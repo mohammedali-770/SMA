@@ -42,6 +42,34 @@ export function getVATBreakdown(totalInclusive: number, vatPercentage: number = 
   };
 }
 
+/** Generate a short unique-enough id of the form "<prefix>-<9 base36 chars>". */
+export function generateId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
+const RIYADH_TZ = 'Asia/Riyadh';
+
+/**
+ * Formats an ISO timestamp as "YYYY-MM-DD HH:mm" in Saudi (Riyadh, UTC+3) local
+ * time. Receipts and history previously rendered raw UTC via toISOString(),
+ * which showed the wrong wall-clock time to Saudi users.
+ */
+export function formatRiyadhDateTime(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString('en-CA', { timeZone: RIYADH_TZ }); // YYYY-MM-DD
+  const time = d.toLocaleTimeString('en-GB', { timeZone: RIYADH_TZ, hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date} ${time}`;
+}
+
+/**
+ * Returns the "YYYY-MM-DD" calendar date of an ISO timestamp in Riyadh local
+ * time, for date-range filtering that must agree with the branch's local day
+ * (slicing the UTC string put late-evening orders on the wrong day).
+ */
+export function riyadhDateOnly(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: RIYADH_TZ });
+}
+
 /**
  * Creates a sample CSV data URL for menu import.
  */
@@ -114,7 +142,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
     // Find or create category
     let category = newCategories.find(c => c.nameEn.toLowerCase() === catNameEn.toLowerCase());
     if (!category) {
-      const newCatId = 'cat-csv-' + Math.random().toString(36).substr(2, 9);
+      const newCatId = generateId('cat-csv');
       category = {
         id: newCatId,
         nameEn: catNameEn,
@@ -124,7 +152,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
       newCategories.push(category);
     }
 
-    const prodId = 'prod-csv-' + Math.random().toString(36).substr(2, 9);
+    const prodId = generateId('prod-csv');
     const newProduct: Product = {
       id: prodId,
       categoryId: category.id,

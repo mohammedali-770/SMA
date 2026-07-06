@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Product, ModifierGroup, Modifier, SavedAddress, CartItem } from '../types';
-import { calculateDistance, getVATBreakdown } from '../utils/calculations';
+import { calculateDistance, getVATBreakdown, formatRiyadhDateTime } from '../utils/calculations';
 
 const LOCALES = {
   en: {
@@ -208,6 +208,7 @@ export const MobileEmulator: React.FC = () => {
   // Real-time loyalty toast state
   const [loyaltyToast, setLoyaltyToast] = useState<{ show: boolean; diff: number; current: number } | null>(null);
   const prevPointsRef = useRef<number>(currentUser.loyaltyPoints || 0);
+  const prevUserIdRef = useRef<string>(currentUser.id);
 
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     const saved = localStorage.getItem('sm_wallet_balance');
@@ -236,6 +237,9 @@ export const MobileEmulator: React.FC = () => {
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.35);
+      // Release the context once the ping ends to avoid leaking one AudioContext
+      // per call (browsers cap the number of live contexts).
+      osc.onended = () => { ctx.close().catch(() => {}); };
     } catch (e) {
       // Ignore audio fail
     }
@@ -245,6 +249,9 @@ export const MobileEmulator: React.FC = () => {
     if ((currentUser.loyaltyPoints || 0) < ptsToDeduct) return;
     const nextPoints = (currentUser.loyaltyPoints || 0) - ptsToDeduct;
     updateCustomerPoints(currentUser.id, nextPoints);
+    // Points just spent on wallet credit can no longer back a staged checkout
+    // discount — drop the staged redemption if it now exceeds the balance.
+    if (loyaltyPointsRedeemed > nextPoints) setLoyaltyPointsRedeemed(0);
     const nextBalance = walletBalance + cashToAdd;
     setWalletBalance(nextBalance);
     localStorage.setItem('sm_wallet_balance', String(nextBalance));
@@ -261,7 +268,10 @@ export const MobileEmulator: React.FC = () => {
     if ((currentUser.loyaltyPoints || 0) < reward.points) return;
     const nextPoints = (currentUser.loyaltyPoints || 0) - reward.points;
     updateCustomerPoints(currentUser.id, nextPoints);
-    
+    // Same guard as wallet conversion: a staged checkout redemption cannot
+    // outlive the points that funded it.
+    if (loyaltyPointsRedeemed > nextPoints) setLoyaltyPointsRedeemed(0);
+
     playNotificationSound();
     
     const voucherCode = `SM-VOU-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -287,7 +297,7 @@ export const MobileEmulator: React.FC = () => {
         ledger.push({
           titleEn: `Earned on order ${order.orderNumber}`,
           titleAr: `نقاط مكتسبة من الطلب رقم ${order.orderNumber}`,
-          date: new Date(order.createdAt).toISOString().replace('T', ' ').substring(0, 16),
+          date: formatRiyadhDateTime(order.createdAt),
           points: orderPts
         });
       }
@@ -298,6 +308,13 @@ export const MobileEmulator: React.FC = () => {
 
   useEffect(() => {
     const currentPoints = currentUser.loyaltyPoints || 0;
+    // On a profile switch, re-baseline silently — the balance delta between two
+    // different users is not a points change to celebrate.
+    if (prevUserIdRef.current !== currentUser.id) {
+      prevUserIdRef.current = currentUser.id;
+      prevPointsRef.current = currentPoints;
+      return;
+    }
     const diff = currentPoints - prevPointsRef.current;
     if (diff !== 0 && currentUser.role === 'customer') {
       setLoyaltyToast({ show: true, diff, current: currentPoints });
@@ -349,9 +366,12 @@ export const MobileEmulator: React.FC = () => {
     const currentSelections = selectedModifiers[group.id] || [];
 
     if (isSingleSelect) {
+      const alreadySelected = currentSelections.some(m => m.id === modifier.id);
       setSelectedModifiers(prev => ({
         ...prev,
-        [group.id]: [modifier]
+        // In an optional single-select group, tapping the chosen option again
+        // clears it; a required group always keeps exactly one selected.
+        [group.id]: (alreadySelected && !group.isRequired) ? [] : [modifier]
       }));
     } else {
       const exists = currentSelections.some(m => m.id === modifier.id);
@@ -463,10 +483,10 @@ export const MobileEmulator: React.FC = () => {
       return;
     }
     const result = placeOrder();
-    if (result.success && result.orderId) {
-      // Find the placed order
-      const orderMatch = orders.find(o => o.id === result.orderId) || orders[0];
-      setActiveOrderReceipt(orderMatch);
+    if (result.success && result.order) {
+      // Use the order object returned by placeOrder — it is not yet present in
+      // the `orders` array from this render's context snapshot.
+      setActiveOrderReceipt(result.order);
       setActiveTab('profile');
     } else if (result.error) {
       alert(result.error);
@@ -959,31 +979,57 @@ export const MobileEmulator: React.FC = () => {
                           </span>
                         </div>
 
-                        {(currentUser.loyaltyPoints || 0) >= loyaltySettings.minPointsToRedeem ? (
-                          <div className="flex flex-col items-end gap-1">
-                            {loyaltyPointsRedeemed > 0 ? (
-                              <button 
-                                onClick={() => setLoyaltyPointsRedeemed(0)}
-                                className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
-                              >
-                                {isRTL ? 'إلغاء الخصم' : 'Cancel Discount'}
-                              </button>
-                            ) : (
-                              <button 
-                                onClick={() => setLoyaltyPointsRedeemed(currentUser.loyaltyPoints || 0)}
-                                className="bg-purple-600 text-white hover:bg-purple-700 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
-                              >
-                                {isRTL ? 'استبدال النقاط' : 'Redeem Points'}
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[8px] bg-amber-50 text-amber-800 border border-amber-200/40 p-1.5 rounded-lg font-bold max-w-[150px] leading-tight text-center">
-                            {isRTL 
-                              ? `يلزمك ${loyaltySettings.minPointsToRedeem} نقطة على الأقل للاستبدال` 
-                              : `Min ${loyaltySettings.minPointsToRedeem} points needed to redeem`}
-                          </span>
-                        )}
+                        {(() => {
+                          const perPoint = loyaltySettings.discountPerPoint || 0.1;
+                          const balance = currentUser.loyaltyPoints || 0;
+                          const preLoyaltyTotal = Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount);
+                          // Cap the staged redemption at the balance and the order value,
+                          // then require it to clear the configured minimum so a small
+                          // order cannot bypass the "Min Points to Redeem" setting.
+                          const redeemable = Math.min(balance, Math.floor(preLoyaltyTotal / perPoint));
+                          const canRedeem = redeemable >= loyaltySettings.minPointsToRedeem;
+
+                          // A staged redemption can always be cancelled, even if the cart
+                          // later shrinks below the threshold.
+                          if (loyaltyPointsRedeemed > 0) {
+                            return (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => setLoyaltyPointsRedeemed(0)}
+                                  className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
+                                >
+                                  {isRTL ? 'إلغاء الخصم' : 'Cancel Discount'}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          if (canRedeem) {
+                            return (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => setLoyaltyPointsRedeemed(redeemable)}
+                                  className="bg-purple-600 text-white hover:bg-purple-700 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
+                                >
+                                  {isRTL ? 'استبدال النقاط' : 'Redeem Points'}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          const belowBalance = balance < loyaltySettings.minPointsToRedeem;
+                          return (
+                            <span className="text-[8px] bg-amber-50 text-amber-800 border border-amber-200/40 p-1.5 rounded-lg font-bold max-w-[150px] leading-tight text-center">
+                              {belowBalance
+                                ? (isRTL
+                                    ? `يلزمك ${loyaltySettings.minPointsToRedeem} نقطة على الأقل للاستبدال`
+                                    : `Min ${loyaltySettings.minPointsToRedeem} points needed to redeem`)
+                                : (isRTL
+                                    ? `قيمة الطلب صغيرة جداً لاستبدال ${loyaltySettings.minPointsToRedeem} نقطة`
+                                    : `Order too small to redeem ${loyaltySettings.minPointsToRedeem} points`)}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {loyaltyPointsRedeemed > 0 && (
@@ -1438,7 +1484,7 @@ export const MobileEmulator: React.FC = () => {
                                   {order.orderNumber}
                                 </span>
                                 <span className="text-[8.5px] text-gray-400 block">
-                                  {new Date(order.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
+                                  {formatRiyadhDateTime(order.createdAt)}
                                 </span>
                                 <span className="text-[9.5px] font-extrabold text-secondary block mt-0.5">
                                   {order.total.toFixed(2)} {t.sar}
@@ -1584,7 +1630,7 @@ export const MobileEmulator: React.FC = () => {
                     <h3 className="text-[10px] font-extrabold text-gray-400 mt-1 uppercase tracking-wider">{t.invoice}</h3>
                     <p className="text-xs font-black text-primary tracking-wide mt-0.5">{activeOrderReceipt.orderNumber}</p>
                     <p className="text-[9.5px] text-gray-400 mt-0.5">
-                      {new Date(activeOrderReceipt.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
+                      {formatRiyadhDateTime(activeOrderReceipt.createdAt)}
                     </p>
                   </div>
 
@@ -1648,6 +1694,18 @@ export const MobileEmulator: React.FC = () => {
                         <span>+{activeOrderReceipt.deliveryFee.toFixed(2)} {t.sar}</span>
                       </div>
                     )}
+                    {(activeOrderReceipt.discountAmount ?? 0) > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}</span>
+                        <span>-{(activeOrderReceipt.discountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                      </div>
+                    )}
+                    {(activeOrderReceipt.loyaltyDiscountAmount ?? 0) > 0 && (
+                      <div className="flex justify-between text-purple-600">
+                        <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}</span>
+                        <span>-{(activeOrderReceipt.loyaltyDiscountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                      </div>
+                    )}
                     <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-black text-gray-900">
                       <div>
                         <span>{t.total}</span>
@@ -1660,11 +1718,11 @@ export const MobileEmulator: React.FC = () => {
                     <div className="bg-white p-2 rounded-lg text-[9.5px] text-gray-400 space-y-0.5 mt-2 border border-slate-100">
                       <div className="flex justify-between">
                         <span>{isRTL ? 'المبلغ الخاضع للضريبة:' : 'Amount Excl. VAT:'}</span>
-                        <span>{(activeOrderReceipt.total / 1.15).toFixed(2)} {t.sar}</span>
+                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).subtotalExcludingVat} {t.sar}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>{isRTL ? `ضريبة القيمة المضافة (١٥٪):` : `Saudi VAT portion (15%):`}</span>
-                        <span>{(activeOrderReceipt.total - (activeOrderReceipt.total / 1.15)).toFixed(2)} {t.sar}</span>
+                        <span>{isRTL ? `ضريبة القيمة المضافة (${brandSettings?.vatPercentage || 15}٪):` : `Saudi VAT portion (${brandSettings?.vatPercentage || 15}%):`}</span>
+                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).vatAmount} {t.sar}</span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
                         <span>{t.sync_status}:</span>

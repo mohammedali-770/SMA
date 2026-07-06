@@ -119,7 +119,9 @@ export interface Order {
   orderType: 'delivery' | 'pickup';
   subtotal: number;
   deliveryFee: number;
-  total: number;
+  discountAmount?: number; // coupon discount applied at checkout
+  loyaltyDiscountAmount?: number; // value of loyalty points redeemed at checkout
+  total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
   orderSyncStatus: SyncStatus;
   createdAt: string;

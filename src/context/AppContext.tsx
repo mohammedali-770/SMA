@@ -17,7 +17,7 @@ import {
   INITIAL_BRAND_SETTINGS, INITIAL_LAZYWAIT_SETTINGS, INITIAL_PAYMENT_SETTINGS,
   INITIAL_SMS_SETTINGS, INITIAL_NOTIFICATION_SETTINGS, INITIAL_LOYALTY_SETTINGS
 } from '../data/initialData';
-import { getVATBreakdown } from '../utils/calculations';
+import { getVATBreakdown, generateId } from '../utils/calculations';
 
 interface AppContextType {
   // DB Tables
@@ -62,7 +62,7 @@ interface AppContextType {
   // DB operations
   addAddress: (address: Omit<SavedAddress, 'id'>) => void;
   deleteAddress: (id: string) => void;
-  placeOrder: () => { success: boolean; orderId?: string; error?: string };
+  placeOrder: () => { success: boolean; orderId?: string; order?: Order; error?: string };
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   
   // Phase 8: Admin Panel Operations
@@ -81,6 +81,8 @@ interface AppContextType {
   playNotificationSound: () => void;
   newOrderAlert: boolean;
   setNewOrderAlert: (alert: boolean) => void;
+  soundMuted: boolean;
+  setSoundMuted: (muted: boolean) => void;
 
   // Phase 10: Settings & Integration States
   brandSettings: BrandSettings;
@@ -105,41 +107,57 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+/**
+ * Allowed forward-only order-status transitions. A status can advance to any of
+ * the listed targets (or be cancelled), but cannot jump backwards or skip the
+ * flow (e.g. delivered -> received, or cancelled -> delivered).
+ */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  received: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['out_for_delivery', 'delivered', 'cancelled'],
+  out_for_delivery: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+/** Whether an order may move from `from` to `to` (a no-op stay is always allowed). */
+export function canTransitionOrder(from: OrderStatus, to: OrderStatus): boolean {
+  return from === to || (ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false);
+}
+
+/**
+ * Safely load a persisted value from localStorage, falling back to `fallback`
+ * when the key is missing or holds corrupted/non-JSON data. Without this guard
+ * a single malformed key crashes the whole app during the provider's initial
+ * render (white screen with no recovery path).
+ */
+function loadPersisted<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved !== null ? (JSON.parse(saved) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Database state
-  const [branches, setBranches] = useState<Branch[]>(() => {
-    const saved = localStorage.getItem('sm_branches');
-    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
-  });
-  
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('sm_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
+  const [branches, setBranches] = useState<Branch[]>(() => loadPersisted('sm_branches', INITIAL_BRANCHES));
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('sm_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
+  const [categories, setCategories] = useState<Category[]>(() => loadPersisted('sm_categories', INITIAL_CATEGORIES));
 
-  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(() => {
-    const saved = localStorage.getItem('sm_modifier_groups');
-    return saved ? JSON.parse(saved) : INITIAL_MODIFIER_GROUPS;
-  });
+  const [products, setProducts] = useState<Product[]>(() => loadPersisted('sm_products', INITIAL_PRODUCTS));
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('sm_orders');
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-  });
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(() => loadPersisted('sm_modifier_groups', INITIAL_MODIFIER_GROUPS));
 
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
-    const saved = localStorage.getItem('sm_addresses');
-    return saved ? JSON.parse(saved) : INITIAL_ADDRESSES;
-  });
+  const [orders, setOrders] = useState<Order[]>(() => loadPersisted('sm_orders', INITIAL_ORDERS));
+
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => loadPersisted('sm_addresses', INITIAL_ADDRESSES));
 
   const [profiles, setProfiles] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('sm_profiles');
-    if (saved) return JSON.parse(saved);
+    const saved = loadPersisted<UserProfile[] | null>('sm_profiles', null);
+    if (saved) return saved;
     // Seed default loyalty points to make the experience interactive
     const defaultProfiles = INITIAL_PROFILES.map(p => {
       if (p.id === 'usr-customer-1') {
@@ -153,9 +171,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Availability matrix: productId -> Map of branchId -> isAvailable (true by default)
   const [availabilityMatrix, setAvailabilityMatrix] = useState<{ [key: string]: { [branchId: string]: boolean } }>(() => {
-    const saved = localStorage.getItem('sm_availability_matrix');
-    if (saved) return JSON.parse(saved);
-    
+    const saved = loadPersisted<{ [key: string]: { [branchId: string]: boolean } } | null>('sm_availability_matrix', null);
+    if (saved) return saved;
+
     // Seed default availability: all products available everywhere except non-active branches
     const matrix: { [key: string]: { [branchId: string]: boolean } } = {};
     INITIAL_PRODUCTS.forEach(p => {
@@ -169,12 +187,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Current session configurations
   const [currentUser, setCurrentUserInternal] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('sm_profiles');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed[0] || INITIAL_PROFILES[0];
-    }
-    return INITIAL_PROFILES[0];
+    const parsed = loadPersisted<UserProfile[] | null>('sm_profiles', null);
+    return (parsed && parsed[0]) || INITIAL_PROFILES[0];
   });
 
   const setCurrentUser = (user: UserProfile) => {
@@ -195,10 +209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 11: Real-time Customer Loyalty Integration
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState<number>(0);
   
-  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(() => {
-    const saved = localStorage.getItem('sm_loyalty_settings');
-    return saved ? JSON.parse(saved) : INITIAL_LOYALTY_SETTINGS;
-  });
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(() => loadPersisted('sm_loyalty_settings', INITIAL_LOYALTY_SETTINGS));
 
   const loyaltyDiscountAmount = Number((loyaltyPointsRedeemed * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2));
 
@@ -229,36 +240,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Real-time states
   const [newOrderAlert, setNewOrderAlert] = useState<boolean>(false);
+  const [soundMuted, setSoundMuted] = useState<boolean>(false);
 
   // Languages
   const [mobileLang, setMobileLang] = useState<'en' | 'ar'>('en');
   const [adminLang, setAdminLang] = useState<'en' | 'ar'>('en');
 
   // Phase 10: Settings & Integration States
-  const [brandSettings, setBrandSettings] = useState<BrandSettings>(() => {
-    const saved = localStorage.getItem('sm_brand_settings');
-    return saved ? JSON.parse(saved) : INITIAL_BRAND_SETTINGS;
-  });
+  const [brandSettings, setBrandSettings] = useState<BrandSettings>(() => loadPersisted('sm_brand_settings', INITIAL_BRAND_SETTINGS));
 
-  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(() => {
-    const saved = localStorage.getItem('sm_lazywait_settings');
-    return saved ? JSON.parse(saved) : INITIAL_LAZYWAIT_SETTINGS;
-  });
+  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(() => loadPersisted('sm_lazywait_settings', INITIAL_LAZYWAIT_SETTINGS));
 
-  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(() => {
-    const saved = localStorage.getItem('sm_payment_settings');
-    return saved ? JSON.parse(saved) : INITIAL_PAYMENT_SETTINGS;
-  });
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(() => loadPersisted('sm_payment_settings', INITIAL_PAYMENT_SETTINGS));
 
-  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => {
-    const saved = localStorage.getItem('sm_sms_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SMS_SETTINGS;
-  });
+  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => loadPersisted('sm_sms_settings', INITIAL_SMS_SETTINGS));
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
-    const saved = localStorage.getItem('sm_notification_settings');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATION_SETTINGS;
-  });
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => loadPersisted('sm_notification_settings', INITIAL_NOTIFICATION_SETTINGS));
 
   const updateBrandSettings = (updates: Partial<BrandSettings>) => {
     setBrandSettings(prev => {
@@ -357,24 +354,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Audio trigger
   const playNotificationSound = () => {
+    if (soundMuted) return;
     try {
       // Simple synth ping using Web Audio API to prevent asset-loading issues
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
-      
+
       osc.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High A
       osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1); // Quick up-slide
-      
+
       gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-      
+
       osc.start();
       osc.stop(audioCtx.currentTime + 0.4);
+      // Release the context once the ping ends; browsers cap live AudioContexts,
+      // so leaking one per notification eventually silences all of them.
+      osc.onended = () => { audioCtx.close().catch(() => {}); };
     } catch (e) {
       console.warn('Audio play block or unsupported:', e);
     }
@@ -443,7 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Saved Addresses
   const addAddress = (address: Omit<SavedAddress, 'id'>) => {
-    const id = 'adr-' + Math.random().toString(36).substr(2, 9);
+    const id = generateId('adr');
     const newAddress: SavedAddress = {
       ...address,
       id,
@@ -481,15 +482,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false, error: 'Please select or add a delivery address' };
       }
       if (cartTotal < selectedBranch.minDeliveryOrder) {
-        return { 
-          success: false, 
-          error: `Minimum delivery order for this branch is ${selectedBranch.minDeliveryOrder} SAR` 
+        return {
+          success: false,
+          error: `Minimum delivery order for this branch is ${selectedBranch.minDeliveryOrder} SAR`
         };
       }
     }
 
+    // Revalidate the cart against the live menu: a product may have been
+    // deactivated, deleted, or switched off for this branch while it sat in the
+    // cart, and must not be silently ordered.
+    for (const cItem of cart) {
+      const product = products.find(p => p.id === cItem.product.id);
+      if (!product || !product.isActive) {
+        return { success: false, error: `${cItem.product.nameEn} is no longer on the menu. Please remove it from your cart.` };
+      }
+      if (!isProductAvailableInBranch(product.id, selectedBranch.id)) {
+        return { success: false, error: `${cItem.product.nameEn} is not available at ${selectedBranch.nameEn}.` };
+      }
+    }
+
     const currentDeliveryFee = checkoutType === 'delivery' ? selectedBranch.deliveryFee : 0;
-    const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - loyaltyDiscountAmount);
+
+    // Cap the staged loyalty redemption to the points the customer actually
+    // holds, then derive the discount from that capped figure. This keeps the
+    // discount applied to the total and the points deducted below in lockstep,
+    // so a stale redemption (e.g. after the admin adjusts the same customer's
+    // balance mid-session) can never fund an unbacked discount.
+    const loyaltyActive = loyaltySettings.isEnabled && currentUser.role === 'customer';
+    const availablePoints = currentUser.loyaltyPoints || 0;
+    const pointsRedeemed = loyaltyActive ? Math.min(Math.max(0, loyaltyPointsRedeemed), availablePoints) : 0;
+    const appliedLoyaltyDiscount = Number((pointsRedeemed * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2));
+    const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - appliedLoyaltyDiscount);
 
     // Build order items
     const orderItems: OrderItem[] = cart.map((cItem, index) => {
@@ -517,10 +541,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
-    // Generate Order ID & Number
-    const seq = String(orders.length + 1).padStart(6, '0');
+    // Generate Order ID & Number. Continue from the highest existing sequence so
+    // numbers never collide with seeded orders or repeat after a deletion (using
+    // orders.length would restart and clash).
+    const maxSeq = orders.reduce((max, o) => {
+      const m = o.orderNumber.match(/SM-2026-(\d+)/);
+      const n = m ? parseInt(m[1], 10) : 0;
+      return n > max ? n : max;
+    }, 0);
+    const seq = String(maxSeq + 1).padStart(6, '0');
     const orderNumber = `SM-2026-${seq}`;
-    const orderId = `ord-${Math.random().toString(36).substr(2, 9)}`;
+    const orderId = generateId('ord');
 
     const newOrder: Order = {
       id: orderId,
@@ -535,6 +566,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderType: checkoutType,
       subtotal: cartTotal,
       deliveryFee: currentDeliveryFee,
+      discountAmount: discountAmount,
+      loyaltyDiscountAmount: appliedLoyaltyDiscount,
       total: finalTotal,
       paymentStatus: 'pending',
       orderSyncStatus: 'not_synced', // Starts as unsynced (representing Lazywait connector status)
@@ -543,11 +576,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items: orderItems
     };
 
-    // Phase 11: Real-time loyalty update
-    if (loyaltySettings.isEnabled && currentUser.role === 'customer') {
-      const currentPoints = currentUser.loyaltyPoints || 0;
+    // Phase 11: Real-time loyalty update. Deduct exactly the capped points that
+    // funded appliedLoyaltyDiscount above, then add points earned on this order.
+    if (loyaltyActive) {
       const earnedPoints = Math.floor(finalTotal * loyaltySettings.pointsPerRiyal);
-      const nextPoints = Math.max(0, currentPoints - loyaltyPointsRedeemed + earnedPoints);
+      const nextPoints = Math.max(0, availablePoints - pointsRedeemed + earnedPoints);
       updateCustomerPoints(currentUser.id, nextPoints);
     }
 
@@ -562,17 +595,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearCart();
     setLoyaltyPointsRedeemed(0);
 
-    return { success: true, orderId };
+    return { success: true, orderId, order: newOrder };
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
+        // Reject invalid jumps (e.g. delivered -> received, cancelled -> delivered).
+        if (!canTransitionOrder(o.status, status)) {
+          return o;
+        }
         // Mocking external POS sync update status
         const syncStatusVal = status === 'received' ? 'not_synced' : 'synced';
-        return { 
-          ...o, 
-          status, 
+        return {
+          ...o,
+          status,
           orderSyncStatus: syncStatusVal as any,
           paymentStatus: status === 'delivered' ? 'paid' : o.paymentStatus
         };
@@ -584,7 +621,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 8 Admin Features: Category CRUD
   const addCategory = (nameEn: string, nameAr: string) => {
     const newCat: Category = {
-      id: 'cat-' + Math.random().toString(36).substr(2, 9),
+      id: generateId('cat'),
       nameEn,
       nameAr,
       sortOrder: categories.length + 1
@@ -608,7 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Phase 8 Admin Features: Product CRUD
   const addProduct = (pData: Omit<Product, 'id'>) => {
-    const id = 'prod-' + Math.random().toString(36).substr(2, 9);
+    const id = generateId('prod');
     const newProd: Product = {
       ...pData,
       id
@@ -664,13 +701,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBranchSettings = (id: string, updates: Partial<Branch>) => {
     setBranches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
-    
-    // If a branch is closed, update availability for products
-    if (updates.isActive === false) {
+
+    // Mirror the branch's open/closed state into the availability matrix so the
+    // mobile menu tracks it: closing marks every product unavailable at that
+    // branch, and reopening restores them (without this the branch stays empty
+    // after a close/reopen cycle). Rows are copied, not mutated in place.
+    if (updates.isActive === false || updates.isActive === true) {
+      const available = updates.isActive === true;
       setAvailabilityMatrix(prev => {
         const copy = { ...prev };
         Object.keys(copy).forEach(pId => {
-          copy[pId][id] = false;
+          copy[pId] = { ...copy[pId], [id]: available };
         });
         return copy;
       });
@@ -761,6 +802,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       playNotificationSound,
       newOrderAlert,
       setNewOrderAlert,
+      soundMuted,
+      setSoundMuted,
 
       // Phase 10 Settings & Integrations
       brandSettings,

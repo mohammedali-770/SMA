@@ -10,9 +10,9 @@ import {
   Volume2, VolumeX, ShieldAlert, FileSpreadsheet, RefreshCw, Eye,
   Settings, Sliders, CreditCard, MessageSquare, Bell, Gift
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, canTransitionOrder } from '../context/AppContext';
 import { Product, Category, Branch, OrderStatus, Order } from '../types';
-import { getCSVTemplateData, parseCSVMenu, getVATBreakdown } from '../utils/calculations';
+import { getCSVTemplateData, parseCSVMenu, getVATBreakdown, riyadhDateOnly } from '../utils/calculations';
 
 const ADMIN_LOCALES = {
   en: {
@@ -129,6 +129,7 @@ export const AdminDashboard: React.FC = () => {
     updateOrderStatus, addCategory, updateCategory, deleteCategory, addProduct,
     updateProduct, deleteProduct, toggleProductAvailability, isProductAvailableInBranch,
     updateBranchSettings, bulkUploadMenu, adminLang, setAdminLang, newOrderAlert, setNewOrderAlert, playNotificationSound,
+    soundMuted, setSoundMuted,
     brandSettings, updateBrandSettings, lazywaitSettings, updateLazywaitSettings,
     paymentSettings, updatePaymentSettings, smsSettings, updateSmsSettings,
     notificationSettings, updateNotificationSettings, loyaltySettings, updateLoyaltySettings,
@@ -149,7 +150,6 @@ export const AdminDashboard: React.FC = () => {
   const [menuSubTab, setMenuSubTab] = useState<'categories' | 'products' | 'csv'>('products');
   const [orderFilter, setOrderFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState<string>('');
-  const [isMuted, setIsMuted] = useState(false);
   
   // Dialogs and edits states
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
@@ -237,13 +237,21 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (isAccountant || !prodNameEn || !prodNameAr || !prodCatId) return;
 
+    // Reject an empty/invalid/non-positive price rather than silently defaulting
+    // it to 20.00 SAR (which hid typos and mapped a legitimate 0 to 20).
+    const parsedPrice = parseFloat(prodPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      alert(isRTL ? 'الرجاء إدخال سعر صحيح أكبر من صفر.' : 'Please enter a valid price greater than 0.');
+      return;
+    }
+
     const pData = {
       categoryId: prodCatId,
       nameEn: prodNameEn,
       nameAr: prodNameAr,
       descriptionEn: prodDescEn,
       descriptionAr: prodDescAr,
-      price: parseFloat(prodPrice) || 20.00,
+      price: parsedPrice,
       calories: parseInt(prodCalories) || 0,
       imageUrl: prodImg || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
       isActive: true,
@@ -356,8 +364,8 @@ export const AdminDashboard: React.FC = () => {
             <span className="text-xs font-black tracking-wide">{t.realtime_pulse}</span>
           </div>
           <div className="flex gap-2">
-            {!isMuted && (
-              <button 
+            {!soundMuted && (
+              <button
                 onClick={() => playNotificationSound()}
                 className="bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold py-1 px-3 rounded-md transition-colors"
               >
@@ -387,12 +395,12 @@ export const AdminDashboard: React.FC = () => {
         {/* Global configurations / Language / Session roles */}
         <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
           {/* Audio sound toggler */}
-          <button 
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-2 rounded-xl border transition-all ${isMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
-            title={isMuted ? t.sound_alert_off : t.sound_alert_on}
+          <button
+            onClick={() => setSoundMuted(!soundMuted)}
+            className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
+            title={soundMuted ? t.sound_alert_off : t.sound_alert_on}
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
           {/* Session Role switcher */}
@@ -1023,7 +1031,7 @@ export const AdminDashboard: React.FC = () => {
             // 1. Filtered orders for reporting (delivered within date range and branch)
             const filteredOrders = orders.filter(o => {
               if (reportBranchId !== 'all' && o.branchId !== reportBranchId) return false;
-              const oDate = o.createdAt.substring(0, 10);
+              const oDate = riyadhDateOnly(o.createdAt);
               return oDate >= reportStartDate && oDate <= reportEndDate;
             });
 
@@ -1039,9 +1047,12 @@ export const AdminDashboard: React.FC = () => {
             const dayReport = (() => {
               const map: { [date: string]: { subtotal: number; deliveryFee: number; discount: number; total: number; vat: number; ordersCount: number } } = {};
               deliveredOrders.forEach(o => {
-                const date = o.createdAt.substring(0, 10);
+                const date = riyadhDateOnly(o.createdAt);
                 const disc = Math.max(0, (o.subtotal + o.deliveryFee) - o.total);
-                const { vatAmount } = getVATBreakdown(o.subtotal, brandSettings?.vatPercentage || 15);
+                // Extract VAT from the VAT-inclusive grand total actually charged,
+                // consistent with the customer and admin receipts (not the
+                // pre-discount, delivery-excluded subtotal).
+                const { vatAmount } = getVATBreakdown(o.total, brandSettings?.vatPercentage || 15);
                 if (!map[date]) map[date] = { subtotal: 0, deliveryFee: 0, discount: 0, total: 0, vat: 0, ordersCount: 0 };
                 map[date].subtotal += o.subtotal;
                 map[date].deliveryFee += o.deliveryFee;
@@ -1148,7 +1159,7 @@ export const AdminDashboard: React.FC = () => {
               return {
                 orderId: o.id,
                 orderNumber: o.orderNumber,
-                date: o.createdAt.substring(0, 10),
+                date: riyadhDateOnly(o.createdAt),
                 branch: isRTL ? o.branchNameAr : o.branchNameEn,
                 total: o.total,
                 status: o.orderSyncStatus,
@@ -2458,12 +2469,12 @@ export const AdminDashboard: React.FC = () => {
                     onChange={(e) => handleUpdateStatus(activeReceiptOrder.id, e.target.value as OrderStatus)}
                     className="flex-1 bg-white border border-gray-200 rounded-lg p-2 font-bold outline-none text-xs text-gray-800 disabled:opacity-50"
                   >
-                    <option value="received">Received</option>
-                    <option value="preparing">Preparing</option>
-                    <option value="ready">Ready (POS Buzzer)</option>
-                    <option value="out_for_delivery">Out for Delivery</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="received" disabled={!canTransitionOrder(activeReceiptOrder.status, 'received')}>Received</option>
+                    <option value="preparing" disabled={!canTransitionOrder(activeReceiptOrder.status, 'preparing')}>Preparing</option>
+                    <option value="ready" disabled={!canTransitionOrder(activeReceiptOrder.status, 'ready')}>Ready (POS Buzzer)</option>
+                    <option value="out_for_delivery" disabled={!canTransitionOrder(activeReceiptOrder.status, 'out_for_delivery')}>Out for Delivery</option>
+                    <option value="delivered" disabled={!canTransitionOrder(activeReceiptOrder.status, 'delivered')}>Delivered</option>
+                    <option value="cancelled" disabled={!canTransitionOrder(activeReceiptOrder.status, 'cancelled')}>Cancelled</option>
                   </select>
                 </div>
               </div>
@@ -2522,6 +2533,18 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex justify-between text-gray-500">
                     <span>Delivery Fee:</span>
                     <span>+{activeReceiptOrder.deliveryFee.toFixed(2)} SAR</span>
+                  </div>
+                )}
+                {(activeReceiptOrder.discountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}:</span>
+                    <span>-{(activeReceiptOrder.discountAmount ?? 0).toFixed(2)} SAR</span>
+                  </div>
+                )}
+                {(activeReceiptOrder.loyaltyDiscountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-purple-600">
+                    <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}:</span>
+                    <span>-{(activeReceiptOrder.loyaltyDiscountAmount ?? 0).toFixed(2)} SAR</span>
                   </div>
                 )}
                 <div className="flex justify-between font-black text-gray-900 text-sm pt-1 border-t border-gray-50">
