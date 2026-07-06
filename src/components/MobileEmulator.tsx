@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Product, ModifierGroup, Modifier, SavedAddress, CartItem } from '../types';
-import { calculateDistance, getVATBreakdown } from '../utils/calculations';
+import { calculateDistance, getVATBreakdown, formatRiyadhDateTime } from '../utils/calculations';
 
 const LOCALES = {
   en: {
@@ -208,6 +208,7 @@ export const MobileEmulator: React.FC = () => {
   // Real-time loyalty toast state
   const [loyaltyToast, setLoyaltyToast] = useState<{ show: boolean; diff: number; current: number } | null>(null);
   const prevPointsRef = useRef<number>(currentUser.loyaltyPoints || 0);
+  const prevUserIdRef = useRef<string>(currentUser.id);
 
   const [walletBalance, setWalletBalance] = useState<number>(() => {
     const saved = localStorage.getItem('sm_wallet_balance');
@@ -296,7 +297,7 @@ export const MobileEmulator: React.FC = () => {
         ledger.push({
           titleEn: `Earned on order ${order.orderNumber}`,
           titleAr: `نقاط مكتسبة من الطلب رقم ${order.orderNumber}`,
-          date: new Date(order.createdAt).toISOString().replace('T', ' ').substring(0, 16),
+          date: formatRiyadhDateTime(order.createdAt),
           points: orderPts
         });
       }
@@ -307,6 +308,13 @@ export const MobileEmulator: React.FC = () => {
 
   useEffect(() => {
     const currentPoints = currentUser.loyaltyPoints || 0;
+    // On a profile switch, re-baseline silently — the balance delta between two
+    // different users is not a points change to celebrate.
+    if (prevUserIdRef.current !== currentUser.id) {
+      prevUserIdRef.current = currentUser.id;
+      prevPointsRef.current = currentPoints;
+      return;
+    }
     const diff = currentPoints - prevPointsRef.current;
     if (diff !== 0 && currentUser.role === 'customer') {
       setLoyaltyToast({ show: true, diff, current: currentPoints });
@@ -358,9 +366,12 @@ export const MobileEmulator: React.FC = () => {
     const currentSelections = selectedModifiers[group.id] || [];
 
     if (isSingleSelect) {
+      const alreadySelected = currentSelections.some(m => m.id === modifier.id);
       setSelectedModifiers(prev => ({
         ...prev,
-        [group.id]: [modifier]
+        // In an optional single-select group, tapping the chosen option again
+        // clears it; a required group always keeps exactly one selected.
+        [group.id]: (alreadySelected && !group.isRequired) ? [] : [modifier]
       }));
     } else {
       const exists = currentSelections.some(m => m.id === modifier.id);
@@ -1473,7 +1484,7 @@ export const MobileEmulator: React.FC = () => {
                                   {order.orderNumber}
                                 </span>
                                 <span className="text-[8.5px] text-gray-400 block">
-                                  {new Date(order.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
+                                  {formatRiyadhDateTime(order.createdAt)}
                                 </span>
                                 <span className="text-[9.5px] font-extrabold text-secondary block mt-0.5">
                                   {order.total.toFixed(2)} {t.sar}
@@ -1619,7 +1630,7 @@ export const MobileEmulator: React.FC = () => {
                     <h3 className="text-[10px] font-extrabold text-gray-400 mt-1 uppercase tracking-wider">{t.invoice}</h3>
                     <p className="text-xs font-black text-primary tracking-wide mt-0.5">{activeOrderReceipt.orderNumber}</p>
                     <p className="text-[9.5px] text-gray-400 mt-0.5">
-                      {new Date(activeOrderReceipt.createdAt).toISOString().replace('T', ' ').substring(0, 16)}
+                      {formatRiyadhDateTime(activeOrderReceipt.createdAt)}
                     </p>
                   </div>
 

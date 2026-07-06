@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../context/AppContext';
 import { Product, Category, Branch, OrderStatus, Order } from '../types';
-import { getCSVTemplateData, parseCSVMenu, getVATBreakdown } from '../utils/calculations';
+import { getCSVTemplateData, parseCSVMenu, getVATBreakdown, riyadhDateOnly } from '../utils/calculations';
 
 const ADMIN_LOCALES = {
   en: {
@@ -1031,7 +1031,7 @@ export const AdminDashboard: React.FC = () => {
             // 1. Filtered orders for reporting (delivered within date range and branch)
             const filteredOrders = orders.filter(o => {
               if (reportBranchId !== 'all' && o.branchId !== reportBranchId) return false;
-              const oDate = o.createdAt.substring(0, 10);
+              const oDate = riyadhDateOnly(o.createdAt);
               return oDate >= reportStartDate && oDate <= reportEndDate;
             });
 
@@ -1047,7 +1047,7 @@ export const AdminDashboard: React.FC = () => {
             const dayReport = (() => {
               const map: { [date: string]: { subtotal: number; deliveryFee: number; discount: number; total: number; vat: number; ordersCount: number } } = {};
               deliveredOrders.forEach(o => {
-                const date = o.createdAt.substring(0, 10);
+                const date = riyadhDateOnly(o.createdAt);
                 const disc = Math.max(0, (o.subtotal + o.deliveryFee) - o.total);
                 // Extract VAT from the VAT-inclusive grand total actually charged,
                 // consistent with the customer and admin receipts (not the
@@ -1159,7 +1159,7 @@ export const AdminDashboard: React.FC = () => {
               return {
                 orderId: o.id,
                 orderNumber: o.orderNumber,
-                date: o.createdAt.substring(0, 10),
+                date: riyadhDateOnly(o.createdAt),
                 branch: isRTL ? o.branchNameAr : o.branchNameEn,
                 total: o.total,
                 status: o.orderSyncStatus,
