@@ -10,7 +10,7 @@ import {
   Volume2, VolumeX, ShieldAlert, FileSpreadsheet, RefreshCw, Eye,
   Settings, Sliders, CreditCard, MessageSquare, Bell, Gift
 } from 'lucide-react';
-import { useApp } from '../context/AppContext';
+import { useApp, canTransitionOrder } from '../context/AppContext';
 import { Product, Category, Branch, OrderStatus, Order } from '../types';
 import { getCSVTemplateData, parseCSVMenu, getVATBreakdown } from '../utils/calculations';
 
@@ -1041,7 +1041,10 @@ export const AdminDashboard: React.FC = () => {
               deliveredOrders.forEach(o => {
                 const date = o.createdAt.substring(0, 10);
                 const disc = Math.max(0, (o.subtotal + o.deliveryFee) - o.total);
-                const { vatAmount } = getVATBreakdown(o.subtotal, brandSettings?.vatPercentage || 15);
+                // Extract VAT from the VAT-inclusive grand total actually charged,
+                // consistent with the customer and admin receipts (not the
+                // pre-discount, delivery-excluded subtotal).
+                const { vatAmount } = getVATBreakdown(o.total, brandSettings?.vatPercentage || 15);
                 if (!map[date]) map[date] = { subtotal: 0, deliveryFee: 0, discount: 0, total: 0, vat: 0, ordersCount: 0 };
                 map[date].subtotal += o.subtotal;
                 map[date].deliveryFee += o.deliveryFee;
@@ -2458,12 +2461,12 @@ export const AdminDashboard: React.FC = () => {
                     onChange={(e) => handleUpdateStatus(activeReceiptOrder.id, e.target.value as OrderStatus)}
                     className="flex-1 bg-white border border-gray-200 rounded-lg p-2 font-bold outline-none text-xs text-gray-800 disabled:opacity-50"
                   >
-                    <option value="received">Received</option>
-                    <option value="preparing">Preparing</option>
-                    <option value="ready">Ready (POS Buzzer)</option>
-                    <option value="out_for_delivery">Out for Delivery</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="received" disabled={!canTransitionOrder(activeReceiptOrder.status, 'received')}>Received</option>
+                    <option value="preparing" disabled={!canTransitionOrder(activeReceiptOrder.status, 'preparing')}>Preparing</option>
+                    <option value="ready" disabled={!canTransitionOrder(activeReceiptOrder.status, 'ready')}>Ready (POS Buzzer)</option>
+                    <option value="out_for_delivery" disabled={!canTransitionOrder(activeReceiptOrder.status, 'out_for_delivery')}>Out for Delivery</option>
+                    <option value="delivered" disabled={!canTransitionOrder(activeReceiptOrder.status, 'delivered')}>Delivered</option>
+                    <option value="cancelled" disabled={!canTransitionOrder(activeReceiptOrder.status, 'cancelled')}>Cancelled</option>
                   </select>
                 </div>
               </div>
@@ -2522,6 +2525,18 @@ export const AdminDashboard: React.FC = () => {
                   <div className="flex justify-between text-gray-500">
                     <span>Delivery Fee:</span>
                     <span>+{activeReceiptOrder.deliveryFee.toFixed(2)} SAR</span>
+                  </div>
+                )}
+                {(activeReceiptOrder.discountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-emerald-600">
+                    <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}:</span>
+                    <span>-{(activeReceiptOrder.discountAmount ?? 0).toFixed(2)} SAR</span>
+                  </div>
+                )}
+                {(activeReceiptOrder.loyaltyDiscountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-purple-600">
+                    <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}:</span>
+                    <span>-{(activeReceiptOrder.loyaltyDiscountAmount ?? 0).toFixed(2)} SAR</span>
                   </div>
                 )}
                 <div className="flex justify-between font-black text-gray-900 text-sm pt-1 border-t border-gray-50">

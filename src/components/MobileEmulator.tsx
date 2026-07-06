@@ -965,40 +965,57 @@ export const MobileEmulator: React.FC = () => {
                           </span>
                         </div>
 
-                        {(currentUser.loyaltyPoints || 0) >= loyaltySettings.minPointsToRedeem ? (
-                          <div className="flex flex-col items-end gap-1">
-                            {loyaltyPointsRedeemed > 0 ? (
-                              <button 
-                                onClick={() => setLoyaltyPointsRedeemed(0)}
-                                className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
-                              >
-                                {isRTL ? 'إلغاء الخصم' : 'Cancel Discount'}
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  const perPoint = loyaltySettings.discountPerPoint || 0.1;
-                                  const balance = currentUser.loyaltyPoints || 0;
-                                  const preLoyaltyTotal = Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount);
-                                  // Only stage as many points as are needed to cover the
-                                  // remaining order value, capped at the available balance,
-                                  // so points are never wasted past a zero total.
-                                  const maxUsefulPoints = Math.floor(preLoyaltyTotal / perPoint);
-                                  setLoyaltyPointsRedeemed(Math.min(balance, maxUsefulPoints));
-                                }}
-                                className="bg-purple-600 text-white hover:bg-purple-700 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
-                              >
-                                {isRTL ? 'استبدال النقاط' : 'Redeem Points'}
-                              </button>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[8px] bg-amber-50 text-amber-800 border border-amber-200/40 p-1.5 rounded-lg font-bold max-w-[150px] leading-tight text-center">
-                            {isRTL 
-                              ? `يلزمك ${loyaltySettings.minPointsToRedeem} نقطة على الأقل للاستبدال` 
-                              : `Min ${loyaltySettings.minPointsToRedeem} points needed to redeem`}
-                          </span>
-                        )}
+                        {(() => {
+                          const perPoint = loyaltySettings.discountPerPoint || 0.1;
+                          const balance = currentUser.loyaltyPoints || 0;
+                          const preLoyaltyTotal = Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount);
+                          // Cap the staged redemption at the balance and the order value,
+                          // then require it to clear the configured minimum so a small
+                          // order cannot bypass the "Min Points to Redeem" setting.
+                          const redeemable = Math.min(balance, Math.floor(preLoyaltyTotal / perPoint));
+                          const canRedeem = redeemable >= loyaltySettings.minPointsToRedeem;
+
+                          // A staged redemption can always be cancelled, even if the cart
+                          // later shrinks below the threshold.
+                          if (loyaltyPointsRedeemed > 0) {
+                            return (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => setLoyaltyPointsRedeemed(0)}
+                                  className="bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
+                                >
+                                  {isRTL ? 'إلغاء الخصم' : 'Cancel Discount'}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          if (canRedeem) {
+                            return (
+                              <div className="flex flex-col items-end gap-1">
+                                <button
+                                  onClick={() => setLoyaltyPointsRedeemed(redeemable)}
+                                  className="bg-purple-600 text-white hover:bg-purple-700 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
+                                >
+                                  {isRTL ? 'استبدال النقاط' : 'Redeem Points'}
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          const belowBalance = balance < loyaltySettings.minPointsToRedeem;
+                          return (
+                            <span className="text-[8px] bg-amber-50 text-amber-800 border border-amber-200/40 p-1.5 rounded-lg font-bold max-w-[150px] leading-tight text-center">
+                              {belowBalance
+                                ? (isRTL
+                                    ? `يلزمك ${loyaltySettings.minPointsToRedeem} نقطة على الأقل للاستبدال`
+                                    : `Min ${loyaltySettings.minPointsToRedeem} points needed to redeem`)
+                                : (isRTL
+                                    ? `قيمة الطلب صغيرة جداً لاستبدال ${loyaltySettings.minPointsToRedeem} نقطة`
+                                    : `Order too small to redeem ${loyaltySettings.minPointsToRedeem} points`)}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       {loyaltyPointsRedeemed > 0 && (
@@ -1663,6 +1680,18 @@ export const MobileEmulator: React.FC = () => {
                         <span>+{activeOrderReceipt.deliveryFee.toFixed(2)} {t.sar}</span>
                       </div>
                     )}
+                    {(activeOrderReceipt.discountAmount ?? 0) > 0 && (
+                      <div className="flex justify-between text-emerald-600">
+                        <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}</span>
+                        <span>-{(activeOrderReceipt.discountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                      </div>
+                    )}
+                    {(activeOrderReceipt.loyaltyDiscountAmount ?? 0) > 0 && (
+                      <div className="flex justify-between text-purple-600">
+                        <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}</span>
+                        <span>-{(activeOrderReceipt.loyaltyDiscountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                      </div>
+                    )}
                     <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-black text-gray-900">
                       <div>
                         <span>{t.total}</span>
@@ -1675,11 +1704,11 @@ export const MobileEmulator: React.FC = () => {
                     <div className="bg-white p-2 rounded-lg text-[9.5px] text-gray-400 space-y-0.5 mt-2 border border-slate-100">
                       <div className="flex justify-between">
                         <span>{isRTL ? 'المبلغ الخاضع للضريبة:' : 'Amount Excl. VAT:'}</span>
-                        <span>{(activeOrderReceipt.total / 1.15).toFixed(2)} {t.sar}</span>
+                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).subtotalExcludingVat} {t.sar}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>{isRTL ? `ضريبة القيمة المضافة (١٥٪):` : `Saudi VAT portion (15%):`}</span>
-                        <span>{(activeOrderReceipt.total - (activeOrderReceipt.total / 1.15)).toFixed(2)} {t.sar}</span>
+                        <span>{isRTL ? `ضريبة القيمة المضافة (${brandSettings?.vatPercentage || 15}٪):` : `Saudi VAT portion (${brandSettings?.vatPercentage || 15}%):`}</span>
+                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).vatAmount} {t.sar}</span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
                         <span>{t.sync_status}:</span>

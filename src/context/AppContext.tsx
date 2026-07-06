@@ -106,6 +106,25 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 /**
+ * Allowed forward-only order-status transitions. A status can advance to any of
+ * the listed targets (or be cancelled), but cannot jump backwards or skip the
+ * flow (e.g. delivered -> received, or cancelled -> delivered).
+ */
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  received: ['preparing', 'cancelled'],
+  preparing: ['ready', 'cancelled'],
+  ready: ['out_for_delivery', 'delivered', 'cancelled'],
+  out_for_delivery: ['delivered', 'cancelled'],
+  delivered: [],
+  cancelled: [],
+};
+
+/** Whether an order may move from `from` to `to` (a no-op stay is always allowed). */
+export function canTransitionOrder(from: OrderStatus, to: OrderStatus): boolean {
+  return from === to || (ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false);
+}
+
+/**
  * Safely load a persisted value from localStorage, falling back to `fallback`
  * when the key is missing or holds corrupted/non-JSON data. Without this guard
  * a single malformed key crashes the whole app during the provider's initial
@@ -464,7 +483,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const currentDeliveryFee = checkoutType === 'delivery' ? selectedBranch.deliveryFee : 0;
-    const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - loyaltyDiscountAmount);
+
+    // Cap the staged loyalty redemption to the points the customer actually
+    // holds, then derive the discount from that capped figure. This keeps the
+    // discount applied to the total and the points deducted below in lockstep,
+    // so a stale redemption (e.g. after the admin adjusts the same customer's
+    // balance mid-session) can never fund an unbacked discount.
+    const loyaltyActive = loyaltySettings.isEnabled && currentUser.role === 'customer';
+    const availablePoints = currentUser.loyaltyPoints || 0;
+    const pointsRedeemed = loyaltyActive ? Math.min(Math.max(0, loyaltyPointsRedeemed), availablePoints) : 0;
+    const appliedLoyaltyDiscount = Number((pointsRedeemed * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2));
+    const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - appliedLoyaltyDiscount);
 
     // Build order items
     const orderItems: OrderItem[] = cart.map((cItem, index) => {
@@ -510,6 +539,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderType: checkoutType,
       subtotal: cartTotal,
       deliveryFee: currentDeliveryFee,
+      discountAmount: discountAmount,
+      loyaltyDiscountAmount: appliedLoyaltyDiscount,
       total: finalTotal,
       paymentStatus: 'pending',
       orderSyncStatus: 'not_synced', // Starts as unsynced (representing Lazywait connector status)
@@ -518,13 +549,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items: orderItems
     };
 
-    // Phase 11: Real-time loyalty update. Never deduct more points than the
-    // customer actually holds, even if a stale staged redemption says otherwise.
-    if (loyaltySettings.isEnabled && currentUser.role === 'customer') {
-      const currentPoints = currentUser.loyaltyPoints || 0;
-      const pointsSpent = Math.min(Math.max(0, loyaltyPointsRedeemed), currentPoints);
+    // Phase 11: Real-time loyalty update. Deduct exactly the capped points that
+    // funded appliedLoyaltyDiscount above, then add points earned on this order.
+    if (loyaltyActive) {
       const earnedPoints = Math.floor(finalTotal * loyaltySettings.pointsPerRiyal);
-      const nextPoints = Math.max(0, currentPoints - pointsSpent + earnedPoints);
+      const nextPoints = Math.max(0, availablePoints - pointsRedeemed + earnedPoints);
       updateCustomerPoints(currentUser.id, nextPoints);
     }
 
@@ -545,11 +574,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     setOrders(prev => prev.map(o => {
       if (o.id === orderId) {
+        // Reject invalid jumps (e.g. delivered -> received, cancelled -> delivered).
+        if (!canTransitionOrder(o.status, status)) {
+          return o;
+        }
         // Mocking external POS sync update status
         const syncStatusVal = status === 'received' ? 'not_synced' : 'synced';
-        return { 
-          ...o, 
-          status, 
+        return {
+          ...o,
+          status,
           orderSyncStatus: syncStatusVal as any,
           paymentStatus: status === 'delivered' ? 'paid' : o.paymentStatus
         };
@@ -641,13 +674,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBranchSettings = (id: string, updates: Partial<Branch>) => {
     setBranches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
-    
-    // If a branch is closed, update availability for products
-    if (updates.isActive === false) {
+
+    // Mirror the branch's open/closed state into the availability matrix so the
+    // mobile menu tracks it: closing marks every product unavailable at that
+    // branch, and reopening restores them (without this the branch stays empty
+    // after a close/reopen cycle). Rows are copied, not mutated in place.
+    if (updates.isActive === false || updates.isActive === true) {
+      const available = updates.isActive === true;
       setAvailabilityMatrix(prev => {
         const copy = { ...prev };
         Object.keys(copy).forEach(pId => {
-          copy[pId][id] = false;
+          copy[pId] = { ...copy[pId], [id]: available };
         });
         return copy;
       });
