@@ -58,28 +58,28 @@ body {
 }
 
 .glass-btn-primary {
-  background: linear-gradient(135deg, #422e87 0%, #2e1e65 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary), black 25%) 100%);
   color: white;
-  box-shadow: 0 10px 20px -10px rgba(66, 46, 135, 0.3);
+  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--color-primary), transparent 70%);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px -8px rgba(66, 46, 135, 0.4);
+  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--color-primary), transparent 60%);
 }
 .glass-btn-primary:active {
   transform: translateY(0);
 }
 
 .glass-btn-secondary {
-  background: linear-gradient(135deg, #e02d3d 0%, #bd202e 100%);
+  background: linear-gradient(135deg, var(--color-secondary) 0%, color-mix(in srgb, var(--color-secondary), black 16%) 100%);
   color: white;
-  box-shadow: 0 10px 20px -10px rgba(224, 45, 61, 0.3);
+  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--color-secondary), transparent 70%);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-btn-secondary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 24px -8px rgba(224, 45, 61, 0.4);
+  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--color-secondary), transparent 60%);
 }
 .glass-btn-secondary:active {
   transform: translateY(0);
@@ -107,6 +107,6 @@ body {
 }
 .glass-input:focus {
   background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(66, 46, 135, 0.4);
-  box-shadow: 0 0 0 4px rgba(66, 46, 135, 0.08);
+  border-color: color-mix(in srgb, var(--color-primary), transparent 60%);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary), transparent 92%);
 }
