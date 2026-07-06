@@ -129,6 +129,7 @@ export const AdminDashboard: React.FC = () => {
     updateOrderStatus, addCategory, updateCategory, deleteCategory, addProduct,
     updateProduct, deleteProduct, toggleProductAvailability, isProductAvailableInBranch,
     updateBranchSettings, bulkUploadMenu, adminLang, setAdminLang, newOrderAlert, setNewOrderAlert, playNotificationSound,
+    soundMuted, setSoundMuted,
     brandSettings, updateBrandSettings, lazywaitSettings, updateLazywaitSettings,
     paymentSettings, updatePaymentSettings, smsSettings, updateSmsSettings,
     notificationSettings, updateNotificationSettings, loyaltySettings, updateLoyaltySettings,
@@ -149,7 +150,6 @@ export const AdminDashboard: React.FC = () => {
   const [menuSubTab, setMenuSubTab] = useState<'categories' | 'products' | 'csv'>('products');
   const [orderFilter, setOrderFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState<string>('');
-  const [isMuted, setIsMuted] = useState(false);
   
   // Dialogs and edits states
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
@@ -237,13 +237,21 @@ export const AdminDashboard: React.FC = () => {
     e.preventDefault();
     if (isAccountant || !prodNameEn || !prodNameAr || !prodCatId) return;
 
+    // Reject an empty/invalid/non-positive price rather than silently defaulting
+    // it to 20.00 SAR (which hid typos and mapped a legitimate 0 to 20).
+    const parsedPrice = parseFloat(prodPrice);
+    if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
+      alert(isRTL ? 'الرجاء إدخال سعر صحيح أكبر من صفر.' : 'Please enter a valid price greater than 0.');
+      return;
+    }
+
     const pData = {
       categoryId: prodCatId,
       nameEn: prodNameEn,
       nameAr: prodNameAr,
       descriptionEn: prodDescEn,
       descriptionAr: prodDescAr,
-      price: parseFloat(prodPrice) || 20.00,
+      price: parsedPrice,
       calories: parseInt(prodCalories) || 0,
       imageUrl: prodImg || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
       isActive: true,
@@ -356,8 +364,8 @@ export const AdminDashboard: React.FC = () => {
             <span className="text-xs font-black tracking-wide">{t.realtime_pulse}</span>
           </div>
           <div className="flex gap-2">
-            {!isMuted && (
-              <button 
+            {!soundMuted && (
+              <button
                 onClick={() => playNotificationSound()}
                 className="bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold py-1 px-3 rounded-md transition-colors"
               >
@@ -387,12 +395,12 @@ export const AdminDashboard: React.FC = () => {
         {/* Global configurations / Language / Session roles */}
         <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
           {/* Audio sound toggler */}
-          <button 
-            onClick={() => setIsMuted(!isMuted)}
-            className={`p-2 rounded-xl border transition-all ${isMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
-            title={isMuted ? t.sound_alert_off : t.sound_alert_on}
+          <button
+            onClick={() => setSoundMuted(!soundMuted)}
+            className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
+            title={soundMuted ? t.sound_alert_off : t.sound_alert_on}
           >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
           {/* Session Role switcher */}

@@ -409,7 +409,7 @@ export const INITIAL_ORDERS: Order[] = [
   {
     id: 'ord-1003',
     orderNumber: 'SM-2026-000414',
-    customerId: 'usr-customer-1',
+    customerId: 'usr-customer-jeddah',
     customerName: 'Aisha Al-Otaibi',
     customerPhone: '+966 54 888 2211',
     branchId: 'b-jeddah-corniche',

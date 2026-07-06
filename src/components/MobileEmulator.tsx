@@ -236,6 +236,9 @@ export const MobileEmulator: React.FC = () => {
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 0.35);
+      // Release the context once the ping ends to avoid leaking one AudioContext
+      // per call (browsers cap the number of live contexts).
+      osc.onended = () => { ctx.close().catch(() => {}); };
     } catch (e) {
       // Ignore audio fail
     }

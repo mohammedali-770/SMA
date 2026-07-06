@@ -81,6 +81,8 @@ interface AppContextType {
   playNotificationSound: () => void;
   newOrderAlert: boolean;
   setNewOrderAlert: (alert: boolean) => void;
+  soundMuted: boolean;
+  setSoundMuted: (muted: boolean) => void;
 
   // Phase 10: Settings & Integration States
   brandSettings: BrandSettings;
@@ -238,6 +240,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Real-time states
   const [newOrderAlert, setNewOrderAlert] = useState<boolean>(false);
+  const [soundMuted, setSoundMuted] = useState<boolean>(false);
 
   // Languages
   const [mobileLang, setMobileLang] = useState<'en' | 'ar'>('en');
@@ -351,24 +354,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Audio trigger
   const playNotificationSound = () => {
+    if (soundMuted) return;
     try {
       // Simple synth ping using Web Audio API to prevent asset-loading issues
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
-      
+
       osc.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      
+
       osc.type = 'sine';
       osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High A
       osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1); // Quick up-slide
-      
+
       gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-      
+
       osc.start();
       osc.stop(audioCtx.currentTime + 0.4);
+      // Release the context once the ping ends; browsers cap live AudioContexts,
+      // so leaking one per notification eventually silences all of them.
+      osc.onended = () => { audioCtx.close().catch(() => {}); };
     } catch (e) {
       console.warn('Audio play block or unsupported:', e);
     }
@@ -475,10 +482,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false, error: 'Please select or add a delivery address' };
       }
       if (cartTotal < selectedBranch.minDeliveryOrder) {
-        return { 
-          success: false, 
-          error: `Minimum delivery order for this branch is ${selectedBranch.minDeliveryOrder} SAR` 
+        return {
+          success: false,
+          error: `Minimum delivery order for this branch is ${selectedBranch.minDeliveryOrder} SAR`
         };
+      }
+    }
+
+    // Revalidate the cart against the live menu: a product may have been
+    // deactivated, deleted, or switched off for this branch while it sat in the
+    // cart, and must not be silently ordered.
+    for (const cItem of cart) {
+      const product = products.find(p => p.id === cItem.product.id);
+      if (!product || !product.isActive) {
+        return { success: false, error: `${cItem.product.nameEn} is no longer on the menu. Please remove it from your cart.` };
+      }
+      if (!isProductAvailableInBranch(product.id, selectedBranch.id)) {
+        return { success: false, error: `${cItem.product.nameEn} is not available at ${selectedBranch.nameEn}.` };
       }
     }
 
@@ -521,8 +541,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
-    // Generate Order ID & Number
-    const seq = String(orders.length + 1).padStart(6, '0');
+    // Generate Order ID & Number. Continue from the highest existing sequence so
+    // numbers never collide with seeded orders or repeat after a deletion (using
+    // orders.length would restart and clash).
+    const maxSeq = orders.reduce((max, o) => {
+      const m = o.orderNumber.match(/SM-2026-(\d+)/);
+      const n = m ? parseInt(m[1], 10) : 0;
+      return n > max ? n : max;
+    }, 0);
+    const seq = String(maxSeq + 1).padStart(6, '0');
     const orderNumber = `SM-2026-${seq}`;
     const orderId = `ord-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -775,6 +802,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       playNotificationSound,
       newOrderAlert,
       setNewOrderAlert,
+      soundMuted,
+      setSoundMuted,
 
       // Phase 10 Settings & Integrations
       brandSettings,
