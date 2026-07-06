@@ -334,6 +334,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('sm_availability_matrix', JSON.stringify(availabilityMatrix));
   }, [availabilityMatrix]);
 
+  // Drive the Tailwind brand tokens from the editable brand settings, so the
+  // admin's primary/secondary colour pickers actually re-theme every
+  // bg-primary/text-primary/bg-secondary element across the app.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--color-primary', brandSettings.primaryColor);
+    root.style.setProperty('--color-secondary', brandSettings.secondaryColor);
+  }, [brandSettings.primaryColor, brandSettings.secondaryColor]);
+
   // Coupon application logic
   useEffect(() => {
     if (!couponCode) {
