@@ -245,6 +245,9 @@ export const MobileEmulator: React.FC = () => {
     if ((currentUser.loyaltyPoints || 0) < ptsToDeduct) return;
     const nextPoints = (currentUser.loyaltyPoints || 0) - ptsToDeduct;
     updateCustomerPoints(currentUser.id, nextPoints);
+    // Points just spent on wallet credit can no longer back a staged checkout
+    // discount — drop the staged redemption if it now exceeds the balance.
+    if (loyaltyPointsRedeemed > nextPoints) setLoyaltyPointsRedeemed(0);
     const nextBalance = walletBalance + cashToAdd;
     setWalletBalance(nextBalance);
     localStorage.setItem('sm_wallet_balance', String(nextBalance));
@@ -261,7 +264,10 @@ export const MobileEmulator: React.FC = () => {
     if ((currentUser.loyaltyPoints || 0) < reward.points) return;
     const nextPoints = (currentUser.loyaltyPoints || 0) - reward.points;
     updateCustomerPoints(currentUser.id, nextPoints);
-    
+    // Same guard as wallet conversion: a staged checkout redemption cannot
+    // outlive the points that funded it.
+    if (loyaltyPointsRedeemed > nextPoints) setLoyaltyPointsRedeemed(0);
+
     playNotificationSound();
     
     const voucherCode = `SM-VOU-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -463,10 +469,10 @@ export const MobileEmulator: React.FC = () => {
       return;
     }
     const result = placeOrder();
-    if (result.success && result.orderId) {
-      // Find the placed order
-      const orderMatch = orders.find(o => o.id === result.orderId) || orders[0];
-      setActiveOrderReceipt(orderMatch);
+    if (result.success && result.order) {
+      // Use the order object returned by placeOrder — it is not yet present in
+      // the `orders` array from this render's context snapshot.
+      setActiveOrderReceipt(result.order);
       setActiveTab('profile');
     } else if (result.error) {
       alert(result.error);
@@ -969,8 +975,17 @@ export const MobileEmulator: React.FC = () => {
                                 {isRTL ? 'إلغاء الخصم' : 'Cancel Discount'}
                               </button>
                             ) : (
-                              <button 
-                                onClick={() => setLoyaltyPointsRedeemed(currentUser.loyaltyPoints || 0)}
+                              <button
+                                onClick={() => {
+                                  const perPoint = loyaltySettings.discountPerPoint || 0.1;
+                                  const balance = currentUser.loyaltyPoints || 0;
+                                  const preLoyaltyTotal = Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount);
+                                  // Only stage as many points as are needed to cover the
+                                  // remaining order value, capped at the available balance,
+                                  // so points are never wasted past a zero total.
+                                  const maxUsefulPoints = Math.floor(preLoyaltyTotal / perPoint);
+                                  setLoyaltyPointsRedeemed(Math.min(balance, maxUsefulPoints));
+                                }}
                                 className="bg-purple-600 text-white hover:bg-purple-700 text-[9px] font-black py-1 px-2.5 rounded-lg transition-all"
                               >
                                 {isRTL ? 'استبدال النقاط' : 'Redeem Points'}

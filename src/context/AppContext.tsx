@@ -62,7 +62,7 @@ interface AppContextType {
   // DB operations
   addAddress: (address: Omit<SavedAddress, 'id'>) => void;
   deleteAddress: (id: string) => void;
-  placeOrder: () => { success: boolean; orderId?: string; error?: string };
+  placeOrder: () => { success: boolean; orderId?: string; order?: Order; error?: string };
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
   
   // Phase 8: Admin Panel Operations
@@ -105,41 +105,38 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+/**
+ * Safely load a persisted value from localStorage, falling back to `fallback`
+ * when the key is missing or holds corrupted/non-JSON data. Without this guard
+ * a single malformed key crashes the whole app during the provider's initial
+ * render (white screen with no recovery path).
+ */
+function loadPersisted<T>(key: string, fallback: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved !== null ? (JSON.parse(saved) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Database state
-  const [branches, setBranches] = useState<Branch[]>(() => {
-    const saved = localStorage.getItem('sm_branches');
-    return saved ? JSON.parse(saved) : INITIAL_BRANCHES;
-  });
-  
-  const [categories, setCategories] = useState<Category[]>(() => {
-    const saved = localStorage.getItem('sm_categories');
-    return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-  });
+  const [branches, setBranches] = useState<Branch[]>(() => loadPersisted('sm_branches', INITIAL_BRANCHES));
 
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('sm_products');
-    return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-  });
+  const [categories, setCategories] = useState<Category[]>(() => loadPersisted('sm_categories', INITIAL_CATEGORIES));
 
-  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(() => {
-    const saved = localStorage.getItem('sm_modifier_groups');
-    return saved ? JSON.parse(saved) : INITIAL_MODIFIER_GROUPS;
-  });
+  const [products, setProducts] = useState<Product[]>(() => loadPersisted('sm_products', INITIAL_PRODUCTS));
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('sm_orders');
-    return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-  });
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(() => loadPersisted('sm_modifier_groups', INITIAL_MODIFIER_GROUPS));
 
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => {
-    const saved = localStorage.getItem('sm_addresses');
-    return saved ? JSON.parse(saved) : INITIAL_ADDRESSES;
-  });
+  const [orders, setOrders] = useState<Order[]>(() => loadPersisted('sm_orders', INITIAL_ORDERS));
+
+  const [addresses, setAddresses] = useState<SavedAddress[]>(() => loadPersisted('sm_addresses', INITIAL_ADDRESSES));
 
   const [profiles, setProfiles] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('sm_profiles');
-    if (saved) return JSON.parse(saved);
+    const saved = loadPersisted<UserProfile[] | null>('sm_profiles', null);
+    if (saved) return saved;
     // Seed default loyalty points to make the experience interactive
     const defaultProfiles = INITIAL_PROFILES.map(p => {
       if (p.id === 'usr-customer-1') {
@@ -153,9 +150,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Availability matrix: productId -> Map of branchId -> isAvailable (true by default)
   const [availabilityMatrix, setAvailabilityMatrix] = useState<{ [key: string]: { [branchId: string]: boolean } }>(() => {
-    const saved = localStorage.getItem('sm_availability_matrix');
-    if (saved) return JSON.parse(saved);
-    
+    const saved = loadPersisted<{ [key: string]: { [branchId: string]: boolean } } | null>('sm_availability_matrix', null);
+    if (saved) return saved;
+
     // Seed default availability: all products available everywhere except non-active branches
     const matrix: { [key: string]: { [branchId: string]: boolean } } = {};
     INITIAL_PRODUCTS.forEach(p => {
@@ -169,12 +166,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Current session configurations
   const [currentUser, setCurrentUserInternal] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('sm_profiles');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed[0] || INITIAL_PROFILES[0];
-    }
-    return INITIAL_PROFILES[0];
+    const parsed = loadPersisted<UserProfile[] | null>('sm_profiles', null);
+    return (parsed && parsed[0]) || INITIAL_PROFILES[0];
   });
 
   const setCurrentUser = (user: UserProfile) => {
@@ -195,10 +188,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 11: Real-time Customer Loyalty Integration
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState<number>(0);
   
-  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(() => {
-    const saved = localStorage.getItem('sm_loyalty_settings');
-    return saved ? JSON.parse(saved) : INITIAL_LOYALTY_SETTINGS;
-  });
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(() => loadPersisted('sm_loyalty_settings', INITIAL_LOYALTY_SETTINGS));
 
   const loyaltyDiscountAmount = Number((loyaltyPointsRedeemed * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2));
 
@@ -235,30 +225,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [adminLang, setAdminLang] = useState<'en' | 'ar'>('en');
 
   // Phase 10: Settings & Integration States
-  const [brandSettings, setBrandSettings] = useState<BrandSettings>(() => {
-    const saved = localStorage.getItem('sm_brand_settings');
-    return saved ? JSON.parse(saved) : INITIAL_BRAND_SETTINGS;
-  });
+  const [brandSettings, setBrandSettings] = useState<BrandSettings>(() => loadPersisted('sm_brand_settings', INITIAL_BRAND_SETTINGS));
 
-  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(() => {
-    const saved = localStorage.getItem('sm_lazywait_settings');
-    return saved ? JSON.parse(saved) : INITIAL_LAZYWAIT_SETTINGS;
-  });
+  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(() => loadPersisted('sm_lazywait_settings', INITIAL_LAZYWAIT_SETTINGS));
 
-  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(() => {
-    const saved = localStorage.getItem('sm_payment_settings');
-    return saved ? JSON.parse(saved) : INITIAL_PAYMENT_SETTINGS;
-  });
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(() => loadPersisted('sm_payment_settings', INITIAL_PAYMENT_SETTINGS));
 
-  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => {
-    const saved = localStorage.getItem('sm_sms_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SMS_SETTINGS;
-  });
+  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => loadPersisted('sm_sms_settings', INITIAL_SMS_SETTINGS));
 
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => {
-    const saved = localStorage.getItem('sm_notification_settings');
-    return saved ? JSON.parse(saved) : INITIAL_NOTIFICATION_SETTINGS;
-  });
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => loadPersisted('sm_notification_settings', INITIAL_NOTIFICATION_SETTINGS));
 
   const updateBrandSettings = (updates: Partial<BrandSettings>) => {
     setBrandSettings(prev => {
@@ -543,11 +518,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       items: orderItems
     };
 
-    // Phase 11: Real-time loyalty update
+    // Phase 11: Real-time loyalty update. Never deduct more points than the
+    // customer actually holds, even if a stale staged redemption says otherwise.
     if (loyaltySettings.isEnabled && currentUser.role === 'customer') {
       const currentPoints = currentUser.loyaltyPoints || 0;
+      const pointsSpent = Math.min(Math.max(0, loyaltyPointsRedeemed), currentPoints);
       const earnedPoints = Math.floor(finalTotal * loyaltySettings.pointsPerRiyal);
-      const nextPoints = Math.max(0, currentPoints - loyaltyPointsRedeemed + earnedPoints);
+      const nextPoints = Math.max(0, currentPoints - pointsSpent + earnedPoints);
       updateCustomerPoints(currentUser.id, nextPoints);
     }
 
@@ -562,7 +539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearCart();
     setLoyaltyPointsRedeemed(0);
 
-    return { success: true, orderId };
+    return { success: true, orderId, order: newOrder };
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
