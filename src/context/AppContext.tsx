@@ -17,7 +17,7 @@ import {
   INITIAL_BRAND_SETTINGS, INITIAL_LAZYWAIT_SETTINGS, INITIAL_PAYMENT_SETTINGS,
   INITIAL_SMS_SETTINGS, INITIAL_NOTIFICATION_SETTINGS, INITIAL_LOYALTY_SETTINGS
 } from '../data/initialData';
-import { getVATBreakdown } from '../utils/calculations';
+import { getVATBreakdown, generateId } from '../utils/calculations';
 
 interface AppContextType {
   // DB Tables
@@ -444,7 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Saved Addresses
   const addAddress = (address: Omit<SavedAddress, 'id'>) => {
-    const id = 'adr-' + Math.random().toString(36).substr(2, 9);
+    const id = generateId('adr');
     const newAddress: SavedAddress = {
       ...address,
       id,
@@ -551,7 +551,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 0);
     const seq = String(maxSeq + 1).padStart(6, '0');
     const orderNumber = `SM-2026-${seq}`;
-    const orderId = `ord-${Math.random().toString(36).substr(2, 9)}`;
+    const orderId = generateId('ord');
 
     const newOrder: Order = {
       id: orderId,
@@ -621,7 +621,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Phase 8 Admin Features: Category CRUD
   const addCategory = (nameEn: string, nameAr: string) => {
     const newCat: Category = {
-      id: 'cat-' + Math.random().toString(36).substr(2, 9),
+      id: generateId('cat'),
       nameEn,
       nameAr,
       sortOrder: categories.length + 1
@@ -645,7 +645,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Phase 8 Admin Features: Product CRUD
   const addProduct = (pData: Omit<Product, 'id'>) => {
-    const id = 'prod-' + Math.random().toString(36).substr(2, 9);
+    const id = generateId('prod');
     const newProd: Product = {
       ...pData,
       id

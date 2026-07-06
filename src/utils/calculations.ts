@@ -42,6 +42,11 @@ export function getVATBreakdown(totalInclusive: number, vatPercentage: number = 
   };
 }
 
+/** Generate a short unique-enough id of the form "<prefix>-<9 base36 chars>". */
+export function generateId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 const RIYADH_TZ = 'Asia/Riyadh';
 
 /**
@@ -137,7 +142,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
     // Find or create category
     let category = newCategories.find(c => c.nameEn.toLowerCase() === catNameEn.toLowerCase());
     if (!category) {
-      const newCatId = 'cat-csv-' + Math.random().toString(36).substr(2, 9);
+      const newCatId = generateId('cat-csv');
       category = {
         id: newCatId,
         nameEn: catNameEn,
@@ -147,7 +152,7 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
       newCategories.push(category);
     }
 
-    const prodId = 'prod-csv-' + Math.random().toString(36).substr(2, 9);
+    const prodId = generateId('prod-csv');
     const newProduct: Product = {
       id: prodId,
       categoryId: category.id,
