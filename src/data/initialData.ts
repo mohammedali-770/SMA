@@ -449,7 +449,7 @@ export const INITIAL_ORDERS: Order[] = [
 ];
 
 export const INITIAL_BRAND_SETTINGS: BrandSettings = {
-  logoUrl: 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?auto=format&fit=crop&w=150&h=150&q=80',
+  logoUrl: '/logo.png',
   primaryColor: '#422e87',
   secondaryColor: '#e02d3d',
   vatPercentage: 15,

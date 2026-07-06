@@ -21,9 +21,7 @@ function AppContent() {
       <header className="sticky top-0 backdrop-blur-md bg-white/30 border-b border-slate-200/60 text-slate-800 py-4 px-6 z-40">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-md border border-white/20" style={{ background: 'linear-gradient(135deg, #422e87, #e02d3d)' }}>
-              🌶️
-            </div>
+            <img src="/logo.png" alt="Spicy Meal logo" className="w-10 h-10 rounded-xl object-contain bg-white shadow-md border border-white/20" />
             <div>
               <h1 className="text-lg font-black tracking-tight leading-tight text-[#422e87]">SPICY MEAL MONOREPO PLATFORM</h1>
               <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 mt-0.5">

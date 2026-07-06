@@ -571,9 +571,7 @@ export const MobileEmulator: React.FC = () => {
         {/* Main Phone Header */}
         <div className="bg-white/30 backdrop-blur-md px-4 py-2 border-b border-slate-200/60 flex items-center justify-between z-30">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center font-black text-white text-lg tracking-wider">
-              S
-            </div>
+            <img src="/logo.png" alt="Spicy Meal logo" className="w-9 h-9 rounded-full object-contain bg-white border border-gray-100" />
             <div>
               <div className="flex items-center gap-1 text-[10px] text-secondary font-bold uppercase tracking-wider">
                 <Sparkles className="w-2.5 h-2.5" />
