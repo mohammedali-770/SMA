@@ -313,7 +313,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                       )}
 
                       {/* Display estimated earnings for this purchase */}
-                      <div className="p-2 bg-[#422e87]/5 rounded-xl border border-purple-500/10 flex justify-between text-[9px]">
+                      <div className="p-2 bg-primary/5 rounded-xl border border-purple-500/10 flex justify-between text-[9px]">
                         <span className="text-slate-500 font-medium">{isRTL ? 'نقاط مضمونة على هذا الطلب:' : 'Points you will earn on checkout:'}</span>
                         <span className="font-extrabold text-secondary">
                           +{Math.floor(Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount) * (loyaltySettings.pointsPerRiyal || 1))} {isRTL ? 'نقطة' : 'Points'}

@@ -66,7 +66,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('brand')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'brand' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -78,7 +78,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('lazywait')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'lazywait' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -90,7 +90,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('payments')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'payments' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -102,7 +102,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('sms')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'sms' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -114,7 +114,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('notifications')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'notifications' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -126,7 +126,7 @@ export const SettingsPanel: React.FC = () => {
                     onClick={() => setSettingsSubTab('loyalty')}
                     className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
                       settingsSubTab === 'loyalty' 
-                        ? 'bg-[#422e87]/10 text-[#422e87] border-[#422e87]/20 shadow-xs' 
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' 
                         : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
                     }`}
                   >
@@ -143,7 +143,7 @@ export const SettingsPanel: React.FC = () => {
                     <div className="space-y-4">
                       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                         <span className="font-black text-slate-800 text-xs uppercase">{isRTL ? 'تخصيص الهوية وشروط الاستخدام والضريبة' : 'Brand Corporate Design & VAT Rules'}</span>
-                        <span className="text-[9px] bg-indigo-100 text-[#422e87] px-2 py-0.5 rounded font-black">{isRTL ? 'الوعاء الضريبي المعتمد' : 'ZATCA Active'}</span>
+                        <span className="text-[9px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black">{isRTL ? 'الوعاء الضريبي المعتمد' : 'ZATCA Active'}</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -201,7 +201,7 @@ export const SettingsPanel: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="p-3 bg-slate-50/60 rounded-xl space-y-3">
-                          <span className="font-extrabold text-[#422e87] text-[10px] block border-b border-slate-100 pb-1">{isRTL ? 'إعدادات ضريبة القيمة المضافة بالمملكة' : 'Saudi Arabia VAT Regulatory Config'}</span>
+                          <span className="font-extrabold text-primary text-[10px] block border-b border-slate-100 pb-1">{isRTL ? 'إعدادات ضريبة القيمة المضافة بالمملكة' : 'Saudi Arabia VAT Regulatory Config'}</span>
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -231,7 +231,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div className="p-3 bg-slate-50/60 rounded-xl space-y-3">
-                          <span className="font-extrabold text-[#422e87] text-[10px] block border-b border-slate-100 pb-1">{isRTL ? 'قنوات الدعم والتواصل' : 'Customer Support Desks'}</span>
+                          <span className="font-extrabold text-primary text-[10px] block border-b border-slate-100 pb-1">{isRTL ? 'قنوات الدعم والتواصل' : 'Customer Support Desks'}</span>
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -366,7 +366,7 @@ export const SettingsPanel: React.FC = () => {
 
                       {/* TRIGGER SYNC TOGGLES */}
                       <div className="p-4 bg-slate-50/60 rounded-xl space-y-4">
-                        <span className="font-extrabold text-[#422e87] text-[10px] block border-b border-slate-200/40 pb-1">{isRTL ? 'سياسات وقواعد المزامنة التلقائية' : 'Active Automation & Cloud Sync Protocols'}</span>
+                        <span className="font-extrabold text-primary text-[10px] block border-b border-slate-200/40 pb-1">{isRTL ? 'سياسات وقواعد المزامنة التلقائية' : 'Active Automation & Cloud Sync Protocols'}</span>
                         
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                           <div className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-slate-100">
@@ -429,7 +429,7 @@ export const SettingsPanel: React.FC = () => {
 
                       {/* TACTILE TEST CONTROLLERS */}
                       <div className="p-4 bg-purple-50/40 border border-purple-100/60 rounded-xl space-y-3">
-                        <span className="font-extrabold text-[#422e87] text-[10px] block">{isRTL ? 'مطابقة ومحاكاة الاتصال الفورية (POS API Simulator)' : 'POS Sandbox Sync Testing & Logging'}</span>
+                        <span className="font-extrabold text-primary text-[10px] block">{isRTL ? 'مطابقة ومحاكاة الاتصال الفورية (POS API Simulator)' : 'POS Sandbox Sync Testing & Logging'}</span>
                         
                         <div className="flex flex-wrap gap-2.5">
                           <button
@@ -455,8 +455,8 @@ export const SettingsPanel: React.FC = () => {
                         {(connectionResult || connectionTesting) && (
                           <div className="p-2.5 bg-white border border-slate-100 rounded-lg font-mono text-[9.5px] text-slate-600 animate-slide-down">
                             {connectionTesting ? (
-                              <span className="flex items-center gap-1.5 text-[#422e87] font-bold">
-                                <span className="w-2 h-2 rounded-full bg-[#422e87] animate-ping" />
+                              <span className="flex items-center gap-1.5 text-primary font-bold">
+                                <span className="w-2 h-2 rounded-full bg-primary animate-ping" />
                                 {isRTL ? 'جاري فحص بروتوكولات الاتصال ومطابقة API Key...' : 'Establishing secure handshake with Lazywait Cloud servers...'}
                               </span>
                             ) : (
@@ -776,8 +776,8 @@ export const SettingsPanel: React.FC = () => {
                       </div>
 
                       {/* LOYALTY SUMMARY STATISTICS */}
-                      <div className="p-4 bg-[#422e87]/5 border border-[#422e87]/10 rounded-2xl space-y-3 animate-fade-in">
-                        <span className="font-extrabold text-[#422e87] text-[10px] block border-b border-[#422e87]/10 pb-1">{isRTL ? 'مؤشرات أداء العملاء ونقاط الولاء (Loyalty Statistics)' : 'Corporate Customer Loyalty Metrics (Real-time Live Audit)'}</span>
+                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl space-y-3 animate-fade-in">
+                        <span className="font-extrabold text-primary text-[10px] block border-b border-primary/10 pb-1">{isRTL ? 'مؤشرات أداء العملاء ونقاط الولاء (Loyalty Statistics)' : 'Corporate Customer Loyalty Metrics (Real-time Live Audit)'}</span>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
@@ -816,7 +816,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         {/* CUSTOMER LOYALTY LEDGER & REAL-TIME POINT ADJUSTMENTS */}
-                        <div className="space-y-3 pt-3.5 border-t border-[#422e87]/10">
+                        <div className="space-y-3 pt-3.5 border-t border-primary/10">
                           <span className="font-extrabold text-slate-800 text-[10px] block uppercase tracking-wider">
                             {isRTL ? 'سجل أرصدة نقاط ولاء العملاء (Customer Loyalty Ledger)' : 'Customer Loyalty Ledger & Point Adjustments'}
                           </span>
@@ -850,7 +850,7 @@ export const SettingsPanel: React.FC = () => {
                               };
 
                               return (
-                                <div key={customer.id} className="bg-white border border-slate-100 p-3.5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs hover:border-[#422e87]/25 transition-all">
+                                <div key={customer.id} className="bg-white border border-slate-100 p-3.5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs hover:border-primary/25 transition-all">
                                   <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center font-black text-xs text-primary border border-purple-100/50">
                                       {customer.fullName.split(' ').map(n => n[0]).join('')}
@@ -864,7 +864,7 @@ export const SettingsPanel: React.FC = () => {
                                     </div>
                                   </div>
 
-                                  <div className="flex items-center gap-4 bg-[#422e87]/3 px-3 py-2 rounded-xl border border-purple-100/10 self-start md:self-auto min-w-[130px]">
+                                  <div className="flex items-center gap-4 bg-primary/3 px-3 py-2 rounded-xl border border-purple-100/10 self-start md:self-auto min-w-[130px]">
                                     <div>
                                       <span className="text-[8px] font-bold text-gray-400 uppercase block">{isRTL ? 'النقاط المتوفرة' : 'Point Balance'}</span>
                                       <div className="flex items-baseline gap-1">

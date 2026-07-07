@@ -348,7 +348,7 @@ export const MenuManagementPanel: React.FC = () => {
                   </a>
 
                   {/* Drag and Drop uploader box */}
-                  <div className="border-2 border-dashed border-slate-200 hover:border-[#422e87] rounded-2xl p-6 text-center transition-all cursor-pointer bg-white/40">
+                  <div className="border-2 border-dashed border-slate-200 hover:border-primary rounded-2xl p-6 text-center transition-all cursor-pointer bg-white/40">
                     <input 
                       type="file" 
                       accept=".csv" 

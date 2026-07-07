@@ -23,9 +23,9 @@ function AppContent() {
           <div className="flex items-center gap-3">
             <img src="/logo.png" alt="Spicy Meal logo" className="w-10 h-10 rounded-xl object-contain bg-white shadow-md border border-white/20" />
             <div>
-              <h1 className="text-lg font-black tracking-tight leading-tight text-[#422e87]">SPICY MEAL MONOREPO PLATFORM</h1>
+              <h1 className="text-lg font-black tracking-tight leading-tight text-primary">SPICY MEAL MONOREPO PLATFORM</h1>
               <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 mt-0.5">
-                <span className="bg-[#422e87]/10 text-[#422e87] px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider">Phase 1-9 Prototype</span>
+                <span className="bg-primary/10 text-primary px-1.5 py-0.5 rounded font-black text-[9px] uppercase tracking-wider">Phase 1-9 Prototype</span>
                 <span>• Saudi Fast-Food Delivery & Administrative POS Ecosystem</span>
               </p>
             </div>
@@ -44,8 +44,8 @@ function AppContent() {
                 onClick={() => setActiveWorkspaceTab(tab.key as any)}
                 className={`text-xs font-bold py-1.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${
                   activeWorkspaceTab === tab.key 
-                    ? 'bg-white text-[#422e87] shadow-sm scale-102 font-black' 
-                    : 'text-slate-600 hover:text-[#422e87] hover:bg-white/30'
+                    ? 'bg-white text-primary shadow-sm scale-102 font-black' 
+                    : 'text-slate-600 hover:text-primary hover:bg-white/30'
                 }`}
               >
                 {tab.label}
@@ -59,9 +59,9 @@ function AppContent() {
       <div className="bg-white/40 backdrop-blur-md border-b border-slate-200/60 py-3 px-6 text-xs text-slate-700">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-semibold">
           <div className="flex items-start md:items-center gap-2">
-            <Info className="w-4.5 h-4.5 text-[#422e87] flex-shrink-0 mt-0.5 md:mt-0" />
+            <Info className="w-4.5 h-4.5 text-primary flex-shrink-0 mt-0.5 md:mt-0" />
             <div>
-              <span className="font-extrabold text-[#422e87]">{activeWorkspaceTab === 'all' ? 'Combined Real-time Sandbox:' : 'Sync Checklist:'}</span>
+              <span className="font-extrabold text-primary">{activeWorkspaceTab === 'all' ? 'Combined Real-time Sandbox:' : 'Sync Checklist:'}</span>
               <span className="text-slate-600 font-medium ml-1">
                 {activeWorkspaceTab === 'all' 
                   ? 'Add items with modifiers in the Mobile App, complete checkout with Saudi Address, and see the Admin panel immediately buzz with alerts and audio! Toggle product availability in Branch matrix to watch the Mobile menu instantly update!'
@@ -74,7 +74,7 @@ function AppContent() {
               <CheckCircle2 className="w-3 h-3 text-emerald-600" />
               RTL/Arabic Ready
             </span>
-            <span className="text-[10px] bg-[#422e87]/10 text-[#422e87] py-0.5 px-2 rounded-full font-bold flex items-center gap-1 border border-purple-500/10">
+            <span className="text-[10px] bg-primary/10 text-primary py-0.5 px-2 rounded-full font-bold flex items-center gap-1 border border-purple-500/10">
               <Server className="w-3 h-3" />
               Lazywait Mapping
             </span>
@@ -92,7 +92,7 @@ function AppContent() {
             {/* Column 1: Customer Mobile Emulator (Span 4) */}
             <div className="lg:col-span-4 flex flex-col items-center">
               <div className="w-full text-center mb-2.5">
-                <span className="text-xs bg-white/50 backdrop-blur-md text-[#422e87] font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest shadow-2xs">
+                <span className="text-xs bg-white/50 backdrop-blur-md text-primary font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest shadow-2xs">
                   📱 Customer Mobile App Simulation
                 </span>
               </div>
@@ -104,7 +104,7 @@ function AppContent() {
               
               {/* Top sub-row: Admin POS control center */}
               <div className="flex flex-col">
-                <span className="text-xs bg-white/50 backdrop-blur-md text-[#e02d3d] font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 shadow-2xs">
+                <span className="text-xs bg-white/50 backdrop-blur-md text-secondary font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 shadow-2xs">
                   🖥️ Administrative POS Panel (Phase 8 Menu & Branch Controls)
                 </span>
                 <AdminDashboard />
@@ -113,7 +113,7 @@ function AppContent() {
               {/* Bottom sub-row: Supabase postgres table inspector */}
               <div className="flex flex-col">
                 <span className="text-xs bg-white/50 backdrop-blur-md text-slate-600 font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 flex items-center gap-1 shadow-2xs">
-                  <Server className="w-3.5 h-3.5 text-[#e02d3d]" />
+                  <Server className="w-3.5 h-3.5 text-secondary" />
                   <span>⚙️ Live Supabase PostgreSQL Database Tables</span>
                 </span>
                 <DatabasePlayground />
@@ -128,7 +128,7 @@ function AppContent() {
         {activeWorkspaceTab === 'mobile' && (
           <div className="flex flex-col items-center max-w-md mx-auto py-4">
             <div className="text-center mb-4">
-              <h2 className="text-lg font-black text-[#422e87] flex items-center justify-center gap-2">
+              <h2 className="text-lg font-black text-primary flex items-center justify-center gap-2">
                 <span>📱 Customer Mobile App Simulation</span>
               </h2>
               <p className="text-xs text-slate-500 mt-1">Simulates Expo React Native navigation with localized fields, modifier choices, Saudi short address, and instant VAT invoice receipts.</p>
@@ -142,7 +142,7 @@ function AppContent() {
           <div className="space-y-4">
             <div className="backdrop-blur-md bg-white/40 border border-white/60 p-4 rounded-2xl shadow-xs">
               <h3 className="text-sm font-black text-slate-800 uppercase">POS Administrative command center</h3>
-              <p className="text-xs text-slate-500 mt-1">Manage orders, update live branch parameters, and bulk load files. Logged in as: <span className="font-extrabold text-[#422e87]">{currentUser.fullName} ({currentUser.role})</span>. Switch profiles in the header to change permissions.</p>
+              <p className="text-xs text-slate-500 mt-1">Manage orders, update live branch parameters, and bulk load files. Logged in as: <span className="font-extrabold text-primary">{currentUser.fullName} ({currentUser.role})</span>. Switch profiles in the header to change permissions.</p>
             </div>
             <AdminDashboard />
           </div>
