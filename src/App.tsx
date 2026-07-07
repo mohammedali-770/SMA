@@ -3,12 +3,27 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { MobileEmulator } from './components/MobileEmulator';
-import { AdminDashboard } from './components/AdminDashboard';
-import { DatabasePlayground } from './components/DatabasePlayground';
-import { Sparkles, Phone, Server, Settings, Store, AlertCircle, Volume2, Info, CheckCircle2 } from 'lucide-react';
+import { Server, Info, CheckCircle2 } from 'lucide-react';
+
+// The Admin POS panel and the Supabase console are heavy and secondary to the
+// customer mobile app, so they load as separate chunks on demand rather than
+// bloating the initial bundle. Named exports are adapted to lazy()'s default shape.
+const AdminDashboard = lazy(() =>
+  import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard }))
+);
+const DatabasePlayground = lazy(() =>
+  import('./components/DatabasePlayground').then(m => ({ default: m.DatabasePlayground }))
+);
+
+/** Placeholder shown while a lazily-loaded panel's chunk is fetched. */
+const PanelFallback: React.FC = () => (
+  <div className="flex-1 glass-panel rounded-2xl min-h-[400px] flex items-center justify-center">
+    <span className="text-slate-400 text-sm font-bold animate-pulse">Loading…</span>
+  </div>
+);
 
 function AppContent() {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'all' | 'mobile' | 'admin' | 'database'>('all');
@@ -107,7 +122,9 @@ function AppContent() {
                 <span className="text-xs bg-white/50 backdrop-blur-md text-secondary font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 shadow-2xs">
                   🖥️ Administrative POS Panel (Phase 8 Menu & Branch Controls)
                 </span>
-                <AdminDashboard />
+                <Suspense fallback={<PanelFallback />}>
+                  <AdminDashboard />
+                </Suspense>
               </div>
 
               {/* Bottom sub-row: Supabase postgres table inspector */}
@@ -116,7 +133,9 @@ function AppContent() {
                   <Server className="w-3.5 h-3.5 text-secondary" />
                   <span>⚙️ Live Supabase PostgreSQL Database Tables</span>
                 </span>
-                <DatabasePlayground />
+                <Suspense fallback={<PanelFallback />}>
+                  <DatabasePlayground />
+                </Suspense>
               </div>
 
             </div>
@@ -144,7 +163,9 @@ function AppContent() {
               <h3 className="text-sm font-black text-slate-800 uppercase">POS Administrative command center</h3>
               <p className="text-xs text-slate-500 mt-1">Manage orders, update live branch parameters, and bulk load files. Logged in as: <span className="font-extrabold text-primary">{currentUser.fullName} ({currentUser.role})</span>. Switch profiles in the header to change permissions.</p>
             </div>
-            <AdminDashboard />
+            <Suspense fallback={<PanelFallback />}>
+              <AdminDashboard />
+            </Suspense>
           </div>
         )}
 
@@ -155,7 +176,9 @@ function AppContent() {
               <h3 className="text-sm font-black text-white font-mono uppercase">POSTGRESQL RELATIONAL SCHEMA ENGINE</h3>
               <p className="text-slate-400 mt-1">Direct representation of tables created during Phase 2. These state lists represent live data elements synchronized via our unified local store wrapper.</p>
             </div>
-            <DatabasePlayground />
+            <Suspense fallback={<PanelFallback />}>
+              <DatabasePlayground />
+            </Suspense>
           </div>
         )}
 
