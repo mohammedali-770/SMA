@@ -161,6 +161,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(GUEST_USER);
   const loadedUserRef = useRef<string | null>(null);
+  // Stable per-checkout key so a retried submit can't create a duplicate order.
+  // Reset whenever the cart materially changes or an order succeeds.
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   // ---- Data load lifecycle -------------------------------------------------
   const [dataLoading, setDataLoading] = useState(false);
@@ -509,6 +512,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Cart (client-only) --------------------------------------------------
   const addToCart = (product: Product, selectedModifiers: { [groupId: string]: Modifier[] }, quantity: number) => {
+    idempotencyKeyRef.current = null; // cart changed → next checkout is a new order
     const modifierIds: string[] = [];
     Object.values(selectedModifiers).forEach(list => list.forEach(m => modifierIds.push(m.id)));
     modifierIds.sort();
@@ -528,10 +532,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeFromCart = (cartItemId: string) => {
+    idempotencyKeyRef.current = null;
     setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
   const updateCartQuantity = (cartItemId: string, change: number) => {
+    idempotencyKeyRef.current = null;
     setCart(prev => prev.map(item => {
       if (item.cartItemId === cartItemId) {
         const newQty = item.quantity + change;
@@ -542,6 +548,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearCart = () => {
+    idempotencyKeyRef.current = null;
     setCart([]);
     setCouponCode('');
     setDiscountAmount(0);
@@ -596,6 +603,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       modifier_ids: (Object.values(ci.selectedModifiers) as Modifier[][]).flat().map(m => m.id),
     }));
 
+    // One key per checkout attempt; kept across a retry so a lost-response retry
+    // returns the same order instead of creating a duplicate.
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
     try {
       const created = await ordersApi.place({
         branchId: selectedBranch.id,
@@ -605,7 +621,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         couponCode: couponCode || null,
         notes: null,
         loyaltyPoints: currentUser.role === 'customer' ? loyaltyPointsRedeemed : 0,
+        idempotencyKey: idempotencyKeyRef.current,
       });
+      idempotencyKeyRef.current = null; // success → the next checkout gets a fresh key
       // The RPC returns the order row without its items; refetch (with items) so
       // the receipt renders the full breakdown recomputed by the server.
       const rows = await ordersApi.listWithItems();

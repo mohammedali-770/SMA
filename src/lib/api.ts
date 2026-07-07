@@ -227,6 +227,8 @@ export interface PlaceOrderInput {
   couponCode?: string | null;
   notes?: string | null;
   loyaltyPoints?: number;
+  /** Retry-safe key: a repeated submit with the same key returns the same order. */
+  idempotencyKey?: string | null;
 }
 export const orders = {
   /** Server-authoritative order creation (recomputes all amounts + coupon + VAT + loyalty). */
@@ -239,6 +241,7 @@ export const orders = {
       p_coupon_code: input.couponCode ?? null,
       p_notes: input.notes ?? null,
       p_loyalty_points: input.loyaltyPoints ?? 0,
+      p_idempotency_key: input.idempotencyKey ?? null,
     }));
   },
   /** RLS returns own orders for a customer, all orders for staff. */

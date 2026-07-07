@@ -27,8 +27,13 @@ later).
 | 10 | `20260707120900_loyalty_audit.sql` | `orders.loyalty_points_earned/_redeemed/_awarded_at`; `loyalty_transactions` ledger (idempotency + reconciling `balance_after`); `place_order`/`adjust_loyalty_points` write the ledger under a row lock |
 | 11 | `20260707121000_integration_settings.sql` | `integration_settings` (secrets hidden; no client grants) + admin-only `list_/upsert_integration_settings()` RPCs (return `has_secret` only) |
 | 12 | `20260707121100_realtime_orders.sql` | Adds `orders` to the `supabase_realtime` publication (guarded no-op off Supabase) for the admin live console |
+| 13 | `20260707121200_perf_indexes.sql` | High-traffic composite/partial indexes (orders by branch/status/customer + created_at, sync queue, Lazywait id, catalog); drops redundant single-column orders indexes |
+| 14 | `20260707121300_payments_and_sync.sql` | `payment_records` + `integration_sync_logs` (staff-read RLS); service-role-only `confirm_order_payment()` + `record_order_sync()` hooks |
+| 15 | `20260707121400_order_idempotency.sql` | `orders.idempotency_key` + partial unique index; `place_order` gains `p_idempotency_key` (retry-safe, no duplicate orders) |
 
 `seed.sql` holds idempotent local demo data (catalog + coupons; no auth users).
+See `docs/ARCHITECTURE.md` for the production topology, security boundary, Edge
+Functions, and the high-traffic performance/monitoring/load-test plan.
 
 ## Applying
 
