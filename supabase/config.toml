@@ -1,0 +1,5 @@
+# Minimal Supabase CLI config. Extend as needed (auth, storage, edge runtime).
+project_id = "spicy-meal"
+
+[db]
+major_version = 15
