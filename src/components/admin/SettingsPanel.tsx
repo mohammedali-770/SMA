@@ -634,7 +634,7 @@ export const SettingsPanel: React.FC = () => {
                       <div className="p-3 bg-slate-50/60 rounded-xl flex items-center justify-between">
                         <div>
                           <span className="font-extrabold text-slate-700 block text-[10px]">{isRTL ? 'إرسال الرسائل التنبيهية التلقائية' : 'Activate SMS Alerts'}</span>
-                          <span className="text-[8px] text-slate-400 font-bold block mt-0.5">{isRTL ? 'إرسال كود التحقق OTP وتحديثات الطلبات للعملاء' : 'Send verification codes and live order updates to customer mobile phones'}</span>
+                          <span className="text-[8px] text-slate-400 font-bold block mt-0.5">{isRTL ? 'قناة احتياطية — تُستخدم فقط عند إيقاف إشعارات التطبيق (الرسائل النصية مدفوعة)' : 'Fallback channel — used only when app push is disabled (SMS is billable)'}</span>
                         </div>
                         <input 
                           type="checkbox"
@@ -702,7 +702,7 @@ export const SettingsPanel: React.FC = () => {
                       <div className="p-3 bg-slate-50/60 rounded-xl flex items-center justify-between">
                         <div>
                           <span className="font-extrabold text-slate-700 block text-[10px]">{isRTL ? 'تمكين التنبيهات اللحظية للجوّال' : 'Enable Mobile Device Push Notification Service'}</span>
-                          <span className="text-[8px] text-slate-400 font-bold block mt-0.5">{isRTL ? 'إرسال عروض ترويجية وتحديثات لحظية لتجهيز الطلب على هواتف العملاء' : 'Broadcast promos and order preparation status updates to iOS & Android customers'}</span>
+                          <span className="text-[8px] text-slate-400 font-bold block mt-0.5">{isRTL ? 'القناة الأساسية — إشعارات مجانية داخل التطبيق لتحديثات الطلب (مفضّلة على الرسائل النصية)' : 'Primary channel — free in-app push for order updates, preferred over SMS'}</span>
                         </div>
                         <input 
                           type="checkbox"
@@ -731,8 +731,8 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                         <p className="text-[8px] text-slate-400 font-bold leading-snug">
                           {isRTL
-                            ? 'يتم تسجيل رسالة محاكاة عند تأكيد الطلب وعند كل تغيير في حالته — فقط عند تفعيل مزوّد الرسائل النصية أو الإشعارات أعلاه.'
-                            : 'A simulated message is recorded on order confirmation and each status change — only while the SMS or Push provider above is enabled.'}
+                            ? 'يتم تسجيل رسالة محاكاة عند تأكيد الطلب وعند كل تغيير في حالته — تُرسل عبر إشعارات التطبيق إن كانت مفعّلة، وإلا عبر الرسائل النصية كقناة احتياطية.'
+                            : 'A simulated message is recorded on order confirmation and each status change — delivered via in-app push when enabled, otherwise SMS as a fallback.'}
                         </p>
 
                         {integrationEvents.length === 0 ? (

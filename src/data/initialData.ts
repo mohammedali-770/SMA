@@ -492,7 +492,9 @@ export const INITIAL_SMS_SETTINGS: SmsSettings = {
 export const INITIAL_NOTIFICATION_SETTINGS: NotificationSettings = {
   providerName: 'onesignal',
   apiKey: 'os_app_id_99228833-abcd-1234',
-  isEnabled: false
+  // Push is the primary customer-messaging channel (free, in-app), so it is on
+  // by default; SMS is only a fallback for when push is disabled.
+  isEnabled: true
 };
 
 export const INITIAL_LOYALTY_SETTINGS: LoyaltySettings = {
