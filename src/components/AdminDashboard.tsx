@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ADMIN_LOCALES } from './admin/adminLocales';
@@ -84,6 +84,8 @@ export const AdminDashboard: React.FC = () => {
             onClick={() => setSoundMuted(!soundMuted)}
             className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
             title={soundMuted ? t.sound_alert_off : t.sound_alert_on}
+            aria-label={soundMuted ? t.sound_alert_off : t.sound_alert_on}
+            aria-pressed={soundMuted}
           >
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
@@ -106,8 +108,9 @@ export const AdminDashboard: React.FC = () => {
           <button 
             onClick={() => setAdminLang(adminLang === 'en' ? 'ar' : 'en')}
             className="text-xs bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl font-bold text-gray-800 flex items-center gap-1"
+            aria-label={adminLang === 'en' ? 'Switch language to Arabic' : 'التبديل إلى اللغة الإنجليزية'}
           >
-            ✕ {adminLang.toUpperCase()}
+            <Languages className="w-3.5 h-3.5" aria-hidden="true" /> {adminLang.toUpperCase()}
           </button>
         </div>
       </div>

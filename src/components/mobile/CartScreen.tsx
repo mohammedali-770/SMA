@@ -98,6 +98,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                               <button 
                                 onClick={() => removeFromCart(item.cartItemId)}
                                 className="text-gray-300 hover:text-red-500 transition-colors p-0.5"
+                                aria-label={isRTL ? 'إزالة العنصر' : 'Remove item'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -121,6 +122,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                               <button 
                                 onClick={() => updateCartQuantity(item.cartItemId, -1)}
                                 className="w-5 h-5 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-100"
+                                aria-label={isRTL ? 'إنقاص الكمية' : 'Decrease quantity'}
                               >
                                 <Minus className="w-3 h-3" />
                               </button>
@@ -128,6 +130,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                               <button 
                                 onClick={() => updateCartQuantity(item.cartItemId, 1)}
                                 className="w-5 h-5 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-600 hover:bg-gray-100"
+                                aria-label={isRTL ? 'زيادة الكمية' : 'Increase quantity'}
                               >
                                 <Plus className="w-3 h-3" />
                               </button>

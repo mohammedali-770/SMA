@@ -148,6 +148,7 @@ export const LiveOrdersPanel: React.FC = () => {
               <button 
                 onClick={() => setActiveReceiptOrder(null)}
                 className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-400 hover:bg-gray-100 transition-all"
+                aria-label={isRTL ? 'إغلاق' : 'Close'}
               >
                 ✕
               </button>

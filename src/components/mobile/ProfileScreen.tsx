@@ -226,6 +226,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ isLoggedIn, setIsL
                           <button 
                             onClick={() => deleteAddress(addr.id)}
                             className="text-gray-300 hover:text-red-500 p-1"
+                            aria-label={isRTL ? 'حذف العنوان' : 'Delete address'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
