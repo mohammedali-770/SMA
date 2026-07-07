@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ClipboardList, Trash2, User } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order } from '../../types';
-import { formatRiyadhDateTime } from '../../utils/calculations';
+import { formatRiyadhDateTime, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
 
 interface ProfileScreenProps {
@@ -182,7 +182,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ isLoggedIn, setIsL
                                   {formatRiyadhDateTime(order.createdAt)}
                                 </span>
                                 <span className="text-[9.5px] font-extrabold text-secondary block mt-0.5">
-                                  {order.total.toFixed(2)} {t.sar}
+                                  {formatSAR(order.total, mobileLang)}
                                 </span>
                               </div>
                               <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-full uppercase ${

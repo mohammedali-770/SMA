@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Eye } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
-import { getVATBreakdown } from '../../utils/calculations';
+import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 
 export const LiveOrdersPanel: React.FC = () => {
@@ -89,7 +89,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           {isRTL ? order.branchNameAr : order.branchNameEn}
                         </td>
                         <td className="px-4 py-3.5 font-bold text-secondary">
-                          {order.total.toFixed(2)} SAR
+                          {formatSAR(order.total, adminLang)}
                         </td>
                         <td className="px-4 py-3.5">
                           <span className={`text-[9.5px] font-black px-2.5 py-0.5 rounded-full uppercase ${
@@ -213,7 +213,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      <span className="font-black text-secondary">{(item.price * item.quantity).toFixed(2)} SAR</span>
+                      <span className="font-black text-secondary">{formatSAR(item.price * item.quantity, adminLang)}</span>
                     </div>
                   ))}
                 </div>
@@ -223,36 +223,36 @@ export const LiveOrdersPanel: React.FC = () => {
               <div className="pt-2 border-t border-gray-100 space-y-1">
                 <div className="flex justify-between text-gray-500">
                   <span>Subtotal:</span>
-                  <span>{activeReceiptOrder.subtotal.toFixed(2)} SAR</span>
+                  <span>{formatSAR(activeReceiptOrder.subtotal, adminLang)}</span>
                 </div>
                 {activeReceiptOrder.deliveryFee > 0 && (
                   <div className="flex justify-between text-gray-500">
                     <span>Delivery Fee:</span>
-                    <span>+{activeReceiptOrder.deliveryFee.toFixed(2)} SAR</span>
+                    <span>+{formatSAR(activeReceiptOrder.deliveryFee, adminLang)}</span>
                   </div>
                 )}
                 {(activeReceiptOrder.discountAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-emerald-600">
                     <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}:</span>
-                    <span>-{(activeReceiptOrder.discountAmount ?? 0).toFixed(2)} SAR</span>
+                    <span>-{formatSAR(activeReceiptOrder.discountAmount ?? 0, adminLang)}</span>
                   </div>
                 )}
                 {(activeReceiptOrder.loyaltyDiscountAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-purple-600">
                     <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}:</span>
-                    <span>-{(activeReceiptOrder.loyaltyDiscountAmount ?? 0).toFixed(2)} SAR</span>
+                    <span>-{formatSAR(activeReceiptOrder.loyaltyDiscountAmount ?? 0, adminLang)}</span>
                   </div>
                 )}
                 <div className="flex justify-between font-black text-gray-900 text-sm pt-1 border-t border-gray-50">
                   <span>Grand Total (VAT Inclusive):</span>
-                  <span>{activeReceiptOrder.total.toFixed(2)} SAR</span>
+                  <span>{formatSAR(activeReceiptOrder.total, adminLang)}</span>
                 </div>
               </div>
 
               {/* Mandatory VAT details stamp */}
               <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-400 flex justify-between">
                 <span>{brandSettings?.vatPercentage || 15}% Saudi VAT component:</span>
-                <span className="font-semibold">{getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount} SAR</span>
+                <span className="font-semibold">{formatSAR(getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount, adminLang)}</span>
               </div>
 
             </div>

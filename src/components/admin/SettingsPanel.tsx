@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, Bell, Check, CreditCard, Gift, Layers, MessageSquare, RefreshCw, Sliders } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
+import { formatSAR } from '../../utils/calculations';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -799,7 +800,7 @@ export const SettingsPanel: React.FC = () => {
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
                             <span className="text-[8.5px] font-bold text-gray-400 uppercase block">{isRTL ? 'إجمالي قيمة خصومات النقاط' : 'Deducted Points Discount Value'}</span>
                             <p className="text-sm font-black text-primary mt-1">
-                              {(profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2)} SAR
+                              {formatSAR(profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1), adminLang)}
                             </p>
                             <span className="text-[8px] text-slate-400 block mt-0.5">{isRTL ? 'مستقطعة من قيمة الفواتير المكتملة' : 'Calculated at active conversions'}</span>
                           </div>
@@ -807,9 +808,9 @@ export const SettingsPanel: React.FC = () => {
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
                             <span className="text-[8.5px] font-bold text-gray-400 uppercase block">{isRTL ? 'متوسط قيمة الاسترداد لكل عميل' : 'Average Cashback per User'}</span>
                             <p className="text-sm font-black text-green-700 mt-1">
-                              {(profiles.filter(p => p.role === 'customer').length 
+                              {formatSAR(profiles.filter(p => p.role === 'customer').length
                                 ? (profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1) / profiles.filter(p => p.role === 'customer').length) 
-                                : 0).toFixed(2)} SAR
+                                : 0, adminLang)}
                             </p>
                             <span className="text-[8px] text-slate-400 block mt-0.5">{isRTL ? 'قيمة مضافة للمشتريات' : 'Avg customer wallet balance'}</span>
                           </div>
@@ -824,7 +825,7 @@ export const SettingsPanel: React.FC = () => {
                           <div className="grid grid-cols-1 gap-2.5">
                             {profiles.filter(p => p.role === 'customer').map(customer => {
                               const currentPoints = customer.loyaltyPoints || 0;
-                              const currentSAR = (currentPoints * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2);
+                              const currentSAR = formatSAR(currentPoints * (loyaltySettings.discountPerPoint || 0.1), adminLang);
                               const tier = currentPoints >= 300 
                                 ? (isRTL ? '👑 ذهبي' : '👑 Gold') 
                                 : currentPoints >= 100 
@@ -872,7 +873,7 @@ export const SettingsPanel: React.FC = () => {
                                         <span className="text-[8px] text-slate-400 font-bold">{isRTL ? 'نقب' : 'pts'}</span>
                                       </div>
                                       <span className="text-[8px] text-slate-400 font-medium block mt-0.5">
-                                        (= {currentSAR} SAR)
+                                        (= {currentSAR})
                                       </span>
                                     </div>
                                   </div>

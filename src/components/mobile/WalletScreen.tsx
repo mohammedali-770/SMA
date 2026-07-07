@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Award, History, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { formatRiyadhDateTime } from '../../utils/calculations';
+import { formatRiyadhDateTime, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
 
 interface WalletScreenProps {
@@ -174,7 +174,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                             <span className="text-xs font-bold text-purple-100">{isRTL ? 'نقطة' : 'pts'}</span>
                           </div>
                           <span className="text-[9.5px] text-purple-100 block mt-1">
-                            (= {((currentUser.loyaltyPoints || 0) * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2)} {t.sar} {isRTL ? 'رصيد مسترجع' : 'cashback credit'})
+                            (= {formatSAR((currentUser.loyaltyPoints || 0) * (loyaltySettings?.discountPerPoint || 0.1), mobileLang)} {isRTL ? 'رصيد مسترجع' : 'cashback credit'})
                           </span>
                         </div>
 
@@ -227,7 +227,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                       </div>
                       <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 px-3 py-1 rounded-xl text-center">
                         <span className="text-[9px] font-bold block uppercase leading-none">{isRTL ? 'رصيد المحفظة' : 'Wallet Balance'}</span>
-                        <span className="text-sm font-black text-emerald-600 font-mono mt-1 block leading-none">{walletBalance.toFixed(2)} {t.sar}</span>
+                        <span className="text-sm font-black text-emerald-600 font-mono mt-1 block leading-none">{formatSAR(walletBalance, mobileLang)}</span>
                       </div>
                     </div>
 

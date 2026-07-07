@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Download, Edit, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Product, Category } from '../../types';
-import { getCSVTemplateData, parseCSVMenu } from '../../utils/calculations';
+import { getCSVTemplateData, parseCSVMenu, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 
 export const MenuManagementPanel: React.FC = () => {
@@ -245,7 +245,7 @@ export const MenuManagementPanel: React.FC = () => {
                               <td className="px-4 py-2 text-primary font-bold">
                                 {catMatch ? (isRTL ? catMatch.nameAr : catMatch.nameEn) : 'No Category'}
                               </td>
-                              <td className="px-4 py-2 font-black text-secondary">{p.price.toFixed(2)} SAR</td>
+                              <td className="px-4 py-2 font-black text-secondary">{formatSAR(p.price, adminLang)}</td>
                               <td className="px-4 py-2 font-semibold text-gray-600">{p.calories} kcal</td>
                               <td className="px-4 py-2">
                                 <div className="flex gap-1.5">
@@ -420,7 +420,7 @@ export const MenuManagementPanel: React.FC = () => {
                             {csvResult.products.map((cp, idx) => (
                               <tr key={idx}>
                                 <td className="px-3 py-1.5 font-bold text-gray-800">{cp.nameEn}</td>
-                                <td className="px-3 py-1.5 font-bold text-secondary">{cp.price.toFixed(2)} SAR</td>
+                                <td className="px-3 py-1.5 font-bold text-secondary">{formatSAR(cp.price, adminLang)}</td>
                                 <td className="px-3 py-1.5">{cp.calories} kcal</td>
                               </tr>
                             ))}

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Product, ModifierGroup, Modifier, SavedAddress, CartItem } from '../types';
-import { calculateDistance, getVATBreakdown, formatRiyadhDateTime } from '../utils/calculations';
+import { calculateDistance, getVATBreakdown, formatRiyadhDateTime, formatSAR } from '../utils/calculations';
 import { LOCALES } from './mobile/mobileLocales';
 import { WalletScreen } from './mobile/WalletScreen';
 import { HomeScreen } from './mobile/HomeScreen';
@@ -447,7 +447,7 @@ export const MobileEmulator: React.FC = () => {
                             </p>
                           )}
                         </div>
-                        <span className="font-black text-gray-900">{(item.price * item.quantity).toFixed(2)} {t.sar}</span>
+                        <span className="font-black text-gray-900">{formatSAR(item.price * item.quantity, mobileLang)}</span>
                       </div>
                     ))}
                   </div>
@@ -456,24 +456,24 @@ export const MobileEmulator: React.FC = () => {
                   <div className="pt-2.5 border-t border-dashed border-slate-200 space-y-1.5 text-xs text-gray-600">
                     <div className="flex justify-between">
                       <span>{t.subtotal}</span>
-                      <span>{activeOrderReceipt.subtotal.toFixed(2)} {t.sar}</span>
+                      <span>{formatSAR(activeOrderReceipt.subtotal, mobileLang)}</span>
                     </div>
                     {activeOrderReceipt.deliveryFee > 0 && (
                       <div className="flex justify-between">
                         <span>{t.delivery_fee}</span>
-                        <span>+{activeOrderReceipt.deliveryFee.toFixed(2)} {t.sar}</span>
+                        <span>+{formatSAR(activeOrderReceipt.deliveryFee, mobileLang)}</span>
                       </div>
                     )}
                     {(activeOrderReceipt.discountAmount ?? 0) > 0 && (
                       <div className="flex justify-between text-emerald-600">
                         <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}</span>
-                        <span>-{(activeOrderReceipt.discountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                        <span>-{formatSAR(activeOrderReceipt.discountAmount ?? 0, mobileLang)}</span>
                       </div>
                     )}
                     {(activeOrderReceipt.loyaltyDiscountAmount ?? 0) > 0 && (
                       <div className="flex justify-between text-purple-600">
                         <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}</span>
-                        <span>-{(activeOrderReceipt.loyaltyDiscountAmount ?? 0).toFixed(2)} {t.sar}</span>
+                        <span>-{formatSAR(activeOrderReceipt.loyaltyDiscountAmount ?? 0, mobileLang)}</span>
                       </div>
                     )}
                     <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-black text-gray-900">
@@ -481,18 +481,18 @@ export const MobileEmulator: React.FC = () => {
                         <span>{t.total}</span>
                         <p className="text-[8px] text-gray-400 font-normal leading-none mt-0.5">{t.vat_label}</p>
                       </div>
-                      <span className="text-base font-black text-secondary">{activeOrderReceipt.total.toFixed(2)} {t.sar}</span>
+                      <span className="text-base font-black text-secondary">{formatSAR(activeOrderReceipt.total, mobileLang)}</span>
                     </div>
 
                     {/* VAT extraction info strictly required in Saudi e-invoicing */}
                     <div className="bg-white p-2 rounded-lg text-[9.5px] text-gray-400 space-y-0.5 mt-2 border border-slate-100">
                       <div className="flex justify-between">
                         <span>{isRTL ? 'المبلغ الخاضع للضريبة:' : 'Amount Excl. VAT:'}</span>
-                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).subtotalExcludingVat} {t.sar}</span>
+                        <span>{formatSAR(getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).subtotalExcludingVat, mobileLang)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>{isRTL ? `ضريبة القيمة المضافة (${brandSettings?.vatPercentage || 15}٪):` : `Saudi VAT portion (${brandSettings?.vatPercentage || 15}%):`}</span>
-                        <span>{getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).vatAmount} {t.sar}</span>
+                        <span>{formatSAR(getVATBreakdown(activeOrderReceipt.total, brandSettings?.vatPercentage || 15).vatAmount, mobileLang)}</span>
                       </div>
                       <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
                         <span>{t.sync_status}:</span>
@@ -660,12 +660,12 @@ export const MobileEmulator: React.FC = () => {
                               <div className="flex items-center gap-1.5">
                                 {mod.price > 0 && (
                                   <span className="text-[10px] text-secondary font-black bg-secondary/10 px-2 py-0.5 rounded-full">
-                                    +{mod.price.toFixed(2)} {t.sar}
+                                    +{formatSAR(mod.price, mobileLang)}
                                   </span>
                                 )}
                                 {mod.price < 0 && (
                                   <span className="text-[10px] text-green-600 font-black bg-green-50 px-2 py-0.5 rounded-full">
-                                    {mod.price.toFixed(2)} {t.sar}
+                                    {formatSAR(mod.price, mobileLang)}
                                   </span>
                                 )}
                                 <div className={`w-4 h-4 rounded flex items-center justify-center border ${isChecked ? 'bg-primary border-primary text-white' : 'border-gray-200'}`}>
@@ -718,8 +718,8 @@ export const MobileEmulator: React.FC = () => {
                       (Object.values(selectedModifiers) as Modifier[][]).forEach(list => {
                         list.forEach(m => { price += m.price; });
                       });
-                      return (price * customizationQty).toFixed(2);
-                    })()} {t.sar}
+                      return formatSAR(price * customizationQty, mobileLang);
+                    })()}
                   </span>
                 </button>
               </div>

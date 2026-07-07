@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getVATBreakdown, riyadhDateOnly } from '../../utils/calculations';
+import { getVATBreakdown, riyadhDateOnly, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 
 export const ReportsPanel: React.FC = () => {
@@ -257,7 +257,7 @@ export const ReportsPanel: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'إجمالي المبيعات المفلترة' : 'Filtered Sales Revenue'}</span>
-                    <p className="text-base font-black text-primary mt-0.5">{repGrossSales.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-primary mt-0.5">{formatSAR(repGrossSales, adminLang)}</p>
                     <span className="text-[8px] text-gray-400">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'Includes 15% VAT'}</span>
                   </div>
 
@@ -269,13 +269,13 @@ export const ReportsPanel: React.FC = () => {
 
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'إجمالي خصومات الكوبونات' : 'Total Coupon Savings'}</span>
-                    <p className="text-base font-black text-slate-800 mt-0.5">{repDiscounts.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-slate-800 mt-0.5">{formatSAR(repDiscounts, adminLang)}</p>
                     <span className="text-[8px] text-purple-600 font-bold">{isRTL ? 'مستقطعة من إيراد المبيعات' : 'Deducted from gross rev'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'رسوم التوصيل المحصلة' : 'Delivery Fees Collected'}</span>
-                    <p className="text-base font-black text-green-700 mt-0.5">{repDeliveryFees.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-green-700 mt-0.5">{formatSAR(repDeliveryFees, adminLang)}</p>
                     <span className="text-[8px] text-gray-400">{isRTL ? 'من طلبات التوصيل الناجحة' : 'From completed deliveries'}</span>
                   </div>
                 </div>
@@ -352,7 +352,7 @@ export const ReportsPanel: React.FC = () => {
                               <td className="py-3 px-4 text-right text-primary font-black">{r.totalRevenue.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right">{r.deliveryFees.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right text-red-500">-{r.discounts.toFixed(2)}</td>
-                              <td className="py-3 px-4 text-right font-mono text-xs">{r.avgTicket.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right font-mono text-xs">{formatSAR(r.avgTicket, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -379,7 +379,7 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-2.5 px-4 font-black text-slate-800 text-xs">{r.name}</td>
                                 <td className="py-2.5 px-4 font-semibold text-slate-500">{r.category}</td>
                                 <td className="py-2.5 px-4 text-center text-slate-900 font-black">{r.qty}</td>
-                                <td className="py-2.5 px-4 text-right text-primary font-black">{r.rev.toFixed(2)} SAR</td>
+                                <td className="py-2.5 px-4 text-right text-primary font-black">{formatSAR(r.rev, adminLang)}</td>
                               </tr>
                             ))
                           )}
@@ -402,7 +402,7 @@ export const ReportsPanel: React.FC = () => {
                             <tr key={i} className="hover:bg-white/50">
                               <td className="py-3 px-4 font-black"><span className="bg-purple-100 text-primary px-2.5 py-1 rounded-lg font-mono text-xs">{r.code}</span></td>
                               <td className="py-3 px-4 text-center font-bold text-slate-800 text-sm">{r.count}</td>
-                              <td className="py-3 px-4 text-right text-secondary font-black text-sm">-{r.savings.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right text-secondary font-black text-sm">-{formatSAR(r.savings, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -425,8 +425,8 @@ export const ReportsPanel: React.FC = () => {
                             <tr key={i} className="hover:bg-white/50">
                               <td className="py-3 px-4 font-black text-slate-800 text-xs">{r.name}</td>
                               <td className="py-3 px-4 text-center">{r.deliveryCount}</td>
-                              <td className="py-3 px-4 text-right text-green-700 font-black">{r.totalFees.toFixed(2)} SAR</td>
-                              <td className="py-3 px-4 text-right font-mono">{r.avgFee.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right text-green-700 font-black">{formatSAR(r.totalFees, adminLang)}</td>
+                              <td className="py-3 px-4 text-right font-mono">{formatSAR(r.avgFee, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
