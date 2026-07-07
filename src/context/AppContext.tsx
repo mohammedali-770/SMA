@@ -9,7 +9,7 @@ import {
   UserProfile, SavedAddress, CartItem, OrderStatus, 
   Modifier, OrderItem, OrderItemModifier,
   BrandSettings, LazywaitSettings, PaymentSettings,
-  SmsSettings, NotificationSettings, LoyaltySettings
+  SmsSettings, NotificationSettings, LoyaltySettings, IntegrationEvent
 } from '../types';
 import { 
   INITIAL_BRANCHES, INITIAL_CATEGORIES, INITIAL_MODIFIER_GROUPS, 
@@ -95,6 +95,8 @@ interface AppContextType {
   updateSmsSettings: (settings: Partial<SmsSettings>) => void;
   notificationSettings: NotificationSettings;
   updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
+  integrationEvents: IntegrationEvent[];
+  clearIntegrationEvents: () => void;
   loyaltySettings: LoyaltySettings;
   updateLoyaltySettings: (settings: Partial<LoyaltySettings>) => void;
 
@@ -125,6 +127,24 @@ export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 export function canTransitionOrder(from: OrderStatus, to: OrderStatus): boolean {
   return from === to || (ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false);
 }
+
+/** Display labels for the payment gateway providers. */
+const PAYMENT_PROVIDER_LABELS: Record<PaymentSettings['providerName'], string> = {
+  moyasar: 'Moyasar',
+  paytabs: 'PayTabs',
+  hyperpay: 'HyperPay',
+  sandbox: 'Sandbox',
+};
+
+/** One-liner describing each status, used in the simulated customer messages. */
+const ORDER_STATUS_MESSAGES: Record<OrderStatus, string> = {
+  received: 'has been received',
+  preparing: 'is now being prepared',
+  ready: 'is ready for pickup/dispatch',
+  out_for_delivery: 'is out for delivery',
+  delivered: 'has been delivered',
+  cancelled: 'has been cancelled',
+};
 
 /**
  * Safely load a persisted value from localStorage, falling back to `fallback`
@@ -256,6 +276,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => loadPersisted('sm_sms_settings', INITIAL_SMS_SETTINGS));
 
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => loadPersisted('sm_notification_settings', INITIAL_NOTIFICATION_SETTINGS));
+  // Simulated SMS/push gateway activity, newest first (capped, see emitIntegrationEvent).
+  const [integrationEvents, setIntegrationEvents] = useState<IntegrationEvent[]>(() => loadPersisted<IntegrationEvent[]>('sm_integration_events', []));
 
   const updateBrandSettings = (updates: Partial<BrandSettings>) => {
     setBrandSettings(prev => {
@@ -333,6 +355,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('sm_availability_matrix', JSON.stringify(availabilityMatrix));
   }, [availabilityMatrix]);
+
+  useEffect(() => {
+    localStorage.setItem('sm_integration_events', JSON.stringify(integrationEvents));
+  }, [integrationEvents]);
 
   // Drive the Tailwind brand tokens from the editable brand settings, so the
   // admin's primary/secondary colour pickers actually re-theme every
@@ -490,6 +516,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Place Order (Real-time trigger)
+  // Append a simulated gateway message to the activity log (newest first),
+  // capped so the persisted log can't grow without bound.
+  const emitIntegrationEvent = (channel: 'sms' | 'push', provider: string, recipient: string, message: string) => {
+    setIntegrationEvents(prev => [
+      { id: generateId('evt'), createdAt: new Date().toISOString(), channel, provider, recipient, message },
+      ...prev,
+    ].slice(0, 50));
+  };
+
+  const clearIntegrationEvents = () => setIntegrationEvents([]);
+
+  // Fan an order event out to the SMS and push channels, each gated by its own
+  // provider toggle. There is no real gateway — this records what *would* be sent.
+  const notifyCustomer = (order: Order, message: string) => {
+    if (smsSettings.isEnabled) emitIntegrationEvent('sms', smsSettings.providerName, order.customerPhone, message);
+    if (notificationSettings.isEnabled) emitIntegrationEvent('push', notificationSettings.providerName, order.customerName, message);
+  };
+
   const placeOrder = () => {
     if (cart.length === 0) return { success: false, error: 'Cart is empty' };
     if (!selectedBranch) return { success: false, error: 'No branch selected' };
@@ -534,6 +578,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const pointsRedeemed = loyaltyActive ? Math.min(Math.max(0, loyaltyPointsRedeemed), availablePoints) : 0;
     const appliedLoyaltyDiscount = Number((pointsRedeemed * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2));
     const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - appliedLoyaltyDiscount);
+
+    // Payment gateway wiring: when enabled the order is treated as paid online
+    // through the configured provider; when disabled it falls back to cash on
+    // delivery (still placeable, settled on delivery).
+    const paymentEnabled = paymentSettings.isEnabled;
+    const paymentMethod = paymentEnabled
+      ? `${PAYMENT_PROVIDER_LABELS[paymentSettings.providerName]}${paymentSettings.isLiveMode ? '' : ' (Test)'}`
+      : 'Cash on Delivery';
 
     // Build order items
     const orderItems: OrderItem[] = cart.map((cItem, index) => {
@@ -589,7 +641,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       discountAmount: discountAmount,
       loyaltyDiscountAmount: appliedLoyaltyDiscount,
       total: finalTotal,
-      paymentStatus: 'pending',
+      paymentStatus: paymentEnabled ? 'paid' : 'pending',
+      paymentMethod,
       orderSyncStatus: 'not_synced', // Starts as unsynced (representing Lazywait connector status)
       createdAt: new Date().toISOString(),
       address: deliveryAddress,
@@ -615,27 +668,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearCart();
     setLoyaltyPointsRedeemed(0);
 
+    // Simulated order-confirmation message to the customer (SMS/push per toggles).
+    notifyCustomer(newOrder, `Order ${orderNumber} confirmed — ${finalTotal.toFixed(2)} SAR, ${paymentEnabled ? 'paid via ' + paymentMethod : paymentMethod}.`);
+
     return { success: true, orderId, order: newOrder };
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    // Reject invalid jumps (e.g. delivered -> received, cancelled -> delivered)
+    // up front, so we only mutate state and notify on a real transition.
+    const target = orders.find(o => o.id === orderId);
+    if (!target || !canTransitionOrder(target.status, status)) return;
+
     setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        // Reject invalid jumps (e.g. delivered -> received, cancelled -> delivered).
-        if (!canTransitionOrder(o.status, status)) {
-          return o;
-        }
-        // Mocking external POS sync update status
-        const syncStatusVal = status === 'received' ? 'not_synced' : 'synced';
-        return {
-          ...o,
-          status,
-          orderSyncStatus: syncStatusVal as any,
-          paymentStatus: status === 'delivered' ? 'paid' : o.paymentStatus
-        };
-      }
-      return o;
+      if (o.id !== orderId) return o;
+      // Mocking external POS sync update status
+      const syncStatusVal = status === 'received' ? 'not_synced' : 'synced';
+      return {
+        ...o,
+        status,
+        orderSyncStatus: syncStatusVal as any,
+        paymentStatus: status === 'delivered' ? 'paid' : o.paymentStatus
+      };
     }));
+
+    // Simulated customer notification for the status change (SMS/push per toggles).
+    notifyCustomer(target, `Order ${target.orderNumber} ${ORDER_STATUS_MESSAGES[status]}.`);
   };
 
   // Phase 8 Admin Features: Category CRUD
@@ -836,6 +894,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateSmsSettings,
       notificationSettings,
       updateNotificationSettings,
+      integrationEvents,
+      clearIntegrationEvents,
       loyaltySettings,
       updateLoyaltySettings,
 

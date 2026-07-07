@@ -256,6 +256,16 @@ export const LiveOrdersPanel: React.FC = () => {
                 <span className="font-semibold">{formatSAR(getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount, adminLang)}</span>
               </div>
 
+              <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-400 flex justify-between items-center">
+                <span>Payment method:</span>
+                <span className="font-semibold flex items-center gap-1.5 text-gray-600">
+                  {activeReceiptOrder.paymentMethod || 'Cash on Delivery'}
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${activeReceiptOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    {activeReceiptOrder.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                  </span>
+                </span>
+              </div>
+
             </div>
           </div>
         </div>
