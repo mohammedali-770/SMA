@@ -23,6 +23,7 @@ later).
 | 6 | `20260707120500_orders.sql` | `orders`, `order_items`, `order_item_modifiers`; order-number generator; RLS |
 | 7 | `20260707120600_app_settings.sql` | `app_settings` singleton (brand + VAT + loyalty); RLS |
 | 8 | `20260707120700_place_order.sql` | `place_order()` RPC — the only path that creates an order |
+| 9 | `20260707120800_loyalty.sql` | `place_order()` gains `p_loyalty_points` (server-side earn + redeem); `adjust_loyalty_points()` admin RPC |
 
 `seed.sql` holds idempotent local demo data (catalog + coupons; no auth users).
 
@@ -60,9 +61,14 @@ Key guarantees (all verified):
   `place_order()`, which recomputes subtotal, modifiers, delivery fee, coupon,
   and VAT server-side and leaves `payment_status = 'pending'`.
 - **No privilege escalation** — customers can't change their own `role` or
-  `loyalty_points` (column-level grants), and can't create/cancel orders.
+  `loyalty_points` directly (column-level grants), and can't create/cancel orders.
 - **Coupon codes are secret** — never client-readable; checked via
   `validate_coupon()`.
+- **Loyalty is server-authoritative** — points are earned and redeemed only
+  inside `place_order()` (validated against the real balance + the
+  `min_points_to_redeem` threshold, discount capped to the order), and adjusted
+  by admins only via the `adjust_loyalty_points()` `SECURITY DEFINER` RPC. Both
+  are the only sanctioned way to write the client-hidden `loyalty_points` column.
 
 ## Bootstrapping the first admin
 
@@ -79,8 +85,8 @@ update public.profiles set role = 'admin' where id = '<auth-user-uuid>';
 - SMS/OTP and phone-auth wiring.
 - Lazywait client, sync worker, and sync logs (the `orders.sync_status` /
   `lazywait_*` columns are reserved placeholders only).
-- Loyalty redemption/earning inside `place_order` (points are tracked on
-  `profiles` but not yet spent/awarded).
+- Store-credit wallet + voucher redemption (the mobile Wallet's points→credit
+  conversion has no backing table yet; those actions stay disabled).
 - Staff-management RPC (role changes are done via service role for now).
 - Storage buckets/policies for product images.
 

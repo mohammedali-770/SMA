@@ -130,6 +130,22 @@ export const profiles = {
 };
 
 // ---------------------------------------------------------------------------
+// Loyalty (server-authoritative point mutations)
+// ---------------------------------------------------------------------------
+export const loyalty = {
+  /**
+   * Admin-only manual point adjustment (delta may be negative). RLS/`is_admin()`
+   * inside the RPC rejects non-admins. Earning + checkout redemption are handled
+   * atomically inside place_order, not here.
+   */
+  async adjustPoints(customerId: string, delta: number): Promise<DbProfile> {
+    return ok<DbProfile>(await supabase.rpc('adjust_loyalty_points', {
+      p_customer_id: customerId, p_delta: delta,
+    }));
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Catalog (public reads)
 // ---------------------------------------------------------------------------
 export const catalog = {
@@ -165,9 +181,10 @@ export interface PlaceOrderInput {
   addressId?: string | null;
   couponCode?: string | null;
   notes?: string | null;
+  loyaltyPoints?: number;
 }
 export const orders = {
-  /** Server-authoritative order creation (recomputes all amounts + coupon + VAT). */
+  /** Server-authoritative order creation (recomputes all amounts + coupon + VAT + loyalty). */
   async place(input: PlaceOrderInput): Promise<DbOrder> {
     return ok<DbOrder>(await supabase.rpc('place_order', {
       p_branch_id: input.branchId,
@@ -176,6 +193,7 @@ export const orders = {
       p_address_id: input.addressId ?? null,
       p_coupon_code: input.couponCode ?? null,
       p_notes: input.notes ?? null,
+      p_loyalty_points: input.loyaltyPoints ?? 0,
     }));
   },
   /** RLS returns own orders for a customer, all orders for staff. */

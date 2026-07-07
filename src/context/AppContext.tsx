@@ -15,7 +15,7 @@ import {
   INITIAL_SMS_SETTINGS, INITIAL_NOTIFICATION_SETTINGS, INITIAL_LOYALTY_SETTINGS,
 } from '../data/initialData';
 import { supabase } from '../lib/supabase';
-import { auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi, admin as adminApi, profiles as profilesApi } from '../lib/api';
+import { auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi, admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi } from '../lib/api';
 import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
   mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
@@ -116,8 +116,11 @@ interface AppContextType {
   loyaltySettings: LoyaltySettings;
   updateLoyaltySettings: (settings: Partial<LoyaltySettings>) => void;
 
-  // Customer Loyalty (read-only in this build — no server RPC for point mutations)
+  // Customer Loyalty. Earning + checkout redemption + admin adjustment are
+  // server-authoritative (place_order / adjust_loyalty_points). The store-credit
+  // wallet has no backend, so its conversions stay disabled.
   loyaltyMutationsEnabled: boolean;
+  walletCreditEnabled: boolean;
   loyaltyPointsRedeemed: number;
   setLoyaltyPointsRedeemed: (points: number) => void;
   loyaltyDiscountAmount: number;
@@ -199,15 +202,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [newOrderAlert, setNewOrderAlert] = useState<boolean>(false);
   const [soundMuted, setSoundMuted] = useState<boolean>(false);
 
-  // Loyalty point redemption/earning has no server RPC in this build, so it is
-  // read-only: the balance is shown from profiles.loyalty_points but cannot be
-  // mutated from the client (a column-level GRANT blocks it, and place_order
-  // does not award/redeem). Kept 0 so no unbacked discount is ever staged.
-  const loyaltyMutationsEnabled = false;
+  // Loyalty earning + checkout redemption are handled server-side by
+  // place_order, and admin point adjustments by adjust_loyalty_points — so
+  // point mutations are enabled. The store-credit wallet + voucher claims have
+  // no backend table, so those specific conversions stay disabled.
+  const loyaltyMutationsEnabled = true;
+  const walletCreditEnabled = false;
   const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemedState] = useState<number>(0);
   const setLoyaltyPointsRedeemed = (points: number) => {
-    if (!loyaltyMutationsEnabled) { setLoyaltyPointsRedeemedState(0); return; }
-    setLoyaltyPointsRedeemedState(points);
+    setLoyaltyPointsRedeemedState(Math.max(0, points));
   };
   const loyaltyDiscountAmount = Number((loyaltyPointsRedeemed * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2));
 
@@ -490,6 +493,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addressId: checkoutType === 'delivery' ? selectedAddressId : null,
         couponCode: couponCode || null,
         notes: null,
+        loyaltyPoints: currentUser.role === 'customer' ? loyaltyPointsRedeemed : 0,
       });
       // The RPC returns the order row without its items; refetch (with items) so
       // the receipt renders the full breakdown recomputed by the server.
@@ -497,6 +501,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const mapped = rows.map(mapOrder);
       setOrders(mapped);
       const full = mapped.find(o => o.id === created.id);
+
+      // The order changed the loyalty balance (redeemed + earned); refetch the
+      // profile so the wallet/checkout reflect the new balance.
+      const dbProfile = await auth.myProfile();
+      if (dbProfile) {
+        const u = mapProfile(dbProfile);
+        setCurrentUser(u);
+        setProfiles(prev => (prev.some(p => p.id === u.id) ? prev.map(p => (p.id === u.id ? u : p)) : [u]));
+      }
 
       clearCart();
       setNewOrderAlert(true);
@@ -674,12 +687,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateNotificationSettings = (u: Partial<NotificationSettings>) => setNotificationSettings(prev => ({ ...prev, ...u }));
   const clearIntegrationEvents = () => setIntegrationEvents([]);
 
-  // Loyalty point mutations are not supported by the current backend.
-  const updateCustomerPoints = (_userId: string, _points: number) => {
-    if (!loyaltyMutationsEnabled) {
-      console.warn('[Spicy Meal] Loyalty point adjustments are read-only in this build.');
-      return;
-    }
+  // Admin loyalty point adjustment. Callers pass the desired absolute balance
+  // (e.g. currentPoints + 50); we derive the delta and apply it through the
+  // admin-only adjust_loyalty_points RPC, then refresh the affected profile.
+  const updateCustomerPoints = (userId: string, points: number) => {
+    const current = profiles.find(p => p.id === userId)?.loyaltyPoints ?? 0;
+    const delta = Math.round(points - current);
+    if (delta === 0) return;
+    void (async () => {
+      try {
+        const updated = mapProfile(await loyaltyApi.adjustPoints(userId, delta));
+        setProfiles(prev => prev.map(p => (p.id === userId ? updated : p)));
+        setCurrentUser(prev => (prev.id === userId ? updated : prev));
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
+      }
+    })();
   };
 
   return (
@@ -765,6 +788,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateLoyaltySettings,
 
       loyaltyMutationsEnabled,
+      walletCreditEnabled,
       loyaltyPointsRedeemed,
       setLoyaltyPointsRedeemed,
       loyaltyDiscountAmount,
