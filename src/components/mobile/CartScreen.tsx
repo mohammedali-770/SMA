@@ -16,25 +16,29 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
   const {
     cart, cartTotal, updateCartQuantity, removeFromCart, checkoutType, setCheckoutType,
     selectedAddressId, setSelectedAddressId, addresses, deleteAddress,
-    couponCode, setCouponCode, discountAmount,
-    loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, loyaltySettings,
+    couponCode, discountAmount, applyCoupon,
+    loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, loyaltySettings, loyaltyMutationsEnabled,
     currentUser, selectedBranch, placeOrder, brandSettings, mobileLang,
   } = useApp();
   const t = LOCALES[mobileLang];
   const isRTL = mobileLang === 'ar';
   const [couponInput, setCouponInput] = useState('');
   const [couponMsg, setCouponMsg] = useState({ text: '', isError: false });
+  const [placing, setPlacing] = useState(false);
 
-  const handlePlaceOrderClick = () => {
+  const handlePlaceOrderClick = async () => {
     if (!isLoggedIn) {
       onNavigate('profile');
       alert(mobileLang === 'en' ? 'Please login to place an order!' : 'الرجاء تسجيل الدخول لتتمكن من الطلب!');
       return;
     }
-    const result = placeOrder();
+    if (placing) return;
+    setPlacing(true);
+    // place_order runs server-side (recomputes totals, coupon + VAT); the receipt
+    // shown is the authoritative order the database returned.
+    const result = await placeOrder();
+    setPlacing(false);
     if (result.success && result.order) {
-      // Use the order object returned by placeOrder — it is not yet present in
-      // the `orders` array from this render's context snapshot.
       onShowReceipt(result.order);
       onNavigate('profile');
     } else if (result.error) {
@@ -42,21 +46,15 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
     }
   };
 
-  const handleApplyCouponCode = () => {
+  const handleApplyCouponCode = async () => {
     if (!couponInput) return;
-    setCouponCode(couponInput);
-    const clean = couponInput.trim().toUpperCase();
-    if (clean === 'SPICY15' || clean === 'RIYADH10') {
-      setCouponMsg({
-        text: t.coupon_success,
-        isError: false
-      });
-    } else {
-      setCouponMsg({
-        text: t.invalid_coupon,
-        isError: true
-      });
-    }
+    // Validated server-side via the validate_coupon RPC — codes are never
+    // shipped to the client, and place_order re-checks at checkout.
+    const res = await applyCoupon(couponInput);
+    setCouponMsg({
+      text: res.valid ? t.coupon_success : (res.message || t.invalid_coupon),
+      isError: !res.valid,
+    });
   };
 
   return (
@@ -262,6 +260,15 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                         </div>
 
                         {(() => {
+                          // Redemption isn't wired server-side in this build, so
+                          // the balance is shown read-only (no unbacked discount).
+                          if (!loyaltyMutationsEnabled) {
+                            return (
+                              <span className="text-[8px] bg-slate-50 text-slate-500 border border-slate-200/60 p-1.5 rounded-lg font-bold max-w-[150px] leading-tight text-center">
+                                {isRTL ? 'الاستبدال غير متاح حالياً' : 'Redemption coming soon'}
+                              </span>
+                            );
+                          }
                           const perPoint = loyaltySettings.discountPerPoint || 0.1;
                           const balance = currentUser.loyaltyPoints || 0;
                           const preLoyaltyTotal = Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount);
@@ -380,16 +387,16 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                       </div>
                     </div>
 
-                    <button 
+                    <button
                       onClick={handlePlaceOrderClick}
-                      disabled={checkoutType === 'delivery' && selectedBranch && cartTotal < selectedBranch.minDeliveryOrder}
+                      disabled={placing || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)}
                       className={`w-full text-center text-xs font-black py-3 rounded-full shadow-sm mt-2 transition-all ${
-                        checkoutType === 'delivery' && selectedBranch && cartTotal < selectedBranch.minDeliveryOrder
+                        placing || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)
                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           : 'bg-secondary text-white hover:bg-secondary/95 hover:scale-102'
                       }`}
                     >
-                      {t.place_order}
+                      {placing ? (isRTL ? 'جاري إرسال الطلب…' : 'Placing order…') : t.place_order}
                     </button>
                   </div>
 

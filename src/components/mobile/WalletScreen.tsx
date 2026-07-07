@@ -11,7 +11,7 @@ interface WalletScreenProps {
 }
 
 export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNavigate, onToast }) => {
-  const { currentUser, updateCustomerPoints, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltySettings, orders, mobileLang } = useApp();
+  const { currentUser, updateCustomerPoints, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltySettings, loyaltyMutationsEnabled, orders, mobileLang } = useApp();
   const t = LOCALES[mobileLang];
   const isRTL = mobileLang === 'ar';
   const [walletBalance, setWalletBalance] = useState<number>(() => {
@@ -232,16 +232,16 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                     </div>
 
                     <div className="flex gap-2">
-                      <button 
-                        disabled={currentUser.loyaltyPoints < 100}
+                      <button
+                        disabled={!loyaltyMutationsEnabled || currentUser.loyaltyPoints < 100}
                         onClick={() => handleConvertPoints(100, 10)}
                         className="flex-1 bg-slate-50 hover:bg-purple-50 text-primary border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
                       >
                         <span className="block text-[11px] font-black">{isRTL ? 'تحويل ١٠٠ نقطة' : 'Convert 100 Pts'}</span>
                         <span className="block text-[9px] text-secondary font-bold mt-0.5">{isRTL ? 'للحصول على ١٠ ر.س' : 'Get 10 SAR'}</span>
                       </button>
-                      <button 
-                        disabled={currentUser.loyaltyPoints < 250}
+                      <button
+                        disabled={!loyaltyMutationsEnabled || currentUser.loyaltyPoints < 250}
                         onClick={() => handleConvertPoints(250, 30)}
                         className="flex-1 bg-slate-50 hover:bg-purple-50 text-primary border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
                       >
@@ -250,9 +250,9 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                       </button>
                     </div>
 
-                    {currentUser.loyaltyPoints < 100 && (
-                      <p className="text-[9.5px] text-amber-600 font-semibold text-center mt-1">
-                        ⚠️ {isRTL ? 'تحتاج إلى ١٠٠ نقطة على الأقل للبدء بتحويل النقاط لرصيد مالي' : 'You need at least 100 points to start converting points to credit'}
+                    {!loyaltyMutationsEnabled && (
+                      <p className="text-[9.5px] text-slate-500 font-semibold text-center mt-1">
+                        {isRTL ? 'استبدال النقاط غير متاح في هذه النسخة (عرض فقط)' : 'Point redemption is read-only in this build (display only)'}
                       </p>
                     )}
                   </div>
@@ -297,8 +297,8 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                               </p>
                             </div>
 
-                            <button 
-                              disabled={!isUnlocked}
+                            <button
+                              disabled={!isUnlocked || !loyaltyMutationsEnabled}
                               onClick={() => handleClaimVoucher(reward)}
                               className={`text-[9px] font-black px-3 py-1.5 rounded-lg transition-all ${
                                 isUnlocked 

@@ -1,0 +1,295 @@
+/**
+ * Translation layer between the Supabase/Postgres row shapes (snake_case,
+ * normalized) exposed by `api.ts` and the app's domain types (camelCase, with
+ * modifiers nested inside groups / items). Keeping the mapping in one place lets
+ * every screen keep consuming the existing `types.ts` shapes unchanged while the
+ * data now comes from Supabase instead of localStorage.
+ */
+import {
+  Branch, Category, Product, ModifierGroup, Modifier, Order, OrderItem,
+  OrderItemModifier, SavedAddress, UserProfile, BrandSettings, LoyaltySettings, SyncStatus,
+} from '../types';
+import {
+  DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier, DbProductModifierGroup,
+  DbBranchAvailability, DbAppSettings, DbProfile, DbAddress, DbOrderWithItems, DbOrderItem,
+  DbOrderItemModifier, DbSyncStatus,
+} from './api';
+import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
+
+const FALLBACK_IMAGE =
+  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+export function mapBranch(b: DbBranch): Branch {
+  return {
+    id: b.id,
+    nameEn: b.name_en,
+    nameAr: b.name_ar,
+    addressEn: b.address_en ?? '',
+    addressAr: b.address_ar ?? '',
+    phone: b.phone ?? '',
+    latitude: b.latitude ?? 0,
+    longitude: b.longitude ?? 0,
+    isActive: b.is_active,
+    deliveryFee: Number(b.delivery_fee),
+    minDeliveryOrder: Number(b.min_delivery_order),
+  };
+}
+
+export function mapCategory(c: DbCategory): Category {
+  return { id: c.id, nameEn: c.name_en, nameAr: c.name_ar, sortOrder: c.sort_order };
+}
+
+/** A product needs the ids of the modifier groups linked to it (M:N join). */
+export function mapProduct(p: DbProduct, links: DbProductModifierGroup[]): Product {
+  return {
+    id: p.id,
+    categoryId: p.category_id,
+    nameEn: p.name_en,
+    nameAr: p.name_ar,
+    descriptionEn: p.description_en ?? '',
+    descriptionAr: p.description_ar ?? '',
+    price: Number(p.price),
+    imageUrl: p.image_url ?? FALLBACK_IMAGE,
+    calories: p.calories ?? 0,
+    isActive: p.is_active,
+    modifierGroupIds: links.filter(l => l.product_id === p.id).map(l => l.group_id),
+  };
+}
+
+export function mapModifier(m: DbModifier): Modifier {
+  return {
+    id: m.id,
+    groupId: m.group_id,
+    nameEn: m.name_en,
+    nameAr: m.name_ar,
+    price: Number(m.price),
+  };
+}
+
+/** Nests each group's active modifiers under it (the app renders them together). */
+export function mapModifierGroup(g: DbModifierGroup, modifiers: DbModifier[]): ModifierGroup {
+  return {
+    id: g.id,
+    nameEn: g.name_en,
+    nameAr: g.name_ar,
+    minSelection: g.min_select,
+    // A null max_select means "no upper bound"; the app expects a number, so use
+    // a large sentinel that still behaves as multi-select.
+    maxSelection: g.max_select ?? 99,
+    isRequired: g.is_required,
+    modifiers: modifiers.filter(m => m.group_id === g.id).map(mapModifier),
+  };
+}
+
+/**
+ * Builds the availability matrix the app expects (productId -> branchId -> bool).
+ * The table only stores explicit rows; an absent row means "available", so we
+ * seed every product/branch pair to true and then apply the stored exceptions.
+ */
+export function buildAvailabilityMatrix(
+  products: DbProduct[], branches: DbBranch[], rows: DbBranchAvailability[],
+): { [productId: string]: { [branchId: string]: boolean } } {
+  const matrix: { [productId: string]: { [branchId: string]: boolean } } = {};
+  for (const p of products) {
+    matrix[p.id] = {};
+    for (const b of branches) matrix[p.id][b.id] = true;
+  }
+  for (const r of rows) {
+    if (!matrix[r.product_id]) matrix[r.product_id] = {};
+    matrix[r.product_id][r.branch_id] = r.is_available;
+  }
+  return matrix;
+}
+
+// ---------------------------------------------------------------------------
+// Profiles / addresses
+// ---------------------------------------------------------------------------
+export function mapProfile(p: DbProfile): UserProfile {
+  return {
+    id: p.id,
+    fullName: p.full_name ?? '',
+    phoneNumber: p.phone_number ?? '',
+    role: p.role,
+    email: p.email ?? undefined,
+    createdAt: '',
+    loyaltyPoints: p.loyalty_points,
+  };
+}
+
+export function mapAddress(a: DbAddress): SavedAddress {
+  return {
+    id: a.id,
+    label: a.label ?? '',
+    description: a.description ?? '',
+    nationalShortAddress: a.national_short_address ?? '',
+    lat: a.latitude ?? 0,
+    lng: a.longitude ?? 0,
+    isDefault: a.is_default,
+  };
+}
+
+/** The order carries its delivery address as a jsonb snapshot (snake_case row). */
+function mapAddressSnapshot(snap: Record<string, unknown>): SavedAddress {
+  return {
+    id: String(snap.id ?? ''),
+    label: (snap.label as string) ?? '',
+    description: (snap.description as string) ?? '',
+    nationalShortAddress: (snap.national_short_address as string) ?? '',
+    lat: Number(snap.latitude ?? 0),
+    lng: Number(snap.longitude ?? 0),
+    isDefault: Boolean(snap.is_default),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+/** DB sync_status enum -> the app's SyncStatus labels. */
+function mapSyncStatus(s: DbSyncStatus): SyncStatus {
+  switch (s) {
+    case 'syncing': return 'pending_sync';
+    case 'failed': return 'sync_failed';
+    case 'synced': return 'synced';
+    default: return 'not_synced';
+  }
+}
+
+function mapOrderItemModifier(m: DbOrderItemModifier): OrderItemModifier {
+  return {
+    id: m.id,
+    modifierId: m.modifier_id ?? '',
+    nameEn: m.name_en,
+    nameAr: m.name_ar,
+    price: Number(m.price),
+  };
+}
+
+function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModifier[] }): OrderItem {
+  return {
+    id: i.id,
+    productId: i.product_id ?? '',
+    nameEn: i.name_en,
+    nameAr: i.name_ar,
+    // unit_price already includes the selected modifiers (place_order sums them),
+    // so `price * quantity` matches the persisted line_total on receipts.
+    price: Number(i.unit_price),
+    quantity: i.quantity,
+    selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
+  };
+}
+
+export function mapOrder(o: DbOrderWithItems): Order {
+  return {
+    id: o.id,
+    orderNumber: o.order_number,
+    customerId: o.customer_id ?? '',
+    customerName: o.customer_name ?? '',
+    customerPhone: o.customer_phone ?? '',
+    branchId: o.branch_id,
+    branchNameEn: o.branch_name_en ?? '',
+    branchNameAr: o.branch_name_ar ?? '',
+    status: o.status,
+    orderType: o.order_type,
+    subtotal: Number(o.subtotal),
+    deliveryFee: Number(o.delivery_fee),
+    discountAmount: Number(o.discount_amount),
+    loyaltyDiscountAmount: Number(o.loyalty_discount_amount),
+    total: Number(o.total),
+    paymentStatus: o.payment_status,
+    paymentMethod: o.payment_method ?? undefined,
+    orderSyncStatus: mapSyncStatus(o.sync_status),
+    createdAt: o.created_at,
+    address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
+    items: (o.order_items ?? []).map(mapOrderItem),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Settings (the single app_settings row feeds both brand + loyalty config)
+// ---------------------------------------------------------------------------
+export function mapBrandSettings(s: DbAppSettings): BrandSettings {
+  // Only colour + VAT are modelled server-side; the rest (logo, socials, legal
+  // text, support numbers) have no backend yet, so keep the bundled defaults.
+  return {
+    ...INITIAL_BRAND_SETTINGS,
+    primaryColor: s.primary_color,
+    secondaryColor: s.secondary_color,
+    vatPercentage: Number(s.vat_percentage),
+  };
+}
+
+export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
+  return {
+    isEnabled: s.loyalty_enabled,
+    pointsPerRiyal: Number(s.points_per_riyal),
+    minPointsToRedeem: s.min_points_to_redeem,
+    discountPerPoint: Number(s.discount_per_point),
+  };
+}
+
+/** Reverse map: brand-settings patch -> app_settings columns we can persist. */
+export function brandPatchToDb(patch: Partial<BrandSettings>): Partial<DbAppSettings> {
+  const out: Partial<DbAppSettings> = {};
+  if (patch.primaryColor !== undefined) out.primary_color = patch.primaryColor;
+  if (patch.secondaryColor !== undefined) out.secondary_color = patch.secondaryColor;
+  if (patch.vatPercentage !== undefined) out.vat_percentage = patch.vatPercentage;
+  return out;
+}
+
+export function loyaltyPatchToDb(patch: Partial<LoyaltySettings>): Partial<DbAppSettings> {
+  const out: Partial<DbAppSettings> = {};
+  if (patch.isEnabled !== undefined) out.loyalty_enabled = patch.isEnabled;
+  if (patch.pointsPerRiyal !== undefined) out.points_per_riyal = patch.pointsPerRiyal;
+  if (patch.discountPerPoint !== undefined) out.discount_per_point = patch.discountPerPoint;
+  if (patch.minPointsToRedeem !== undefined) out.min_points_to_redeem = patch.minPointsToRedeem;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Reverse maps: app catalog shapes -> DB insert/update payloads (admin writes)
+// ---------------------------------------------------------------------------
+export function productToDbInsert(p: Omit<Product, 'id'>, sortOrder: number): Partial<DbProduct> {
+  return {
+    category_id: p.categoryId,
+    name_en: p.nameEn,
+    name_ar: p.nameAr,
+    description_en: p.descriptionEn,
+    description_ar: p.descriptionAr,
+    price: p.price,
+    calories: p.calories,
+    image_url: p.imageUrl,
+    is_active: p.isActive,
+    sort_order: sortOrder,
+  };
+}
+
+export function productToDbUpdate(p: Product): Partial<DbProduct> {
+  return {
+    category_id: p.categoryId,
+    name_en: p.nameEn,
+    name_ar: p.nameAr,
+    description_en: p.descriptionEn,
+    description_ar: p.descriptionAr,
+    price: p.price,
+    calories: p.calories,
+    image_url: p.imageUrl,
+    is_active: p.isActive,
+  };
+}
+
+export function categoryToDbInsert(nameEn: string, nameAr: string, sortOrder: number): Partial<DbCategory> {
+  return { name_en: nameEn, name_ar: nameAr, sort_order: sortOrder };
+}
+
+export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
+  const out: Partial<DbBranch> = {};
+  if (patch.deliveryFee !== undefined) out.delivery_fee = patch.deliveryFee;
+  if (patch.minDeliveryOrder !== undefined) out.min_delivery_order = patch.minDeliveryOrder;
+  if (patch.isActive !== undefined) out.is_active = patch.isActive;
+  if (patch.nameEn !== undefined) out.name_en = patch.nameEn;
+  if (patch.nameAr !== undefined) out.name_ar = patch.nameAr;
+  return out;
+}

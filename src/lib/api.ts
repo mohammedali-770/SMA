@@ -56,6 +56,7 @@ export interface DbAddress {
   national_short_address: string | null; latitude: number | null; longitude: number | null;
   is_default: boolean;
 }
+export type DbSyncStatus = 'not_synced' | 'syncing' | 'synced' | 'failed';
 export interface DbOrder {
   id: string; order_number: string; customer_id: string | null;
   customer_name: string | null; customer_phone: string | null;
@@ -65,14 +66,21 @@ export interface DbOrder {
   loyalty_discount_amount: number; vat_amount: number; total: number;
   payment_status: 'pending' | 'paid'; payment_method: string | null;
   coupon_code: string | null; notes: string | null; created_at: string;
+  // Extra columns returned by `select('*')` that the app maps for display.
+  sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
 }
 export interface DbOrderItem {
   id: string; order_id: string; product_id: string | null;
   name_en: string; name_ar: string; unit_price: number; quantity: number; line_total: number;
 }
 export interface DbOrderItemModifier {
-  id: string; order_item_id: string; name_en: string; name_ar: string; price: number;
+  id: string; order_item_id: string; modifier_id: string | null;
+  name_en: string; name_ar: string; price: number;
 }
+/** An order row with its items + modifiers embedded via PostgREST resource embedding. */
+export type DbOrderWithItems = DbOrder & {
+  order_items: (DbOrderItem & { order_item_modifiers: DbOrderItemModifier[] })[];
+};
 export interface DbCoupon {
   id: string; code: string; type: 'percentage' | 'fixed'; value: number;
   is_active: boolean; min_order_amount: number; max_discount_amount: number | null;
@@ -111,6 +119,14 @@ export const auth = {
     if (!user) return null;
     return ok(await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   },
+};
+
+// ---------------------------------------------------------------------------
+// Profiles (RLS: a customer reads only their own row; staff read all)
+// ---------------------------------------------------------------------------
+export const profiles = {
+  list: async () =>
+    ok<DbProfile[]>(await supabase.from('profiles').select('*').order('full_name')),
 };
 
 // ---------------------------------------------------------------------------
@@ -165,6 +181,16 @@ export const orders = {
   /** RLS returns own orders for a customer, all orders for staff. */
   list: async () =>
     ok<DbOrder[]>(await supabase.from('orders').select('*').order('created_at', { ascending: false })),
+  /**
+   * Same as list(), but embeds each order's items + item modifiers in one round
+   * trip (PostgREST resource embedding). RLS is applied to the embedded tables
+   * too, so a customer still only sees their own orders' lines.
+   */
+  listWithItems: async () =>
+    ok<DbOrderWithItems[]>(await supabase
+      .from('orders')
+      .select('*, order_items(*, order_item_modifiers(*))')
+      .order('created_at', { ascending: false })),
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>

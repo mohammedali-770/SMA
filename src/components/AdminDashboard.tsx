@@ -20,7 +20,7 @@ import { MenuManagementPanel } from './admin/MenuManagementPanel';
 
 export const AdminDashboard: React.FC = () => {
   const {
-    orders, profiles, currentUser, setCurrentUser,
+    orders, currentUser,
     adminLang, setAdminLang, newOrderAlert, setNewOrderAlert,
     playNotificationSound, soundMuted, setSoundMuted,
   } = useApp();
@@ -90,18 +90,12 @@ export const AdminDashboard: React.FC = () => {
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
-          {/* Session Role switcher */}
+          {/* Signed-in role (from profiles.role — set by Supabase Auth, not switchable here) */}
           <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
             <span className="text-[10px] text-gray-500 font-extrabold px-1.5 uppercase">{t.role}:</span>
-            {profiles.filter(p => p.role !== 'customer').map(p => (
-              <button 
-                key={p.role}
-                onClick={() => setCurrentUser(p)}
-                className={`text-[10px] font-black px-2.5 py-1 rounded-lg capitalize transition-all ${currentUser.role === p.role ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-white/50'}`}
-              >
-                {p.fullName.split(' ')[0]} ({p.role})
-              </button>
-            ))}
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-lg capitalize bg-primary text-white shadow-sm">
+              {currentUser.fullName ? `${currentUser.fullName.split(' ')[0]} ` : ''}({currentUser.role})
+            </span>
           </div>
 
           {/* Admin panel English/Arabic translation switcher */}

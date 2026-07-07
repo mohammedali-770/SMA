@@ -10,7 +10,7 @@ export const SettingsPanel: React.FC = () => {
     paymentSettings, updatePaymentSettings, smsSettings, updateSmsSettings,
     notificationSettings, updateNotificationSettings, loyaltySettings, updateLoyaltySettings,
     integrationEvents, clearIntegrationEvents,
-    profiles, updateCustomerPoints, currentUser, adminLang, products, categories,
+    profiles, updateCustomerPoints, loyaltyMutationsEnabled, currentUser, adminLang, products, categories,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -22,6 +22,10 @@ export const SettingsPanel: React.FC = () => {
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
             const isAccountant = currentUser.role === 'accountant';
+            // Per-customer loyalty point adjustments have no backend RPC in this
+            // build (a column-level GRANT blocks direct loyalty_points writes), so
+            // the ledger is read-only regardless of role.
+            const pointsLocked = isAccountant || !loyaltyMutationsEnabled;
 
             // Simulate Lazywait Connection Test
             const handleTestConnection = () => {
@@ -871,6 +875,13 @@ export const SettingsPanel: React.FC = () => {
                           <span className="font-extrabold text-slate-800 text-[10px] block uppercase tracking-wider">
                             {isRTL ? 'سجل أرصدة نقاط ولاء العملاء (Customer Loyalty Ledger)' : 'Customer Loyalty Ledger & Point Adjustments'}
                           </span>
+                          {!loyaltyMutationsEnabled && (
+                            <p className="text-[9px] text-slate-500 font-bold bg-slate-100/70 border border-slate-200/60 rounded-lg p-2">
+                              {isRTL
+                                ? 'أرصدة النقاط للعرض فقط في هذه النسخة — لا يوجد إجراء خلفي لتعديل النقاط بعد.'
+                                : 'Point balances are read-only in this build — there is no backend routine to adjust loyalty points yet.'}
+                            </p>
+                          )}
 
                           <div className="grid grid-cols-1 gap-2.5">
                             {profiles.filter(p => p.role === 'customer').map(customer => {
@@ -938,16 +949,16 @@ export const SettingsPanel: React.FC = () => {
                                         className="glass-input p-1.5 text-center font-mono font-bold text-xs text-slate-800 w-16"
                                         disabled={isAccountant}
                                       />
-                                      <button 
+                                      <button
                                         onClick={handleAddPoints}
-                                        disabled={isAccountant || !adjustmentValue}
+                                        disabled={pointsLocked || !adjustmentValue}
                                         className="bg-green-600 hover:bg-green-700 text-white text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
                                       >
                                         +{isRTL ? 'إضافة' : 'Add'}
                                       </button>
-                                      <button 
+                                      <button
                                         onClick={handleDeductPoints}
-                                        disabled={isAccountant || !adjustmentValue || currentPoints <= 0}
+                                        disabled={pointsLocked || !adjustmentValue || currentPoints <= 0}
                                         className="bg-red-500 hover:bg-red-600 text-white text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
                                       >
                                         -{isRTL ? 'خصم' : 'Deduct'}
@@ -956,21 +967,21 @@ export const SettingsPanel: React.FC = () => {
                                     <div className="flex gap-1 justify-end">
                                       <button 
                                         onClick={() => updateCustomerPoints(customer.id, currentPoints + 50)}
-                                        disabled={isAccountant}
+                                        disabled={pointsLocked}
                                         className="text-[8px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-extrabold"
                                       >
                                         +50
                                       </button>
                                       <button 
                                         onClick={() => updateCustomerPoints(customer.id, Math.max(0, currentPoints - 50))}
-                                        disabled={isAccountant || currentPoints < 50}
+                                        disabled={pointsLocked || currentPoints < 50}
                                         className="text-[8px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-extrabold disabled:opacity-40"
                                       >
                                         -50
                                       </button>
                                       <button 
                                         onClick={() => updateCustomerPoints(customer.id, currentPoints + 100)}
-                                        disabled={isAccountant}
+                                        disabled={pointsLocked}
                                         className="text-[8px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded font-extrabold"
                                       >
                                         +100

@@ -21,12 +21,10 @@ import { ProfileScreen } from './mobile/ProfileScreen';
 
 export const MobileEmulator: React.FC = () => {
   const {
-    branches, categories, products, modifierGroups, orders, addresses, currentUser, setCurrentUser,
-    selectedBranch, setSelectedBranch, cart, addToCart, removeFromCart, updateCartQuantity, clearCart,
-    cartTotal, cartCount, checkoutType, setCheckoutType, selectedAddressId, setSelectedAddressId,
-    couponCode, setCouponCode, discountAmount, mobileLang, setMobileLang, addAddress, deleteAddress,
-    placeOrder, isProductAvailableInBranch, brandSettings,
-    loyaltySettings, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, updateCustomerPoints
+    branches, modifierGroups, currentUser,
+    selectedBranch, setSelectedBranch, addToCart, cartCount,
+    mobileLang, setMobileLang, addAddress,
+    brandSettings,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'home' | 'cart' | 'wallet' | 'profile'>('home');
