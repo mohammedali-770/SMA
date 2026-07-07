@@ -300,8 +300,9 @@ export const MobileEmulator: React.FC = () => {
               onClick={() => setMobileLang(mobileLang === 'en' ? 'ar' : 'en')}
               className="p-1.5 rounded-full bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors text-gray-600"
               title={t.change_lang}
+              aria-label={mobileLang === 'en' ? 'Switch language to Arabic' : 'التبديل إلى اللغة الإنجليزية'}
             >
-              <Globe className="w-4 h-4" />
+              <Globe className="w-4 h-4" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -382,6 +383,7 @@ export const MobileEmulator: React.FC = () => {
                 <button 
                   onClick={() => setActiveOrderReceipt(null)}
                   className="w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 transition-colors text-xs font-black"
+                  aria-label={isRTL ? 'إغلاق' : 'Close'}
                 >
                   ✕
                 </button>
@@ -529,6 +531,7 @@ export const MobileEmulator: React.FC = () => {
                 <button 
                   onClick={() => setIsBranchModalOpen(false)}
                   className="w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 transition-colors"
+                  aria-label={isRTL ? 'إغلاق' : 'Close'}
                 >
                   ✕
                 </button>
@@ -604,6 +607,7 @@ export const MobileEmulator: React.FC = () => {
                   <button 
                     onClick={() => setCustomizingProduct(null)}
                     className="w-8 h-8 rounded-full bg-white/95 flex items-center justify-center font-bold text-gray-700 hover:bg-white transition-colors"
+                    aria-label={isRTL ? 'إغلاق' : 'Close'}
                   >
                     ✕
                   </button>
@@ -689,6 +693,7 @@ export const MobileEmulator: React.FC = () => {
                   <button 
                     onClick={() => setCustomizationQty(prev => Math.max(1, prev - 1))}
                     className="w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-600"
+                    aria-label={isRTL ? 'إنقاص الكمية' : 'Decrease quantity'}
                   >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
@@ -696,6 +701,7 @@ export const MobileEmulator: React.FC = () => {
                   <button 
                     onClick={() => setCustomizationQty(prev => prev + 1)}
                     className="w-7 h-7 rounded-full bg-white border border-gray-100 flex items-center justify-center text-gray-600"
+                    aria-label={isRTL ? 'زيادة الكمية' : 'Increase quantity'}
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -737,6 +743,7 @@ export const MobileEmulator: React.FC = () => {
                 <button 
                   onClick={() => setIsAddressFormOpen(false)}
                   className="text-gray-400 font-bold hover:text-gray-600"
+                  aria-label={isRTL ? 'إغلاق' : 'Close'}
                 >
                   ✕
                 </button>

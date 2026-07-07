@@ -260,6 +260,7 @@ export const MenuManagementPanel: React.FC = () => {
                                     onClick={() => { if (confirm('Delete product?')) deleteProduct(p.id); }}
                                     disabled={isAccountant}
                                     className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
+                                    aria-label={isRTL ? 'حذف المنتج' : 'Delete product'}
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -316,6 +317,7 @@ export const MenuManagementPanel: React.FC = () => {
                                   onClick={() => { if (confirm('Delete Category? All associated products will be disabled.')) deleteCategory(c.id); }}
                                   disabled={isAccountant}
                                   className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
+                                  aria-label={isRTL ? 'حذف الفئة' : 'Delete category'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
@@ -449,7 +451,7 @@ export const MenuManagementPanel: React.FC = () => {
           <form onSubmit={handleSaveCategory} className="glass-panel w-full max-w-sm overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
               <h3 className="text-sm font-black text-slate-800 uppercase">{editingCategory ? 'Edit Menu Category' : 'Create Menu Category'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
             </div>
 
             <div className="space-y-3">
@@ -491,7 +493,7 @@ export const MenuManagementPanel: React.FC = () => {
           <form onSubmit={handleSaveProduct} className="glass-panel w-full max-w-md overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
               <h3 className="text-sm font-black text-slate-800 uppercase">{editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}</h3>
-              <button type="button" onClick={() => setIsProductModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+              <button type="button" onClick={() => setIsProductModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
             </div>
 
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">

@@ -140,10 +140,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onCustomize, onOpenBranc
               {/* Dynamic Menu Product Cards */}
               <div className="mt-3 px-4 grid grid-cols-2 gap-3 pb-8">
                 {filteredProducts.map(product => (
-                  <div 
+                  <div
                     key={product.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={isRTL ? `تخصيص ${product.nameAr}` : `Customize ${product.nameEn}`}
                     className="glass-card rounded-2xl overflow-hidden flex flex-col hover:shadow-md transition-all cursor-pointer"
                     onClick={() => onCustomize(product)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onCustomize(product); } }}
                   >
                     <div className="relative h-[100px] w-full bg-gray-50">
                       <img 

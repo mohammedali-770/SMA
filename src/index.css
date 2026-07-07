@@ -117,3 +117,12 @@ body {
   border-color: color-mix(in srgb, var(--color-primary), transparent 60%);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary), transparent 92%);
 }
+
+/* Keyboard-only focus ring. :focus-visible keeps it off mouse clicks while
+   making tab-navigation visible — the app had no visible keyboard-focus state,
+   so keyboard users could not tell which control was active. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
