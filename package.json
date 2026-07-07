@@ -21,8 +21,10 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.14.0",
     "esbuild": "^0.25.0",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
