@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Award, History, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { formatRiyadhDateTime } from '../../utils/calculations';
+import { formatRiyadhDateTime, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
 
 interface WalletScreenProps {
@@ -107,7 +107,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
             <div className="p-4 animate-fade-in pb-12 space-y-4">
               <div className="flex justify-between items-center mb-1">
                 <h2 className="text-base font-black text-gray-900">{isRTL ? 'المحفظة والولاء' : 'Wallet & Loyalty'}</h2>
-                <span className="text-[10px] bg-[#422e87]/10 text-[#422e87] px-2 py-0.5 rounded-full font-black uppercase">
+                <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-black uppercase">
                   {isRTL ? 'مكافآت حصرية' : 'Exclusive Rewards'}
                 </span>
               </div>
@@ -115,7 +115,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
               {!isLoggedIn ? (
                 /* IF NOT LOGGED IN, SHOW PROMPT CARD TO LOG IN FOR LOYALTY */
                 <div className="glass-card rounded-2xl p-6 text-center space-y-4">
-                  <div className="w-14 h-14 bg-purple-50 rounded-full flex items-center justify-center mx-auto text-[#422e87]">
+                  <div className="w-14 h-14 bg-purple-50 rounded-full flex items-center justify-center mx-auto text-primary">
                     <Wallet className="w-7 h-7" />
                   </div>
                   <div>
@@ -137,7 +137,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                 /* FULL LOYALTY SYSTEM AND WALLET DETAILS */
                 <div className="space-y-4">
                   {/* Digital Loyalty Card Component */}
-                  <div className="bg-gradient-to-br from-[#422e87] to-[#e02d3d] text-white rounded-3xl p-4 shadow-lg relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-primary to-secondary text-white rounded-3xl p-4 shadow-lg relative overflow-hidden">
                     {/* Abstract background design blobs */}
                     <div className="absolute -right-8 -top-8 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
                     <div className="absolute -left-8 -bottom-8 w-24 h-24 bg-white/10 rounded-full blur-xl pointer-events-none" />
@@ -174,7 +174,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                             <span className="text-xs font-bold text-purple-100">{isRTL ? 'نقطة' : 'pts'}</span>
                           </div>
                           <span className="text-[9.5px] text-purple-100 block mt-1">
-                            (= {((currentUser.loyaltyPoints || 0) * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2)} {t.sar} {isRTL ? 'رصيد مسترجع' : 'cashback credit'})
+                            (= {formatSAR((currentUser.loyaltyPoints || 0) * (loyaltySettings?.discountPerPoint || 0.1), mobileLang)} {isRTL ? 'رصيد مسترجع' : 'cashback credit'})
                           </span>
                         </div>
 
@@ -188,7 +188,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                               backgroundPosition: '0 0, 3px 3px'
                             }} />
                           </div>
-                          <span className="text-[7px] text-[#422e87] font-mono font-black tracking-wide leading-none">POS_SCAN_EARN</span>
+                          <span className="text-[7px] text-primary font-mono font-black tracking-wide leading-none">POS_SCAN_EARN</span>
                         </div>
                       </div>
 
@@ -227,7 +227,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                       </div>
                       <div className="bg-emerald-50 text-emerald-800 border border-emerald-100 px-3 py-1 rounded-xl text-center">
                         <span className="text-[9px] font-bold block uppercase leading-none">{isRTL ? 'رصيد المحفظة' : 'Wallet Balance'}</span>
-                        <span className="text-sm font-black text-emerald-600 font-mono mt-1 block leading-none">{walletBalance.toFixed(2)} {t.sar}</span>
+                        <span className="text-sm font-black text-emerald-600 font-mono mt-1 block leading-none">{formatSAR(walletBalance, mobileLang)}</span>
                       </div>
                     </div>
 
@@ -235,18 +235,18 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                       <button 
                         disabled={currentUser.loyaltyPoints < 100}
                         onClick={() => handleConvertPoints(100, 10)}
-                        className="flex-1 bg-slate-50 hover:bg-purple-50 text-[#422e87] border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
+                        className="flex-1 bg-slate-50 hover:bg-purple-50 text-primary border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
                       >
                         <span className="block text-[11px] font-black">{isRTL ? 'تحويل ١٠٠ نقطة' : 'Convert 100 Pts'}</span>
-                        <span className="block text-[9px] text-[#e02d3d] font-bold mt-0.5">{isRTL ? 'للحصول على ١٠ ر.س' : 'Get 10 SAR'}</span>
+                        <span className="block text-[9px] text-secondary font-bold mt-0.5">{isRTL ? 'للحصول على ١٠ ر.س' : 'Get 10 SAR'}</span>
                       </button>
                       <button 
                         disabled={currentUser.loyaltyPoints < 250}
                         onClick={() => handleConvertPoints(250, 30)}
-                        className="flex-1 bg-slate-50 hover:bg-purple-50 text-[#422e87] border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
+                        className="flex-1 bg-slate-50 hover:bg-purple-50 text-primary border border-gray-100 hover:border-purple-200 rounded-xl p-2.5 text-center transition-all disabled:opacity-40"
                       >
                         <span className="block text-[11px] font-black">{isRTL ? 'تحويل ٢٥٠ نقطة' : 'Convert 250 Pts'}</span>
-                        <span className="block text-[9px] text-[#e02d3d] font-bold mt-0.5">{isRTL ? 'للحصول على ٣٠ ر.س' : 'Get 30 SAR'}</span>
+                        <span className="block text-[9px] text-secondary font-bold mt-0.5">{isRTL ? 'للحصول على ٣٠ ر.س' : 'Get 30 SAR'}</span>
                       </button>
                     </div>
 
@@ -333,7 +333,7 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                             </span>
                           </div>
                           <span className={`font-black font-mono text-[10.5px] ${
-                            item.points > 0 ? 'text-green-600' : 'text-[#e02d3d]'
+                            item.points > 0 ? 'text-green-600' : 'text-secondary'
                           }`}>
                             {item.points > 0 ? `+${item.points}` : item.points} pts
                           </span>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order, Modifier } from '../../types';
-import { getVATBreakdown } from '../../utils/calculations';
+import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
 
 interface CartScreenProps {
@@ -160,7 +160,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                     {checkoutType === 'delivery' && selectedBranch && cartTotal < selectedBranch.minDeliveryOrder && (
                       <div className="mt-2.5 p-2 bg-red-50 text-red-800 text-[10px] rounded-lg border border-red-100 font-medium flex items-center gap-1.5">
                         <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                        <span>{t.min_order_warning} {selectedBranch.minDeliveryOrder} {t.sar} ({isRTL ? 'ينقصك' : 'need'} {Number((selectedBranch.minDeliveryOrder - cartTotal).toFixed(2))} {t.sar})</span>
+                        <span>{t.min_order_warning} {formatSAR(selectedBranch.minDeliveryOrder, mobileLang)} ({isRTL ? 'ينقصك' : 'need'} {formatSAR(selectedBranch.minDeliveryOrder - cartTotal, mobileLang)})</span>
                       </div>
                     )}
                   </div>
@@ -249,7 +249,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                           <span className="text-[9px] font-bold text-gray-400 block uppercase">{isRTL ? 'رصيد نقاطك المتوفرة' : 'Available Point Balance'}</span>
                           <span className="text-sm font-black text-purple-950">{currentUser.loyaltyPoints || 0} {isRTL ? 'نقطة' : 'points'}</span>
                           <span className="text-[8.5px] text-gray-400 block mt-0.5">
-                            (= {((currentUser.loyaltyPoints || 0) * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2)} {t.sar})
+                            (= {formatSAR((currentUser.loyaltyPoints || 0) * (loyaltySettings.discountPerPoint || 0.1), mobileLang)})
                           </span>
                         </div>
 
@@ -313,7 +313,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                       )}
 
                       {/* Display estimated earnings for this purchase */}
-                      <div className="p-2 bg-[#422e87]/5 rounded-xl border border-purple-500/10 flex justify-between text-[9px]">
+                      <div className="p-2 bg-primary/5 rounded-xl border border-purple-500/10 flex justify-between text-[9px]">
                         <span className="text-slate-500 font-medium">{isRTL ? 'نقاط مضمونة على هذا الطلب:' : 'Points you will earn on checkout:'}</span>
                         <span className="font-extrabold text-secondary">
                           +{Math.floor(Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount) * (loyaltySettings.pointsPerRiyal || 1))} {isRTL ? 'نقطة' : 'Points'}
@@ -326,27 +326,27 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                   <div className="bg-white rounded-2xl shadow-xs border border-gray-100 p-3 space-y-2">
                     <div className="flex justify-between text-xs text-gray-500">
                       <span>{t.subtotal}</span>
-                      <span className="font-bold">{cartTotal.toFixed(2)} {t.sar}</span>
+                      <span className="font-bold">{formatSAR(cartTotal, mobileLang)}</span>
                     </div>
 
                     {checkoutType === 'delivery' && selectedBranch && (
                       <div className="flex justify-between text-xs text-gray-500">
                         <span>{t.delivery_fee}</span>
-                        <span className="font-bold">+{selectedBranch.deliveryFee.toFixed(2)} {t.sar}</span>
+                        <span className="font-bold">+{formatSAR(selectedBranch.deliveryFee, mobileLang)}</span>
                       </div>
                     )}
 
                     {discountAmount > 0 && (
                       <div className="flex justify-between text-xs text-green-600 font-bold">
                         <span>{t.discount} {couponCode.toUpperCase() ? `(${couponCode.toUpperCase()})` : ''}</span>
-                        <span>-{discountAmount.toFixed(2)} {t.sar}</span>
+                        <span>-{formatSAR(discountAmount, mobileLang)}</span>
                       </div>
                     )}
 
                     {loyaltyDiscountAmount > 0 && (
                       <div className="flex justify-between text-xs text-purple-600 font-bold">
                         <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}</span>
-                        <span>-{loyaltyDiscountAmount.toFixed(2)} {t.sar}</span>
+                        <span>-{formatSAR(loyaltyDiscountAmount, mobileLang)}</span>
                       </div>
                     )}
 
@@ -356,7 +356,7 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                         <p className="text-[9px] text-gray-400 leading-none mt-0.5">{t.vat_label}</p>
                       </div>
                       <span className="text-base font-black text-secondary">
-                        {Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount).toFixed(2)} {t.sar}
+                        {formatSAR(Math.max(0, cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount), mobileLang)}
                       </span>
                     </div>
 
@@ -364,11 +364,11 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                     <div className="bg-gray-50/50 p-2 rounded-lg text-[9px] text-gray-400 space-y-0.5">
                       <div className="flex justify-between">
                         <span>{isRTL ? 'المجموع غير شامل الضريبة:' : 'Subtotal Excl. VAT:'}</span>
-                        <span>{getVATBreakdown(cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount, brandSettings?.vatPercentage || 15).subtotalExcludingVat} {t.sar}</span>
+                        <span>{formatSAR(getVATBreakdown(cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount, brandSettings?.vatPercentage || 15).subtotalExcludingVat, mobileLang)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>{isRTL ? `قيمة الضريبة (${brandSettings?.vatPercentage || 15}٪):` : `Saudi VAT portion (${brandSettings?.vatPercentage || 15}%):`}</span>
-                        <span>{getVATBreakdown(cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount, brandSettings?.vatPercentage || 15).vatAmount} {t.sar}</span>
+                        <span>{formatSAR(getVATBreakdown(cartTotal + (checkoutType === 'delivery' && selectedBranch ? selectedBranch.deliveryFee : 0) - discountAmount - loyaltyDiscountAmount, brandSettings?.vatPercentage || 15).vatAmount, mobileLang)}</span>
                       </div>
                     </div>
 

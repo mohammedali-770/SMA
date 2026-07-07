@@ -47,6 +47,19 @@ export function generateId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 11)}`;
 }
 
+/**
+ * Formats a numeric amount as a Saudi-Riyal currency string with the locale's
+ * currency label — "123.00 SAR" (en) / "123.00 ر.س" (ar).
+ *
+ * Centralises the `amount.toFixed(2)` + label pattern that was duplicated across
+ * the mobile and admin views. The admin views previously hardcoded " SAR" even
+ * in Arabic; routing them through here makes the label follow the active
+ * language ("ر.س" is the abbreviation used everywhere else in the app).
+ */
+export function formatSAR(amount: number, lang: 'en' | 'ar' = 'en'): string {
+  return `${amount.toFixed(2)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
+}
+
 const RIYADH_TZ = 'Asia/Riyadh';
 
 /**

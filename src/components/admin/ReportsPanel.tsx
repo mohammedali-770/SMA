@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getVATBreakdown, riyadhDateOnly } from '../../utils/calculations';
+import { getVATBreakdown, riyadhDateOnly, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 
 export const ReportsPanel: React.FC = () => {
@@ -257,25 +257,25 @@ export const ReportsPanel: React.FC = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'إجمالي المبيعات المفلترة' : 'Filtered Sales Revenue'}</span>
-                    <p className="text-base font-black text-[#422e87] mt-0.5">{repGrossSales.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-primary mt-0.5">{formatSAR(repGrossSales, adminLang)}</p>
                     <span className="text-[8px] text-gray-400">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'Includes 15% VAT'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'عدد الطلبات المكتملة' : 'Completed Order Volume'}</span>
-                    <p className="text-base font-black text-[#e02d3d] mt-0.5">{repOrdersCount} {isRTL ? 'طلب ناجح' : 'Orders'}</p>
+                    <p className="text-base font-black text-secondary mt-0.5">{repOrdersCount} {isRTL ? 'طلب ناجح' : 'Orders'}</p>
                     <span className="text-[8px] text-gray-400">{isRTL ? 'خلال النطاق الزمني المحدد' : 'Within date range scope'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'إجمالي خصومات الكوبونات' : 'Total Coupon Savings'}</span>
-                    <p className="text-base font-black text-slate-800 mt-0.5">{repDiscounts.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-slate-800 mt-0.5">{formatSAR(repDiscounts, adminLang)}</p>
                     <span className="text-[8px] text-purple-600 font-bold">{isRTL ? 'مستقطعة من إيراد المبيعات' : 'Deducted from gross rev'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
                     <span className="text-[9px] font-bold text-gray-400 uppercase">{isRTL ? 'رسوم التوصيل المحصلة' : 'Delivery Fees Collected'}</span>
-                    <p className="text-base font-black text-green-700 mt-0.5">{repDeliveryFees.toFixed(2)} SAR</p>
+                    <p className="text-base font-black text-green-700 mt-0.5">{formatSAR(repDeliveryFees, adminLang)}</p>
                     <span className="text-[8px] text-gray-400">{isRTL ? 'من طلبات التوصيل الناجحة' : 'From completed deliveries'}</span>
                   </div>
                 </div>
@@ -321,7 +321,7 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-2.5 px-4 text-center">{r.ordersCount}</td>
                                 <td className="py-2.5 px-4 text-right">{r.subtotal.toFixed(2)}</td>
                                 <td className="py-2.5 px-4 text-right">{r.deliveryFee.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-[#e02d3d] font-semibold">-{r.discount.toFixed(2)}</td>
+                                <td className="py-2.5 px-4 text-right text-secondary font-semibold">-{r.discount.toFixed(2)}</td>
                                 <td className="py-2.5 px-4 text-right text-primary font-black">{r.total.toFixed(2)}</td>
                                 <td className="py-2.5 px-4 text-right text-purple-700 font-mono">{r.vat.toFixed(2)}</td>
                               </tr>
@@ -352,7 +352,7 @@ export const ReportsPanel: React.FC = () => {
                               <td className="py-3 px-4 text-right text-primary font-black">{r.totalRevenue.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right">{r.deliveryFees.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right text-red-500">-{r.discounts.toFixed(2)}</td>
-                              <td className="py-3 px-4 text-right font-mono text-xs">{r.avgTicket.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right font-mono text-xs">{formatSAR(r.avgTicket, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -379,7 +379,7 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-2.5 px-4 font-black text-slate-800 text-xs">{r.name}</td>
                                 <td className="py-2.5 px-4 font-semibold text-slate-500">{r.category}</td>
                                 <td className="py-2.5 px-4 text-center text-slate-900 font-black">{r.qty}</td>
-                                <td className="py-2.5 px-4 text-right text-primary font-black">{r.rev.toFixed(2)} SAR</td>
+                                <td className="py-2.5 px-4 text-right text-primary font-black">{formatSAR(r.rev, adminLang)}</td>
                               </tr>
                             ))
                           )}
@@ -394,15 +394,15 @@ export const ReportsPanel: React.FC = () => {
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'رمز الكوبون الترويجي' : 'Promo Coupon Code'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'مرات الاستخدام الناجحة' : 'Redemption Counts'}</th>
-                            <th className="py-2.5 px-4 text-right text-[#e02d3d]">{isRTL ? 'إجمالي الخصومات الممنوحة' : 'Total Revenue Deductions (SAR)'}</th>
+                            <th className="py-2.5 px-4 text-right text-secondary">{isRTL ? 'إجمالي الخصومات الممنوحة' : 'Total Revenue Deductions (SAR)'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[11px]">
                           {couponReport.map((r, i) => (
                             <tr key={i} className="hover:bg-white/50">
-                              <td className="py-3 px-4 font-black"><span className="bg-purple-100 text-[#422e87] px-2.5 py-1 rounded-lg font-mono text-xs">{r.code}</span></td>
+                              <td className="py-3 px-4 font-black"><span className="bg-purple-100 text-primary px-2.5 py-1 rounded-lg font-mono text-xs">{r.code}</span></td>
                               <td className="py-3 px-4 text-center font-bold text-slate-800 text-sm">{r.count}</td>
-                              <td className="py-3 px-4 text-right text-[#e02d3d] font-black text-sm">-{r.savings.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right text-secondary font-black text-sm">-{formatSAR(r.savings, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -425,8 +425,8 @@ export const ReportsPanel: React.FC = () => {
                             <tr key={i} className="hover:bg-white/50">
                               <td className="py-3 px-4 font-black text-slate-800 text-xs">{r.name}</td>
                               <td className="py-3 px-4 text-center">{r.deliveryCount}</td>
-                              <td className="py-3 px-4 text-right text-green-700 font-black">{r.totalFees.toFixed(2)} SAR</td>
-                              <td className="py-3 px-4 text-right font-mono">{r.avgFee.toFixed(2)} SAR</td>
+                              <td className="py-3 px-4 text-right text-green-700 font-black">{formatSAR(r.totalFees, adminLang)}</td>
+                              <td className="py-3 px-4 text-right font-mono">{formatSAR(r.avgFee, adminLang)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -467,7 +467,7 @@ export const ReportsPanel: React.FC = () => {
                                     {r.status.toUpperCase()}
                                   </span>
                                 </td>
-                                <td className="py-3 px-4 font-mono font-bold text-[#422e87]">{r.ref || <span className="text-gray-300">-</span>}</td>
+                                <td className="py-3 px-4 font-mono font-bold text-primary">{r.ref || <span className="text-gray-300">-</span>}</td>
                                 <td className="py-3 px-4 text-slate-500 text-[10px] leading-tight truncate max-w-[200px]" title={r.error}>
                                   {r.status === 'synced' ? (
                                     <span className="text-green-600 font-bold">✓ {isRTL ? 'تمت مزامنة الطلب لنقاط البيع بنجاح' : 'تمت المزامنة'}</span>
@@ -485,10 +485,10 @@ export const ReportsPanel: React.FC = () => {
                 </div>
 
                 {/* HELPERS NOTES */}
-                <div className="bg-[#422e87]/5 border border-[#422e87]/10 p-3 rounded-2xl flex items-start gap-2 text-slate-600 text-[10px] leading-relaxed">
-                  <Check className="w-4 h-4 text-[#422e87] flex-shrink-0 mt-0.5" />
+                <div className="bg-primary/5 border border-primary/10 p-3 rounded-2xl flex items-start gap-2 text-slate-600 text-[10px] leading-relaxed">
+                  <Check className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-extrabold text-[#422e87] block mb-0.5">{isRTL ? 'إقرار ومطابقة الهيئة العامة للزكاة والضريبة والجمارك (Saudi VAT Audit Compliance)' : 'ZATCA Tax Invoice Audit Note:'}</span>
+                    <span className="font-extrabold text-primary block mb-0.5">{isRTL ? 'إقرار ومطابقة الهيئة العامة للزكاة والضريبة والجمارك (Saudi VAT Audit Compliance)' : 'ZATCA Tax Invoice Audit Note:'}</span>
                     {isRTL ? (
                       'تعتبر هذه التقارير والتحليلات كشوف مبيعات فورية متوافقة بالكامل مع اللائحة التنفيذية لضريبة القيمة المضافة بالمملكة العربية السعودية بنسبة ١٥٪. جميع الأسعار الظاهرة شاملة الضريبة، ويتم استخلاص الوعاء الضريبي تلقائياً بناءً على العمليات الناجحة.'
                     ) : (

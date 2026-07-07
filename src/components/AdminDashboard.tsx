@@ -142,7 +142,7 @@ export const AdminDashboard: React.FC = () => {
               <span>{isRTL ? 'الطلبات المباشرة' : 'Live Orders'}</span>
             </div>
             {activeOrdersCount > 0 && (
-              <span className={`text-[9px] px-2 py-0.5 rounded-full ${activeTab === 'orders' ? 'bg-white text-primary' : 'bg-[#e02d3d] text-white'} font-black`}>
+              <span className={`text-[9px] px-2 py-0.5 rounded-full ${activeTab === 'orders' ? 'bg-white text-primary' : 'bg-secondary text-white'} font-black`}>
                 {activeOrdersCount}
               </span>
             )}
