@@ -530,8 +530,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Fan an order event out to the SMS and push channels, each gated by its own
   // provider toggle. There is no real gateway — this records what *would* be sent.
   const notifyCustomer = (order: Order, message: string) => {
-    if (smsSettings.isEnabled) emitIntegrationEvent('sms', smsSettings.providerName, order.customerPhone, message);
-    if (notificationSettings.isEnabled) emitIntegrationEvent('push', notificationSettings.providerName, order.customerName, message);
+    // Prefer the in-app push channel; fall back to SMS only when push is
+    // unavailable. Leaning on (free) app notifications keeps paid SMS to a
+    // minimum — SMS fires only when push is disabled.
+    if (notificationSettings.isEnabled) {
+      emitIntegrationEvent('push', notificationSettings.providerName, order.customerName, message);
+    } else if (smsSettings.isEnabled) {
+      emitIntegrationEvent('sms', smsSettings.providerName, order.customerPhone, message);
+    }
   };
 
   const placeOrder = () => {
