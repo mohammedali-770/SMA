@@ -7,15 +7,15 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import {
   Branch, Category, Product, ModifierGroup, Order,
   UserProfile, SavedAddress, CartItem, OrderStatus,
-  Modifier, BrandSettings, LazywaitSettings, PaymentSettings,
-  SmsSettings, NotificationSettings, LoyaltySettings, IntegrationEvent,
+  Modifier, BrandSettings, LoyaltySettings,
 } from '../types';
-import {
-  INITIAL_BRAND_SETTINGS, INITIAL_LAZYWAIT_SETTINGS, INITIAL_PAYMENT_SETTINGS,
-  INITIAL_SMS_SETTINGS, INITIAL_NOTIFICATION_SETTINGS, INITIAL_LOYALTY_SETTINGS,
-} from '../data/initialData';
+import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
 import { supabase } from '../lib/supabase';
-import { auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi, admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi } from '../lib/api';
+import {
+  auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi,
+  admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi, integrations as integrationsApi,
+  DbIntegrationSetting, UpsertIntegrationInput,
+} from '../lib/api';
 import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
   mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
@@ -100,21 +100,22 @@ interface AppContextType {
   soundMuted: boolean;
   setSoundMuted: (muted: boolean) => void;
 
-  // Settings & Integration States
+  // Brand + loyalty settings (from the app_settings singleton)
   brandSettings: BrandSettings;
   updateBrandSettings: (settings: Partial<BrandSettings>) => void;
-  lazywaitSettings: LazywaitSettings;
-  updateLazywaitSettings: (settings: Partial<LazywaitSettings>) => void;
-  paymentSettings: PaymentSettings;
-  updatePaymentSettings: (settings: Partial<PaymentSettings>) => void;
-  smsSettings: SmsSettings;
-  updateSmsSettings: (settings: Partial<SmsSettings>) => void;
-  notificationSettings: NotificationSettings;
-  updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
-  integrationEvents: IntegrationEvent[];
-  clearIntegrationEvents: () => void;
   loyaltySettings: LoyaltySettings;
   updateLoyaltySettings: (settings: Partial<LoyaltySettings>) => void;
+
+  // Admin live orders (realtime with polling fallback)
+  ordersLiveMode: 'realtime' | 'polling' | 'off';
+  ordersLastUpdated: number | null;
+
+  // Secure integration settings (admin-only; secrets never returned to client)
+  integrationSettings: DbIntegrationSetting[];
+  integrationsLoading: boolean;
+  integrationsError: string | null;
+  loadIntegrations: () => Promise<void>;
+  saveIntegration: (input: UpsertIntegrationInput) => Promise<DbIntegrationSetting>;
 
   // Customer Loyalty. Earning + checkout redemption + admin adjustment are
   // server-authoritative (place_order / adjust_loyalty_points). The store-credit
@@ -180,15 +181,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [brandSettings, setBrandSettings] = useState<BrandSettings>(INITIAL_BRAND_SETTINGS);
   const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(INITIAL_LOYALTY_SETTINGS);
 
-  // Integration settings with no backend yet (payment / SMS / push / Lazywait)
-  // are deliberately client-only session state and drive no real behaviour —
-  // the order flow is server-authoritative. Surfaced read/write so the admin
-  // Settings screen keeps working; documented as not-yet-wired.
-  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(INITIAL_LAZYWAIT_SETTINGS);
-  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(INITIAL_PAYMENT_SETTINGS);
-  const [smsSettings, setSmsSettings] = useState<SmsSettings>(INITIAL_SMS_SETTINGS);
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(INITIAL_NOTIFICATION_SETTINGS);
-  const [integrationEvents, setIntegrationEvents] = useState<IntegrationEvent[]>([]);
+  // Secure integration settings (payment / SMS / push / Lazywait). Loaded for
+  // admins via an RPC that returns only non-secret fields + a has_secret flag;
+  // secrets live server-side and never reach the browser.
+  const [integrationSettings, setIntegrationSettings] = useState<DbIntegrationSetting[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null);
+
+  // Admin live-orders indicator (see the realtime/polling effect below).
+  const [ordersLiveMode, setOrdersLiveMode] = useState<'realtime' | 'polling' | 'off'>('off');
+  const [ordersLastUpdated, setOrdersLastUpdated] = useState<number | null>(null);
 
   // ---- Client-only UI/session state ----------------------------------------
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
@@ -218,10 +220,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   // ---- Data loading --------------------------------------------------------
-  /** Load only the orders (used after placing / advancing an order). */
+  /** Load only the orders (used after placing / advancing an order + live updates). */
   const refreshOrders = useCallback(async () => {
     const rows = await ordersApi.listWithItems();
     setOrders(rows.map(mapOrder));
+    setOrdersLastUpdated(Date.now());
+  }, []);
+
+  /** Admin-only: load integration settings (non-secret projection). */
+  const loadIntegrations = useCallback(async () => {
+    setIntegrationsLoading(true);
+    setIntegrationsError(null);
+    try {
+      setIntegrationSettings(await integrationsApi.list());
+    } catch (e) {
+      setIntegrationsError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }, []);
+
+  const saveIntegration = useCallback(async (input: UpsertIntegrationInput): Promise<DbIntegrationSetting> => {
+    const row = await integrationsApi.upsert(input);
+    setIntegrationSettings(prev => {
+      const exists = prev.some(r => r.provider_type === row.provider_type);
+      return exists ? prev.map(r => (r.provider_type === row.provider_type ? row : r)) : [...prev, row];
+    });
+    return row;
   }, []);
 
   /** Reload the whole catalog + availability + settings (used after admin writes). */
@@ -260,13 +285,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // read via each order's snapshot, so no separate list is needed.
         setAddresses([]);
         setProfiles((await profilesApi.list()).map(mapProfile));
+        // Integration settings are admin-only (the RPC rejects accountants).
+        if (user.role === 'admin') void loadIntegrations();
       }
     } catch (e) {
       setDataError(e instanceof Error ? e.message : String(e));
     } finally {
       setDataLoading(false);
     }
-  }, [refreshCatalog, refreshOrders]);
+  }, [refreshCatalog, refreshOrders, loadIntegrations]);
 
   const resetToGuest = useCallback(() => {
     loadedUserRef.current = null;
@@ -275,6 +302,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBranches([]); setCategories([]); setProducts([]); setModifierGroups([]);
     setOrders([]); setAddresses([]); setProfiles([]); setAvailabilityMatrix({});
     setSelectedBranch(null); setCart([]); setCouponCode(''); setDiscountAmount(0);
+    setIntegrationSettings([]); setIntegrationsError(null);
+    setOrdersLiveMode('off'); setOrdersLastUpdated(null);
     setDataError(null); setDataLoading(false);
   }, []);
 
@@ -318,6 +347,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const reload = useCallback(async () => {
     if (currentUser.id) await loadEverything(currentUser);
   }, [currentUser, loadEverything]);
+
+  // ---- Admin live orders: Supabase Realtime with a polling fallback --------
+  // Staff only. Realtime pushes order INSERT/UPDATE events; if the channel never
+  // connects (or drops), we fall back to a 12s poll. A slow 60s backstop poll
+  // also runs even in realtime mode, so a silently-stalled subscription still
+  // catches up. All timers/channels are torn down on sign-out / unmount.
+  useEffect(() => {
+    if (!isAuthenticated || currentUser.role === 'customer') {
+      setOrdersLiveMode('off');
+      return;
+    }
+    let disposed = false;
+    let refreshing = false;
+    let pending = false;                    // an event arrived while a refresh was in-flight
+    let debounceT: ReturnType<typeof setTimeout> | null = null;
+    let connectT: ReturnType<typeof setTimeout> | null = null;
+    let fastPoll: ReturnType<typeof setInterval> | null = null;
+    let slowPoll: ReturnType<typeof setInterval> | null = null;
+    const modeRef = { current: 'off' as 'realtime' | 'polling' | 'off' };
+    const setMode = (m: 'realtime' | 'polling' | 'off') => {
+      if (disposed) return;
+      modeRef.current = m;
+      setOrdersLiveMode(m);
+    };
+    const doRefresh = async () => {
+      if (disposed) return;
+      if (refreshing) { pending = true; return; }  // coalesce, but never drop the last event
+      refreshing = true;
+      try { await refreshOrders(); } catch { /* transient; keep the loop alive */ }
+      finally {
+        refreshing = false;
+        if (pending && !disposed) { pending = false; void doRefresh(); }  // trailing run
+      }
+    };
+    const bump = () => {                     // coalesce event bursts into one refetch
+      if (debounceT) return;
+      debounceT = setTimeout(() => { debounceT = null; void doRefresh(); }, 500);
+    };
+    const startFastPoll = () => {
+      if (fastPoll) return;
+      fastPoll = setInterval(() => { if (!document.hidden) void doRefresh(); }, 12000);
+    };
+    const stopFastPoll = () => { if (fastPoll) { clearInterval(fastPoll); fastPoll = null; } };
+
+    // Always-on slow backstop covers a realtime channel that connects but never
+    // delivers (e.g. table not in the realtime publication).
+    slowPoll = setInterval(() => { if (!document.hidden) void doRefresh(); }, 60000);
+
+    const channel = supabase
+      .channel(`admin-orders-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => bump())
+      .subscribe((status) => {
+        if (disposed) return;
+        if (status === 'SUBSCRIBED') {
+          if (connectT) { clearTimeout(connectT); connectT = null; }
+          setMode('realtime');
+          stopFastPoll();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setMode('polling');
+          startFastPoll();
+        }
+      });
+
+    // If realtime hasn't connected within 6s, start polling.
+    connectT = setTimeout(() => {
+      if (!disposed && modeRef.current !== 'realtime') { setMode('polling'); startFastPoll(); }
+    }, 6000);
+
+    // Catch up immediately when the tab becomes visible again.
+    const onVis = () => { if (!document.hidden && !disposed) void doRefresh(); };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      disposed = true;
+      if (debounceT) clearTimeout(debounceT);
+      if (connectT) clearTimeout(connectT);
+      stopFastPoll();
+      if (slowPoll) clearInterval(slowPoll);
+      document.removeEventListener('visibilitychange', onVis);
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, currentUser.role, currentUser.id, refreshOrders]);
 
   // ---- Auth actions --------------------------------------------------------
   const signIn = useCallback(async (email: string, password: string) => {
@@ -680,13 +791,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Integrations with no backend yet: client-only session state (no persistence).
-  const updateLazywaitSettings = (u: Partial<LazywaitSettings>) => setLazywaitSettings(prev => ({ ...prev, ...u }));
-  const updatePaymentSettings = (u: Partial<PaymentSettings>) => setPaymentSettings(prev => ({ ...prev, ...u }));
-  const updateSmsSettings = (u: Partial<SmsSettings>) => setSmsSettings(prev => ({ ...prev, ...u }));
-  const updateNotificationSettings = (u: Partial<NotificationSettings>) => setNotificationSettings(prev => ({ ...prev, ...u }));
-  const clearIntegrationEvents = () => setIntegrationEvents([]);
-
   // Admin loyalty point adjustment. Callers pass the desired absolute balance
   // (e.g. currentPoints + 50); we derive the delta and apply it through the
   // admin-only adjust_loyalty_points RPC, then refresh the affected profile.
@@ -774,18 +878,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       brandSettings,
       updateBrandSettings,
-      lazywaitSettings,
-      updateLazywaitSettings,
-      paymentSettings,
-      updatePaymentSettings,
-      smsSettings,
-      updateSmsSettings,
-      notificationSettings,
-      updateNotificationSettings,
-      integrationEvents,
-      clearIntegrationEvents,
       loyaltySettings,
       updateLoyaltySettings,
+
+      ordersLiveMode,
+      ordersLastUpdated,
+
+      integrationSettings,
+      integrationsLoading,
+      integrationsError,
+      loadIntegrations,
+      saveIntegration,
 
       loyaltyMutationsEnabled,
       walletCreditEnabled,

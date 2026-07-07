@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Award, History, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
+import { loyalty as loyaltyApi } from '../../lib/api';
 
 interface WalletScreenProps {
   isLoggedIn: boolean;
@@ -11,7 +12,7 @@ interface WalletScreenProps {
 }
 
 export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNavigate, onToast }) => {
-  const { currentUser, updateCustomerPoints, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltySettings, walletCreditEnabled, orders, mobileLang } = useApp();
+  const { currentUser, updateCustomerPoints, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltySettings, walletCreditEnabled, mobileLang } = useApp();
   const t = LOCALES[mobileLang];
   const isRTL = mobileLang === 'ar';
   const [walletBalance, setWalletBalance] = useState<number>(() => {
@@ -77,30 +78,25 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
     );
   };
 
-  const getLoyaltyLedger = () => {
-    const ledger = [
-      {
-        titleEn: 'Welcome Bonus Points',
-        titleAr: 'نقاط ترحيبية من الإدارة',
-        date: '2026-07-01 12:00',
-        points: 350
-      }
-    ];
-
-    orders.filter(o => o.customerId === currentUser.id).forEach(order => {
-      const orderPts = Math.floor(order.total * (loyaltySettings.pointsPerRiyal || 1));
-      if (orderPts > 0) {
-        ledger.push({
-          titleEn: `Earned on order ${order.orderNumber}`,
-          titleAr: `نقاط مكتسبة من الطلب رقم ${order.orderNumber}`,
-          date: formatRiyadhDateTime(order.createdAt),
-          points: orderPts
-        });
-      }
-    });
-
-    return ledger;
-  };
+  // Real loyalty ledger from Supabase (RLS scopes it to this customer's rows).
+  // Refetched whenever the balance changes (after an order / redemption).
+  const [ledger, setLedger] = useState<{ titleEn: string; titleAr: string; date: string; points: number }[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await loyaltyApi.myLedger();
+        if (cancelled) return;
+        setLedger(rows.map(r => ({
+          titleEn: r.reason || (r.type === 'earn' ? 'Points earned' : r.type === 'redeem' ? 'Points redeemed' : 'Adjustment'),
+          titleAr: r.type === 'earn' ? 'نقاط مكتسبة' : r.type === 'redeem' ? 'نقاط مستبدلة' : 'تعديل إداري',
+          date: formatRiyadhDateTime(r.created_at),
+          points: r.points,
+        })));
+      } catch { if (!cancelled) setLedger([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser.id, currentUser.loyaltyPoints]);
 
   return (
     <>
@@ -322,7 +318,10 @@ export const WalletScreen: React.FC<WalletScreenProps> = ({ isLoggedIn, onNaviga
                     </h3>
 
                     <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                      {getLoyaltyLedger().map((item: any, i: number) => (
+                      {ledger.length === 0 && (
+                        <p className="text-[10px] text-gray-400 text-center py-3">{isRTL ? 'لا توجد حركات نقاط بعد.' : 'No point activity yet.'}</p>
+                      )}
+                      {ledger.map((item: any, i: number) => (
                         <div key={i} className="flex justify-between items-center p-2 bg-slate-50 rounded-xl text-[10px]">
                           <div>
                             <span className="font-extrabold text-gray-800 block leading-tight">

@@ -68,6 +68,21 @@ export interface DbOrder {
   coupon_code: string | null; notes: string | null; created_at: string;
   // Extra columns returned by `select('*')` that the app maps for display.
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
+  loyalty_points_earned: number; loyalty_points_redeemed: number;
+}
+export interface DbLoyaltyTransaction {
+  id: string; profile_id: string; order_id: string | null;
+  type: 'earn' | 'redeem' | 'adjustment'; points: number;
+  balance_after: number | null; reason: string | null; created_at: string;
+}
+/** NON-secret projection of an integration_settings row (secrets never sent). */
+export interface DbIntegrationSetting {
+  provider_type: 'payment' | 'sms' | 'push' | 'lazywait';
+  provider_name: string | null;
+  enabled: boolean;
+  public_config: Record<string, unknown>;
+  has_secret: boolean;
+  updated_at: string;
 }
 export interface DbOrderItem {
   id: string; order_id: string; product_id: string | null;
@@ -136,12 +151,42 @@ export const loyalty = {
   /**
    * Admin-only manual point adjustment (delta may be negative). RLS/`is_admin()`
    * inside the RPC rejects non-admins. Earning + checkout redemption are handled
-   * atomically inside place_order, not here.
+   * atomically inside place_order, not here. Writes a ledger row.
    */
-  async adjustPoints(customerId: string, delta: number): Promise<DbProfile> {
+  async adjustPoints(customerId: string, delta: number, reason?: string): Promise<DbProfile> {
     return ok<DbProfile>(await supabase.rpc('adjust_loyalty_points', {
-      p_customer_id: customerId, p_delta: delta,
+      p_customer_id: customerId, p_delta: delta, p_reason: reason ?? null,
     }));
+  },
+  /** The signed-in customer's loyalty ledger (RLS: own rows; staff see all). */
+  myLedger: async () =>
+    ok<DbLoyaltyTransaction[]>(await supabase
+      .from('loyalty_transactions').select('*').order('created_at', { ascending: false })),
+};
+
+// ---------------------------------------------------------------------------
+// Integration settings (admin-only; secrets never returned — see migration)
+// ---------------------------------------------------------------------------
+export interface UpsertIntegrationInput {
+  providerType: DbIntegrationSetting['provider_type'];
+  providerName: string;
+  enabled: boolean;
+  publicConfig: Record<string, unknown>;
+  /** Only send when the admin entered a NEW secret; omit/null keeps the stored one. */
+  secretConfig?: Record<string, unknown> | null;
+}
+export const integrations = {
+  /** Admin-only. Returns the non-secret projection (`has_secret` flag only). */
+  list: async () => ok<DbIntegrationSetting[]>(await supabase.rpc('list_integration_settings')),
+  async upsert(input: UpsertIntegrationInput): Promise<DbIntegrationSetting> {
+    const rows = ok<DbIntegrationSetting[]>(await supabase.rpc('upsert_integration_settings', {
+      p_provider_type: input.providerType,
+      p_provider_name: input.providerName,
+      p_enabled: input.enabled,
+      p_public_config: input.publicConfig,
+      p_secret_config: input.secretConfig ?? null,
+    }));
+    return rows[0];
   },
 };
 

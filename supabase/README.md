@@ -24,6 +24,9 @@ later).
 | 7 | `20260707120600_app_settings.sql` | `app_settings` singleton (brand + VAT + loyalty); RLS |
 | 8 | `20260707120700_place_order.sql` | `place_order()` RPC — the only path that creates an order |
 | 9 | `20260707120800_loyalty.sql` | `place_order()` gains `p_loyalty_points` (server-side earn + redeem); `adjust_loyalty_points()` admin RPC |
+| 10 | `20260707120900_loyalty_audit.sql` | `orders.loyalty_points_earned/_redeemed/_awarded_at`; `loyalty_transactions` ledger (idempotency + reconciling `balance_after`); `place_order`/`adjust_loyalty_points` write the ledger under a row lock |
+| 11 | `20260707121000_integration_settings.sql` | `integration_settings` (secrets hidden; no client grants) + admin-only `list_/upsert_integration_settings()` RPCs (return `has_secret` only) |
+| 12 | `20260707121100_realtime_orders.sql` | Adds `orders` to the `supabase_realtime` publication (guarded no-op off Supabase) for the admin live console |
 
 `seed.sql` holds idempotent local demo data (catalog + coupons; no auth users).
 
@@ -54,6 +57,8 @@ shim for those.
 | addresses | — | own CRUD | read all | read all |
 | coupons | — | — (validate via RPC) | — | read+write |
 | orders / order_items / order_item_modifiers | — | read own | read all | read all + status update |
+| loyalty_transactions | — | read own | read all | read all (writes only via RPC) |
+| integration_settings | — | — | — (no access) | manage via RPC only (secrets never returned) |
 
 Key guarantees (all verified):
 - **Customer isolation** — a customer sees only their own orders and addresses.
@@ -64,11 +69,18 @@ Key guarantees (all verified):
   `loyalty_points` directly (column-level grants), and can't create/cancel orders.
 - **Coupon codes are secret** — never client-readable; checked via
   `validate_coupon()`.
-- **Loyalty is server-authoritative** — points are earned and redeemed only
-  inside `place_order()` (validated against the real balance + the
-  `min_points_to_redeem` threshold, discount capped to the order), and adjusted
-  by admins only via the `adjust_loyalty_points()` `SECURITY DEFINER` RPC. Both
-  are the only sanctioned way to write the client-hidden `loyalty_points` column.
+- **Loyalty is server-authoritative + audited** — points are earned and redeemed
+  only inside `place_order()` (validated against the real balance under a
+  `FOR UPDATE` lock + the `min_points_to_redeem` threshold, discount capped to
+  the order), and adjusted by admins only via `adjust_loyalty_points()`. Both
+  are the only sanctioned way to write the client-hidden `loyalty_points` column,
+  and both append a reconciling `loyalty_transactions` row (a partial unique
+  index blocks a second `earn` for the same order).
+- **Integration secrets never reach the client** — `integration_settings` has
+  all client grants revoked; admins manage it only through the SECURITY DEFINER
+  `list_/upsert_integration_settings()` RPCs, which return a `has_secret` flag
+  instead of `secret_config`. Server-side code (Edge Functions / service role)
+  reads the secret. Accountants and customers get `42501`.
 
 ## Bootstrapping the first admin
 
@@ -81,10 +93,17 @@ update public.profiles set role = 'admin' where id = '<auth-user-uuid>';
 
 ## Deliberately NOT included yet
 
-- Payment records, payment webhooks, and payment status transitions.
-- SMS/OTP and phone-auth wiring.
-- Lazywait client, sync worker, and sync logs (the `orders.sync_status` /
-  `lazywait_*` columns are reserved placeholders only).
+> Note: `integration_settings` now provides **secure config storage** for the
+> payment / SMS / push / Lazywait providers (admin-managed, secrets server-only).
+> The actual third-party calls below are still NOT implemented.
+
+- Payment charge/capture, webhooks, and payment status transitions (only the
+  provider config is stored).
+- SMS/OTP send + phone-auth wiring (only the provider config is stored).
+- Push notification send (only the provider config is stored).
+- Lazywait Create-Order client, sync worker, and sync logs (only the provider
+  config is stored; the `orders.sync_status` / `lazywait_*` columns are reserved
+  placeholders).
 - Store-credit wallet + voucher redemption (the mobile Wallet's points→credit
   conversion has no backing table yet; those actions stay disabled).
 - Staff-management RPC (role changes are done via service role for now).

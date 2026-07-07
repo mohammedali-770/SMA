@@ -198,6 +198,8 @@ export function mapOrder(o: DbOrderWithItems): Order {
     discountAmount: Number(o.discount_amount),
     loyaltyDiscountAmount: Number(o.loyalty_discount_amount),
     total: Number(o.total),
+    loyaltyPointsEarned: o.loyalty_points_earned ?? 0,
+    loyaltyPointsRedeemed: o.loyalty_points_redeemed ?? 0,
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
     orderSyncStatus: mapSyncStatus(o.sync_status),

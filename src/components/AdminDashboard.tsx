@@ -23,6 +23,7 @@ export const AdminDashboard: React.FC = () => {
     orders, currentUser,
     adminLang, setAdminLang, newOrderAlert, setNewOrderAlert,
     playNotificationSound, soundMuted, setSoundMuted,
+    ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'settings'>('stats');
@@ -70,9 +71,23 @@ export const AdminDashboard: React.FC = () => {
       {/* Admin Title bar Header */}
       <div className="bg-white/20 backdrop-blur-md border-b border-slate-200/60 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-lg font-black text-primary flex items-center gap-2">
+          <h2 className="text-lg font-black text-primary flex items-center gap-2 flex-wrap">
             <BarChart3 className="w-5 h-5 text-secondary" />
             {t.dashboard_title}
+            {ordersLiveMode !== 'off' && (
+              <span
+                title={ordersLastUpdated ? `${isRTL ? 'آخر تحديث' : 'Last updated'} ${new Date(ordersLastUpdated).toLocaleTimeString()}` : ''}
+                className={`text-[9px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${ordersLiveMode === 'realtime' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${ordersLiveMode === 'realtime' ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-ping'}`} />
+                {ordersLiveMode === 'realtime' ? (isRTL ? 'مباشر' : 'Live') : (isRTL ? 'تحديث تلقائي' : 'Auto-refreshing')}
+                {ordersLastUpdated && (
+                  <span className="font-mono text-[8px] opacity-70">
+                    {new Date(ordersLastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                )}
+              </span>
+            )}
           </h2>
           <p className="text-[11px] text-gray-400 mt-0.5">{isRTL ? 'نظام التحكم والربط المباشر لفروع سبايسي ميل' : 'Real-time synchronization console connected to live Fast-Food branches'}</p>
         </div>
