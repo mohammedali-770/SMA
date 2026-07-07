@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { AlertCircle, Bell, Check, CreditCard, Gift, Layers, MessageSquare, RefreshCw, Sliders } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
-import { formatSAR } from '../../utils/calculations';
+import { formatSAR, formatRiyadhDateTime } from '../../utils/calculations';
 
 export const SettingsPanel: React.FC = () => {
   const {
     brandSettings, updateBrandSettings, lazywaitSettings, updateLazywaitSettings,
     paymentSettings, updatePaymentSettings, smsSettings, updateSmsSettings,
     notificationSettings, updateNotificationSettings, loyaltySettings, updateLoyaltySettings,
+    integrationEvents, clearIntegrationEvents,
     profiles, updateCustomerPoints, currentUser, adminLang, products, categories,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
@@ -710,6 +711,55 @@ export const SettingsPanel: React.FC = () => {
                           className="w-4 h-4 cursor-pointer accent-primary"
                           disabled={isAccountant}
                         />
+                      </div>
+
+                      {/* SIMULATED GATEWAY ACTIVITY LOG (SMS + PUSH) */}
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-extrabold text-slate-700 text-[10px] flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-primary" aria-hidden="true" />
+                            {isRTL ? 'سجل نشاط بوابات الرسائل (محاكاة)' : 'Integration Activity Log — SMS & Push (simulated)'}
+                          </span>
+                          {integrationEvents.length > 0 && !isAccountant && (
+                            <button
+                              onClick={clearIntegrationEvents}
+                              className="text-[9px] font-black text-slate-400 hover:text-secondary transition-colors"
+                            >
+                              {isRTL ? 'مسح السجل' : 'Clear log'}
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-[8px] text-slate-400 font-bold leading-snug">
+                          {isRTL
+                            ? 'يتم تسجيل رسالة محاكاة عند تأكيد الطلب وعند كل تغيير في حالته — فقط عند تفعيل مزوّد الرسائل النصية أو الإشعارات أعلاه.'
+                            : 'A simulated message is recorded on order confirmation and each status change — only while the SMS or Push provider above is enabled.'}
+                        </p>
+
+                        {integrationEvents.length === 0 ? (
+                          <div className="text-center py-5 text-[10px] text-slate-400 font-bold bg-slate-50/60 rounded-xl">
+                            {isRTL ? 'لا يوجد نشاط بعد — أنشئ طلباً أو غيّر حالة طلب.' : 'No activity yet — place an order or change an order status.'}
+                          </div>
+                        ) : (
+                          <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                            {integrationEvents.map(ev => (
+                              <div key={ev.id} className="flex items-start gap-2 bg-white border border-slate-100 rounded-xl p-2.5 shadow-xs">
+                                <span className={`mt-0.5 flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center ${ev.channel === 'sms' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-primary'}`}>
+                                  {ev.channel === 'sms' ? <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> : <Bell className="w-3.5 h-3.5" aria-hidden="true" />}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">
+                                      {ev.channel === 'sms' ? 'SMS' : (isRTL ? 'إشعار' : 'PUSH')} · {ev.provider}
+                                    </span>
+                                    <span className="text-[8px] font-mono text-slate-400 truncate">→ {ev.recipient}</span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-700 font-semibold mt-0.5 leading-snug break-words">{ev.message}</p>
+                                  <span className="text-[8px] text-slate-300 font-mono block mt-0.5">{formatRiyadhDateTime(ev.createdAt)}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

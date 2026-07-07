@@ -123,6 +123,7 @@ export interface Order {
   loyaltyDiscountAmount?: number; // value of loyalty points redeemed at checkout
   total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
+  paymentMethod?: string; // display label, e.g. "Moyasar (Test)" or "Cash on Delivery"
   orderSyncStatus: SyncStatus;
   createdAt: string;
   address?: SavedAddress;
@@ -190,6 +191,21 @@ export interface NotificationSettings {
   providerName: 'expo' | 'onesignal' | 'sandbox';
   apiKey: string;
   isEnabled: boolean;
+}
+
+/**
+ * A simulated outbound message from the SMS or push-notification gateway,
+ * recorded when an order is placed or its status changes — but only while the
+ * relevant provider toggle is enabled. Surfaced in the admin activity log so
+ * the SMS/push settings visibly do something instead of being dead config.
+ */
+export interface IntegrationEvent {
+  id: string;
+  createdAt: string; // ISO timestamp
+  channel: 'sms' | 'push';
+  provider: string;
+  recipient: string;
+  message: string;
 }
 
 export interface LoyaltySettings {

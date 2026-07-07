@@ -502,6 +502,15 @@ export const MobileEmulator: React.FC = () => {
                           {t[activeOrderReceipt.orderSyncStatus]}
                         </span>
                       </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
+                        <span>{isRTL ? 'طريقة الدفع:' : 'Payment:'}</span>
+                        <span className="flex items-center gap-1.5 text-gray-500">
+                          {activeOrderReceipt.paymentMethod || (isRTL ? 'الدفع عند الاستلام' : 'Cash on Delivery')}
+                          <span className={`px-1.5 py-0.5 rounded-full ${activeOrderReceipt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {activeOrderReceipt.paymentStatus === 'paid' ? (isRTL ? 'مدفوع' : 'PAID') : (isRTL ? 'عند الاستلام' : 'UNPAID')}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
