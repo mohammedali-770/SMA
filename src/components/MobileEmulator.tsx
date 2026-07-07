@@ -551,10 +551,22 @@ export const MobileEmulator: React.FC = () => {
                 {branches.map(branch => {
                   const distance = calculateDistance(userLat, userLng, branch.latitude, branch.longitude);
                   return (
-                    <div 
+                    <div
                       key={branch.id}
+                      role="button"
+                      tabIndex={branch.isActive ? 0 : -1}
+                      aria-disabled={!branch.isActive}
+                      aria-pressed={selectedBranch?.id === branch.id}
+                      aria-label={`${isRTL ? branch.nameAr : branch.nameEn} — ${branch.isActive ? t.open : t.closed}`}
                       onClick={() => {
                         if (branch.isActive) {
+                          setSelectedBranch(branch);
+                          setIsBranchModalOpen(false);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && branch.isActive) {
+                          e.preventDefault();
                           setSelectedBranch(branch);
                           setIsBranchModalOpen(false);
                         }
@@ -660,11 +672,16 @@ export const MobileEmulator: React.FC = () => {
                         {group.modifiers.map(mod => {
                           const isChecked = selections.some(m => m.id === mod.id);
                           return (
-                            <div 
+                            <div
                               key={mod.id}
+                              role="checkbox"
+                              tabIndex={0}
+                              aria-checked={isChecked}
+                              aria-label={isRTL ? mod.nameAr : mod.nameEn}
                               onClick={() => handleModifierToggle(group, mod)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleModifierToggle(group, mod); } }}
                               className={`p-2 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${
-                                isChecked 
+                                isChecked
                                   ? 'border-primary bg-primary/5 font-semibold text-primary' 
                                   : 'border-gray-100 bg-white hover:bg-gray-50/80 text-gray-700'
                               }`}
