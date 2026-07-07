@@ -186,9 +186,14 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                       ) : (
                         <div className="space-y-1.5 max-h-[110px] overflow-y-auto">
                           {addresses.map(addr => (
-                            <div 
+                            <div
                               key={addr.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-pressed={selectedAddressId === addr.id}
+                              aria-label={`${isRTL ? 'اختيار العنوان' : 'Select address'} ${addr.label}`}
                               onClick={() => setSelectedAddressId(addr.id)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedAddressId(addr.id); } }}
                               className={`p-2 border rounded-xl flex items-center justify-between cursor-pointer transition-all ${selectedAddressId === addr.id ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
                             >
                               <div className="flex items-center gap-2">

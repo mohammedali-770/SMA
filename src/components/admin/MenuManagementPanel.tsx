@@ -358,11 +358,11 @@ export const MenuManagementPanel: React.FC = () => {
                       ref={fileInputRef}
                       className="hidden" 
                     />
-                    <div onClick={() => fileInputRef.current?.click()} className="space-y-1">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="space-y-1 w-full" aria-label={isRTL ? 'اختيار ملف CSV للاستيراد' : 'Choose a CSV file to import'}>
                       <FileSpreadsheet className="w-8 h-8 text-primary/40 mx-auto" />
                       <p className="text-xs font-bold text-gray-700">{t.drag_drop}</p>
                       <p className="text-[10px] text-gray-400">supports raw text sheets</p>
-                    </div>
+                    </button>
                   </div>
 
                   {/* Pasted text container fallback */}

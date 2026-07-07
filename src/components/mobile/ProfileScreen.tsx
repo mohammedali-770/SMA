@@ -169,9 +169,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ isLoggedIn, setIsL
                         {orders
                           .filter(o => o.customerId === currentUser.id)
                           .map(order => (
-                            <div 
+                            <div
                               key={order.id}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`${isRTL ? 'عرض فاتورة الطلب' : 'View receipt for order'} ${order.orderNumber}`}
                               onClick={() => onShowReceipt(order)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onShowReceipt(order); } }}
                               className="p-3 bg-slate-50/75 hover:bg-purple-50/30 border border-gray-100 hover:border-purple-200 rounded-xl cursor-pointer flex justify-between items-center transition-all"
                             >
                               <div className="space-y-0.5">
