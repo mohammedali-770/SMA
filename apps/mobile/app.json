@@ -35,11 +35,6 @@
           "backgroundColor": "#422e87"
         }
       ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "REPLACE_WITH_REAL_EAS_PROJECT_ID"
-      }
-    }
+    ]
   }
 }
