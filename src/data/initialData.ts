@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Branch, Category, Product, ModifierGroup, Banner, UserProfile, SavedAddress, Order, BrandSettings, LazywaitSettings, PaymentSettings, SmsSettings, NotificationSettings, LoyaltySettings } from '../types';
+import { Branch, Category, Product, ModifierGroup, Banner, UserProfile, SavedAddress, Order, BrandSettings, PaymentSettings, SmsSettings, NotificationSettings, LoyaltySettings } from '../types';
 
 export const INITIAL_BRANCHES: Branch[] = [
   {
@@ -464,15 +464,8 @@ export const INITIAL_BRAND_SETTINGS: BrandSettings = {
   termsAr: 'بتقديم طلب عبر منصتنا، فإنك توافق على الالتزام بشروط وأحكام سبايسي ميل، الخاضعة لأنظمة التجارة الإلكترونية المعمول بها في المملكة العربية السعودية.'
 };
 
-export const INITIAL_LAZYWAIT_SETTINGS: LazywaitSettings = {
-  baseUrl: 'https://api.lazywait.com/v1',
-  apiKey: 'lw_sk_9a8b7c6d5e4f3g2h1i',
-  clientId: 'client_spicymeal_riyadh',
-  isEnabled: true,
-  isMenuSyncEnabled: true,
-  isStockSyncEnabled: true,
-  isOrderSyncEnabled: true
-};
+// (Removed INITIAL_LAZYWAIT_SETTINGS — it shipped a fake api key. Lazywait is
+//  now configured securely via integration_settings, never in bundled data.)
 
 export const INITIAL_PAYMENT_SETTINGS: PaymentSettings = {
   providerName: 'moyasar',

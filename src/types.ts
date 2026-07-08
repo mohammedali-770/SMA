@@ -27,6 +27,7 @@ export interface Branch {
   isActive: boolean;
   deliveryFee: number;
   minDeliveryOrder: number;
+  lazywaitBranchId?: string; // Lazywait POS branch mapping (admin-set)
 }
 
 export interface Category {
@@ -127,6 +128,15 @@ export interface Order {
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // display label, e.g. "Moyasar (Test)" or "Cash on Delivery"
   orderSyncStatus: SyncStatus;
+  // Lazywait POS sync detail (admin visibility).
+  lazywaitSyncState?: string; // pending|syncing|synced|failed|blocked|dead_letter|skipped
+  lazywaitRef?: string;
+  lazywaitOrderNumber?: string;
+  lazywaitStatus?: string;
+  syncAttemptCount?: number;
+  syncLastError?: string;
+  syncBlockedReason?: string;
+  syncedAt?: string;
   createdAt: string;
   address?: SavedAddress;
   items: OrderItem[];

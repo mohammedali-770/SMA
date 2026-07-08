@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
 import { IntegrationCard } from './IntegrationCard';
+import { LazywaitPanel } from './LazywaitPanel';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -293,12 +294,13 @@ export const SettingsPanel: React.FC = () => {
                           <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
                             <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                             <div>
-                              <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'تخزين آمن فقط' : 'Secure storage only'}</span>
+                              <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'تخزين آمن' : 'Secure storage'}</span>
                               {isRTL
-                                ? 'يتم حفظ الإعدادات بأمان. لم يتم تفعيل أي تكامل خارجي فعلي بعد (الدفع، الرسائل، الإشعارات، Lazywait).'
-                                : 'Settings are saved securely. No real third-party integration is activated yet (payment, SMS, push, Lazywait).'}
+                                ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. تكامل Lazywait للطلبات مفعّل من جهة الخادم؛ الدفع والرسائل غير مفعّلة بعد.'
+                                : 'Secrets are stored server-side and never reach the browser. Lazywait order sync is wired server-side; payment and SMS are not activated yet.'}
                             </div>
                           </div>
+                          <LazywaitPanel disabled={isAccountant} />
                         </>
                       )}
                     </div>

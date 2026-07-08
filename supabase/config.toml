@@ -23,6 +23,10 @@ verify_jwt = false
 [functions.lazywait-sync]
 verify_jwt = false
 
+# Called by Lazywait POS; authenticated by the HMAC webhook signature.
+[functions.lazywait-webhook]
+verify_jwt = false
+
 [functions.lazywait-create-order]
 verify_jwt = false
 

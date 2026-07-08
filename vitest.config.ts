@@ -7,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}'],
+    // Pure app logic under src/, plus pure Edge-Function helpers (no Deno APIs).
+    include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts'],
   },
 });

@@ -46,15 +46,16 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
   },
   lazywait: {
     title: 'Lazywait POS',
-    subtitle: 'POS sync connection — stored only, not activated yet',
+    subtitle: 'POS order sync — server-side only. Secrets never leave the server.',
     providerOptions: ['lazywait'],
     publicFields: [
-      { key: 'base_url', label: 'API Base URL', type: 'text', placeholder: 'https://api.lazywait.com' },
-      { key: 'client_id', label: 'Client ID', type: 'text' },
-      { key: 'menu_sync', label: 'Menu Sync', type: 'bool' },
-      { key: 'order_sync', label: 'Order Sync', type: 'bool' },
+      { key: 'base_url', label: 'API Base URL', type: 'text', placeholder: 'https://apiv2.lazywait.com/v1' },
+      { key: 'client_id', label: 'Client ID', type: 'text', placeholder: 'vAK1AmUr…' },
     ],
-    secretFields: [{ key: 'api_key', label: 'API Key' }],
+    secretFields: [
+      { key: 'api_token', label: 'API Token (lw_live_…)' },
+      { key: 'webhook_secret', label: 'Webhook Secret' },
+    ],
   },
 };
 

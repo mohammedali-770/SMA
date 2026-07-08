@@ -23,13 +23,15 @@ export interface DbBranch {
   address_en: string | null; address_ar: string | null; phone: string | null;
   latitude: number | null; longitude: number | null;
   delivery_fee: number; min_delivery_order: number; is_active: boolean;
+  lazywait_branch_id?: string | null;
 }
-export interface DbCategory { id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean; }
+export interface DbCategory { id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean; lazywait_category_id?: string | null; }
 export interface DbProduct {
   id: string; category_id: string; name_en: string; name_ar: string;
   description_en: string | null; description_ar: string | null;
   price: number; calories: number | null; image_url: string | null;
   is_active: boolean; sort_order: number;
+  lazywait_item_id?: string | null; lazywait_price_id?: string | null;
 }
 export interface DbModifierGroup {
   id: string; name_en: string; name_ar: string;
@@ -69,7 +71,15 @@ export interface DbOrder {
   // Extra columns returned by `select('*')` that the app maps for display.
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
   loyalty_points_earned: number; loyalty_points_redeemed: number;
+  // Lazywait POS sync tracking (see 20260708130000_lazywait_integration).
+  lazywait_sync_state?: LazywaitSyncState; lazywait_ref?: string | null;
+  lazywait_order_id?: string | null; lazywait_order_number?: string | null;
+  lazywait_status?: string | null; sync_attempt_count?: number;
+  sync_next_attempt_at?: string | null; sync_last_error?: string | null;
+  sync_blocked_reason?: string | null; synced_at?: string | null;
 }
+export type LazywaitSyncState =
+  | 'pending' | 'syncing' | 'synced' | 'failed' | 'blocked' | 'dead_letter' | 'skipped';
 export interface DbLoyaltyTransaction {
   id: string; profile_id: string; order_id: string | null;
   type: 'earn' | 'redeem' | 'adjustment'; points: number;
@@ -265,6 +275,10 @@ export const orders = {
   async setStatus(orderId: string, status: OrderStatus) {
     const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
     if (error) throw new Error(error.message);
+  },
+  /** Admin-only: re-queue a failed/blocked/dead-lettered order for Lazywait sync. */
+  async requeueLazywait(orderId: string): Promise<DbOrder> {
+    return ok<DbOrder>(await supabase.rpc('requeue_lazywait_order', { p_order_id: orderId }));
   },
 };
 

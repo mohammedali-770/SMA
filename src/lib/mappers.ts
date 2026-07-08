@@ -35,6 +35,7 @@ export function mapBranch(b: DbBranch): Branch {
     isActive: b.is_active,
     deliveryFee: Number(b.delivery_fee),
     minDeliveryOrder: Number(b.min_delivery_order),
+    lazywaitBranchId: b.lazywait_branch_id ?? undefined,
   };
 }
 
@@ -203,6 +204,14 @@ export function mapOrder(o: DbOrderWithItems): Order {
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
     orderSyncStatus: mapSyncStatus(o.sync_status),
+    lazywaitSyncState: o.lazywait_sync_state ?? undefined,
+    lazywaitRef: o.lazywait_ref ?? undefined,
+    lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
+    lazywaitStatus: o.lazywait_status ?? undefined,
+    syncAttemptCount: o.sync_attempt_count ?? undefined,
+    syncLastError: o.sync_last_error ?? undefined,
+    syncBlockedReason: o.sync_blocked_reason ?? undefined,
+    syncedAt: o.synced_at ?? undefined,
     createdAt: o.created_at,
     address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
@@ -293,5 +302,6 @@ export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
   if (patch.isActive !== undefined) out.is_active = patch.isActive;
   if (patch.nameEn !== undefined) out.name_en = patch.nameEn;
   if (patch.nameAr !== undefined) out.name_ar = patch.nameAr;
+  if (patch.lazywaitBranchId !== undefined) out.lazywait_branch_id = patch.lazywaitBranchId || null;
   return out;
 }

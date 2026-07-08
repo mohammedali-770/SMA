@@ -2,6 +2,8 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { callbackSignature, formatAmount, timingSafeEqual } from '../_shared/geidea.ts';
+import { DEFAULT_BASE_URL, lazywaitFetch, round2, type LazywaitConfig } from '../_shared/lazywait.ts';
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
  * payment-webhook — called by GEIDEA (not the app) after a payment completes
@@ -99,8 +101,64 @@ Deno.serve(async (req: Request) => {
     p_raw: evt,
   });
   if (error) return json({ error: error.message }, 400);
+
+  // Prepared hook: after the LOCAL order is confirmed paid, best-effort notify
+  // Lazywait POS of the online payment (server-trusted amount). Never affects the
+  // payment result — a Lazywait failure is logged and retried by ops, not fatal.
+  await pushLazywaitOnlinePayment(admin, data as Record<string, unknown> | null, orderId).catch(() => {});
+
   return json({ status: 'paid', order: data }, 200);
 });
+
+/**
+ * POST /pos/orders/update-online-payment with the SERVER-TRUSTED paid total.
+ * Only runs after confirm_order_payment succeeded and the order was already
+ * synced to Lazywait (has a lazywait_ref). Best-effort + logged; never throws.
+ */
+async function pushLazywaitOnlinePayment(
+  admin: SupabaseClient, order: Record<string, unknown> | null, geideaRef: string,
+): Promise<void> {
+  if (!order) return;
+  const lazywaitRef = order.lazywait_ref ? String(order.lazywait_ref) : '';
+  if (!lazywaitRef) return; // order not synced to POS yet — nothing to attach payment to
+
+  const cfg = await getProviderConfig(admin, 'lazywait');
+  if (!cfg || !cfg.enabled) return;
+  const lw: LazywaitConfig = {
+    baseUrl: String((cfg.publicConfig as Record<string, unknown>).base_url ?? DEFAULT_BASE_URL),
+    clientId: String((cfg.publicConfig as Record<string, unknown>).client_id ?? ''),
+    apiToken: String((cfg.secretConfig as Record<string, unknown>).api_token ?? ''),
+  };
+  if (!lw.clientId || !lw.apiToken) return;
+
+  const { data: branch } = await admin
+    .from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle();
+  const branchId = (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id;
+  if (!branchId) return;
+
+  const res = await lazywaitFetch(lw, {
+    method: 'POST',
+    path: '/pos/orders/update-online-payment',
+    body: {
+      client_id: lw.clientId,
+      branch_id: branchId,
+      order_ref: lazywaitRef,
+      Trans_Amount: round2(Number(order.total ?? 0)), // server-trusted paid amount
+      Approval_No: geideaRef,
+      Card_Type: 'card',
+    },
+    timeoutMs: 12000,
+  });
+
+  await admin.from('integration_sync_logs').insert({
+    provider: 'lazywait',
+    order_id: order.id ? String(order.id) : null,
+    direction: 'push',
+    status: res.ok ? 'success' : 'failed',
+    request: { endpoint: 'update-online-payment', order_ref: lazywaitRef },
+    error: res.ok ? null : `payment_push_${res.status}`,
+  }).then(() => {}, () => {});
+}
 
 /** Cheap UUID shape check so a bad merchantReferenceId doesn't break the log insert. */
 function isUuid(v: string): boolean {

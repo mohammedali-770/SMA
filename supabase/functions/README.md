@@ -10,8 +10,9 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `order-intake` | app (user) | true | working wrapper | Calls `place_order` AS THE USER (RLS + totals stay authoritative); future create-order+payment orchestration point. |
 | `payment-initiate` | app (user) | true | **Geidea** | Reads the user's own order (RLS → trusted total), creates a **Geidea** session (server-to-server, Basic auth + HMAC signature), returns `sessionId` + hosted-checkout URL. Never returns a secret. |
 | `payment-webhook` | Geidea | false | **Geidea** | Verifies the **Geidea callback HMAC signature** server-side, then on `status=Paid`+`responseCode=000` calls `confirm_order_payment` (amount must equal the server total; idempotent). A forged callback can't mark an order paid. |
-| `lazywait-sync` | schedule/queue | false | placeholder (501) | Server-side Lazywait sync worker → `record_order_sync` RPC. |
-| `lazywait-create-order` | server | false | placeholder (501) | **Awaiting official Lazywait API docs.** Do not implement yet. |
+| `lazywait-sync` | schedule/cron | false | **Lazywait** | POS sync worker: claims due orders (SKIP LOCKED), `POST /pos/orders/create` (pickup only), records via `record_lazywait_sync` with retry/backoff/dead-letter. See `docs/LAZYWAIT.md`. |
+| `lazywait-webhook` | Lazywait | false | **Lazywait** | Verifies the `X-LazyWait-Signature` HMAC (hex), records POS status; unknown events are logged + accepted safely. |
+| `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
 | `push-dispatch` | server | false | placeholder (501) | Push send (Expo/OneSignal TBD). |
 
