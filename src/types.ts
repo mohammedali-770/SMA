@@ -121,6 +121,8 @@ export interface Order {
   deliveryFee: number;
   discountAmount?: number; // coupon discount applied at checkout
   loyaltyDiscountAmount?: number; // value of loyalty points redeemed at checkout
+  loyaltyPointsEarned?: number; // points credited by place_order for this order
+  loyaltyPointsRedeemed?: number; // points spent on this order
   total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // display label, e.g. "Moyasar (Test)" or "Cash on Delivery"

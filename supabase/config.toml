@@ -1,0 +1,28 @@
+# Minimal Supabase CLI config. Extend as needed (auth, storage, edge runtime).
+project_id = "spicy-meal"
+
+[db]
+major_version = 15
+
+# ---- Edge Functions ------------------------------------------------------
+# verify_jwt controls whether Supabase requires a valid user JWT to invoke the
+# function. External/scheduled callers (gateway webhooks, sync workers, OTP
+# pre-login) set it false and authenticate by other means (signature / service
+# role); user-initiated functions keep it true.
+[functions.order-intake]
+verify_jwt = true
+
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.lazywait-sync]
+verify_jwt = false
+
+[functions.lazywait-create-order]
+verify_jwt = false
+
+[functions.send-otp]
+verify_jwt = false
+
+[functions.push-dispatch]
+verify_jwt = false

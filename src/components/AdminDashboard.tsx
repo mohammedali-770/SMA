@@ -20,9 +20,10 @@ import { MenuManagementPanel } from './admin/MenuManagementPanel';
 
 export const AdminDashboard: React.FC = () => {
   const {
-    orders, profiles, currentUser, setCurrentUser,
+    orders, currentUser,
     adminLang, setAdminLang, newOrderAlert, setNewOrderAlert,
     playNotificationSound, soundMuted, setSoundMuted,
+    ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'settings'>('stats');
@@ -70,9 +71,23 @@ export const AdminDashboard: React.FC = () => {
       {/* Admin Title bar Header */}
       <div className="bg-white/20 backdrop-blur-md border-b border-slate-200/60 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
-          <h2 className="text-lg font-black text-primary flex items-center gap-2">
+          <h2 className="text-lg font-black text-primary flex items-center gap-2 flex-wrap">
             <BarChart3 className="w-5 h-5 text-secondary" />
             {t.dashboard_title}
+            {ordersLiveMode !== 'off' && (
+              <span
+                title={ordersLastUpdated ? `${isRTL ? 'آخر تحديث' : 'Last updated'} ${new Date(ordersLastUpdated).toLocaleTimeString()}` : ''}
+                className={`text-[9px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${ordersLiveMode === 'realtime' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${ordersLiveMode === 'realtime' ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-ping'}`} />
+                {ordersLiveMode === 'realtime' ? (isRTL ? 'مباشر' : 'Live') : (isRTL ? 'تحديث تلقائي' : 'Auto-refreshing')}
+                {ordersLastUpdated && (
+                  <span className="font-mono text-[8px] opacity-70">
+                    {new Date(ordersLastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                )}
+              </span>
+            )}
           </h2>
           <p className="text-[11px] text-gray-400 mt-0.5">{isRTL ? 'نظام التحكم والربط المباشر لفروع سبايسي ميل' : 'Real-time synchronization console connected to live Fast-Food branches'}</p>
         </div>
@@ -90,18 +105,12 @@ export const AdminDashboard: React.FC = () => {
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
 
-          {/* Session Role switcher */}
+          {/* Signed-in role (from profiles.role — set by Supabase Auth, not switchable here) */}
           <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
             <span className="text-[10px] text-gray-500 font-extrabold px-1.5 uppercase">{t.role}:</span>
-            {profiles.filter(p => p.role !== 'customer').map(p => (
-              <button 
-                key={p.role}
-                onClick={() => setCurrentUser(p)}
-                className={`text-[10px] font-black px-2.5 py-1 rounded-lg capitalize transition-all ${currentUser.role === p.role ? 'bg-primary text-white shadow-sm' : 'text-gray-600 hover:bg-white/50'}`}
-              >
-                {p.fullName.split(' ')[0]} ({p.role})
-              </button>
-            ))}
+            <span className="text-[10px] font-black px-2.5 py-1 rounded-lg capitalize bg-primary text-white shadow-sm">
+              {currentUser.fullName ? `${currentUser.fullName.split(' ')[0]} ` : ''}({currentUser.role})
+            </span>
           </div>
 
           {/* Admin panel English/Arabic translation switcher */}

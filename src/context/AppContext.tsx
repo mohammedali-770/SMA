@@ -3,24 +3,40 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  Branch, Category, Product, ModifierGroup, Order, 
-  UserProfile, SavedAddress, CartItem, OrderStatus, 
-  Modifier, OrderItem, OrderItemModifier,
-  BrandSettings, LazywaitSettings, PaymentSettings,
-  SmsSettings, NotificationSettings, LoyaltySettings, IntegrationEvent
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Branch, Category, Product, ModifierGroup, Order,
+  UserProfile, SavedAddress, CartItem, OrderStatus,
+  Modifier, BrandSettings, LoyaltySettings,
 } from '../types';
-import { 
-  INITIAL_BRANCHES, INITIAL_CATEGORIES, INITIAL_MODIFIER_GROUPS, 
-  INITIAL_PRODUCTS, INITIAL_PROFILES, INITIAL_ADDRESSES, INITIAL_ORDERS,
-  INITIAL_BRAND_SETTINGS, INITIAL_LAZYWAIT_SETTINGS, INITIAL_PAYMENT_SETTINGS,
-  INITIAL_SMS_SETTINGS, INITIAL_NOTIFICATION_SETTINGS, INITIAL_LOYALTY_SETTINGS
-} from '../data/initialData';
-import { getVATBreakdown, generateId } from '../utils/calculations';
+import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
+import { supabase } from '../lib/supabase';
+import {
+  auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi,
+  admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi, integrations as integrationsApi,
+  DbIntegrationSetting, UpsertIntegrationInput,
+} from '../lib/api';
+import {
+  mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
+  mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
+  brandPatchToDb, loyaltyPatchToDb, productToDbInsert, productToDbUpdate,
+  categoryToDbInsert, branchPatchToDb,
+} from '../lib/mappers';
 
 interface AppContextType {
-  // DB Tables
+  // Auth / session (Option A: GoTrue = authentication, profiles.role = authorization)
+  authReady: boolean;
+  isAuthenticated: boolean;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string, fullName: string, phone?: string) => Promise<void>;
+  signOut: () => Promise<void>;
+
+  // Data load lifecycle
+  dataLoading: boolean;
+  dataError: string | null;
+  reload: () => Promise<void>;
+
+  // DB Tables (mapped to app types)
   branches: Branch[];
   categories: Category[];
   products: Product[];
@@ -28,14 +44,13 @@ interface AppContextType {
   orders: Order[];
   addresses: SavedAddress[];
   profiles: UserProfile[];
-  
-  // Current Sessions
+
+  // Current session
   currentUser: UserProfile;
-  setCurrentUser: (user: UserProfile) => void;
   selectedBranch: Branch | null;
   setSelectedBranch: (branch: Branch | null) => void;
-  
-  // Cart
+
+  // Cart (client-only ephemeral state)
   cart: CartItem[];
   addToCart: (product: Product, selectedModifiers: { [groupId: string]: Modifier[] }, quantity: number) => void;
   removeFromCart: (cartItemId: string) => void;
@@ -43,7 +58,7 @@ interface AppContextType {
   clearCart: () => void;
   cartTotal: number;
   cartCount: number;
-  
+
   // Mobile Checkout Preferences
   checkoutType: 'delivery' | 'pickup';
   setCheckoutType: (type: 'delivery' | 'pickup') => void;
@@ -52,20 +67,21 @@ interface AppContextType {
   couponCode: string;
   setCouponCode: (code: string) => void;
   discountAmount: number;
-  
+  applyCoupon: (code: string) => Promise<{ valid: boolean; message: string }>;
+
   // Active Languages
   mobileLang: 'en' | 'ar';
   setMobileLang: (lang: 'en' | 'ar') => void;
   adminLang: 'en' | 'ar';
   setAdminLang: (lang: 'en' | 'ar') => void;
-  
+
   // DB operations
   addAddress: (address: Omit<SavedAddress, 'id'>) => void;
   deleteAddress: (id: string) => void;
-  placeOrder: () => { success: boolean; orderId?: string; order?: Order; error?: string };
+  placeOrder: () => Promise<{ success: boolean; orderId?: string; order?: Order; error?: string }>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  
-  // Phase 8: Admin Panel Operations
+
+  // Admin Panel Operations
   addCategory: (nameEn: string, nameAr: string) => void;
   updateCategory: (id: string, nameEn: string, nameAr: string) => void;
   deleteCategory: (id: string) => void;
@@ -75,8 +91,8 @@ interface AppContextType {
   toggleProductAvailability: (productId: string, branchId: string) => void;
   isProductAvailableInBranch: (productId: string, branchId: string) => boolean;
   updateBranchSettings: (id: string, updates: Partial<Branch>) => void;
-  bulkUploadMenu: (categories: Category[], products: Product[]) => { success: boolean; count: number };
-  
+  bulkUploadMenu: (categories: Category[], products: Product[]) => Promise<{ success: boolean; count: number }>;
+
   // Audio indicator for realtime
   playNotificationSound: () => void;
   newOrderAlert: boolean;
@@ -84,23 +100,28 @@ interface AppContextType {
   soundMuted: boolean;
   setSoundMuted: (muted: boolean) => void;
 
-  // Phase 10: Settings & Integration States
+  // Brand + loyalty settings (from the app_settings singleton)
   brandSettings: BrandSettings;
   updateBrandSettings: (settings: Partial<BrandSettings>) => void;
-  lazywaitSettings: LazywaitSettings;
-  updateLazywaitSettings: (settings: Partial<LazywaitSettings>) => void;
-  paymentSettings: PaymentSettings;
-  updatePaymentSettings: (settings: Partial<PaymentSettings>) => void;
-  smsSettings: SmsSettings;
-  updateSmsSettings: (settings: Partial<SmsSettings>) => void;
-  notificationSettings: NotificationSettings;
-  updateNotificationSettings: (settings: Partial<NotificationSettings>) => void;
-  integrationEvents: IntegrationEvent[];
-  clearIntegrationEvents: () => void;
   loyaltySettings: LoyaltySettings;
   updateLoyaltySettings: (settings: Partial<LoyaltySettings>) => void;
 
-  // Phase 11: Real-time Customer Loyalty Integration
+  // Admin live orders (realtime with polling fallback)
+  ordersLiveMode: 'realtime' | 'polling' | 'off';
+  ordersLastUpdated: number | null;
+
+  // Secure integration settings (admin-only; secrets never returned to client)
+  integrationSettings: DbIntegrationSetting[];
+  integrationsLoading: boolean;
+  integrationsError: string | null;
+  loadIntegrations: () => Promise<void>;
+  saveIntegration: (input: UpsertIntegrationInput) => Promise<DbIntegrationSetting>;
+
+  // Customer Loyalty. Earning + checkout redemption + admin adjustment are
+  // server-authoritative (place_order / adjust_loyalty_points). The store-credit
+  // wallet has no backend, so its conversions stay disabled.
+  loyaltyMutationsEnabled: boolean;
+  walletCreditEnabled: boolean;
   loyaltyPointsRedeemed: number;
   setLoyaltyPointsRedeemed: (points: number) => void;
   loyaltyDiscountAmount: number;
@@ -128,247 +149,305 @@ export function canTransitionOrder(from: OrderStatus, to: OrderStatus): boolean 
   return from === to || (ORDER_STATUS_TRANSITIONS[from]?.includes(to) ?? false);
 }
 
-/** Display labels for the payment gateway providers. */
-const PAYMENT_PROVIDER_LABELS: Record<PaymentSettings['providerName'], string> = {
-  moyasar: 'Moyasar',
-  paytabs: 'PayTabs',
-  hyperpay: 'HyperPay',
-  sandbox: 'Sandbox',
+/** A neutral placeholder used before a profile has loaded / while signed out. */
+const GUEST_USER: UserProfile = {
+  id: '', fullName: '', phoneNumber: '', role: 'customer', email: undefined,
+  createdAt: '', loyaltyPoints: 0,
 };
-
-/** One-liner describing each status, used in the simulated customer messages. */
-const ORDER_STATUS_MESSAGES: Record<OrderStatus, string> = {
-  received: 'has been received',
-  preparing: 'is now being prepared',
-  ready: 'is ready for pickup/dispatch',
-  out_for_delivery: 'is out for delivery',
-  delivered: 'has been delivered',
-  cancelled: 'has been cancelled',
-};
-
-/**
- * Safely load a persisted value from localStorage, falling back to `fallback`
- * when the key is missing or holds corrupted/non-JSON data. Without this guard
- * a single malformed key crashes the whole app during the provider's initial
- * render (white screen with no recovery path).
- */
-function loadPersisted<T>(key: string, fallback: T): T {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved !== null ? (JSON.parse(saved) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Database state
-  const [branches, setBranches] = useState<Branch[]>(() => loadPersisted('sm_branches', INITIAL_BRANCHES));
+  // ---- Auth / session ------------------------------------------------------
+  const [authReady, setAuthReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(GUEST_USER);
+  const loadedUserRef = useRef<string | null>(null);
+  // Stable per-checkout key so a retried submit can't create a duplicate order.
+  // Reset whenever the cart materially changes or an order succeeds.
+  const idempotencyKeyRef = useRef<string | null>(null);
 
-  const [categories, setCategories] = useState<Category[]>(() => loadPersisted('sm_categories', INITIAL_CATEGORIES));
+  // ---- Data load lifecycle -------------------------------------------------
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
 
-  const [products, setProducts] = useState<Product[]>(() => loadPersisted('sm_products', INITIAL_PRODUCTS));
+  // ---- Database-backed state (mapped app types) ----------------------------
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [availabilityMatrix, setAvailabilityMatrix] =
+    useState<{ [key: string]: { [branchId: string]: boolean } }>({});
 
-  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(() => loadPersisted('sm_modifier_groups', INITIAL_MODIFIER_GROUPS));
+  // Settings sourced from the app_settings singleton (brand colours + VAT + loyalty).
+  const [brandSettings, setBrandSettings] = useState<BrandSettings>(INITIAL_BRAND_SETTINGS);
+  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(INITIAL_LOYALTY_SETTINGS);
 
-  const [orders, setOrders] = useState<Order[]>(() => loadPersisted('sm_orders', INITIAL_ORDERS));
+  // Secure integration settings (payment / SMS / push / Lazywait). Loaded for
+  // admins via an RPC that returns only non-secret fields + a has_secret flag;
+  // secrets live server-side and never reach the browser.
+  const [integrationSettings, setIntegrationSettings] = useState<DbIntegrationSetting[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+  const [integrationsError, setIntegrationsError] = useState<string | null>(null);
 
-  const [addresses, setAddresses] = useState<SavedAddress[]>(() => loadPersisted('sm_addresses', INITIAL_ADDRESSES));
+  // Admin live-orders indicator (see the realtime/polling effect below).
+  const [ordersLiveMode, setOrdersLiveMode] = useState<'realtime' | 'polling' | 'off'>('off');
+  const [ordersLastUpdated, setOrdersLastUpdated] = useState<number | null>(null);
 
-  const [profiles, setProfiles] = useState<UserProfile[]>(() => {
-    const saved = loadPersisted<UserProfile[] | null>('sm_profiles', null);
-    if (saved) return saved;
-    // Seed default loyalty points to make the experience interactive
-    const defaultProfiles = INITIAL_PROFILES.map(p => {
-      if (p.id === 'usr-customer-1') {
-        return { ...p, loyaltyPoints: 350 };
-      }
-      return { ...p, loyaltyPoints: p.role === 'customer' ? 50 : 0 };
-    });
-    localStorage.setItem('sm_profiles', JSON.stringify(defaultProfiles));
-    return defaultProfiles;
-  });
-
-  // Availability matrix: productId -> Map of branchId -> isAvailable (true by default)
-  const [availabilityMatrix, setAvailabilityMatrix] = useState<{ [key: string]: { [branchId: string]: boolean } }>(() => {
-    const saved = loadPersisted<{ [key: string]: { [branchId: string]: boolean } } | null>('sm_availability_matrix', null);
-    if (saved) return saved;
-
-    // Seed default availability: all products available everywhere except non-active branches
-    const matrix: { [key: string]: { [branchId: string]: boolean } } = {};
-    INITIAL_PRODUCTS.forEach(p => {
-      matrix[p.id] = {};
-      INITIAL_BRANCHES.forEach(b => {
-        matrix[p.id][b.id] = b.isActive;
-      });
-    });
-    return matrix;
-  });
-
-  // Current session configurations
-  const [currentUser, setCurrentUserInternal] = useState<UserProfile>(() => {
-    const parsed = loadPersisted<UserProfile[] | null>('sm_profiles', null);
-    return (parsed && parsed[0]) || INITIAL_PROFILES[0];
-  });
-
-  const setCurrentUser = (user: UserProfile) => {
-    const latest = profiles.find(p => p.id === user.id) || user;
-    setCurrentUserInternal(latest);
-  };
-  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(() => {
-    const active = INITIAL_BRANCHES.find(b => b.isActive);
-    return active || null;
-  });
-  
+  // ---- Client-only UI/session state ----------------------------------------
+  const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checkoutType, setCheckoutType] = useState<'delivery' | 'pickup'>('delivery');
-  const [selectedAddressId, setSelectedAddressId] = useState<string>(INITIAL_ADDRESSES[0]?.id || '');
+  const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [couponCode, setCouponCode] = useState<string>('');
   const [discountAmount, setDiscountAmount] = useState<number>(0);
-
-  // Phase 11: Real-time Customer Loyalty Integration
-  const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemed] = useState<number>(0);
-  
-  const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(() => loadPersisted('sm_loyalty_settings', INITIAL_LOYALTY_SETTINGS));
-
-  const loyaltyDiscountAmount = Number((loyaltyPointsRedeemed * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2));
-
-  const updateCustomerPoints = (userId: string, points: number) => {
-    const nextPoints = Math.max(0, points);
-    setProfiles(prev => {
-      const updated = prev.map(p => {
-        if (p.id === userId) {
-          return { ...p, loyaltyPoints: nextPoints };
-        }
-        return p;
-      });
-      localStorage.setItem('sm_profiles', JSON.stringify(updated));
-      return updated;
-    });
-
-    setCurrentUserInternal(prev => {
-      if (prev.id === userId) {
-        return { ...prev, loyaltyPoints: nextPoints };
-      }
-      return prev;
-    });
-  };
-
-  useEffect(() => {
-    setLoyaltyPointsRedeemed(0);
-  }, [currentUser.id]);
-  
-  // Real-time states
+  const [mobileLang, setMobileLang] = useState<'en' | 'ar'>('en');
+  const [adminLang, setAdminLang] = useState<'en' | 'ar'>('en');
   const [newOrderAlert, setNewOrderAlert] = useState<boolean>(false);
   const [soundMuted, setSoundMuted] = useState<boolean>(false);
 
-  // Languages
-  const [mobileLang, setMobileLang] = useState<'en' | 'ar'>('en');
-  const [adminLang, setAdminLang] = useState<'en' | 'ar'>('en');
-
-  // Phase 10: Settings & Integration States
-  const [brandSettings, setBrandSettings] = useState<BrandSettings>(() => loadPersisted('sm_brand_settings', INITIAL_BRAND_SETTINGS));
-
-  const [lazywaitSettings, setLazywaitSettings] = useState<LazywaitSettings>(() => loadPersisted('sm_lazywait_settings', INITIAL_LAZYWAIT_SETTINGS));
-
-  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(() => loadPersisted('sm_payment_settings', INITIAL_PAYMENT_SETTINGS));
-
-  const [smsSettings, setSmsSettings] = useState<SmsSettings>(() => loadPersisted('sm_sms_settings', INITIAL_SMS_SETTINGS));
-
-  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(() => loadPersisted('sm_notification_settings', INITIAL_NOTIFICATION_SETTINGS));
-  // Simulated SMS/push gateway activity, newest first (capped, see emitIntegrationEvent).
-  const [integrationEvents, setIntegrationEvents] = useState<IntegrationEvent[]>(() => loadPersisted<IntegrationEvent[]>('sm_integration_events', []));
-
-  const updateBrandSettings = (updates: Partial<BrandSettings>) => {
-    setBrandSettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_brand_settings', JSON.stringify(next));
-      return next;
-    });
+  // Loyalty earning + checkout redemption are handled server-side by
+  // place_order, and admin point adjustments by adjust_loyalty_points — so
+  // point mutations are enabled. The store-credit wallet + voucher claims have
+  // no backend table, so those specific conversions stay disabled.
+  const loyaltyMutationsEnabled = true;
+  const walletCreditEnabled = false;
+  const [loyaltyPointsRedeemed, setLoyaltyPointsRedeemedState] = useState<number>(0);
+  const setLoyaltyPointsRedeemed = (points: number) => {
+    setLoyaltyPointsRedeemedState(Math.max(0, points));
   };
+  const loyaltyDiscountAmount = Number((loyaltyPointsRedeemed * (loyaltySettings?.discountPerPoint || 0.1)).toFixed(2));
 
-  const updateLazywaitSettings = (updates: Partial<LazywaitSettings>) => {
-    setLazywaitSettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_lazywait_settings', JSON.stringify(next));
-      return next;
+  const cartTotal = cart.reduce((acc, item) => acc + (item.totalPrice * item.quantity), 0);
+  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+  // ---- Data loading --------------------------------------------------------
+  /** Load only the orders (used after placing / advancing an order + live updates). */
+  const refreshOrders = useCallback(async () => {
+    const rows = await ordersApi.listWithItems();
+    setOrders(rows.map(mapOrder));
+    setOrdersLastUpdated(Date.now());
+  }, []);
+
+  /** Admin-only: load integration settings (non-secret projection). */
+  const loadIntegrations = useCallback(async () => {
+    setIntegrationsLoading(true);
+    setIntegrationsError(null);
+    try {
+      setIntegrationSettings(await integrationsApi.list());
+    } catch (e) {
+      setIntegrationsError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIntegrationsLoading(false);
+    }
+  }, []);
+
+  const saveIntegration = useCallback(async (input: UpsertIntegrationInput): Promise<DbIntegrationSetting> => {
+    const row = await integrationsApi.upsert(input);
+    setIntegrationSettings(prev => {
+      const exists = prev.some(r => r.provider_type === row.provider_type);
+      return exists ? prev.map(r => (r.provider_type === row.provider_type ? row : r)) : [...prev, row];
     });
-  };
+    return row;
+  }, []);
 
-  const updatePaymentSettings = (updates: Partial<PaymentSettings>) => {
-    setPaymentSettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_payment_settings', JSON.stringify(next));
-      return next;
+  /** Reload the whole catalog + availability + settings (used after admin writes). */
+  const refreshCatalog = useCallback(async () => {
+    const c = await catalog.all();
+    setBranches(c.branches.map(mapBranch));
+    setCategories(c.categories.map(mapCategory));
+    setProducts(c.products.map(p => mapProduct(p, c.links)));
+    setModifierGroups(c.modifierGroups.map(g => mapModifierGroup(g, c.modifiers)));
+    setAvailabilityMatrix(buildAvailabilityMatrix(c.products, c.branches, c.availability));
+    setBrandSettings(mapBrandSettings(c.settings));
+    setLoyaltySettings(mapLoyaltySettings(c.settings));
+    return c;
+  }, []);
+
+  /** Full load after authentication: profile → role → catalog + orders + profiles + addresses. */
+  const loadEverything = useCallback(async (user: UserProfile) => {
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      const c = await refreshCatalog();
+
+      // Default the branch selection to the first open branch right away (don't
+      // make the storefront wait on orders/profiles to finish loading).
+      const mappedBranches = c.branches.map(mapBranch);
+      const firstActive = mappedBranches.find(b => b.isActive) ?? mappedBranches[0] ?? null;
+      setSelectedBranch(prev => prev ?? firstActive);
+
+      await refreshOrders();
+
+      if (user.role === 'customer') {
+        setAddresses((await addressesApi.listMine()).map(mapAddress));
+        setProfiles([user]);
+      } else {
+        // Staff read all profiles (loyalty stats / DB console). Addresses are
+        // read via each order's snapshot, so no separate list is needed.
+        setAddresses([]);
+        setProfiles((await profilesApi.list()).map(mapProfile));
+        // Integration settings are admin-only (the RPC rejects accountants).
+        if (user.role === 'admin') void loadIntegrations();
+      }
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDataLoading(false);
+    }
+  }, [refreshCatalog, refreshOrders, loadIntegrations]);
+
+  const resetToGuest = useCallback(() => {
+    loadedUserRef.current = null;
+    setIsAuthenticated(false);
+    setCurrentUser(GUEST_USER);
+    setBranches([]); setCategories([]); setProducts([]); setModifierGroups([]);
+    setOrders([]); setAddresses([]); setProfiles([]); setAvailabilityMatrix({});
+    setSelectedBranch(null); setCart([]); setCouponCode(''); setDiscountAmount(0);
+    setIntegrationSettings([]); setIntegrationsError(null);
+    setOrdersLiveMode('off'); setOrdersLastUpdated(null);
+    setDataError(null); setDataLoading(false);
+  }, []);
+
+  /** Load the signed-in user's profile then all their data. */
+  const bootstrap = useCallback(async (userId: string) => {
+    if (loadedUserRef.current === userId) return;
+    loadedUserRef.current = userId;
+    setIsAuthenticated(true);
+    setDataLoading(true);
+    setDataError(null);
+    try {
+      const dbProfile = await auth.myProfile();
+      const user = dbProfile ? mapProfile(dbProfile) : { ...GUEST_USER, id: userId };
+      setCurrentUser(user);
+      await loadEverything(user);
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : String(e));
+      setDataLoading(false);
+    }
+  }, [loadEverything]);
+
+  // Wire the Supabase auth listener once. INITIAL_SESSION fires on mount with
+  // any persisted session, and SIGNED_IN / SIGNED_OUT drive subsequent changes.
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthReady(true);
+      if (session?.user) {
+        void bootstrap(session.user.id);
+      } else {
+        resetToGuest();
+      }
     });
-  };
+    // Fallback in case no INITIAL_SESSION event arrives promptly.
+    supabase.auth.getSession().then(({ data }) => {
+      setAuthReady(true);
+      if (data.session?.user) void bootstrap(data.session.user.id);
+    }).catch(() => setAuthReady(true));
+    return () => sub.subscription.unsubscribe();
+  }, [bootstrap, resetToGuest]);
 
-  const updateSmsSettings = (updates: Partial<SmsSettings>) => {
-    setSmsSettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_sms_settings', JSON.stringify(next));
-      return next;
-    });
-  };
+  const reload = useCallback(async () => {
+    if (currentUser.id) await loadEverything(currentUser);
+  }, [currentUser, loadEverything]);
 
-  const updateNotificationSettings = (updates: Partial<NotificationSettings>) => {
-    setNotificationSettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_notification_settings', JSON.stringify(next));
-      return next;
-    });
-  };
-
-  const updateLoyaltySettings = (updates: Partial<LoyaltySettings>) => {
-    setLoyaltySettings(prev => {
-      const next = { ...prev, ...updates };
-      localStorage.setItem('sm_loyalty_settings', JSON.stringify(next));
-      return next;
-    });
-  };
-
-  // Sync to local storage
+  // ---- Admin live orders: Supabase Realtime with a polling fallback --------
+  // Staff only. Realtime pushes order INSERT/UPDATE events; if the channel never
+  // connects (or drops), we fall back to a 12s poll. A slow 60s backstop poll
+  // also runs even in realtime mode, so a silently-stalled subscription still
+  // catches up. All timers/channels are torn down on sign-out / unmount.
   useEffect(() => {
-    localStorage.setItem('sm_branches', JSON.stringify(branches));
-  }, [branches]);
+    if (!isAuthenticated || currentUser.role === 'customer') {
+      setOrdersLiveMode('off');
+      return;
+    }
+    let disposed = false;
+    let refreshing = false;
+    let pending = false;                    // an event arrived while a refresh was in-flight
+    let debounceT: ReturnType<typeof setTimeout> | null = null;
+    let connectT: ReturnType<typeof setTimeout> | null = null;
+    let fastPoll: ReturnType<typeof setInterval> | null = null;
+    let slowPoll: ReturnType<typeof setInterval> | null = null;
+    const modeRef = { current: 'off' as 'realtime' | 'polling' | 'off' };
+    const setMode = (m: 'realtime' | 'polling' | 'off') => {
+      if (disposed) return;
+      modeRef.current = m;
+      setOrdersLiveMode(m);
+    };
+    const doRefresh = async () => {
+      if (disposed) return;
+      if (refreshing) { pending = true; return; }  // coalesce, but never drop the last event
+      refreshing = true;
+      try { await refreshOrders(); } catch { /* transient; keep the loop alive */ }
+      finally {
+        refreshing = false;
+        if (pending && !disposed) { pending = false; void doRefresh(); }  // trailing run
+      }
+    };
+    const bump = () => {                     // coalesce event bursts into one refetch
+      if (debounceT) return;
+      debounceT = setTimeout(() => { debounceT = null; void doRefresh(); }, 500);
+    };
+    const startFastPoll = () => {
+      if (fastPoll) return;
+      fastPoll = setInterval(() => { if (!document.hidden) void doRefresh(); }, 12000);
+    };
+    const stopFastPoll = () => { if (fastPoll) { clearInterval(fastPoll); fastPoll = null; } };
 
-  useEffect(() => {
-    localStorage.setItem('sm_categories', JSON.stringify(categories));
-  }, [categories]);
+    // Always-on slow backstop covers a realtime channel that connects but never
+    // delivers (e.g. table not in the realtime publication).
+    slowPoll = setInterval(() => { if (!document.hidden) void doRefresh(); }, 60000);
 
-  useEffect(() => {
-    localStorage.setItem('sm_products', JSON.stringify(products));
-  }, [products]);
+    const channel = supabase
+      .channel(`admin-orders-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => bump())
+      .subscribe((status) => {
+        if (disposed) return;
+        if (status === 'SUBSCRIBED') {
+          if (connectT) { clearTimeout(connectT); connectT = null; }
+          setMode('realtime');
+          stopFastPoll();
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setMode('polling');
+          startFastPoll();
+        }
+      });
 
-  useEffect(() => {
-    localStorage.setItem('sm_modifier_groups', JSON.stringify(modifierGroups));
-  }, [modifierGroups]);
+    // If realtime hasn't connected within 6s, start polling.
+    connectT = setTimeout(() => {
+      if (!disposed && modeRef.current !== 'realtime') { setMode('polling'); startFastPoll(); }
+    }, 6000);
 
-  useEffect(() => {
-    localStorage.setItem('sm_orders', JSON.stringify(orders));
-  }, [orders]);
+    // Catch up immediately when the tab becomes visible again.
+    const onVis = () => { if (!document.hidden && !disposed) void doRefresh(); };
+    document.addEventListener('visibilitychange', onVis);
 
-  useEffect(() => {
-    localStorage.setItem('sm_addresses', JSON.stringify(addresses));
-  }, [addresses]);
+    return () => {
+      disposed = true;
+      if (debounceT) clearTimeout(debounceT);
+      if (connectT) clearTimeout(connectT);
+      stopFastPoll();
+      if (slowPoll) clearInterval(slowPoll);
+      document.removeEventListener('visibilitychange', onVis);
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, currentUser.role, currentUser.id, refreshOrders]);
 
-  useEffect(() => {
-    localStorage.setItem('sm_availability_matrix', JSON.stringify(availabilityMatrix));
-  }, [availabilityMatrix]);
+  // ---- Auth actions --------------------------------------------------------
+  const signIn = useCallback(async (email: string, password: string) => {
+    await auth.signIn(email, password);
+  }, []);
+  const signUp = useCallback(async (email: string, password: string, fullName: string, phone?: string) => {
+    await auth.signUp(email, password, fullName, phone);
+  }, []);
+  const signOut = useCallback(async () => {
+    await auth.signOut();
+    resetToGuest();
+  }, [resetToGuest]);
 
-  useEffect(() => {
-    localStorage.setItem('sm_integration_events', JSON.stringify(integrationEvents));
-  }, [integrationEvents]);
-
-  // Drive the Tailwind brand tokens from the editable brand settings, so the
-  // admin's primary/secondary colour pickers actually re-theme every
-  // bg-primary/text-primary/bg-secondary element across the app.
+  // ---- Brand theming: drive Tailwind tokens from the settings colours -------
   useEffect(() => {
     const root = document.documentElement;
-    // Only apply a valid CSS colour. The settings field updates on every
-    // keystroke, so a partial/invalid value (e.g. "#" or "bluee") would
-    // otherwise blank out every primary/secondary element; in that case fall
-    // back to the @theme default by clearing the inline override.
     const apply = (token: string, value: string) => {
       if (typeof CSS !== 'undefined' && CSS.supports('color', value)) {
         root.style.setProperty(token, value);
@@ -380,96 +459,85 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     apply('--color-secondary', brandSettings.secondaryColor);
   }, [brandSettings.primaryColor, brandSettings.secondaryColor]);
 
-  // Coupon application logic
+  // ---- Coupon preview: server-validated (no client-side hardcoded codes) ----
   useEffect(() => {
-    if (!couponCode) {
-      setDiscountAmount(0);
-      return;
-    }
-    const cleanCode = couponCode.trim().toUpperCase();
-    if (cleanCode === 'SPICY15') {
-      // 15% discount
-      const sub = cart.reduce((acc, item) => acc + (item.totalPrice * item.quantity), 0);
-      setDiscountAmount(Number((sub * 0.15).toFixed(2)));
-    } else if (cleanCode === 'RIYADH10') {
-      setDiscountAmount(10.00);
-    } else {
-      setDiscountAmount(0);
-    }
-  }, [couponCode, cart]);
+    if (!couponCode || !isAuthenticated) { setDiscountAmount(0); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await couponsApi.validate(couponCode, cartTotal);
+        if (!cancelled) setDiscountAmount(r.valid ? Number(r.discount_amount) : 0);
+      } catch {
+        if (!cancelled) setDiscountAmount(0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [couponCode, cartTotal, isAuthenticated]);
 
-  // Audio trigger
+  const applyCoupon = useCallback(async (code: string): Promise<{ valid: boolean; message: string }> => {
+    const trimmed = code.trim();
+    if (!trimmed) { setCouponCode(''); setDiscountAmount(0); return { valid: false, message: 'No code supplied' }; }
+    try {
+      const r = await couponsApi.validate(trimmed, cartTotal);
+      setCouponCode(trimmed);
+      setDiscountAmount(r.valid ? Number(r.discount_amount) : 0);
+      return { valid: r.valid, message: r.message };
+    } catch (e) {
+      setDiscountAmount(0);
+      return { valid: false, message: e instanceof Error ? e.message : 'Coupon check failed' };
+    }
+  }, [cartTotal]);
+
+  // ---- Audio ping (unchanged) ----------------------------------------------
   const playNotificationSound = () => {
     if (soundMuted) return;
     try {
-      // Simple synth ping using Web Audio API to prevent asset-loading issues
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
-
       osc.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime); // High A
-      osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1); // Quick up-slide
-
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(1200, audioCtx.currentTime + 0.1);
       gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
-
       osc.start();
       osc.stop(audioCtx.currentTime + 0.4);
-      // Release the context once the ping ends; browsers cap live AudioContexts,
-      // so leaking one per notification eventually silences all of them.
       osc.onended = () => { audioCtx.close().catch(() => {}); };
     } catch (e) {
       console.warn('Audio play block or unsupported:', e);
     }
   };
 
-  // Cart operations
+  // ---- Cart (client-only) --------------------------------------------------
   const addToCart = (product: Product, selectedModifiers: { [groupId: string]: Modifier[] }, quantity: number) => {
-    // Generate a unique cartItemId by flattening selected modifier IDs
+    idempotencyKeyRef.current = null; // cart changed → next checkout is a new order
     const modifierIds: string[] = [];
-    Object.values(selectedModifiers).forEach(list => {
-      list.forEach(m => modifierIds.push(m.id));
-    });
+    Object.values(selectedModifiers).forEach(list => list.forEach(m => modifierIds.push(m.id)));
     modifierIds.sort();
     const cartItemId = `${product.id}-${modifierIds.join('_')}`;
 
-    // Calculate single item price
     let itemPrice = product.price;
-    Object.values(selectedModifiers).forEach(list => {
-      list.forEach(m => {
-        itemPrice += m.price;
-      });
-    });
+    Object.values(selectedModifiers).forEach(list => list.forEach(m => { itemPrice += m.price; }));
 
     setCart(prev => {
       const existing = prev.find(item => item.cartItemId === cartItemId);
       if (existing) {
-        return prev.map(item => 
-          item.cartItemId === cartItemId 
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      } else {
-        return [...prev, {
-          cartItemId,
-          product,
-          selectedModifiers,
-          quantity,
-          totalPrice: itemPrice
-        }];
+        return prev.map(item =>
+          item.cartItemId === cartItemId ? { ...item, quantity: item.quantity + quantity } : item);
       }
+      return [...prev, { cartItemId, product, selectedModifiers, quantity, totalPrice: itemPrice }];
     });
   };
 
   const removeFromCart = (cartItemId: string) => {
+    idempotencyKeyRef.current = null;
     setCart(prev => prev.filter(item => item.cartItemId !== cartItemId));
   };
 
   const updateCartQuantity = (cartItemId: string, change: number) => {
+    idempotencyKeyRef.current = null;
     setCart(prev => prev.map(item => {
       if (item.cartItemId === cartItemId) {
         const newQty = item.quantity + change;
@@ -480,301 +548,190 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const clearCart = () => {
+    idempotencyKeyRef.current = null;
     setCart([]);
     setCouponCode('');
     setDiscountAmount(0);
+    setLoyaltyPointsRedeemedState(0);
   };
 
-  const cartTotal = cart.reduce((acc, item) => acc + (item.totalPrice * item.quantity), 0);
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
-
-  // Saved Addresses
+  // ---- Addresses (Supabase, customer-owned) --------------------------------
   const addAddress = (address: Omit<SavedAddress, 'id'>) => {
-    const id = generateId('adr');
-    const newAddress: SavedAddress = {
-      ...address,
-      id,
-      isDefault: address.isDefault || addresses.length === 0
-    };
-    
-    setAddresses(prev => {
-      let updated = prev;
-      if (newAddress.isDefault) {
-        updated = prev.map(a => ({ ...a, isDefault: false }));
+    if (!currentUser.id) return;
+    void (async () => {
+      try {
+        const created = await addressesApi.add({
+          customer_id: currentUser.id,
+          label: address.label,
+          description: address.description,
+          national_short_address: address.nationalShortAddress || null,
+          latitude: address.lat,
+          longitude: address.lng,
+          is_default: address.isDefault || addresses.length === 0,
+        });
+        setAddresses((await addressesApi.listMine()).map(mapAddress));
+        setSelectedAddressId(created.id);
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
       }
-      return [...updated, newAddress];
-    });
-    
-    setSelectedAddressId(id);
+    })();
   };
 
   const deleteAddress = (id: string) => {
-    setAddresses(prev => prev.filter(a => a.id !== id));
-    if (selectedAddressId === id) {
-      setSelectedAddressId('');
-    }
+    void (async () => {
+      try {
+        await addressesApi.remove(id);
+        setAddresses((await addressesApi.listMine()).map(mapAddress));
+        if (selectedAddressId === id) setSelectedAddressId('');
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
+      }
+    })();
   };
 
-  // Place Order (Real-time trigger)
-  // Append a simulated gateway message to the activity log (newest first),
-  // capped so the persisted log can't grow without bound.
-  const emitIntegrationEvent = (channel: 'sms' | 'push', provider: string, recipient: string, message: string) => {
-    setIntegrationEvents(prev => [
-      { id: generateId('evt'), createdAt: new Date().toISOString(), channel, provider, recipient, message },
-      ...prev,
-    ].slice(0, 50));
-  };
-
-  const clearIntegrationEvents = () => setIntegrationEvents([]);
-
-  // Fan an order event out to the SMS and push channels, each gated by its own
-  // provider toggle. There is no real gateway — this records what *would* be sent.
-  const notifyCustomer = (order: Order, message: string) => {
-    // Prefer the in-app push channel; fall back to SMS only when push is
-    // unavailable. Leaning on (free) app notifications keeps paid SMS to a
-    // minimum — SMS fires only when push is disabled.
-    if (notificationSettings.isEnabled) {
-      emitIntegrationEvent('push', notificationSettings.providerName, order.customerName, message);
-    } else if (smsSettings.isEnabled) {
-      emitIntegrationEvent('sms', smsSettings.providerName, order.customerPhone, message);
-    }
-  };
-
-  const placeOrder = () => {
+  // ---- Place order: server-authoritative via the place_order RPC -----------
+  const placeOrder = async (): Promise<{ success: boolean; orderId?: string; order?: Order; error?: string }> => {
     if (cart.length === 0) return { success: false, error: 'Cart is empty' };
     if (!selectedBranch) return { success: false, error: 'No branch selected' };
-    
-    // Delivery validation
-    let deliveryAddress: SavedAddress | undefined;
-    if (checkoutType === 'delivery') {
-      deliveryAddress = addresses.find(a => a.id === selectedAddressId);
-      if (!deliveryAddress) {
-        return { success: false, error: 'Please select or add a delivery address' };
-      }
-      if (cartTotal < selectedBranch.minDeliveryOrder) {
-        return {
-          success: false,
-          error: `Minimum delivery order for this branch is ${selectedBranch.minDeliveryOrder} SAR`
-        };
-      }
+    if (checkoutType === 'delivery' && !selectedAddressId) {
+      return { success: false, error: 'Please select or add a delivery address' };
     }
 
-    // Revalidate the cart against the live menu: a product may have been
-    // deactivated, deleted, or switched off for this branch while it sat in the
-    // cart, and must not be silently ordered.
-    for (const cItem of cart) {
-      const product = products.find(p => p.id === cItem.product.id);
-      if (!product || !product.isActive) {
-        return { success: false, error: `${cItem.product.nameEn} is no longer on the menu. Please remove it from your cart.` };
-      }
-      if (!isProductAvailableInBranch(product.id, selectedBranch.id)) {
-        return { success: false, error: `${cItem.product.nameEn} is not available at ${selectedBranch.nameEn}.` };
-      }
-    }
-
-    const currentDeliveryFee = checkoutType === 'delivery' ? selectedBranch.deliveryFee : 0;
-
-    // Cap the staged loyalty redemption to the points the customer actually
-    // holds, then derive the discount from that capped figure. This keeps the
-    // discount applied to the total and the points deducted below in lockstep,
-    // so a stale redemption (e.g. after the admin adjusts the same customer's
-    // balance mid-session) can never fund an unbacked discount.
-    const loyaltyActive = loyaltySettings.isEnabled && currentUser.role === 'customer';
-    const availablePoints = currentUser.loyaltyPoints || 0;
-    const pointsRedeemed = loyaltyActive ? Math.min(Math.max(0, loyaltyPointsRedeemed), availablePoints) : 0;
-    const appliedLoyaltyDiscount = Number((pointsRedeemed * (loyaltySettings.discountPerPoint || 0.1)).toFixed(2));
-    const finalTotal = Math.max(0, cartTotal + currentDeliveryFee - discountAmount - appliedLoyaltyDiscount);
-
-    // Payment gateway wiring: when enabled the order is treated as paid online
-    // through the configured provider; when disabled it falls back to cash on
-    // delivery (still placeable, settled on delivery).
-    const paymentEnabled = paymentSettings.isEnabled;
-    const paymentMethod = paymentEnabled
-      ? `${PAYMENT_PROVIDER_LABELS[paymentSettings.providerName]}${paymentSettings.isLiveMode ? '' : ' (Test)'}`
-      : 'Cash on Delivery';
-
-    // Build order items
-    const orderItems: OrderItem[] = cart.map((cItem, index) => {
-      const selectedMods: OrderItemModifier[] = [];
-      Object.entries(cItem.selectedModifiers).forEach(([gId, mList]) => {
-        (mList as Modifier[]).forEach(m => {
-          selectedMods.push({
-            id: `oim-${index}-${m.id}`,
-            modifierId: m.id,
-            nameEn: m.nameEn,
-            nameAr: m.nameAr,
-            price: m.price
-          });
-        });
-      });
-
-      return {
-        id: `oi-${index}-${Math.random().toString(36).substr(2, 5)}`,
-        productId: cItem.product.id,
-        nameEn: cItem.product.nameEn,
-        nameAr: cItem.product.nameAr,
-        price: cItem.product.price,
-        quantity: cItem.quantity,
-        selectedModifiers: selectedMods
-      };
-    });
-
-    // Generate Order ID & Number. Continue from the highest existing sequence so
-    // numbers never collide with seeded orders or repeat after a deletion (using
-    // orders.length would restart and clash).
-    const maxSeq = orders.reduce((max, o) => {
-      const m = o.orderNumber.match(/SM-2026-(\d+)/);
-      const n = m ? parseInt(m[1], 10) : 0;
-      return n > max ? n : max;
-    }, 0);
-    const seq = String(maxSeq + 1).padStart(6, '0');
-    const orderNumber = `SM-2026-${seq}`;
-    const orderId = generateId('ord');
-
-    const newOrder: Order = {
-      id: orderId,
-      orderNumber,
-      customerId: currentUser.id,
-      customerName: currentUser.fullName,
-      customerPhone: currentUser.phoneNumber,
-      branchId: selectedBranch.id,
-      branchNameEn: selectedBranch.nameEn,
-      branchNameAr: selectedBranch.nameAr,
-      status: 'received',
-      orderType: checkoutType,
-      subtotal: cartTotal,
-      deliveryFee: currentDeliveryFee,
-      discountAmount: discountAmount,
-      loyaltyDiscountAmount: appliedLoyaltyDiscount,
-      total: finalTotal,
-      paymentStatus: paymentEnabled ? 'paid' : 'pending',
-      paymentMethod,
-      orderSyncStatus: 'not_synced', // Starts as unsynced (representing Lazywait connector status)
-      createdAt: new Date().toISOString(),
-      address: deliveryAddress,
-      items: orderItems
-    };
-
-    // Phase 11: Real-time loyalty update. Deduct exactly the capped points that
-    // funded appliedLoyaltyDiscount above, then add points earned on this order.
-    if (loyaltyActive) {
-      const earnedPoints = Math.floor(finalTotal * loyaltySettings.pointsPerRiyal);
-      const nextPoints = Math.max(0, availablePoints - pointsRedeemed + earnedPoints);
-      updateCustomerPoints(currentUser.id, nextPoints);
-    }
-
-    // Append to orders
-    setOrders(prev => [newOrder, ...prev]);
-    
-    // Realtime alert
-    setNewOrderAlert(true);
-    playNotificationSound();
-
-    // Reset checkout states
-    clearCart();
-    setLoyaltyPointsRedeemed(0);
-
-    // Simulated order-confirmation message to the customer (SMS/push per toggles).
-    notifyCustomer(newOrder, `Order ${orderNumber} confirmed — ${finalTotal.toFixed(2)} SAR, ${paymentEnabled ? 'paid via ' + paymentMethod : paymentMethod}.`);
-
-    return { success: true, orderId, order: newOrder };
-  };
-
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
-    // Reject invalid jumps (e.g. delivered -> received, cancelled -> delivered)
-    // up front, so we only mutate state and notify on a real transition.
-    const target = orders.find(o => o.id === orderId);
-    if (!target || !canTransitionOrder(target.status, status)) return;
-
-    setOrders(prev => prev.map(o => {
-      if (o.id !== orderId) return o;
-      // Mocking external POS sync update status
-      const syncStatusVal = status === 'received' ? 'not_synced' : 'synced';
-      return {
-        ...o,
-        status,
-        orderSyncStatus: syncStatusVal as any,
-        paymentStatus: status === 'delivered' ? 'paid' : o.paymentStatus
-      };
+    const items = cart.map(ci => ({
+      product_id: ci.product.id,
+      quantity: ci.quantity,
+      modifier_ids: (Object.values(ci.selectedModifiers) as Modifier[][]).flat().map(m => m.id),
     }));
 
-    // Simulated customer notification for the status change (SMS/push per toggles).
-    notifyCustomer(target, `Order ${target.orderNumber} ${ORDER_STATUS_MESSAGES[status]}.`);
-  };
+    // One key per checkout attempt; kept across a retry so a lost-response retry
+    // returns the same order instead of creating a duplicate.
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
 
-  // Phase 8 Admin Features: Category CRUD
-  const addCategory = (nameEn: string, nameAr: string) => {
-    const newCat: Category = {
-      id: generateId('cat'),
-      nameEn,
-      nameAr,
-      sortOrder: categories.length + 1
-    };
-    setCategories(prev => [...prev, newCat]);
-  };
-
-  const updateCategory = (id: string, nameEn: string, nameAr: string) => {
-    setCategories(prev => prev.map(c => 
-      c.id === id ? { ...c, nameEn, nameAr } : c
-    ));
-  };
-
-  const deleteCategory = (id: string) => {
-    setCategories(prev => prev.filter(c => c.id !== id));
-    // Also disable or reassign products belonging to this category
-    setProducts(prev => prev.map(p => 
-      p.categoryId === id ? { ...p, isActive: false } : p
-    ));
-  };
-
-  // Phase 8 Admin Features: Product CRUD
-  const addProduct = (pData: Omit<Product, 'id'>) => {
-    const id = generateId('prod');
-    const newProd: Product = {
-      ...pData,
-      id
-    };
-    setProducts(prev => [...prev, newProd]);
-    
-    // Update availability matrix for all active branches
-    setAvailabilityMatrix(prev => {
-      const copy = { ...prev };
-      copy[id] = {};
-      branches.forEach(b => {
-        copy[id][b.id] = b.isActive;
+    try {
+      const created = await ordersApi.place({
+        branchId: selectedBranch.id,
+        orderType: checkoutType,
+        items,
+        addressId: checkoutType === 'delivery' ? selectedAddressId : null,
+        couponCode: couponCode || null,
+        notes: null,
+        loyaltyPoints: currentUser.role === 'customer' ? loyaltyPointsRedeemed : 0,
+        idempotencyKey: idempotencyKeyRef.current,
       });
-      return copy;
-    });
+      idempotencyKeyRef.current = null; // success → the next checkout gets a fresh key
+      // The RPC returns the order row without its items; refetch (with items) so
+      // the receipt renders the full breakdown recomputed by the server.
+      const rows = await ordersApi.listWithItems();
+      const mapped = rows.map(mapOrder);
+      setOrders(mapped);
+      const full = mapped.find(o => o.id === created.id);
+
+      // The order changed the loyalty balance (redeemed + earned); refetch the
+      // profile so the wallet/checkout reflect the new balance.
+      const dbProfile = await auth.myProfile();
+      if (dbProfile) {
+        const u = mapProfile(dbProfile);
+        setCurrentUser(u);
+        setProfiles(prev => (prev.some(p => p.id === u.id) ? prev.map(p => (p.id === u.id ? u : p)) : [u]));
+      }
+
+      clearCart();
+      setNewOrderAlert(true);
+      playNotificationSound();
+      return { success: true, orderId: created.id, order: full };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'Could not place the order' };
+    }
   };
 
+  // ---- Order status (admin only; RLS enforces) -----------------------------
+  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+    const target = orders.find(o => o.id === orderId);
+    if (!target || !canTransitionOrder(target.status, status)) return;
+    void (async () => {
+      try {
+        await ordersApi.setStatus(orderId, status);
+        await refreshOrders();
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+  };
+
+  // ---- Admin: category CRUD ------------------------------------------------
+  const addCategory = (nameEn: string, nameAr: string) => {
+    void (async () => {
+      try {
+        await adminApi.createCategory(categoryToDbInsert(nameEn, nameAr, categories.length + 1));
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
+  };
+  const updateCategory = (id: string, nameEn: string, nameAr: string) => {
+    void (async () => {
+      try {
+        await adminApi.updateCategory(id, { name_en: nameEn, name_ar: nameAr });
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
+  };
+  const deleteCategory = (id: string) => {
+    void (async () => {
+      try {
+        await adminApi.deleteCategory(id);
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
+  };
+
+  // ---- Admin: product CRUD -------------------------------------------------
+  const addProduct = (pData: Omit<Product, 'id'>) => {
+    void (async () => {
+      try {
+        await adminApi.createProduct(productToDbInsert(pData, products.length + 1));
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
+  };
   const updateProduct = (p: Product) => {
-    setProducts(prev => prev.map(old => old.id === p.id ? p : old));
+    void (async () => {
+      try {
+        await adminApi.updateProduct(p.id, productToDbUpdate(p));
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
   };
-
   const deleteProduct = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-    // Remove from availability matrix
-    setAvailabilityMatrix(prev => {
-      const copy = { ...prev };
-      delete copy[id];
-      return copy;
-    });
+    void (async () => {
+      try {
+        await adminApi.deleteProduct(id);
+        await refreshCatalog();
+      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+    })();
   };
 
-  // Phase 8 Admin Features: Branch Specific Availability
+  // ---- Admin: branch availability matrix -----------------------------------
   const toggleProductAvailability = (productId: string, branchId: string) => {
-    setAvailabilityMatrix(prev => {
-      const current = prev[productId] ? { ...prev[productId] } : {};
-      const nextVal = current[branchId] === undefined ? false : !current[branchId];
-      
-      return {
-        ...prev,
-        [productId]: {
-          ...current,
-          [branchId]: nextVal
-        }
-      };
-    });
+    const current = availabilityMatrix[productId]?.[branchId];
+    const nextVal = current === undefined ? false : !current;
+    // Optimistic local update so the toggle feels instant; then persist.
+    setAvailabilityMatrix(prev => ({
+      ...prev,
+      [productId]: { ...(prev[productId] || {}), [branchId]: nextVal },
+    }));
+    void (async () => {
+      try {
+        await adminApi.setAvailability(branchId, productId, nextVal);
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
+        await refreshCatalog(); // revert to server truth on failure
+      }
+    })();
   };
 
   const isProductAvailableInBranch = (productId: string, branchId: string): boolean => {
@@ -784,54 +741,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateBranchSettings = (id: string, updates: Partial<Branch>) => {
+    // Optimistic local update, then persist the mapped columns.
     setBranches(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+    void (async () => {
+      try {
+        await adminApi.updateBranch(id, branchPatchToDb(updates));
+        await refreshCatalog();
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
+        await refreshCatalog();
+      }
+    })();
+  };
 
-    // Mirror the branch's open/closed state into the availability matrix so the
-    // mobile menu tracks it: closing marks every product unavailable at that
-    // branch, and reopening restores them (without this the branch stays empty
-    // after a close/reopen cycle). Rows are copied, not mutated in place.
-    if (updates.isActive === false || updates.isActive === true) {
-      const available = updates.isActive === true;
-      setAvailabilityMatrix(prev => {
-        const copy = { ...prev };
-        Object.keys(copy).forEach(pId => {
-          copy[pId] = { ...copy[pId], [id]: available };
-        });
-        return copy;
-      });
+  // ---- Admin: bulk CSV upload ----------------------------------------------
+  const bulkUploadMenu = async (newCats: Category[], newProds: Product[]): Promise<{ success: boolean; count: number }> => {
+    try {
+      // Insert categories not already present (match by English name), then map
+      // the parsed products' category ids to the real inserted category ids.
+      const existingByName = new Map(categories.map(c => [c.nameEn.toLowerCase(), c]));
+      const toInsert = newCats.filter(c => !existingByName.has(c.nameEn.toLowerCase()));
+      for (const c of toInsert) {
+        await adminApi.createCategory(categoryToDbInsert(c.nameEn, c.nameAr, c.sortOrder));
+      }
+      const refreshed = await refreshCatalog();
+      const dbByName = new Map<string, string>(
+        refreshed.categories.map(c => [c.name_en.toLowerCase(), c.id] as [string, string]),
+      );
+
+      const parsedCatById = new Map(newCats.map(c => [c.id, c] as [string, Category]));
+      let count = 0;
+      for (const p of newProds) {
+        const parsedCat = parsedCatById.get(p.categoryId);
+        const realCatId = parsedCat ? dbByName.get(parsedCat.nameEn.toLowerCase()) : dbByName.get('');
+        if (!realCatId) continue;
+        await adminApi.createProduct(productToDbInsert({ ...p, categoryId: realCatId }, count + 1));
+        count++;
+      }
+      await refreshCatalog();
+      return { success: true, count };
+    } catch (e) {
+      setDataError(e instanceof Error ? e.message : String(e));
+      return { success: false, count: 0 };
     }
   };
 
-  // Phase 8 Admin Features: Bulk Upload Menu (Excel/CSV Parser support)
-  const bulkUploadMenu = (newCats: Category[], newProds: Product[]) => {
-    // Filter duplicates
-    const finalCats = [...categories];
-    newCats.forEach(nc => {
-      if (!finalCats.some(fc => fc.nameEn.toLowerCase() === nc.nameEn.toLowerCase())) {
-        finalCats.push(nc);
+  // ---- Settings ------------------------------------------------------------
+  const updateBrandSettings = (updates: Partial<BrandSettings>) => {
+    setBrandSettings(prev => ({ ...prev, ...updates })); // colours re-theme instantly
+    const dbPatch = brandPatchToDb(updates);
+    if (Object.keys(dbPatch).length > 0) {
+      void (async () => {
+        try { await adminApi.updateSettings(dbPatch); }
+        catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      })();
+    }
+  };
+
+  const updateLoyaltySettings = (updates: Partial<LoyaltySettings>) => {
+    setLoyaltySettings(prev => ({ ...prev, ...updates }));
+    const dbPatch = loyaltyPatchToDb(updates);
+    if (Object.keys(dbPatch).length > 0) {
+      void (async () => {
+        try { await adminApi.updateSettings(dbPatch); }
+        catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      })();
+    }
+  };
+
+  // Admin loyalty point adjustment. Callers pass the desired absolute balance
+  // (e.g. currentPoints + 50); we derive the delta and apply it through the
+  // admin-only adjust_loyalty_points RPC, then refresh the affected profile.
+  const updateCustomerPoints = (userId: string, points: number) => {
+    const current = profiles.find(p => p.id === userId)?.loyaltyPoints ?? 0;
+    const delta = Math.round(points - current);
+    if (delta === 0) return;
+    void (async () => {
+      try {
+        const updated = mapProfile(await loyaltyApi.adjustPoints(userId, delta));
+        setProfiles(prev => prev.map(p => (p.id === userId ? updated : p)));
+        setCurrentUser(prev => (prev.id === userId ? updated : prev));
+      } catch (e) {
+        setDataError(e instanceof Error ? e.message : String(e));
       }
-    });
-
-    setCategories(finalCats);
-    setProducts(prev => [...prev, ...newProds]);
-
-    // Update availability matrix for new products
-    setAvailabilityMatrix(prev => {
-      const copy = { ...prev };
-      newProds.forEach(p => {
-        copy[p.id] = {};
-        branches.forEach(b => {
-          copy[p.id][b.id] = b.isActive;
-        });
-      });
-      return copy;
-    });
-
-    return { success: true, count: newProds.length };
+    })();
   };
 
   return (
     <AppContext.Provider value={{
+      authReady,
+      isAuthenticated,
+      signIn,
+      signUp,
+      signOut,
+      dataLoading,
+      dataError,
+      reload,
+
       branches,
       categories,
       products,
@@ -839,12 +845,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orders,
       addresses,
       profiles,
-      
+
       currentUser,
-      setCurrentUser,
       selectedBranch,
       setSelectedBranch,
-      
+
       cart,
       addToCart,
       removeFromCart,
@@ -852,7 +857,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       clearCart,
       cartTotal,
       cartCount,
-      
+
       checkoutType,
       setCheckoutType,
       selectedAddressId,
@@ -860,18 +865,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       couponCode,
       setCouponCode,
       discountAmount,
-      
+      applyCoupon,
+
       mobileLang,
       setMobileLang,
       adminLang,
       setAdminLang,
-      
+
       addAddress,
       deleteAddress,
       placeOrder,
       updateOrderStatus,
-      
-      // Phase 8 CRUDs
+
       addCategory,
       updateCategory,
       deleteCategory,
@@ -882,34 +887,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isProductAvailableInBranch,
       updateBranchSettings,
       bulkUploadMenu,
-      
+
       playNotificationSound,
       newOrderAlert,
       setNewOrderAlert,
       soundMuted,
       setSoundMuted,
 
-      // Phase 10 Settings & Integrations
       brandSettings,
       updateBrandSettings,
-      lazywaitSettings,
-      updateLazywaitSettings,
-      paymentSettings,
-      updatePaymentSettings,
-      smsSettings,
-      updateSmsSettings,
-      notificationSettings,
-      updateNotificationSettings,
-      integrationEvents,
-      clearIntegrationEvents,
       loyaltySettings,
       updateLoyaltySettings,
 
-      // Phase 11 Customer Loyalty
+      ordersLiveMode,
+      ordersLastUpdated,
+
+      integrationSettings,
+      integrationsLoading,
+      integrationsError,
+      loadIntegrations,
+      saveIntegration,
+
+      loyaltyMutationsEnabled,
+      walletCreditEnabled,
       loyaltyPointsRedeemed,
       setLoyaltyPointsRedeemed,
       loyaltyDiscountAmount,
-      updateCustomerPoints
+      updateCustomerPoints,
     }}>
       {children}
     </AppContext.Provider>

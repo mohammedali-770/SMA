@@ -21,12 +21,10 @@ import { ProfileScreen } from './mobile/ProfileScreen';
 
 export const MobileEmulator: React.FC = () => {
   const {
-    branches, categories, products, modifierGroups, orders, addresses, currentUser, setCurrentUser,
-    selectedBranch, setSelectedBranch, cart, addToCart, removeFromCart, updateCartQuantity, clearCart,
-    cartTotal, cartCount, checkoutType, setCheckoutType, selectedAddressId, setSelectedAddressId,
-    couponCode, setCouponCode, discountAmount, mobileLang, setMobileLang, addAddress, deleteAddress,
-    placeOrder, isProductAvailableInBranch, brandSettings,
-    loyaltySettings, loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, updateCustomerPoints
+    branches, modifierGroups, currentUser,
+    selectedBranch, setSelectedBranch, addToCart, cartCount,
+    mobileLang, setMobileLang, addAddress,
+    brandSettings,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'home' | 'cart' | 'wallet' | 'profile'>('home');
@@ -486,6 +484,12 @@ export const MobileEmulator: React.FC = () => {
                       <span className="text-base font-black text-secondary">{formatSAR(activeOrderReceipt.total, mobileLang)}</span>
                     </div>
 
+                    {(activeOrderReceipt.loyaltyPointsEarned ?? 0) > 0 && (
+                      <div className="flex justify-between text-purple-600 text-[11px] font-bold pt-1">
+                        <span>{isRTL ? 'نقاط الولاء المكتسبة' : 'Loyalty points earned'}</span>
+                        <span className="font-black">+{activeOrderReceipt.loyaltyPointsEarned} {isRTL ? 'نقطة' : 'pts'}</span>
+                      </div>
+                    )}
                     {/* VAT extraction info strictly required in Saudi e-invoicing */}
                     <div className="bg-white p-2 rounded-lg text-[9.5px] text-gray-400 space-y-0.5 mt-2 border border-slate-100">
                       <div className="flex justify-between">
