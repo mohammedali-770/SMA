@@ -2,6 +2,7 @@
   "expo": {
     "name": "Spicy Meal",
     "slug": "spicy-meal",
+    "owner": "spicy-meal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -18,7 +19,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "permissions": ["INTERNET"],
+      "permissions": [
+        "INTERNET"
+      ],
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -35,6 +38,12 @@
           "backgroundColor": "#422e87"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c8422901-b27a-40b3-91c7-b6ce99d97936"
+      }
+    }
   }
 }
