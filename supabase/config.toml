@@ -12,6 +12,11 @@ major_version = 15
 [functions.order-intake]
 verify_jwt = true
 
+# The signed-in customer starts paying for their own order (Geidea session).
+[functions.payment-initiate]
+verify_jwt = true
+
+# Called by Geidea's servers; authenticated by the HMAC callback signature.
 [functions.payment-webhook]
 verify_jwt = false
 

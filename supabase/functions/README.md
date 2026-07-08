@@ -8,7 +8,8 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | Function | Caller | verify_jwt | Status | Purpose |
 |----------|--------|-----------|--------|---------|
 | `order-intake` | app (user) | true | working wrapper | Calls `place_order` AS THE USER (RLS + totals stay authoritative); future create-order+payment orchestration point. |
-| `payment-webhook` | payment gateway | false | placeholder (501) | Verify signature server-side → `confirm_order_payment` RPC. No order is paid without a verified webhook. |
+| `payment-initiate` | app (user) | true | **Geidea** | Reads the user's own order (RLS → trusted total), creates a **Geidea** session (server-to-server, Basic auth + HMAC signature), returns `sessionId` + hosted-checkout URL. Never returns a secret. |
+| `payment-webhook` | Geidea | false | **Geidea** | Verifies the **Geidea callback HMAC signature** server-side, then on `status=Paid`+`responseCode=000` calls `confirm_order_payment` (amount must equal the server total; idempotent). A forged callback can't mark an order paid. |
 | `lazywait-sync` | schedule/queue | false | placeholder (501) | Server-side Lazywait sync worker → `record_order_sync` RPC. |
 | `lazywait-create-order` | server | false | placeholder (501) | **Awaiting official Lazywait API docs.** Do not implement yet. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
@@ -37,8 +38,36 @@ curl -i -X POST http://127.0.0.1:54321/functions/v1/payment-webhook -d '{}'
 
 ## Deploy
 ```bash
-supabase functions deploy order-intake payment-webhook lazywait-sync \
-  lazywait-create-order send-otp push-dispatch
+supabase functions deploy order-intake payment-initiate payment-webhook \
+  lazywait-sync lazywait-create-order send-otp push-dispatch
 # secrets that are NOT in integration_settings (rare) go via:
 # supabase secrets set SOME_KEY=... 
 ```
+
+## Geidea payment setup
+
+The Geidea merchant credentials live in the `integration_settings` `payment`
+row — **never in the app**. Set them with the admin RPC (service role / SQL
+editor / admin dashboard), NOT from the client:
+
+```sql
+select public.upsert_integration_settings(
+  'payment', 'geidea', true,
+  -- public_config (non-secret): environment + currency + app return URL
+  '{"country":"ksa","currency":"SAR","returnUrl":"spicymeal://payment-return"}'::jsonb,
+  -- secret_config (server-only): Geidea merchant public key + API password
+  '{"publicKey":"<MERCHANT_PUBLIC_KEY>","apiPassword":"<API_PASSWORD>"}'::jsonb
+);
+```
+
+- `public_config.country` selects the host (`ksa` default); override the exact
+  hosts with `apiBaseUrl` / `checkoutBaseUrl` to point at the **sandbox** during
+  testing.
+- The `apiPassword` is both the Basic-auth password **and** the HMAC signing key
+  (see `_shared/geidea.ts`).
+
+**Flow:** app calls `place_order` → order `payment_status='pending'` → app calls
+`payment-initiate {orderId}` → opens the returned Geidea checkout URL → customer
+pays → Geidea POSTs the signed callback to `payment-webhook` → verified
+`Paid`+`000` → `confirm_order_payment` flips the order to `paid`. The client is
+never trusted to set payment status.
