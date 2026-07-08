@@ -8,7 +8,6 @@
     "icon": "./assets/icon.png",
     "scheme": "spicymeal",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.spicymeal.app"
@@ -21,8 +20,7 @@
       },
       "permissions": [
         "INTERNET"
-      ],
-      "edgeToEdgeEnabled": true
+      ]
     },
     "web": {
       "output": "static",
