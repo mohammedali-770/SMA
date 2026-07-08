@@ -63,13 +63,21 @@ Deno.serve(async (req: Request) => {
   });
 
   if (!provided || !timingSafeEqual(provided, expected)) {
-    // Do not touch the order. Log the rejected attempt for the ops view.
+    // Do not touch the order. Log the rejected attempt for ops, but WITHOUT
+    // persisting the full body: this branch runs before the signature is verified,
+    // so `evt` is unauthenticated + attacker-controlled and unbounded. Store only
+    // a small bounded snapshot to keep visibility without a write-amplification /
+    // storage-growth vector on this public endpoint.
     await admin.from('integration_sync_logs').insert({
       provider: 'geidea',
       order_id: isUuid(merchantReferenceId) ? merchantReferenceId : null,
       direction: 'webhook',
       status: 'failed',
-      request: evt,
+      request: {
+        merchant_reference_id: merchantReferenceId ? merchantReferenceId.slice(0, 64) : null,
+        status: status ? status.slice(0, 32) : null,
+        body_bytes: rawBody.length,
+      },
       error: 'signature mismatch',
     }).then(() => {}, () => {});
     return json({ error: 'invalid signature' }, 401);

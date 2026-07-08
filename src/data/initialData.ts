@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Branch, Category, Product, ModifierGroup, Banner, UserProfile, SavedAddress, Order, BrandSettings, PaymentSettings, SmsSettings, NotificationSettings, LoyaltySettings } from '../types';
+import { Branch, Category, Product, ModifierGroup, Banner, UserProfile, SavedAddress, Order, BrandSettings, LoyaltySettings } from '../types';
 
 export const INITIAL_BRANCHES: Branch[] = [
   {
@@ -464,31 +464,12 @@ export const INITIAL_BRAND_SETTINGS: BrandSettings = {
   termsAr: 'بتقديم طلب عبر منصتنا، فإنك توافق على الالتزام بشروط وأحكام سبايسي ميل، الخاضعة لأنظمة التجارة الإلكترونية المعمول بها في المملكة العربية السعودية.'
 };
 
-// (Removed INITIAL_LAZYWAIT_SETTINGS — it shipped a fake api key. Lazywait is
-//  now configured securely via integration_settings, never in bundled data.)
-
-export const INITIAL_PAYMENT_SETTINGS: PaymentSettings = {
-  providerName: 'moyasar',
-  isLiveMode: false,
-  publicKey: 'pk_test_a1b2c3d4e5f6g7h8i9j0',
-  secretKey: 'sk_test_z9y8x7w6v5u4t3s2r1q0',
-  isEnabled: true
-};
-
-export const INITIAL_SMS_SETTINGS: SmsSettings = {
-  providerName: 'unifonic',
-  apiKey: 'unifonic_test_key_552199',
-  senderId: 'SPICYMEAL',
-  isEnabled: true
-};
-
-export const INITIAL_NOTIFICATION_SETTINGS: NotificationSettings = {
-  providerName: 'onesignal',
-  apiKey: 'os_app_id_99228833-abcd-1234',
-  // Push is the primary customer-messaging channel (free, in-app), so it is on
-  // by default; SMS is only a fallback for when push is disabled.
-  isEnabled: true
-};
+// (Removed INITIAL_LAZYWAIT_SETTINGS, INITIAL_PAYMENT_SETTINGS, INITIAL_SMS_SETTINGS
+//  and INITIAL_NOTIFICATION_SETTINGS — they shipped fake/placeholder provider
+//  secret-shaped fields (secretKey / apiKey) in the client bundle and were unused
+//  dead exports. All provider config now lives in integration_settings
+//  (secret_config, admin-only, never returned to the browser); the admin UI reads
+//  only the non-secret projection via list_integration_settings.)
 
 export const INITIAL_LOYALTY_SETTINGS: LoyaltySettings = {
   isEnabled: true,

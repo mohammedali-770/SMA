@@ -29,9 +29,16 @@ Deno.serve(async (req: Request) => {
   const cfg = await getProviderConfig(admin, 'lazywait');
   if (!cfg || !cfg.enabled) return json({ status: 'disabled', reason: 'lazywait not enabled' }, 200);
 
-  // Optional shared-secret gate for the scheduled trigger.
+  // Shared-secret gate for the scheduled/server trigger — fail CLOSED. Because
+  // verify_jwt=false makes this function internet-reachable, we REQUIRE a
+  // configured secret and a matching x-sync-secret header; without it we refuse
+  // rather than run unauthenticated. Configure secret_config.sync_trigger_secret
+  // and send it as the x-sync-secret header (see docs/LAZYWAIT_PILOT.md).
   const triggerSecret = String((cfg.secretConfig as Record<string, unknown>).sync_trigger_secret ?? '');
-  if (triggerSecret && req.headers.get('x-sync-secret') !== triggerSecret) {
+  if (!triggerSecret) {
+    return json({ error: 'sync trigger secret not configured' }, 503);
+  }
+  if (req.headers.get('x-sync-secret') !== triggerSecret) {
     return json({ error: 'unauthorized' }, 401);
   }
 

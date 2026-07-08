@@ -87,15 +87,22 @@ Deno.serve(async (req: Request) => {
     });
     result = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      return json({ error: 'Geidea session creation failed', status: resp.status, details: result }, 502);
+      // Log the upstream detail SERVER-SIDE only; never echo the gateway's raw
+      // response body back to the client (it can carry internal error detail).
+      console.error('Geidea session creation failed', resp.status, JSON.stringify(result).slice(0, 500));
+      return json({ error: 'Geidea session creation failed', status: resp.status }, 502);
     }
   } catch (e) {
-    return json({ error: `Geidea request failed: ${e instanceof Error ? e.message : String(e)}` }, 502);
+    console.error('Geidea request failed', e instanceof Error ? e.message : String(e));
+    return json({ error: 'Geidea request failed' }, 502);
   }
 
   const session = (result.session ?? result) as Record<string, unknown>;
   const sessionId = String(session.id ?? result.sessionId ?? '');
-  if (!sessionId) return json({ error: 'Geidea did not return a session id', details: result }, 502);
+  if (!sessionId) {
+    console.error('Geidea returned no session id', JSON.stringify(result).slice(0, 500));
+    return json({ error: 'Geidea did not return a session id' }, 502);
+  }
 
   // Audit the initiation (best-effort; the webhook is the source of truth for paid).
   await admin.from('payment_records').insert({

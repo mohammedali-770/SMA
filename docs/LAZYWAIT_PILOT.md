@@ -97,7 +97,9 @@ Settings → Integrations → **Lazywait POS** card, enter:
 - `client_id` = `<CLIENT_ID>`  (public)
 - `api_token` = `<ROTATED_API_TOKEN>`  (secret)
 - `webhook_secret` = `<WEBHOOK_SECRET>`  (secret; optional for pilot)
-- `sync_trigger_secret` = `<SYNC_TRIGGER_SECRET>`  (secret; recommended)
+- `sync_trigger_secret` = `<SYNC_TRIGGER_SECRET>`  (secret; **REQUIRED** — the
+  `lazywait-sync` worker fails closed and returns 503 until this is set, so it is
+  never invocable unauthenticated)
 
 Leave **Enabled OFF** for now (map first, enable last).
 
