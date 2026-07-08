@@ -24,6 +24,16 @@ export const DEFAULT_BASE_URL = 'https://apiv2.lazywait.com/v1';
 export const MAX_SYNC_ATTEMPTS = 8;
 export const SOURCE = 'LWAPI';
 
+/**
+ * How long an order may sit in 'syncing' before the reaper reclaims it. If a
+ * worker crashes/times out after claiming (flipping the row to 'syncing') but
+ * before calling record_lazywait_sync, the row would otherwise stay stuck and
+ * never be picked up again. 10 min is comfortably longer than the worker's
+ * per-order network budget (8s CRM + 15s Create Order) so a still-running
+ * attempt is never reaped out from under itself. Must match the RPC default.
+ */
+export const STALE_SYNC_TIMEOUT_MINUTES = 10;
+
 const enc = new TextEncoder();
 
 // ---------------------------------------------------------------------------
@@ -105,6 +115,17 @@ export function round2(n: number): number {
   return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Decide whether the worker may (re-)POST Create Order for a claimed order.
+ * Create Order has NO idempotency key, so once we hold a Lazywait `order_ref`
+ * the POS ticket already exists — re-sending would duplicate it. If a ref is
+ * present the caller must finalize as 'synced' WITHOUT re-POSTing. Returns
+ * false when a ref is already stored, true only for genuinely un-created orders.
+ */
+export function shouldResendCreateOrder(order: { lazywait_ref?: string | null }): boolean {
+  return !order.lazywait_ref;
+}
+
 // ---------------------------------------------------------------------------
 // Webhook signature (HMAC-SHA256 hex)
 // ---------------------------------------------------------------------------
@@ -181,6 +202,24 @@ export interface LazywaitResponse<T = unknown> {
   error: string | null;
 }
 
+/**
+ * Parse a `Retry-After` header into milliseconds. RFC 7231 allows either
+ * delta-seconds ("120") or an HTTP-date. Returns null when absent/unparseable
+ * (caller falls back to computeBackoffMs). Note: a valid "0" returns 0 (retry
+ * now) — callers must use `??`, not `||`, so that zero is preserved.
+ */
+export function parseRetryAfterMs(
+  value: string | null | undefined, nowMs: number = Date.now(),
+): number | null {
+  if (value == null) return null;
+  const s = String(value).trim();
+  if (s === '') return null;
+  if (/^\d+$/.test(s)) return Math.max(0, Number(s) * 1000);        // delta-seconds
+  const t = Date.parse(s);                                          // HTTP-date
+  if (!Number.isNaN(t)) return Math.max(0, t - nowMs);
+  return null;
+}
+
 export async function lazywaitFetch<T = unknown>(
   cfg: LazywaitConfig,
   opts: {
@@ -218,8 +257,7 @@ export async function lazywaitFetch<T = unknown>(
     try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
     const code = (data && typeof data === 'object' && 'code' in (data as Record<string, unknown>))
       ? String((data as Record<string, unknown>).code) : null;
-    const retryAfterHeader = res.headers.get('retry-after');
-    const retryAfterMs = retryAfterHeader ? Math.max(0, Number(retryAfterHeader) * 1000) || null : null;
+    const retryAfterMs = parseRetryAfterMs(res.headers.get('retry-after'));
     return {
       ok: res.ok,
       status: res.status,

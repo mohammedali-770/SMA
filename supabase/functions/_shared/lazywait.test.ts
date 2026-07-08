@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createHmac } from 'node:crypto';
 import {
   buildCreateOrderPayload, classifyLazywaitError, computeBackoffMs, hmacSha256Hex,
-  MAX_SYNC_ATTEMPTS, normalizePhone, round2, verifyWebhookSignature,
+  MAX_SYNC_ATTEMPTS, normalizePhone, parseRetryAfterMs, round2,
+  shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature,
 } from './lazywait';
 
 const items = [{ menuItemId: 'ITEM_1', name: 'Burger', quantity: 2, unitPrice: 25 }];
@@ -102,5 +103,42 @@ describe('round2', () => {
   it('rounds to 2 decimals', () => {
     expect(round2(25.005)).toBe(25.01);
     expect(round2(25)).toBe(25);
+  });
+});
+
+describe('shouldResendCreateOrder (duplicate-send guard)', () => {
+  it('NEVER re-sends Create Order once a Lazywait ref exists', () => {
+    expect(shouldResendCreateOrder({ lazywait_ref: 'ORDER_REF_1' })).toBe(false);
+  });
+  it('allows the first send when no ref is stored yet', () => {
+    expect(shouldResendCreateOrder({ lazywait_ref: null })).toBe(true);
+    expect(shouldResendCreateOrder({ lazywait_ref: '' })).toBe(true);
+    expect(shouldResendCreateOrder({})).toBe(true);
+  });
+});
+
+describe('parseRetryAfterMs', () => {
+  it('parses delta-seconds, keeping a valid 0 (retry now)', () => {
+    expect(parseRetryAfterMs('120')).toBe(120_000);
+    expect(parseRetryAfterMs('0')).toBe(0);              // must NOT become null
+  });
+  it('parses an HTTP-date relative to now', () => {
+    const now = Date.parse('2026-07-08T00:00:00Z');
+    expect(parseRetryAfterMs('Wed, 08 Jul 2026 00:00:30 GMT', now)).toBe(30_000);
+    // A past date clamps to 0 rather than going negative.
+    expect(parseRetryAfterMs('Wed, 08 Jul 2026 00:00:00 GMT', now + 5_000)).toBe(0);
+  });
+  it('returns null for absent/blank/garbage values (falls back to backoff)', () => {
+    expect(parseRetryAfterMs(null)).toBeNull();
+    expect(parseRetryAfterMs(undefined)).toBeNull();
+    expect(parseRetryAfterMs('')).toBeNull();
+    expect(parseRetryAfterMs('soon')).toBeNull();
+  });
+});
+
+describe('STALE_SYNC_TIMEOUT_MINUTES', () => {
+  it('is a safe 5–10 min lease window, longer than the worker network budget', () => {
+    expect(STALE_SYNC_TIMEOUT_MINUTES).toBeGreaterThanOrEqual(5);
+    expect(STALE_SYNC_TIMEOUT_MINUTES).toBeLessThanOrEqual(10);
   });
 });

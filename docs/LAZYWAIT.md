@@ -78,11 +78,53 @@ Delivery orders are **blocked** (not synced) until Lazywait confirms the schema.
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
   `sync_next_attempt_at = now()+backoff` (30s→60s→…→1h, ±20% jitter; 429 honors
-  `Retry-After`). After `MAX_SYNC_ATTEMPTS` (8) → `dead_letter` (off the queue).
+  `Retry-After`, delta-seconds or HTTP-date). After `MAX_SYNC_ATTEMPTS` (8) →
+  `dead_letter` (off the queue).
 - Terminal (401 INVALID_KEY, 403 LICENSE_EXPIRED, other 4xx, missing mapping) →
   `blocked` (no auto-retry; admin fixes config/mapping then **Retry**).
+- **Ambiguous 2xx** (HTTP success but no usable `order_ref`, or `success` not
+  `true`) → `blocked` (`unexpected_response` / `created_without_ref`), NOT
+  retried: the POS may have created the order and Create Order has no idempotency
+  key, so a blind re-send would duplicate the ticket. Admin confirms in Lazywait,
+  then **Retry** or resolves manually.
 - The queue index `orders_lazywait_queue_idx` pulls due `pending`/`failed` rows
-  oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`.
+  oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
+  **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
+
+### Stale-'syncing' reaper (crash/timeout recovery)
+`claim_lazywait_sync_batch` flips a whole batch to `syncing` up front, then the
+worker processes orders one at a time. If the worker crashes / times out / is
+redeployed mid-batch, a row can be left in `syncing` — which is **outside** the
+queue predicate (`pending`/`failed`), the admin requeue guard, and the UI retry
+set — so nothing would ever recover it.
+
+`reap_stale_lazywait_syncs(p_timeout_minutes default 10, p_max_attempts default 8)`
+(service-role) is called by the worker at the **start of every run** (before
+claiming) to recover rows stuck in `syncing` past the lease timeout:
+- **With a `lazywait_ref`** → `synced`. The Create Order already succeeded; we
+  **never** re-POST (no idempotency key). `synced_at` is preserved/backfilled.
+- **Without a ref** → `failed` with `sync_attempt_count++` and a backoff delay
+  (safe to resend — no POS ticket was created), or `dead_letter` at the ceiling.
+
+Each reaped row writes an `integration_sync_logs` row
+(`recovered_stale_syncing_with_ref` / `stale_syncing_no_ref_requeued` /
+`stale_syncing_no_ref_dead_letter`) so Admin sees the recovery, and the worker
+returns a `reaped: {recovered_synced, requeued, dead_lettered}` summary. The
+10-minute lease is comfortably longer than the worker's per-order network budget
+(8s CRM + 15s Create Order), so an in-flight attempt is never reaped early. A
+partial index `orders_lazywait_syncing_idx (updated_at) where lazywait_sync_state
+= 'syncing'` keeps the scan cheap.
+
+The worker also **guards before every POST**: if a claimed order already carries
+a `lazywait_ref` (`shouldResendCreateOrder` → false), it finalizes as `synced`
+(`already_created_no_resend`) instead of re-sending.
+
+> **Residual duplicate risk (unavoidable without an idempotency key):** a network
+> timeout that happens *after* Lazywait created the order but *before* the response
+> is received leaves us with no ref, so the retry re-creates it. Mitigations above
+> cover crash-after-success and ambiguous-2xx; a true lost-response-after-create
+> can still duplicate until Lazywait exposes an idempotency key or a
+> reconcile-by-reference lookup. Tracked in *Known limitations*.
 
 ## CRM matching
 Before create, if the order has a phone, `GET /crm/customers/search` with a
@@ -115,6 +157,7 @@ excluded). Accountants can view but not edit. Secrets are never shown.
 ```bash
 # 1) DB migration
 supabase db push                       # applies 20260708130000_lazywait_integration
+                                       #     + 20260708140000_lazywait_stale_reap
 
 # 2) Edge Functions
 supabase functions deploy lazywait-sync lazywait-webhook payment-webhook
@@ -143,9 +186,19 @@ select * from integration_sync_logs where provider='lazywait' order by created_a
 payload mapping, delivery/missing-branch/missing-item blocking, price rounding,
 error classification (401/403 terminal, 429/5xx retryable), webhook HMAC verify
 (valid/tampered/missing, cross-checked vs Node crypto), backoff, phone
-normalization. The migration + trigger + `claim`/`record` RPCs were validated by
-applying all 16 migrations to a throwaway Postgres 16 and exercising the flow.
-No real Lazywait token is used in tests.
+normalization, the `shouldResendCreateOrder` duplicate-send guard, and
+`Retry-After` parsing (delta-seconds/HTTP-date, valid `0` preserved). No real
+Lazywait token is used in tests.
+
+`supabase/tests/lazywait_reap_test.sql` covers the stale-'syncing' reaper against
+a throwaway Postgres 16 (all migrations applied): young `syncing` NOT reclaimed,
+old reclaimed, `synced` never reclaimed, stale-with-ref recovered to `synced`
+(not resent), max-attempts → `dead_letter`, reaper idempotency, and recovery
+logging:
+```bash
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/lazywait_reap_test.sql
+```
 
 ## Known limitations (confirm with Lazywait)
 - Delivery Create Order schema, addons/modifiers, `price_id`, and
