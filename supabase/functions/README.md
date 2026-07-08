@@ -11,6 +11,7 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `payment-initiate` | app (user) | true | **Geidea** | Reads the user's own order (RLS → trusted total), creates a **Geidea** session (server-to-server, Basic auth + HMAC signature), returns `sessionId` + hosted-checkout URL. Never returns a secret. |
 | `payment-webhook` | Geidea | false | **Geidea** | Verifies the **Geidea callback HMAC signature** server-side, then on `status=Paid`+`responseCode=000` calls `confirm_order_payment` (amount must equal the server total; idempotent). A forged callback can't mark an order paid. |
 | `lazywait-sync` | schedule/cron | false | **Lazywait** | POS sync worker: claims due orders (SKIP LOCKED), `POST /pos/orders/create` (pickup only), records via `record_lazywait_sync` with retry/backoff/dead-letter. See `docs/LAZYWAIT.md`. |
+| `lazywait-catalog` | admin (browser) | true | **Lazywait** | Admin-only catalog pull: GETs branches/categories/items/addons/addon-groups server-side and caches them in `lazywait_catalog_items` for id-mapping review. Extra `is_admin()` check; never returns a secret. |
 | `lazywait-webhook` | Lazywait | false | **Lazywait** | Verifies the `X-LazyWait-Signature` HMAC (hex), records POS status; unknown events are logged + accepted safely. |
 | `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
@@ -40,7 +41,7 @@ curl -i -X POST http://127.0.0.1:54321/functions/v1/payment-webhook -d '{}'
 ## Deploy
 ```bash
 supabase functions deploy order-intake payment-initiate payment-webhook \
-  lazywait-sync lazywait-create-order send-otp push-dispatch
+  lazywait-sync lazywait-catalog lazywait-create-order send-otp push-dispatch
 # secrets that are NOT in integration_settings (rare) go via:
 # supabase secrets set SOME_KEY=... 
 ```

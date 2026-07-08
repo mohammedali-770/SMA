@@ -31,20 +31,42 @@ select public.upsert_integration_settings(
 ```
 
 ## Mapping (external ids)
-Added by `20260708130000_lazywait_integration`. Admins set them (RLS-guarded):
-| Local column | Lazywait field | Set via |
+Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
+`20260708150000_lazywait_catalog_mapping`. All confirmed by an admin in the UI:
+| Local column | Lazywait field | Catalog endpoint |
 |---|---|---|
-| `branches.lazywait_branch_id` | `branch_id` (`GET /platform/branches`) | Admin → Settings → Lazywait Sync Monitor |
-| `products.lazywait_item_id` | `menu_item_id` (`GET /menu/products/items`) | admin catalog update / backfill |
-| `products.lazywait_price_id` | `price_id` (**unused in Create Order**) | future |
-| `categories.lazywait_category_id` | `category_id` | future |
-| `modifier_groups.lazywait_group_id` | `addons_group_id` | future |
-| `modifiers.lazywait_addon_id` | `addon_id` | future |
+| `branches.lazywait_branch_id` | `branch_id` | `GET /platform/branches` |
+| `categories.lazywait_category_id` | `category_id` | `GET /menu/products/categories` |
+| `products.lazywait_item_id` | `menu_item_id` | `GET /menu/products/items` |
+| `products.lazywait_price_id` + `lazywait_price_ref` | `price_id` + price snapshot (**reference only, NOT sent in Create Order**) | `GET /menu/products/items` |
+| `modifier_groups.lazywait_group_id` | `addons_group_id` | `GET /menu/addons-groups` |
+| `modifiers.lazywait_addon_id` | `addon_id` | `GET /menu/addons` |
 | `profiles.lazywait_customer_id` | CRM `id` (matched by phone) | set automatically on CRM match |
 
-Branch mapping has an admin UI. Product/addon id mapping is prepared (columns +
-`GET /menu/*` endpoints) — populate by pulling the Lazywait catalog and matching
-by name for admin review (auto-map UI is a follow-up).
+### Catalog pull → suggest → confirm
+1. **Pull (server-side):** the `lazywait-catalog` Edge Function (admin-only,
+   `verify_jwt` + `is_admin()`) fetches the five endpoints with the server-held
+   token and upserts normalized records into `lazywait_catalog_items`
+   (staff-readable cache; only names/ids/prices/raw — **no secret**). Each run
+   logs a `lazywait_catalog_pulls` row (last sync time + sanitized per-endpoint
+   errors); records removed from Lazywait are pruned on the next successful pull.
+   Parsing is **defensive**: handles en/ar/Turkish-only names, multi-price items,
+   `branches_ids`, and null addon prices / null group min/max/multi safely.
+2. **Suggest (client-side, pure):** `src/lib/lazywaitMatch.ts` normalizes names
+   (Arabic alef/hamza/taa-marbuta/tashkeel, Latin diacritics, Turkish letters)
+   and scores each local record against the pulled candidates →
+   `high | medium | low | none`. Anything below `high` is flagged **review**.
+3. **Confirm (admin-only RPC):** `set_lazywait_mapping(entity, local_id,
+   lazywait_id, price_ref?)` writes **only** the id column(s) — it never touches
+   local names or the local price. `clear_lazywait_mapping(entity, local_id)`
+   removes a mapping. Accountants can view the mapping tables + status but the
+   RPCs reject them (42501).
+
+`lazywait_mapping_status()` (staff) returns mapped/total per entity, the count of
+orders blocked on missing mapping, a **`secrets_configured` boolean** (computed
+server-side — the token is never returned), and a pickup-sync **readiness**
+checklist (secrets configured · ≥1 branch mapped · all active products mapped ·
+no blocked orders).
 
 ## Order sync flow
 1. `place_order` creates the local order (`payment_status='pending'`). A BEFORE
@@ -158,9 +180,10 @@ excluded). Accountants can view but not edit. Secrets are never shown.
 # 1) DB migration
 supabase db push                       # applies 20260708130000_lazywait_integration
                                        #     + 20260708140000_lazywait_stale_reap
+                                       #     + 20260708150000_lazywait_catalog_mapping
 
 # 2) Edge Functions
-supabase functions deploy lazywait-sync lazywait-webhook payment-webhook
+supabase functions deploy lazywait-sync lazywait-catalog lazywait-webhook payment-webhook
 
 # 3) Secrets (server-side; NOT committed) — via admin card or the upsert SQL above.
 
@@ -190,14 +213,27 @@ normalization, the `shouldResendCreateOrder` duplicate-send guard, and
 `Retry-After` parsing (delta-seconds/HTTP-date, valid `0` preserved). No real
 Lazywait token is used in tests.
 
-`supabase/tests/lazywait_reap_test.sql` covers the stale-'syncing' reaper against
-a throwaway Postgres 16 (all migrations applied): young `syncing` NOT reclaimed,
-old reclaimed, `synced` never reclaimed, stale-with-ref recovered to `synced`
-(not resent), max-attempts → `dead_letter`, reaper idempotency, and recovery
-logging:
+`src/lib/lazywaitMatch.test.ts` covers name normalization (Arabic/Latin/Turkish),
+confidence scoring, and that a low-confidence match requires manual confirmation
+while an exact match does not. `supabase/functions/_shared/lazywaitCatalog.test.ts`
+covers defensive catalog parsing: multi-price items, null addon price/price_id,
+null group min/max/multi, Turkish-only names, localized name objects, and id-less
+rows being dropped.
+
+`supabase/tests/*.sql` run against a throwaway Postgres 16 (all migrations
+applied):
+- `lazywait_reap_test.sql` — the stale-'syncing' reaper (young NOT reclaimed, old
+  reclaimed, `synced` never reclaimed, stale-with-ref recovered without resend,
+  max-attempts → `dead_letter`, idempotency, recovery logging).
+- `lazywait_mapping_test.sql` — mapping RPCs write only id/price-ref columns
+  (local names + prices untouched), accountant rejected 42501 on set/clear,
+  `lazywait_mapping_status()` counts + readiness, and **the api_token never
+  appears in the status payload**.
 ```bash
 psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   -f supabase/tests/lazywait_reap_test.sql
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/lazywait_mapping_test.sql
 ```
 
 ## Known limitations (confirm with Lazywait)
@@ -212,7 +248,9 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
 - Webhook URL registration method + exact event catalog are not fully confirmed.
 
 ## Recommended next task
-Wire the **product/addon id mapping** (pull `GET /menu/products/items` +
-`/menu/addons*`, match by name, admin-confirm) so pickup orders sync end-to-end,
-then run a **single-branch pilot** against a Lazywait sandbox before enabling all
-branches.
+Catalog id mapping (pull + suggest + confirm) is now implemented. Next: run a
+**single-branch pickup pilot** against a Lazywait sandbox — map that branch + its
+active products, place a real pickup order, confirm it creates in the POS with
+the right `order_ref`, then widen to all branches. (Addons/modifiers, `price_id`,
+and delivery are mapped for reference but still intentionally **not** sent in
+Create Order until Lazywait confirms those schemas.)

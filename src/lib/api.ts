@@ -32,14 +32,17 @@ export interface DbProduct {
   price: number; calories: number | null; image_url: string | null;
   is_active: boolean; sort_order: number;
   lazywait_item_id?: string | null; lazywait_price_id?: string | null;
+  lazywait_price_ref?: LazywaitPriceRef | null;
 }
 export interface DbModifierGroup {
   id: string; name_en: string; name_ar: string;
   min_select: number; max_select: number | null; is_required: boolean;
+  lazywait_group_id?: string | null;
 }
 export interface DbModifier {
   id: string; group_id: string; name_en: string; name_ar: string;
   price: number; sort_order: number; is_active: boolean;
+  lazywait_addon_id?: string | null;
 }
 export interface DbProductModifierGroup { product_id: string; group_id: string; sort_order: number; }
 export interface DbBranchAvailability { branch_id: string; product_id: string; is_available: boolean; }
@@ -80,6 +83,40 @@ export interface DbOrder {
 }
 export type LazywaitSyncState =
   | 'pending' | 'syncing' | 'synced' | 'failed' | 'blocked' | 'dead_letter' | 'skipped';
+
+// ---- Lazywait catalog mapping ---------------------------------------------
+/** Reference-only price snapshot chosen from a Lazywait item's price list. */
+export interface LazywaitPriceRef {
+  price_id?: string | null; name?: string | null;
+  price_with_vat?: number | null; price_excl_vat?: number | null;
+}
+export type LazywaitCatalogEntity = 'branch' | 'category' | 'item' | 'addon' | 'addon_group';
+/** Local entity a mapping is confirmed onto (maps to set/clear_lazywait_mapping). */
+export type LazywaitMappingEntity = 'branch' | 'category' | 'product' | 'modifier_group' | 'modifier';
+/** A pulled Lazywait catalog record (cache; non-secret names/ids/prices only). */
+export interface DbLazywaitCatalogItem {
+  id: string; entity_type: LazywaitCatalogEntity; lazywait_id: string;
+  name_en: string | null; name_ar: string | null; name_other: string | null;
+  parent_id: string | null; prices: LazywaitPriceRef[] | null; branches_ids: string[] | null;
+  min_selection: number | null; max_selection: number | null; multi_max: number | null;
+  pulled_at: string;
+}
+export interface LazywaitMappingCount { mapped: number; total: number; }
+export interface LazywaitMappingStatus {
+  branches: LazywaitMappingCount; categories: LazywaitMappingCount; products: LazywaitMappingCount;
+  modifier_groups: LazywaitMappingCount; modifiers: LazywaitMappingCount;
+  blocked_orders: number; secrets_configured: boolean; last_pull_at: string | null;
+  readiness: {
+    secrets: boolean; branch_mapped: boolean; active_products_mapped: boolean;
+    no_blocked_orders: boolean; ready: boolean;
+  };
+}
+export interface LazywaitPullResult {
+  status: 'success' | 'partial' | 'error';
+  counts: Record<string, number>;
+  errors: { endpoint: string; message: string }[];
+  pulled_at: string;
+}
 export interface DbLoyaltyTransaction {
   id: string; profile_id: string; order_id: string | null;
   type: 'earn' | 'redeem' | 'adjustment'; points: number;
@@ -197,6 +234,40 @@ export const integrations = {
       p_secret_config: input.secretConfig ?? null,
     }));
     return rows[0];
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Lazywait catalog mapping (admin pull + confirm; secrets stay server-side)
+// ---------------------------------------------------------------------------
+export const lazywaitCatalog = {
+  /** Staff read of the pulled catalog cache (RLS: is_staff). */
+  items: async () =>
+    ok<DbLazywaitCatalogItem[]>(await supabase.from('lazywait_catalog_items').select('*')),
+  /** Staff readiness + mapped/total summary (never returns secrets). */
+  status: async () => ok<LazywaitMappingStatus>(await supabase.rpc('lazywait_mapping_status')),
+  /** Admin-only: trigger the server-side catalog pull (Edge Function). */
+  async pull(): Promise<LazywaitPullResult> {
+    const { data, error } = await supabase.functions.invoke('lazywait-catalog', { body: { action: 'pull' } });
+    if (error) {
+      let msg = error.message;
+      const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+      try { const body = ctx?.json ? await ctx.json() : null; if (body?.error) msg = body.error; } catch { /* keep msg */ }
+      throw new Error(msg);
+    }
+    return data as LazywaitPullResult;
+  },
+  /** Admin-only: confirm a mapping id onto a local record (+ optional product price ref). */
+  async setMapping(entity: LazywaitMappingEntity, localId: string, lazywaitId: string, priceRef?: LazywaitPriceRef | null) {
+    const { error } = await supabase.rpc('set_lazywait_mapping', {
+      p_entity: entity, p_local_id: localId, p_lazywait_id: lazywaitId, p_price_ref: priceRef ?? null,
+    });
+    if (error) throw new Error(error.message);
+  },
+  /** Admin-only: clear a mapping (+ price ref for products). */
+  async clearMapping(entity: LazywaitMappingEntity, localId: string) {
+    const { error } = await supabase.rpc('clear_lazywait_mapping', { p_entity: entity, p_local_id: localId });
+    if (error) throw new Error(error.message);
   },
 };
 

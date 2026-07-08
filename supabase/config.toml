@@ -23,6 +23,11 @@ verify_jwt = false
 [functions.lazywait-sync]
 verify_jwt = false
 
+# Admin-initiated Lazywait catalog pull (from the browser). Requires a valid
+# user JWT; the function additionally checks is_admin() before touching the API.
+[functions.lazywait-catalog]
+verify_jwt = true
+
 # Called by Lazywait POS; authenticated by the HMAC webhook signature.
 [functions.lazywait-webhook]
 verify_jwt = false
