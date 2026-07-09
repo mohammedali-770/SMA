@@ -40,6 +40,22 @@ export const auth = {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
   },
+  // --- Customer WhatsApp login (Supabase Phone Auth is the login authority) ---
+  // signInWithOtp asks Supabase Auth to GENERATE the login OTP; Supabase then
+  // calls our `auth-send-sms-whatsapp` Send SMS Hook to deliver it over WhatsApp.
+  // No code is generated here and no custom OTP table is involved in login.
+  async signInWithPhone(phone: string) {
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+    if (error) throw new Error(error.message);
+  },
+  // verifyOtp with type 'sms' returns a REAL authenticated session (persisted by
+  // the existing supabase-js session handling). This — not whatsapp-verify-otp —
+  // is what logs a customer in.
+  async verifyPhone(phone: string, token: string) {
+    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
+    if (error) throw new Error(error.message);
+    return data.session;
+  },
   async signUp(email: string, password: string, fullName: string, phone?: string) {
     const { error } = await supabase.auth.signUp({
       email, password, options: { data: { full_name: fullName, phone } },
@@ -53,6 +69,17 @@ export const auth = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
     return ok(await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
+  },
+  // Anon-safe feature flag (boolean only, no secrets) telling the pre-login UI
+  // whether WhatsApp login is fully configured + enabled. Falls back to false.
+  async whatsappLoginEnabled(): Promise<boolean> {
+    try {
+      const { data, error } = await supabase.rpc('whatsapp_login_enabled');
+      if (error) return false;
+      return data === true;
+    } catch {
+      return false;
+    }
   },
 };
 

@@ -56,5 +56,8 @@ Deno.serve(async (req: Request) => {
     app_secret_set: has(sec.app_secret),
     webhook_verify_token_set: has(sec.webhook_verify_token),
     pepper_set: Boolean(Deno.env.get('WHATSAPP_OTP_HMAC_SECRET')) || has(sec.otp_hmac_secret),
+    // Login (Send SMS Hook) readiness — separate from phone verification.
+    login_enabled: pub.whatsapp_login_enabled === true,
+    send_sms_hook_secret_set: Boolean(Deno.env.get('SEND_SMS_HOOK_SECRET')) || has(sec.send_sms_hook_secret),
   }, 200);
 });

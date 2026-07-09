@@ -18,6 +18,8 @@ const GRAPH_BASE = 'https://graph.facebook.com';
 export type Language = 'ar' | 'en';
 export type SendOutcome = 'disabled' | 'rate_limited' | 'sent' | 'error';
 
+export type ResolvedWhatsAppConfig = ResolvedConfig;
+
 function str(v: unknown): string { return typeof v === 'string' ? v : ''; }
 function num(v: unknown, d: number): number { const n = Number(v); return Number.isFinite(n) ? n : d; }
 function bool(v: unknown, d: boolean): boolean { return typeof v === 'boolean' ? v : d; }
@@ -121,8 +123,28 @@ export async function sendOtpViaWhatsApp(
   const begin = Array.isArray(beginRows) ? beginRows[0] : beginRows;
   if (!begin?.allowed) return 'rate_limited';
 
-  // Send the template message to Meta. The token is only ever in this request
-  // header — never logged; only the sanitized response is persisted.
+  return deliverOtpTemplate(admin, cfg, e164, otp, 'otp_send');
+}
+
+/**
+ * Deliver a *specific* OTP code via the Meta WhatsApp Authentication template
+ * and record a sanitized message-log row. This does the Meta POST only — it does
+ * NOT generate a code, rate-limit, or create an `otp_challenges` row. It is used
+ * both by the custom send flow (after it has stored its own hashed challenge)
+ * and by the Supabase **Send SMS Hook** (`auth-send-sms-whatsapp`), where
+ * Supabase Auth is the sole OTP/login authority and no challenge is stored.
+ *
+ * The access token lives only in this request header — never logged; only the
+ * sanitized provider response (message id + safe error summary) is persisted.
+ * The OTP is never logged either.
+ */
+export async function deliverOtpTemplate(
+  admin: SupabaseClient,
+  cfg: ResolvedConfig,
+  e164: string,
+  otp: string,
+  messageType: string,
+): Promise<SendOutcome> {
   const body = buildOtpTemplateMessage({
     to: e164, templateName: cfg.templateName, langCode: cfg.langCode, otp, hasCopyButton: cfg.hasCopyButton,
   });
@@ -142,7 +164,7 @@ export async function sendOtpViaWhatsApp(
   }
 
   await admin.rpc('record_whatsapp_message', {
-    p_phone: e164, p_message_type: 'otp_send', p_template_name: cfg.templateName,
+    p_phone: e164, p_message_type: messageType, p_template_name: cfg.templateName,
     p_provider_message_id: sanitized.message_id, p_provider_status: providerStatus,
     p_error_code: sanitized.error_code, p_error_message_safe: sanitized.error_message,
     p_raw: sanitized,

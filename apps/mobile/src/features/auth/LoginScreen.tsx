@@ -1,10 +1,18 @@
 /**
- * Email/password sign-in and sign-up against Supabase Auth (GoTrue). On success
- * the AuthProvider flips to signed_in via onAuthStateChange; we navigate to the
- * tabs. Phone/OTP is intentionally out of scope for this pass.
+ * Customer authentication for the Spicy Meal app.
+ *
+ * Primary path: **Login with WhatsApp** — Supabase Phone Auth (signInWithOtp /
+ * verifyOtp) with the OTP delivered over WhatsApp by the Send SMS hook. This is
+ * the real login: verifyOtp returns a genuine session.
+ *
+ * Fallback path: email + password (existing customers, or whenever WhatsApp
+ * login isn't configured/enabled — `auth.whatsappLoginEnabled()` returns false).
+ *
+ * Admin/staff do NOT log in here (they use the web dashboard's email/password);
+ * whichever path a customer uses, the profile is created with role 'customer'.
  */
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
@@ -12,13 +20,66 @@ import {
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { Screen } from '../../components/Screen';
+import { LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
+import { PhoneOtpLogin } from './PhoneOtpLogin';
 
+type Method = 'whatsapp' | 'email';
 type Mode = 'signin' | 'signup';
 
 export function LoginScreen() {
+  const { t } = useI18n();
+  const [method, setMethod] = useState<Method | null>(null);
+  const [waEnabled, setWaEnabled] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    auth.whatsappLoginEnabled().then((enabled) => {
+      if (!alive) return;
+      setWaEnabled(enabled);
+      setMethod((m) => m ?? (enabled ? 'whatsapp' : 'email'));
+    }).catch(() => {
+      if (alive) setMethod((m) => m ?? 'email');
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <Screen background={colors.white}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.hero}>
+            <Logo />
+            <Text style={styles.welcome}>{t('welcome')}</Text>
+            <Text style={styles.sub}>{t('authSub')}</Text>
+          </View>
+
+          {method === null ? (
+            <LoadingView />
+          ) : method === 'whatsapp' ? (
+            <>
+              <PhoneOtpLogin />
+              <Pressable onPress={() => setMethod('email')} style={styles.switch}>
+                <Text style={styles.switchText}>{t('useEmailInstead')}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <EmailAuth showWhatsAppSwitch={waEnabled} onUseWhatsApp={() => setMethod('whatsapp')} />
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+/** Email + password sign-in / sign-up (the fallback path). */
+function EmailAuth({ showWhatsAppSwitch, onUseWhatsApp }: { showWhatsAppSwitch: boolean; onUseWhatsApp: () => void }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -48,8 +109,6 @@ export function LoginScreen() {
           return;
         }
         await auth.signUp(email.trim(), password, fullName.trim(), phone.trim() || undefined);
-        // If email confirmation is disabled, a session already exists and the
-        // AuthProvider will route us in. Otherwise, prompt to sign in.
         const session = await auth.getSession();
         if (session) {
           router.replace('/(tabs)');
@@ -66,68 +125,60 @@ export function LoginScreen() {
   };
 
   return (
-    <Screen background={colors.white}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.hero}>
-            <Logo />
-            <Text style={styles.welcome}>{t('welcome')}</Text>
-            <Text style={styles.sub}>{t('authSub')}</Text>
-          </View>
+    <>
+      <Text style={styles.title}>{mode === 'signin' ? t('signInTitle') : t('signUpTitle')}</Text>
 
-          <Text style={styles.title}>{mode === 'signin' ? t('signInTitle') : t('signUpTitle')}</Text>
+      {mode === 'signup' && (
+        <Field label={t('fullName')} value={fullName} onChangeText={setFullName} placeholder={t('namePlaceholder')} />
+      )}
 
-          {mode === 'signup' && (
-            <Field label={t('fullName')} value={fullName} onChangeText={setFullName} placeholder={t('namePlaceholder')} />
-          )}
+      <Field
+        label={t('email')}
+        value={email}
+        onChangeText={setEmail}
+        placeholder={t('emailPlaceholder')}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+      />
+      <Field
+        label={t('password')}
+        value={password}
+        onChangeText={setPassword}
+        placeholder={t('passwordPlaceholder')}
+        secureTextEntry
+        autoCapitalize="none"
+      />
+      {mode === 'signup' && (
+        <Field
+          label={t('phoneOptional')}
+          value={phone}
+          onChangeText={setPhone}
+          placeholder={t('phonePlaceholder')}
+          keyboardType="phone-pad"
+        />
+      )}
 
-          <Field
-            label={t('email')}
-            value={email}
-            onChangeText={setEmail}
-            placeholder={t('emailPlaceholder')}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-          />
-          <Field
-            label={t('password')}
-            value={password}
-            onChangeText={setPassword}
-            placeholder={t('passwordPlaceholder')}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          {mode === 'signup' && (
-            <Field
-              label={t('phoneOptional')}
-              value={phone}
-              onChangeText={setPhone}
-              placeholder={t('phonePlaceholder')}
-              keyboardType="phone-pad"
-            />
-          )}
+      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Button
+        label={mode === 'signin' ? t('signInBtn') : t('signUpBtn')}
+        onPress={submit}
+        loading={busy}
+        style={{ marginTop: spacing.md }}
+      />
 
-          <Button
-            label={mode === 'signin' ? t('signInBtn') : t('signUpBtn')}
-            onPress={submit}
-            loading={busy}
-            style={{ marginTop: spacing.md }}
-          />
+      <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} style={styles.switch}>
+        <Text style={styles.switchText}>{mode === 'signin' ? t('haveNoAccount') : t('haveAccount')}</Text>
+      </Pressable>
 
-          <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} style={styles.switch}>
-            <Text style={styles.switchText}>{mode === 'signin' ? t('haveNoAccount') : t('haveAccount')}</Text>
-          </Pressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </Screen>
+      {showWhatsAppSwitch && (
+        <Pressable onPress={onUseWhatsApp} style={styles.switchAlt}>
+          <Text style={styles.switchText}>{t('useWhatsappInstead')}</Text>
+        </Pressable>
+      )}
+    </>
   );
 }
 
@@ -166,5 +217,6 @@ const styles = StyleSheet.create({
   error: { color: colors.red, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
   notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
   switch: { marginTop: spacing.xl, alignItems: 'center' },
+  switchAlt: { marginTop: spacing.md, alignItems: 'center' },
   switchText: { color: colors.purple, fontSize: font.md, fontWeight: '700' },
 });

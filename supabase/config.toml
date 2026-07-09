@@ -55,3 +55,9 @@ verify_jwt = false
 
 [functions.whatsapp-test-config]
 verify_jwt = true
+
+# Supabase Auth "Send SMS" Hook for REAL customer phone-OTP login. Supabase Auth
+# generates the login OTP and calls this to deliver it over WhatsApp; the call is
+# authenticated by the Standard Webhooks signature (verify_jwt=false, no user JWT).
+[functions.auth-send-sms-whatsapp]
+verify_jwt = false

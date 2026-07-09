@@ -16,8 +16,9 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
 | `push-dispatch` | server | false | placeholder (501) | Push send (Expo/OneSignal TBD). |
-| `whatsapp-send-otp` | app (pre-login) | false | active | Send WhatsApp OTP (Meta Cloud API). Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
-| `whatsapp-verify-otp` | app | false | active | Verify OTP (timing-safe); marks the signed-in user's `phone_verified`. Never issues a session. |
+| `auth-send-sms-whatsapp` | Supabase Auth (Send SMS Hook) | false | active | **Real customer login delivery leg.** Supabase Phone Auth generates the login OTP and calls this hook (Standard Webhooks signed) to deliver it via WhatsApp. Supabase Auth stays the sole login authority — this issues no session, generates no code, stores no challenge. Fails closed until `whatsapp_login_enabled` + Meta creds + template. |
+| `whatsapp-send-otp` | app (pre-login) | false | active (secondary) | **Phone _verification_ only, NOT login.** Send WhatsApp OTP (Meta Cloud API) for a signed-in user to verify their profile phone. Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
+| `whatsapp-verify-otp` | app | false | active (secondary) | Verify the *verification* OTP (timing-safe); marks the signed-in user's `phone_verified`. Never issues a session; not part of login. |
 | `whatsapp-webhook` | Meta | false | active | GET verify-token challenge + POST status callbacks (app-secret HMAC), logged sanitized. |
 | `whatsapp-test-config` | admin browser | true | active | Admin `is_admin()`-gated status booleans + test send. No secret values returned. |
 

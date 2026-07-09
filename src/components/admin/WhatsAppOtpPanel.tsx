@@ -87,6 +87,20 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
             <Indicator label={isRTL ? `إصدار Graph (${status.graph_api_version ?? '—'})` : `Graph version (${status.graph_api_version ?? '—'})`} ok={Boolean(status.graph_api_version)} />
           </div>
 
+          {/* Customer LOGIN (Send SMS Hook) readiness — distinct from verification. */}
+          <div className="pt-2 border-t border-slate-100 space-y-1.5">
+            <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'تسجيل الدخول عبر واتساب' : 'WhatsApp customer login'}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+              <Indicator label={isRTL ? 'تسجيل الدخول مُفعّل' : 'Login enabled'} ok={Boolean(status.login_enabled)} />
+              <Indicator label={isRTL ? 'سر Send SMS Hook' : 'Send SMS Hook secret'} ok={Boolean(status.send_sms_hook_secret_set)} />
+            </div>
+            <p className="text-[9px] text-slate-400 font-semibold">
+              {isRTL
+                ? 'يتطلب تسجيل الدخول: تفعيل المزود + تفعيل تسجيل الدخول + سر الـHook + بيانات Meta + قالب معتمد، مع تفعيل مصادقة الهاتف في لوحة Supabase.'
+                : 'Login requires: provider enabled + login enabled + hook secret + Meta creds + an approved template, plus Phone Auth turned on in the Supabase dashboard.'}
+            </p>
+          </div>
+
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'إرسال رمز تجريبي' : 'Send test OTP'}</span>
