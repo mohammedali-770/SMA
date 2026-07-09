@@ -139,6 +139,7 @@ export interface Order {
   couponCode?: string;
   notes?: string;
   createdAt: string;
+  lazywaitOrderNumber?: string; // POS number once synced; primary display ref
   address?: SavedAddress;
   items: OrderItem[];
 }

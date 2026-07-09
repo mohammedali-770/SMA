@@ -80,6 +80,8 @@ export interface DbOrder {
   payment_status: 'pending' | 'paid'; payment_method: string | null;
   payment_provider?: string | null; paid_at?: string | null;
   coupon_code: string | null; notes: string | null; created_at: string;
+  // Lazywait POS number, set on the order once it syncs (customer-readable).
+  lazywait_order_number?: string | null;
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
   loyalty_points_earned: number; loyalty_points_redeemed: number;
 }

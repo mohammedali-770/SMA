@@ -10,7 +10,7 @@ import { Screen } from '../../components/Screen';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
-import { mapOrder } from '../../lib/mappers';
+import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
 import type { Order, OrderStatus } from '../../types/models';
@@ -68,7 +68,12 @@ export function OrdersScreen() {
           renderItem={({ item }) => (
             <Pressable style={[styles.card, shadow.card]} onPress={() => router.push(`/receipt/${item.id}`)} accessibilityRole="button">
               <View style={styles.cardTop}>
-                <Text style={styles.orderNo}>{item.orderNumber}</Text>
+                {(() => { const d = orderDisplayNumber(item); return (
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={styles.orderNo}>{d.primary}</Text>
+                    {d.secondary ? <Text style={styles.orderRef}>{d.secondary}</Text> : null}
+                  </View>
+                ); })()}
                 <StatusBadge label={t(STATUS_KEY[item.status])} status={item.status} />
               </View>
               <Text style={styles.date}>{formatRiyadhDateTime(item.createdAt)}</Text>
@@ -105,6 +110,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   orderNo: { fontSize: font.md, fontWeight: '800', color: colors.text },
+  orderRef: { fontSize: font.sm, color: colors.muted, fontWeight: '600', marginTop: 1 },
   date: { fontSize: font.sm, color: colors.muted },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
   itemsCount: { fontSize: font.sm, color: colors.text, fontWeight: '600' },

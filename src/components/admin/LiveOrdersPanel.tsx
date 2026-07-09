@@ -5,6 +5,7 @@ import { Order, OrderStatus } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
+import { orderDisplayNumber } from '../../lib/mappers';
 
 // Statuses an order should not reach while an ONLINE payment is still unverified.
 // "Received" is always allowed and "Cancelled" needs no payment. Cash orders are
@@ -103,8 +104,10 @@ export const LiveOrdersPanel: React.FC = () => {
   };
 
   const filteredOrders = orders.filter(o => {
-    const matchesSearch = o.orderNumber.toLowerCase().includes(orderSearch.toLowerCase()) ||
-                          o.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+    const q = orderSearch.toLowerCase();
+    const matchesSearch = o.orderNumber.toLowerCase().includes(q) ||
+                          (o.lazywaitOrderNumber ?? '').toLowerCase().includes(q) ||
+                          o.customerName.toLowerCase().includes(q) ||
                           o.customerPhone.includes(orderSearch);
     const matchesFilter = orderFilter === 'all' || o.status === orderFilter;
     return matchesSearch && matchesFilter;
@@ -159,7 +162,14 @@ export const LiveOrdersPanel: React.FC = () => {
                   <tbody className="divide-y divide-gray-50">
                     {filteredOrders.map(order => (
                       <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3.5 font-black text-primary">{order.orderNumber}</td>
+                        <td className="px-4 py-3.5">
+                          {(() => { const d = orderDisplayNumber(order); return (
+                            <>
+                              <div className="font-black text-primary">{d.primary}</div>
+                              {d.secondary && <div className="text-[10px] text-gray-400 font-semibold">{d.secondary}</div>}
+                            </>
+                          ); })()}
+                        </td>
                         <td className="px-4 py-3.5">
                           <div className="font-semibold text-gray-900">{order.customerName}</div>
                           <div className={`text-[10px] ${order.customerPhone && order.customerPhone.trim() ? 'text-gray-400' : 'text-amber-600 italic'}`}>{phoneLabel(order.customerPhone)}</div>
@@ -234,7 +244,11 @@ export const LiveOrdersPanel: React.FC = () => {
             <div className="p-5 bg-white/20 border-b border-white/10 flex justify-between items-center">
               <div>
                 <h4 className="text-xs font-black text-gray-500 uppercase">{isRTL ? 'تعديل حالة الكاشير الموحدة' : 'Live POS Status Controller'}</h4>
-                <p className="text-sm font-extrabold text-primary">{activeReceiptOrder.orderNumber}</p>
+                {(() => { const d = orderDisplayNumber(activeReceiptOrder); return (
+                  <p className="text-sm font-extrabold text-primary">
+                    {d.primary}{d.secondary && <span className="text-[10px] text-gray-400 font-semibold ml-1">· {d.secondary}</span>}
+                  </p>
+                ); })()}
               </div>
               <button 
                 onClick={() => setActiveReceiptOrder(null)}

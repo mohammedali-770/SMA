@@ -3,6 +3,7 @@ import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
   mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
   brandPatchToDb, loyaltyPatchToDb, productToDbInsert, branchPatchToDb,
+  orderDisplayNumber,
 } from './mappers';
 import type {
   DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier, DbProductModifierGroup,
@@ -93,6 +94,21 @@ describe('order mapper', () => {
     expect(o.items).toHaveLength(1);
     expect(o.items[0].price).toBe(34);
     expect(o.items[0].selectedModifiers[0].nameEn).toBe('Volcano');
+  });
+});
+
+describe('orderDisplayNumber', () => {
+  it('shows the Lazywait POS number as primary with the SM number secondary once synced', () => {
+    expect(orderDisplayNumber({ orderNumber: 'SM-2026-000005', lazywaitOrderNumber: '#1' }))
+      .toEqual({ primary: '#1', secondary: 'SM-2026-000005' });
+  });
+  it('falls back to the SM number when there is no POS number (unsynced/delivery/off)', () => {
+    expect(orderDisplayNumber({ orderNumber: 'SM-2026-000005', lazywaitOrderNumber: null }))
+      .toEqual({ primary: 'SM-2026-000005', secondary: null });
+    expect(orderDisplayNumber({ orderNumber: 'SM-2026-000005' }))
+      .toEqual({ primary: 'SM-2026-000005', secondary: null });
+    expect(orderDisplayNumber({ orderNumber: 'SM-2026-000005', lazywaitOrderNumber: '   ' }))
+      .toEqual({ primary: 'SM-2026-000005', secondary: null });
   });
 });
 

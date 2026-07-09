@@ -238,6 +238,21 @@ export function mapOrder(o: DbOrderWithItems): Order {
   };
 }
 
+/**
+ * The order number to display so the customer, dashboard, and Lazywait POS all
+ * reference the same ticket. Once an order has synced, the Lazywait POS number
+ * (e.g. "#1") is the primary reference and the internal SM-… number becomes a
+ * secondary reference; before sync / for delivery / when POS is off there is no
+ * POS number, so the internal SM-… number is shown alone. The SM-… number stays
+ * the canonical id used everywhere else.
+ */
+export function orderDisplayNumber(
+  o: { orderNumber: string; lazywaitOrderNumber?: string | null },
+): { primary: string; secondary: string | null } {
+  const pos = (o.lazywaitOrderNumber ?? '').trim();
+  return pos ? { primary: pos, secondary: o.orderNumber } : { primary: o.orderNumber, secondary: null };
+}
+
 // ---------------------------------------------------------------------------
 // Settings (the single app_settings row feeds both brand + loyalty config)
 // ---------------------------------------------------------------------------

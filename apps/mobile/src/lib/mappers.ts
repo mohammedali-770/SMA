@@ -189,9 +189,23 @@ export function mapOrder(o: DbOrderWithItems): Order {
     couponCode: o.coupon_code ?? undefined,
     notes: o.notes ?? undefined,
     createdAt: o.created_at,
+    lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
     address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
   };
+}
+
+/**
+ * The order number to show the customer so it matches the Lazywait POS ticket.
+ * Once synced, the POS number (e.g. "#1") is primary and the internal SM-… number
+ * is a secondary reference; before sync / for delivery / when POS is off, the
+ * SM-… number is shown alone. SM-… stays the canonical id.
+ */
+export function orderDisplayNumber(
+  o: { orderNumber: string; lazywaitOrderNumber?: string | null },
+): { primary: string; secondary: string | null } {
+  const pos = (o.lazywaitOrderNumber ?? '').trim();
+  return pos ? { primary: pos, secondary: o.orderNumber } : { primary: o.orderNumber, secondary: null };
 }
 
 // --- Settings (single app_settings row feeds brand + loyalty) --------------

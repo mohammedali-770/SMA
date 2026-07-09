@@ -12,7 +12,7 @@ import { Screen } from '../../components/Screen';
 import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
-import { mapOrder } from '../../lib/mappers';
+import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
@@ -71,7 +71,14 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               return (
                 <>
                   <View style={[styles.card, shadow.card]}>
-                    <Row label={t('orderNumber')} value={order.orderNumber} strong />
+                    {(() => { const d = orderDisplayNumber(order); return (
+                      <Row
+                        label={t('orderNumber')}
+                        value={d.primary}
+                        secondary={d.secondary ? `${t('orderRef')}: ${d.secondary}` : undefined}
+                        strong
+                      />
+                    ); })()}
                     <Row label={pick('Payment method', 'طريقة الدفع')} value={methodText} />
                     <Row label={t('paymentStatus')} value={statusText} />
                     <Row label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />
@@ -125,11 +132,14 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   );
 }
 
-function Row({ label, value, strong, big, muted }: { label: string; value: string; strong?: boolean; big?: boolean; muted?: boolean }) {
+function Row({ label, value, secondary, strong, big, muted }: { label: string; value: string; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, muted && styles.muted]}>{label}</Text>
-      <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
+      <View style={styles.rowValueCol}>
+        <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
+        {secondary ? <Text style={styles.rowSecondary}>{secondary}</Text> : null}
+      </View>
     </View>
   );
 }
@@ -143,7 +153,9 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600' },
+  rowValueCol: { alignItems: 'flex-end', flexShrink: 1 },
   rowValue: { fontSize: font.md, color: colors.text, fontWeight: '700' },
+  rowSecondary: { fontSize: font.sm, color: colors.muted, fontWeight: '600', marginTop: 1 },
   muted: { color: colors.muted, fontSize: font.sm },
   strong: { fontWeight: '800' },
   big: { fontSize: font.lg, color: colors.purple },
