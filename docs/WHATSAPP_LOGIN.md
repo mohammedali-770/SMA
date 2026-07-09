@@ -125,16 +125,26 @@ Admin Dashboard → Integrations → **WhatsApp OTP (Meta Cloud API)** card:
   LOGIN** (`whatsapp_login_enabled`) = ON.
 - Secret (write-only): `access_token`, **`send_sms_hook_secret`** (the `v1,whsec_…`
   from Supabase step 2), and (for the webhook) `app_secret` / `webhook_verify_token`.
+  Secrets **merge** on save — you can add the hook secret later (typing only that
+  field) without re-entering the Meta secrets; existing keys are preserved.
 - Flip the card's master **enabled** switch ON.
 
 Login only activates when **all** of: provider enabled + `whatsapp_login_enabled` +
-`phone_number_id` + `access_token` + a template + the hook secret are present, AND
-Phone Auth + the Send SMS Hook are enabled in the dashboard. Until then the mobile
-app shows email login (the `whatsapp_login_enabled()` flag returns false).
+`phone_number_id` + `access_token` + **`send_sms_hook_secret`** + the template for
+the configured `otp_default_language` are present, AND Phone Auth + the Send SMS
+Hook are enabled in the dashboard. Until then the mobile app shows email login (the
+`whatsapp_login_enabled()` flag returns false).
 
 > Stronger option: instead of storing `send_sms_hook_secret` in `secret_config`,
 > set it as the Edge Function env var `SEND_SMS_HOOK_SECRET` (and the OTP pepper as
 > `WHATSAPP_OTP_HMAC_SECRET`). The function prefers env vars when present.
+>
+> **Caveat:** the pre-login readiness flag `whatsapp_login_enabled()` runs in SQL
+> and **cannot see Edge Function env vars**. If you use the env-var path and leave
+> `secret_config.send_sms_hook_secret` empty, the flag stays `false` and the app
+> keeps showing email login (safe — the hook still works if a client calls it). To
+> surface WhatsApp login as the default in that setup, also store the hook secret
+> in `secret_config` (the app never reads it — the flag only checks presence).
 
 ---
 
