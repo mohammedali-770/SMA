@@ -3,7 +3,7 @@ import { RefreshCw, Loader2, AlertCircle, Check, X, DownloadCloud, CheckCircle2,
 import {
   catalog, lazywaitCatalog,
   DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier,
-  DbLazywaitCatalogItem, LazywaitMappingStatus, LazywaitPullResult,
+  DbLazywaitCatalogItem, LazywaitMappingStatus, LazywaitPullResult, LazywaitImportResult,
   LazywaitCatalogEntity, LazywaitMappingEntity, LazywaitPriceRef,
 } from '../../lib/api';
 import { suggestBestMatch, MatchLevel } from '../../lib/lazywaitMatch';
@@ -49,6 +49,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
   const [chosenPrice, setChosenPrice] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [pulling, setPulling] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -86,6 +87,30 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       setError(e instanceof Error ? e.message : 'Pull failed');
     } finally {
       setPulling(false);
+    }
+  };
+
+  const runImport = async () => {
+    if (!window.confirm(
+      'Import the Lazywait catalog into your app menu?\n\n' +
+      'Lazywait becomes the menu source: categories & products are created/updated ' +
+      'from the latest pull, and any local items NOT in Lazywait are hidden ' +
+      '(deactivated, not deleted). Branch delivery settings are kept. Continue?'
+    )) return;
+    setImporting(true); setError(null); setMsg(null);
+    try {
+      const r: LazywaitImportResult = await lazywaitCatalog.importToApp();
+      setMsg(
+        `Imported from Lazywait — products: +${r.products.created} new / ${r.products.updated} updated` +
+        `${r.products.deactivated ? ` / ${r.products.deactivated} hidden` : ''}; ` +
+        `categories: +${r.categories.created} / ${r.categories.updated} updated` +
+        `${r.categories.deactivated ? ` / ${r.categories.deactivated} hidden` : ''}.`
+      );
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Import failed');
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -161,13 +186,23 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
             {status?.last_pull_at ? `Last pull ${new Date(status.last_pull_at).toLocaleString()}` : 'Not pulled yet'}
           </p>
         </div>
-        <button
-          onClick={runPull}
-          disabled={disabled || pulling || loading}
-          className="glass-btn-primary text-[9px] py-1.5 px-3 font-black text-white disabled:opacity-50 flex items-center gap-1"
-        >
-          {pulling ? <Loader2 className="w-3 h-3 animate-spin" /> : <DownloadCloud className="w-3 h-3" />} Pull from Lazywait
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={runPull}
+            disabled={disabled || pulling || importing || loading}
+            className="glass-btn-primary text-[9px] py-1.5 px-3 font-black text-white disabled:opacity-50 flex items-center gap-1"
+          >
+            {pulling ? <Loader2 className="w-3 h-3 animate-spin" /> : <DownloadCloud className="w-3 h-3" />} Pull from Lazywait
+          </button>
+          <button
+            onClick={runImport}
+            disabled={disabled || importing || pulling || loading || items.length === 0}
+            title={items.length === 0 ? 'Pull the Lazywait catalog first' : 'Import the pulled catalog into your app menu'}
+            className="glass-btn-primary text-[9px] py-1.5 px-3 font-black text-white disabled:opacity-40 flex items-center gap-1"
+          >
+            {importing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Import to App
+          </button>
+        </div>
       </div>
 
       {error && <div className="text-[10px] font-bold text-red-600 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{error}</div>}
@@ -327,8 +362,10 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       )}
 
       <p className="text-[8.5px] text-slate-400 font-bold leading-snug">
-        Lazywait data is used for ID mapping + reference only — local names and prices are never overwritten.
-        price_id, addons/modifiers and delivery are mapped for reference but intentionally NOT sent in Create Order yet.
+        <b>Import to App</b> makes Lazywait the menu source: it creates/updates your categories &amp; products from
+        the latest pull (prices from Lazywait), hides local items not in Lazywait, and keeps branch delivery settings.
+        Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). price_id,
+        addons/modifiers and delivery are mapped for reference but intentionally NOT sent in Create Order yet.
       </p>
     </div>
   );

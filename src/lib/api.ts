@@ -117,6 +117,12 @@ export interface LazywaitPullResult {
   errors: { endpoint: string; message: string }[];
   pulled_at: string;
 }
+/** Result of import_lazywait_catalog() — Lazywait catalog applied to the local menu. */
+export interface LazywaitImportResult {
+  categories: { created: number; updated: number; deactivated: number };
+  products: { created: number; updated: number; deactivated: number };
+  branches: { created: number; updated: number };
+}
 export interface DbLoyaltyTransaction {
   id: string; profile_id: string; order_id: string | null;
   type: 'earn' | 'redeem' | 'adjustment'; points: number;
@@ -256,6 +262,15 @@ export const lazywaitCatalog = {
       throw new Error(msg);
     }
     return data as LazywaitPullResult;
+  },
+  /**
+   * Admin-only: import the pulled Lazywait catalog INTO the local menu (Lazywait
+   * = source of truth). Creates/updates categories + products, syncs branch
+   * names, and deactivates local rows not present in the latest pull. Reversible
+   * (deactivates, never deletes); place_order still prices server-side.
+   */
+  async importToApp(): Promise<LazywaitImportResult> {
+    return ok<LazywaitImportResult>(await supabase.rpc('import_lazywait_catalog'));
   },
   /** Admin-only: confirm a mapping id onto a local record (+ optional product price ref). */
   async setMapping(entity: LazywaitMappingEntity, localId: string, lazywaitId: string, priceRef?: LazywaitPriceRef | null) {
