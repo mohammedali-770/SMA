@@ -387,6 +387,14 @@ export const LiveOrdersPanel: React.FC = () => {
                         <span className="font-semibold text-red-600">{activeReceiptOrder.syncBlockedReason}</span>
                       </div>
                     )}
+                    {activeReceiptOrder.syncBlockedReason === 'delivery_schema_unconfirmed' && (
+                      <div className="flex items-start gap-1.5 text-amber-700 font-bold pt-1.5 border-t border-gray-100">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                        <span>{isRTL
+                          ? 'مزامنة طلبات التوصيل مع Lazywait موقوفة بانتظار تأكيد صيغة طلب التوصيل من Lazywait.'
+                          : 'Delivery Lazywait sync is blocked pending Lazywait delivery payload confirmation.'}</span>
+                      </div>
+                    )}
                     {!branchMapped && (
                       <div className="flex items-start gap-1.5 text-amber-700 font-bold pt-1.5 border-t border-gray-100">
                         <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />

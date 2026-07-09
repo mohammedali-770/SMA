@@ -8,11 +8,12 @@
 import {
   Branch, Category, Product, ModifierGroup, Modifier, Order, OrderItem,
   OrderItemModifier, SavedAddress, UserProfile, BrandSettings, LoyaltySettings, SyncStatus,
+  DeliveryZone,
 } from '../types';
 import {
   DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier, DbProductModifierGroup,
   DbBranchAvailability, DbAppSettings, DbProfile, DbAddress, DbOrderWithItems, DbOrderItem,
-  DbOrderItemModifier, DbSyncStatus,
+  DbOrderItemModifier, DbSyncStatus, DbBranchDeliveryZone,
 } from './api';
 import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
 import { PaymentMethodSettings } from './payment';
@@ -37,6 +38,21 @@ export function mapBranch(b: DbBranch): Branch {
     deliveryFee: Number(b.delivery_fee),
     minDeliveryOrder: Number(b.min_delivery_order),
     lazywaitBranchId: b.lazywait_branch_id ?? undefined,
+    deliveryEnabled: b.delivery_enabled ?? true,
+    pickupEnabled: b.pickup_enabled ?? true,
+    deliveryTemporarilyClosed: b.delivery_temporarily_closed ?? false,
+    estimatedDeliveryMinutes: b.estimated_delivery_minutes ?? undefined,
+  };
+}
+
+/** DB delivery-zone row -> domain DeliveryZone (geojson kept as-is for rendering). */
+export function mapDeliveryZone(z: DbBranchDeliveryZone): DeliveryZone {
+  return {
+    id: z.id,
+    branchId: z.branch_id,
+    name: z.name ?? undefined,
+    geojson: z.zone_geojson as DeliveryZone['geojson'],
+    isActive: z.is_active,
   };
 }
 
@@ -317,5 +333,11 @@ export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
   if (patch.nameEn !== undefined) out.name_en = patch.nameEn;
   if (patch.nameAr !== undefined) out.name_ar = patch.nameAr;
   if (patch.lazywaitBranchId !== undefined) out.lazywait_branch_id = patch.lazywaitBranchId || null;
+  if (patch.deliveryEnabled !== undefined) out.delivery_enabled = patch.deliveryEnabled;
+  if (patch.pickupEnabled !== undefined) out.pickup_enabled = patch.pickupEnabled;
+  if (patch.deliveryTemporarilyClosed !== undefined) out.delivery_temporarily_closed = patch.deliveryTemporarilyClosed;
+  if (patch.estimatedDeliveryMinutes !== undefined) {
+    out.estimated_delivery_minutes = patch.estimatedDeliveryMinutes ?? null;
+  }
   return out;
 }

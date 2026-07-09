@@ -5,6 +5,7 @@ import { Order, Modifier } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
 import { availableMethods, checkoutBlocked, onlineUnavailableCashOn } from '../../lib/payment';
+import { pointInPolygon } from '../../lib/geo';
 
 interface CartScreenProps {
   isLoggedIn: boolean;
@@ -21,9 +22,32 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
     loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, loyaltySettings, loyaltyMutationsEnabled,
     currentUser, selectedBranch, placeOrder, brandSettings, mobileLang,
     paymentSettings, selectedPaymentMethod, setSelectedPaymentMethod,
+    deliveryZones,
   } = useApp();
   const t = LOCALES[mobileLang];
   const isRTL = mobileLang === 'ar';
+
+  // ---- Delivery serviceability pre-check (UX only; place_order is authoritative) ----
+  const selectedAddress = addresses.find(a => a.id === selectedAddressId);
+  const branchZone = deliveryZones.find(z => z.branchId === selectedBranch?.id && z.isActive);
+  const branchDeliveryOff = selectedBranch
+    ? !(selectedBranch.deliveryEnabled ?? true) || (selectedBranch.deliveryTemporarilyClosed ?? false)
+    : false;
+  const insideZone = Boolean(
+    selectedAddress && branchZone
+    && pointInPolygon({ lat: selectedAddress.lat, lng: selectedAddress.lng }, branchZone.geojson),
+  );
+  // A delivery order is pre-check-serviceable only when the branch offers delivery,
+  // has an active zone, an address is chosen, and the point falls inside the zone.
+  const deliveryServiceable = checkoutType !== 'delivery'
+    || (!branchDeliveryOff && Boolean(selectedAddress) && Boolean(branchZone) && insideZone);
+  const deliveryBlockReason: string | null =
+    checkoutType !== 'delivery' ? null
+    : branchDeliveryOff ? (isRTL ? 'التوصيل مغلق حالياً لهذا الفرع.' : 'Delivery is currently closed for this branch.')
+    : !selectedAddress ? (isRTL ? 'يرجى تحديد موقع التوصيل على الخريطة.' : 'Please select your delivery location on the map.')
+    : !branchZone ? (isRTL ? 'منطقة التوصيل غير مُعدّة لهذا الفرع.' : 'Delivery area is not configured for this branch.')
+    : !insideZone ? (isRTL ? 'موقعك خارج منطقة توصيل هذا الفرع.' : 'Your location is outside this branch delivery area.')
+    : null;
 
   // Admin-configured availability mirrored for the UI (server re-checks at place_order).
   const payMethods = availableMethods(paymentSettings);
@@ -275,6 +299,14 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                     </div>
                   )}
 
+                  {/* Delivery serviceability notice (UX pre-check; server re-validates) */}
+                  {checkoutType === 'delivery' && deliveryBlockReason && (
+                    <div className="p-2.5 bg-red-50 text-red-800 text-[10px] rounded-xl border border-red-100 font-bold flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                      <span>{deliveryBlockReason}</span>
+                    </div>
+                  )}
+
                   {/* Coupon Codes Input */}
                   <div className="bg-white rounded-2xl shadow-xs border border-gray-100 p-3">
                     <h3 className="text-xs font-black text-gray-800 mb-1.5">{t.apply_coupon}</h3>
@@ -447,9 +479,9 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
 
                     <button
                       onClick={handlePlaceOrderClick}
-                      disabled={placing || paymentBlocked || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)}
+                      disabled={placing || paymentBlocked || !deliveryServiceable || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)}
                       className={`w-full text-center text-xs font-black py-3 rounded-full shadow-sm mt-2 transition-all ${
-                        placing || paymentBlocked || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)
+                        placing || paymentBlocked || !deliveryServiceable || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)
                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           : 'bg-secondary text-white hover:bg-secondary/95 hover:scale-102'
                       }`}

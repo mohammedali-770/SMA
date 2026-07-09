@@ -28,6 +28,21 @@ export interface Branch {
   isActive: boolean;
   deliveryFee: number;
   minDeliveryOrder: number;
+  // Delivery-zone feature (admin-configured). Optional; mapBranch always sets
+  // them and consumers default (?? true / ?? false).
+  deliveryEnabled?: boolean;
+  pickupEnabled?: boolean;
+  deliveryTemporarilyClosed?: boolean;
+  estimatedDeliveryMinutes?: number;
+}
+
+/** An active per-branch delivery coverage polygon (GeoJSON Geometry). */
+export interface DeliveryZone {
+  id: string;
+  branchId: string;
+  name?: string;
+  geojson: import('../lib/geo').GeoJSONGeometry;
+  isActive: boolean;
 }
 
 export interface Category {

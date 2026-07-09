@@ -24,6 +24,19 @@ export interface DbBranch {
   latitude: number | null; longitude: number | null;
   delivery_fee: number; min_delivery_order: number; is_active: boolean;
   lazywait_branch_id?: string | null;
+  // Delivery-zone feature (admin-configured operational flags).
+  delivery_enabled?: boolean;
+  pickup_enabled?: boolean;
+  delivery_temporarily_closed?: boolean;
+  estimated_delivery_minutes?: number | null;
+}
+/** An active per-branch delivery coverage polygon (non-secret; safe columns only). */
+export interface DbBranchDeliveryZone {
+  id: string;
+  branch_id: string;
+  name: string | null;
+  zone_geojson: unknown; // GeoJSON Geometry (Polygon | MultiPolygon)
+  is_active: boolean;
 }
 export interface DbCategory { id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean; lazywait_category_id?: string | null; }
 export interface DbProduct {
@@ -305,14 +318,22 @@ export const catalog = {
     ok<DbBranchAvailability[]>(await supabase.from('branch_product_availability').select('*')),
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
+  /** Active delivery zones (safe columns only — never `updated_by`). RLS returns
+   *  active zones to everyone and all zones to staff. */
+  deliveryZones: async () =>
+    ok<DbBranchDeliveryZone[]>(await supabase
+      .from('branch_delivery_zones')
+      .select('id, branch_id, name, zone_geojson, is_active')
+      .eq('is_active', true)),
   /** Fetch the whole menu graph in parallel. */
   async all() {
-    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings] =
+    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones] =
       await Promise.all([
         this.branches(), this.categories(), this.products(), this.modifierGroups(),
         this.modifiers(), this.productModifierGroups(), this.availability(), this.settings(),
+        this.deliveryZones(),
       ]);
-    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings };
+    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones };
   },
 };
 
@@ -440,6 +461,21 @@ export const admin = {
       p_default_method: input.defaultMethod,
       p_outage_mode: input.outageMode,
     }));
+  },
+  /** Admin-only: upsert a branch's active delivery zone. `geojson` is a GeoJSON
+   *  Geometry (Polygon | MultiPolygon). The RPC validates geometry + is_admin(). */
+  async setBranchDeliveryZone(input: { branchId: string; geojson: unknown; name?: string | null }) {
+    return ok<DbBranchDeliveryZone>(await supabase.rpc('set_branch_delivery_zone', {
+      p_branch_id: input.branchId,
+      p_geojson: input.geojson,
+      p_name: input.name ?? null,
+      p_is_active: true,
+    }));
+  },
+  /** Admin-only: deactivate a branch's active delivery zone. */
+  async clearBranchDeliveryZone(branchId: string) {
+    const { error } = await supabase.rpc('clear_branch_delivery_zone', { p_branch_id: branchId });
+    if (error) throw new Error(error.message);
   },
 };
 

@@ -28,6 +28,22 @@ export interface Branch {
   deliveryFee: number;
   minDeliveryOrder: number;
   lazywaitBranchId?: string; // Lazywait POS branch mapping (admin-set)
+  // Delivery-zone feature: per-branch channel controls (admin-configured).
+  // Optional so bundled demo branches stay valid; mapBranch always sets them,
+  // and consumers default (?? true / ?? false) when reading.
+  deliveryEnabled?: boolean;
+  pickupEnabled?: boolean;
+  deliveryTemporarilyClosed?: boolean;
+  estimatedDeliveryMinutes?: number; // display-only ETA; not used in pricing
+}
+
+/** An active per-branch delivery coverage polygon (GeoJSON Geometry). */
+export interface DeliveryZone {
+  id: string;
+  branchId: string;
+  name?: string;
+  geojson: import('./lib/geo').GeoJSONGeometry;
+  isActive: boolean;
 }
 
 export interface Category {

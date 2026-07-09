@@ -4,12 +4,12 @@
  * the customer slice of the web app's src/lib/mappers.ts.
  */
 import type {
-  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbCategory,
+  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
   DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile,
 } from '../types/db';
 import type {
-  Branch, BrandSettings, Category, LoyaltySettings, Modifier, ModifierGroup,
+  Branch, BrandSettings, Category, DeliveryZone, LoyaltySettings, Modifier, ModifierGroup,
   Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
@@ -32,6 +32,21 @@ export function mapBranch(b: DbBranch): Branch {
     isActive: b.is_active,
     deliveryFee: Number(b.delivery_fee),
     minDeliveryOrder: Number(b.min_delivery_order),
+    deliveryEnabled: b.delivery_enabled ?? true,
+    pickupEnabled: b.pickup_enabled ?? true,
+    deliveryTemporarilyClosed: b.delivery_temporarily_closed ?? false,
+    estimatedDeliveryMinutes: b.estimated_delivery_minutes ?? undefined,
+  };
+}
+
+/** DB delivery-zone row -> domain DeliveryZone (geojson kept for pre-check/render). */
+export function mapDeliveryZone(z: DbBranchDeliveryZone): DeliveryZone {
+  return {
+    id: z.id,
+    branchId: z.branch_id,
+    name: z.name ?? undefined,
+    geojson: z.zone_geojson as DeliveryZone['geojson'],
+    isActive: z.is_active,
   };
 }
 

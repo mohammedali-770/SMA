@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import {
   MapPin, ShoppingBag, User,
   Plus, Minus, Check, Globe,
@@ -18,6 +18,8 @@ import { HomeScreen } from './mobile/HomeScreen';
 import { CartScreen } from './mobile/CartScreen';
 import { ProfileScreen } from './mobile/ProfileScreen';
 import { paymentDisplayState, paymentMethodLabel } from '../lib/payment';
+// Lazy so mapbox-gl only loads when the address form's map is opened.
+const LocationPicker = React.lazy(() => import('./mobile/LocationPicker').then(m => ({ default: m.LocationPicker })));
 
 
 export const MobileEmulator: React.FC = () => {
@@ -854,10 +856,24 @@ export const MobileEmulator: React.FC = () => {
                   />
                 </div>
 
+                {/* Map pin picker (delivery location). Manual lat/lng below stay
+                    as an accessible fallback and reflect the pin. */}
+                <div>
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">{isRTL ? 'حدّد موقع التوصيل' : 'Select your delivery location'}</label>
+                  <Suspense fallback={<div className="w-full h-40 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-center text-[10px] text-gray-400 font-bold">{isRTL ? 'جارٍ تحميل الخريطة…' : 'Loading map…'}</div>}>
+                    <LocationPicker
+                      lat={parseFloat(addrLat) || 24.7136}
+                      lng={parseFloat(addrLng) || 46.6753}
+                      onChange={(lat, lng) => { setAddrLat(String(lat)); setAddrLng(String(lng)); }}
+                      isRTL={isRTL}
+                    />
+                  </Suspense>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Latitude</label>
-                    <input 
+                    <input
                       type="text"
                       value={addrLat}
                       onChange={(e) => setAddrLat(e.target.value)}
@@ -866,7 +882,7 @@ export const MobileEmulator: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Longitude</label>
-                    <input 
+                    <input
                       type="text"
                       value={addrLng}
                       onChange={(e) => setAddrLng(e.target.value)}

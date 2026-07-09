@@ -10,7 +10,10 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.spicymeal.app"
+      "bundleIdentifier": "com.spicymeal.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your location only to center the delivery map on you. You can always move the pin manually."
+      }
     },
     "android": {
       "package": "com.spicymeal.app",
@@ -19,7 +22,9 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {

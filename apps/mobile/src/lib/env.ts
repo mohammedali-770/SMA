@@ -12,3 +12,13 @@ export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? ''
 
 /** True only when both public Supabase env vars are present. */
 export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+/**
+ * Map provider (public). The Mapbox public token is safe to ship but MUST be
+ * restricted to this app's bundle id in the Mapbox dashboard. No secret here.
+ */
+export const MAP_PROVIDER = (process.env.EXPO_PUBLIC_MAP_PROVIDER ?? 'mapbox').toLowerCase();
+export const MAPBOX_PUBLIC_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? '';
+
+/** True only when the active map provider has the public token it needs. */
+export const isMapConfigured = MAP_PROVIDER === 'mapbox' ? Boolean(MAPBOX_PUBLIC_TOKEN) : false;

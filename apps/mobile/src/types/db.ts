@@ -18,6 +18,16 @@ export interface DbBranch {
   address_en: string | null; address_ar: string | null; phone: string | null;
   latitude: number | null; longitude: number | null;
   delivery_fee: number; min_delivery_order: number; is_active: boolean;
+  // Delivery-zone feature flags (optional so a pre-migration project still parses).
+  delivery_enabled?: boolean;
+  pickup_enabled?: boolean;
+  delivery_temporarily_closed?: boolean;
+  estimated_delivery_minutes?: number | null;
+}
+/** Active per-branch delivery coverage polygon (safe columns only). */
+export interface DbBranchDeliveryZone {
+  id: string; branch_id: string; name: string | null;
+  zone_geojson: unknown; is_active: boolean;
 }
 export interface DbCategory {
   id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean;

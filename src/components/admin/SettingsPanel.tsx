@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, ShieldCheck, Sliders, Wallet } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, MapPin, ShieldCheck, Sliders, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
 import { IntegrationCard } from './IntegrationCard';
 import { LazywaitPanel } from './LazywaitPanel';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
+import { mapConfig } from '../../lib/map';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -16,7 +17,7 @@ export const SettingsPanel: React.FC = () => {
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
-  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'integrations' | 'payments' | 'loyalty'>('brand');
+  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'integrations' | 'payments' | 'maps' | 'loyalty'>('brand');
   const [pointAdjustments, setPointAdjustments] = useState<{ [profileId: string]: string }>({});
 
   // ---- Payment-method availability (admin-editable, accountant read-only) ----
@@ -131,6 +132,18 @@ export const SettingsPanel: React.FC = () => {
                   >
                     <Wallet className="w-3.5 h-3.5" />
                     <span>{isRTL ? 'طرق الدفع' : 'Payment Methods'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSettingsSubTab('maps')}
+                    className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                      settingsSubTab === 'maps'
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
+                        : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{isRTL ? 'الخرائط' : 'Map Settings'}</span>
                   </button>
 
                   <button
@@ -523,6 +536,56 @@ export const SettingsPanel: React.FC = () => {
                         >
                           {paySaving ? (isRTL ? 'جاري الحفظ…' : 'Saving…') : (isRTL ? 'حفظ طرق الدفع' : 'Save Payment Settings')}
                         </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SUB-TAB: MAP SETTINGS (provider status; no secret values) */}
+                  {settingsSubTab === 'maps' && (
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
+                        <div>
+                          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'إعدادات الخريطة' : 'Map Settings'}</span>
+                          <span className="text-[9.5px] text-slate-400 font-bold">{isRTL ? 'مزوّد الخرائط لرسم مناطق التوصيل واختيار موقع العميل' : 'Provider for delivery-zone drawing + customer location picker'}</span>
+                        </div>
+                        <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> {isRTL ? 'قيم عامة فقط' : 'Public config only'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="p-3 bg-white border border-slate-100 rounded-2xl">
+                          <span className="text-[9px] font-black text-slate-400 uppercase block">{isRTL ? 'المزوّد الحالي' : 'Current provider'}</span>
+                          <p className="text-sm font-black text-slate-800 mt-1 capitalize">{mapConfig.provider}</p>
+                        </div>
+                        <div className="p-3 bg-white border border-slate-100 rounded-2xl">
+                          <span className="text-[9px] font-black text-slate-400 uppercase block">{isRTL ? 'الرمز العام مُهيّأ' : 'Public token configured'}</span>
+                          <p className={`text-sm font-black mt-1 ${mapConfig.isConfigured ? 'text-green-600' : 'text-red-600'}`}>
+                            {mapConfig.isConfigured ? (isRTL ? 'نعم' : 'Yes') : (isRTL ? 'لا' : 'No')}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-white border border-slate-100 rounded-2xl md:col-span-2">
+                          <span className="text-[9px] font-black text-slate-400 uppercase block">{isRTL ? 'رابط النمط' : 'Style URL'}</span>
+                          <p className="text-[11px] font-mono font-bold text-slate-600 mt-1 break-all">{mapConfig.styleUrl}</p>
+                        </div>
+                      </div>
+
+                      {!mapConfig.isConfigured && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] font-bold flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>
+                            {isRTL
+                              ? 'لم يتم ضبط رمز Mapbox العام. أضف VITE_MAPBOX_PUBLIC_TOKEN في بيئة Vercel لتفعيل الخرائط. لن يتعطّل باقي النظام.'
+                              : 'Mapbox public token is not set. Add VITE_MAPBOX_PUBLIC_TOKEN to your Vercel env to enable maps. The rest of the dashboard keeps working.'}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl text-slate-500 text-[10px] leading-relaxed">
+                        <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'حماية الرمز' : 'Token restriction'}</span>
+                        {isRTL
+                          ? 'الرمز العام (pk.) قابل للنشر مثل مفتاح anon، لكن قيّده حسب النطاق/التطبيق من لوحة Mapbox. لا تضع الأسرار في متغيرات VITE_.'
+                          : 'The public token (pk.) is shippable like the anon key, but restrict it by URL/app in the Mapbox dashboard. Never place secret keys in VITE_ variables.'}
                       </div>
                     </div>
                   )}

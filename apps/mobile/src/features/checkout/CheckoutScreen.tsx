@@ -24,6 +24,8 @@ import {
   availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
   type PaymentMethod,
 } from '../../lib/payment';
+import { pointInPolygon } from '../../lib/geo';
+import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { useAuth, useCart, useCatalog } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
@@ -33,13 +35,20 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
   const { profile } = useAuth();
-  const { selectedBranch, brand, loyalty, payment, branchIsOpen } = useCatalog();
+  const { selectedBranch, brand, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
   const cart = useCart();
 
   const [orderType, setOrderType] = useState<OrderType | null>(null); // never preselected
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(resolveDefaultMethod(payment));
   const [addressList, setAddressList] = useState<SavedAddress[]>([]);
   const [addressId, setAddressId] = useState<string | null>(null);
+  // Map-picked delivery location (null until the customer confirms one).
+  const [pickedLat, setPickedLat] = useState<number | null>(null);
+  const [pickedLng, setPickedLng] = useState<number | null>(null);
+  const [addrLabel, setAddrLabel] = useState('');
+  // Bump to remount + recenter the map (saved-address tap / geolocation), without
+  // remounting on every pin drag.
+  const [recenterSeed, setRecenterSeed] = useState(0);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState<{ ok: boolean; message: string; discount: number } | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState(false);
@@ -71,10 +80,22 @@ export function CheckoutScreen() {
         const mapped = rows.map(mapAddress);
         setAddressList(mapped);
         const def = mapped.find((a) => a.isDefault) ?? mapped[0];
-        if (def) setAddressId(def.id);
+        if (def && Number.isFinite(def.lat) && Number.isFinite(def.lng)) {
+          setAddressId(def.id);
+          setPickedLat(def.lat);
+          setPickedLng(def.lng);
+        }
       })
       .catch(() => setAddressList([]));
   }, []);
+
+  // Select a saved location: use its coords + recenter the map on it.
+  const chooseSavedAddress = (a: SavedAddress) => {
+    setAddressId(a.id);
+    setPickedLat(a.lat);
+    setPickedLng(a.lng);
+    setRecenterSeed((s) => s + 1);
+  };
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -104,14 +125,33 @@ export function CheckoutScreen() {
   const belowMin = orderType === 'delivery'
     && cart.subtotal < (selectedBranch?.minDeliveryOrder ?? 0);
 
+  // ---- Delivery serviceability pre-check (UX only; place_order is authoritative) ----
+  const branchZone = deliveryZones.find((z) => z.branchId === selectedBranch?.id && z.isActive);
+  const branchDeliveryOff = selectedBranch
+    ? !(selectedBranch.deliveryEnabled ?? true) || (selectedBranch.deliveryTemporarilyClosed ?? false)
+    : false;
+  const hasPickedCoords = pickedLat != null && pickedLng != null;
+  const insideZone = Boolean(
+    hasPickedCoords && branchZone
+    && pointInPolygon({ lat: pickedLat as number, lng: pickedLng as number }, branchZone.geojson),
+  );
+  const deliveryBlockReason: string | null =
+    orderType !== 'delivery' ? null
+    : branchDeliveryOff ? pick('Delivery is currently closed for this branch', 'التوصيل مغلق حالياً لهذا الفرع')
+    : !hasPickedCoords ? pick('Please select your location on the map', 'يرجى تحديد موقعك على الخريطة')
+    : !branchZone ? pick('Delivery is not available for this location', 'التوصيل غير متاح لهذا الموقع')
+    : !insideZone ? pick('Outside delivery area', 'خارج منطقة التوصيل')
+    : null;
+
   const blockReason = useMemo(() => {
     if (!selectedBranch) return t('selectBranchCta');
     if (!branchOpen) return t('branchClosedError');
     if (!orderType) return t('chooseOrderType');
     if (belowMin) return `${t('minOrderError')} ${formatSAR(selectedBranch?.minDeliveryOrder ?? 0, lang)}`;
     if (paymentBlocked || !paymentMethod) return pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.');
+    if (deliveryBlockReason) return deliveryBlockReason;
     return null;
-  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick]);
+  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick, deliveryBlockReason]);
 
   const canPlace = !blockReason && cart.items.length > 0 && !placing;
 
@@ -120,11 +160,30 @@ export function CheckoutScreen() {
     setError(null);
     setPlacing(true);
     try {
+      // Resolve the delivery address: reuse the selected saved address when the
+      // pin hasn't moved off it, otherwise persist the map-picked coordinates.
+      let deliveryAddressId: string | null = null;
+      if (orderType === 'delivery') {
+        if (pickedLat == null || pickedLng == null) throw new Error(pick('Please select your location on the map', 'يرجى تحديد موقعك على الخريطة'));
+        const saved = addressList.find((a) => a.id === addressId);
+        if (saved && saved.lat === pickedLat && saved.lng === pickedLng) {
+          deliveryAddressId = saved.id;
+        } else {
+          const created = await addresses.create({
+            label: addrLabel.trim() || pick('Delivery location', 'موقع التوصيل'),
+            latitude: pickedLat,
+            longitude: pickedLng,
+            isDefault: addressList.length === 0,
+          });
+          deliveryAddressId = created.id;
+        }
+      }
+
       const order = await orders.place({
         branchId: selectedBranch.id,
         orderType,
         items: cart.toOrderItems(),
-        addressId: orderType === 'delivery' ? addressId : null,
+        addressId: deliveryAddressId,
         couponCode: couponResult?.ok ? couponCode.trim() : null,
         notes: notes.trim() || null,
         loyaltyPoints: redeemPoints ? availablePoints : 0,
@@ -184,27 +243,52 @@ export function CheckoutScreen() {
             )}
           </View>
 
-          {/* Delivery address */}
+          {/* Delivery location — map picker + optional details */}
           {orderType === 'delivery' ? (
             <View style={styles.block}>
-              <Text style={styles.sectionTitle}>{t('deliveryAddress')}</Text>
-              {addressList.length === 0 ? (
-                <Text style={styles.note}>{t('noSavedAddress')}</Text>
-              ) : (
-                addressList.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    style={[styles.addrRow, addressId === a.id && styles.addrRowActive]}
-                    onPress={() => setAddressId(a.id)}
-                  >
-                    <View style={[styles.radioDot, addressId === a.id && styles.radioDotOn]} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.addrLabel}>{a.label || t('deliveryAddress')}</Text>
-                      {a.description ? <Text style={styles.addrDesc}>{a.description}</Text> : null}
-                    </View>
-                  </Pressable>
-                ))
-              )}
+              <Text style={styles.sectionTitle}>{pick('Select your delivery location', 'حدّد موقع التوصيل')}</Text>
+              <LocationPickerMap
+                key={recenterSeed}
+                lat={pickedLat ?? selectedBranch?.latitude ?? 24.7136}
+                lng={pickedLng ?? selectedBranch?.longitude ?? 46.6753}
+                onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
+                labels={{
+                  moveHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
+                  useMyLocation: pick('Use my location', 'استخدم موقعي'),
+                  setupRequired: pick('Map setup required — ask support to enable the map.', 'إعداد الخريطة مطلوب — تواصل مع الدعم لتفعيل الخريطة.'),
+                }}
+              />
+
+              <TextInput
+                value={addrLabel}
+                onChangeText={setAddrLabel}
+                placeholder={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
+                placeholderTextColor={colors.muted}
+                style={[styles.couponInput, { marginTop: spacing.md }]}
+              />
+
+              {addressList.length > 0 ? (
+                <View style={{ marginTop: spacing.md }}>
+                  <Text style={styles.note}>{pick('Saved locations', 'المواقع المحفوظة')}</Text>
+                  {addressList.map((a) => (
+                    <Pressable
+                      key={a.id}
+                      style={[styles.addrRow, addressId === a.id && styles.addrRowActive]}
+                      onPress={() => chooseSavedAddress(a)}
+                    >
+                      <View style={[styles.radioDot, addressId === a.id && styles.radioDotOn]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.addrLabel}>{a.label || t('deliveryAddress')}</Text>
+                        {a.description ? <Text style={styles.addrDesc}>{a.description}</Text> : null}
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {deliveryBlockReason ? (
+                <Text style={[styles.note, { color: colors.red, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
+              ) : null}
             </View>
           ) : null}
 

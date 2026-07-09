@@ -15,7 +15,7 @@
  */
 import { supabase } from '../lib/supabase';
 import type {
-  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbCategory,
+  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
   DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile, OrderType,
 } from '../types/db';
@@ -71,14 +71,21 @@ export const catalog = {
     ok<DbBranchAvailability[]>(await supabase.from('branch_product_availability').select('*')),
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
+  /** Active delivery zones (safe columns only — never `updated_by`). */
+  deliveryZones: async () =>
+    ok<DbBranchDeliveryZone[]>(await supabase
+      .from('branch_delivery_zones')
+      .select('id, branch_id, name, zone_geojson, is_active')
+      .eq('is_active', true)),
   /** Fetch the whole menu graph in parallel (one app-open round of requests). */
   async all() {
-    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings] =
+    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones] =
       await Promise.all([
         this.branches(), this.categories(), this.products(), this.modifierGroups(),
         this.modifiers(), this.productModifierGroups(), this.availability(), this.settings(),
+        this.deliveryZones(),
       ]);
-    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings };
+    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones };
   },
 };
 
@@ -143,8 +150,42 @@ export const coupons = {
 // ---------------------------------------------------------------------------
 // Addresses (customer-owned, RLS-isolated)
 // ---------------------------------------------------------------------------
+export interface AddressInput {
+  label?: string | null;
+  description?: string | null;
+  nationalShortAddress?: string | null;
+  latitude: number;
+  longitude: number;
+  isDefault?: boolean;
+}
 export const addresses = {
   listMine: async () => ok<DbAddress[]>(await supabase.from('addresses').select('*').order('created_at')),
+  /** Create an address for the signed-in customer (RLS forces customer_id). The
+   *  map picker writes the coordinates place_order validates against zones. */
+  async create(input: AddressInput): Promise<DbAddress> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be signed in to save an address.');
+    return ok<DbAddress>(await supabase.from('addresses').insert({
+      customer_id: user.id,
+      label: input.label ?? null,
+      description: input.description ?? null,
+      national_short_address: input.nationalShortAddress ?? null,
+      latitude: input.latitude,
+      longitude: input.longitude,
+      is_default: input.isDefault ?? false,
+    }).select('*').single());
+  },
+  /** Update an existing address (RLS scopes it to the owner). */
+  async update(id: string, patch: Partial<AddressInput>): Promise<DbAddress> {
+    const row: Record<string, unknown> = {};
+    if (patch.label !== undefined) row.label = patch.label;
+    if (patch.description !== undefined) row.description = patch.description;
+    if (patch.nationalShortAddress !== undefined) row.national_short_address = patch.nationalShortAddress;
+    if (patch.latitude !== undefined) row.latitude = patch.latitude;
+    if (patch.longitude !== undefined) row.longitude = patch.longitude;
+    if (patch.isDefault !== undefined) row.is_default = patch.isDefault;
+    return ok<DbAddress>(await supabase.from('addresses').update(row).eq('id', id).select('*').single());
+  },
 };
 
 // ---------------------------------------------------------------------------

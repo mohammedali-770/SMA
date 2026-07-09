@@ -7,7 +7,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import {
   Branch, Category, Product, ModifierGroup, Order,
   UserProfile, SavedAddress, CartItem, OrderStatus,
-  Modifier, BrandSettings, LoyaltySettings,
+  Modifier, BrandSettings, LoyaltySettings, DeliveryZone,
 } from '../types';
 import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
 import { supabase } from '../lib/supabase';
@@ -17,7 +17,7 @@ import {
   DbIntegrationSetting, UpsertIntegrationInput,
 } from '../lib/api';
 import {
-  mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
+  mapBranch, mapCategory, mapProduct, mapModifierGroup, mapDeliveryZone, buildAvailabilityMatrix,
   mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
   mapPaymentMethodSettings,
   brandPatchToDb, loyaltyPatchToDb, productToDbInsert, productToDbUpdate,
@@ -96,6 +96,12 @@ interface AppContextType {
   isProductAvailableInBranch: (productId: string, branchId: string) => boolean;
   updateBranchSettings: (id: string, updates: Partial<Branch>) => void;
   bulkUploadMenu: (categories: Category[], products: Product[]) => Promise<{ success: boolean; count: number }>;
+
+  // Delivery zones (per-branch coverage polygons). Reads are public (active
+  // zones); writes are admin-only via the server RPCs.
+  deliveryZones: DeliveryZone[];
+  saveBranchDeliveryZone: (branchId: string, geojson: unknown, name?: string | null) => Promise<void>;
+  clearBranchDeliveryZone: (branchId: string) => Promise<void>;
 
   // Audio indicator for realtime
   playNotificationSound: () => void;
@@ -186,6 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Database-backed state (mapped app types) ----------------------------
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
@@ -287,6 +294,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBrandSettings(mapBrandSettings(c.settings));
     setLoyaltySettings(mapLoyaltySettings(c.settings));
     setPaymentSettings(mapPaymentMethodSettings(c.settings));
+    setDeliveryZones((c.deliveryZones ?? []).map(mapDeliveryZone));
     return c;
   }, []);
 
@@ -328,6 +336,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsAuthenticated(false);
     setCurrentUser(GUEST_USER);
     setBranches([]); setCategories([]); setProducts([]); setModifierGroups([]);
+    setDeliveryZones([]);
     setOrders([]); setAddresses([]); setProfiles([]); setAvailabilityMatrix({});
     setSelectedBranch(null); setCart([]); setCouponCode(''); setDiscountAmount(0);
     setIntegrationSettings([]); setIntegrationsError(null);
@@ -806,6 +815,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   };
 
+  // ---- Admin: delivery-zone save / clear (server RPCs re-check is_admin()) ---
+  const saveBranchDeliveryZone = useCallback(async (branchId: string, geojson: unknown, name?: string | null): Promise<void> => {
+    await adminApi.setBranchDeliveryZone({ branchId, geojson, name: name ?? null });
+    const zones = await catalog.deliveryZones();
+    setDeliveryZones(zones.map(mapDeliveryZone));
+  }, []);
+
+  const clearBranchDeliveryZone = useCallback(async (branchId: string): Promise<void> => {
+    await adminApi.clearBranchDeliveryZone(branchId);
+    const zones = await catalog.deliveryZones();
+    setDeliveryZones(zones.map(mapDeliveryZone));
+  }, []);
+
   // ---- Admin: bulk CSV upload ----------------------------------------------
   const bulkUploadMenu = async (newCats: Category[], newProds: Product[]): Promise<{ success: boolean; count: number }> => {
     try {
@@ -957,6 +979,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isProductAvailableInBranch,
       updateBranchSettings,
       bulkUploadMenu,
+
+      deliveryZones,
+      saveBranchDeliveryZone,
+      clearBranchDeliveryZone,
 
       playNotificationSound,
       newOrderAlert,

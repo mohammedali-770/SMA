@@ -1,0 +1,80 @@
+import React, { useEffect, useRef } from 'react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { MapPin } from 'lucide-react';
+import { mapConfig } from '../../lib/map';
+
+interface LocationPickerProps {
+  lat: number;
+  lng: number;
+  onChange: (lat: number, lng: number) => void;
+  isRTL: boolean;
+}
+
+/**
+ * Customer delivery-location picker (web): a Mapbox map with a draggable pin.
+ * Drag the marker or tap the map to set coordinates. When the map token is
+ * absent it renders a setup hint and the caller's manual lat/lng inputs remain
+ * the fallback — delivery still requires coordinates, validated server-side.
+ */
+export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChange, isRTL }) => {
+  const container = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markerRef = useRef<mapboxgl.Marker | null>(null);
+
+  useEffect(() => {
+    if (!mapConfig.isConfigured || !container.current) return;
+    mapboxgl.accessToken = mapConfig.publicToken;
+    const start: [number, number] = [
+      Number.isFinite(lng) ? lng : mapConfig.defaultCenter.lng,
+      Number.isFinite(lat) ? lat : mapConfig.defaultCenter.lat,
+    ];
+    const map = new mapboxgl.Map({
+      container: container.current,
+      style: mapConfig.styleUrl,
+      center: start,
+      zoom: 13,
+    });
+    mapRef.current = map;
+
+    const marker = new mapboxgl.Marker({ color: '#7c3aed', draggable: true }).setLngLat(start).addTo(map);
+    markerRef.current = marker;
+    marker.on('dragend', () => {
+      const { lng: mlng, lat: mlat } = marker.getLngLat();
+      onChange(Number(mlat.toFixed(6)), Number(mlng.toFixed(6)));
+    });
+    map.on('click', (e) => {
+      marker.setLngLat(e.lngLat);
+      onChange(Number(e.lngLat.lat.toFixed(6)), Number(e.lngLat.lng.toFixed(6)));
+    });
+    map.addControl(new mapboxgl.NavigationControl(), 'top-left');
+
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the marker in sync when the parent updates coords (e.g. manual inputs).
+  useEffect(() => {
+    if (markerRef.current && Number.isFinite(lat) && Number.isFinite(lng)) {
+      markerRef.current.setLngLat([lng, lat]);
+    }
+  }, [lat, lng]);
+
+  if (!mapConfig.isConfigured) {
+    return (
+      <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] font-bold text-amber-800 flex items-center gap-2">
+        <MapPin className="w-4 h-4 flex-shrink-0" />
+        {isRTL ? 'إعداد الخريطة مطلوب — أدخل الإحداثيات يدوياً أدناه.' : 'Map setup required — enter coordinates manually below.'}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div ref={container} className="w-full h-40 rounded-lg overflow-hidden border border-gray-200" />
+      <p className="text-[9px] text-gray-400 font-bold mt-1">
+        {isRTL ? 'حرّك الدبوس إلى موقعك بالضبط.' : 'Move the pin to your exact location.'}
+      </p>
+    </div>
+  );
+};
