@@ -126,7 +126,7 @@ export interface Order {
   loyaltyPointsRedeemed?: number; // points spent on this order
   total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
-  paymentMethod?: string; // display label, e.g. "Moyasar (Test)" or "Cash on Delivery"
+  paymentMethod?: string; // verified gateway label once paid (e.g. "geidea"); COD is NOT supported
   orderSyncStatus: SyncStatus;
   // Lazywait POS sync detail (admin visibility).
   lazywaitSyncState?: string; // pending|syncing|synced|failed|blocked|dead_letter|skipped

@@ -56,6 +56,10 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               <Row label={pick('Placed', 'وقت الطلب')} value={formatRiyadhDateTime(order.createdAt)} />
             </View>
 
+            {order.paymentStatus !== 'paid' ? (
+              <Text style={styles.notPaid}>⚠ {t('notPaidYet')}</Text>
+            ) : null}
+
             <Text style={styles.summaryTitle}>{t('orderSummary')}</Text>
             <View style={[styles.card, shadow.card]}>
               {order.items.map((it) => (
@@ -127,5 +131,6 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: font.md, fontWeight: '700', color: colors.text },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   earned: { marginTop: spacing.sm, color: colors.warning, fontWeight: '800', fontSize: font.sm },
+  notPaid: { marginTop: spacing.md, color: colors.warning, fontWeight: '800', fontSize: font.sm, textAlign: 'center' },
   footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
 });

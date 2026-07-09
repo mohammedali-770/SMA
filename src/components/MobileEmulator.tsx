@@ -506,15 +506,26 @@ export const MobileEmulator: React.FC = () => {
                           {t[activeOrderReceipt.orderSyncStatus]}
                         </span>
                       </div>
+                      {/* Payment — Cash on Delivery is not supported */}
                       <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
-                        <span>{isRTL ? 'طريقة الدفع:' : 'Payment:'}</span>
-                        <span className="flex items-center gap-1.5 text-gray-500">
-                          {activeOrderReceipt.paymentMethod || (isRTL ? 'الدفع عند الاستلام' : 'Cash on Delivery')}
-                          <span className={`px-1.5 py-0.5 rounded-full ${activeOrderReceipt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                            {activeOrderReceipt.paymentStatus === 'paid' ? (isRTL ? 'مدفوع' : 'PAID') : (isRTL ? 'عند الاستلام' : 'UNPAID')}
-                          </span>
+                        <span>{isRTL ? 'طريقة الدفع:' : 'Payment method:'}</span>
+                        <span className="text-gray-500">
+                          {activeOrderReceipt.paymentStatus === 'paid' && activeOrderReceipt.paymentMethod
+                            ? activeOrderReceipt.paymentMethod
+                            : (isRTL ? 'الدفع الإلكتروني غير مُفعّل' : 'Online payment not configured')}
                         </span>
                       </div>
+                      <div className="flex justify-between items-center pt-1 text-[8.5px] font-bold text-gray-400">
+                        <span>{isRTL ? 'حالة الدفع:' : 'Payment status:'}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full font-black ${activeOrderReceipt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
+                          {activeOrderReceipt.paymentStatus === 'paid' ? (isRTL ? 'مدفوع' : 'PAID') : (isRTL ? 'قيد الانتظار · غير مدفوع' : 'PENDING · UNPAID')}
+                        </span>
+                      </div>
+                      {activeOrderReceipt.paymentStatus !== 'paid' && (
+                        <div className="text-[8.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-1.5 mt-1 text-center">
+                          {isRTL ? 'لم يتم دفع هذا الطلب بعد.' : 'This order is not paid yet.'}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
