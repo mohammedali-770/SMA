@@ -59,7 +59,7 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
   },
   whatsapp: {
     title: 'WhatsApp OTP (Meta Cloud API)',
-    subtitle: 'Phone verification via WhatsApp — server-side only. Tokens never leave the server.',
+    subtitle: 'Customer login + phone verification via WhatsApp — server-side only. Tokens never leave the server.',
     providerOptions: ['meta_cloud'],
     publicFields: [
       { key: 'graph_api_version', label: 'Graph API Version', type: 'text', placeholder: 'v21.0' },
@@ -70,11 +70,14 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
       { key: 'otp_template_name_ar', label: 'OTP Template Name (AR)', type: 'text', placeholder: 'otp_code_ar' },
       { key: 'otp_template_language_ar', label: 'OTP Template Language (AR)', type: 'text', placeholder: 'ar' },
       { key: 'otp_template_has_copy_button', label: 'Template has copy-code button', type: 'bool' },
+      { key: 'whatsapp_login_enabled', label: 'Enable WhatsApp customer LOGIN (Send SMS Hook)', type: 'bool' },
+      { key: 'otp_default_language', label: 'Login OTP default language (en/ar)', type: 'text', placeholder: 'en' },
     ],
     secretFields: [
       { key: 'access_token', label: 'Access Token' },
       { key: 'app_secret', label: 'App Secret (webhook signature)' },
       { key: 'webhook_verify_token', label: 'Webhook Verify Token' },
+      { key: 'send_sms_hook_secret', label: 'Send SMS Hook Secret (v1,whsec_…)' },
     ],
   },
 };

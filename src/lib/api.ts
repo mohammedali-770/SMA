@@ -278,6 +278,8 @@ export interface WhatsAppOtpStatus {
   app_secret_set: boolean;
   webhook_verify_token_set: boolean;
   pepper_set: boolean;
+  login_enabled?: boolean;
+  send_sms_hook_secret_set?: boolean;
 }
 async function invokeWhatsAppTestConfig<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke('whatsapp-test-config', { body });

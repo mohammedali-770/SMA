@@ -35,6 +35,22 @@ export const STRINGS = {
     haveAccount: 'Already have an account? Sign in',
     signUpCheckEmail: 'Account created. If email confirmation is on, check your inbox, then sign in.',
 
+    // customer WhatsApp login (Supabase Phone Auth)
+    loginWithWhatsapp: 'Login with WhatsApp',
+    loginPhoneTitle: 'Login with your phone',
+    loginPhoneSub: "We'll send a login code to your WhatsApp.",
+    phoneNumberLabel: 'Phone number',
+    sendLoginCode: 'Send login code',
+    weSentLoginCode: 'We sent a login code to your WhatsApp.',
+    enterLoginCode: 'Enter your login code',
+    verifyAndLogin: 'Verify & Login',
+    changeNumber: 'Change number',
+    invalidPhone: 'Enter a valid phone number.',
+    loginCodeSendFailed: 'Could not send the login code. Please try again.',
+    whatsappLoginNotAvailable: 'WhatsApp login isn’t available right now. Please sign in with email.',
+    useEmailInstead: 'Sign in with email instead',
+    useWhatsappInstead: 'Login with WhatsApp instead',
+
     // branch
     selectBranch: 'Select Branch',
     chooseBranch: 'Choose a branch',
@@ -133,8 +149,8 @@ export const STRINGS = {
     role: 'Role',
 
     // WhatsApp phone verification
-    verifyPhoneTitle: 'Verify your phone',
-    verifyPhoneSub: 'Confirm phone ownership via WhatsApp',
+    verifyPhoneTitle: 'Verify phone number',
+    verifyPhoneSub: 'Confirm phone ownership via WhatsApp. This does not sign you in.',
     phoneVerifiedBadge: 'Verified',
     enterPhoneNumber: 'Enter your phone number',
     sendCodeWhatsapp: 'Send code via WhatsApp',
@@ -184,6 +200,22 @@ export const STRINGS = {
     haveNoAccount: 'ليس لديك حساب؟ أنشئ حساباً',
     haveAccount: 'لديك حساب بالفعل؟ سجّل الدخول',
     signUpCheckEmail: 'تم إنشاء الحساب. إذا كان تأكيد البريد مفعّلاً، تحقق من بريدك ثم سجّل الدخول.',
+
+    // تسجيل دخول العميل عبر واتساب (مصادقة الجوال في Supabase)
+    loginWithWhatsapp: 'تسجيل الدخول عبر واتساب',
+    loginPhoneTitle: 'تسجيل الدخول برقم جوالك',
+    loginPhoneSub: 'سنرسل رمز الدخول إلى واتساب الخاص بك.',
+    phoneNumberLabel: 'رقم الجوال',
+    sendLoginCode: 'إرسال رمز الدخول',
+    weSentLoginCode: 'أرسلنا رمز الدخول إلى واتساب الخاص بك.',
+    enterLoginCode: 'أدخل رمز الدخول',
+    verifyAndLogin: 'تحقّق وتسجيل الدخول',
+    changeNumber: 'تغيير الرقم',
+    invalidPhone: 'أدخل رقم جوال صحيح.',
+    loginCodeSendFailed: 'تعذّر إرسال رمز الدخول. حاول مرة أخرى.',
+    whatsappLoginNotAvailable: 'تسجيل الدخول عبر واتساب غير متاح حالياً. الرجاء تسجيل الدخول بالبريد الإلكتروني.',
+    useEmailInstead: 'تسجيل الدخول بالبريد الإلكتروني بدلاً من ذلك',
+    useWhatsappInstead: 'تسجيل الدخول عبر واتساب بدلاً من ذلك',
 
     selectBranch: 'اختر الفرع',
     chooseBranch: 'اختر فرعاً',
@@ -275,8 +307,8 @@ export const STRINGS = {
     role: 'الصلاحية',
 
     // التحقق من الجوال عبر واتساب
-    verifyPhoneTitle: 'التحقق من رقم جوالك',
-    verifyPhoneSub: 'أكِّد ملكية رقمك عبر واتساب',
+    verifyPhoneTitle: 'التحقق من رقم الجوال',
+    verifyPhoneSub: 'أكِّد ملكية رقمك عبر واتساب. هذا لا يسجّل دخولك.',
     phoneVerifiedBadge: 'موثّق',
     enterPhoneNumber: 'أدخل رقم جوالك',
     sendCodeWhatsapp: 'إرسال الرمز عبر واتساب',
