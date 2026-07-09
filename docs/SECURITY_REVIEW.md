@@ -227,3 +227,102 @@ now-required `sync_trigger_secret`.
 **NO-GO if:** any real secret is found in the bundle/repo/logs; the coupon migration
 is not deployed (M-1 unpatched); the sync worker is exposed without its secret; or
 leaked-password protection and the deploy checklist above are skipped.
+
+---
+
+# Re-review — 2026-07-09 (independent second pass)
+
+A full independent re-audit was run (13-dimension multi-agent fan-out — 36 agents,
+0 errors — with adversarial verification of every finding, plus a manual re-read of
+every migration, RPC, Edge Function and client). **All §3 fixes from the first pass
+were verified still present and correct.** The re-review found **no new Critical or
+High issues**; it confirmed three small behavior-preserving items (now fixed) and
+re-confirmed/documented the rest.
+
+## New fixes applied (2026-07-09) — all behavior-preserving
+
+### R-1 `lazywait-sync` trigger secret compared with non-constant-time `!==` — LOW — FIXED
+The `x-sync-secret` shared-secret gate used a plain `!==` string compare (a timing
+oracle), unlike the webhook HMAC checks which already use `timingSafeEqual`.
+**Fix** (`supabase/functions/lazywait-sync/index.ts`): compare with the existing
+`timingSafeEqual` helper (imported from `_shared/lazywait.ts`). Same 401/503
+behavior; a null header still fails closed.
+
+### R-2 `payment-webhook` echoed the internal `confirm_order_payment` error to the caller — LOW — FIXED
+`if (error) return json({ error: error.message }, 400)` returned the RPC error
+verbatim to the gateway. The amount-mismatch message embeds the **server-trusted
+order total**, so a caller holding a valid signature could read it.
+**Fix** (`supabase/functions/payment-webhook/index.ts`): log the detail server-side
+(`console.error`, truncated) and return a generic `payment confirmation failed` 400.
+The success path (verified paid + matching amount → 200) is unchanged; only the
+error-detail string is removed. (Mirrors the first pass's L-2 for `payment-initiate`.)
+
+### R-3 Two trigger functions were `search_path`-mutable — LOW — FIXED
+The first-pass doc claimed the advisor reported no `function_search_path_mutable`,
+but `set_updated_at` and `set_order_number` (plain, non-`SECURITY DEFINER` trigger
+functions) did not pin `search_path`. Not a privilege-escalation vector (they run
+with invoker rights, and orders are inserted only via the `search_path`-pinned
+`SECURITY DEFINER` `place_order`), but the advisor flags them.
+**Fix** (`supabase/migrations/20260709120000_sec_trigger_search_path.sql`): pure
+`create or replace` with the **same body** + `set search_path = public`. All existing
+triggers keep working; `now()`/`to_char`/`lpad`/`nextval` resolve identically →
+byte-for-byte behavior. All 24 `SECURITY DEFINER` functions were re-verified to
+already pin `search_path`.
+
+## Re-confirmed & documented (no code change — a safe fix would alter behavior, or the item is by-design / infra-level)
+
+- **Coupon-code enumeration via `validate_coupon()`** (LOW). An authenticated user can
+  probe codes and learn a valid code's discount. It's the intended checkout-validation
+  path and reveals no other customer's data; a DB-level throttle would change behavior.
+  Recommend per-user rate-limiting + monitoring redemption-vs-limit. Accepted for pilot.
+- **Lazywait mapping IDs / price-ref exposed via public catalog `SELECT`** (INFO). Anon
+  can read `lazywait_*_id` and `lazywait_price_ref` on branches/products. These are
+  internal POS **IDs, not secrets** (the API token is the secret and never ships).
+  Hiding them would need a column-restricting view and risks the admin mapping UI.
+- **Create Order duplicate on a lost response** (LOW; verifier down-rated from Medium).
+  Lazywait Create Order has no idempotency key, so a response lost *after* the POS
+  committed the ticket can duplicate it on retry. Already heavily mitigated: the ref is
+  persisted immediately, the reaper recovers ref-bearing rows without re-POSTing, and
+  ambiguous 2xx responses are **blocked** for admin review rather than retried. No
+  payload-preserving code fix exists; add an idempotency key once Lazywait supports one.
+- **`order-intake` passes the `place_order` error string through** (LOW). Left as-is on
+  purpose: those `RAISE EXCEPTION` messages ("Coupon rejected…", "…not available…") are
+  the **user-facing validation text** the app displays (the direct `place_order` path
+  returns them too); sanitizing would degrade UX, not harden a machine endpoint.
+- **`payment-initiate` has no rate limit** (LOW). An authenticated user could spam
+  Geidea session creation / `payment_records` inserts. Requires new rate-limit infra;
+  recommend before scale.
+- **`send-otp` / `push-dispatch`** remain inert 501 stubs (`verify_jwt=false`); add
+  per-phone + per-IP rate-limiting and a caller gate **before** implementing.
+- **Wildcard CORS**, **PII in `payment_records.raw` / verified webhook logs**,
+  **AsyncStorage session store**, **mobile `uuid` dev-tooling advisories**, and
+  **pickup-enqueue-regardless-of-payment_status** were re-examined and **refuted** as
+  vulnerabilities (Bearer-auth/no-cookies; staff-only reconciliation data; the
+  Supabase-recommended RN default; dev-only/not-shipped; and the confirmed order flow).
+- **No CSP / security headers** at the web layer (LOW) and **no CI dependency-audit gate**
+  (INFO) — add at the host/CDN and in CI respectively (see §9). Not injected here
+  untested, to avoid breaking the SPA.
+
+## Tools run (2026-07-09)
+
+| Tool | Result |
+|---|---|
+| Multi-agent re-audit (13 dims × adversarial verify, 36 agents) | 0 Critical/High; 3 new behavior-preserving fixes; rest documented |
+| Manual re-read (all migrations / RPCs / Edge Functions / clients) | Controls re-confirmed |
+| `rg` secret scan (working tree) + `git log --all -p` (history) | No real secret; leaked Lazywait token absent; only the public **anon** JWT present |
+| `tsc --noEmit` (web) | Pass |
+| `vitest run` (web + shared helpers) | 79/79 pass |
+| `vite build` | Pass |
+| `npm audit` (root) | 0 vulnerabilities |
+| `npm audit` (apps/mobile) | 11 moderate — all transitive `uuid` under Expo **build tooling** (dev-only, not shipped); `--force` breaks the SDK → not applied |
+| SECURITY DEFINER `search_path` census (24 fns) | All pinned ✓ (+ 2 trigger fns now pinned by R-3) |
+| Deno type-check / Supabase advisor / gitleaks / semgrep / osv-scanner | Not installed here — substituted with manual review + `rg`/`git` history scan + static census |
+
+**Deploy delta (add to §9):**
+`supabase db push` (applies `20260709120000_sec_trigger_search_path`) and
+`supabase functions deploy lazywait-sync payment-webhook`. The R-1/R-2/R-3 changes are
+transactional / behavior-preserving and only take effect once deployed.
+
+**Go / No-Go (2026-07-09): GO (security)** — unchanged from §11, with R-1/R-2/R-3 added
+to the deploy list and the Lazywait-token rotation (§10) still **mandatory** before any
+pilot/production use.

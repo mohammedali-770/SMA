@@ -4,7 +4,7 @@ import { getProviderConfig } from '../_shared/secrets.ts';
 import {
   buildCreateOrderPayload, classifyLazywaitError, computeBackoffMs, DEFAULT_BASE_URL,
   lazywaitFetch, MAX_SYNC_ATTEMPTS, normalizePhone, shouldResendCreateOrder,
-  STALE_SYNC_TIMEOUT_MINUTES, type LazywaitConfig,
+  STALE_SYNC_TIMEOUT_MINUTES, timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 
 /**
@@ -38,7 +38,11 @@ Deno.serve(async (req: Request) => {
   if (!triggerSecret) {
     return json({ error: 'sync trigger secret not configured' }, 503);
   }
-  if (req.headers.get('x-sync-secret') !== triggerSecret) {
+  // Constant-time compare so the shared-secret check is not a timing oracle
+  // (same treatment as the webhook HMAC checks). A null header -> '' -> length
+  // mismatch -> false -> 401.
+  const providedSyncSecret = req.headers.get('x-sync-secret') ?? '';
+  if (!timingSafeEqual(providedSyncSecret, triggerSecret)) {
     return json({ error: 'unauthorized' }, 401);
   }
 
