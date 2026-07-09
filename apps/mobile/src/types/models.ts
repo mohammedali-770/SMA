@@ -14,6 +14,7 @@ export interface UserProfile {
   email?: string;
   role: UserRole;
   loyaltyPoints: number;
+  phoneVerified: boolean;
 }
 
 export interface Branch {

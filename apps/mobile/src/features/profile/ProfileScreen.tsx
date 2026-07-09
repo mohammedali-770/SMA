@@ -9,6 +9,7 @@ import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
+import { VerifyPhoneWhatsApp } from './VerifyPhoneWhatsApp';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
@@ -52,6 +53,9 @@ export function ProfileScreen() {
           <DetailRow label={t('phone')} value={profile?.phoneNumber || '—'} />
           <DetailRow label={t('role')} value={profile?.role ?? '—'} last />
         </View>
+
+        {/* WhatsApp phone verification (signed-in only) */}
+        {profile ? <VerifyPhoneWhatsApp /> : null}
 
         {/* Language */}
         <Text style={styles.sectionTitle}>{t('language')}</Text>

@@ -132,6 +132,21 @@ export const STRINGS = {
     phone: 'Phone',
     role: 'Role',
 
+    // WhatsApp phone verification
+    verifyPhoneTitle: 'Verify your phone',
+    verifyPhoneSub: 'Confirm phone ownership via WhatsApp',
+    phoneVerifiedBadge: 'Verified',
+    enterPhoneNumber: 'Enter your phone number',
+    sendCodeWhatsapp: 'Send code via WhatsApp',
+    weSentWhatsappCode: 'We sent a verification code to your WhatsApp',
+    enterVerificationCode: 'Enter verification code',
+    verifyBtn: 'Verify',
+    resendCode: 'Resend code',
+    resendIn: 'Resend in',
+    invalidOrExpiredCode: 'Invalid or expired code',
+    phoneVerifiedSuccess: 'Phone verified successfully',
+    whatsappNotAvailable: 'WhatsApp verification is not available right now.',
+
     // status
     status_received: 'Received',
     status_preparing: 'Preparing',
@@ -258,6 +273,21 @@ export const STRINGS = {
     signOut: 'تسجيل الخروج',
     phone: 'الجوال',
     role: 'الصلاحية',
+
+    // التحقق من الجوال عبر واتساب
+    verifyPhoneTitle: 'التحقق من رقم جوالك',
+    verifyPhoneSub: 'أكِّد ملكية رقمك عبر واتساب',
+    phoneVerifiedBadge: 'موثّق',
+    enterPhoneNumber: 'أدخل رقم جوالك',
+    sendCodeWhatsapp: 'إرسال الرمز عبر واتساب',
+    weSentWhatsappCode: 'أرسلنا رمز التحقق إلى واتساب الخاص بك',
+    enterVerificationCode: 'أدخل رمز التحقق',
+    verifyBtn: 'تحقّق',
+    resendCode: 'إعادة إرسال الرمز',
+    resendIn: 'إعادة الإرسال خلال',
+    invalidOrExpiredCode: 'رمز غير صالح أو منتهي الصلاحية',
+    phoneVerifiedSuccess: 'تم التحقق من رقم جوالك بنجاح',
+    whatsappNotAvailable: 'التحقق عبر واتساب غير متاح حالياً.',
 
     status_received: 'تم الاستلام',
     status_preparing: 'قيد التحضير',

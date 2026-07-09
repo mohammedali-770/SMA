@@ -71,6 +71,7 @@ export interface DbAppSettings {
 export interface DbProfile {
   id: string; full_name: string | null; phone_number: string | null;
   email: string | null; role: UserRole; loyalty_points: number;
+  phone_verified?: boolean; phone_verified_at?: string | null;
 }
 export interface DbAddress {
   id: string; customer_id: string; label: string | null; description: string | null;
@@ -147,7 +148,7 @@ export interface DbLoyaltyTransaction {
 }
 /** NON-secret projection of an integration_settings row (secrets never sent). */
 export interface DbIntegrationSetting {
-  provider_type: 'payment' | 'sms' | 'push' | 'lazywait';
+  provider_type: 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp';
   provider_name: string | null;
   enabled: boolean;
   public_config: Record<string, unknown>;
@@ -258,6 +259,42 @@ export const integrations = {
     }));
     return rows[0];
   },
+};
+
+// ---------------------------------------------------------------------------
+// WhatsApp OTP admin controls (status + test send via Edge Function). No secret
+// ever crosses this boundary — the function returns booleans / generic results.
+// ---------------------------------------------------------------------------
+export interface WhatsAppOtpStatus {
+  status: string;
+  enabled: boolean;
+  provider: string;
+  graph_api_version: string | null;
+  phone_number_id_set: boolean;
+  business_account_id_set: boolean;
+  template_ar_set: boolean;
+  template_en_set: boolean;
+  access_token_set: boolean;
+  app_secret_set: boolean;
+  webhook_verify_token_set: boolean;
+  pepper_set: boolean;
+}
+async function invokeWhatsAppTestConfig<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('whatsapp-test-config', { body });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  return data as T;
+}
+export const whatsappOtp = {
+  /** Admin-only: config status booleans (no secret values). */
+  status: () => invokeWhatsAppTestConfig<WhatsAppOtpStatus>({ action: 'status' }),
+  /** Admin-only: send a test OTP (never reveals the code). */
+  testSend: (phone: string, language: 'ar' | 'en') =>
+    invokeWhatsAppTestConfig<{ ok: boolean; message?: string; status?: string }>({ action: 'test_send', phone, language }),
 };
 
 // ---------------------------------------------------------------------------

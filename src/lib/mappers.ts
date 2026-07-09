@@ -134,6 +134,7 @@ export function mapProfile(p: DbProfile): UserProfile {
     email: p.email ?? undefined,
     createdAt: '',
     loyaltyPoints: p.loyalty_points,
+    phoneVerified: Boolean(p.phone_verified),
   };
 }
 

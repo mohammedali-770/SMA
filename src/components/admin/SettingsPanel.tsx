@@ -5,6 +5,7 @@ import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
 import { IntegrationCard } from './IntegrationCard';
 import { LazywaitPanel } from './LazywaitPanel';
+import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 
@@ -367,7 +368,7 @@ export const SettingsPanel: React.FC = () => {
                         <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
                       ) : (
                         <>
-                          {(['payment', 'sms', 'push', 'lazywait'] as const).map(pt => (
+                          {(['payment', 'sms', 'push', 'lazywait', 'whatsapp'] as const).map(pt => (
                             <IntegrationCard
                               key={pt}
                               providerType={pt}
@@ -376,6 +377,7 @@ export const SettingsPanel: React.FC = () => {
                               onSave={saveIntegration}
                             />
                           ))}
+                          <WhatsAppOtpPanel disabled={isAccountant} />
                           <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
                             <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                             <div>

@@ -40,3 +40,18 @@ verify_jwt = false
 
 [functions.push-dispatch]
 verify_jwt = false
+
+# WhatsApp OTP (Meta Cloud API). Send/verify are pre-login-capable (false) and
+# rate-limited + generic-response server-side; the webhook is called by Meta and
+# authenticated by the app-secret signature; test-config requires an admin JWT.
+[functions.whatsapp-send-otp]
+verify_jwt = false
+
+[functions.whatsapp-verify-otp]
+verify_jwt = false
+
+[functions.whatsapp-webhook]
+verify_jwt = false
+
+[functions.whatsapp-test-config]
+verify_jwt = true

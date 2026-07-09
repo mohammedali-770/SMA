@@ -57,6 +57,26 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
       { key: 'webhook_secret', label: 'Webhook Secret' },
     ],
   },
+  whatsapp: {
+    title: 'WhatsApp OTP (Meta Cloud API)',
+    subtitle: 'Phone verification via WhatsApp — server-side only. Tokens never leave the server.',
+    providerOptions: ['meta_cloud'],
+    publicFields: [
+      { key: 'graph_api_version', label: 'Graph API Version', type: 'text', placeholder: 'v21.0' },
+      { key: 'phone_number_id', label: 'Phone Number ID', type: 'text', placeholder: '1234567890' },
+      { key: 'business_account_id', label: 'Business Account ID (optional)', type: 'text', placeholder: 'WABA id' },
+      { key: 'otp_template_name_en', label: 'OTP Template Name (EN)', type: 'text', placeholder: 'otp_code_en' },
+      { key: 'otp_template_language_en', label: 'OTP Template Language (EN)', type: 'text', placeholder: 'en_US' },
+      { key: 'otp_template_name_ar', label: 'OTP Template Name (AR)', type: 'text', placeholder: 'otp_code_ar' },
+      { key: 'otp_template_language_ar', label: 'OTP Template Language (AR)', type: 'text', placeholder: 'ar' },
+      { key: 'otp_template_has_copy_button', label: 'Template has copy-code button', type: 'bool' },
+    ],
+    secretFields: [
+      { key: 'access_token', label: 'Access Token' },
+      { key: 'app_secret', label: 'App Secret (webhook signature)' },
+      { key: 'webhook_verify_token', label: 'Webhook Verify Token' },
+    ],
+  },
 };
 
 interface Props {

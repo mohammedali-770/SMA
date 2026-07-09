@@ -63,6 +63,7 @@ export interface DbAppSettings {
 export interface DbProfile {
   id: string; full_name: string | null; phone_number: string | null;
   email: string | null; role: UserRole; loyalty_points: number;
+  phone_verified?: boolean; phone_verified_at?: string | null;
 }
 export interface DbAddress {
   id: string; customer_id: string; label: string | null; description: string | null;

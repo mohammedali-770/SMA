@@ -16,6 +16,10 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
 | `push-dispatch` | server | false | placeholder (501) | Push send (Expo/OneSignal TBD). |
+| `whatsapp-send-otp` | app (pre-login) | false | active | Send WhatsApp OTP (Meta Cloud API). Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
+| `whatsapp-verify-otp` | app | false | active | Verify OTP (timing-safe); marks the signed-in user's `phone_verified`. Never issues a session. |
+| `whatsapp-webhook` | Meta | false | active | GET verify-token challenge + POST status callbacks (app-secret HMAC), logged sanitized. |
+| `whatsapp-test-config` | admin browser | true | active | Admin `is_admin()`-gated status booleans + test send. No secret values returned. |
 
 `_shared/`
 - `cors.ts` — CORS + `json()` helper.

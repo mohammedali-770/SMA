@@ -116,6 +116,7 @@ export function mapProfile(p: DbProfile): UserProfile {
     email: p.email ?? undefined,
     role: p.role,
     loyaltyPoints: p.loyalty_points,
+    phoneVerified: Boolean(p.phone_verified),
   };
 }
 

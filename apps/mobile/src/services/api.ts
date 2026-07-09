@@ -196,3 +196,22 @@ export const loyalty = {
     ok<DbLoyaltyTransaction[]>(await supabase
       .from('loyalty_transactions').select('*').order('created_at', { ascending: false })),
 };
+
+// ---------------------------------------------------------------------------
+// WhatsApp OTP (phone verification). The app never generates or trusts the code;
+// send/verify happen server-side via Edge Functions (rate-limited, hashed). The
+// user JWT is auto-attached by supabase-js so a successful verify can mark the
+// signed-in user's phone verified. No provider token ever reaches the app.
+// ---------------------------------------------------------------------------
+export const whatsappOtp = {
+  async send(phone: string, language: 'ar' | 'en', purpose = 'phone_verification'): Promise<{ status: string; message?: string }> {
+    const { data, error } = await supabase.functions.invoke('whatsapp-send-otp', { body: { phone, purpose, language } });
+    if (error) throw new Error(error.message);
+    return data as { status: string; message?: string };
+  },
+  async verify(phone: string, code: string, purpose = 'phone_verification'): Promise<{ verified: boolean; session?: boolean; message?: string }> {
+    const { data, error } = await supabase.functions.invoke('whatsapp-verify-otp', { body: { phone, code, purpose } });
+    if (error) throw new Error(error.message);
+    return data as { verified: boolean; session?: boolean; message?: string };
+  },
+};

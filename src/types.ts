@@ -13,6 +13,7 @@ export interface UserProfile {
   email?: string;
   createdAt: string;
   loyaltyPoints?: number; // Phase 11: Customer rewards
+  phoneVerified?: boolean; // set server-side after WhatsApp OTP verification
 }
 
 export interface Branch {
