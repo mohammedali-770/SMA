@@ -73,13 +73,17 @@ function extractNames(raw: Record<string, unknown>): {
   let ar = pickStr(raw, ['name_ar', 'nameAr', 'arabic_name', 'title_ar']);
   let other: string | null = null;
 
-  const n = raw.name ?? raw.title ?? raw.label ?? raw.display_name;
+  // Lazywait nests localized names under `names`/`item_names`/`cat_names`/
+  // `category_names` (objects keyed by locale, e.g. {en, ar, tr}). Prefer those,
+  // then fall back to the generic single-name fields.
+  const n = raw.names ?? raw.item_names ?? raw.name ?? raw.title ?? raw.label
+    ?? raw.display_name ?? raw.cat_names ?? raw.category_names;
   if (typeof n === 'string') {
     other = n.trim() || null;
   } else if (isObj(n)) {
     en = en ?? pickStr(n, ['en', 'english']);
     ar = ar ?? pickStr(n, ['ar', 'arabic']);
-    other = pickStr(n, ['tr', 'turkish', 'default', 'value']);
+    other = pickStr(n, ['tr', 'turkish', 'default', 'value']) ?? en ?? ar;
   }
 
   // translations: [{ locale/lang, name/value }]
@@ -105,7 +109,9 @@ function extractNames(raw: Record<string, unknown>): {
 function extractPrices(raw: Record<string, unknown>): NormalizedPrice[] | null {
   const one = (p: Record<string, unknown>): NormalizedPrice => ({
     price_id: pickStr(p, ['price_id', 'priceId', 'id']),
-    name: pickStr(p, ['name', 'price_name', 'title', 'label']),
+    // Lazywait price variants label themselves under `names: {en, ar, tr}` too.
+    name: pickStr(p, ['name', 'price_name', 'title', 'label'])
+      ?? pickStr(isObj(p.names) ? p.names : null, ['en', 'ar', 'tr', 'value']),
     price_with_vat: pickNum(p, ['price_with_vat', 'priceWithVat', 'price_with_tax', 'gross_price', 'gross']),
     price_excl_vat: pickNum(p, ['price_excluding_vat', 'price_without_vat', 'price_excl_vat', 'net_price', 'net']),
   });

@@ -45,6 +45,38 @@ describe('extractCatalogRecord — ids + names', () => {
     expect(r2?.name_en).toBe('Salads');
     expect(r2?.name_ar).toBe('سلطات');
   });
+
+  it('reads the Lazywait `names` object shape (en/ar/tr) on an item', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'wN2', names: { ar: 'برجر', en: 'Burgeer', tr: 'Burgeer' },
+    });
+    expect(r?.name_en).toBe('Burgeer');
+    expect(r?.name_ar).toBe('برجر');
+    expect(r?.name_other).toBe('Burgeer');
+  });
+
+  it('reads a category with only a Turkish `names` entry via name_other', () => {
+    const r = extractCatalogRecord('category', { id: 'C3', names: { tr: 'Yemekler' } });
+    expect(r?.name_en).toBeNull();
+    expect(r?.name_ar).toBeNull();
+    expect(r?.name_other).toBe('Yemekler');
+  });
+
+  it('falls back to `item_names` when `names` is absent', () => {
+    const r = extractCatalogRecord('item', { id: 'I5', item_names: { en: 'Fries', ar: 'بطاطس' } });
+    expect(r?.name_en).toBe('Fries');
+    expect(r?.name_ar).toBe('بطاطس');
+  });
+
+  it('reads a price variant label from its `names` object', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I6', names: { en: 'Burger' },
+      prices: [{ price_id: 'PR1', names: { ar: 'دجاج', en: 'Chicken' }, price_with_vat: 8 }],
+    });
+    expect(r?.prices?.[0].price_id).toBe('PR1');
+    expect(r?.prices?.[0].name).toBe('Chicken');
+    expect(r?.prices?.[0].price_with_vat).toBe(8);
+  });
 });
 
 describe('extractCatalogRecord — items with multiple prices', () => {
