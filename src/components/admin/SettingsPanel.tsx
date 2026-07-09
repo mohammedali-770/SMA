@@ -368,7 +368,7 @@ export const SettingsPanel: React.FC = () => {
                         <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
                       ) : (
                         <>
-                          {(['payment', 'sms', 'push', 'lazywait', 'whatsapp'] as const).map(pt => (
+                          {(['payment', 'sms', 'push', 'lazywait', 'whatsapp', 'email'] as const).map(pt => (
                             <IntegrationCard
                               key={pt}
                               providerType={pt}
@@ -518,6 +518,18 @@ export const SettingsPanel: React.FC = () => {
                           {isRTL ? 'الدفع الإلكتروني معطّل والنقدي مفعّل — تستمر العمليات نقداً، وتُرسل الطلبات للكاشير كغير مدفوعة.' : 'Online is off and cash is on — operations continue on cash; orders go to POS as unpaid.'}
                         </div>
                       )}
+                      {!payForm.onlineEnabled && !payBothDisabled && (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-800 text-[11px] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          {isRTL ? 'لن يتمكّن العملاء من الدفع إلكترونياً.' : 'Customers will not be able to pay online.'}
+                        </div>
+                      )}
+                      {payForm.cashEnabled && (
+                        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-800 text-[11px] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          {isRTL ? 'طلبات الدفع النقدي تُرسل إلى نقطة البيع كغير مدفوعة. على الكاشير/السائق تحصيل المبلغ.' : 'Cash payment orders will be sent to POS as unpaid. Cashier/driver must collect payment.'}
+                        </div>
+                      )}
 
                       {payError && (
                         <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center gap-2">
@@ -572,7 +584,16 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                       </div>
 
-                      {!mapConfig.isConfigured && (
+                      {mapConfig.tokenPresentButInvalid ? (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-800 text-[11px] font-bold flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>
+                            {isRTL
+                              ? 'الرمز المضبوط لا يبدأ بـ pk. — يجب أن يكون رمز Mapbox العام (pk.). لا تستخدم رمزاً سرياً (sk.) في متغيرات VITE_.'
+                              : 'The configured token does not start with pk. — it must be a Mapbox public token (pk.). Never use a secret (sk.) token in VITE_ variables.'}
+                          </span>
+                        </div>
+                      ) : !mapConfig.isConfigured && (
                         <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] font-bold flex items-start gap-2">
                           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                           <span>

@@ -333,6 +333,15 @@ export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
   if (patch.isActive !== undefined) out.is_active = patch.isActive;
   if (patch.nameEn !== undefined) out.name_en = patch.nameEn;
   if (patch.nameAr !== undefined) out.name_ar = patch.nameAr;
+  // Address / phone / branch location — needed by the branch Edit modal and the
+  // "Set branch location" flow. Persisted only through the admin-only path
+  // (branches RLS: is_admin()). Previously these were silently dropped, which is
+  // why setting a branch location did nothing.
+  if (patch.addressEn !== undefined) out.address_en = patch.addressEn;
+  if (patch.addressAr !== undefined) out.address_ar = patch.addressAr;
+  if (patch.phone !== undefined) out.phone = patch.phone;
+  if (patch.latitude !== undefined) out.latitude = patch.latitude;
+  if (patch.longitude !== undefined) out.longitude = patch.longitude;
   if (patch.lazywaitBranchId !== undefined) out.lazywait_branch_id = patch.lazywaitBranchId || null;
   if (patch.deliveryEnabled !== undefined) out.delivery_enabled = patch.deliveryEnabled;
   if (patch.pickupEnabled !== undefined) out.pickup_enabled = patch.pickupEnabled;

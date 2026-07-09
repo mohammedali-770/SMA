@@ -169,6 +169,7 @@ export const LiveOrdersPanel: React.FC = () => {
                         </td>
                         <td className="px-4 py-3.5 font-bold text-secondary">
                           {formatSAR(order.total, adminLang)}
+                          <span className="mt-1 block text-[9px] font-bold text-gray-500 normal-case">{methodLabelText(order)}</span>
                           {(() => {
                             const badge = paymentBadge(order);
                             return (
@@ -195,6 +196,11 @@ export const LiveOrdersPanel: React.FC = () => {
                           <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${syncTone(syncStateOf(order))}`}>
                             {syncStateOf(order)}
                           </span>
+                          {order.syncBlockedReason && (
+                            <span className="mt-1 block text-[9px] font-bold text-red-600 max-w-[130px] leading-tight">
+                              {order.syncBlockedReason}
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">

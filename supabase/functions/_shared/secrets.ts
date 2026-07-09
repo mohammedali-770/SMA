@@ -1,6 +1,6 @@
 import { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
-export type ProviderType = 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp';
+export type ProviderType = 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp' | 'email';
 
 export interface ProviderConfig {
   enabled: boolean;

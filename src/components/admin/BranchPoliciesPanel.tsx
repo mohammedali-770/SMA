@@ -1,11 +1,13 @@
 import React, { useState, Suspense } from 'react';
-import { AlertTriangle, Map as MapIcon } from 'lucide-react';
+import { AlertTriangle, Map as MapIcon, Pencil, MapPin } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import type { GeoJSONGeometry } from '../../lib/geo';
+import type { Branch } from '../../types';
 
 // Lazy so mapbox-gl loads only when an admin opens the zone editor.
 const DeliveryZoneModal = React.lazy(() => import('./DeliveryZoneModal').then(m => ({ default: m.DeliveryZoneModal })));
+const BranchEditModal = React.lazy(() => import('./BranchEditModal').then(m => ({ default: m.BranchEditModal })));
 
 export const BranchPoliciesPanel: React.FC = () => {
   const {
@@ -16,12 +18,17 @@ export const BranchPoliciesPanel: React.FC = () => {
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const [zoneBranchId, setZoneBranchId] = useState<string | null>(null);
+  const [editBranchId, setEditBranchId] = useState<string | null>(null);
 
   const zoneForBranch = (branchId: string) => deliveryZones.find(z => z.branchId === branchId && z.isActive);
   const zoneBranch = branches.find(b => b.id === zoneBranchId) ?? null;
+  const editBranch = branches.find(b => b.id === editBranchId) ?? null;
 
   const handleSaveZone = async (branchId: string, geojson: GeoJSONGeometry) => {
     await saveBranchDeliveryZone(branchId, geojson);
+  };
+  const handleSaveBranch = async (patch: Partial<Branch>) => {
+    if (editBranchId) await updateBranchSettings(editBranchId, patch);
   };
 
   return (
@@ -39,13 +46,39 @@ export const BranchPoliciesPanel: React.FC = () => {
                   const hasZone = Boolean(zoneForBranch(branch.id));
                   return (
                   <div key={branch.id} className="glass-card p-3.5 rounded-2xl space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="text-xs font-black text-gray-900">{isRTL ? branch.nameAr : branch.nameEn}</h4>
-                        <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">{isRTL ? branch.addressAr : branch.addressEn}</p>
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs font-black text-gray-900 truncate">{branch.nameEn}</h4>
+                        <p className="text-[11px] font-bold text-gray-500 leading-tight truncate" dir="rtl">{branch.nameAr}</p>
+                        <p className="text-[10px] text-gray-400 mt-0.5 leading-tight truncate">{isRTL ? branch.addressAr : branch.addressEn}</p>
                       </div>
-                      <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${branch.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {branch.isActive ? 'OPEN' : 'CLOSED'}
+                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${branch.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                          {branch.isActive ? 'OPEN' : 'CLOSED'}
+                        </span>
+                        <button
+                          onClick={() => setEditBranchId(branch.id)}
+                          className="flex items-center gap-1 text-[9px] font-black uppercase text-primary bg-primary/10 border border-primary/20 hover:bg-primary hover:text-white rounded-lg px-2 py-0.5 transition-all"
+                        >
+                          <Pencil className="w-2.5 h-2.5" />
+                          {isAccountant ? (isRTL ? 'عرض' : 'View') : (isRTL ? 'تعديل' : 'Edit')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Config status badges */}
+                    <div className="flex flex-wrap gap-1">
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${hasCoords ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {isRTL ? 'الموقع' : 'Location'}: {hasCoords ? (isRTL ? 'محدّد' : 'Set') : (isRTL ? 'غير محدّد' : 'Not set')}
+                      </span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${pickupEnabled ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {isRTL ? 'الاستلام' : 'Pickup'}: {pickupEnabled ? 'ON' : 'OFF'}
+                      </span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${deliveryEnabled && !deliveryClosed ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {isRTL ? 'التوصيل' : 'Delivery'}: {deliveryClosed ? (isRTL ? 'موقوف' : 'PAUSED') : (deliveryEnabled ? 'ON' : 'OFF')}
+                      </span>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${branch.lazywaitBranchId ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
+                        POS: {branch.lazywaitBranchId ? (isRTL ? 'مربوط' : 'Mapped') : (isRTL ? 'غير مربوط' : 'Unmapped')}
                       </span>
                     </div>
 
@@ -119,26 +152,38 @@ export const BranchPoliciesPanel: React.FC = () => {
                             {hasZone ? (isRTL ? 'مُعدّة' : 'Configured') : (isRTL ? 'منطقة التوصيل غير مُعدّة' : 'Delivery area not configured')}
                           </span>
                         </div>
-                        <button
-                          onClick={() => setZoneBranchId(branch.id)}
-                          className="w-full py-1.5 rounded-lg text-center text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-1"
-                        >
-                          <MapIcon className="w-3 h-3" />
-                          {hasZone
-                            ? (isAccountant ? (isRTL ? 'عرض منطقة التوصيل' : 'View delivery area') : (isRTL ? 'تعديل منطقة التوصيل' : 'Edit delivery area'))
-                            : (isRTL ? 'رسم منطقة التوصيل' : 'Draw delivery area')}
-                        </button>
+                        {hasCoords ? (
+                          <button
+                            onClick={() => setZoneBranchId(branch.id)}
+                            className="w-full py-1.5 rounded-lg text-center text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-1"
+                          >
+                            <MapIcon className="w-3 h-3" />
+                            {hasZone
+                              ? (isAccountant ? (isRTL ? 'عرض منطقة التوصيل' : 'View delivery area') : (isRTL ? 'تعديل منطقة التوصيل' : 'Edit delivery area'))
+                              : (isRTL ? 'رسم منطقة التوصيل' : 'Draw delivery area')}
+                          </button>
+                        ) : (
+                          <div className="p-1.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[8.5px] font-bold space-y-1.5">
+                            <div className="flex items-start gap-1">
+                              <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                              {isRTL ? 'حدّد موقع الفرع قبل رسم منطقة التوصيل.' : 'Set branch location before drawing delivery area.'}
+                            </div>
+                            {!isAccountant && (
+                              <button
+                                onClick={() => setEditBranchId(branch.id)}
+                                className="w-full py-1.5 rounded-lg text-center text-[9px] font-black uppercase bg-amber-500 text-white hover:bg-amber-600 transition-all flex items-center justify-center gap-1"
+                              >
+                                <MapPin className="w-3 h-3" />
+                                {isRTL ? 'تحديد موقع الفرع' : 'Set branch location'}
+                              </button>
+                            )}
+                          </div>
+                        )}
 
-                        {deliveryEnabled && !hasZone && (
+                        {deliveryEnabled && !hasZone && hasCoords && (
                           <div className="p-1.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[8.5px] font-bold flex items-start gap-1">
                             <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
                             {isRTL ? 'التوصيل مفعّل ولكن لا توجد منطقة توصيل مُعدّة.' : 'Delivery is enabled but no delivery zone is configured.'}
-                          </div>
-                        )}
-                        {!hasCoords && (
-                          <div className="p-1.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-[8.5px] font-bold flex items-start gap-1">
-                            <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                            {isRTL ? 'حدّد موقع الفرع قبل رسم منطقة التوصيل.' : 'Set branch location before drawing delivery area.'}
                           </div>
                         )}
                       </div>
@@ -190,6 +235,18 @@ export const BranchPoliciesPanel: React.FC = () => {
                     onClose={() => setZoneBranchId(null)}
                     onSave={handleSaveZone}
                     onClear={clearBranchDeliveryZone}
+                  />
+                </Suspense>
+              )}
+
+              {editBranch && (
+                <Suspense fallback={null}>
+                  <BranchEditModal
+                    branch={editBranch}
+                    disabled={isAccountant}
+                    isRTL={isRTL}
+                    onClose={() => setEditBranchId(null)}
+                    onSave={handleSaveBranch}
                   />
                 </Suspense>
               )}

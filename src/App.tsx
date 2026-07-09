@@ -44,7 +44,6 @@ const AppHeader: React.FC = () => {
           <img src="/logo.png" alt="Spicy Meal logo" className="w-9 h-9 rounded-xl object-contain bg-white shadow-md border border-white/20" />
           <div>
             <h1 className="text-base font-black tracking-tight leading-tight text-primary">SPICY MEAL</h1>
-            <p className="text-[10px] font-bold text-slate-500">Saudi Fast-Food Ordering Platform</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -98,12 +97,16 @@ const CustomerApp: React.FC = () => (
 const StaffApp: React.FC = () => {
   const { currentUser } = useApp();
   const isAdmin = currentUser.role === 'admin';
+  // The emulated Supabase console is a DEV-only aid — Vite statically replaces
+  // import.meta.env.DEV with false in production builds, so it never ships to
+  // the live dashboard (the lazy chunk is tree-shaken away).
+  const showDbConsole = isAdmin && import.meta.env.DEV;
   return (
     <main className="flex-grow p-4 md:p-6 max-w-7xl mx-auto w-full space-y-6">
       <Suspense fallback={<PanelFallback />}>
         <AdminDashboard />
       </Suspense>
-      {isAdmin && (
+      {showDbConsole && (
         <div className="flex flex-col">
           <span className="text-xs bg-white/50 backdrop-blur-md text-slate-600 font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 flex items-center gap-1 shadow-2xs">
             <Server className="w-3.5 h-3.5 text-secondary" />
@@ -138,7 +141,7 @@ function AppContent() {
       )}
       <footer className="backdrop-blur-md bg-white/10 text-slate-500 text-center py-5 border-t border-slate-200/60 mt-10 text-xs">
         <div className="max-w-7xl mx-auto px-6">
-          <span>© 2026 Spicy Meal Brand Group · Saudi Arabia</span>
+          <span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span>
         </div>
       </footer>
     </div>

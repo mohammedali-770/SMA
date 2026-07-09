@@ -13,14 +13,20 @@ export type MapProvider = 'mapbox' | 'google';
 const rawProvider = (import.meta.env.VITE_MAP_PROVIDER as string | undefined)?.toLowerCase();
 const provider: MapProvider = rawProvider === 'google' ? 'google' : 'mapbox';
 const mapboxToken = (import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined) ?? '';
+// A Mapbox *public* token starts with `pk.`. Secret tokens (`sk.`) must never be
+// shipped to the browser, so we treat a non-`pk.` token as unconfigured and let
+// the Map Settings panel flag it explicitly.
+const tokenLooksPublic = mapboxToken.startsWith('pk.');
 
 export const mapConfig = {
   provider,
   /** Mapbox public access token (pk.…). Empty when not configured. */
   publicToken: mapboxToken,
   styleUrl: (import.meta.env.VITE_MAPBOX_STYLE_URL as string | undefined) ?? 'mapbox://styles/mapbox/streets-v12',
-  /** True only when the active provider has the token it needs to render. */
-  isConfigured: provider === 'mapbox' ? Boolean(mapboxToken) : false,
+  /** True only when the active provider has a valid public (pk.) token. */
+  isConfigured: provider === 'mapbox' ? (Boolean(mapboxToken) && tokenLooksPublic) : false,
+  /** A token is set but doesn't look like a public `pk.` token (misconfig hint). */
+  tokenPresentButInvalid: provider === 'mapbox' && Boolean(mapboxToken) && !tokenLooksPublic,
   /** Riyadh — a sensible default center before a branch/user location is known. */
   defaultCenter: { lng: 46.6753, lat: 24.7136 },
   defaultZoom: 11,

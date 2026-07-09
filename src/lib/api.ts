@@ -148,7 +148,7 @@ export interface DbLoyaltyTransaction {
 }
 /** NON-secret projection of an integration_settings row (secrets never sent). */
 export interface DbIntegrationSetting {
-  provider_type: 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp';
+  provider_type: 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp' | 'email';
   provider_name: string | null;
   enabled: boolean;
   public_config: Record<string, unknown>;

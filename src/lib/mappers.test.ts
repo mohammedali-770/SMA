@@ -137,6 +137,15 @@ describe('reverse patch mappers (app -> DB)', () => {
   it('maps a branch patch', () => {
     expect(branchPatchToDb({ deliveryFee: 20, isActive: false })).toEqual({ delivery_fee: 20, is_active: false });
   });
+  it('persists branch location + address + phone (regression: these were dropped)', () => {
+    expect(branchPatchToDb({ latitude: 24.7136, longitude: 46.6753 }))
+      .toEqual({ latitude: 24.7136, longitude: 46.6753 });
+    expect(branchPatchToDb({ addressEn: 'A', addressAr: 'ع', phone: '+966500000000' }))
+      .toEqual({ address_en: 'A', address_ar: 'ع', phone: '+966500000000' });
+  });
+  it('omits branch fields that were not provided', () => {
+    expect(branchPatchToDb({ nameEn: 'X' })).toEqual({ name_en: 'X' });
+  });
   it('maps a product insert with sort order', () => {
     const ins = productToDbInsert({
       categoryId: 'c1', nameEn: 'X', nameAr: 'س', descriptionEn: 'd', descriptionAr: 'د',

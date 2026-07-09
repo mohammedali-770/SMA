@@ -173,7 +173,7 @@ export const AdminDashboard: React.FC = () => {
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'branches' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
             <Store className="w-4 h-4" />
-            <span>{isRTL ? 'تخصيص الفروع والتوفر' : 'Branch Policies'}</span>
+            <span>{isRTL ? 'إدارة الفروع' : 'Branch Management'}</span>
           </button>
 
           <button 

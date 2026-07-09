@@ -57,6 +57,23 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
       { key: 'webhook_secret', label: 'Webhook Secret' },
     ],
   },
+  email: {
+    title: 'Email Server (SMTP)',
+    subtitle: 'Transactional email (receipts / notifications) — server-side only. Password never leaves the server.',
+    providerOptions: ['smtp'],
+    publicFields: [
+      { key: 'host', label: 'SMTP Host', type: 'text', placeholder: 'smtp.example.com' },
+      { key: 'port', label: 'SMTP Port', type: 'text', placeholder: '587' },
+      { key: 'secure', label: 'Use TLS/SSL', type: 'bool' },
+      { key: 'username', label: 'SMTP Username', type: 'text', placeholder: 'apikey / user@example.com' },
+      { key: 'from_email', label: 'From Email', type: 'text', placeholder: 'orders@example.com' },
+      { key: 'from_name', label: 'From Name', type: 'text', placeholder: 'Spicy Meal' },
+      { key: 'reply_to', label: 'Reply-To Email (optional)', type: 'text', placeholder: 'support@example.com' },
+    ],
+    secretFields: [
+      { key: 'password', label: 'SMTP Password' },
+    ],
+  },
   whatsapp: {
     title: 'WhatsApp OTP (Meta Cloud API)',
     subtitle: 'Customer login + phone verification via WhatsApp — server-side only. Tokens never leave the server.',
