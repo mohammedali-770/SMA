@@ -108,7 +108,15 @@ Deno.serve(async (req: Request) => {
     p_amount: amountNum,
     p_raw: evt,
   });
-  if (error) return json({ error: error.message }, 400);
+  if (error) {
+    // Do NOT echo the internal RPC/DB error to the caller: confirm_order_payment's
+    // amount-mismatch message contains the server-trusted order total, and other
+    // failures can leak internal detail. Log server-side; return a generic 400 so
+    // the gateway still sees a non-2xx and retries. (A legitimate paid callback
+    // with a matching amount succeeds above and never reaches this branch.)
+    console.error('confirm_order_payment failed', String(error.message ?? '').slice(0, 300));
+    return json({ error: 'payment confirmation failed' }, 400);
+  }
 
   // Prepared hook: after the LOCAL order is confirmed paid, best-effort notify
   // Lazywait POS of the online payment (server-trusted amount). Never affects the
