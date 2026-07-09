@@ -1,12 +1,41 @@
 import React, { useState } from 'react';
-import { Eye } from 'lucide-react';
+import { Eye, AlertTriangle } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 
+// Statuses an order should not reach while still UNPAID. "Received" is always
+// allowed and "Cancelled" needs no payment. Spicy Meal does NOT support Cash on
+// Delivery, so an order counts as paid only once a verified online payment sets
+// paymentStatus='paid' server-side.
+const UNPAID_GUARDED_STATUSES: OrderStatus[] = ['preparing', 'ready', 'out_for_delivery', 'delivered'];
+
+/** Authoritative Lazywait POS sync state (falls back to the legacy sync field). */
+function syncStateOf(o: Order): string {
+  return o.lazywaitSyncState ?? o.orderSyncStatus ?? 'not_synced';
+}
+
+/** Colour tone for a POS sync state so failures/blocks read as problems. */
+function syncTone(state: string): string {
+  switch (state) {
+    case 'synced':
+      return 'bg-green-50 text-green-600';
+    case 'blocked':
+    case 'failed':
+    case 'dead_letter':
+    case 'sync_failed':
+      return 'bg-red-50 text-red-600';
+    case 'not_synced':
+    case 'skipped':
+      return 'bg-slate-100 text-slate-500';
+    default: // pending / syncing / pending_sync
+      return 'bg-yellow-50 text-yellow-600';
+  }
+}
+
 export const LiveOrdersPanel: React.FC = () => {
-  const { orders, updateOrderStatus, brandSettings, currentUser, adminLang } = useApp();
+  const { orders, branches, updateOrderStatus, brandSettings, currentUser, adminLang } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
@@ -14,8 +43,28 @@ export const LiveOrdersPanel: React.FC = () => {
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
 
+  // COD is not supported: show a real method only when a verified payment set one;
+  // otherwise state that online payment isn't configured (never "Cash on Delivery").
+  const paymentMethodLabel = (o: Order): string =>
+    (o.paymentStatus === 'paid' && o.paymentMethod)
+      ? o.paymentMethod
+      : (isRTL ? 'الدفع الإلكتروني غير مُفعّل' : 'Online payment not configured');
+
+  const phoneLabel = (phone: string | undefined): string =>
+    (phone && phone.trim()) ? phone : (isRTL ? 'لا يوجد رقم جوال' : 'No phone provided');
+
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
-    if (isAccountant) return;
+    if (isAccountant) return; // accountant is view-only (also enforced by RLS server-side)
+    const target = orders.find(o => o.id === orderId) ?? activeReceiptOrder ?? undefined;
+    // Warn before advancing an UNPAID order past "Received" (Received/Cancelled are fine).
+    if (target && target.paymentStatus !== 'paid' && UNPAID_GUARDED_STATUSES.includes(status)) {
+      const proceed = window.confirm(
+        isRTL
+          ? 'هذا الطلب غير مدفوع بعد. هل أنت متأكد من تغيير حالته؟'
+          : 'This order is not paid yet. Are you sure you want to advance its status?'
+      );
+      if (!proceed) return;
+    }
     updateOrderStatus(orderId, status);
     if (activeReceiptOrder?.id === orderId) {
       const match = orders.find(o => o.id === orderId);
@@ -83,7 +132,7 @@ export const LiveOrdersPanel: React.FC = () => {
                         <td className="px-4 py-3.5 font-black text-primary">{order.orderNumber}</td>
                         <td className="px-4 py-3.5">
                           <div className="font-semibold text-gray-900">{order.customerName}</div>
-                          <div className="text-[10px] text-gray-400">{order.customerPhone}</div>
+                          <div className={`text-[10px] ${order.customerPhone && order.customerPhone.trim() ? 'text-gray-400' : 'text-amber-600 italic'}`}>{phoneLabel(order.customerPhone)}</div>
                         </td>
                         <td className="px-4 py-3.5 font-medium text-gray-700">
                           {isRTL ? order.branchNameAr : order.branchNameEn}
@@ -105,10 +154,8 @@ export const LiveOrdersPanel: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${
-                            order.orderSyncStatus === 'synced' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
-                          }`}>
-                            {order.orderSyncStatus}
+                          <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${syncTone(syncStateOf(order))}`}>
+                            {syncStateOf(order)}
                           </span>
                         </td>
                         <td className="px-4 py-3.5">
@@ -155,7 +202,15 @@ export const LiveOrdersPanel: React.FC = () => {
             </div>
 
             <div className="p-5 space-y-4 max-h-[480px] overflow-y-auto text-xs text-gray-700">
-              
+
+              {/* Unpaid warning — shown until a verified payment marks the order paid */}
+              {activeReceiptOrder.paymentStatus !== 'paid' && (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-2.5 text-[11px] font-black">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {isRTL ? 'لم يتم دفع هذا الطلب بعد.' : 'This order is not paid yet.'}
+                </div>
+              )}
+
               {/* Order Status Controller dropdown selector */}
               <div className="bg-purple-50/30 border border-purple-100 p-3 rounded-xl space-y-2">
                 <label className="block text-[10px] font-black text-primary uppercase">{isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}</label>
@@ -184,7 +239,9 @@ export const LiveOrdersPanel: React.FC = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Phone:</span>
-                  <span className="font-bold text-gray-800">{activeReceiptOrder.customerPhone}</span>
+                  <span className={`font-bold ${activeReceiptOrder.customerPhone && activeReceiptOrder.customerPhone.trim() ? 'text-gray-800' : 'text-amber-600 italic'}`}>
+                    {phoneLabel(activeReceiptOrder.customerPhone)}
+                  </span>
                 </div>
                 {activeReceiptOrder.address && (
                   <div className="pt-1.5 border-t border-gray-100">
@@ -256,15 +313,46 @@ export const LiveOrdersPanel: React.FC = () => {
                 <span className="font-semibold">{formatSAR(getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount, adminLang)}</span>
               </div>
 
-              <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-400 flex justify-between items-center">
-                <span>Payment method:</span>
-                <span className="font-semibold flex items-center gap-1.5 text-gray-600">
-                  {activeReceiptOrder.paymentMethod || 'Cash on Delivery'}
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${activeReceiptOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                    {activeReceiptOrder.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+              {/* Payment — Cash on Delivery is not a supported method */}
+              <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Payment method:</span>
+                  <span className="font-semibold text-gray-600">{paymentMethodLabel(activeReceiptOrder)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Payment status:</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${activeReceiptOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
+                    {activeReceiptOrder.paymentStatus === 'paid' ? 'PAID' : 'PENDING · UNPAID'}
                   </span>
-                </span>
+                </div>
               </div>
+
+              {/* POS (Lazywait) sync status — visibility only; nothing is synced from here */}
+              {(() => {
+                const state = syncStateOf(activeReceiptOrder);
+                const branch = branches.find(b => b.id === activeReceiptOrder.branchId);
+                const branchMapped = !!branch?.lazywaitBranchId;
+                return (
+                  <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">POS sync status:</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${syncTone(state)}`}>{state}</span>
+                    </div>
+                    {activeReceiptOrder.syncBlockedReason && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-400">Reason:</span>
+                        <span className="font-semibold text-red-600">{activeReceiptOrder.syncBlockedReason}</span>
+                      </div>
+                    )}
+                    {!branchMapped && (
+                      <div className="flex items-start gap-1.5 text-amber-700 font-bold pt-1.5 border-t border-gray-100">
+                        <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                        <span>{isRTL ? 'غير مؤهل لمزامنة Lazywait: الفرع غير مربوط.' : 'Not eligible for Lazywait sync: branch is not mapped.'}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
             </div>
           </div>
