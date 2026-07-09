@@ -43,6 +43,12 @@ export interface DbAppSettings {
   primary_color: string; secondary_color: string; currency: string;
   vat_percentage: number; loyalty_enabled: boolean;
   points_per_riyal: number; discount_per_point: number; min_points_to_redeem: number;
+  // Admin-configured payment availability (optional so a pre-migration project
+  // still parses; the app falls back to cash-on / online-off defaults).
+  online_payment_enabled?: boolean;
+  cash_payment_enabled?: boolean;
+  default_payment_method?: 'online' | 'cash' | null;
+  payment_outage_mode_enabled?: boolean;
 }
 export interface DbProfile {
   id: string; full_name: string | null; phone_number: string | null;
@@ -61,6 +67,7 @@ export interface DbOrder {
   subtotal: number; delivery_fee: number; discount_amount: number;
   loyalty_discount_amount: number; vat_amount: number; total: number;
   payment_status: 'pending' | 'paid'; payment_method: string | null;
+  payment_provider?: string | null; paid_at?: string | null;
   coupon_code: string | null; notes: string | null; created_at: string;
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
   loyalty_points_earned: number; loyalty_points_redeemed: number;

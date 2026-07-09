@@ -13,6 +13,7 @@ import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { mapOrder } from '../../lib/mappers';
+import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
 import type { Order } from '../../types/models';
@@ -48,17 +49,39 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               <Text style={styles.sub}>{t('orderPlacedSub')}</Text>
             </View>
 
-            <View style={[styles.card, shadow.card]}>
-              <Row label={t('orderNumber')} value={order.orderNumber} strong />
-              <Row label={t('paymentStatus')} value={order.paymentStatus === 'paid' ? t('paymentPaid') : t('paymentPending')} />
-              <Row label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />
-              <Row label={pick('Branch', 'الفرع')} value={pick(order.branchNameEn, order.branchNameAr)} />
-              <Row label={pick('Placed', 'وقت الطلب')} value={formatRiyadhDateTime(order.createdAt)} />
-            </View>
-
-            {order.paymentStatus !== 'paid' ? (
-              <Text style={styles.notPaid}>⚠ {t('notPaidYet')}</Text>
-            ) : null}
+            {(() => {
+              const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
+              const methodText =
+                methodKey === 'online' ? pick('Online Payment', 'الدفع الإلكتروني')
+                : methodKey === 'cash_delivery' ? pick('Cash on Delivery', 'نقداً عند التوصيل')
+                : methodKey === 'cash_pickup' ? pick('Cash on Pickup', 'نقداً عند الاستلام')
+                : methodKey === 'cash' ? pick('Cash Payment', 'دفع نقدي')
+                : pick('Payment method not set', 'لم تُحدَّد طريقة الدفع');
+              const state = paymentDisplayState(order);
+              const statusText =
+                state === 'paid' ? t('paymentPaid')
+                : state === 'pending_online' ? pick('Pending online payment', 'بانتظار الدفع الإلكتروني')
+                : state === 'cash_required' ? pick('Pay cash on receipt', 'يُدفع نقداً عند الاستلام')
+                : t('paymentPending');
+              const note =
+                state === 'cash_required' ? pick('Please have the cash amount ready on receipt.', 'يُرجى تجهيز المبلغ نقداً عند الاستلام.')
+                : state === 'pending_online' ? pick('Online payment has not been completed.', 'لم يكتمل الدفع الإلكتروني بعد.')
+                : state === 'unpaid' ? t('notPaidYet')
+                : null;
+              return (
+                <>
+                  <View style={[styles.card, shadow.card]}>
+                    <Row label={t('orderNumber')} value={order.orderNumber} strong />
+                    <Row label={pick('Payment method', 'طريقة الدفع')} value={methodText} />
+                    <Row label={t('paymentStatus')} value={statusText} />
+                    <Row label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />
+                    <Row label={pick('Branch', 'الفرع')} value={pick(order.branchNameEn, order.branchNameAr)} />
+                    <Row label={pick('Placed', 'وقت الطلب')} value={formatRiyadhDateTime(order.createdAt)} />
+                  </View>
+                  {note ? <Text style={styles.notPaid}>⚠ {note}</Text> : null}
+                </>
+              );
+            })()}
 
             <Text style={styles.summaryTitle}>{t('orderSummary')}</Text>
             <View style={[styles.card, shadow.card]}>

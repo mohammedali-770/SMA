@@ -17,6 +17,7 @@ import { WalletScreen } from './mobile/WalletScreen';
 import { HomeScreen } from './mobile/HomeScreen';
 import { CartScreen } from './mobile/CartScreen';
 import { ProfileScreen } from './mobile/ProfileScreen';
+import { paymentDisplayState, paymentMethodLabel } from '../lib/payment';
 
 
 export const MobileEmulator: React.FC = () => {
@@ -506,26 +507,48 @@ export const MobileEmulator: React.FC = () => {
                           {t[activeOrderReceipt.orderSyncStatus]}
                         </span>
                       </div>
-                      {/* Payment — Cash on Delivery is not supported */}
-                      <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
-                        <span>{isRTL ? 'طريقة الدفع:' : 'Payment method:'}</span>
-                        <span className="text-gray-500">
-                          {activeOrderReceipt.paymentStatus === 'paid' && activeOrderReceipt.paymentMethod
-                            ? activeOrderReceipt.paymentMethod
-                            : (isRTL ? 'الدفع الإلكتروني غير مُفعّل' : 'Online payment not configured')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center pt-1 text-[8.5px] font-bold text-gray-400">
-                        <span>{isRTL ? 'حالة الدفع:' : 'Payment status:'}</span>
-                        <span className={`px-1.5 py-0.5 rounded-full font-black ${activeOrderReceipt.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
-                          {activeOrderReceipt.paymentStatus === 'paid' ? (isRTL ? 'مدفوع' : 'PAID') : (isRTL ? 'قيد الانتظار · غير مدفوع' : 'PENDING · UNPAID')}
-                        </span>
-                      </div>
-                      {activeOrderReceipt.paymentStatus !== 'paid' && (
-                        <div className="text-[8.5px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-1.5 mt-1 text-center">
-                          {isRTL ? 'لم يتم دفع هذا الطلب بعد.' : 'This order is not paid yet.'}
-                        </div>
-                      )}
+                      {/* Payment — actual chosen method + derived status */}
+                      {(() => {
+                        const methodKey = paymentMethodLabel(activeOrderReceipt.paymentMethod, activeOrderReceipt.orderType);
+                        const methodText =
+                          methodKey === 'online' ? (isRTL ? 'الدفع الإلكتروني' : 'Online Payment')
+                          : methodKey === 'cash_pickup' ? (isRTL ? 'نقداً عند الاستلام' : 'Cash on Pickup')
+                          : methodKey === 'cash_delivery' ? (isRTL ? 'نقداً عند التوصيل' : 'Cash on Delivery')
+                          : methodKey === 'cash' ? (isRTL ? 'دفع نقدي' : 'Cash Payment')
+                          : (isRTL ? 'لم تُحدَّد طريقة الدفع' : 'Payment method not set');
+                        const state = paymentDisplayState(activeOrderReceipt);
+                        const statusText =
+                          state === 'paid' ? (isRTL ? 'مدفوع' : 'PAID')
+                          : state === 'pending_online' ? (isRTL ? 'بانتظار الدفع الإلكتروني' : 'PENDING ONLINE PAYMENT')
+                          : state === 'cash_required' ? (isRTL ? 'يُدفع نقداً عند الاستلام' : 'PAY CASH ON RECEIPT')
+                          : (isRTL ? 'غير مدفوع' : 'UNPAID');
+                        const statusTone =
+                          state === 'paid' ? 'bg-green-100 text-green-700'
+                          : state === 'cash_required' ? 'bg-blue-100 text-blue-800'
+                          : 'bg-amber-100 text-amber-800';
+                        const note =
+                          state === 'cash_required' ? (isRTL ? 'يُرجى تجهيز المبلغ نقداً عند الاستلام.' : 'Please have the cash amount ready on receipt.')
+                          : state === 'pending_online' ? (isRTL ? 'لم يكتمل الدفع الإلكتروني بعد.' : 'Online payment has not been completed.')
+                          : state === 'unpaid' ? (isRTL ? 'هذا الطلب غير مدفوع بعد.' : 'This order is not paid yet.')
+                          : null;
+                        return (
+                          <>
+                            <div className="flex justify-between items-center pt-1 border-t border-slate-100 mt-1 text-[8.5px] font-bold text-gray-400">
+                              <span>{isRTL ? 'طريقة الدفع:' : 'Payment method:'}</span>
+                              <span className="text-gray-500">{methodText}</span>
+                            </div>
+                            <div className="flex justify-between items-center pt-1 text-[8.5px] font-bold text-gray-400">
+                              <span>{isRTL ? 'حالة الدفع:' : 'Payment status:'}</span>
+                              <span className={`px-1.5 py-0.5 rounded-full font-black ${statusTone}`}>{statusText}</span>
+                            </div>
+                            {note && (
+                              <div className={`text-[8.5px] font-bold rounded-lg p-1.5 mt-1 text-center ${state === 'cash_required' ? 'text-blue-700 bg-blue-50 border border-blue-200' : 'text-amber-700 bg-amber-50 border border-amber-200'}`}>
+                                {note}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

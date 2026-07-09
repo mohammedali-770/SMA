@@ -4,12 +4,13 @@ import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
+import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 
-// Statuses an order should not reach while still UNPAID. "Received" is always
-// allowed and "Cancelled" needs no payment. Spicy Meal does NOT support Cash on
-// Delivery, so an order counts as paid only once a verified online payment sets
-// paymentStatus='paid' server-side.
-const UNPAID_GUARDED_STATUSES: OrderStatus[] = ['preparing', 'ready', 'out_for_delivery', 'delivered'];
+// Statuses an order should not reach while an ONLINE payment is still unverified.
+// "Received" is always allowed and "Cancelled" needs no payment. Cash orders are
+// legitimately unpaid until collected, so they are warned (banner) but not gated
+// by a confirm here — only online-pending / unknown-method orders are.
+const ONLINE_GUARDED_STATUSES: OrderStatus[] = ['preparing', 'ready', 'out_for_delivery', 'delivered'];
 
 /** Authoritative Lazywait POS sync state (falls back to the legacy sync field). */
 function syncStateOf(o: Order): string {
@@ -43,12 +44,37 @@ export const LiveOrdersPanel: React.FC = () => {
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
 
-  // COD is not supported: show a real method only when a verified payment set one;
-  // otherwise state that online payment isn't configured (never "Cash on Delivery").
-  const paymentMethodLabel = (o: Order): string =>
-    (o.paymentStatus === 'paid' && o.paymentMethod)
-      ? o.paymentMethod
-      : (isRTL ? 'الدفع الإلكتروني غير مُفعّل' : 'Online payment not configured');
+  // Show the actual chosen method — Online Payment / Cash on Pickup / Cash on
+  // Delivery — never a blanket "Cash on Delivery". Unknown method reads as unset.
+  const methodLabelText = (o: Order): string => {
+    switch (paymentMethodLabel(o.paymentMethod, o.orderType)) {
+      case 'online': return isRTL ? 'الدفع الإلكتروني' : 'Online Payment';
+      case 'cash_pickup': return isRTL ? 'نقداً عند الاستلام' : 'Cash on Pickup';
+      case 'cash_delivery': return isRTL ? 'نقداً عند التوصيل' : 'Cash on Delivery';
+      case 'cash': return isRTL ? 'دفع نقدي' : 'Cash Payment';
+      default: return isRTL ? 'لم تُحدَّد طريقة الدفع' : 'Payment method not set';
+    }
+  };
+
+  // Derived payment status pill (paid / pending online / cash required / unpaid).
+  const paymentBadge = (o: Order): { text: string; tone: string } => {
+    switch (paymentDisplayState(o)) {
+      case 'paid': return { text: 'PAID', tone: 'bg-green-100 text-green-700' };
+      case 'pending_online': return { text: isRTL ? 'بانتظار الدفع الإلكتروني' : 'PENDING ONLINE PAYMENT', tone: 'bg-amber-100 text-amber-800' };
+      case 'cash_required': return { text: isRTL ? 'مطلوب تحصيل نقدي' : 'CASH PAYMENT REQUIRED', tone: 'bg-blue-100 text-blue-800' };
+      default: return { text: isRTL ? 'غير مدفوع' : 'UNPAID', tone: 'bg-slate-200 text-slate-600' };
+    }
+  };
+
+  // Actionable warning for staff (collect cash / online not completed / unpaid).
+  const paymentWarning = (o: Order): string | null => {
+    switch (paymentDisplayState(o)) {
+      case 'cash_required': return isRTL ? 'يجب تحصيل المبلغ نقداً من العميل.' : 'Payment must be collected from the customer.';
+      case 'pending_online': return isRTL ? 'لم يكتمل الدفع الإلكتروني بعد.' : 'Online payment has not been completed.';
+      case 'unpaid': return isRTL ? 'هذا الطلب غير مدفوع ولم تُحدَّد طريقة الدفع.' : 'This order is unpaid and has no payment method set.';
+      default: return null;
+    }
+  };
 
   const phoneLabel = (phone: string | undefined): string =>
     (phone && phone.trim()) ? phone : (isRTL ? 'لا يوجد رقم جوال' : 'No phone provided');
@@ -56,12 +82,16 @@ export const LiveOrdersPanel: React.FC = () => {
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
     if (isAccountant) return; // accountant is view-only (also enforced by RLS server-side)
     const target = orders.find(o => o.id === orderId) ?? activeReceiptOrder ?? undefined;
-    // Warn before advancing an UNPAID order past "Received" (Received/Cancelled are fine).
-    if (target && target.paymentStatus !== 'paid' && UNPAID_GUARDED_STATUSES.includes(status)) {
+    // Cash orders are legitimately unpaid until collected — keep the banner but
+    // don't block. Only confirm when an ONLINE payment (or unknown method) has
+    // not completed before advancing past "Received".
+    const st = target ? paymentDisplayState(target) : 'paid';
+    const needsConfirm = (st === 'pending_online' || st === 'unpaid') && ONLINE_GUARDED_STATUSES.includes(status);
+    if (target && needsConfirm) {
       const proceed = window.confirm(
         isRTL
-          ? 'هذا الطلب غير مدفوع بعد. هل أنت متأكد من تغيير حالته؟'
-          : 'This order is not paid yet. Are you sure you want to advance its status?'
+          ? 'لم يكتمل الدفع الإلكتروني لهذا الطلب بعد. هل أنت متأكد من تغيير حالته؟'
+          : 'Online payment for this order has not completed. Are you sure you want to advance its status?'
       );
       if (!proceed) return;
     }
@@ -139,6 +169,14 @@ export const LiveOrdersPanel: React.FC = () => {
                         </td>
                         <td className="px-4 py-3.5 font-bold text-secondary">
                           {formatSAR(order.total, adminLang)}
+                          {(() => {
+                            const badge = paymentBadge(order);
+                            return (
+                              <span className={`mt-1 block w-fit text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${badge.tone}`}>
+                                {badge.text}
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="px-4 py-3.5">
                           <span className={`text-[9.5px] font-black px-2.5 py-0.5 rounded-full uppercase ${
@@ -203,11 +241,15 @@ export const LiveOrdersPanel: React.FC = () => {
 
             <div className="p-5 space-y-4 max-h-[480px] overflow-y-auto text-xs text-gray-700">
 
-              {/* Unpaid warning — shown until a verified payment marks the order paid */}
-              {activeReceiptOrder.paymentStatus !== 'paid' && (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-2.5 text-[11px] font-black">
+              {/* Payment warning — method-aware (collect cash / online not done) */}
+              {paymentWarning(activeReceiptOrder) && (
+                <div className={`flex items-center gap-2 border rounded-xl p-2.5 text-[11px] font-black ${
+                  paymentDisplayState(activeReceiptOrder) === 'cash_required'
+                    ? 'bg-blue-50 border-blue-200 text-blue-800'
+                    : 'bg-amber-50 border-amber-200 text-amber-800'
+                }`}>
                   <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                  {isRTL ? 'لم يتم دفع هذا الطلب بعد.' : 'This order is not paid yet.'}
+                  {paymentWarning(activeReceiptOrder)}
                 </div>
               )}
 
@@ -313,17 +355,18 @@ export const LiveOrdersPanel: React.FC = () => {
                 <span className="font-semibold">{formatSAR(getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount, adminLang)}</span>
               </div>
 
-              {/* Payment — Cash on Delivery is not a supported method */}
+              {/* Payment — actual chosen method + derived status (method-aware) */}
               <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Payment method:</span>
-                  <span className="font-semibold text-gray-600">{paymentMethodLabel(activeReceiptOrder)}</span>
+                  <span className="font-semibold text-gray-600">{methodLabelText(activeReceiptOrder)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Payment status:</span>
-                  <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${activeReceiptOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-800'}`}>
-                    {activeReceiptOrder.paymentStatus === 'paid' ? 'PAID' : 'PENDING · UNPAID'}
-                  </span>
+                  {(() => {
+                    const badge = paymentBadge(activeReceiptOrder);
+                    return <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase ${badge.tone}`}>{badge.text}</span>;
+                  })()}
                 </div>
               </div>
 

@@ -126,7 +126,9 @@ export interface Order {
   loyaltyPointsRedeemed?: number; // points spent on this order
   total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
-  paymentMethod?: string; // verified gateway label once paid (e.g. "geidea"); COD is NOT supported
+  paymentMethod?: string; // how the customer pays: 'online' | 'cash' (admin-configured availability)
+  paymentProvider?: string; // verified gateway label once an online payment is confirmed (server-set)
+  paidAt?: string; // ISO timestamp an online payment was verified (server-set); null for unpaid/cash
   orderSyncStatus: SyncStatus;
   // Lazywait POS sync detail (admin visibility).
   lazywaitSyncState?: string; // pending|syncing|synced|failed|blocked|dead_letter|skipped

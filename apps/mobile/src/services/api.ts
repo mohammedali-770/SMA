@@ -95,6 +95,8 @@ export interface PlaceOrderInput {
   loyaltyPoints?: number;
   /** Retry-safe key: a repeated submit with the same key returns the same order. */
   idempotencyKey?: string | null;
+  /** 'online' | 'cash' — availability is admin-controlled; place_order re-validates. */
+  paymentMethod?: 'online' | 'cash' | null;
 }
 export const orders = {
   /** Server-authoritative order creation (place_order RPC). */
@@ -108,6 +110,7 @@ export const orders = {
       p_notes: input.notes ?? null,
       p_loyalty_points: input.loyaltyPoints ?? 0,
       p_idempotency_key: input.idempotencyKey ?? null,
+      p_payment_method: input.paymentMethod ?? null,
     }));
   },
   /** RLS returns only the signed-in customer's own orders, newest first. */

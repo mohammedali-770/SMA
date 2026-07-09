@@ -15,6 +15,7 @@ import {
   DbOrderItemModifier, DbSyncStatus,
 } from './api';
 import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
+import { PaymentMethodSettings } from './payment';
 
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
@@ -203,6 +204,8 @@ export function mapOrder(o: DbOrderWithItems): Order {
     loyaltyPointsRedeemed: o.loyalty_points_redeemed ?? 0,
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
+    paymentProvider: o.payment_provider ?? undefined,
+    paidAt: o.paid_at ?? undefined,
     orderSyncStatus: mapSyncStatus(o.sync_status),
     lazywaitSyncState: o.lazywait_sync_state ?? undefined,
     lazywaitRef: o.lazywait_ref ?? undefined,
@@ -238,6 +241,17 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     pointsPerRiyal: Number(s.points_per_riyal),
     minPointsToRedeem: s.min_points_to_redeem,
     discountPerPoint: Number(s.discount_per_point),
+  };
+}
+
+/** Admin-configurable payment-method availability (non-secret). Cash defaults ON,
+ *  online OFF, so a project without the migration still behaves safely. */
+export function mapPaymentMethodSettings(s: DbAppSettings): PaymentMethodSettings {
+  return {
+    onlineEnabled: Boolean(s.online_payment_enabled),
+    cashEnabled: s.cash_payment_enabled ?? true,
+    defaultMethod: (s.default_payment_method ?? null) as 'online' | 'cash' | null,
+    outageMode: Boolean(s.payment_outage_mode_enabled),
   };
 }
 

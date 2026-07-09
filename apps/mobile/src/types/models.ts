@@ -117,7 +117,9 @@ export interface Order {
   loyaltyPointsEarned: number;
   loyaltyPointsRedeemed: number;
   paymentStatus: 'pending' | 'paid';
-  paymentMethod?: string;
+  paymentMethod?: string; // 'online' | 'cash' (admin-configured availability)
+  paymentProvider?: string; // gateway label once an online payment is verified (server-set)
+  paidAt?: string; // ISO time an online payment was verified; null for unpaid/cash
   couponCode?: string;
   notes?: string;
   createdAt: string;

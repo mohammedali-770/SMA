@@ -10,9 +10,16 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { catalog } from '../services/api';
 import {
   buildAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory, mapLoyaltySettings,
-  mapModifierGroup, mapProduct,
+  mapModifierGroup, mapPaymentMethodSettings, mapProduct,
 } from '../lib/mappers';
 import type { Branch, BrandSettings, Category, LoyaltySettings, ModifierGroup, Product } from '../types/models';
+import type { PaymentMethodSettings } from '../lib/payment';
+
+// Safe fallback matching the DB defaults (cash on, online off) so the customer
+// is never blocked before settings finish loading.
+const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
+  onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
+};
 
 const BRANCH_KEY = 'spicymeal.branchId';
 
@@ -27,6 +34,7 @@ interface CatalogValue {
   modifierGroupsById: Record<string, ModifierGroup>;
   brand: BrandSettings | null;
   loyalty: LoyaltySettings | null;
+  payment: PaymentMethodSettings;
 
   selectedBranchId: string | null;
   selectedBranch: Branch | null;
@@ -49,6 +57,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [modifierGroupsById, setModifierGroupsById] = useState<Record<string, ModifierGroup>>({});
   const [brand, setBrand] = useState<BrandSettings | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltySettings | null>(null);
+  const [payment, setPayment] = useState<PaymentMethodSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [availability, setAvailability] = useState<{ [p: string]: { [b: string]: boolean } }>({});
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
@@ -83,6 +92,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setAvailability(buildAvailabilityMatrix(raw.products, raw.branches, raw.availability));
         setBrand(mapBrandSettings(raw.settings));
         setLoyalty(mapLoyaltySettings(raw.settings));
+        setPayment(mapPaymentMethodSettings(raw.settings));
       } catch (e) {
         if (mounted.current) setError(e instanceof Error ? e.message : 'Failed to load the menu.');
       } finally {
@@ -122,11 +132,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<CatalogValue>(() => ({
     loading, error, reload,
-    branches, categories, products, modifierGroupsById, brand, loyalty,
+    branches, categories, products, modifierGroupsById, brand, loyalty, payment,
     selectedBranchId, selectedBranch, setSelectedBranch,
     getProduct, groupsForProduct, isAvailable, branchIsOpen,
   }), [
-    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty,
+    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty, payment,
     selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable, branchIsOpen,
   ]);
 

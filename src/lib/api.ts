@@ -51,6 +51,9 @@ export interface DbAppSettings {
   primary_color: string; secondary_color: string; currency: string;
   vat_percentage: number; loyalty_enabled: boolean;
   points_per_riyal: number; discount_per_point: number; min_points_to_redeem: number;
+  // Payment-method availability (non-secret; admin-editable, public-readable).
+  online_payment_enabled?: boolean; cash_payment_enabled?: boolean;
+  default_payment_method?: 'online' | 'cash' | null; payment_outage_mode_enabled?: boolean;
 }
 export interface DbProfile {
   id: string; full_name: string | null; phone_number: string | null;
@@ -70,6 +73,7 @@ export interface DbOrder {
   subtotal: number; delivery_fee: number; discount_amount: number;
   loyalty_discount_amount: number; vat_amount: number; total: number;
   payment_status: 'pending' | 'paid'; payment_method: string | null;
+  payment_provider?: string | null; paid_at?: string | null;
   coupon_code: string | null; notes: string | null; created_at: string;
   // Extra columns returned by `select('*')` that the app maps for display.
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
@@ -325,6 +329,8 @@ export interface PlaceOrderInput {
   loyaltyPoints?: number;
   /** Retry-safe key: a repeated submit with the same key returns the same order. */
   idempotencyKey?: string | null;
+  /** 'online' | 'cash' — validated server-side against admin payment settings. */
+  paymentMethod?: 'online' | 'cash' | null;
 }
 export const orders = {
   /** Server-authoritative order creation (recomputes all amounts + coupon + VAT + loyalty). */
@@ -338,6 +344,7 @@ export const orders = {
       p_notes: input.notes ?? null,
       p_loyalty_points: input.loyaltyPoints ?? 0,
       p_idempotency_key: input.idempotencyKey ?? null,
+      p_payment_method: input.paymentMethod ?? null,
     }));
   },
   /** RLS returns own orders for a customer, all orders for staff. */
@@ -421,6 +428,18 @@ export const admin = {
   async updateSettings(patch: Partial<DbAppSettings>) {
     const { error } = await supabase.from('app_settings').update(patch).eq('id', true);
     if (error) throw new Error(error.message);
+  },
+  /** Admin-only: set payment-method availability. The RPC re-checks is_admin() server-side. */
+  async setPaymentSettings(input: {
+    onlineEnabled: boolean; cashEnabled: boolean;
+    defaultMethod: 'online' | 'cash' | null; outageMode: boolean;
+  }) {
+    return ok<DbAppSettings>(await supabase.rpc('set_payment_settings', {
+      p_online_enabled: input.onlineEnabled,
+      p_cash_enabled: input.cashEnabled,
+      p_default_method: input.defaultMethod,
+      p_outage_mode: input.outageMode,
+    }));
   },
 };
 

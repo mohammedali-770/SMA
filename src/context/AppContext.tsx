@@ -19,9 +19,13 @@ import {
 import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, buildAvailabilityMatrix,
   mapProfile, mapAddress, mapOrder, mapBrandSettings, mapLoyaltySettings,
+  mapPaymentMethodSettings,
   brandPatchToDb, loyaltyPatchToDb, productToDbInsert, productToDbUpdate,
   categoryToDbInsert, branchPatchToDb,
 } from '../lib/mappers';
+import {
+  PaymentMethod, PaymentMethodSettings, resolveDefaultMethod, availableMethods,
+} from '../lib/payment';
 
 interface AppContextType {
   // Auth / session (Option A: GoTrue = authentication, profiles.role = authorization)
@@ -106,6 +110,17 @@ interface AppContextType {
   loyaltySettings: LoyaltySettings;
   updateLoyaltySettings: (settings: Partial<LoyaltySettings>) => void;
 
+  // Payment-method availability (admin-configured; server-authoritative in place_order).
+  // The customer picks from what's enabled; the client can never enable a method
+  // or mark an order paid — these are read-only mirrors for the UI.
+  paymentSettings: PaymentMethodSettings;
+  updatePaymentSettings: (settings: {
+    onlineEnabled: boolean; cashEnabled: boolean;
+    defaultMethod: PaymentMethod | null; outageMode: boolean;
+  }) => Promise<void>;
+  selectedPaymentMethod: PaymentMethod | null;
+  setSelectedPaymentMethod: (method: PaymentMethod | null) => void;
+
   // Admin live orders (realtime with polling fallback)
   ordersLiveMode: 'realtime' | 'polling' | 'off';
   ordersLastUpdated: number | null;
@@ -183,6 +198,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Settings sourced from the app_settings singleton (brand colours + VAT + loyalty).
   const [brandSettings, setBrandSettings] = useState<BrandSettings>(INITIAL_BRAND_SETTINGS);
   const [loyaltySettings, setLoyaltySettings] = useState<LoyaltySettings>(INITIAL_LOYALTY_SETTINGS);
+
+  // Admin-configured payment availability. Safe fallback matches the DB defaults
+  // (cash ON, online OFF) so a customer is never blocked before settings load.
+  const [paymentSettings, setPaymentSettings] = useState<PaymentMethodSettings>({
+    onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
+  });
+  // The customer's chosen method for the current checkout. Null until resolved
+  // from availability; a disabled method can never be submitted (server re-checks).
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
 
   // Secure integration settings (payment / SMS / push / Lazywait). Loaded for
   // admins via an RPC that returns only non-secret fields + a has_secret flag;
@@ -262,6 +286,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAvailabilityMatrix(buildAvailabilityMatrix(c.products, c.branches, c.availability));
     setBrandSettings(mapBrandSettings(c.settings));
     setLoyaltySettings(mapLoyaltySettings(c.settings));
+    setPaymentSettings(mapPaymentMethodSettings(c.settings));
     return c;
   }, []);
 
@@ -474,6 +499,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => { cancelled = true; };
   }, [couponCode, cartTotal, isAuthenticated]);
 
+  // ---- Keep the chosen payment method valid as availability changes ---------
+  // If the customer hasn't picked (null) or their pick is no longer offered
+  // (e.g. admin just turned online off mid-session), fall back to the resolved
+  // default. When nothing is enabled, leave it null so checkout stays blocked.
+  useEffect(() => {
+    const allowed = availableMethods(paymentSettings);
+    setSelectedPaymentMethod(prev =>
+      prev && allowed.includes(prev) ? prev : resolveDefaultMethod(paymentSettings),
+    );
+  }, [paymentSettings]);
+
   const applyCoupon = useCallback(async (code: string): Promise<{ valid: boolean; message: string }> => {
     const trimmed = code.trim();
     if (!trimmed) { setCouponCode(''); setDiscountAmount(0); return { valid: false, message: 'No code supplied' }; }
@@ -597,6 +633,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Please select or add a delivery address' };
     }
 
+    // Resolve the payment method against current availability. The client picks
+    // from enabled methods only; place_order re-validates server-side, so this is
+    // just an early, friendly guard (never the security boundary).
+    const allowed = availableMethods(paymentSettings);
+    if (allowed.length === 0) {
+      return { success: false, error: 'No payment method is currently available.' };
+    }
+    const chosen =
+      selectedPaymentMethod && allowed.includes(selectedPaymentMethod)
+        ? selectedPaymentMethod
+        : resolveDefaultMethod(paymentSettings);
+    if (!chosen) {
+      return { success: false, error: 'No payment method is currently available.' };
+    }
+
     const items = cart.map(ci => ({
       product_id: ci.product.id,
       quantity: ci.quantity,
@@ -622,6 +673,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         notes: null,
         loyaltyPoints: currentUser.role === 'customer' ? loyaltyPointsRedeemed : 0,
         idempotencyKey: idempotencyKeyRef.current,
+        paymentMethod: chosen,
       });
       idempotencyKeyRef.current = null; // success → the next checkout gets a fresh key
       // The RPC returns the order row without its items; refetch (with items) so
@@ -809,6 +861,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Admin-only: persist payment-method availability via the SECURITY DEFINER
+  // set_payment_settings RPC (server enforces admin + stamps updated_by/at).
+  // We re-read the settings afterwards so the value reflects exactly what the
+  // server stored (e.g. a default that got coerced when its method was disabled).
+  const updatePaymentSettings = useCallback(async (settings: {
+    onlineEnabled: boolean; cashEnabled: boolean;
+    defaultMethod: PaymentMethod | null; outageMode: boolean;
+  }): Promise<void> => {
+    await adminApi.setPaymentSettings({
+      onlineEnabled: settings.onlineEnabled,
+      cashEnabled: settings.cashEnabled,
+      defaultMethod: settings.defaultMethod,
+      outageMode: settings.outageMode,
+    });
+    const c = await catalog.all();
+    setPaymentSettings(mapPaymentMethodSettings(c.settings));
+  }, []);
+
   // Admin loyalty point adjustment. Callers pass the desired absolute balance
   // (e.g. currentPoints + 50); we derive the delta and apply it through the
   // admin-only adjust_loyalty_points RPC, then refresh the affected profile.
@@ -898,6 +968,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateBrandSettings,
       loyaltySettings,
       updateLoyaltySettings,
+
+      paymentSettings,
+      updatePaymentSettings,
+      selectedPaymentMethod,
+      setSelectedPaymentMethod,
 
       ordersLiveMode,
       ordersLastUpdated,

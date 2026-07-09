@@ -1,26 +1,86 @@
-import React, { useState } from 'react';
-import { AlertCircle, Check, CreditCard, Gift, ShieldCheck, Sliders } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, ShieldCheck, Sliders, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
 import { IntegrationCard } from './IntegrationCard';
 import { LazywaitPanel } from './LazywaitPanel';
+import { PaymentMethod, availableMethods } from '../../lib/payment';
 
 export const SettingsPanel: React.FC = () => {
   const {
     brandSettings, updateBrandSettings, loyaltySettings, updateLoyaltySettings,
     integrationSettings, integrationsLoading, integrationsError, loadIntegrations, saveIntegration,
     profiles, updateCustomerPoints, loyaltyMutationsEnabled, currentUser, adminLang,
+    paymentSettings, updatePaymentSettings,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
-  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'integrations' | 'loyalty'>('brand');
+  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'integrations' | 'payments' | 'loyalty'>('brand');
   const [pointAdjustments, setPointAdjustments] = useState<{ [profileId: string]: string }>({});
+
+  // ---- Payment-method availability (admin-editable, accountant read-only) ----
+  // Local draft so interdependent toggles (a default must be an *enabled* method)
+  // can be edited together, then persisted atomically via the SECURITY DEFINER RPC.
+  const [payForm, setPayForm] = useState({
+    onlineEnabled: paymentSettings.onlineEnabled,
+    cashEnabled: paymentSettings.cashEnabled,
+    defaultMethod: paymentSettings.defaultMethod as PaymentMethod | null,
+    outageMode: paymentSettings.outageMode,
+  });
+  const [paySaving, setPaySaving] = useState(false);
+  const [paySaved, setPaySaved] = useState(false);
+  const [payError, setPayError] = useState<string | null>(null);
+  // Re-sync the draft whenever the server value changes (initial load + post-save
+  // re-read, which may coerce the default when its method is disabled).
+  useEffect(() => {
+    setPayForm({
+      onlineEnabled: paymentSettings.onlineEnabled,
+      cashEnabled: paymentSettings.cashEnabled,
+      defaultMethod: paymentSettings.defaultMethod,
+      outageMode: paymentSettings.outageMode,
+    });
+  }, [paymentSettings]);
 
             const isAccountant = currentUser.role === 'accountant';
             // Admin loyalty adjustments go through the admin-only
             // adjust_loyalty_points RPC; accountants remain read-only.
             const pointsLocked = isAccountant || !loyaltyMutationsEnabled;
+
+            // Payment draft derived values (kept next to the JSX that reads them).
+            const payDraftMethods = availableMethods({
+              onlineEnabled: payForm.onlineEnabled, cashEnabled: payForm.cashEnabled,
+              defaultMethod: payForm.defaultMethod, outageMode: payForm.outageMode,
+            });
+            const payBothDisabled = payDraftMethods.length === 0;
+            const payOnlineOffCashOn = !payForm.onlineEnabled && payForm.cashEnabled;
+            const payDirty =
+              payForm.onlineEnabled !== paymentSettings.onlineEnabled ||
+              payForm.cashEnabled !== paymentSettings.cashEnabled ||
+              payForm.defaultMethod !== paymentSettings.defaultMethod ||
+              payForm.outageMode !== paymentSettings.outageMode;
+            const handleSavePayments = () => {
+              setPaySaving(true); setPayError(null); setPaySaved(false);
+              // Never send a default whose method is disabled — coerce to null so the
+              // server resolves the first enabled method (place_order does the same).
+              const def = payForm.defaultMethod && payDraftMethods.includes(payForm.defaultMethod)
+                ? payForm.defaultMethod : null;
+              void (async () => {
+                try {
+                  await updatePaymentSettings({
+                    onlineEnabled: payForm.onlineEnabled,
+                    cashEnabled: payForm.cashEnabled,
+                    defaultMethod: def,
+                    outageMode: payForm.outageMode,
+                  });
+                  setPaySaved(true);
+                } catch (e) {
+                  setPayError(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setPaySaving(false);
+                }
+              })();
+            };
 
             return (
               <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
@@ -59,6 +119,18 @@ export const SettingsPanel: React.FC = () => {
                   >
                     <CreditCard className="w-3.5 h-3.5" />
                     <span>{isRTL ? 'التكامل والربط' : 'Integrations'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSettingsSubTab('payments')}
+                    className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                      settingsSubTab === 'payments'
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
+                        : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
+                    }`}
+                  >
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span>{isRTL ? 'طرق الدفع' : 'Payment Methods'}</span>
                   </button>
 
                   <button
@@ -306,6 +378,154 @@ export const SettingsPanel: React.FC = () => {
                     </div>
                   )}
 
+
+                  {/* SUB-TAB: PAYMENT METHODS (admin-configurable availability) */}
+                  {settingsSubTab === 'payments' && (
+                    <div className="space-y-4">
+                      <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
+                        <div>
+                          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'توفر طرق الدفع' : 'Payment Method Availability'}</span>
+                          <span className="text-[9.5px] text-slate-400 font-bold">{isRTL ? 'تحكّم في الدفع الإلكتروني والنقدي — يُطبَّق على السلة والطلبات فوراً' : 'Control online vs cash — applied to checkout and new orders immediately'}</span>
+                        </div>
+                        <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> {isRTL ? 'للمشرف فقط' : 'Admin only'}
+                        </span>
+                      </div>
+
+                      {isAccountant ? (
+                        <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                          {isRTL ? 'طرق الدفع للعرض فقط — التعديل متاح للمشرف.' : 'Payment methods are view-only for accountants — editing is admin-only.'}
+                        </div>
+                      ) : null}
+
+                      {/* Current live availability (from the server, not the draft) */}
+                      <div className="p-3 bg-slate-50/70 border border-slate-200/50 rounded-xl flex flex-wrap items-center gap-2 text-[10px] font-bold">
+                        <span className="text-slate-500 uppercase tracking-wide">{isRTL ? 'الوضع الحالي:' : 'Live now:'}</span>
+                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.onlineEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                          {isRTL ? 'إلكتروني' : 'Online'} {paymentSettings.onlineEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full ${paymentSettings.cashEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
+                          {isRTL ? 'نقدي' : 'Cash'} {paymentSettings.cashEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
+                        </span>
+                        {paymentSettings.outageMode && (
+                          <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{isRTL ? 'وضع انقطاع الدفع' : 'Outage mode'}</span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* ONLINE toggle */}
+                        <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-primary" />
+                            <span className="font-black text-slate-800 text-[11px]">{isRTL ? 'الدفع الإلكتروني' : 'Online Payment'}</span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">
+                            {isRTL ? 'بوابة الدفع غير مفعّلة بعد؛ الطلبات الإلكترونية لا تُرسل للكاشير حتى يتأكد الدفع.' : 'No gateway yet; online orders are held from POS until payment is verified.'}
+                          </p>
+                          <select
+                            value={payForm.onlineEnabled ? 'true' : 'false'}
+                            onChange={(e) => setPayForm(f => ({ ...f, onlineEnabled: e.target.value === 'true' }))}
+                            className="glass-input w-full p-2 font-bold text-slate-800 text-xs"
+                            disabled={isAccountant || paySaving}
+                          >
+                            <option value="true">{isRTL ? 'مفعّل' : 'Enabled'}</option>
+                            <option value="false">{isRTL ? 'معطّل' : 'Disabled'}</option>
+                          </select>
+                        </div>
+
+                        {/* CASH toggle */}
+                        <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Banknote className="w-4 h-4 text-green-600" />
+                            <span className="font-black text-slate-800 text-[11px]">{isRTL ? 'الدفع النقدي (عند الاستلام)' : 'Cash Payment (on Pickup/Delivery)'}</span>
+                          </div>
+                          <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">
+                            {isRTL ? 'الطلبات النقدية تُرسل للكاشير كغير مدفوعة؛ يُحصّل المبلغ من العميل.' : 'Cash orders are sent to POS as unpaid; collect the amount from the customer.'}
+                          </p>
+                          <select
+                            value={payForm.cashEnabled ? 'true' : 'false'}
+                            onChange={(e) => setPayForm(f => ({ ...f, cashEnabled: e.target.value === 'true' }))}
+                            className="glass-input w-full p-2 font-bold text-slate-800 text-xs"
+                            disabled={isAccountant || paySaving}
+                          >
+                            <option value="true">{isRTL ? 'مفعّل' : 'Enabled'}</option>
+                            <option value="false">{isRTL ? 'معطّل' : 'Disabled'}</option>
+                          </select>
+                        </div>
+
+                        {/* DEFAULT method */}
+                        <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
+                          <span className="font-black text-slate-800 text-[11px] block">{isRTL ? 'الطريقة الافتراضية' : 'Default Method'}</span>
+                          <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">
+                            {isRTL ? 'الطريقة المختارة مسبقاً في السلة (يجب أن تكون مفعّلة).' : 'Preselected in checkout (must be an enabled method).'}
+                          </p>
+                          <select
+                            value={payForm.defaultMethod ?? ''}
+                            onChange={(e) => setPayForm(f => ({ ...f, defaultMethod: (e.target.value || null) as PaymentMethod | null }))}
+                            className="glass-input w-full p-2 font-bold text-slate-800 text-xs"
+                            disabled={isAccountant || paySaving}
+                          >
+                            <option value="">{isRTL ? 'تلقائي (أول طريقة مفعّلة)' : 'Auto (first enabled)'}</option>
+                            <option value="online" disabled={!payForm.onlineEnabled}>{isRTL ? 'إلكتروني' : 'Online'}</option>
+                            <option value="cash" disabled={!payForm.cashEnabled}>{isRTL ? 'نقدي' : 'Cash'}</option>
+                          </select>
+                        </div>
+
+                        {/* OUTAGE mode */}
+                        <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
+                          <span className="font-black text-slate-800 text-[11px] block">{isRTL ? 'وضع انقطاع الدفع الإلكتروني' : 'Online Outage Mode'}</span>
+                          <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">
+                            {isRTL ? 'علامة توضيحية عند تعطّل البوابة (تُعرض للفريق فقط).' : 'A label flag for when the gateway is down (informational for staff).'}
+                          </p>
+                          <select
+                            value={payForm.outageMode ? 'true' : 'false'}
+                            onChange={(e) => setPayForm(f => ({ ...f, outageMode: e.target.value === 'true' }))}
+                            className="glass-input w-full p-2 font-bold text-slate-800 text-xs"
+                            disabled={isAccountant || paySaving}
+                          >
+                            <option value="false">{isRTL ? 'إيقاف' : 'Off'}</option>
+                            <option value="true">{isRTL ? 'تفعيل' : 'On'}</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Contextual warnings mirroring what the customer will see */}
+                      {payBothDisabled && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          {isRTL ? 'لا توجد طريقة دفع مفعّلة — لن يتمكّن العملاء من إتمام الطلب. فعّل النقدي أو الإلكتروني.' : 'No payment method is enabled — customers cannot check out. Enable cash or online.'}
+                        </div>
+                      )}
+                      {payOnlineOffCashOn && !payBothDisabled && (
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-blue-800 text-[11px] font-bold flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                          {isRTL ? 'الدفع الإلكتروني معطّل والنقدي مفعّل — تستمر العمليات نقداً، وتُرسل الطلبات للكاشير كغير مدفوعة.' : 'Online is off and cash is on — operations continue on cash; orders go to POS as unpaid.'}
+                        </div>
+                      )}
+
+                      {payError && (
+                        <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /> {payError}
+                        </div>
+                      )}
+
+                      <div className="flex justify-end items-center gap-3 border-t border-slate-100 pt-3">
+                        {paySaved && !payDirty && (
+                          <span className="text-[10px] text-green-600 font-bold flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5" /> {isRTL ? 'تم الحفظ' : 'Saved'}
+                          </span>
+                        )}
+                        <button
+                          onClick={handleSavePayments}
+                          disabled={isAccountant || paySaving || !payDirty}
+                          className="bg-primary hover:bg-primary/90 text-white text-[11px] font-black py-2 px-4 rounded-xl transition-colors disabled:opacity-40"
+                        >
+                          {paySaving ? (isRTL ? 'جاري الحفظ…' : 'Saving…') : (isRTL ? 'حفظ طرق الدفع' : 'Save Payment Settings')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* SUB-TAB 6: LOYALTY PROGRAM */}
                   {settingsSubTab === 'loyalty' && (

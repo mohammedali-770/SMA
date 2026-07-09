@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { AlertCircle, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
+import { AlertCircle, Banknote, CreditCard, Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order, Modifier } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { LOCALES } from './mobileLocales';
+import { availableMethods, checkoutBlocked, onlineUnavailableCashOn } from '../../lib/payment';
 
 interface CartScreenProps {
   isLoggedIn: boolean;
@@ -19,9 +20,20 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
     couponCode, discountAmount, applyCoupon,
     loyaltyPointsRedeemed, setLoyaltyPointsRedeemed, loyaltyDiscountAmount, loyaltySettings, loyaltyMutationsEnabled,
     currentUser, selectedBranch, placeOrder, brandSettings, mobileLang,
+    paymentSettings, selectedPaymentMethod, setSelectedPaymentMethod,
   } = useApp();
   const t = LOCALES[mobileLang];
   const isRTL = mobileLang === 'ar';
+
+  // Admin-configured availability mirrored for the UI (server re-checks at place_order).
+  const payMethods = availableMethods(paymentSettings);
+  const paymentBlocked = checkoutBlocked(paymentSettings);
+  const showOnlineOutageNotice = onlineUnavailableCashOn(paymentSettings);
+  // Cash label follows the order type: "on Pickup" vs "on Delivery".
+  const cashLabel = checkoutType === 'delivery'
+    ? (isRTL ? 'الدفع نقداً عند التوصيل' : 'Cash on Delivery')
+    : (isRTL ? 'الدفع نقداً عند الاستلام' : 'Cash on Pickup');
+  const onlineLabel = isRTL ? 'الدفع الإلكتروني' : 'Online Payment';
   const [couponInput, setCouponInput] = useState('');
   const [couponMsg, setCouponMsg] = useState({ text: '', isError: false });
   const [placing, setPlacing] = useState(false);
@@ -163,6 +175,52 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
                         <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
                         <span>{t.min_order_warning} {formatSAR(selectedBranch.minDeliveryOrder, mobileLang)} ({isRTL ? 'ينقصك' : 'need'} {formatSAR(selectedBranch.minDeliveryOrder - cartTotal, mobileLang)})</span>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Payment method selector (availability is admin-controlled) */}
+                  <div className="glass-card rounded-2xl p-3">
+                    <h3 className="text-xs font-black text-gray-800 uppercase mb-2.5">{isRTL ? 'طريقة الدفع' : 'Payment Method'}</h3>
+
+                    {paymentBlocked ? (
+                      <div className="p-2.5 bg-red-50 text-red-800 text-[10px] rounded-lg border border-red-100 font-bold flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
+                        <span>{isRTL ? 'لا توجد طريقة دفع متاحة حالياً.' : 'No payment method is currently available.'}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="space-y-1.5">
+                          {payMethods.map(method => {
+                            const active = selectedPaymentMethod === method;
+                            const label = method === 'online' ? onlineLabel : cashLabel;
+                            const Icon = method === 'online' ? CreditCard : Banknote;
+                            return (
+                              <button
+                                key={method}
+                                onClick={() => setSelectedPaymentMethod(method)}
+                                aria-pressed={active}
+                                className={`w-full flex items-center gap-2.5 p-2.5 border rounded-xl transition-all text-left ${active ? 'border-primary bg-primary/5' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
+                              >
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${active ? 'bg-primary' : 'bg-gray-300'}`}></div>
+                                <Icon className={`w-4 h-4 flex-shrink-0 ${method === 'online' ? 'text-primary' : 'text-green-600'}`} />
+                                <div className="flex-1">
+                                  <p className="text-xs font-black text-gray-900 leading-tight">{label}</p>
+                                  {method === 'cash' && (
+                                    <p className="text-[9px] text-gray-400 leading-tight mt-0.5">{isRTL ? 'يُدفع المبلغ نقداً عند الاستلام' : 'Pay in cash when you receive your order'}</p>
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {showOnlineOutageNotice && (
+                          <div className="mt-2 p-2 bg-blue-50 text-blue-800 text-[10px] rounded-lg border border-blue-100 font-bold flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                            <span>{isRTL ? 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.' : 'Online payment is currently unavailable. Cash payment is enabled.'}</span>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -389,9 +447,9 @@ export const CartScreen: React.FC<CartScreenProps> = ({ isLoggedIn, onNavigate, 
 
                     <button
                       onClick={handlePlaceOrderClick}
-                      disabled={placing || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)}
+                      disabled={placing || paymentBlocked || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)}
                       className={`w-full text-center text-xs font-black py-3 rounded-full shadow-sm mt-2 transition-all ${
-                        placing || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)
+                        placing || paymentBlocked || (checkoutType === 'delivery' && !!selectedBranch && cartTotal < selectedBranch.minDeliveryOrder)
                           ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                           : 'bg-secondary text-white hover:bg-secondary/95 hover:scale-102'
                       }`}

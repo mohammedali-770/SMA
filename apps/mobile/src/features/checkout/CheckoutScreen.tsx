@@ -20,6 +20,10 @@ import { Header } from '../../components/Header';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses, coupons, orders } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
+import {
+  availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
+  type PaymentMethod,
+} from '../../lib/payment';
 import { useAuth, useCart, useCatalog } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
@@ -29,10 +33,11 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
   const { profile } = useAuth();
-  const { selectedBranch, brand, loyalty, branchIsOpen } = useCatalog();
+  const { selectedBranch, brand, loyalty, payment, branchIsOpen } = useCatalog();
   const cart = useCart();
 
   const [orderType, setOrderType] = useState<OrderType | null>(null); // never preselected
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(resolveDefaultMethod(payment));
   const [addressList, setAddressList] = useState<SavedAddress[]>([]);
   const [addressId, setAddressId] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState('');
@@ -45,6 +50,20 @@ export function CheckoutScreen() {
 
   const branchOpen = branchIsOpen(selectedBranch);
   const vatPct = brand?.vatPercentage ?? 15;
+
+  // Payment availability (admin-controlled; place_order re-validates server-side).
+  const payMethods = availableMethods(payment);
+  const paymentBlocked = checkoutBlocked(payment);
+  const showOnlineOutageNotice = onlineUnavailableCashOn(payment);
+
+  // Keep the chosen method valid as availability changes (e.g. admin turns online
+  // off mid-session). Never assume cash unless it's actually enabled.
+  useEffect(() => {
+    setPaymentMethod((prev) =>
+      prev && payMethods.includes(prev) ? prev : resolveDefaultMethod(payment),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payment.onlineEnabled, payment.cashEnabled, payment.defaultMethod]);
 
   useEffect(() => {
     addresses.listMine()
@@ -90,8 +109,9 @@ export function CheckoutScreen() {
     if (!branchOpen) return t('branchClosedError');
     if (!orderType) return t('chooseOrderType');
     if (belowMin) return `${t('minOrderError')} ${formatSAR(selectedBranch?.minDeliveryOrder ?? 0, lang)}`;
+    if (paymentBlocked || !paymentMethod) return pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.');
     return null;
-  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t]);
+  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick]);
 
   const canPlace = !blockReason && cart.items.length > 0 && !placing;
 
@@ -109,6 +129,7 @@ export function CheckoutScreen() {
         notes: notes.trim() || null,
         loyaltyPoints: redeemPoints ? availablePoints : 0,
         idempotencyKey: cart.idempotencyKey,
+        paymentMethod,
       });
       cart.clear();
       router.replace(`/receipt/${order.id}`);
@@ -130,6 +151,37 @@ export function CheckoutScreen() {
           <View style={styles.segment}>
             <SegmentBtn label={t('delivery')} active={orderType === 'delivery'} onPress={() => setOrderType('delivery')} />
             <SegmentBtn label={t('pickup')} active={orderType === 'pickup'} onPress={() => setOrderType('pickup')} />
+          </View>
+
+          {/* Payment method — availability is admin-controlled */}
+          <View style={styles.block}>
+            <Text style={styles.sectionTitle}>{pick('Payment method', 'طريقة الدفع')}</Text>
+            {paymentBlocked ? (
+              <Text style={[styles.note, { color: colors.red, fontWeight: '700' }]}>
+                {pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
+              </Text>
+            ) : (
+              <>
+                <View style={styles.segment}>
+                  {payMethods.map((m) => {
+                    const label = m === 'online'
+                      ? pick('Online Payment', 'الدفع الإلكتروني')
+                      : orderType === 'delivery'
+                        ? pick('Cash on Delivery', 'نقداً عند التوصيل')
+                        : pick('Cash on Pickup', 'نقداً عند الاستلام');
+                    return <SegmentBtn key={m} label={label} active={paymentMethod === m} onPress={() => setPaymentMethod(m)} />;
+                  })}
+                </View>
+                {paymentMethod === 'cash' ? (
+                  <Text style={styles.note}>{pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')}</Text>
+                ) : null}
+                {showOnlineOutageNotice ? (
+                  <Text style={[styles.note, { color: colors.purple, fontWeight: '700' }]}>
+                    {pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')}
+                  </Text>
+                ) : null}
+              </>
+            )}
           </View>
 
           {/* Delivery address */}

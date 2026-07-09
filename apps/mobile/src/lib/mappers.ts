@@ -12,6 +12,7 @@ import type {
   Branch, BrandSettings, Category, LoyaltySettings, Modifier, ModifierGroup,
   Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
 } from '../types/models';
+import type { PaymentMethodSettings } from './payment';
 
 /** A neutral food image used when a product has no image_url. */
 const FALLBACK_IMAGE =
@@ -167,6 +168,8 @@ export function mapOrder(o: DbOrderWithItems): Order {
     loyaltyPointsRedeemed: o.loyalty_points_redeemed ?? 0,
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
+    paymentProvider: o.payment_provider ?? undefined,
+    paidAt: o.paid_at ?? undefined,
     couponCode: o.coupon_code ?? undefined,
     notes: o.notes ?? undefined,
     createdAt: o.created_at,
@@ -193,5 +196,16 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     pointsPerRiyal: Number(s.points_per_riyal),
     minPointsToRedeem: s.min_points_to_redeem,
     discountPerPoint: Number(s.discount_per_point),
+  };
+}
+
+/** Admin-configurable payment availability (non-secret). Falls back to cash-on /
+ *  online-off so a project without the migration still checks out safely. */
+export function mapPaymentMethodSettings(s: DbAppSettings): PaymentMethodSettings {
+  return {
+    onlineEnabled: Boolean(s.online_payment_enabled),
+    cashEnabled: s.cash_payment_enabled ?? true,
+    defaultMethod: (s.default_payment_method ?? null) as 'online' | 'cash' | null,
+    outageMode: Boolean(s.payment_outage_mode_enabled),
   };
 }
