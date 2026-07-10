@@ -10,9 +10,10 @@
  */
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Pressable, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent,
+  Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -35,6 +36,10 @@ export function HomeMenuScreen() {
   const [search, setSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const offsets = useRef<Record<string, number>>({});
+  // Active category (for the highlighted chip) + horizontal chip-row scrolling.
+  const chipScrollRef = useRef<ScrollView>(null);
+  const chipOffsets = useRef<Record<string, { x: number; width: number }>>({});
+  const [activeCatId, setActiveCatId] = useState<string | null>(null);
 
   const branchOpen = branchIsOpen(selectedBranch);
 
@@ -58,9 +63,32 @@ export function HomeMenuScreen() {
   }, [products, categories, selectedBranchId, isAvailable, search]);
 
   const scrollToCategory = (catId: string) => {
+    setActiveCatId(catId);
     const y = offsets.current[catId];
     if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
   };
+
+  // Which chip is highlighted: the category tapped, else the section currently
+  // scrolled into view, else the first section.
+  const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
+
+  // Scroll-spy: as the menu scrolls, highlight the category whose section top has
+  // passed the top of the viewport.
+  const onMenuScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = e.nativeEvent.contentOffset.y + spacing.sm + 1;
+    let current = sections[0]?.category.id ?? null;
+    for (const s of sections) {
+      const oy = offsets.current[s.category.id];
+      if (oy != null && oy <= y) current = s.category.id;
+    }
+    if (current && current !== activeCatId) setActiveCatId(current);
+  };
+
+  // Keep the highlighted chip visible in the horizontal chip row.
+  useEffect(() => {
+    const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null;
+    if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - spacing.lg), animated: true });
+  }, [activeCatIdResolved]);
 
   const onAdd = (product: Product) => {
     if (groupsForProduct(product).length > 0) {
@@ -140,12 +168,24 @@ export function HomeMenuScreen() {
           {/* Horizontal categories */}
           {sections.length > 0 ? (
             <View style={styles.chipsWrap}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-                {sections.map((s) => (
-                  <Pressable key={s.category.id} onPress={() => scrollToCategory(s.category.id)} style={styles.chip}>
-                    <Text style={styles.chipText}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
-                  </Pressable>
-                ))}
+              <ScrollView ref={chipScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                {sections.map((s) => {
+                  const active = s.category.id === activeCatIdResolved;
+                  return (
+                    <Pressable
+                      key={s.category.id}
+                      onLayout={(e: LayoutChangeEvent) => {
+                        chipOffsets.current[s.category.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
+                      }}
+                      onPress={() => scrollToCategory(s.category.id)}
+                      style={[styles.chip, active && styles.chipActive]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </View>
           ) : null}
@@ -156,6 +196,8 @@ export function HomeMenuScreen() {
           ) : (
             <ScrollView
               ref={scrollRef}
+              onScroll={onMenuScroll}
+              scrollEventThrottle={16}
               contentContainerStyle={{ padding: spacing.lg, paddingBottom: cart.count > 0 ? 120 : spacing.xxl }}
               showsVerticalScrollIndicator={false}
             >
@@ -277,7 +319,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.white,
     borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.purple,
   },
+  chipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
   chipText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  chipTextActive: { color: colors.white },
 
   section: { marginBottom: spacing.xl },
   sectionTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
