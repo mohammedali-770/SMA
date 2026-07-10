@@ -147,6 +147,34 @@ export const orders = {
       p_payment_method: input.paymentMethod ?? null,
     }));
   },
+  /**
+   * Create the order AND synchronously sync it to Lazywait POS via the
+   * `order-intake` Edge Function, so the receipt can show the POS order number
+   * (e.g. "#5"). The server bounds the wait (~10s) and, if the POS is slow/down,
+   * returns the order WITHOUT a POS number — the order is still placed and the
+   * background worker finishes the sync, so the app just falls back to the SM-…
+   * number. place_order stays the authoritative order creation inside it.
+   */
+  async placeAndSync(input: PlaceOrderInput): Promise<DbOrder> {
+    const { data, error } = await supabase.functions.invoke('order-intake', {
+      body: {
+        branchId: input.branchId,
+        orderType: input.orderType,
+        items: input.items,
+        addressId: input.addressId ?? null,
+        couponCode: input.couponCode ?? null,
+        notes: input.notes ?? null,
+        loyaltyPoints: input.loyaltyPoints ?? 0,
+        idempotencyKey: input.idempotencyKey ?? null,
+        paymentMethod: input.paymentMethod ?? null,
+      },
+    });
+    if (error) throw new Error(error.message);
+    const res = (data ?? {}) as { order?: DbOrder; error?: string };
+    if (res.error) throw new Error(res.error);
+    if (!res.order) throw new Error('Order was not created.');
+    return res.order;
+  },
   /** RLS returns only the signed-in customer's own orders, newest first. */
   listWithItems: async () =>
     ok<DbOrderWithItems[]>(await supabase

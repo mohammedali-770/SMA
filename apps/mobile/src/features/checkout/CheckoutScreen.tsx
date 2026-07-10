@@ -179,7 +179,9 @@ export function CheckoutScreen() {
         }
       }
 
-      const order = await orders.place({
+      // place_order + synchronous Lazywait POS sync, so the receipt shows the
+      // POS order number when the POS responds in time (falls back to SM-… if not).
+      const order = await orders.placeAndSync({
         branchId: selectedBranch.id,
         orderType,
         items: cart.toOrderItems(),
