@@ -1,10 +1,10 @@
 /**
  * Catalog + settings state. Loads the whole menu graph from Supabase once on
  * mount (catalog.all()), maps it to domain models, and exposes selectors the
- * screens use. Also owns the manually-chosen branch (persisted) — per the
- * brief, the app NEVER auto-selects a branch.
+ * screens use. Also owns the manually-chosen branch. The app NEVER auto-selects
+ * a branch AND never remembers it across launches — the branch is a per-session
+ * choice, so every time the app is opened the customer must pick a branch.
  */
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { catalog } from '../services/api';
@@ -20,8 +20,6 @@ import type { PaymentMethodSettings } from '../lib/payment';
 const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
   onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
 };
-
-const BRANCH_KEY = 'spicymeal.branchId';
 
 interface CatalogValue {
   loading: boolean;
@@ -65,13 +63,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
 
-  // Restore the previously chosen branch (if any) — this is a user choice being
-  // remembered, NOT an auto-selection of a default branch.
-  useEffect(() => {
-    AsyncStorage.getItem(BRANCH_KEY)
-      .then((v) => { if (v) setSelectedBranchId(v); })
-      .catch(() => {});
-  }, []);
+  // NOTE: the chosen branch is intentionally NOT restored from storage. It lives
+  // in memory only, so a fresh app launch always starts with no branch selected
+  // and the customer is prompted to choose one (never auto-selected).
 
   useEffect(() => {
     mounted.current = true;
@@ -105,9 +99,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted.current = false; };
   }, [reloadTick]);
 
+  // In-memory only: the choice is kept for the current session but never
+  // persisted, so the next app launch requires selecting a branch again.
   const setSelectedBranch = useCallback((id: string) => {
     setSelectedBranchId(id);
-    AsyncStorage.setItem(BRANCH_KEY, id).catch(() => {});
   }, []);
 
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
