@@ -106,7 +106,11 @@ export function HomeMenuScreen() {
           <Image source={require('../../../assets/icon.png')} style={styles.mark} contentFit="cover" />
           <View>
             <Text style={styles.brand}>{pick('Spicy Meal', 'سبايسي ميل')}</Text>
-            <Text style={styles.brandTag}>{t('tagline')}</Text>
+            <Text style={styles.brandTag} numberOfLines={1}>
+              {pick('Hot, ', 'حار، ')}
+              <Text style={styles.brandTagAccent}>{pick('Crispy', 'مقرمش')}</Text>
+              {pick(', Fresh and Golden Bites', '، طازج ولقيمات ذهبية')}
+            </Text>
           </View>
         </View>
         <Pressable onPress={toggle} hitSlop={8} style={styles.langBtn} accessibilityRole="button">
@@ -281,7 +285,8 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   mark: { width: 38, height: 38, borderRadius: radius.sm },
   brand: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
-  brandTag: { fontSize: font.xs, fontWeight: '600', color: colors.red, marginTop: -2 },
+  brandTag: { fontSize: font.xs, fontWeight: '700', color: colors.text, marginTop: -2 },
+  brandTagAccent: { color: colors.red, fontWeight: '800' },
   langBtn: {
     paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill,
     borderWidth: 1.5, borderColor: colors.purple,

@@ -5,7 +5,7 @@
 export const STRINGS = {
   en: {
     appName: 'Spicy Meal',
-    tagline: 'Spicy Fast-Food',
+    tagline: 'Hot, Crispy, Fresh and Golden Bites',
     welcome: 'Satisfy Your Cravings!',
 
     // common
@@ -174,7 +174,7 @@ export const STRINGS = {
   },
   ar: {
     appName: 'سبايسي ميل',
-    tagline: 'الوجبات الحارة السريعة',
+    tagline: 'حار، مقرمش، طازج ولقيمات ذهبية',
     welcome: 'أشبع رغبتك في الطعم الحار!',
 
     retry: 'إعادة المحاولة',
