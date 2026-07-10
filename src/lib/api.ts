@@ -300,6 +300,41 @@ export const whatsappOtp = {
 };
 
 // ---------------------------------------------------------------------------
+// Email server (SMTP) admin controls (status + test send via Edge Function).
+// The SMTP password never crosses this boundary — only booleans / generic results.
+// ---------------------------------------------------------------------------
+export interface EmailServerStatus {
+  status: string;
+  enabled: boolean;
+  provider: string;
+  host_set: boolean;
+  port: string | null;
+  secure: boolean;
+  username_set: boolean;
+  from_email_set: boolean;
+  from_name: string | null;
+  reply_to_set: boolean;
+  password_set: boolean;
+}
+async function invokeEmailTestConfig<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('email-test-config', { body });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  return data as T;
+}
+export const emailServer = {
+  /** Admin-only: SMTP config status booleans (no secret values). */
+  status: () => invokeEmailTestConfig<EmailServerStatus>({ action: 'status' }),
+  /** Admin-only: send a test email via the stored SMTP settings. */
+  testSend: (to: string) =>
+    invokeEmailTestConfig<{ ok: boolean; message?: string }>({ action: 'test_send', to }),
+};
+
+// ---------------------------------------------------------------------------
 // Lazywait catalog mapping (admin pull + confirm; secrets stay server-side)
 // ---------------------------------------------------------------------------
 export const lazywaitCatalog = {

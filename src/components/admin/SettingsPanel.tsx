@@ -6,6 +6,7 @@ import { formatSAR } from '../../utils/calculations';
 import { IntegrationCard } from './IntegrationCard';
 import { LazywaitPanel } from './LazywaitPanel';
 import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
+import { EmailServerPanel } from './EmailServerPanel';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 
@@ -378,6 +379,7 @@ export const SettingsPanel: React.FC = () => {
                             />
                           ))}
                           <WhatsAppOtpPanel disabled={isAccountant} />
+                          <EmailServerPanel disabled={isAccountant} />
                           <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
                             <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
                             <div>

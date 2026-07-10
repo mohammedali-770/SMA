@@ -61,3 +61,8 @@ verify_jwt = true
 # authenticated by the Standard Webhooks signature (verify_jwt=false, no user JWT).
 [functions.auth-send-sms-whatsapp]
 verify_jwt = false
+
+# Admin-only SMTP status + test-send. Requires a valid admin JWT; reads the SMTP
+# password server-side and never returns it.
+[functions.email-test-config]
+verify_jwt = true
