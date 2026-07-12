@@ -1,0 +1,54 @@
+name: Deploy Supabase Functions
+
+# Deploys the payment Edge Functions from this repo to the Supabase project.
+# REQUIRES a SUPABASE_ACCESS_TOKEN repo secret (Supabase dashboard → Account →
+# Access Tokens → generate; then GitHub repo → Settings → Secrets → Actions).
+#
+# Migrations are NOT run here (they are applied separately) — this only deploys
+# functions, so it can never touch the database schema.
+#
+# Trigger from the Actions tab ("Run workflow"). Defaults to the payment set.
+
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: "Space-separated function names, or 'all' for the payment set"
+        type: string
+        default: "payment-initiate payment-verify payment-webhook payment-return"
+
+env:
+  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+  PROJECT_REF: wxfmmnihidsdyemasstf
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy functions
+        run: |
+          set -euo pipefail
+          FNS="${{ inputs.functions }}"
+          if [ "$FNS" = "all" ] || [ -z "$FNS" ]; then
+            FNS="payment-initiate payment-verify payment-webhook payment-return"
+          fi
+          for fn in $FNS; do
+            # payment-webhook (called by Tap) and payment-return (browser GET) have
+            # no Supabase JWT, so they must deploy with --no-verify-jwt. All others
+            # keep JWT verification ON.
+            case "$fn" in
+              payment-webhook|payment-return) FLAGS="--no-verify-jwt" ;;
+              *) FLAGS="" ;;
+            esac
+            echo "::group::Deploy $fn ($FLAGS)"
+            supabase functions deploy "$fn" --project-ref "$PROJECT_REF" $FLAGS
+            echo "::endgroup::"
+          done
