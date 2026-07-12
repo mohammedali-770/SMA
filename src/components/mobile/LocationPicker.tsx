@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
 import { mapConfig } from '../../lib/map';
+import { MapSearchBox } from '../MapSearchBox';
 
 interface LocationPickerProps {
   lat: number;
@@ -75,6 +76,13 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
     }
   }, [lat, lng]);
 
+  // Address search picked a place → drop the pin there, fly to it, set coords.
+  const goToSearchResult = (rlng: number, rlat: number) => {
+    onChange(Number(rlat.toFixed(6)), Number(rlng.toFixed(6)));
+    markerRef.current?.setLngLat([rlng, rlat]);
+    mapRef.current?.flyTo({ center: [rlng, rlat], zoom: 15, duration: 800 });
+  };
+
   if (!mapConfig.isConfigured) {
     return (
       <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] font-bold text-amber-800 flex items-center gap-2">
@@ -85,10 +93,11 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
   }
 
   return (
-    <div>
-      <div ref={container} className="w-full h-40 rounded-lg overflow-hidden border border-gray-200" />
-      <p className="text-[9px] text-gray-400 font-bold mt-1">
-        {isRTL ? 'حرّك الدبوس إلى موقعك بالضبط.' : 'Move the pin to your exact location.'}
+    <div className="space-y-1.5">
+      <MapSearchBox isRTL={isRTL} onSelect={goToSearchResult} />
+      <div ref={container} className="w-full h-56 rounded-lg overflow-hidden border border-gray-200" />
+      <p className="text-[9px] text-gray-400 font-bold">
+        {isRTL ? 'ابحث عن العنوان أعلاه، أو حرّك الدبوس إلى موقعك بالضبط.' : 'Search the address above, or move the pin to your exact location.'}
       </p>
     </div>
   );

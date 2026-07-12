@@ -7,6 +7,7 @@ import { AlertTriangle, MapPin } from 'lucide-react';
 import { Branch, DeliveryZone } from '../../types';
 import { mapConfig } from '../../lib/map';
 import type { GeoJSONGeometry } from '../../lib/geo';
+import { MapSearchBox } from '../MapSearchBox';
 
 interface DeliveryZoneModalProps {
   branch: Branch;
@@ -173,6 +174,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               </div>
             )}
 
+            <MapSearchBox isRTL={isRTL} onSelect={(lng, lat) => mapRef.current?.flyTo({ center: [lng, lat], zoom: 13, duration: 800 })} />
             <div ref={mapContainer} className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200" />
 
             {error && (
