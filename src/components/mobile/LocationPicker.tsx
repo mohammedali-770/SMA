@@ -37,6 +37,14 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
     });
     mapRef.current = map;
 
+    // This picker is lazy/Suspense-mounted inside a modal, so the container can
+    // still be settling its size when the map initialises. Without a resize the
+    // GL canvas keeps the wrong dimensions and tiles never paint (controls show
+    // over a blank map). A ResizeObserver corrects it once layout settles and on
+    // any later container size change.
+    const ro = new ResizeObserver(() => mapRef.current?.resize());
+    ro.observe(container.current);
+
     const marker = new mapboxgl.Marker({ color: '#7c3aed', draggable: true }).setLngLat(start).addTo(map);
     markerRef.current = marker;
     marker.on('dragend', () => {
@@ -49,7 +57,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
     });
     map.addControl(new mapboxgl.NavigationControl(), 'top-left');
 
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+    return () => { ro.disconnect(); map.remove(); mapRef.current = null; markerRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

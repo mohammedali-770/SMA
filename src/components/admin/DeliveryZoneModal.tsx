@@ -53,6 +53,13 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
     });
     mapRef.current = map;
 
+    // The modal animates in (scale-up), so the container may not be at its final
+    // size when the map initialises. Without a resize the GL canvas keeps the
+    // wrong dimensions and tiles never paint (controls show over a blank map). A
+    // ResizeObserver corrects it once layout settles and on any later change.
+    const ro = new ResizeObserver(() => mapRef.current?.resize());
+    ro.observe(mapContainer.current);
+
     const draw = new MapboxDraw({
       displayControlsDefault: false,
       controls: disabled ? {} : { polygon: true, trash: true },
@@ -82,7 +89,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
       setReady(true);
     });
 
-    return () => { map.remove(); mapRef.current = null; drawRef.current = null; };
+    return () => { ro.disconnect(); map.remove(); mapRef.current = null; drawRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
