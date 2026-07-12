@@ -389,7 +389,7 @@ export const paymentGateway = {
     invokePaymentTestConfig<{ status: string; message?: string }>({ action: 'verify_order', orderId }),
   /** Admin-only: create an isolated 1 SAR Tap TEST checkout (no order created). Returns the hosted URL. */
   testCheckout: () =>
-    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; checkoutUrl?: string; mode?: string }>({ action: 'test_checkout' }),
+    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; checkoutUrl?: string; mode?: string; tapErrorCode?: string | null; tapErrorDescription?: string | null; httpStatus?: number }>({ action: 'test_checkout' }),
   /** Admin-only: verify the admin test charge via Retrieve Charge (display only — never confirms an order). */
   testCheckoutResult: (chargeId: string) =>
     invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; status?: string; amount?: number; currency?: string; mode?: string; messageKey?: string }>({ action: 'test_checkout_result', chargeId }),

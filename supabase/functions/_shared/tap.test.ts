@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatTapAmount, currencyDecimals, normalizeSaudiPhone, buildTapChargePayload,
   computeChargeWebhookHash, chargeHashFields, mapTapStatus, sanitizeTapResponse, timingSafeEqual,
-  resolveTapConfig, isAdminTestCharge,
+  resolveTapConfig, isAdminTestCharge, extractTapError,
 } from './tap.ts';
 
 describe('formatTapAmount / currencyDecimals', () => {
@@ -154,6 +154,24 @@ describe('resolveTapConfig (fail-closed)', () => {
   it('clamps expiry to 5..60', () => {
     expect(resolveTapConfig(true, 'tap', { ...pub, transaction_expiry_minutes: 3 }, sec).expiryMinutes).toBe(5);
     expect(resolveTapConfig(true, 'tap', { ...pub, transaction_expiry_minutes: 120 }, sec).expiryMinutes).toBe(60);
+  });
+});
+
+describe('extractTapError', () => {
+  it('pulls code + description from a Tap error body', () => {
+    const e = extractTapError({ errors: [{ code: '1139', description: 'Customer phone number or email address is required' }] });
+    expect(e.code).toBe('1139');
+    expect(e.description).toBe('Customer phone number or email address is required');
+  });
+  it('returns nulls when there is no error array', () => {
+    expect(extractTapError({})).toEqual({ code: null, description: null });
+    expect(extractTapError(null)).toEqual({ code: null, description: null });
+    expect(extractTapError({ errors: [] })).toEqual({ code: null, description: null });
+  });
+  it('coerces numeric codes to string and clamps long descriptions', () => {
+    const e = extractTapError({ errors: [{ code: 1139, description: 'x'.repeat(500) }] });
+    expect(e.code).toBe('1139');
+    expect(e.description?.length).toBe(200);
   });
 });
 

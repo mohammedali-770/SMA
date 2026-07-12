@@ -1,7 +1,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
-import { resolveTapConfig, mapTapStatus, buildTapChargePayload, sanitizeTapResponse, isAdminTestCharge } from '../_shared/tap.ts';
+import { resolveTapConfig, mapTapStatus, buildTapChargePayload, sanitizeTapResponse, isAdminTestCharge, extractTapError } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
 
 /**
@@ -102,7 +102,14 @@ Deno.serve(async (req: Request) => {
       postUrl: `${supabaseUrl}/functions/v1/payment-webhook`,
       redirectUrl: `${supabaseUrl}/functions/v1/tap-admin-test-return`,
       metadata: { purpose: 'admin_test' },
-      customer: { firstName: 'Admin', lastName: 'Test' },
+      // Tap Create Charge requires customer email OR phone (error 1139 otherwise).
+      // Admin-test-only dummy contact — sandbox values, never a real customer; the
+      // receipt is off, so nothing is sent to this address/number.
+      customer: {
+        firstName: 'Spicy', lastName: 'Meal',
+        email: 'test@spicymeal.com.sa',
+        phone: { country_code: '966', number: '500000000' },
+      },
     });
     try {
       const resp = await fetch(TAP_BASE, {
@@ -113,8 +120,17 @@ Deno.serve(async (req: Request) => {
       });
       const result = await resp.json().catch(() => ({}));
       if (!resp.ok) {
-        console.error('Tap admin test charge failed', resp.status);
-        return json({ ok: false, message: 'Tap did not accept the test charge. Check the merchant id / test key.' }, 200);
+        // Surface the real Tap reason to Admin — code + description ONLY (no secret,
+        // no Authorization header, no raw body). Logs are sanitized the same way.
+        const tapErr = extractTapError(result);
+        console.error('Tap admin test charge failed', { httpStatus: resp.status, code: tapErr.code, description: tapErr.description });
+        return json({
+          ok: false,
+          message: 'Tap did not accept the test charge.',
+          tapErrorCode: tapErr.code,
+          tapErrorDescription: tapErr.description,
+          httpStatus: resp.status,
+        }, 200);
       }
       const chargeId = String((result as Record<string, unknown>).id ?? '');
       const transaction = ((result as Record<string, unknown>).transaction ?? {}) as Record<string, unknown>;
