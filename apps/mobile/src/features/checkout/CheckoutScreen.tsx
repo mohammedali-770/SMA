@@ -201,13 +201,18 @@ export function CheckoutScreen() {
       // payment is verified (the DB trigger holds them in 'awaiting_payment');
       // cash orders sync to the POS now, as before.
       const order = isOnline ? await orders.place(orderInput) : await orders.placeAndSync(orderInput);
-      cart.clear();
 
       // Zero-total (e.g. full coupon/loyalty) never touches Tap — go straight to
       // the receipt. Online orders with a real total go through Tap checkout.
       if (isOnline && Number(order.total) > 0) {
+        // Keep the cart until the payment actually succeeds. Clearing it here
+        // (before Tap) wiped the customer's cart on any failed/abandoned payment
+        // and left the order summary showing 0.00 behind the payment modal. The
+        // cart's idempotencyKey is stable until the cart changes, so re-placing
+        // the same unchanged cart returns the same order — never a duplicate.
         await runTapPayment(order.id);
       } else {
+        cart.clear();
         router.replace(`/receipt/${order.id}`);
       }
     } catch (e) {
@@ -222,7 +227,7 @@ export function CheckoutScreen() {
     setPayFlow({ state: 'opening', orderId });
     try {
       const init = await payments.initiate(orderId, lang === 'ar' ? 'ar' : 'en');
-      if (init.status === 'already_paid') { router.replace(`/receipt/${orderId}`); return; }
+      if (init.status === 'already_paid') { cart.clear(); router.replace(`/receipt/${orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
         setPayFlow({ state: 'error', orderId, message: t('payUnavailable') });
         return;
@@ -243,7 +248,7 @@ export function CheckoutScreen() {
     setPayBusy(true);
     try {
       const res = await payments.verify(orderId);
-      if (res.status === 'paid') { setPayFlow(null); router.replace(`/receipt/${orderId}`); return; }
+      if (res.status === 'paid') { cart.clear(); setPayFlow(null); router.replace(`/receipt/${orderId}`); return; }
       const state: PayState =
         res.status === 'cancelled' ? 'cancelled'
         : res.status === 'expired' ? 'expired'

@@ -125,26 +125,49 @@ async function initiateTap(
     },
   });
 
+  // Create the charge. A transient network blip (DNS / connect reset / timeout)
+  // shouldn't fail the whole checkout, so retry once. Retrying is double-charge
+  // safe: the payload carries the same `idempotent` reference_transaction, so Tap
+  // returns the SAME charge instead of creating a second one.
   let result: Record<string, unknown> = {};
-  try {
-    const resp = await fetch(TAP_CHARGES, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tap.secretKey}` },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(15_000),
-    });
-    result = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      console.error('Tap charge create failed', resp.status);
-      await admin.from('payment_records').update({
-        status: 'failed', failure_code: `create_${resp.status}`, failure_message_safe: 'Could not start payment.',
-        raw: sanitizeTapResponse(result),
-      }).eq('id', attempt.id).then(() => {}, () => {});
-      return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  let resp: Response | null = null;
+  for (let attemptNo = 1; attemptNo <= 2; attemptNo++) {
+    try {
+      resp = await fetch(TAP_CHARGES, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tap.secretKey}` },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15_000),
+      });
+      break; // got an HTTP response (ok or not) — stop retrying
+    } catch (e) {
+      console.error(`Tap charge request error (attempt ${attemptNo}/2)`, e instanceof Error ? e.message : 'error');
+      if (attemptNo < 2) await new Promise((r) => setTimeout(r, 600));
     }
-  } catch (e) {
-    console.error('Tap charge request error', e instanceof Error ? e.message : 'error');
+  }
+
+  if (!resp) {
+    // Still couldn't reach Tap after the retry. Annotate the attempt so the
+    // failure is visible instead of a bare 'initiated' record — but KEEP the
+    // status 'initiated' so tap_begin_payment_attempt reuses this same attempt
+    // (and its idempotent reference) on the next "Try Again", preserving the
+    // double-charge guard.
+    await admin.from('payment_records').update({
+      failure_code: 'network_unreachable',
+      failure_message_safe: 'Could not reach the payment provider.',
+      last_verified_at: new Date().toISOString(),
+    }).eq('id', attempt.id).then(() => {}, () => {});
     return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
+  }
+
+  result = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('Tap charge create failed', resp.status);
+    await admin.from('payment_records').update({
+      status: 'failed', failure_code: `create_${resp.status}`, failure_message_safe: 'Could not start payment.',
+      raw: sanitizeTapResponse(result),
+    }).eq('id', attempt.id).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
   }
 
   const chargeId = String(result.id ?? '');
@@ -167,6 +190,8 @@ async function initiateTap(
   const { error: persistErr } = await admin.from('payment_records').update({
     provider_ref: chargeId, checkout_url: checkoutUrl || null, raw: sanitizeTapResponse(result),
     last_verified_at: new Date().toISOString(),
+    // Clear any prior 'network_unreachable' breadcrumb now that the charge exists.
+    failure_code: null, failure_message_safe: null,
   }).eq('id', attempt.id);
   if (persistErr) {
     console.error('Tap charge persist failed', String(persistErr.message ?? '').slice(0, 200));
