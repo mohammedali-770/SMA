@@ -66,3 +66,20 @@ verify_jwt = false
 # password server-side and never returns it.
 [functions.email-test-config]
 verify_jwt = true
+
+# ---- Tap Payments (Hosted Checkout) --------------------------------------
+# The customer verifies their own paid order after returning from Tap. Requires a
+# valid user JWT; retrieves the charge from Tap server-side and confirms only on
+# CAPTURED. The order is read via the user's RLS so they can verify only their own.
+[functions.payment-verify]
+verify_jwt = true
+
+# The HTTPS page Tap redirects the browser to after checkout. Bounces back into
+# the app via the spicymeal:// deep link; marks nothing paid. No JWT (public page).
+[functions.payment-return]
+verify_jwt = false
+
+# Admin-only Tap status + harmless key check (never creates a charge). Requires a
+# valid admin JWT; reads the secret key server-side and never returns it.
+[functions.payment-test-config]
+verify_jwt = true

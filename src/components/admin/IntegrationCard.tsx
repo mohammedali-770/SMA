@@ -21,14 +21,21 @@ export interface ProviderSpec {
  */
 export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], ProviderSpec> = {
   payment: {
-    title: 'Payment Gateway',
-    subtitle: 'Mada / Visa / Apple Pay provider — stored only, not activated yet',
-    providerOptions: ['moyasar', 'paytabs', 'hyperpay', 'sandbox'],
+    title: 'Payment Gateway (Tap)',
+    subtitle: 'Tap Hosted Checkout (Mada/Visa/…). Secrets server-side only. Set TEST mode first — switching to LIVE asks for confirmation.',
+    providerOptions: ['tap'],
     publicFields: [
-      { key: 'publishable_key', label: 'Publishable Key', type: 'text', placeholder: 'pk_test_…' },
-      { key: 'live_mode', label: 'Live / Production Mode', type: 'bool' },
+      { key: 'merchant_id', label: 'Merchant ID', type: 'text', placeholder: 'Tap merchant id' },
+      { key: 'mode', label: 'Mode (test / live)', type: 'text', placeholder: 'test' },
+      { key: 'currency', label: 'Currency', type: 'text', placeholder: 'SAR' },
+      { key: 'source_id', label: 'Source ID', type: 'text', placeholder: 'src_all' },
+      { key: 'transaction_expiry_minutes', label: 'Charge expiry (minutes, 5–60)', type: 'text', placeholder: '30' },
+      { key: 'statement_descriptor', label: 'Statement descriptor (optional)', type: 'text', placeholder: 'Spicy Meal' },
     ],
-    secretFields: [{ key: 'secret_key', label: 'Secret Key' }],
+    secretFields: [
+      { key: 'test_secret_key', label: 'Test Secret Key (sk_test_…)' },
+      { key: 'live_secret_key', label: 'Live Secret Key (sk_live_…)' },
+    ],
   },
   sms: {
     title: 'SMS / OTP Gateway',
@@ -117,6 +124,17 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const handleSave = async () => {
+    // Explicit confirmation before switching Tap to LIVE (real payments).
+    if (providerType === 'payment') {
+      const newMode = String((pub.mode as string) ?? '').toLowerCase();
+      const oldMode = String(((row?.public_config as Record<string, unknown>)?.mode as string) ?? 'test').toLowerCase();
+      if (newMode === 'live' && oldMode !== 'live') {
+        const okLive = window.confirm(
+          'Switch Tap to LIVE mode? Real customer payments will be processed. Make sure the LIVE secret key is configured.',
+        );
+        if (!okLive) return;
+      }
+    }
     setSaving(true);
     setMsg(null);
     try {

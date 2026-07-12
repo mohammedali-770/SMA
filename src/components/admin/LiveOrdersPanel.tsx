@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, AlertTriangle } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
@@ -6,6 +6,7 @@ import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { orderDisplayNumber } from '../../lib/mappers';
+import { paymentGateway, DbPaymentRecord } from '../../lib/api';
 
 // Statuses an order should not reach while an ONLINE payment is still unverified.
 // "Received" is always allowed and "Cancelled" needs no payment. Cash orders are
@@ -35,6 +36,82 @@ function syncTone(state: string): string {
       return 'bg-yellow-50 text-yellow-600';
   }
 }
+
+/**
+ * Tap payment details for an online order in the receipt modal: provider, charge
+ * id, test/live badge, card brand + last four, sanitized failure. Admin (not
+ * accountant) gets a "Verify" action that re-checks the charge via Tap Retrieve
+ * Charge (only a genuine CAPTURED confirms — it can never force paid). Reads only
+ * the safe payment_records columns (RLS: staff read); no raw payload, no secrets.
+ */
+const TapPaymentDetails: React.FC<{ order: Order; isAccountant: boolean; isRTL: boolean }> = ({ order, isAccountant, isRTL }) => {
+  const [rec, setRec] = useState<DbPaymentRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try { setRec(await paymentGateway.record(order.id)); } catch { setRec(null); } finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [order.id]);
+
+  if (order.paymentMethod !== 'online') return null;
+  if (loading) return <div className="p-2.5 bg-gray-50 rounded-lg text-[9px] text-gray-400 font-bold animate-pulse">{isRTL ? 'جاري تحميل تفاصيل الدفع…' : 'Loading payment details…'}</div>;
+  if (!rec || rec.provider !== 'tap') return null;
+
+  const isLive = rec.mode === 'live';
+  const paid = rec.status === 'paid';
+  const verify = async () => {
+    setVerifying(true); setResult(null);
+    try { const r = await paymentGateway.adminVerify(order.id); setResult(r.status); await load(); }
+    catch (e) { setResult(e instanceof Error ? e.message : 'error'); }
+    finally { setVerifying(false); }
+  };
+
+  return (
+    <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
+      <div className="flex justify-between items-center">
+        <span className="text-gray-400">Payment provider:</span>
+        <span className="font-black text-slate-700 flex items-center gap-1">
+          Tap
+          <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${isLive ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{isLive ? 'LIVE' : 'TEST'}</span>
+        </span>
+      </div>
+      {rec.provider_ref && (
+        <div className="flex justify-between items-center gap-2">
+          <span className="text-gray-400">Charge ID:</span>
+          <span className="font-mono text-[8.5px] text-slate-600 truncate">{rec.provider_ref}</span>
+        </div>
+      )}
+      <div className="flex justify-between items-center">
+        <span className="text-gray-400">Provider status:</span>
+        <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase ${paid ? 'bg-green-100 text-green-700' : rec.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-50 text-yellow-700'}`}>{rec.status}</span>
+      </div>
+      {(rec.card_scheme || rec.card_last_four) && (
+        <div className="flex justify-between items-center">
+          <span className="text-gray-400">Card:</span>
+          <span className="font-semibold text-slate-600">{[rec.card_scheme, rec.card_last_four ? `•••• ${rec.card_last_four}` : ''].filter(Boolean).join(' ')}</span>
+        </div>
+      )}
+      {rec.failure_message_safe && (
+        <div className="flex justify-between items-center">
+          <span className="text-gray-400">Note:</span>
+          <span className="font-semibold text-red-600">{rec.failure_message_safe}</span>
+        </div>
+      )}
+      {!isAccountant && !paid && (
+        <div className="pt-1.5 border-t border-gray-100 flex items-center justify-between gap-2">
+          <span className="text-[8.5px] text-gray-400 font-bold">{isRTL ? 'إعادة التحقق من الدفع عبر Tap' : 'Re-verify via Tap'}</span>
+          <button onClick={() => void verify()} disabled={verifying} className="bg-primary text-white text-[9px] font-black px-2.5 py-1 rounded-lg disabled:opacity-40">
+            {verifying ? '…' : (isRTL ? 'تحقق' : 'Verify')}
+          </button>
+        </div>
+      )}
+      {result && <div className="text-[8.5px] font-bold text-slate-500">{isRTL ? 'النتيجة' : 'Result'}: {result}</div>}
+    </div>
+  );
+};
 
 export const LiveOrdersPanel: React.FC = () => {
   const { orders, branches, updateOrderStatus, brandSettings, currentUser, adminLang } = useApp();
@@ -389,6 +466,9 @@ export const LiveOrdersPanel: React.FC = () => {
                   })()}
                 </div>
               </div>
+
+              {/* Tap payment details (online orders) — provider/charge/mode/card + admin verify */}
+              <TapPaymentDetails order={activeReceiptOrder} isAccountant={isAccountant} isRTL={isRTL} />
 
               {/* POS (Lazywait) sync status — visibility only; nothing is synced from here */}
               {(() => {

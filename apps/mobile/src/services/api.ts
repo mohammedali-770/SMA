@@ -191,6 +191,40 @@ export const orders = {
 };
 
 // ---------------------------------------------------------------------------
+// Tap Payments (online checkout). The app NEVER trusts the redirect result — it
+// opens the Tap hosted checkout URL, then calls payment-verify, which retrieves
+// the charge server-side and confirms only on CAPTURED. No secret key ever
+// reaches the app; amounts/status are always server-authoritative.
+// ---------------------------------------------------------------------------
+export interface PaymentInitiateResult {
+  provider?: string;
+  status?: string;            // 'disabled' | 'already_paid' | undefined
+  mode?: string;              // 'test' | 'live'
+  chargeId?: string;
+  checkoutUrl?: string | null;
+  needsVerify?: boolean;
+  orderNumber?: string;
+}
+export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string; }
+async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  return data as T;
+}
+export const payments = {
+  /** Start (or reuse) a Tap charge for an online order. Returns the hosted URL. */
+  initiate: (orderId: string, language: 'ar' | 'en') =>
+    invokePaymentFn<PaymentInitiateResult>('payment-initiate', { orderId, language }),
+  /** Server-authoritative verification after returning from checkout. */
+  verify: (orderId: string) => invokePaymentFn<PaymentVerifyResult>('payment-verify', { orderId }),
+};
+
+// ---------------------------------------------------------------------------
 // Coupons (validation RPC only — codes are never client-readable)
 // ---------------------------------------------------------------------------
 export const coupons = {

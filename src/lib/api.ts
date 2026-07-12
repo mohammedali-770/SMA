@@ -335,6 +335,71 @@ export const emailServer = {
 };
 
 // ---------------------------------------------------------------------------
+// Tap Payments admin controls. Secret keys never cross this boundary — only
+// readiness booleans / generic results. `record` is a staff read of the safe
+// payment_records columns (no raw provider payload, no secrets).
+// ---------------------------------------------------------------------------
+export interface PaymentGatewayStatus {
+  status: string;
+  provider: string | null;
+  enabled: boolean;
+  mode: 'test' | 'live';
+  currency: string;
+  source_id: string;
+  merchant_id_set: boolean;
+  test_key_set: boolean;
+  live_key_set: boolean;
+  active_key_set: boolean;
+  expiry_minutes: number;
+}
+export interface DbPaymentRecord {
+  id: string;
+  order_id: string;
+  provider: string;
+  provider_ref: string | null;
+  status: 'initiated' | 'authorized' | 'paid' | 'failed' | 'refunded';
+  amount: number;
+  currency: string;
+  mode: 'test' | 'live' | null;
+  card_scheme: string | null;
+  card_last_four: string | null;
+  failure_code: string | null;
+  failure_message_safe: string | null;
+  confirmed_at: string | null;
+  last_verified_at: string | null;
+  created_at: string;
+}
+async function invokePaymentTestConfig<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('payment-test-config', { body });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  return data as T;
+}
+export const paymentGateway = {
+  /** Admin-only: Tap config readiness booleans (no secret values). */
+  status: () => invokePaymentTestConfig<PaymentGatewayStatus>({ action: 'status' }),
+  /** Admin-only: validate the selected-mode key against Tap (never creates a charge). */
+  testConnection: () => invokePaymentTestConfig<{ ok: boolean; message?: string }>({ action: 'test_connection' }),
+  /** Admin-only: re-verify an order's payment via Tap Retrieve Charge (only CAPTURED confirms). */
+  adminVerify: (orderId: string) =>
+    invokePaymentTestConfig<{ status: string; message?: string }>({ action: 'verify_order', orderId }),
+  /** Staff read of the latest safe payment record for an order (no raw/secret). */
+  async record(orderId: string): Promise<DbPaymentRecord | null> {
+    const rows = ok<DbPaymentRecord[]>(await supabase
+      .from('payment_records')
+      .select('id, order_id, provider, provider_ref, status, amount, currency, mode, card_scheme, card_last_four, failure_code, failure_message_safe, confirmed_at, last_verified_at, created_at')
+      .eq('order_id', orderId)
+      .order('created_at', { ascending: false })
+      .limit(1));
+    return rows[0] ?? null;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Lazywait catalog mapping (admin pull + confirm; secrets stay server-side)
 // ---------------------------------------------------------------------------
 export const lazywaitCatalog = {
