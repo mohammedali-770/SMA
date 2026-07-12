@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Check, CreditCard, RefreshCw, Plug } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { paymentGateway, PaymentGatewayStatus } from '../../lib/api';
+import { canRunAdminTestCheckout } from '../../lib/tapAdminTest';
 
 /**
  * Admin Tap Payments readiness + connection test. Reads config-presence booleans
@@ -17,6 +18,12 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Isolated admin TEST checkout (1 SAR sandbox; no order created).
+  const [coRunning, setCoRunning] = useState(false);
+  const [coChargeId, setCoChargeId] = useState<string | null>(null);
+  const [coChecking, setCoChecking] = useState(false);
+  const [coMsg, setCoMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [coResult, setCoResult] = useState<{ chargeId?: string; status?: string; amount?: number; currency?: string; mode?: string } | null>(null);
 
   const load = async () => {
     setLoading(true); setError(null);
@@ -38,6 +45,35 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
 
   const isTap = (status?.provider ?? '') === 'tap';
   const isLive = status?.mode === 'live';
+  const canRunTest = canRunAdminTestCheckout(status, disabled);
+
+  const runTestCheckout = async () => {
+    setCoRunning(true); setCoMsg(null); setCoResult(null);
+    try {
+      const res = await paymentGateway.testCheckout();
+      if (res.ok && res.checkoutUrl) {
+        setCoChargeId(res.chargeId ?? null);
+        window.open(res.checkoutUrl, '_blank', 'noopener,noreferrer');
+        setCoMsg({ ok: true, text: isRTL ? 'فُتحت صفحة الدفع في نافذة جديدة. أكمل الدفع ثم عُد وتحقق من النتيجة.' : 'Opened the sandbox checkout in a new tab. Complete it, then return and check the result.' });
+      } else {
+        setCoMsg({ ok: false, text: res.message || (isRTL ? 'تعذّر بدء التجربة.' : 'Could not start the test.') });
+      }
+    } catch (e) {
+      setCoMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally { setCoRunning(false); }
+  };
+
+  const checkTestResult = async () => {
+    if (!coChargeId) return;
+    setCoChecking(true); setCoMsg(null);
+    try {
+      const res = await paymentGateway.testCheckoutResult(coChargeId);
+      if (res.ok) setCoResult({ chargeId: res.chargeId, status: res.status, amount: res.amount, currency: res.currency, mode: res.mode });
+      else setCoMsg({ ok: false, text: res.message || (isRTL ? 'تعذّر التحقق.' : 'Could not verify.') });
+    } catch (e) {
+      setCoMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
+    } finally { setCoChecking(false); }
+  };
 
   const Indicator: React.FC<{ label: string; ok: boolean }> = ({ label, ok }) => (
     <div className="flex items-center justify-between bg-white/70 border border-slate-100 rounded-lg px-2.5 py-1.5">
@@ -120,6 +156,59 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
                   ? 'يتحقق من المفتاح السري للوضع المحدد لدى Tap دون إنشاء أي عملية دفع.'
                   : 'Validates the selected-mode secret key against Tap without creating any charge.'}
               </p>
+            </div>
+          )}
+
+          {/* Isolated admin TEST checkout — 1 SAR sandbox, no Spicy Meal order created */}
+          {!disabled && (
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
+                <button
+                  onClick={() => void runTestCheckout()}
+                  disabled={coRunning || !canRunTest}
+                  className="bg-primary hover:opacity-90 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-1 disabled:opacity-40"
+                >
+                  <CreditCard className="w-3 h-3" /> {coRunning ? '…' : (isRTL ? 'ابدأ' : 'Run')}
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-400 font-semibold">
+                {isRTL
+                  ? 'ينشئ عملية دفع تجريبية بقيمة ١ ريال عبر Tap (Sandbox) لاختبار صفحة الدفع. لا يُنشئ أو يدفع أي طلب في Spicy Meal.'
+                  : 'Creates a 1 SAR Tap sandbox checkout to test the hosted payment page. It does not create or pay any Spicy Meal order.'}
+              </p>
+              {!canRunTest && (
+                <p className="text-[9px] text-amber-600 font-bold">
+                  {isRTL
+                    ? 'متاح فقط عندما يكون Tap مفعّلاً في وضع الاختبار مع معرّف التاجر ومفتاح الاختبار.'
+                    : 'Available only when Tap is enabled in TEST mode with a merchant id + test key.'}
+                </p>
+              )}
+              {coChargeId && (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-[9px] text-slate-500 font-bold">{isRTL ? 'بعد إتمام الدفع في النافذة:' : 'After paying in the new tab:'}</span>
+                  <button
+                    onClick={() => void checkTestResult()}
+                    disabled={coChecking}
+                    className="bg-white border border-primary/30 text-primary text-[11px] font-black px-3 py-1.5 rounded-xl disabled:opacity-40"
+                  >
+                    {coChecking ? '…' : (isRTL ? 'تحقق من النتيجة' : 'Check test result')}
+                  </button>
+                </div>
+              )}
+              {coMsg && (
+                <div className={`text-[10px] font-bold flex items-center gap-1 ${coMsg.ok ? 'text-green-700' : 'text-red-600'}`}>
+                  {coMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {coMsg.text}
+                </div>
+              )}
+              {coResult && (
+                <div className="bg-white/70 border border-slate-100 rounded-lg p-2 text-[10px] space-y-1">
+                  <div className="flex justify-between gap-2"><span className="text-slate-400">{isRTL ? 'رقم العملية' : 'Charge ID'}</span><span className="font-mono text-[8.5px] text-slate-600 truncate">{coResult.chargeId}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الحالة' : 'Status'}</span><span className="font-black text-slate-700">{coResult.status}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'المبلغ' : 'Amount'}</span><span className="font-bold text-slate-700">{coResult.amount} {coResult.currency}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الوضع' : 'Mode'}</span><span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-700">{String(coResult.mode ?? 'test').toUpperCase()}</span></div>
+                </div>
+              )}
             </div>
           )}
         </>

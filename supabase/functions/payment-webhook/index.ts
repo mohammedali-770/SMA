@@ -3,7 +3,7 @@ import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import { callbackSignature, formatAmount, timingSafeEqual as geideaTimingSafeEqual } from '../_shared/geidea.ts';
 import {
-  resolveTapConfig, chargeHashFields, computeChargeWebhookHash, timingSafeEqual,
+  resolveTapConfig, chargeHashFields, computeChargeWebhookHash, timingSafeEqual, isAdminTestCharge,
 } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
 import { triggerLazywaitSyncOnce, pushLazywaitOnlinePayment } from '../_shared/paymentSync.ts';
@@ -63,6 +63,18 @@ async function handleTapWebhook(
       request: { charge_id: chargeId.slice(0, 64), body_bytes: rawBody.length }, error: 'hashstring mismatch',
     }).then(() => {}, () => {});
     return json({ error: 'invalid hashstring' }, 401);
+  }
+
+  // The admin dashboard's isolated test charge is NOT linked to any order.
+  // Recognise it and acknowledge WITHOUT touching order/payment state — never look
+  // it up or confirm anything. (It is also never stored in payment_records, so the
+  // lookup below would miss it anyway; this is the explicit, logged safeguard.)
+  if (isAdminTestCharge(charge)) {
+    await admin.from('integration_sync_logs').insert({
+      provider: 'tap', order_id: null, direction: 'webhook', status: 'skipped',
+      request: { charge_id: chargeId.slice(0, 64) }, error: 'admin_test charge ignored',
+    }).then(() => {}, () => {});
+    return json({ status: 'acknowledged', reason: 'admin_test' }, 200);
   }
 
   // Locate the stored attempt for this charge.

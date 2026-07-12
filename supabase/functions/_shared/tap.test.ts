@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatTapAmount, currencyDecimals, normalizeSaudiPhone, buildTapChargePayload,
   computeChargeWebhookHash, chargeHashFields, mapTapStatus, sanitizeTapResponse, timingSafeEqual,
-  resolveTapConfig,
+  resolveTapConfig, isAdminTestCharge,
 } from './tap.ts';
 
 describe('formatTapAmount / currencyDecimals', () => {
@@ -67,6 +67,22 @@ describe('buildTapChargePayload', () => {
   it('clamps expiry to 5..60 minutes', () => {
     expect(((buildTapChargePayload({ ...base, expiryMinutes: 1 }).transaction as any).expiry.period)).toBe(5);
     expect(((buildTapChargePayload({ ...base, expiryMinutes: 999 }).transaction as any).expiry.period)).toBe(60);
+  });
+  it('attaches metadata only when provided', () => {
+    expect(buildTapChargePayload(base).metadata).toBeUndefined();
+    expect(buildTapChargePayload({ ...base, metadata: { purpose: 'admin_test' } }).metadata).toEqual({ purpose: 'admin_test' });
+  });
+});
+
+describe('isAdminTestCharge', () => {
+  it('recognises the admin test charge by reference.order or metadata.purpose', () => {
+    expect(isAdminTestCharge({ reference: { order: 'admin_test' } })).toBe(true);
+    expect(isAdminTestCharge({ metadata: { purpose: 'admin_test' } })).toBe(true);
+  });
+  it('is false for a normal order charge', () => {
+    expect(isAdminTestCharge({ reference: { order: 'SM-2026-000123' }, metadata: {} })).toBe(false);
+    expect(isAdminTestCharge({})).toBe(false);
+    expect(isAdminTestCharge(null)).toBe(false);
   });
 });
 

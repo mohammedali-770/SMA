@@ -1,7 +1,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
-import { resolveTapConfig, mapTapStatus } from '../_shared/tap.ts';
+import { resolveTapConfig, mapTapStatus, buildTapChargePayload, sanitizeTapResponse, isAdminTestCharge } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
 
 /**
@@ -30,7 +30,7 @@ Deno.serve(async (req: Request) => {
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
   if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
 
-  let payload: { action?: string; orderId?: string };
+  let payload: { action?: string; orderId?: string; chargeId?: string };
   try { payload = await req.json(); } catch { payload = {}; }
 
   const cfg = await getProviderConfig(admin, 'payment');
@@ -79,6 +79,73 @@ Deno.serve(async (req: Request) => {
     const result = await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId);
     const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
     return json({ status: outcome, message: mapTapStatus(retrieved.charge.status).messageKey }, 200);
+  }
+
+  if (payload.action === 'test_checkout') {
+    // Admin-only isolated Tap TEST checkout. Creates a 1 SAR sandbox charge that is
+    // NOT linked to any Spicy Meal order — it never touches orders, payment_records
+    // (order_id is required there), Lazywait, cash, or the mobile flow. Fails closed
+    // unless Tap is enabled in TEST mode with a merchant id + test key.
+    if (providerName !== 'tap') return json({ ok: false, message: "Set the payment provider to 'tap' first." }, 200);
+    if (!cfg?.enabled) return json({ ok: false, message: 'Enable Tap first.' }, 200);
+    if (mode !== 'test') return json({ ok: false, message: 'Admin test checkout is only available in TEST mode.' }, 200);
+    const tap = resolveTapConfig(true, 'tap', pub, sec, 'test'); // force the TEST key
+    if (!tap.merchantId) return json({ ok: false, message: 'Merchant ID is not set.' }, 200);
+    if (!tap.secretKey) return json({ ok: false, message: 'Test secret key is not set.' }, 200);
+
+    const ref = `admin_test_${crypto.randomUUID()}`;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const chargeBody = buildTapChargePayload({
+      amount: 1, currency: 'SAR', description: 'Spicy Meal admin Tap test checkout',
+      referenceTransaction: ref, referenceOrder: 'admin_test', idempotent: ref,
+      sourceId: 'src_all', merchantId: tap.merchantId, expiryMinutes: 30, langCode: 'en',
+      postUrl: `${supabaseUrl}/functions/v1/payment-webhook`,
+      redirectUrl: `${supabaseUrl}/functions/v1/tap-admin-test-return`,
+      metadata: { purpose: 'admin_test' },
+      customer: { firstName: 'Admin', lastName: 'Test' },
+    });
+    try {
+      const resp = await fetch(TAP_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tap.secretKey}` },
+        body: JSON.stringify(chargeBody),
+        signal: AbortSignal.timeout(15_000),
+      });
+      const result = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        console.error('Tap admin test charge failed', resp.status);
+        return json({ ok: false, message: 'Tap did not accept the test charge. Check the merchant id / test key.' }, 200);
+      }
+      const chargeId = String((result as Record<string, unknown>).id ?? '');
+      const transaction = ((result as Record<string, unknown>).transaction ?? {}) as Record<string, unknown>;
+      const checkoutUrl = String(transaction.url ?? '');
+      if (!chargeId || !checkoutUrl) return json({ ok: false, message: 'Tap did not return a checkout URL.' }, 200);
+      return json({ ok: true, chargeId, checkoutUrl, mode: 'test' }, 200);
+    } catch {
+      return json({ ok: false, message: 'Could not reach Tap. Please try again.' }, 200);
+    }
+  }
+
+  if (payload.action === 'test_checkout_result') {
+    // Verify the admin test charge server-side via Retrieve Charge. Display ONLY —
+    // never confirms an order, never writes payment state. Redirect params are not
+    // trusted; the frontend only supplies the charge id it received on create.
+    if (providerName !== 'tap') return json({ ok: false, message: 'unavailable' }, 200);
+    const chargeId = String(payload.chargeId ?? '');
+    if (!chargeId) return json({ ok: false, message: 'chargeId is required' }, 200);
+    const tap = resolveTapConfig(Boolean(cfg?.enabled), 'tap', pub, sec, 'test'); // TEST key
+    if (!tap.secretKey) return json({ ok: false, message: 'Test secret key is not set.' }, 200);
+    const retrieved = await retrieveTapCharge(tap.secretKey, chargeId);
+    if (!retrieved.ok) return json({ ok: false, message: 'Could not retrieve the charge from Tap.' }, 200);
+    const c = retrieved.charge;
+    // Only ever report the isolated admin test charge — never a real order's charge.
+    if (!isAdminTestCharge(c)) return json({ ok: false, message: 'That charge is not an admin test charge.' }, 200);
+    const s = sanitizeTapResponse(c);
+    const { messageKey } = mapTapStatus(c.status);
+    return json({
+      ok: true, chargeId: s.id, status: s.status, amount: s.amount, currency: s.currency,
+      mode: c.live_mode ? 'live' : 'test', messageKey,
+    }, 200);
   }
 
   // Default: status booleans (never any secret values).

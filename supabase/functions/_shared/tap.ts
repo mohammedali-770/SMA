@@ -138,6 +138,7 @@ export interface BuildChargeParams {
   langCode: 'ar' | 'en';
   postUrl: string;                // webhook
   redirectUrl: string;            // return page
+  metadata?: Record<string, unknown>; // optional; e.g. { purpose: 'admin_test' }
   customer: {
     firstName: string;
     lastName: string;
@@ -183,7 +184,20 @@ export function buildTapChargePayload(p: BuildChargeParams): Record<string, unkn
     lang_code: p.langCode === 'ar' ? 'ar' : 'en',
   };
   if (p.descriptor && p.descriptor.trim()) body.statement_descriptor = p.descriptor.trim().slice(0, 22);
+  if (p.metadata && Object.keys(p.metadata).length) body.metadata = p.metadata;
   return body;
+}
+
+/**
+ * True when a charge is the admin dashboard's isolated test charge (not linked to
+ * any Spicy Meal order). Recognised by reference.order or metadata.purpose so the
+ * webhook can ignore it and never touch order/payment state.
+ */
+export function isAdminTestCharge(charge: unknown): boolean {
+  const c = (charge ?? {}) as Record<string, unknown>;
+  const ref = (c.reference ?? {}) as Record<string, unknown>;
+  const meta = (c.metadata ?? {}) as Record<string, unknown>;
+  return String(ref.order ?? '') === 'admin_test' || String(meta.purpose ?? '') === 'admin_test';
 }
 
 // ---------------------------------------------------------------------------
