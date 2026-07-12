@@ -1,0 +1,54 @@
+name: EAS Build (mobile)
+
+# Sends a native build request to Expo's EAS cloud for the apps/mobile app
+# (slug: spicy-meal). REQUIRES an EXPO_TOKEN repository secret:
+#   GitHub repo -> Settings -> Secrets and variables -> Actions -> New secret
+#   Name: EXPO_TOKEN   Value: an Expo access token from expo.dev (Account settings)
+#
+# Trigger it either from the Actions tab ("Run workflow") or by pushing a tag
+# like `mobile-build-1`. The build runs in EAS cloud; the artifact appears on
+# expo.dev for the project.
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Platform"
+        type: choice
+        options: [android, ios, all]
+        default: android
+      profile:
+        description: "EAS build profile"
+        type: choice
+        options: [preview, production, development]
+        default: preview
+  push:
+    tags:
+      - 'mobile-build-*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup EAS / Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Submit EAS build
+        run: eas build --platform "${{ inputs.platform || 'android' }}" --profile "${{ inputs.profile || 'preview' }}" --non-interactive --no-wait
