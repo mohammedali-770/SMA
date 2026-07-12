@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { useI18n } from '../../i18n/I18nProvider';
-import { addresses, coupons, orders, payments } from '../../services/api';
+import { addresses, checkout, coupons, orders, payments } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
 import { legalTitle } from '../../lib/legal';
 import {
@@ -60,7 +60,9 @@ export function CheckoutScreen() {
   const [error, setError] = useState<string | null>(null);
   // Online-payment (Tap) flow overlay. null = not paying.
   type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
-  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId: string; message?: string } | null>(null);
+  // orderId is the LEGACY (order-first) flow; sessionId is the new checkout-session
+  // flow where the order does not exist until payment is verified.
+  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId?: string; sessionId?: string; message?: string } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
 
   const branchOpen = branchIsOpen(selectedBranch);
@@ -197,21 +199,23 @@ export function CheckoutScreen() {
         paymentMethod,
       };
       const isOnline = paymentMethod === 'online';
-      // Online orders are created pending and are NOT sent to the POS until the
-      // payment is verified (the DB trigger holds them in 'awaiting_payment');
-      // cash orders sync to the POS now, as before.
-      const order = isOnline ? await orders.place(orderInput) : await orders.placeAndSync(orderInput);
-
-      // Zero-total (e.g. full coupon/loyalty) never touches Tap — go straight to
-      // the receipt. Online orders with a real total go through Tap checkout.
-      if (isOnline && Number(order.total) > 0) {
-        // Keep the cart until the payment actually succeeds. Clearing it here
-        // (before Tap) wiped the customer's cart on any failed/abandoned payment
-        // and left the order summary showing 0.00 behind the payment modal. The
-        // cart's idempotencyKey is stable until the cart changes, so re-placing
-        // the same unchanged cart returns the same order — never a duplicate.
-        await runTapPayment(order.id);
+      if (isOnline) {
+        // NEW online flow: create a temporary checkout SESSION (not an order). The
+        // real order is created only after the backend verifies the payment. A
+        // zero-total online order (fully covered) is settled server-side and comes
+        // back with order_id already set → straight to the receipt.
+        const session = await checkout.begin(orderInput);
+        if (session.order_id) {
+          cart.clear();
+          router.replace(`/receipt/${session.order_id}`);
+        } else {
+          // Keep the cart until payment actually succeeds — a failed/abandoned
+          // payment must not wipe it, and there is no order to strand.
+          await runTapPaymentSession(session.id);
+        }
       } else {
+        // Cash: unchanged. The order is created + synced to the POS now.
+        const order = await orders.placeAndSync(orderInput);
         cart.clear();
         router.replace(`/receipt/${order.id}`);
       }
@@ -223,32 +227,33 @@ export function CheckoutScreen() {
   };
 
   // ---- Tap online-payment flow (open hosted checkout → server verify) --------
-  const runTapPayment = async (orderId: string) => {
-    setPayFlow({ state: 'opening', orderId });
+  // Session-based: the order is created by the backend ONLY after the charge is
+  // verified. `verifySession` returns the created order id, which we use to open
+  // the receipt. The redirect result is never trusted — server verify decides.
+  const runTapPaymentSession = async (sessionId: string) => {
+    setPayFlow({ state: 'opening', sessionId });
     try {
-      const init = await payments.initiate(orderId, lang === 'ar' ? 'ar' : 'en');
-      if (init.status === 'already_paid') { cart.clear(); router.replace(`/receipt/${orderId}`); return; }
+      const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
+      if (init.status === 'already_paid' && init.orderId) { cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
-        setPayFlow({ state: 'error', orderId, message: t('payUnavailable') });
+        setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });
         return;
       }
       if (init.checkoutUrl) {
-        // Opens the Tap hosted page; returns when it redirects to spicymeal://.
-        // The result is NOT trusted — server verify is authoritative.
         await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
       }
-      await verifyPayment(orderId);
+      await verifyPaymentSession(sessionId);
     } catch (e) {
-      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     }
   };
 
-  const verifyPayment = async (orderId: string) => {
-    setPayFlow({ state: 'verifying', orderId });
+  const verifyPaymentSession = async (sessionId: string) => {
+    setPayFlow({ state: 'verifying', sessionId });
     setPayBusy(true);
     try {
-      const res = await payments.verify(orderId);
-      if (res.status === 'paid') { cart.clear(); setPayFlow(null); router.replace(`/receipt/${orderId}`); return; }
+      const res = await payments.verifySession(sessionId);
+      if (res.status === 'paid' && res.orderId) { cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
       const state: PayState =
         res.status === 'cancelled' ? 'cancelled'
         : res.status === 'expired' ? 'expired'
@@ -257,19 +262,17 @@ export function CheckoutScreen() {
       const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
         state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
       );
-      setPayFlow({ state, orderId, message: t(msgKey as never) });
+      setPayFlow({ state, sessionId, message: t(msgKey as never) });
     } catch (e) {
-      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       setPayBusy(false);
     }
   };
 
-  const dismissPayFlowToReceipt = () => {
-    const id = payFlow?.orderId;
-    setPayFlow(null);
-    if (id) router.replace(`/receipt/${id}`);
-  };
+  // Dismiss the payment modal without paying. In the session flow no order exists
+  // yet, so we simply close and keep the cart intact for a retry.
+  const dismissPayFlow = () => setPayFlow(null);
 
   return (
     <View style={styles.root}>
@@ -466,11 +469,11 @@ export function CheckoutScreen() {
                 <Text style={styles.payMsg}>{payFlow.message ?? t('payFailed')}</Text>
                 <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
                   {payFlow.state === 'pending' ? (
-                    <Button label={t('payVerifyAgain')} onPress={() => void verifyPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                    <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
                   ) : (
-                    <Button label={t('payTryAgain')} onPress={() => void runTapPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                    <Button label={t('payTryAgain')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
                   )}
-                  <Button label={t('payViewOrder')} onPress={dismissPayFlowToReceipt} variant="secondary" />
+                  <Button label={pick('Close', 'إغلاق')} onPress={dismissPayFlow} variant="secondary" />
                 </View>
               </>
             ) : null}

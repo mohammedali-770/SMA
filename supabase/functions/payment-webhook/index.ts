@@ -79,7 +79,7 @@ async function handleTapWebhook(
 
   // Locate the stored attempt for this charge.
   const { data: rec } = await admin.from('payment_records')
-    .select('id, order_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
+    .select('id, order_id, checkout_session_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
     .eq('provider', 'tap').eq('provider_ref', chargeId).maybeSingle();
   if (!rec) {
     // Unknown charge — acknowledge (so Tap stops retrying) and flag for review.

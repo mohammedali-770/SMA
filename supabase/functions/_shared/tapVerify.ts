@@ -30,7 +30,8 @@ export async function retrieveTapCharge(secretKey: string, chargeId: string): Pr
 
 export interface TapAttempt {
   id: string;
-  order_id: string;
+  order_id: string | null;                 // null for a session attempt (order not created yet)
+  checkout_session_id?: string | null;     // set for the session-first flow
   provider_ref: string | null;
   reference_transaction: string | null;
   reference_order: string | null;
@@ -43,6 +44,7 @@ export interface ConfirmResult {
   outcome: TapOutcome | 'mismatch';
   paid: boolean;
   reason?: string;
+  orderId?: string;   // the (possibly just-created) order id, when paid
 }
 
 /**
@@ -79,34 +81,70 @@ export async function validateAndConfirmTapCharge(
   };
 
   if (outcome === 'paid' && allMatch) {
-    const { data, error } = await admin.rpc('confirm_order_payment', {
-      p_order_id: attempt.order_id,
-      p_provider: 'tap',
-      p_provider_ref: String(charge.id ?? ''),
-      p_amount: Number(formatTapAmount(Number(charge.amount ?? 0), 'SAR')),
-      p_raw: sanitized,
-    });
-    if (error) {
-      // confirm_order_payment rejects on amount-mismatch etc. Never leak its message.
-      await admin.from('integration_sync_logs').insert({
-        provider: 'tap', order_id: attempt.order_id, direction: 'webhook', status: 'failed',
-        request: { charge_id: String(charge.id ?? '').slice(0, 64) }, error: 'confirm_failed',
-      }).then(() => {}, () => {});
-      return { outcome: 'failed', paid: false, reason: 'confirm_failed' };
-    }
-    // Store safe card display fields + verification time on the (now paid) record.
-    await admin.from('payment_records').update({
-      card_scheme: card.scheme != null ? String(card.scheme) : null,
-      card_last_four: card.last_four != null ? String(card.last_four) : null,
-      last_verified_at: new Date().toISOString(),
-    }).eq('order_id', attempt.order_id).eq('provider', 'tap').eq('provider_ref', String(charge.id ?? ''))
-      .then(() => {}, () => {});
+    let orderId = '';
+    let confirmedOrder: Record<string, unknown> | null = null;
 
-    // Paid → create the order in the POS, then attach the online payment. Best-effort.
+    if (attempt.checkout_session_id) {
+      // Session-first flow: the order does NOT exist yet. finalize_checkout_session
+      // atomically creates the real, already-paid order from the frozen snapshot,
+      // marks the attempt paid and links it, and consumes the session. Idempotent:
+      // a webhook + a verify (or a duplicate webhook) converge on ONE order.
+      const { data, error } = await admin.rpc('finalize_checkout_session', {
+        p_session_id: attempt.checkout_session_id,
+        p_provider: 'tap',
+        p_provider_ref: String(charge.id ?? ''),
+        p_amount: Number(formatTapAmount(Number(charge.amount ?? 0), 'SAR')),
+        p_currency: 'SAR',
+        p_raw: sanitized,
+        p_card_scheme: card.scheme != null ? String(card.scheme) : null,
+        p_card_last4: card.last_four != null ? String(card.last_four) : null,
+      });
+      if (error || !data) {
+        await admin.from('integration_sync_logs').insert({
+          provider: 'tap', order_id: null, direction: 'webhook', status: 'failed',
+          request: { charge_id: String(charge.id ?? '').slice(0, 64), session: String(attempt.checkout_session_id).slice(0, 64) },
+          error: 'finalize_failed',
+        }).then(() => {}, () => {});
+        return { outcome: 'failed', paid: false, reason: 'finalize_failed' };
+      }
+      confirmedOrder = (Array.isArray(data) ? data[0] : data) as Record<string, unknown>;
+      orderId = String(confirmedOrder?.id ?? '');
+    } else {
+      // Order-first flow (any already-deployed app / cash-parity): confirm the
+      // pre-existing order paid via the untouched confirm_order_payment RPC.
+      const { data, error } = await admin.rpc('confirm_order_payment', {
+        p_order_id: attempt.order_id,
+        p_provider: 'tap',
+        p_provider_ref: String(charge.id ?? ''),
+        p_amount: Number(formatTapAmount(Number(charge.amount ?? 0), 'SAR')),
+        p_raw: sanitized,
+      });
+      if (error) {
+        await admin.from('integration_sync_logs').insert({
+          provider: 'tap', order_id: attempt.order_id, direction: 'webhook', status: 'failed',
+          request: { charge_id: String(charge.id ?? '').slice(0, 64) }, error: 'confirm_failed',
+        }).then(() => {}, () => {});
+        return { outcome: 'failed', paid: false, reason: 'confirm_failed' };
+      }
+      confirmedOrder = (data ?? null) as Record<string, unknown> | null;
+      orderId = String(attempt.order_id ?? '');
+      // Store safe card display fields (the session path does this inside finalize).
+      await admin.from('payment_records').update({
+        card_scheme: card.scheme != null ? String(card.scheme) : null,
+        card_last_four: card.last_four != null ? String(card.last_four) : null,
+        last_verified_at: new Date().toISOString(),
+      }).eq('order_id', attempt.order_id).eq('provider', 'tap').eq('provider_ref', String(charge.id ?? ''))
+        .then(() => {}, () => {});
+    }
+
+    // Paid → hand the order to the POS, then attach the online payment. Best-effort;
+    // a POS hiccup must never undo a confirmed payment (the worker/reaper reconcile).
     await triggerLazywaitSyncOnce(admin);
-    const { data: fresh } = await admin.from('orders').select('*').eq('id', attempt.order_id).maybeSingle();
-    await pushLazywaitOnlinePayment(admin, (fresh ?? data) as Record<string, unknown> | null, String(charge.id ?? '')).catch(() => {});
-    return { outcome: 'paid', paid: true };
+    const { data: fresh } = orderId
+      ? await admin.from('orders').select('*').eq('id', orderId).maybeSingle()
+      : { data: null };
+    await pushLazywaitOnlinePayment(admin, (fresh ?? confirmedOrder) as Record<string, unknown> | null, String(charge.id ?? '')).catch(() => {});
+    return { outcome: 'paid', paid: true, orderId };
   }
 
   // CAPTURED but a bound field does not match → possible tampering. Never confirm.

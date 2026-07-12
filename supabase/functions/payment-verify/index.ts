@@ -3,6 +3,7 @@ import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { resolveTapConfig, mapTapStatus } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
  * payment-verify — the app calls this after returning from Tap checkout. It is
@@ -25,17 +26,23 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const orderId = String(body.orderId ?? body.order_id ?? '');
-  if (!orderId) return json({ error: 'orderId is required' }, 400);
+  const sessionId = String(body.checkoutSessionId ?? body.checkout_session_id ?? '');
+  if (!orderId && !sessionId) return json({ error: 'orderId or checkoutSessionId is required' }, 400);
 
-  // Ownership + server-trusted state via RLS.
   const supaUser = userClient(authHeader);
+  const admin = adminClient();
+
+  // Session flow: the order is created by finalize_checkout_session on a clean
+  // CAPTURED. Return its id so the app can open the receipt.
+  if (sessionId) return await verifySession(supaUser, admin, sessionId);
+
+  // Legacy order flow (unchanged): verify an already-created order.
   const { data: order, error: orderErr } = await supaUser
     .from('orders').select('id, payment_status, order_number').eq('id', orderId).maybeSingle();
   if (orderErr) return json({ error: orderErr.message }, 400);
   if (!order) return json({ error: 'Order not found' }, 404);
   if (order.payment_status === 'paid') return json({ status: 'paid', orderNumber: order.order_number }, 200);
 
-  const admin = adminClient();
   const cfg = await getProviderConfig(admin, 'payment');
   if (!cfg || (cfg.providerName ?? '').toLowerCase() !== 'tap') {
     return json({ status: 'pending' }, 200);
@@ -60,3 +67,51 @@ Deno.serve(async (req: Request) => {
   const { messageKey } = mapTapStatus(retrieved.charge.status);
   return json({ status: outcome, messageKey, orderNumber: order.order_number }, 200);
 });
+
+/**
+ * Verify the Tap charge tied to a CHECKOUT SESSION. On a clean CAPTURED,
+ * validateAndConfirmTapCharge → finalize_checkout_session creates the real order;
+ * we return its id + number so the app opens the receipt. Never trusts the app.
+ */
+async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, sessionId: string): Promise<Response> {
+  const { data: session, error: sErr } = await supaUser
+    .from('checkout_sessions').select('id, status, order_id').eq('id', sessionId).maybeSingle();
+  if (sErr) return json({ error: sErr.message }, 400);
+  if (!session) return json({ error: 'Checkout session not found' }, 404);
+  if (session.order_id) {
+    const { data: paid } = await supaUser.from('orders').select('order_number').eq('id', session.order_id).maybeSingle();
+    return json({ status: 'paid', orderId: session.order_id, orderNumber: paid?.order_number ?? null }, 200);
+  }
+
+  const cfg = await getProviderConfig(admin, 'payment');
+  if (!cfg || (cfg.providerName ?? '').toLowerCase() !== 'tap') return json({ status: 'pending' }, 200);
+
+  const { data: recs } = await admin.from('payment_records')
+    .select('id, order_id, checkout_session_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
+    .eq('checkout_session_id', sessionId).eq('provider', 'tap')
+    .order('created_at', { ascending: false }).limit(1);
+  const rec = (Array.isArray(recs) ? recs[0] : null) as TapAttempt | null;
+  if (!rec || !rec.provider_ref) return json({ status: 'pending' }, 200);
+
+  const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, (rec.mode as 'test' | 'live') ?? undefined);
+  if (!tap.secretKey) return json({ status: 'pending' }, 200);
+
+  const retrieved = await retrieveTapCharge(tap.secretKey, String(rec.provider_ref));
+  if (!retrieved.ok) return json({ status: 'pending' }, 200); // transient — let the app retry
+
+  const result = await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId);
+  const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
+  const { messageKey } = mapTapStatus(retrieved.charge.status);
+
+  let outOrderId = result.orderId ?? '';
+  if (outcome === 'paid' && !outOrderId) {
+    const { data: s2 } = await supaUser.from('checkout_sessions').select('order_id').eq('id', sessionId).maybeSingle();
+    outOrderId = String(s2?.order_id ?? '');
+  }
+  let orderNumber: string | null = null;
+  if (outOrderId) {
+    const { data: o2 } = await supaUser.from('orders').select('order_number').eq('id', outOrderId).maybeSingle();
+    orderNumber = (o2?.order_number as string | undefined) ?? null;
+  }
+  return json({ status: outcome, messageKey, orderId: outOrderId || null, orderNumber }, 200);
+}

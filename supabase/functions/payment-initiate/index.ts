@@ -29,12 +29,24 @@ Deno.serve(async (req: Request) => {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const orderId = String(body.orderId ?? body.order_id ?? '');
-  if (!orderId) return json({ error: 'orderId is required' }, 400);
+  const sessionId = String(body.checkoutSessionId ?? body.checkout_session_id ?? '');
+  if (!orderId && !sessionId) return json({ error: 'orderId or checkoutSessionId is required' }, 400);
   const lang: 'ar' | 'en' = String(body.language ?? 'en').toLowerCase() === 'ar' ? 'ar' : 'en';
 
-  // Read the order AS THE USER — RLS returns it only if they own it, and its
-  // `total` is the server-computed amount we must charge (never a client value).
   const supaUser = userClient(authHeader);
+
+  // New flow: pay for a CHECKOUT SESSION (no order exists yet — it is created
+  // only after this charge is verified). Tap-only. RLS scopes the session read to
+  // its owner.
+  if (sessionId) {
+    const admin0 = adminClient();
+    const cfg0 = await getProviderConfig(admin0, 'payment');
+    if ((cfg0?.providerName ?? '').toLowerCase() !== 'tap') return json({ error: 'Online payment is not enabled' }, 400);
+    return await initiateTapForSession(admin0, supaUser, sessionId, cfg0!, lang);
+  }
+
+  // Legacy flow: pay for an already-created order. Read it AS THE USER — RLS
+  // returns it only if they own it, and its `total` is the server-computed amount.
   const { data: order, error: orderErr } = await supaUser
     .from('orders')
     .select('id, total, payment_status, payment_method, order_number, order_type, customer_name, customer_phone')
@@ -217,6 +229,150 @@ async function initiateTap(
   return json({
     provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
     orderNumber: order.order_number, needsVerify: true,
+  }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Tap Hosted Checkout for a CHECKOUT SESSION. The order does NOT exist yet — it
+// is created only after this charge is verified (webhook / payment-verify →
+// finalize_checkout_session). Mirrors initiateTap but keyed on the session.
+// ---------------------------------------------------------------------------
+async function initiateTapForSession(
+  admin: SupabaseClient,
+  supaUser: SupabaseClient,
+  sessionId: string,
+  cfg: ProviderConfig,
+  lang: 'ar' | 'en',
+): Promise<Response> {
+  // Read the session AS THE USER — RLS returns it only if they own it; its
+  // `total` is the server-computed amount we charge (never a client value).
+  const { data: session, error: sErr } = await supaUser
+    .from('checkout_sessions')
+    .select('id, status, total, currency, order_id, snapshot')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (sErr) return json({ error: sErr.message }, 400);
+  if (!session) return json({ error: 'Checkout session not found' }, 404);
+  if (session.order_id) return json({ status: 'already_paid', orderId: session.order_id }, 200);
+  if (session.status !== 'pending_payment') return json({ error: 'This checkout can no longer be paid.' }, 400);
+
+  const total = Number(session.total ?? 0);
+  if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+
+  const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
+  if (!tap.ok) {
+    if (tap.reason === 'disabled') return json({ status: 'disabled' }, 200);
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
+  const { data: rows, error: beginErr } = await admin.rpc('tap_begin_session_attempt', {
+    p_session_id: session.id, p_mode: tap.mode, p_expiry_minutes: tap.expiryMinutes,
+  });
+  if (beginErr) {
+    console.error('tap_begin_session_attempt failed', String(beginErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+  const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!attempt || !attempt.attempt_id) {
+    console.error('tap_begin_session_attempt returned no attempt_id');
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+
+  if (attempt.reused && attempt.checkout_url && attempt.provider_ref) {
+    return json({
+      provider: 'tap', mode: tap.mode, chargeId: attempt.provider_ref,
+      checkoutUrl: attempt.checkout_url, checkoutSessionId: session.id, expiryMinutes: tap.expiryMinutes,
+    }, 200);
+  }
+
+  const snap = (session.snapshot ?? {}) as Record<string, unknown>;
+  const { data: { user } } = await supaUser.auth.getUser();
+  const fullName = String(snap.customer_name ?? '').trim();
+  const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const payload = buildTapChargePayload({
+    amount: total,
+    currency: tap.currency,
+    descriptor: tap.descriptor,
+    description: `Spicy Meal checkout ${String(attempt.reference_order ?? '')}`,
+    referenceTransaction: String(attempt.reference_transaction ?? ''),
+    referenceOrder: String(attempt.reference_order ?? ''),
+    idempotent: String(attempt.reference_transaction ?? ''),
+    sourceId: tap.sourceId,
+    merchantId: tap.merchantId,
+    expiryMinutes: tap.expiryMinutes,
+    langCode: lang,
+    postUrl: `${supabaseUrl}/functions/v1/payment-webhook`,
+    redirectUrl: `${supabaseUrl}/functions/v1/payment-return?session=${encodeURIComponent(String(session.id))}`,
+    customer: {
+      firstName: firstName ?? 'Customer',
+      lastName: rest.join(' ') || '-',
+      email: user?.email ?? null,
+      phone: normalizeSaudiPhone(snap.customer_phone),
+    },
+  });
+
+  let result: Record<string, unknown> = {};
+  let resp: Response | null = null;
+  for (let attemptNo = 1; attemptNo <= 2; attemptNo++) {
+    try {
+      resp = await fetch(TAP_CHARGES, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tap.secretKey}` },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(15_000),
+      });
+      break;
+    } catch (e) {
+      console.error(`Tap session charge request error (attempt ${attemptNo}/2)`, e instanceof Error ? e.message : 'error');
+      if (attemptNo < 2) await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+  if (!resp) {
+    await admin.from('payment_records').update({
+      failure_code: 'network_unreachable', failure_message_safe: 'Could not reach the payment provider.',
+      last_verified_at: new Date().toISOString(),
+    }).eq('id', attempt.attempt_id).then(() => {}, () => {});
+    return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
+  }
+  result = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.error('Tap session charge create failed', resp.status);
+    await admin.from('payment_records').update({
+      status: 'failed', failure_code: `create_${resp.status}`, failure_message_safe: 'Could not start payment.',
+      raw: sanitizeTapResponse(result),
+    }).eq('id', attempt.attempt_id).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
+  const chargeId = String(result.id ?? '');
+  const transaction = (result.transaction ?? {}) as Record<string, unknown>;
+  const checkoutUrl = String(transaction.url ?? '');
+  const { outcome } = mapTapStatus(result.status);
+  if (!chargeId) {
+    await admin.from('payment_records').update({ status: 'failed', failure_code: 'no_charge_id', raw: sanitizeTapResponse(result) })
+      .eq('id', attempt.attempt_id).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
+  const { error: persistErr } = await admin.from('payment_records').update({
+    provider_ref: chargeId, checkout_url: checkoutUrl || null, raw: sanitizeTapResponse(result),
+    last_verified_at: new Date().toISOString(), failure_code: null, failure_message_safe: null,
+  }).eq('id', attempt.attempt_id);
+  if (persistErr) {
+    console.error('Tap session charge persist failed', String(persistErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
+  if (outcome === 'pending' && checkoutUrl) {
+    return json({
+      provider: 'tap', mode: tap.mode, chargeId, checkoutUrl,
+      checkoutSessionId: session.id, expiryMinutes: tap.expiryMinutes,
+    }, 200);
+  }
+  return json({
+    provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
+    checkoutSessionId: session.id, needsVerify: true,
   }, 200);
 }
 

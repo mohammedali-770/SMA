@@ -226,6 +226,34 @@ export const orders = {
       .single()),
 };
 
+/** A temporary, pre-payment checkout session (NOT an order). */
+export interface DbCheckoutSession {
+  id: string;
+  total: number | string;
+  currency: string;
+  status: string;
+  order_id: string | null;
+}
+
+export const checkout = {
+  /**
+   * Online only: validate + price the cart server-side and open a temporary
+   * checkout session. NO order is created here — the order is created only after
+   * the payment is verified. Retry-safe via the cart idempotency key.
+   */
+  begin: async (input: PlaceOrderInput): Promise<DbCheckoutSession> =>
+    ok<DbCheckoutSession>(await supabase.rpc('begin_checkout_session', {
+      p_branch_id: input.branchId,
+      p_order_type: input.orderType,
+      p_items: input.items,
+      p_address_id: input.addressId ?? null,
+      p_coupon_code: input.couponCode ?? null,
+      p_notes: input.notes ?? null,
+      p_loyalty_points: input.loyaltyPoints ?? 0,
+      p_idempotency_key: input.idempotencyKey ?? null,
+    })),
+};
+
 // ---------------------------------------------------------------------------
 // Tap Payments (online checkout). The app NEVER trusts the redirect result — it
 // opens the Tap hosted checkout URL, then calls payment-verify, which retrieves
@@ -240,8 +268,10 @@ export interface PaymentInitiateResult {
   checkoutUrl?: string | null;
   needsVerify?: boolean;
   orderNumber?: string;
+  checkoutSessionId?: string;
+  orderId?: string | null;    // set when status === 'already_paid' (session flow)
 }
-export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string; }
+export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string | null; orderId?: string | null; }
 async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {
@@ -258,6 +288,12 @@ export const payments = {
     invokePaymentFn<PaymentInitiateResult>('payment-initiate', { orderId, language }),
   /** Server-authoritative verification after returning from checkout. */
   verify: (orderId: string) => invokePaymentFn<PaymentVerifyResult>('payment-verify', { orderId }),
+  /** Start (or reuse) a Tap charge for a CHECKOUT SESSION (order not yet created). */
+  initiateSession: (checkoutSessionId: string, language: 'ar' | 'en') =>
+    invokePaymentFn<PaymentInitiateResult>('payment-initiate', { checkoutSessionId, language }),
+  /** Verify a session's charge; on 'paid' the response carries the created orderId. */
+  verifySession: (checkoutSessionId: string) =>
+    invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId }),
 };
 
 // ---------------------------------------------------------------------------
