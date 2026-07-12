@@ -5,11 +5,11 @@
  */
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile,
 } from '../types/db';
 import type {
-  Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LoyaltySettings, Modifier, ModifierGroup,
+  Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LegalDoc, LoyaltySettings, Modifier, ModifierGroup,
   Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
@@ -28,6 +28,20 @@ export function mapBanner(b: DbHomepageBanner): HomeBanner {
     imageUrl: b.image_url,
     actionType: action,
     actionValue: action === 'none' ? null : (b.action_value ?? null),
+  };
+}
+
+/** Legal document row -> display model. */
+export function mapLegalDoc(d: DbLegalDocument): LegalDoc {
+  return {
+    id: d.id,
+    type: d.document_type,
+    titleEn: d.title_en,
+    titleAr: d.title_ar,
+    contentEn: d.content_en,
+    contentAr: d.content_ar,
+    version: d.version,
+    effectiveDate: d.effective_date ?? null,
   };
 }
 

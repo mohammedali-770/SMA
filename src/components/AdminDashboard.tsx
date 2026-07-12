@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ADMIN_LOCALES } from './admin/adminLocales';
@@ -14,6 +14,7 @@ import { ReportsPanel } from './admin/ReportsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
 import { IntegrationsPanel } from './admin/IntegrationsPanel';
 import { BannerManagementPanel } from './admin/BannerManagementPanel';
+import { LegalDocumentsPanel } from './admin/LegalDocumentsPanel';
 import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
@@ -28,7 +29,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings' | 'legal'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -209,6 +210,14 @@ export const AdminDashboard: React.FC = () => {
             <Settings className="w-4 h-4" />
             <span>{isRTL ? 'الإعدادات' : 'Settings'}</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('legal')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'legal' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Scale className="w-4 h-4" />
+            <span>{isRTL ? 'المستندات القانونية' : 'Legal Documents'}</span>
+          </button>
         </div>
 
         {/* Dynamic Tab Viewport container */}
@@ -237,6 +246,9 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 7: SYSTEM SETTINGS (brand, payment methods, maps, loyalty) */}
           {activeTab === 'settings' && <SettingsPanel />}
+
+          {/* TAB: LEGAL DOCUMENTS (admin-editable policies for the mobile app) */}
+          {activeTab === 'legal' && <LegalDocumentsPanel />}
         </div>
       </div>
 

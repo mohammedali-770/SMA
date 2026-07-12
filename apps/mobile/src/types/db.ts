@@ -32,6 +32,18 @@ export interface DbBranchDeliveryZone {
 export interface DbCategory {
   id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean;
 }
+/** Legal/policy document (RLS returns only active rows to customers). */
+export interface DbLegalDocument {
+  id: string;
+  document_type: string;
+  title_ar: string;
+  title_en: string;
+  content_ar: string;
+  content_en: string;
+  version: string;
+  effective_date: string | null;
+  is_active: boolean;
+}
 /** Homepage marketing banner (RLS returns only active, in-window rows to customers). */
 export interface DbHomepageBanner {
   id: string;

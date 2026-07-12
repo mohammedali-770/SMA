@@ -21,6 +21,7 @@ import { Header } from '../../components/Header';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses, coupons, orders, payments } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
+import { legalTitle } from '../../lib/legal';
 import {
   availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
   type PaymentMethod,
@@ -424,6 +425,16 @@ export function CheckoutScreen() {
 
       {/* Sticky place-order */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+        {/* Policy links shown before Confirm & Order (does not block checkout). */}
+        <Text style={styles.policy}>
+          {pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
+          {pick(', ', '، ')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/delivery_pickup_policy')}>{legalTitle('delivery_pickup_policy', lang)}</Text>
+          {pick(', and ', '، و')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
+          {'.'}
+        </Text>
         {blockReason ? <Text style={styles.blockReason}>{blockReason}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button
@@ -545,6 +556,8 @@ const styles = StyleSheet.create({
   },
   blockReason: { color: colors.warning, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
   error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
+  policy: { color: colors.muted, fontSize: font.xs, lineHeight: 17, textAlign: 'center' },
+  policyLink: { color: colors.purple, fontWeight: '800' },
 
   payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.xl },

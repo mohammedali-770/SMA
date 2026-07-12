@@ -16,7 +16,7 @@
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile, OrderType,
 } from '../types/db';
 
@@ -139,6 +139,24 @@ export interface PlaceOrderInput {
   /** 'online' | 'cash' — availability is admin-controlled; place_order re-validates. */
   paymentMethod?: 'online' | 'cash' | null;
 }
+// ---------------------------------------------------------------------------
+// Legal / policy documents — RLS returns only ACTIVE rows to anon/customers.
+// ---------------------------------------------------------------------------
+export const legal = {
+  list: async () => ok<DbLegalDocument[]>(await supabase
+    .from('legal_documents')
+    .select('id, document_type, title_ar, title_en, content_ar, content_en, version, effective_date, is_active')),
+  byType: async (type: string) => {
+    const { data, error } = await supabase
+      .from('legal_documents')
+      .select('id, document_type, title_ar, title_en, content_ar, content_en, version, effective_date, is_active')
+      .eq('document_type', type)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as DbLegalDocument | null;
+  },
+};
+
 export const orders = {
   /** Server-authoritative order creation (place_order RPC). */
   async place(input: PlaceOrderInput): Promise<DbOrder> {

@@ -696,3 +696,31 @@ export const banners = {
     if (error) throw new Error(error.message);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Legal documents (admin-editable policies shown in the mobile app).
+// RLS: staff (admin+accountant) read all; only admins write. Customers/anon
+// read only active rows.
+// ---------------------------------------------------------------------------
+export interface DbLegalDocument {
+  id: string;
+  document_type: string;
+  title_ar: string;
+  title_en: string;
+  content_ar: string;
+  content_en: string;
+  version: string;
+  effective_date: string | null;
+  is_active: boolean;
+  requires_acceptance: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export const legalDocs = {
+  /** Staff read of ALL documents for management (RLS returns all for admin/accountant). */
+  list: async () => ok<DbLegalDocument[]>(await supabase.from('legal_documents').select('*')),
+  update: async (id: string, patch: Partial<DbLegalDocument>) =>
+    ok<DbLegalDocument>(await supabase.from('legal_documents').update(patch).eq('id', id).select('*').single()),
+};
