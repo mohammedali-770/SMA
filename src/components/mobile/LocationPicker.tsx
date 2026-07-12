@@ -25,15 +25,22 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
   useEffect(() => {
     if (!mapConfig.isConfigured || !container.current) return;
     mapboxgl.accessToken = mapConfig.publicToken;
-    const start: [number, number] = [
-      Number.isFinite(lng) ? lng : mapConfig.defaultCenter.lng,
-      Number.isFinite(lat) ? lat : mapConfig.defaultCenter.lat,
-    ];
+    // Treat (0,0) and non-finite coords as "no location yet": centre on the
+    // default (Riyadh) at city zoom so the admin gets a clear, recognisable map
+    // to click on — NOT the middle of the ocean at Null Island (0,0), which
+    // renders as a featureless zoomed-out globe.
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+    const start: [number, number] = hasCoords
+      ? [lng, lat]
+      : [mapConfig.defaultCenter.lng, mapConfig.defaultCenter.lat];
     const map = new mapboxgl.Map({
       container: container.current,
       style: mapConfig.styleUrl,
       center: start,
-      zoom: 13,
+      zoom: hasCoords ? 14 : mapConfig.defaultZoom,
+      // Flat mercator, not the globe — a small picker reads far clearer as a
+      // traditional street map than as a sphere in space.
+      projection: 'mercator',
     });
     mapRef.current = map;
 

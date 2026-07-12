@@ -50,6 +50,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
       style: mapConfig.styleUrl,
       center,
       zoom: hasBranchCoords ? 12 : mapConfig.defaultZoom,
+      projection: 'mercator', // flat street map, not the globe — clearer for drawing zones
     });
     mapRef.current = map;
 
