@@ -280,6 +280,22 @@ export function mapTapStatus(status: unknown): { outcome: TapOutcome; messageKey
 }
 
 /**
+ * Extract ONLY the safe error code + description from a FAILED Tap response.
+ * Tap's Create Charge returns `{ errors: [{ code, description }] }` on rejection;
+ * we surface just those two fields (description clamped to 200 chars) so Admin can
+ * see the real reason. Never returns anything else from the body, and there is no
+ * secret/PAN/token in Tap's error objects. Returns nulls when absent.
+ */
+export function extractTapError(body: unknown): { code: string | null; description: string | null } {
+  const b = (body ?? {}) as Record<string, unknown>;
+  const errs = Array.isArray(b.errors) ? (b.errors as Array<Record<string, unknown>>) : [];
+  const first = errs.length ? (errs[0] ?? {}) : {};
+  const code = first.code != null ? String(first.code) : null;
+  const description = first.description != null ? String(first.description).slice(0, 200) : null;
+  return { code, description };
+}
+
+/**
  * Keep only safe, non-sensitive fields from a Tap charge response for auditing.
  * Drops raw card data (esp. first_six), tokens, and everything unlisted.
  */

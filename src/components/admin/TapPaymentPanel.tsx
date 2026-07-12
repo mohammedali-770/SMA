@@ -23,6 +23,8 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
   const [coChargeId, setCoChargeId] = useState<string | null>(null);
   const [coChecking, setCoChecking] = useState(false);
   const [coMsg, setCoMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  // Sanitized Tap rejection detail (code + description only — never secret/auth).
+  const [coErr, setCoErr] = useState<{ code?: string | null; description?: string | null; httpStatus?: number } | null>(null);
   const [coResult, setCoResult] = useState<{ chargeId?: string; status?: string; amount?: number; currency?: string; mode?: string } | null>(null);
 
   const load = async () => {
@@ -48,7 +50,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
   const canRunTest = canRunAdminTestCheckout(status, disabled);
 
   const runTestCheckout = async () => {
-    setCoRunning(true); setCoMsg(null); setCoResult(null);
+    setCoRunning(true); setCoMsg(null); setCoResult(null); setCoErr(null);
     try {
       const res = await paymentGateway.testCheckout();
       if (res.ok && res.checkoutUrl) {
@@ -57,6 +59,9 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
         setCoMsg({ ok: true, text: isRTL ? 'فُتحت صفحة الدفع في نافذة جديدة. أكمل الدفع ثم عُد وتحقق من النتيجة.' : 'Opened the sandbox checkout in a new tab. Complete it, then return and check the result.' });
       } else {
         setCoMsg({ ok: false, text: res.message || (isRTL ? 'تعذّر بدء التجربة.' : 'Could not start the test.') });
+        if (res.tapErrorCode || res.tapErrorDescription) {
+          setCoErr({ code: res.tapErrorCode, description: res.tapErrorDescription, httpStatus: res.httpStatus });
+        }
       }
     } catch (e) {
       setCoMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
@@ -199,6 +204,20 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
               {coMsg && (
                 <div className={`text-[10px] font-bold flex items-center gap-1 ${coMsg.ok ? 'text-green-700' : 'text-red-600'}`}>
                   {coMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {coMsg.text}
+                </div>
+              )}
+              {coErr && (coErr.code || coErr.description) && (
+                <div className="bg-red-50 border border-red-100 rounded-lg p-2 text-[10px] space-y-1">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-red-400">{isRTL ? 'رمز خطأ Tap' : 'Tap error code'}</span>
+                    <span className="font-mono font-black text-red-700">{coErr.code ?? '—'}{coErr.httpStatus ? ` · HTTP ${coErr.httpStatus}` : ''}</span>
+                  </div>
+                  {coErr.description && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-red-400 flex-shrink-0">{isRTL ? 'الوصف' : 'Description'}</span>
+                      <span className="font-bold text-red-700 text-right">{coErr.description}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {coResult && (
