@@ -9,6 +9,7 @@
  * RPC, which recomputes all amounts server-side.
  */
 import { supabase } from './supabase';
+import { BANNER_BUCKET, bannerStoragePath } from './banners';
 
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
@@ -633,3 +634,65 @@ async function wrapUpdate(table: string, id: string, patch: any) {
 async function wrapDelete(table: string, id: string) {
   const { error } = await supabase.from(table).delete().eq('id', id); if (error) throw new Error(error.message);
 }
+
+// ---------------------------------------------------------------------------
+// Homepage banners (admin-managed marketing banners shown in the mobile app).
+// RLS: staff (admin+accountant) read all; only admins write. Images live in the
+// public `banner-images` bucket (public read, admin-only upload).
+// ---------------------------------------------------------------------------
+export interface DbHomepageBanner {
+  id: string;
+  title_en: string | null;
+  title_ar: string | null;
+  image_url: string;
+  storage_path: string | null;
+  is_active: boolean;
+  sort_order: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  action_type: 'none' | 'category' | 'product';
+  action_value: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export const banners = {
+  /** Staff read of ALL banners for management (RLS returns all for admin/accountant). */
+  list: async () =>
+    ok<DbHomepageBanner[]>(
+      await supabase
+        .from('homepage_banners')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false }),
+    ),
+  create: async (b: Partial<DbHomepageBanner>) =>
+    ok<DbHomepageBanner>(await supabase.from('homepage_banners').insert(b).select('*').single()),
+  update: async (id: string, patch: Partial<DbHomepageBanner>) =>
+    ok<DbHomepageBanner>(await supabase.from('homepage_banners').update(patch).eq('id', id).select('*').single()),
+  async remove(id: string) {
+    const { error } = await supabase.from('homepage_banners').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  /**
+   * Admin-only: upload an image to the public banner-images bucket and return
+   * its stored path + public URL. RLS on storage.objects enforces admin. Uses a
+   * unique path (no overwrite). `upsert:false` also guards against collisions.
+   */
+  async uploadImage(file: File): Promise<{ path: string; publicUrl: string }> {
+    const unique = `${Date.now()}-${crypto.randomUUID()}`;
+    const path = bannerStoragePath(file.name, unique);
+    const { error } = await supabase.storage
+      .from(BANNER_BUCKET)
+      .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+    if (error) throw new Error(error.message);
+    const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(path);
+    return { path, publicUrl: data.publicUrl };
+  },
+  /** Best-effort delete of a stored image (used when replacing / cleaning up). */
+  async removeImage(path: string) {
+    const { error } = await supabase.storage.from(BANNER_BUCKET).remove([path]);
+    if (error) throw new Error(error.message);
+  },
+};

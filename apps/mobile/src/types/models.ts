@@ -53,6 +53,15 @@ export interface Category {
   sortOrder: number;
 }
 
+export interface HomeBanner {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  imageUrl: string;
+  actionType: 'none' | 'category' | 'product';
+  actionValue: string | null;
+}
+
 export interface Product {
   id: string;
   categoryId: string;

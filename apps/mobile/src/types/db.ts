@@ -32,6 +32,20 @@ export interface DbBranchDeliveryZone {
 export interface DbCategory {
   id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean;
 }
+/** Homepage marketing banner (RLS returns only active, in-window rows to customers). */
+export interface DbHomepageBanner {
+  id: string;
+  title_en: string | null;
+  title_ar: string | null;
+  image_url: string;
+  is_active: boolean;
+  sort_order: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  action_type: string | null;
+  action_value: string | null;
+  created_at: string;
+}
 export interface DbProduct {
   id: string; category_id: string; name_en: string; name_ar: string;
   description_en: string | null; description_ar: string | null;

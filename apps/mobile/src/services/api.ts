@@ -16,7 +16,7 @@
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile, OrderType,
 } from '../types/db';
 
@@ -89,6 +89,13 @@ export const auth = {
 export const catalog = {
   branches: async () => ok<DbBranch[]>(await supabase.from('branches').select('*').order('name_en')),
   categories: async () => ok<DbCategory[]>(await supabase.from('categories').select('*').order('sort_order')),
+  // Homepage banners: RLS returns only ACTIVE, in-window rows to anon/customers.
+  // Ordered here (sort_order asc, then newest) so the carousel needs no client filtering.
+  banners: async () => ok<DbHomepageBanner[]>(await supabase
+    .from('homepage_banners')
+    .select('id, title_en, title_ar, image_url, is_active, sort_order, starts_at, ends_at, action_type, action_value, created_at')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false })),
   products: async () => ok<DbProduct[]>(await supabase.from('products').select('*').order('sort_order')),
   modifierGroups: async () => ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select('*')),
   modifiers: async () => ok<DbModifier[]>(await supabase.from('modifiers').select('*').order('sort_order')),

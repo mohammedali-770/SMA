@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BannerCarousel } from './BannerCarousel';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
@@ -135,6 +136,10 @@ export function HomeMenuScreen() {
         ) : null}
         <Text style={styles.change}>{t('changeBranch')}</Text>
       </Pressable>
+
+      {/* Promotional banners — below the branch selector, above the search bar.
+          Self-fetching; renders nothing when there are no active banners. */}
+      <BannerCarousel />
 
       {loading ? (
         <LoadingView label={t('loading')} />

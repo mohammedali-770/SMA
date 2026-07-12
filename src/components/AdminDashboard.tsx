@@ -6,13 +6,14 @@
 import React, { useState } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
 import { IntegrationsPanel } from './admin/IntegrationsPanel';
+import { BannerManagementPanel } from './admin/BannerManagementPanel';
 import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
@@ -27,7 +28,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'integrations' | 'settings'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -169,7 +170,15 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'إدارة المنيو والأسعار' : 'Menu Management'}</span>
           </button>
 
-          <button 
+          <button
+            onClick={() => setActiveTab('banners')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'banners' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Images className="w-4 h-4" />
+            <span>{isRTL ? 'بانرات الرئيسية' : 'Banners'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('branches')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'branches' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
@@ -213,6 +222,9 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 3: MENU & CONTENT MANAGEMENT (PHASE 8 NEW FEATURE) */}
           {activeTab === 'menu' && <MenuManagementPanel />}
+
+          {/* TAB: HOMEPAGE BANNERS (admin marketing banners for the mobile app) */}
+          {activeTab === 'banners' && <BannerManagementPanel />}
 
           {/* TAB 4: BRANCH MANAGEMENT & CUSTOM AVAILABILITY MATRIX */}
           {activeTab === 'branches' && <BranchPoliciesPanel />}
