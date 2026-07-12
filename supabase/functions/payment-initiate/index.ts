@@ -1,23 +1,24 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
-import { getProviderConfig } from '../_shared/secrets.ts';
+import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import { createSessionSignature, formatAmount, geideaApiBase, geideaHppBase } from '../_shared/geidea.ts';
+import {
+  buildTapChargePayload, resolveTapConfig, normalizeSaudiPhone, mapTapStatus, sanitizeTapResponse,
+} from '../_shared/tap.ts';
+import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
  * payment-initiate — the authenticated customer starts paying for an order they
  * already created (place_order left it payment_status='pending').
  *
- * verify_jwt = true (config.toml): only a signed-in user reaches this. We read
- * the order through the USER's client so RLS proves ownership and hands us the
- * server-trusted total; the Geidea secret + amount signing happen server-side.
- * The client only ever receives the Geidea sessionId + hosted-checkout URL —
- * never the merchant key or API password.
- *
- * Flow: create a Geidea session (server-to-server, Basic auth + HMAC signature),
- * record a payment_records 'initiated' row, and return the session so the app
- * can open the Geidea Hosted Payment Page. The order is marked paid ONLY later,
- * by the verified payment-webhook.
+ * verify_jwt = true: only a signed-in user reaches this. We read the order
+ * through the USER's client so RLS proves ownership and hands us the server-
+ * trusted total; the provider secret is read server-side and never returned. The
+ * active provider is selected by integration_settings('payment').provider_name —
+ * 'tap' (Tap Hosted Checkout) or the pre-existing 'geidea' scaffold.
  */
+const TAP_CHARGES = 'https://api.tap.company/v2/charges';
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -27,41 +28,173 @@ Deno.serve(async (req: Request) => {
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
-  const orderId = String(body.orderId ?? '');
+  const orderId = String(body.orderId ?? body.order_id ?? '');
   if (!orderId) return json({ error: 'orderId is required' }, 400);
+  const lang: 'ar' | 'en' = String(body.language ?? 'en').toLowerCase() === 'ar' ? 'ar' : 'en';
 
   // Read the order AS THE USER — RLS returns it only if they own it, and its
   // `total` is the server-computed amount we must charge (never a client value).
   const supaUser = userClient(authHeader);
   const { data: order, error: orderErr } = await supaUser
     .from('orders')
-    .select('id, total, payment_status, order_number')
+    .select('id, total, payment_status, payment_method, order_number, order_type, customer_name, customer_phone')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) return json({ error: orderErr.message }, 400);
   if (!order) return json({ error: 'Order not found' }, 404);
   if (order.payment_status === 'paid') return json({ status: 'already_paid', orderId }, 200);
 
-  // Provider config + secret (service role — bypasses the table's revoked grants).
   const admin = adminClient();
   const cfg = await getProviderConfig(admin, 'payment');
-  if (!cfg || !cfg.enabled) return json({ error: 'Online payment is not enabled' }, 400);
-  if ((cfg.providerName ?? '').toLowerCase() !== 'geidea') {
-    return json({ error: `Configured payment provider is '${cfg.providerName}', not 'geidea'` }, 400);
+  const providerName = (cfg?.providerName ?? '').toLowerCase();
+
+  if (providerName === 'tap') return await initiateTap(admin, supaUser, order, cfg!, lang);
+  if (providerName === 'geidea') return await initiateGeidea(admin, order, cfg!);
+  return json({ error: 'Online payment is not enabled' }, 400);
+});
+
+// ---------------------------------------------------------------------------
+// Tap Hosted Checkout
+// ---------------------------------------------------------------------------
+async function initiateTap(
+  admin: SupabaseClient,
+  supaUser: SupabaseClient,
+  order: Record<string, unknown>,
+  cfg: ProviderConfig,
+  lang: 'ar' | 'en',
+): Promise<Response> {
+  if (String(order.payment_method ?? '') !== 'online') {
+    return json({ error: 'This order is not an online-payment order' }, 400);
   }
+  const total = Number(order.total ?? 0);
+  if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+
+  const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
+  if (!tap.ok) {
+    // Fail closed. 'disabled' is a global state (safe to reveal); a missing key is
+    // treated the same to the client — online payment simply isn't offered.
+    if (tap.reason === 'disabled') return json({ status: 'disabled' }, 200);
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
+  // Atomic open-or-reuse of THE single active attempt for this order (DB-level
+  // double-charge guard). A reused attempt that already has a checkout URL is
+  // returned as-is — no second Tap charge is ever created.
+  const { data: rows, error: beginErr } = await admin.rpc('tap_begin_payment_attempt', {
+    p_order_id: order.id, p_mode: tap.mode, p_expiry_minutes: tap.expiryMinutes,
+  });
+  if (beginErr) {
+    console.error('tap_begin_payment_attempt failed', String(beginErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+  const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!attempt) return json({ error: 'Could not start the payment. Please try again.' }, 400);
+
+  if (attempt.reused && attempt.checkout_url && attempt.provider_ref) {
+    return json({
+      provider: 'tap', mode: tap.mode, chargeId: attempt.provider_ref,
+      checkoutUrl: attempt.checkout_url, orderNumber: order.order_number, expiryMinutes: tap.expiryMinutes,
+    }, 200);
+  }
+
+  // Build the charge. Customer email comes from the authenticated session; phone
+  // from the order snapshot; both optional and only sent when valid.
+  const { data: { user } } = await supaUser.auth.getUser();
+  const fullName = String(order.customer_name ?? '').trim();
+  const [firstName, ...rest] = fullName.split(/\s+/).filter(Boolean);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const payload = buildTapChargePayload({
+    amount: total,
+    currency: tap.currency,
+    descriptor: tap.descriptor,
+    description: `Spicy Meal order ${order.order_number}`,
+    referenceTransaction: String(attempt.reference_transaction ?? ''),
+    referenceOrder: String(attempt.reference_order ?? order.order_number ?? ''),
+    idempotent: String(attempt.reference_transaction ?? ''),
+    sourceId: tap.sourceId,
+    merchantId: tap.merchantId,
+    expiryMinutes: tap.expiryMinutes,
+    langCode: lang,
+    postUrl: `${supabaseUrl}/functions/v1/payment-webhook`,
+    redirectUrl: `${supabaseUrl}/functions/v1/payment-return?order=${encodeURIComponent(String(order.id))}`,
+    customer: {
+      firstName: firstName ?? 'Customer',
+      lastName: rest.join(' ') || '-',
+      email: user?.email ?? null,
+      phone: normalizeSaudiPhone(order.customer_phone),
+    },
+  });
+
+  let result: Record<string, unknown> = {};
+  try {
+    const resp = await fetch(TAP_CHARGES, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tap.secretKey}` },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+    result = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error('Tap charge create failed', resp.status);
+      await admin.from('payment_records').update({
+        status: 'failed', failure_code: `create_${resp.status}`, failure_message_safe: 'Could not start payment.',
+        raw: sanitizeTapResponse(result),
+      }).eq('id', attempt.id).then(() => {}, () => {});
+      return json({ error: 'Could not start the payment. Please try again.' }, 502);
+    }
+  } catch (e) {
+    console.error('Tap charge request error', e instanceof Error ? e.message : 'error');
+    return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
+  }
+
+  const chargeId = String(result.id ?? '');
+  const transaction = (result.transaction ?? {}) as Record<string, unknown>;
+  const checkoutUrl = String(transaction.url ?? '');
+  const { outcome } = mapTapStatus(result.status);
+
+  if (!chargeId) {
+    await admin.from('payment_records').update({ status: 'failed', failure_code: 'no_charge_id', raw: sanitizeTapResponse(result) })
+      .eq('id', attempt.id).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
+  // Persist the charge id + checkout URL against the attempt (still 'initiated').
+  await admin.from('payment_records').update({
+    provider_ref: chargeId, checkout_url: checkoutUrl || null, raw: sanitizeTapResponse(result),
+    last_verified_at: new Date().toISOString(),
+  }).eq('id', attempt.id).then(() => {}, () => {});
+
+  if (outcome === 'pending' && checkoutUrl) {
+    return json({
+      provider: 'tap', mode: tap.mode, chargeId, checkoutUrl,
+      orderNumber: order.order_number, expiryMinutes: tap.expiryMinutes,
+    }, 200);
+  }
+  // CAPTURED-at-create (rare for hosted 3DS) or any other state → let the app run
+  // the server verify path, which retrieves + confirms authoritatively.
+  return json({
+    provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
+    orderNumber: order.order_number, needsVerify: true,
+  }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Geidea (pre-existing scaffold — retained, dormant; selected only when
+// provider_name='geidea'). Unchanged behavior.
+// ---------------------------------------------------------------------------
+async function initiateGeidea(
+  admin: SupabaseClient, order: Record<string, unknown>, cfg: ProviderConfig,
+): Promise<Response> {
+  if (!cfg.enabled) return json({ error: 'Online payment is not enabled' }, 400);
   const publicKey = String(cfg.secretConfig.publicKey ?? '');
   const apiPassword = String(cfg.secretConfig.apiPassword ?? '');
-  if (!publicKey || !apiPassword) {
-    return json({ error: 'Geidea credentials are not set (publicKey / apiPassword)' }, 500);
-  }
+  if (!publicKey || !apiPassword) return json({ error: 'Geidea credentials are not set' }, 500);
 
   const currency = String(cfg.publicConfig.currency ?? 'SAR');
   const amount = formatAmount(Number(order.total));
   const timestamp = new Date().toISOString();
-  const merchantReferenceId = String(order.id); // our order id round-trips in the callback
-  const signature = await createSessionSignature({
-    publicKey, amount, currency, merchantReferenceId, timestamp, apiPassword,
-  });
+  const merchantReferenceId = String(order.id);
+  const signature = await createSessionSignature({ publicKey, amount, currency, merchantReferenceId, timestamp, apiPassword });
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const callbackUrl = `${supabaseUrl}/functions/v1/payment-webhook`;
@@ -71,24 +204,11 @@ Deno.serve(async (req: Request) => {
   try {
     const resp = await fetch(`${geideaApiBase(cfg.publicConfig)}/payment-intent/api/v2/direct/session`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${btoa(`${publicKey}:${apiPassword}`)}`,
-      },
-      body: JSON.stringify({
-        amount: Number(amount),
-        currency,
-        timestamp,
-        merchantReferenceId,
-        callbackUrl,
-        returnUrl,
-        signature,
-      }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Basic ${btoa(`${publicKey}:${apiPassword}`)}` },
+      body: JSON.stringify({ amount: Number(amount), currency, timestamp, merchantReferenceId, callbackUrl, returnUrl, signature }),
     });
     result = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      // Log the upstream detail SERVER-SIDE only; never echo the gateway's raw
-      // response body back to the client (it can carry internal error detail).
       console.error('Geidea session creation failed', resp.status, JSON.stringify(result).slice(0, 500));
       return json({ error: 'Geidea session creation failed', status: resp.status }, 502);
     }
@@ -104,15 +224,9 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Geidea did not return a session id' }, 502);
   }
 
-  // Audit the initiation (best-effort; the webhook is the source of truth for paid).
   await admin.from('payment_records').insert({
-    order_id: order.id,
-    provider: 'geidea',
-    provider_ref: sessionId,
-    status: 'initiated',
-    amount: Number(order.total),
-    currency,
-    raw: result,
+    order_id: order.id, provider: 'geidea', provider_ref: sessionId, status: 'initiated',
+    amount: Number(order.total), currency, raw: result,
   });
 
   return json({
@@ -120,4 +234,4 @@ Deno.serve(async (req: Request) => {
     checkoutUrl: `${geideaHppBase(cfg.publicConfig)}/hpp/checkout/?${sessionId}`,
     orderNumber: order.order_number,
   });
-});
+}

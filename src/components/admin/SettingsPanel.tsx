@@ -7,6 +7,7 @@ import { IntegrationCard } from './IntegrationCard';
 import { LazywaitPanel } from './LazywaitPanel';
 import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
 import { EmailServerPanel } from './EmailServerPanel';
+import { TapPaymentPanel } from './TapPaymentPanel';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 
@@ -378,6 +379,7 @@ export const SettingsPanel: React.FC = () => {
                               onSave={saveIntegration}
                             />
                           ))}
+                          <TapPaymentPanel disabled={isAccountant} />
                           <WhatsAppOtpPanel disabled={isAccountant} />
                           <EmailServerPanel disabled={isAccountant} />
                           <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
@@ -385,8 +387,8 @@ export const SettingsPanel: React.FC = () => {
                             <div>
                               <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'تخزين آمن' : 'Secure storage'}</span>
                               {isRTL
-                                ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. تكامل Lazywait للطلبات مفعّل من جهة الخادم؛ الدفع والرسائل غير مفعّلة بعد.'
-                                : 'Secrets are stored server-side and never reach the browser. Lazywait order sync is wired server-side; payment and SMS are not activated yet.'}
+                                ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. Lazywait ومدفوعات Tap مفعّلة من جهة الخادم (Tap يبقى معطّلاً حتى تُدخل المفاتيح وتفعّله)؛ الرسائل غير مفعّلة بعد.'
+                                : 'Secrets are stored server-side and never reach the browser. Lazywait sync and Tap payments are wired server-side (Tap stays disabled until you enter keys and enable it); SMS is not activated yet.'}
                             </div>
                           </div>
                           <LazywaitPanel disabled={isAccountant} />

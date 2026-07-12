@@ -9,16 +9,17 @@
  * The idempotency key from the cart store makes a retried submit safe.
  */
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { useI18n } from '../../i18n/I18nProvider';
-import { addresses, coupons, orders } from '../../services/api';
+import { addresses, coupons, orders, payments } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
 import {
   availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
@@ -56,6 +57,10 @@ export function CheckoutScreen() {
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Online-payment (Tap) flow overlay. null = not paying.
+  type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
+  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId: string; message?: string } | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
 
   const branchOpen = branchIsOpen(selectedBranch);
   const vatPct = brand?.vatPercentage ?? 15;
@@ -179,9 +184,7 @@ export function CheckoutScreen() {
         }
       }
 
-      // place_order + synchronous Lazywait POS sync, so the receipt shows the
-      // POS order number when the POS responds in time (falls back to SM-… if not).
-      const order = await orders.placeAndSync({
+      const orderInput = {
         branchId: selectedBranch.id,
         orderType,
         items: cart.toOrderItems(),
@@ -191,14 +194,75 @@ export function CheckoutScreen() {
         loyaltyPoints: redeemPoints ? availablePoints : 0,
         idempotencyKey: cart.idempotencyKey,
         paymentMethod,
-      });
+      };
+      const isOnline = paymentMethod === 'online';
+      // Online orders are created pending and are NOT sent to the POS until the
+      // payment is verified (the DB trigger holds them in 'awaiting_payment');
+      // cash orders sync to the POS now, as before.
+      const order = isOnline ? await orders.place(orderInput) : await orders.placeAndSync(orderInput);
       cart.clear();
-      router.replace(`/receipt/${order.id}`);
+
+      // Zero-total (e.g. full coupon/loyalty) never touches Tap — go straight to
+      // the receipt. Online orders with a real total go through Tap checkout.
+      if (isOnline && Number(order.total) > 0) {
+        await runTapPayment(order.id);
+      } else {
+        router.replace(`/receipt/${order.id}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : t('somethingWentWrong'));
     } finally {
       setPlacing(false);
     }
+  };
+
+  // ---- Tap online-payment flow (open hosted checkout → server verify) --------
+  const runTapPayment = async (orderId: string) => {
+    setPayFlow({ state: 'opening', orderId });
+    try {
+      const init = await payments.initiate(orderId, lang === 'ar' ? 'ar' : 'en');
+      if (init.status === 'already_paid') { router.replace(`/receipt/${orderId}`); return; }
+      if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
+        setPayFlow({ state: 'error', orderId, message: t('payUnavailable') });
+        return;
+      }
+      if (init.checkoutUrl) {
+        // Opens the Tap hosted page; returns when it redirects to spicymeal://.
+        // The result is NOT trusted — server verify is authoritative.
+        await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
+      }
+      await verifyPayment(orderId);
+    } catch (e) {
+      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+    }
+  };
+
+  const verifyPayment = async (orderId: string) => {
+    setPayFlow({ state: 'verifying', orderId });
+    setPayBusy(true);
+    try {
+      const res = await payments.verify(orderId);
+      if (res.status === 'paid') { setPayFlow(null); router.replace(`/receipt/${orderId}`); return; }
+      const state: PayState =
+        res.status === 'cancelled' ? 'cancelled'
+        : res.status === 'expired' ? 'expired'
+        : res.status === 'pending' ? 'pending'
+        : 'failed';
+      const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
+        state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
+      );
+      setPayFlow({ state, orderId, message: t(msgKey as never) });
+    } catch (e) {
+      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  const dismissPayFlowToReceipt = () => {
+    const id = payFlow?.orderId;
+    setPayFlow(null);
+    if (id) router.replace(`/receipt/${id}`);
   };
 
   return (
@@ -370,6 +434,33 @@ export function CheckoutScreen() {
           variant="danger"
         />
       </View>
+
+      {/* Online-payment (Tap) overlay */}
+      <Modal visible={payFlow !== null} transparent animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.payBackdrop}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>{t('payTitle')}</Text>
+            {payFlow && (payFlow.state === 'opening' || payFlow.state === 'verifying') ? (
+              <View style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg }}>
+                <ActivityIndicator size="large" color={colors.purple} />
+                <Text style={styles.payMsg}>{t(payFlow.state === 'opening' ? 'payOpening' : 'payVerifying')}</Text>
+              </View>
+            ) : payFlow ? (
+              <>
+                <Text style={styles.payMsg}>{payFlow.message ?? t('payFailed')}</Text>
+                <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
+                  {payFlow.state === 'pending' ? (
+                    <Button label={t('payVerifyAgain')} onPress={() => void verifyPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                  ) : (
+                    <Button label={t('payTryAgain')} onPress={() => void runTapPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                  )}
+                  <Button label={t('payViewOrder')} onPress={dismissPayFlowToReceipt} variant="secondary" />
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -454,4 +545,9 @@ const styles = StyleSheet.create({
   },
   blockReason: { color: colors.warning, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
   error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
+
+  payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+  payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.xl },
+  payTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: spacing.sm },
+  payMsg: { fontSize: font.md, color: colors.text, textAlign: 'center', lineHeight: 20 },
 });
