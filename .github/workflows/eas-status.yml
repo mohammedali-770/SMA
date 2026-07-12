@@ -34,22 +34,28 @@ jobs:
       - name: Poll EAS build until it finishes
         env:
           BID: 7a6a01b3-ea61-491c-8463-27d5190bef74
+          EXPO_NO_TELEMETRY: "1"
         run: |
           set +e
           for i in $(seq 1 40); do
-            JSON=$(eas build:view "$BID" --json --non-interactive 2>/dev/null)
-            STATUS=$(echo "$JSON" | jq -r '.status // empty')
-            echo "poll $i: status=$STATUS"
+            # eas-cli can prepend update-notice lines to stdout; strip everything
+            # before the first JSON bracket so jq always gets clean JSON.
+            RAW=$(eas build:view "$BID" --json --non-interactive 2>/dev/null)
+            JSON=$(printf '%s\n' "$RAW" | awk '/^[[{]/{f=1} f{print}')
+            STATUS=$(printf '%s' "$JSON" | jq -r '.status // empty' 2>/dev/null)
+            echo "poll $i: status=${STATUS:-unparsed}"
+            if [ -z "$STATUS" ]; then
+              echo "--- raw head (first 3 lines) ---"; printf '%s\n' "$RAW" | head -3
+            fi
             if [ "$STATUS" = "FINISHED" ] || [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELED" ]; then
               echo "=== FINAL BUILD SUMMARY ==="
-              echo "$JSON" | jq '{id, status, platform, appVersion, gitCommitHash, createdAt, completedAt, error}'
+              printf '%s' "$JSON" | jq '{id, status, platform, appVersion, gitCommitHash, createdAt, completedAt, error}'
               echo "=== ARTIFACTS ==="
-              echo "$JSON" | jq '.artifacts'
+              printf '%s' "$JSON" | jq '.artifacts'
               echo "=== APK_URL ==="
-              echo "$JSON" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "none"'
+              printf '%s' "$JSON" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "none"'
               exit 0
             fi
             sleep 30
           done
-          echo "Timed out after ~20 min; last status:"
-          eas build:view "$BID" --json --non-interactive 2>/dev/null | jq '{id, status}'
+          echo "Timed out; build still not terminal."
