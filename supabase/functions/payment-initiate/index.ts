@@ -158,11 +158,20 @@ async function initiateTap(
     return json({ error: 'Could not start the payment. Please try again.' }, 502);
   }
 
-  // Persist the charge id + checkout URL against the attempt (still 'initiated').
-  await admin.from('payment_records').update({
+  // Persist the charge id BEFORE returning any checkout URL. The webhook and
+  // payment-verify both key off provider_ref, so handing the customer a URL for a
+  // charge we failed to store would let them pay a charge we can never match. If
+  // this write fails we return a retryable error instead: the charge already
+  // exists at Tap, and a retry reuses THIS attempt + the same `idempotent` string,
+  // so Tap returns the SAME charge (never a second one) and we persist it then.
+  const { error: persistErr } = await admin.from('payment_records').update({
     provider_ref: chargeId, checkout_url: checkoutUrl || null, raw: sanitizeTapResponse(result),
     last_verified_at: new Date().toISOString(),
-  }).eq('id', attempt.id).then(() => {}, () => {});
+  }).eq('id', attempt.id);
+  if (persistErr) {
+    console.error('Tap charge persist failed', String(persistErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
 
   if (outcome === 'pending' && checkoutUrl) {
     return json({

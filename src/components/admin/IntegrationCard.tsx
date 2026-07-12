@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, Loader2, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
 import { DbIntegrationSetting, UpsertIntegrationInput } from '../../lib/api';
+import { initialProviderName } from '../../lib/integrationProvider';
 
 type FieldType = 'text' | 'bool';
 interface PublicField { key: string; label: string; type: FieldType; placeholder?: string; }
@@ -116,7 +117,9 @@ interface Props {
 export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, onSave }) => {
   const spec = PROVIDER_SPECS[providerType];
   const [enabled, setEnabled] = useState<boolean>(row?.enabled ?? false);
-  const [providerName, setProviderName] = useState<string>(row?.provider_name ?? spec.providerOptions?.[0] ?? '');
+  // Coerce a stale stored provider (e.g. seeded 'sandbox') to a currently-offered
+  // option, so a Save persists a usable provider rather than the stale value.
+  const [providerName, setProviderName] = useState<string>(() => initialProviderName(row?.provider_name, spec.providerOptions));
   const [pub, setPub] = useState<Record<string, unknown>>(() => ({ ...(row?.public_config ?? {}) }));
   const [secrets, setSecrets] = useState<Record<string, string>>({}); // write-only, cleared after save
   const [hasSecret, setHasSecret] = useState<boolean>(row?.has_secret ?? false);
