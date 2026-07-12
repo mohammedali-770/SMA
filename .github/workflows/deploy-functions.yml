@@ -16,6 +16,12 @@ on:
         description: "Space-separated function names, or 'all' for the payment set"
         type: string
         default: "payment-initiate payment-verify payment-webhook payment-return"
+  # Also runs when this workflow file itself changes, so the payment functions can
+  # be (re)deployed by touching it — used because workflow_dispatch via the API
+  # requires the workflow to live on the default branch. Requires SUPABASE_ACCESS_TOKEN.
+  push:
+    paths:
+      - '.github/workflows/deploy-functions.yml'
 
 env:
   SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
