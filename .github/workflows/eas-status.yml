@@ -1,0 +1,55 @@
+name: EAS Build Status (read-only)
+
+# Read-only helper: polls EAS for the status + artifact (APK) URL of an already
+# submitted build and prints them to this job's log. It runs `eas build:view`
+# (a QUERY) — it never starts a build. Triggered only when this file changes, so
+# adding/editing it kicks off exactly one status check. Requires EXPO_TOKEN.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/eas-status.yml'
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup EAS / Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Poll EAS build until it finishes
+        env:
+          BID: 7a6a01b3-ea61-491c-8463-27d5190bef74
+        run: |
+          set +e
+          for i in $(seq 1 40); do
+            JSON=$(eas build:view "$BID" --json --non-interactive 2>/dev/null)
+            STATUS=$(echo "$JSON" | jq -r '.status // empty')
+            echo "poll $i: status=$STATUS"
+            if [ "$STATUS" = "FINISHED" ] || [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELED" ]; then
+              echo "=== FINAL BUILD SUMMARY ==="
+              echo "$JSON" | jq '{id, status, platform, appVersion, gitCommitHash, createdAt, completedAt, error}'
+              echo "=== ARTIFACTS ==="
+              echo "$JSON" | jq '.artifacts'
+              echo "=== APK_URL ==="
+              echo "$JSON" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "none"'
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out after ~20 min; last status:"
+          eas build:view "$BID" --json --non-interactive 2>/dev/null | jq '{id, status}'
