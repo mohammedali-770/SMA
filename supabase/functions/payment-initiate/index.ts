@@ -88,7 +88,15 @@ async function initiateTap(
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
   const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
-  if (!attempt) return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  // tap_begin_payment_attempt returns the payment_records id as `attempt_id`
+  // (NOT `id`). Guard it explicitly: a missing id here previously slipped through
+  // as `.eq('id', undefined)` → Postgres "invalid input syntax for type uuid" →
+  // the charge was created at Tap but never persisted, surfacing as the generic
+  // "Could not start the payment" while leaving the record stuck 'initiated'.
+  if (!attempt || !attempt.attempt_id) {
+    console.error('tap_begin_payment_attempt returned no attempt_id');
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
 
   if (attempt.reused && attempt.checkout_url && attempt.provider_ref) {
     return json({
@@ -156,7 +164,7 @@ async function initiateTap(
       failure_code: 'network_unreachable',
       failure_message_safe: 'Could not reach the payment provider.',
       last_verified_at: new Date().toISOString(),
-    }).eq('id', attempt.id).then(() => {}, () => {});
+    }).eq('id', attempt.attempt_id).then(() => {}, () => {});
     return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
   }
 
@@ -166,7 +174,7 @@ async function initiateTap(
     await admin.from('payment_records').update({
       status: 'failed', failure_code: `create_${resp.status}`, failure_message_safe: 'Could not start payment.',
       raw: sanitizeTapResponse(result),
-    }).eq('id', attempt.id).then(() => {}, () => {});
+    }).eq('id', attempt.attempt_id).then(() => {}, () => {});
     return json({ error: 'Could not start the payment. Please try again.' }, 502);
   }
 
@@ -177,7 +185,7 @@ async function initiateTap(
 
   if (!chargeId) {
     await admin.from('payment_records').update({ status: 'failed', failure_code: 'no_charge_id', raw: sanitizeTapResponse(result) })
-      .eq('id', attempt.id).then(() => {}, () => {});
+      .eq('id', attempt.attempt_id).then(() => {}, () => {});
     return json({ error: 'Could not start the payment. Please try again.' }, 502);
   }
 
@@ -192,7 +200,7 @@ async function initiateTap(
     last_verified_at: new Date().toISOString(),
     // Clear any prior 'network_unreachable' breadcrumb now that the charge exists.
     failure_code: null, failure_message_safe: null,
-  }).eq('id', attempt.id);
+  }).eq('id', attempt.attempt_id);
   if (persistErr) {
     console.error('Tap charge persist failed', String(persistErr.message ?? '').slice(0, 200));
     return json({ error: 'Could not start the payment. Please try again.' }, 502);

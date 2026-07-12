@@ -200,11 +200,22 @@ export const orders = {
     if (!res.order) throw new Error('Order was not created.');
     return res.order;
   },
-  /** RLS returns only the signed-in customer's own orders, newest first. */
+  /**
+   * RLS returns only the signed-in customer's own orders, newest first.
+   *
+   * An unpaid ONLINE order is a checkout-in-progress, not a real order, and must
+   * never surface in My Orders until the backend has verified payment. We hide
+   * exactly those rows (payment_method = 'online' AND payment_status <> 'paid').
+   * Cash orders and paid online orders always show; a null payment_method
+   * (legacy rows) is treated as not-online and shown. RLS is intentionally NOT
+   * tightened — payment-verify, the retry flow, and the receipt screen still
+   * read the pending order by id.
+   */
   listWithItems: async () =>
     ok<DbOrderWithItems[]>(await supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
+      .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
       .order('created_at', { ascending: false })),
   /** A single order with its lines (RLS still scopes it to the owner). */
   byId: async (id: string) =>
