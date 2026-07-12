@@ -1,6 +1,7 @@
 name: Deploy Supabase Functions
 
 # Deploys the payment Edge Functions from this repo to the Supabase project.
+# (retry marker: 2)
 # REQUIRES a SUPABASE_ACCESS_TOKEN repo secret (Supabase dashboard → Account →
 # Access Tokens → generate; then GitHub repo → Settings → Secrets → Actions).
 #
