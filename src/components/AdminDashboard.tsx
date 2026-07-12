@@ -6,12 +6,13 @@
 import React, { useState } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
+import { IntegrationsPanel } from './admin/IntegrationsPanel';
 import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
@@ -26,7 +27,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'settings'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'integrations' | 'settings'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -184,12 +185,20 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'التقارير والتحليلات المالية' : 'Financial Reports'}</span>
           </button>
 
-          <button 
+          <button
+            onClick={() => setActiveTab('integrations')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrations' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Plug className="w-4 h-4" />
+            <span>{isRTL ? 'الربط والتكاملات' : 'Integrations'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
             <Settings className="w-4 h-4" />
-            <span>{isRTL ? 'الربط السحابي والإعدادات' : 'Integrations & Settings'}</span>
+            <span>{isRTL ? 'الإعدادات' : 'Settings'}</span>
           </button>
         </div>
 
@@ -211,7 +220,10 @@ export const AdminDashboard: React.FC = () => {
           {/* TAB 5: FINANCIAL REPORTS & ANALYTICS (PHASE 9) */}
           {activeTab === 'reports' && <ReportsPanel />}
 
-          {/* TAB 6: INTEGRATIONS & SETTINGS (PHASE 10) */}
+          {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
+          {activeTab === 'integrations' && <IntegrationsPanel />}
+
+          {/* TAB 7: SYSTEM SETTINGS (brand, payment methods, maps, loyalty) */}
           {activeTab === 'settings' && <SettingsPanel />}
         </div>
       </div>
