@@ -28,7 +28,7 @@ import type { Category, Product } from '../../types/models';
 
 export function HomeMenuScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, toggle } = useI18n();
+  const { t, pick, lang, toggle, rtlText, rtlRow } = useI18n();
   const {
     loading, error, reload, categories, products, selectedBranch, selectedBranchId,
     isAvailable, branchIsOpen, groupsForProduct,
@@ -120,11 +120,11 @@ export function HomeMenuScreen() {
         </Pressable>
       </View>
 
-      {/* Branch selector — always manual */}
-      <Pressable style={styles.branchRow} onPress={() => router.push('/branch')} accessibilityRole="button">
+      {/* Branch selector — always manual. Mirrored in Arabic (info → badge → action). */}
+      <Pressable style={[styles.branchRow, rtlRow]} onPress={() => router.push('/branch')} accessibilityRole="button">
         <View style={{ flex: 1 }}>
-          <Text style={styles.branchLabel}>{t('selectBranch')}</Text>
-          <Text style={styles.branchValue} numberOfLines={1}>
+          <Text style={[styles.branchLabel, rtlText]}>{t('selectBranch')}</Text>
+          <Text style={[styles.branchValue, rtlText]} numberOfLines={1}>
             {selectedBranch ? pick(selectedBranch.nameEn, selectedBranch.nameAr) : t('tapToChooseBranch')}
           </Text>
         </View>
@@ -151,19 +151,19 @@ export function HomeMenuScreen() {
         <>
           {!branchOpen ? (
             <View style={styles.closedNotice}>
-              <Text style={styles.closedNoticeText}>{t('branchClosedNotice')}</Text>
+              <Text style={[styles.closedNoticeText, rtlText]}>{t('branchClosedNotice')}</Text>
             </View>
           ) : null}
 
-          {/* Search */}
-          <View style={styles.searchWrap}>
+          {/* Search — mirrored so the icon sits on the reading edge in Arabic. */}
+          <View style={[styles.searchWrap, rtlRow]}>
             <Text style={styles.searchIcon}>🔍</Text>
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder={t('searchPlaceholder')}
               placeholderTextColor={colors.muted}
-              style={styles.searchInput}
+              style={[styles.searchInput, rtlText]}
               autoCapitalize="none"
               returnKeyType="search"
             />
@@ -212,7 +212,7 @@ export function HomeMenuScreen() {
                   onLayout={(e: LayoutChangeEvent) => { offsets.current[s.category.id] = e.nativeEvent.layout.y; }}
                   style={styles.section}
                 >
-                  <Text style={styles.sectionTitle}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
+                  <Text style={[styles.sectionTitle, rtlText]}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
                   <View style={{ gap: spacing.md }}>
                     {s.items.map((p) => (
                       <ProductCard
@@ -237,11 +237,11 @@ export function HomeMenuScreen() {
       {/* Sticky cart bar (above the safe area) */}
       {cart.count > 0 ? (
         <View style={[styles.cartBar, { paddingBottom: insets.bottom + spacing.sm }]}>
-          <Pressable style={styles.cartBtn} onPress={() => router.push('/cart')} accessibilityRole="button">
+          <Pressable style={[styles.cartBtn, rtlRow]} onPress={() => router.push('/cart')} accessibilityRole="button">
             <View style={styles.cartCount}>
               <Text style={styles.cartCountText}>{cart.count}</Text>
             </View>
-            <Text style={styles.cartBtnText}>{t('myCart')}</Text>
+            <Text style={[styles.cartBtnText, rtlText]}>{t('myCart')}</Text>
             <Text style={styles.cartBtnPrice}>{formatSAR(cart.subtotal, lang)}</Text>
           </Pressable>
         </View>
@@ -256,13 +256,15 @@ function ProductCard({
   product: Product; name: string; description: string; priceLabel: string;
   kcalLabel: string; actionLabel: string; onAdd: () => void;
 }) {
+  const { rtlText, rtlRow } = useI18n();
   return (
-    <View style={[styles.card, shadow.card]}>
+    // Mirrored in Arabic: image on the right, text block reading right-to-left.
+    <View style={[styles.card, rtlRow, shadow.card]}>
       <Image source={{ uri: product.imageUrl }} style={styles.cardImg} contentFit="cover" transition={150} />
       <View style={styles.cardBody}>
-        <Text style={styles.cardName} numberOfLines={1}>{name}</Text>
-        {description ? <Text style={styles.cardDesc} numberOfLines={2}>{description}</Text> : null}
-        <View style={styles.cardBottom}>
+        <Text style={[styles.cardName, rtlText]} numberOfLines={1}>{name}</Text>
+        {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
+        <View style={[styles.cardBottom, rtlRow]}>
           <View>
             <Text style={styles.cardPrice}>{priceLabel}</Text>
             {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}

@@ -10,6 +10,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { rtlRow, rtlText } from './rtl';
 import { STRINGS, type Lang, type StringKey } from './strings';
 
 const STORAGE_KEY = 'spicymeal.lang';
@@ -23,6 +24,10 @@ interface I18nValue {
   t: (key: StringKey) => string;
   /** Pick the locale-appropriate field from an EN/AR pair. */
   pick: (en: string, ar: string) => string;
+  /** Compose into text styles: aligns to the reading edge (right in Arabic). */
+  rtlText: { textAlign: 'left' | 'right' };
+  /** Compose into row styles: mirrors the row in Arabic. */
+  rtlRow: { flexDirection: 'row' | 'row-reverse' };
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
@@ -53,6 +58,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       toggle: () => setLang(lang === 'en' ? 'ar' : 'en'),
       t: (key: StringKey) => STRINGS[lang][key] ?? STRINGS.en[key] ?? String(key),
       pick: (en: string, ar: string) => (isRTL ? ar : en) || en,
+      rtlText: rtlText(isRTL),
+      rtlRow: rtlRow(isRTL),
     };
   }, [lang, setLang]);
 

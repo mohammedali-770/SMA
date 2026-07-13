@@ -20,7 +20,7 @@ import type { CartItem } from '../../types/models';
 
 export function CartScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang } = useI18n();
+  const { t, pick, lang, rtlRow } = useI18n();
   const cart = useCart();
 
   if (cart.items.length === 0) {
@@ -60,11 +60,11 @@ export function CartScreen() {
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <View style={styles.subtotalRow}>
+        <View style={[styles.subtotalRow, rtlRow]}>
           <Text style={styles.subtotalLabel}>{t('subtotal')}</Text>
           <Text style={styles.subtotalValue}>{formatSAR(cart.subtotal, lang)}</Text>
         </View>
-        <Pressable style={styles.checkoutBtn} onPress={() => router.push('/checkout')} accessibilityRole="button">
+        <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button">
           <Text style={styles.checkoutText}>{t('goToCheckout')}</Text>
           <Text style={styles.checkoutCount}>{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text>
         </Pressable>
@@ -84,14 +84,15 @@ function CartLine({
   item: CartItem; name: string; modifierSummary: string; lineTotal: string;
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
+  const { rtlText, rtlRow } = useI18n();
   return (
     <View style={[styles.line, shadow.card]}>
-      <View style={styles.lineTop}>
-        <Text style={styles.lineName} numberOfLines={2}>{name}</Text>
+      <View style={[styles.lineTop, rtlRow]}>
+        <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
         <Text style={styles.lineTotal}>{lineTotal}</Text>
       </View>
-      {summary ? <Text style={styles.lineMods}>{summary}</Text> : null}
-      <View style={styles.lineBottom}>
+      {summary ? <Text style={[styles.lineMods, rtlText]}>{summary}</Text> : null}
+      <View style={[styles.lineBottom, rtlRow]}>
         <QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small />
         <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={removeLabel}>
           <Text style={styles.remove}>{removeLabel}</Text>

@@ -19,7 +19,7 @@ import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
 import type { Order } from '../../types/models';
 
 export function ReceiptScreen({ orderId }: { orderId: string }) {
-  const { t, pick, lang } = useI18n();
+  const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,15 +90,15 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               );
             })()}
 
-            <Text style={styles.summaryTitle}>{t('orderSummary')}</Text>
+            <Text style={[styles.summaryTitle, rtlText]}>{t('orderSummary')}</Text>
             <View style={[styles.card, shadow.card]}>
               {order.items.map((it) => (
-                <View key={it.id} style={styles.itemRow}>
+                <View key={it.id} style={[styles.itemRow, rtlRow]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.itemName}>{pick(it.nameEn, it.nameAr)}</Text>
+                    <Text style={[styles.itemName, rtlText]}>{pick(it.nameEn, it.nameAr)}</Text>
                     {it.selectedModifiers.length > 0 ? (
-                      <Text style={styles.itemMods}>
+                      <Text style={[styles.itemMods, rtlText]}>
                         {it.selectedModifiers.map((m) => pick(m.nameEn, m.nameAr)).join(' · ')}
                       </Text>
                     ) : null}
@@ -115,7 +115,7 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               <View style={styles.divider} />
               <Row label={t('total')} value={formatSAR(order.total, lang)} strong big />
               {order.loyaltyPointsEarned > 0 ? (
-                <Text style={styles.earned}>
+                <Text style={[styles.earned, rtlText]}>
                   ⭐ +{order.loyaltyPointsEarned} {t('loyaltyPoints')}
                 </Text>
               ) : null}
@@ -133,10 +133,12 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
 }
 
 function Row({ label, value, secondary, strong, big, muted }: { label: string; value: string; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
+  const { isRTL, rtlRow } = useI18n();
   return (
-    <View style={styles.row}>
+    // Mirrored in Arabic: label on the right, value column on the left.
+    <View style={[styles.row, rtlRow]}>
       <Text style={[styles.rowLabel, muted && styles.muted]}>{label}</Text>
-      <View style={styles.rowValueCol}>
+      <View style={[styles.rowValueCol, isRTL && styles.rowValueColRTL]}>
         <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
         {secondary ? <Text style={styles.rowSecondary}>{secondary}</Text> : null}
       </View>
@@ -154,6 +156,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600' },
   rowValueCol: { alignItems: 'flex-end', flexShrink: 1 },
+  rowValueColRTL: { alignItems: 'flex-start' },
   rowValue: { fontSize: font.md, color: colors.text, fontWeight: '700' },
   rowSecondary: { fontSize: font.sm, color: colors.muted, fontWeight: '600', marginTop: 1 },
   muted: { color: colors.muted, fontSize: font.sm },

@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function Header({ title, showBack, onBack, right, left }: Props) {
-  const { isRTL, t } = useI18n();
+  const { isRTL, t, rtlRow } = useI18n();
   const back = () => {
     if (onBack) onBack();
     else if (router.canGoBack()) router.back();
@@ -24,7 +24,9 @@ export function Header({ title, showBack, onBack, right, left }: Props) {
   const chevron = isRTL ? '›' : '‹';
 
   return (
-    <View style={styles.wrap}>
+    // Mirrored in Arabic so Back sits on the trailing (right) edge, matching
+    // native RTL convention; the chevron above already points the correct way.
+    <View style={[styles.wrap, rtlRow]}>
       <View style={styles.side}>
         {showBack ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('back')} onPress={back} hitSlop={10} style={styles.backBtn}>
@@ -33,7 +35,7 @@ export function Header({ title, showBack, onBack, right, left }: Props) {
         ) : left ?? null}
       </View>
       <Text numberOfLines={1} style={styles.title}>{title}</Text>
-      <View style={[styles.side, styles.right]}>{right ?? null}</View>
+      <View style={[styles.side, styles.right, isRTL && styles.rightRTL]}>{right ?? null}</View>
     </View>
   );
 }
@@ -50,6 +52,7 @@ const styles = StyleSheet.create({
   },
   side: { minWidth: 44, justifyContent: 'center' },
   right: { alignItems: 'flex-end' },
+  rightRTL: { alignItems: 'flex-start' },
   backBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.bgAlt,
