@@ -50,21 +50,31 @@ export interface VerifyOutcome {
 
 export type PendingAction =
   | { kind: 'receipt'; orderId: string }  // paid → open the receipt, clear cart + key
-  | { kind: 'keep' }                       // still pending / transient error → leave the key
+  | { kind: 'keep' }                       // still pending / unknown / transient error → leave the key
   | { kind: 'clear' };                     // terminal (failed/cancelled/expired) → drop the key
 
 /**
+ * Tap statuses that are DEFINITELY terminal — the charge can no longer settle, so
+ * the session is safe to drop. Every other value (pending, 'unknown', or any
+ * status the backend still leaves open) is KEPT: the backend treats an unknown
+ * charge as pending, so clearing here would abandon a possibly-live charge and let
+ * the next checkout open a second one.
+ */
+const TERMINAL_STATUSES = new Set(['failed', 'cancelled', 'expired']);
+
+/**
  * Decide what to do with a stored pending session given a verifySession result
- * (or null when the verify call itself failed / couldn't run). Conservative: a
- * missing/unknown result KEEPS the session so a transient network error can never
- * strand or double-charge the customer.
+ * (or null when the verify call itself failed / couldn't run). Conservative: only
+ * an explicitly terminal status clears the session; a missing/pending/unknown
+ * result KEEPS it so a transient error or still-settling charge can never strand
+ * or double-charge the customer.
  */
 export function decidePendingAction(res: VerifyOutcome | null | undefined): PendingAction {
   if (!res) return { kind: 'keep' };
   if (res.status === 'paid' && res.orderId) return { kind: 'receipt', orderId: res.orderId };
-  if (res.status === 'paid') return { kind: 'keep' };     // paid but order id not resolved yet → retry verify
-  if (res.status === 'pending') return { kind: 'keep' };
-  return { kind: 'clear' };                                // failed | cancelled | expired | unknown-terminal
+  if (res.status === 'paid') return { kind: 'keep' };        // paid but order id not resolved yet → retry verify
+  if (TERMINAL_STATUSES.has(res.status)) return { kind: 'clear' };
+  return { kind: 'keep' };                                    // pending | unknown | anything still open
 }
 
 export type RecoverResult =

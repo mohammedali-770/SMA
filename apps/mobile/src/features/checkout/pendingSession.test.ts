@@ -44,8 +44,11 @@ describe('decidePendingAction', () => {
     expect(decidePendingAction(null)).toEqual({ kind: 'keep' });
     expect(decidePendingAction(undefined)).toEqual({ kind: 'keep' });
   });
-  it.each(['failed', 'cancelled', 'expired', 'weird'])('terminal %s -> clear', (status) => {
+  it.each(['failed', 'cancelled', 'expired'])('terminal %s -> clear', (status) => {
     expect(decidePendingAction({ status } as VerifyOutcome)).toEqual({ kind: 'clear' });
+  });
+  it.each(['unknown', 'weird', 'processing'])('non-terminal %s -> keep (backend may still settle it)', (status) => {
+    expect(decidePendingAction({ status } as VerifyOutcome)).toEqual({ kind: 'keep' });
   });
 });
 

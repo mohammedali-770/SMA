@@ -190,6 +190,19 @@ export function CheckoutScreen() {
     setError(null);
     setPlacing(true);
     try {
+      // Resolve any interrupted online payment FIRST — before creating ANY new
+      // order, cash included. Otherwise a customer with an unresolved online charge
+      // could switch to cash and place a second order while that charge may still
+      // be captured. Recovery is idempotent (verify is read-only; resume reopens
+      // the SAME charge).
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
+      if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
+
       // Resolve the delivery address: reuse the selected saved address when the
       // pin hasn't moved off it, otherwise persist the map-picked coordinates.
       let deliveryAddressId: string | null = null;
@@ -222,19 +235,8 @@ export function CheckoutScreen() {
       };
       const isOnline = paymentMethod === 'online';
       if (isOnline) {
-        // Resolve any interrupted payment BEFORE opening a new charge. If a prior
-        // session is already paid → its receipt; if still unresolved → resume THAT
-        // session (idempotent — reuses the same charge). Only a terminal/absent
-        // session lets us begin a new one. This is the double-charge guard for an
-        // app killed (or pay sheet closed) mid-payment.
-        const rec = await recoverPendingSession({
-          read: loadPendingSession,
-          verify: (id) => payments.verifySession(id),
-          clear: clearPendingSession,
-        });
-        if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
-        if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
-
+        // Any interrupted charge was already resolved at the top of placeOrder,
+        // so beginning a new session here is safe.
         // NEW online flow: create a temporary checkout SESSION (not an order). The
         // real order is created only after the backend verifies the payment. A
         // zero-total online order (fully covered) is settled server-side and comes
@@ -266,9 +268,11 @@ export function CheckoutScreen() {
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
   const runTapPaymentSession = async (sessionId: string) => {
-    // Persist the in-flight session so an app kill / cold start recovers THIS
-    // charge instead of opening a new one (see pendingSession.ts).
-    void savePendingSession(sessionId, Date.now());
+    // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
+    // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
+    // forget) so the write is committed before we hand off to the browser — the
+    // exact window this recovery is meant to survive (see pendingSession.ts).
+    await savePendingSession(sessionId, Date.now());
     setPayFlow({ state: 'opening', sessionId });
     try {
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
@@ -292,16 +296,18 @@ export function CheckoutScreen() {
     try {
       const res = await payments.verifySession(sessionId);
       if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
+      // Only an EXPLICITLY terminal charge (failed/cancelled/expired) clears the
+      // persisted session. An 'unknown' status — and 'paid' without a resolved
+      // order id yet — the backend still treats as open, so we keep the session
+      // and show it as pending (verify again), never abandoning a charge that may
+      // still settle into a second one.
+      const isTerminal = res.status === 'failed' || res.status === 'cancelled' || res.status === 'expired';
       const state: PayState =
         res.status === 'cancelled' ? 'cancelled'
         : res.status === 'expired' ? 'expired'
-        : res.status === 'pending' ? 'pending'
-        : 'failed';
-      // Only a still-pending charge keeps the persisted session (recovery can
-      // resolve it later). A terminal result (failed/cancelled/expired) can never
-      // become an order, so drop the key — the next attempt must open a FRESH
-      // session, never reuse a consumed/expired one.
-      if (state !== 'pending') void clearPendingSession();
+        : res.status === 'failed' ? 'failed'
+        : 'pending';
+      if (isTerminal) void clearPendingSession();
       const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
         state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
       );
