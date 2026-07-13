@@ -108,7 +108,7 @@ function EmailAuth({ showWhatsAppSwitch, onUseWhatsApp }: { showWhatsAppSwitch: 
     setError(null);
     setNotice(null);
     if (!email.trim() || !password) {
-      setError(t('somethingWentWrong'));
+      setError(t('fillRequiredFields'));
       return;
     }
     setBusy(true);
@@ -118,7 +118,7 @@ function EmailAuth({ showWhatsAppSwitch, onUseWhatsApp }: { showWhatsAppSwitch: 
         router.replace('/(tabs)');
       } else {
         if (!fullName.trim()) {
-          setError(t('somethingWentWrong'));
+          setError(t('fillRequiredFields'));
           setBusy(false);
           return;
         }
@@ -183,12 +183,12 @@ function EmailAuth({ showWhatsAppSwitch, onUseWhatsApp }: { showWhatsAppSwitch: 
         style={{ marginTop: spacing.md }}
       />
 
-      <Pressable onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} style={styles.switch}>
+      <Pressable accessibilityRole="button" onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} style={styles.switch}>
         <Text style={styles.switchText}>{mode === 'signin' ? t('haveNoAccount') : t('haveAccount')}</Text>
       </Pressable>
 
       {showWhatsAppSwitch && (
-        <Pressable onPress={onUseWhatsApp} style={styles.switchAlt}>
+        <Pressable accessibilityRole="button" onPress={onUseWhatsApp} style={styles.switchAlt}>
           <Text style={styles.switchText}>{t('useWhatsappInstead')}</Text>
         </Pressable>
       )}

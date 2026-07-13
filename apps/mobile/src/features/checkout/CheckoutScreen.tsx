@@ -228,7 +228,7 @@ export function CheckoutScreen() {
           deliveryAddressId = saved.id;
         } else {
           const created = await addresses.create({
-            label: addrLabel.trim() || pick('Delivery location', 'موقع التوصيل'),
+            label: addrLabel.trim() || t('deliveryLocation'),
             latitude: pickedLat,
             longitude: pickedLng,
             isDefault: addressList.length === 0,
@@ -404,7 +404,7 @@ export function CheckoutScreen() {
 
           {/* Payment method — availability is admin-controlled */}
           <View style={styles.block}>
-            <Text style={styles.sectionTitle}>{pick('Payment method', 'طريقة الدفع')}</Text>
+            <Text style={styles.sectionTitle}>{t('paymentMethodTitle')}</Text>
             {paymentBlocked ? (
               <Text style={[styles.note, { color: colors.red, fontWeight: '700' }]}>
                 {pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
@@ -414,10 +414,10 @@ export function CheckoutScreen() {
                 <View style={styles.segment}>
                   {payMethods.map((m) => {
                     const label = m === 'online'
-                      ? pick('Online Payment', 'الدفع الإلكتروني')
+                      ? t('payOnline')
                       : orderType === 'delivery'
-                        ? pick('Cash on Delivery', 'نقداً عند التوصيل')
-                        : pick('Cash on Pickup', 'نقداً عند الاستلام');
+                        ? t('cashOnDelivery')
+                        : t('cashOnPickup');
                     return <SegmentBtn key={m} label={label} active={paymentMethod === m} onPress={() => setPaymentMethod(m)} />;
                   })}
                 </View>
@@ -463,6 +463,8 @@ export function CheckoutScreen() {
                   {addressList.map((a) => (
                     <Pressable
                       key={a.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: addressId === a.id }}
                       style={[styles.addrRow, addressId === a.id && styles.addrRowActive]}
                       onPress={() => chooseSavedAddress(a)}
                     >
@@ -506,7 +508,13 @@ export function CheckoutScreen() {
           {/* Loyalty */}
           {loyaltyEnabled ? (
             <View style={styles.block}>
-              <Pressable style={styles.toggleRow} onPress={() => setRedeemPoints((v) => !v)}>
+              <Pressable
+                style={styles.toggleRow}
+                onPress={() => setRedeemPoints((v) => !v)}
+                accessibilityRole="switch"
+                accessibilityState={{ checked: redeemPoints }}
+                accessibilityLabel={t('useLoyalty')}
+              >
                 <View style={[styles.switch, redeemPoints && styles.switchOn]}>
                   <View style={[styles.knob, redeemPoints && styles.knobOn]} />
                 </View>
@@ -551,11 +559,11 @@ export function CheckoutScreen() {
         {/* Policy links shown before Confirm & Order (does not block checkout). */}
         <Text style={styles.policy}>
           {pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
-          <Text style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
+          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
           {pick(', ', '، ')}
-          <Text style={styles.policyLink} onPress={() => router.push('/legal/delivery_pickup_policy')}>{legalTitle('delivery_pickup_policy', lang)}</Text>
+          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/delivery_pickup_policy')}>{legalTitle('delivery_pickup_policy', lang)}</Text>
           {pick(', and ', '، و')}
-          <Text style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
+          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
           {'.'}
         </Text>
         {blockReason ? <Text style={styles.blockReason}>{blockReason}</Text> : null}
@@ -582,7 +590,7 @@ export function CheckoutScreen() {
                 <Text style={styles.payMsg}>{t(payFlow.state === 'opening' ? 'payOpening' : 'payVerifying')}</Text>
                 {/* Escape hatch if initiate/verify stalls: dismiss keeps the session,
                     so a still-open charge is resolved by recovery on next entry. */}
-                <Button label={pick('Cancel', 'إلغاء')} onPress={dismissPayFlow} variant="secondary" style={{ alignSelf: 'stretch' }} />
+                <Button label={t('cancel')} onPress={dismissPayFlow} variant="secondary" style={{ alignSelf: 'stretch' }} />
               </View>
             ) : payFlow ? (
               <>
@@ -602,7 +610,7 @@ export function CheckoutScreen() {
                     // Terminal (failed/cancelled/expired): open a FRESH session, never reuse.
                     <Button label={t('payTryAgain')} onPress={() => void retryFresh()} loading={payBusy} variant="danger" />
                   )}
-                  <Button label={pick('Close', 'إغلاق')} onPress={dismissPayFlow} variant="secondary" />
+                  <Button label={t('close')} onPress={dismissPayFlow} variant="secondary" />
                 </View>
               </>
             ) : null}
@@ -642,7 +650,7 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: spacing.lg, borderRadius: radius.md, backgroundColor: colors.white,
     borderWidth: 1.5, borderColor: colors.border, alignItems: 'center',
   },
-  segBtnActive: { borderColor: colors.purple, backgroundColor: '#f1edfb' },
+  segBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
   segText: { fontSize: font.md, fontWeight: '800', color: colors.muted },
   segTextActive: { color: colors.purple },
 

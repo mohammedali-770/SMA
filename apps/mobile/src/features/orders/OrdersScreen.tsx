@@ -94,9 +94,9 @@ export function OrdersScreen() {
 
 function StatusBadge({ label, status }: { label: string; status: OrderStatus }) {
   const tone =
-    status === 'delivered' ? { bg: '#e7f6ee', fg: colors.success }
-    : status === 'cancelled' ? { bg: '#fdeaec', fg: colors.red }
-    : { bg: '#f1edfb', fg: colors.purple };
+    status === 'delivered' ? { bg: colors.successBg, fg: colors.success }
+    : status === 'cancelled' ? { bg: colors.dangerBg, fg: colors.red }
+    : { bg: colors.purpleBg, fg: colors.purple };
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }]}>
       <Text style={[styles.badgeText, { color: tone.fg }]}>{label}</Text>

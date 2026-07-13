@@ -65,7 +65,7 @@ export function ProfileScreen() {
         </View>
 
         {/* Legal & Support */}
-        <Text style={styles.sectionTitle}>{pick('Legal & Support', 'المستندات والدعم')}</Text>
+        <Text style={styles.sectionTitle}>{t('legalSupport')}</Text>
         <Pressable
           style={[styles.card, shadow.card, styles.legalRow]}
           onPress={() => router.push('/legal')}
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   name: { fontSize: font.lg, fontWeight: '800', color: colors.text },
   muted: { fontSize: font.sm, color: colors.muted },
 
-  loyalty: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1edfb' },
+  loyalty: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.purpleBg },
   loyaltyLabel: { fontSize: font.md, fontWeight: '800', color: colors.purple },
   loyaltyValue: { fontSize: font.xxl, fontWeight: '800', color: colors.purple },
 
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },
   langRow: { flexDirection: 'row', gap: spacing.md },
   langBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border, alignItems: 'center' },
-  langBtnActive: { borderColor: colors.purple, backgroundColor: '#f1edfb' },
+  langBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
   langBtnText: { fontSize: font.md, fontWeight: '800', color: colors.muted },
   langBtnTextActive: { color: colors.purple },
 

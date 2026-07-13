@@ -74,6 +74,17 @@ export const STRINGS = {
     selectBranchFirst: 'Choose a branch to see the menu',
     selectBranchCta: 'Select a branch',
 
+    // shared UI strings (promoted from repeated inline literals)
+    paymentMethodTitle: 'Payment method',
+    payOnline: 'Online Payment',
+    cashOnDelivery: 'Cash on Delivery',
+    cashOnPickup: 'Cash on Pickup',
+    deliveryLocation: 'Delivery location',
+    legalSupport: 'Legal & Support',
+    fillRequiredFields: 'Please fill in all required fields.',
+    increaseQty: 'Increase quantity',
+    decreaseQty: 'Decrease quantity',
+
     // product
     chooseOptions: 'Choose your options',
     required: 'Required',
@@ -260,6 +271,17 @@ export const STRINGS = {
     noProducts: 'لا توجد عناصر مطابقة لبحثك.',
     selectBranchFirst: 'اختر فرعاً لعرض القائمة',
     selectBranchCta: 'اختر فرعاً',
+
+    // نصوص واجهة مشتركة (نُقلت من نصوص مكررة داخل الشاشات)
+    paymentMethodTitle: 'طريقة الدفع',
+    payOnline: 'الدفع الإلكتروني',
+    cashOnDelivery: 'نقداً عند التوصيل',
+    cashOnPickup: 'نقداً عند الاستلام',
+    deliveryLocation: 'موقع التوصيل',
+    legalSupport: 'المستندات والدعم',
+    fillRequiredFields: 'يرجى تعبئة جميع الحقول المطلوبة.',
+    increaseQty: 'زيادة الكمية',
+    decreaseQty: 'إنقاص الكمية',
 
     chooseOptions: 'اختر خياراتك',
     required: 'إجباري',

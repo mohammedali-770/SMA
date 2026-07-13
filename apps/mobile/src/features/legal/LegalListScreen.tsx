@@ -31,7 +31,7 @@ export function LegalListScreen() {
 
   return (
     <Screen background={colors.bg} edges={['top', 'left', 'right']}>
-      <Header title={pick('Legal & Support', 'المستندات والدعم')} showBack />
+      <Header title={t('legalSupport')} showBack />
       {error ? (
         <ErrorView message={pick('Could not load documents.', 'تعذّر تحميل المستندات.')} onRetry={load} retryLabel={t('retry')} />
       ) : docs === null ? (

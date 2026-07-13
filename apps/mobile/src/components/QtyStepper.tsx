@@ -2,6 +2,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useI18n } from '../i18n/I18nProvider';
 import { colors, font, radius } from '../theme';
 
 interface Props {
@@ -13,14 +14,18 @@ interface Props {
 }
 
 export function QtyStepper({ value, onIncrement, onDecrement, min = 1, small }: Props) {
+  const { t } = useI18n();
   const size = small ? 30 : 38;
+  // Keep the compact visuals but guarantee a ≥44pt effective touch target.
+  const slop = Math.ceil((44 - size) / 2);
   return (
     <View style={[styles.wrap, { height: size }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Decrease quantity"
+        accessibilityLabel={t('decreaseQty')}
         onPress={onDecrement}
         disabled={value <= min}
+        hitSlop={slop}
         style={({ pressed }) => [styles.btn, { width: size, height: size }, pressed && styles.pressed]}
       >
         <Text style={[styles.sign, value <= min && styles.signDisabled]}>−</Text>
@@ -28,8 +33,9 @@ export function QtyStepper({ value, onIncrement, onDecrement, min = 1, small }: 
       <Text style={styles.value}>{value}</Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Increase quantity"
+        accessibilityLabel={t('increaseQty')}
         onPress={onIncrement}
+        hitSlop={slop}
         style={({ pressed }) => [styles.btn, { width: size, height: size }, pressed && styles.pressed]}
       >
         <Text style={styles.sign}>+</Text>

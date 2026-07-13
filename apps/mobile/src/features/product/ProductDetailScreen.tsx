@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   groupTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
   reqPill: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill },
-  reqYes: { backgroundColor: '#fdeaec' },
+  reqYes: { backgroundColor: colors.dangerBg },
   reqNo: { backgroundColor: colors.bgAlt },
   reqText: { fontSize: font.xs, fontWeight: '800' },
   groupError: { color: colors.red, fontSize: font.xs, fontWeight: '700', marginBottom: spacing.xs },

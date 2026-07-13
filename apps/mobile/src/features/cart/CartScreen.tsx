@@ -93,7 +93,7 @@ function CartLine({
       {summary ? <Text style={styles.lineMods}>{summary}</Text> : null}
       <View style={styles.lineBottom}>
         <QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small />
-        <Pressable onPress={onRemove} hitSlop={8}>
+        <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={removeLabel}>
           <Text style={styles.remove}>{removeLabel}</Text>
         </Pressable>
       </View>
