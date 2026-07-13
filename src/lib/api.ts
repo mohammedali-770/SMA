@@ -486,6 +486,10 @@ export const catalog = {
 // ---------------------------------------------------------------------------
 // Orders
 // ---------------------------------------------------------------------------
+
+/** Upper bound on how many recent orders a single listWithItems() call fetches. */
+export const ORDERS_FETCH_LIMIT = 500;
+
 export interface PlaceOrderInput {
   branchId: string;
   orderType: OrderType;
@@ -521,12 +525,18 @@ export const orders = {
    * Same as list(), but embeds each order's items + item modifiers in one round
    * trip (PostgREST resource embedding). RLS is applied to the embedded tables
    * too, so a customer still only sees their own orders' lines.
+   *
+   * Bounded to the most-recent `limit` orders so the admin live-orders poll (which
+   * re-runs this every few seconds) can never grow into an unbounded full-history
+   * fetch as the order table grows. 500 comfortably covers live operations and the
+   * current-month reports; older orders fall outside both.
    */
-  listWithItems: async () =>
+  listWithItems: async (limit = ORDERS_FETCH_LIMIT) =>
     ok<DbOrderWithItems[]>(await supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
-      .order('created_at', { ascending: false })),
+      .order('created_at', { ascending: false })
+      .limit(limit)),
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>

@@ -37,7 +37,9 @@ interface AppContextType {
 
   // Data load lifecycle
   dataLoading: boolean;
-  dataError: string | null;
+  dataError: string | null;      // fatal INITIAL-load failure (full-screen retry)
+  writeError: string | null;     // non-fatal mutation failure (dismissible banner)
+  dismissWriteError: () => void;
   reload: () => Promise<void>;
 
   // DB Tables (mapped to app types)
@@ -188,7 +190,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Data load lifecycle -------------------------------------------------
   const [dataLoading, setDataLoading] = useState(false);
+  // dataError is reserved for a FATAL initial-load failure (the whole dashboard
+  // is replaced with a retry card). A failed *write* (settings/order/loyalty/…)
+  // must never do that — it surfaces via writeError as a dismissible banner so
+  // the admin keeps their place and unsaved edits.
   const [dataError, setDataError] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const dismissWriteError = useCallback(() => setWriteError(null), []);
 
   // ---- Database-backed state (mapped app types) ----------------------------
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -617,7 +625,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAddresses((await addressesApi.listMine()).map(mapAddress));
         setSelectedAddressId(created.id);
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
       }
     })();
   };
@@ -629,7 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAddresses((await addressesApi.listMine()).map(mapAddress));
         if (selectedAddressId === id) setSelectedAddressId('');
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
       }
     })();
   };
@@ -719,7 +727,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await ordersApi.setStatus(orderId, status);
         await refreshOrders();
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
       }
     })();
   };
@@ -730,7 +738,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.createCategory(categoryToDbInsert(nameEn, nameAr, categories.length + 1));
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
   const updateCategory = (id: string, nameEn: string, nameAr: string) => {
@@ -738,7 +746,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.updateCategory(id, { name_en: nameEn, name_ar: nameAr });
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
   const deleteCategory = (id: string) => {
@@ -746,7 +754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.deleteCategory(id);
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
 
@@ -756,7 +764,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.createProduct(productToDbInsert(pData, products.length + 1));
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
   const updateProduct = (p: Product) => {
@@ -764,7 +772,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.updateProduct(p.id, productToDbUpdate(p));
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
   const deleteProduct = (id: string) => {
@@ -772,7 +780,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.deleteProduct(id);
         await refreshCatalog();
-      } catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
 
@@ -789,7 +797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         await adminApi.setAvailability(branchId, productId, nextVal);
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
         await refreshCatalog(); // revert to server truth on failure
       }
     })();
@@ -809,7 +817,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         await adminApi.updateBranch(id, branchPatchToDb(updates));
         await refreshCatalog();
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
         await refreshCatalog();
       }
     })();
@@ -855,32 +863,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshCatalog();
       return { success: true, count };
     } catch (e) {
-      setDataError(e instanceof Error ? e.message : String(e));
+      setWriteError(e instanceof Error ? e.message : String(e));
       return { success: false, count: 0 };
     }
   };
 
   // ---- Settings ------------------------------------------------------------
+  // Brand + loyalty edits update local state INSTANTLY (so inputs stay responsive
+  // and brand colours re-theme live), but the DB write is DEBOUNCED and coalesced
+  // so typing into a field fires one request when editing settles — not one per
+  // keystroke. Accumulated column patches are merged (latest value wins) and
+  // flushed together; a pending flush is also forced on unmount so no edit is lost.
+  const SETTINGS_FLUSH_MS = 600;
+  const settingsPatchRef = useRef<Record<string, unknown>>({});
+  const settingsFlushT = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushSettings = useCallback(() => {
+    if (settingsFlushT.current) { clearTimeout(settingsFlushT.current); settingsFlushT.current = null; }
+    const patch = settingsPatchRef.current;
+    settingsPatchRef.current = {};
+    if (Object.keys(patch).length === 0) return;
+    void (async () => {
+      try { await adminApi.updateSettings(patch); }
+      catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
+    })();
+  }, []);
+
+  const queueSettingsPatch = useCallback((dbPatch: Record<string, unknown>) => {
+    if (Object.keys(dbPatch).length === 0) return;
+    settingsPatchRef.current = { ...settingsPatchRef.current, ...dbPatch };
+    if (settingsFlushT.current) clearTimeout(settingsFlushT.current);
+    settingsFlushT.current = setTimeout(flushSettings, SETTINGS_FLUSH_MS);
+  }, [flushSettings]);
+
+  // Force any pending settings write on unmount so a quick navigate-away can't
+  // drop the last edit.
+  useEffect(() => () => { flushSettings(); }, [flushSettings]);
+
   const updateBrandSettings = (updates: Partial<BrandSettings>) => {
     setBrandSettings(prev => ({ ...prev, ...updates })); // colours re-theme instantly
-    const dbPatch = brandPatchToDb(updates);
-    if (Object.keys(dbPatch).length > 0) {
-      void (async () => {
-        try { await adminApi.updateSettings(dbPatch); }
-        catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
-      })();
-    }
+    queueSettingsPatch(brandPatchToDb(updates));
   };
 
   const updateLoyaltySettings = (updates: Partial<LoyaltySettings>) => {
     setLoyaltySettings(prev => ({ ...prev, ...updates }));
-    const dbPatch = loyaltyPatchToDb(updates);
-    if (Object.keys(dbPatch).length > 0) {
-      void (async () => {
-        try { await adminApi.updateSettings(dbPatch); }
-        catch (e) { setDataError(e instanceof Error ? e.message : String(e)); }
-      })();
-    }
+    queueSettingsPatch(loyaltyPatchToDb(updates));
   };
 
   // Admin-only: persist payment-method availability via the SECURITY DEFINER
@@ -914,7 +941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setProfiles(prev => prev.map(p => (p.id === userId ? updated : p)));
         setCurrentUser(prev => (prev.id === userId ? updated : prev));
       } catch (e) {
-        setDataError(e instanceof Error ? e.message : String(e));
+        setWriteError(e instanceof Error ? e.message : String(e));
       }
     })();
   };
@@ -928,6 +955,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       signOut,
       dataLoading,
       dataError,
+      writeError,
+      dismissWriteError,
       reload,
 
       branches,

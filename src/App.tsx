@@ -7,7 +7,7 @@ import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { MobileEmulator } from './components/MobileEmulator';
 import { AuthScreen } from './components/AuthScreen';
-import { Server, Loader2, LogOut, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 // The Admin POS panel and the Supabase console are heavy and secondary to the
 // customer mobile app, so they load as separate chunks on demand.
@@ -84,6 +84,35 @@ const DataErrorPanel: React.FC = () => {
   );
 };
 
+/**
+ * Non-fatal write-failure banner. A failed settings/order/loyalty save surfaces
+ * here — dismissible, overlaid on the dashboard — instead of replacing the whole
+ * screen with DataErrorPanel (which would unmount the console and lose the
+ * admin's place and unsaved edits). Full-screen is reserved for initial load.
+ */
+const WriteErrorBanner: React.FC = () => {
+  const { writeError, dismissWriteError } = useApp();
+  if (!writeError) return null;
+  return (
+    <div className="px-4 md:px-6 pt-3">
+      <div className="max-w-7xl mx-auto flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 rounded-xl px-3 py-2.5 shadow-sm">
+        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+        <div className="flex-1 text-xs font-bold break-words">
+          <span className="block text-[10px] uppercase tracking-wide text-red-500 font-black">Save failed</span>
+          {writeError}
+        </div>
+        <button
+          onClick={dismissWriteError}
+          aria-label="Dismiss"
+          className="flex-shrink-0 text-red-400 hover:text-red-700 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /** The customer-facing storefront (role = customer). */
 const CustomerApp: React.FC = () => (
   <main className="flex-grow p-4 md:p-6 max-w-md mx-auto w-full">
@@ -130,6 +159,7 @@ function AppContent() {
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <AppHeader />
+      <WriteErrorBanner />
       {dataError ? (
         <DataErrorPanel />
       ) : dataLoading && !currentUser.id ? (

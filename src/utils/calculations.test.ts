@@ -5,6 +5,7 @@ import {
   calculateDistance,
   generateId,
   parseCSVMenu,
+  riyadhMonthRange,
 } from './calculations';
 import { Category } from '../types';
 
@@ -86,6 +87,37 @@ describe('generateId', () => {
     const a = generateId('cat');
     const b = generateId('cat');
     expect(a).not.toBe(b);
+  });
+});
+
+describe('riyadhMonthRange', () => {
+  it('returns the first and last day of the month containing the given date', () => {
+    expect(riyadhMonthRange(new Date('2026-07-13T09:00:00Z'))).toEqual({
+      start: '2026-07-01',
+      end: '2026-07-31',
+    });
+  });
+
+  it('handles February in a non-leap year (28 days)', () => {
+    expect(riyadhMonthRange(new Date('2026-02-15T12:00:00Z'))).toEqual({
+      start: '2026-02-01',
+      end: '2026-02-28',
+    });
+  });
+
+  it('handles a leap-year February (29 days)', () => {
+    expect(riyadhMonthRange(new Date('2028-02-10T12:00:00Z'))).toEqual({
+      start: '2028-02-01',
+      end: '2028-02-29',
+    });
+  });
+
+  it('uses the Riyadh (UTC+3) calendar day at a UTC day boundary', () => {
+    // 2026-07-31T22:30Z is 2026-08-01 01:30 in Riyadh → August, not July.
+    expect(riyadhMonthRange(new Date('2026-07-31T22:30:00Z'))).toEqual({
+      start: '2026-08-01',
+      end: '2026-08-31',
+    });
   });
 });
 
