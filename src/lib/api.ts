@@ -487,8 +487,10 @@ export const catalog = {
 // Orders
 // ---------------------------------------------------------------------------
 
-/** Upper bound on how many recent orders a single listWithItems() call fetches. */
-export const ORDERS_FETCH_LIMIT = 500;
+/** Recent-orders window the admin live poll fetches to keep the frequent refetch
+ *  bounded. The full load (which the reports read from) is intentionally UNBOUNDED
+ *  so no delivered order is ever dropped from a report. */
+export const ORDERS_POLL_LIMIT = 500;
 
 export interface PlaceOrderInput {
   branchId: string;
@@ -526,17 +528,20 @@ export const orders = {
    * trip (PostgREST resource embedding). RLS is applied to the embedded tables
    * too, so a customer still only sees their own orders' lines.
    *
-   * Bounded to the most-recent `limit` orders so the admin live-orders poll (which
-   * re-runs this every few seconds) can never grow into an unbounded full-history
-   * fetch as the order table grows. 500 comfortably covers live operations and the
-   * current-month reports; older orders fall outside both.
+   * UNBOUNDED by default so the full load (which the reports filter in memory)
+   * sees every order — a cap here would silently drop delivered orders from
+   * revenue/VAT/coupon totals. Pass `limit` ONLY for the admin live poll, which
+   * keeps its frequent refetch bounded and merges its recent window back into the
+   * full in-memory list.
    */
-  listWithItems: async (limit = ORDERS_FETCH_LIMIT) =>
-    ok<DbOrderWithItems[]>(await supabase
+  listWithItems: async (limit?: number) => {
+    let q = supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
-      .order('created_at', { ascending: false })
-      .limit(limit)),
+      .order('created_at', { ascending: false });
+    if (limit) q = q.limit(limit);
+    return ok<DbOrderWithItems[]>(await q);
+  },
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>

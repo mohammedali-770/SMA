@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 import {
   auth, catalog, orders as ordersApi, addresses as addressesApi, coupons as couponsApi,
   admin as adminApi, profiles as profilesApi, loyalty as loyaltyApi, integrations as integrationsApi,
-  DbIntegrationSetting, UpsertIntegrationInput,
+  DbIntegrationSetting, UpsertIntegrationInput, ORDERS_POLL_LIMIT,
 } from '../lib/api';
 import {
   mapBranch, mapCategory, mapProduct, mapModifierGroup, mapDeliveryZone, buildAvailabilityMatrix,
@@ -198,6 +198,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [writeError, setWriteError] = useState<string | null>(null);
   const dismissWriteError = useCallback(() => setWriteError(null), []);
 
+  // ---- Debounced settings persistence (declared early so signOut can flush it) --
+  // Brand + loyalty edits update local state INSTANTLY (inputs stay responsive,
+  // brand colours re-theme live), but the DB write is DEBOUNCED + coalesced so
+  // typing fires one request when editing settles — not one per keystroke.
+  // Accumulated column patches merge (latest wins) and flush together.
+  const SETTINGS_FLUSH_MS = 600;
+  const settingsPatchRef = useRef<Record<string, unknown>>({});
+  const settingsFlushT = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Awaitable: signOut (and unmount) await this so a queued edit is persisted
+  // before the session ends — after sign-out the write would run as a guest and
+  // RLS would reject it, silently losing the edit.
+  const flushSettings = useCallback(async () => {
+    if (settingsFlushT.current) { clearTimeout(settingsFlushT.current); settingsFlushT.current = null; }
+    const patch = settingsPatchRef.current;
+    settingsPatchRef.current = {};
+    if (Object.keys(patch).length === 0) return;
+    try { await adminApi.updateSettings(patch); }
+    catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
+  }, []);
+
   // ---- Database-backed state (mapped app types) ----------------------------
   const [branches, setBranches] = useState<Branch[]>([]);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
@@ -262,10 +283,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   // ---- Data loading --------------------------------------------------------
-  /** Load only the orders (used after placing / advancing an order + live updates). */
+  /**
+   * Full orders load (UNBOUNDED) — used after placing / advancing an order and on
+   * the initial load. The reports read the whole in-memory `orders` list, so this
+   * must fetch every order, not a capped window.
+   */
   const refreshOrders = useCallback(async () => {
     const rows = await ordersApi.listWithItems();
     setOrders(rows.map(mapOrder));
+    setOrdersLastUpdated(Date.now());
+  }, []);
+
+  /**
+   * Live-poll refresh — fetches only the most-recent window (bounded, so the
+   * frequent poll payload can't grow with the whole table) and MERGES it into the
+   * existing list by id. Merging (not replacing) preserves the full history the
+   * reports need while still surfacing new/updated recent orders.
+   */
+  const pollRecentOrders = useCallback(async () => {
+    const rows = await ordersApi.listWithItems(ORDERS_POLL_LIMIT);
+    const fresh = rows.map(mapOrder);
+    setOrders(prev => {
+      const byId = new Map<string, Order>(prev.map(o => [o.id, o] as [string, Order]));
+      for (const o of fresh) byId.set(o.id, o);
+      // Keep newest-first (createdAt is an ISO string, so lexical compare works).
+      return [...byId.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+    });
     setOrdersLastUpdated(Date.now());
   }, []);
 
@@ -420,7 +463,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (disposed) return;
       if (refreshing) { pending = true; return; }  // coalesce, but never drop the last event
       refreshing = true;
-      try { await refreshOrders(); } catch { /* transient; keep the loop alive */ }
+      // Poll path uses the bounded + merged refresh so the frequent refetch stays
+      // small without truncating the full history the reports read.
+      try { await pollRecentOrders(); } catch { /* transient; keep the loop alive */ }
       finally {
         refreshing = false;
         if (pending && !disposed) { pending = false; void doRefresh(); }  // trailing run
@@ -473,7 +518,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       document.removeEventListener('visibilitychange', onVis);
       supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, currentUser.role, currentUser.id, refreshOrders]);
+  }, [isAuthenticated, currentUser.role, currentUser.id, pollRecentOrders]);
 
   // ---- Auth actions --------------------------------------------------------
   const signIn = useCallback(async (email: string, password: string) => {
@@ -483,9 +528,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await auth.signUp(email, password, fullName, phone);
   }, []);
   const signOut = useCallback(async () => {
+    // Persist any debounced settings edit BEFORE the session ends — after sign-out
+    // the queued write would run as a guest and RLS would reject it (losing the edit).
+    await flushSettings();
     await auth.signOut();
     resetToGuest();
-  }, [resetToGuest]);
+  }, [resetToGuest, flushSettings]);
 
   // ---- Brand theming: drive Tailwind tokens from the settings colours -------
   useEffect(() => {
@@ -869,26 +917,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ---- Settings ------------------------------------------------------------
-  // Brand + loyalty edits update local state INSTANTLY (so inputs stay responsive
-  // and brand colours re-theme live), but the DB write is DEBOUNCED and coalesced
-  // so typing into a field fires one request when editing settles — not one per
-  // keystroke. Accumulated column patches are merged (latest value wins) and
-  // flushed together; a pending flush is also forced on unmount so no edit is lost.
-  const SETTINGS_FLUSH_MS = 600;
-  const settingsPatchRef = useRef<Record<string, unknown>>({});
-  const settingsFlushT = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flushSettings = useCallback(() => {
-    if (settingsFlushT.current) { clearTimeout(settingsFlushT.current); settingsFlushT.current = null; }
-    const patch = settingsPatchRef.current;
-    settingsPatchRef.current = {};
-    if (Object.keys(patch).length === 0) return;
-    void (async () => {
-      try { await adminApi.updateSettings(patch); }
-      catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
-    })();
-  }, []);
-
+  // The debounced flush machinery (settingsPatchRef / flushSettings) is declared
+  // near the top so signOut can await it. Here we only queue patches and flush on
+  // unmount so a quick navigate-away can't drop the last edit.
   const queueSettingsPatch = useCallback((dbPatch: Record<string, unknown>) => {
     if (Object.keys(dbPatch).length === 0) return;
     settingsPatchRef.current = { ...settingsPatchRef.current, ...dbPatch };
@@ -898,7 +929,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Force any pending settings write on unmount so a quick navigate-away can't
   // drop the last edit.
-  useEffect(() => () => { flushSettings(); }, [flushSettings]);
+  useEffect(() => () => { void flushSettings(); }, [flushSettings]);
 
   const updateBrandSettings = (updates: Partial<BrandSettings>) => {
     setBrandSettings(prev => ({ ...prev, ...updates })); // colours re-theme instantly
