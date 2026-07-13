@@ -5,11 +5,11 @@
  */
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile,
 } from '../types/db';
 import type {
-  Branch, BrandSettings, Category, DeliveryZone, LoyaltySettings, Modifier, ModifierGroup,
+  Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LegalDoc, LoyaltySettings, Modifier, ModifierGroup,
   Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
@@ -17,6 +17,33 @@ import type { PaymentMethodSettings } from './payment';
 /** A neutral food image used when a product has no image_url. */
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
+
+/** Homepage banner row -> display model. Normalizes the optional action fields. */
+export function mapBanner(b: DbHomepageBanner): HomeBanner {
+  const action = b.action_type === 'category' || b.action_type === 'product' ? b.action_type : 'none';
+  return {
+    id: b.id,
+    titleEn: b.title_en ?? '',
+    titleAr: b.title_ar ?? '',
+    imageUrl: b.image_url,
+    actionType: action,
+    actionValue: action === 'none' ? null : (b.action_value ?? null),
+  };
+}
+
+/** Legal document row -> display model. */
+export function mapLegalDoc(d: DbLegalDocument): LegalDoc {
+  return {
+    id: d.id,
+    type: d.document_type,
+    titleEn: d.title_en,
+    titleAr: d.title_ar,
+    contentEn: d.content_en,
+    contentAr: d.content_ar,
+    version: d.version,
+    effectiveDate: d.effective_date ?? null,
+  };
+}
 
 // --- Catalog ---------------------------------------------------------------
 export function mapBranch(b: DbBranch): Branch {

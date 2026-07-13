@@ -53,6 +53,26 @@ export interface Category {
   sortOrder: number;
 }
 
+export interface HomeBanner {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  imageUrl: string;
+  actionType: 'none' | 'category' | 'product';
+  actionValue: string | null;
+}
+
+export interface LegalDoc {
+  id: string;
+  type: string;
+  titleEn: string;
+  titleAr: string;
+  contentEn: string;
+  contentAr: string;
+  version: string;
+  effectiveDate: string | null;
+}
+
 export interface Product {
   id: string;
   categoryId: string;

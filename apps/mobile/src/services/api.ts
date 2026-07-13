@@ -16,7 +16,7 @@
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile, OrderType,
 } from '../types/db';
 
@@ -89,6 +89,13 @@ export const auth = {
 export const catalog = {
   branches: async () => ok<DbBranch[]>(await supabase.from('branches').select('*').order('name_en')),
   categories: async () => ok<DbCategory[]>(await supabase.from('categories').select('*').order('sort_order')),
+  // Homepage banners: RLS returns only ACTIVE, in-window rows to anon/customers.
+  // Ordered here (sort_order asc, then newest) so the carousel needs no client filtering.
+  banners: async () => ok<DbHomepageBanner[]>(await supabase
+    .from('homepage_banners')
+    .select('id, title_en, title_ar, image_url, is_active, sort_order, starts_at, ends_at, action_type, action_value, created_at')
+    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: false })),
   products: async () => ok<DbProduct[]>(await supabase.from('products').select('*').order('sort_order')),
   modifierGroups: async () => ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select('*')),
   modifiers: async () => ok<DbModifier[]>(await supabase.from('modifiers').select('*').order('sort_order')),
@@ -132,6 +139,24 @@ export interface PlaceOrderInput {
   /** 'online' | 'cash' — availability is admin-controlled; place_order re-validates. */
   paymentMethod?: 'online' | 'cash' | null;
 }
+// ---------------------------------------------------------------------------
+// Legal / policy documents — RLS returns only ACTIVE rows to anon/customers.
+// ---------------------------------------------------------------------------
+export const legal = {
+  list: async () => ok<DbLegalDocument[]>(await supabase
+    .from('legal_documents')
+    .select('id, document_type, title_ar, title_en, content_ar, content_en, version, effective_date, is_active')),
+  byType: async (type: string) => {
+    const { data, error } = await supabase
+      .from('legal_documents')
+      .select('id, document_type, title_ar, title_en, content_ar, content_en, version, effective_date, is_active')
+      .eq('document_type', type)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as DbLegalDocument | null;
+  },
+};
+
 export const orders = {
   /** Server-authoritative order creation (place_order RPC). */
   async place(input: PlaceOrderInput): Promise<DbOrder> {
@@ -175,11 +200,22 @@ export const orders = {
     if (!res.order) throw new Error('Order was not created.');
     return res.order;
   },
-  /** RLS returns only the signed-in customer's own orders, newest first. */
+  /**
+   * RLS returns only the signed-in customer's own orders, newest first.
+   *
+   * An unpaid ONLINE order is a checkout-in-progress, not a real order, and must
+   * never surface in My Orders until the backend has verified payment. We hide
+   * exactly those rows (payment_method = 'online' AND payment_status <> 'paid').
+   * Cash orders and paid online orders always show; a null payment_method
+   * (legacy rows) is treated as not-online and shown. RLS is intentionally NOT
+   * tightened — payment-verify, the retry flow, and the receipt screen still
+   * read the pending order by id.
+   */
   listWithItems: async () =>
     ok<DbOrderWithItems[]>(await supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
+      .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
       .order('created_at', { ascending: false })),
   /** A single order with its lines (RLS still scopes it to the owner). */
   byId: async (id: string) =>
@@ -188,6 +224,34 @@ export const orders = {
       .select('*, order_items(*, order_item_modifiers(*))')
       .eq('id', id)
       .single()),
+};
+
+/** A temporary, pre-payment checkout session (NOT an order). */
+export interface DbCheckoutSession {
+  id: string;
+  total: number | string;
+  currency: string;
+  status: string;
+  order_id: string | null;
+}
+
+export const checkout = {
+  /**
+   * Online only: validate + price the cart server-side and open a temporary
+   * checkout session. NO order is created here — the order is created only after
+   * the payment is verified. Retry-safe via the cart idempotency key.
+   */
+  begin: async (input: PlaceOrderInput): Promise<DbCheckoutSession> =>
+    ok<DbCheckoutSession>(await supabase.rpc('begin_checkout_session', {
+      p_branch_id: input.branchId,
+      p_order_type: input.orderType,
+      p_items: input.items,
+      p_address_id: input.addressId ?? null,
+      p_coupon_code: input.couponCode ?? null,
+      p_notes: input.notes ?? null,
+      p_loyalty_points: input.loyaltyPoints ?? 0,
+      p_idempotency_key: input.idempotencyKey ?? null,
+    })),
 };
 
 // ---------------------------------------------------------------------------
@@ -204,8 +268,10 @@ export interface PaymentInitiateResult {
   checkoutUrl?: string | null;
   needsVerify?: boolean;
   orderNumber?: string;
+  checkoutSessionId?: string;
+  orderId?: string | null;    // set when status === 'already_paid' (session flow)
 }
-export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string; }
+export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string | null; orderId?: string | null; }
 async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {
@@ -222,6 +288,12 @@ export const payments = {
     invokePaymentFn<PaymentInitiateResult>('payment-initiate', { orderId, language }),
   /** Server-authoritative verification after returning from checkout. */
   verify: (orderId: string) => invokePaymentFn<PaymentVerifyResult>('payment-verify', { orderId }),
+  /** Start (or reuse) a Tap charge for a CHECKOUT SESSION (order not yet created). */
+  initiateSession: (checkoutSessionId: string, language: 'ar' | 'en') =>
+    invokePaymentFn<PaymentInitiateResult>('payment-initiate', { checkoutSessionId, language }),
+  /** Verify a session's charge; on 'paid' the response carries the created orderId. */
+  verifySession: (checkoutSessionId: string) =>
+    invokePaymentFn<PaymentVerifyResult>('payment-verify', { checkoutSessionId }),
 };
 
 // ---------------------------------------------------------------------------

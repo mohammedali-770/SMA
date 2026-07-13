@@ -6,12 +6,15 @@
 import React, { useState } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
+import { IntegrationsPanel } from './admin/IntegrationsPanel';
+import { BannerManagementPanel } from './admin/BannerManagementPanel';
+import { LegalDocumentsPanel } from './admin/LegalDocumentsPanel';
 import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
@@ -26,7 +29,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'branches' | 'reports' | 'settings'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings' | 'legal'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -168,7 +171,15 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'إدارة المنيو والأسعار' : 'Menu Management'}</span>
           </button>
 
-          <button 
+          <button
+            onClick={() => setActiveTab('banners')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'banners' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Images className="w-4 h-4" />
+            <span>{isRTL ? 'بانرات الرئيسية' : 'Banners'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('branches')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'branches' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
@@ -184,12 +195,28 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'التقارير والتحليلات المالية' : 'Financial Reports'}</span>
           </button>
 
-          <button 
+          <button
+            onClick={() => setActiveTab('integrations')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrations' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Plug className="w-4 h-4" />
+            <span>{isRTL ? 'الربط والتكاملات' : 'Integrations'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
             <Settings className="w-4 h-4" />
-            <span>{isRTL ? 'الربط السحابي والإعدادات' : 'Integrations & Settings'}</span>
+            <span>{isRTL ? 'الإعدادات' : 'Settings'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('legal')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'legal' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <Scale className="w-4 h-4" />
+            <span>{isRTL ? 'المستندات القانونية' : 'Legal Documents'}</span>
           </button>
         </div>
 
@@ -205,14 +232,23 @@ export const AdminDashboard: React.FC = () => {
           {/* TAB 3: MENU & CONTENT MANAGEMENT (PHASE 8 NEW FEATURE) */}
           {activeTab === 'menu' && <MenuManagementPanel />}
 
+          {/* TAB: HOMEPAGE BANNERS (admin marketing banners for the mobile app) */}
+          {activeTab === 'banners' && <BannerManagementPanel />}
+
           {/* TAB 4: BRANCH MANAGEMENT & CUSTOM AVAILABILITY MATRIX */}
           {activeTab === 'branches' && <BranchPoliciesPanel />}
 
           {/* TAB 5: FINANCIAL REPORTS & ANALYTICS (PHASE 9) */}
           {activeTab === 'reports' && <ReportsPanel />}
 
-          {/* TAB 6: INTEGRATIONS & SETTINGS (PHASE 10) */}
+          {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
+          {activeTab === 'integrations' && <IntegrationsPanel />}
+
+          {/* TAB 7: SYSTEM SETTINGS (brand, payment methods, maps, loyalty) */}
           {activeTab === 'settings' && <SettingsPanel />}
+
+          {/* TAB: LEGAL DOCUMENTS (admin-editable policies for the mobile app) */}
+          {activeTab === 'legal' && <LegalDocumentsPanel />}
         </div>
       </div>
 

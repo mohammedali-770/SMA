@@ -9,6 +9,7 @@
  * RPC, which recomputes all amounts server-side.
  */
 import { supabase } from './supabase';
+import { BANNER_BUCKET, bannerStoragePath } from './banners';
 
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
@@ -485,6 +486,12 @@ export const catalog = {
 // ---------------------------------------------------------------------------
 // Orders
 // ---------------------------------------------------------------------------
+
+/** Recent-orders window the admin live poll fetches to keep the frequent refetch
+ *  bounded. The full load (which the reports read from) is intentionally UNBOUNDED
+ *  so no delivered order is ever dropped from a report. */
+export const ORDERS_POLL_LIMIT = 500;
+
 export interface PlaceOrderInput {
   branchId: string;
   orderType: OrderType;
@@ -520,12 +527,21 @@ export const orders = {
    * Same as list(), but embeds each order's items + item modifiers in one round
    * trip (PostgREST resource embedding). RLS is applied to the embedded tables
    * too, so a customer still only sees their own orders' lines.
+   *
+   * UNBOUNDED by default so the full load (which the reports filter in memory)
+   * sees every order — a cap here would silently drop delivered orders from
+   * revenue/VAT/coupon totals. Pass `limit` ONLY for the admin live poll, which
+   * keeps its frequent refetch bounded and merges its recent window back into the
+   * full in-memory list.
    */
-  listWithItems: async () =>
-    ok<DbOrderWithItems[]>(await supabase
+  listWithItems: async (limit?: number) => {
+    let q = supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
-      .order('created_at', { ascending: false })),
+      .order('created_at', { ascending: false });
+    if (limit) q = q.limit(limit);
+    return ok<DbOrderWithItems[]>(await q);
+  },
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>
@@ -633,3 +649,93 @@ async function wrapUpdate(table: string, id: string, patch: any) {
 async function wrapDelete(table: string, id: string) {
   const { error } = await supabase.from(table).delete().eq('id', id); if (error) throw new Error(error.message);
 }
+
+// ---------------------------------------------------------------------------
+// Homepage banners (admin-managed marketing banners shown in the mobile app).
+// RLS: staff (admin+accountant) read all; only admins write. Images live in the
+// public `banner-images` bucket (public read, admin-only upload).
+// ---------------------------------------------------------------------------
+export interface DbHomepageBanner {
+  id: string;
+  title_en: string | null;
+  title_ar: string | null;
+  image_url: string;
+  storage_path: string | null;
+  is_active: boolean;
+  sort_order: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  action_type: 'none' | 'category' | 'product';
+  action_value: string | null;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export const banners = {
+  /** Staff read of ALL banners for management (RLS returns all for admin/accountant). */
+  list: async () =>
+    ok<DbHomepageBanner[]>(
+      await supabase
+        .from('homepage_banners')
+        .select('*')
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false }),
+    ),
+  create: async (b: Partial<DbHomepageBanner>) =>
+    ok<DbHomepageBanner>(await supabase.from('homepage_banners').insert(b).select('*').single()),
+  update: async (id: string, patch: Partial<DbHomepageBanner>) =>
+    ok<DbHomepageBanner>(await supabase.from('homepage_banners').update(patch).eq('id', id).select('*').single()),
+  async remove(id: string) {
+    const { error } = await supabase.from('homepage_banners').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  /**
+   * Admin-only: upload an image to the public banner-images bucket and return
+   * its stored path + public URL. RLS on storage.objects enforces admin. Uses a
+   * unique path (no overwrite). `upsert:false` also guards against collisions.
+   */
+  async uploadImage(file: File): Promise<{ path: string; publicUrl: string }> {
+    const unique = `${Date.now()}-${crypto.randomUUID()}`;
+    const path = bannerStoragePath(file.name, unique);
+    const { error } = await supabase.storage
+      .from(BANNER_BUCKET)
+      .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+    if (error) throw new Error(error.message);
+    const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(path);
+    return { path, publicUrl: data.publicUrl };
+  },
+  /** Best-effort delete of a stored image (used when replacing / cleaning up). */
+  async removeImage(path: string) {
+    const { error } = await supabase.storage.from(BANNER_BUCKET).remove([path]);
+    if (error) throw new Error(error.message);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Legal documents (admin-editable policies shown in the mobile app).
+// RLS: staff (admin+accountant) read all; only admins write. Customers/anon
+// read only active rows.
+// ---------------------------------------------------------------------------
+export interface DbLegalDocument {
+  id: string;
+  document_type: string;
+  title_ar: string;
+  title_en: string;
+  content_ar: string;
+  content_en: string;
+  version: string;
+  effective_date: string | null;
+  is_active: boolean;
+  requires_acceptance: boolean;
+  created_at: string;
+  updated_at: string;
+  updated_by: string | null;
+}
+
+export const legalDocs = {
+  /** Staff read of ALL documents for management (RLS returns all for admin/accountant). */
+  list: async () => ok<DbLegalDocument[]>(await supabase.from('legal_documents').select('*')),
+  update: async (id: string, patch: Partial<DbLegalDocument>) =>
+    ok<DbLegalDocument>(await supabase.from('legal_documents').update(patch).eq('id', id).select('*').single()),
+};

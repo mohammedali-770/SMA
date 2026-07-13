@@ -58,13 +58,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    // React to sign-in / sign-out / token refresh.
-    const { data: sub } = auth.onChange(async (uid) => {
+    // React to sign-in / sign-out / token refresh. IMPORTANT: this callback must
+    // stay SYNCHRONOUS and must not call another Supabase (GoTrue) method inline.
+    // GoTrue holds an internal lock while the handler runs; loadProfile() issues
+    // another Supabase request, so awaiting it here can deadlock auth on native.
+    // Flip the cheap synchronous state now and defer the profile fetch to a
+    // macrotask that runs after the lock is released.
+    const { data: sub } = auth.onChange((uid) => {
       if (!mounted.current) return;
       setUserId(uid);
       if (uid) {
-        await loadProfile();
-        if (mounted.current) setStatus('signed_in');
+        setStatus('signed_in');
+        setTimeout(() => { if (mounted.current) void loadProfile(); }, 0);
       } else {
         setProfile(null);
         setStatus('signed_out');

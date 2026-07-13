@@ -15,11 +15,17 @@ Deno.serve((req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const url = new URL(req.url);
+  const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const rawOrder = url.searchParams.get('order') ?? '';
-  const order = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawOrder) ? rawOrder : '';
-  const deepLink = order
-    ? `spicymeal://payment/return?order=${encodeURIComponent(order)}`
-    : 'spicymeal://payment/return';
+  const rawSession = url.searchParams.get('session') ?? '';
+  const order = uuidRe.test(rawOrder) ? rawOrder : '';
+  const session = uuidRe.test(rawSession) ? rawSession : '';
+  // New flow passes `session`; legacy passes `order`. Only ever our own scheme.
+  const deepLink = session
+    ? `spicymeal://payment/return?session=${encodeURIComponent(session)}`
+    : order
+      ? `spicymeal://payment/return?order=${encodeURIComponent(order)}`
+      : 'spicymeal://payment/return';
   // JSON-encode for safe embedding inside the inline <script> string literal.
   const deepJs = JSON.stringify(deepLink);
 

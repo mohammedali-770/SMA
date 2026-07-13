@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Check, Download } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getVATBreakdown, riyadhDateOnly, formatSAR } from '../../utils/calculations';
+import { getVATBreakdown, riyadhDateOnly, riyadhMonthRange, formatSAR } from '../../utils/calculations';
+import { buildCouponUsage, lazywaitRefOf } from '../../lib/reports';
 import { ADMIN_LOCALES } from './adminLocales';
 
 export const ReportsPanel: React.FC = () => {
@@ -10,8 +11,11 @@ export const ReportsPanel: React.FC = () => {
   const isRTL = adminLang === 'ar';
   const [selectedReport, setSelectedReport] = useState<'sales_by_day' | 'sales_by_branch' | 'sales_by_product' | 'coupon_usage' | 'delivery_fees' | 'lazywait_report'>('sales_by_day');
   const [reportBranchId, setReportBranchId] = useState<string>('all');
-  const [reportStartDate, setReportStartDate] = useState<string>('2026-07-01');
-  const [reportEndDate, setReportEndDate] = useState<string>('2026-07-31');
+  // Default the range to the CURRENT month (Riyadh local), computed once, instead
+  // of a hardcoded window that silently goes stale after July 2026.
+  const defaultRange = useMemo(() => riyadhMonthRange(), []);
+  const [reportStartDate, setReportStartDate] = useState<string>(defaultRange.start);
+  const [reportEndDate, setReportEndDate] = useState<string>(defaultRange.end);
 
             // 1. Filtered orders for reporting (delivered within date range and branch)
             const filteredOrders = orders.filter(o => {
@@ -86,32 +90,9 @@ export const ReportsPanel: React.FC = () => {
               return Object.keys(map).map(id => ({ id, ...map[id] })).sort((a, b) => b.rev - a.rev);
             })();
 
-            // 6. Coupon Usage Memo
-            const couponReport = (() => {
-              const usageMap: { [code: string]: { code: string; count: number; savings: number } } = {
-                'SPICY15': { code: 'SPICY15', count: 0, savings: 0 },
-                'RIYADH10': { code: 'RIYADH10', count: 0, savings: 0 },
-                'OTHER': { code: 'GENERAL/DISCOUNT', count: 0, savings: 0 }
-              };
-              deliveredOrders.forEach(o => {
-                const disc = Math.max(0, (o.subtotal + o.deliveryFee) - o.total);
-                if (disc > 0) {
-                  const isS15 = Math.abs(disc - (o.subtotal * 0.15)) < 0.5;
-                  const isR10 = Math.abs(disc - 10.00) < 0.1;
-                  if (isS15) {
-                    usageMap['SPICY15'].count += 1;
-                    usageMap['SPICY15'].savings += disc;
-                  } else if (isR10) {
-                    usageMap['RIYADH10'].count += 1;
-                    usageMap['RIYADH10'].savings += disc;
-                  } else {
-                    usageMap['OTHER'].count += 1;
-                    usageMap['OTHER'].savings += disc;
-                  }
-                }
-              });
-              return Object.values(usageMap).filter(u => u.count > 0 || u.code !== 'GENERAL/DISCOUNT');
-            })();
+            // 6. Coupon Usage Memo — grouped by the order's REAL coupon_code and the
+            // real coupon discount (no inferring codes from discount amounts).
+            const couponReport = buildCouponUsage(deliveredOrders);
 
             // 7. Delivery Fees Memo
             const deliveryReport = branches.map(b => {
@@ -128,19 +109,16 @@ export const ReportsPanel: React.FC = () => {
               };
             });
 
-            // 8. Lazywait Sync Memo
+            // 8. Lazywait Sync Memo — the POS reference and error come straight from
+            // the order (real lazywait_order_number / lazywait_ref + sync_last_error).
+            // For a not-yet-failed order with no server error we show a neutral,
+            // truthful status label rather than a fabricated failure message.
+            const syncStatusLabel = (s: string) =>
+              s === 'sync_failed' ? (isRTL ? 'فشلت المزامنة' : 'Sync failed')
+              : s === 'pending_sync' ? (isRTL ? 'بانتظار المزامنة' : 'Awaiting sync')
+              : (isRTL ? 'غير مجدول' : 'Not scheduled');
             const lazywaitReport = filteredOrders.map(o => {
-              let err = '';
-              let ref = '';
-              if (o.orderSyncStatus === 'synced') {
-                ref = 'LW-9' + o.orderNumber.substring(8);
-              } else if (o.orderSyncStatus === 'sync_failed') {
-                err = isRTL ? 'انتهاء مهلة طلب الاتصال' : 'Connection Timeout';
-              } else if (o.orderSyncStatus === 'pending_sync') {
-                err = isRTL ? 'في انتظار جدولة المزامنة' : 'In Sync Queue';
-              } else {
-                err = isRTL ? 'غير مجدول' : 'Not Scheduled';
-              }
+              const realError = (o.syncLastError ?? o.syncBlockedReason ?? '').trim();
               return {
                 orderId: o.id,
                 orderNumber: o.orderNumber,
@@ -148,8 +126,8 @@ export const ReportsPanel: React.FC = () => {
                 branch: isRTL ? o.branchNameAr : o.branchNameEn,
                 total: o.total,
                 status: o.orderSyncStatus,
-                ref,
-                error: err
+                ref: lazywaitRefOf(o),
+                error: o.orderSyncStatus === 'synced' ? '' : (realError || syncStatusLabel(o.orderSyncStatus)),
               };
             });
 
@@ -398,13 +376,17 @@ export const ReportsPanel: React.FC = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[11px]">
-                          {couponReport.map((r, i) => (
-                            <tr key={i} className="hover:bg-white/50">
-                              <td className="py-3 px-4 font-black"><span className="bg-purple-100 text-primary px-2.5 py-1 rounded-lg font-mono text-xs">{r.code}</span></td>
-                              <td className="py-3 px-4 text-center font-bold text-slate-800 text-sm">{r.count}</td>
-                              <td className="py-3 px-4 text-right text-secondary font-black text-sm">-{formatSAR(r.savings, adminLang)}</td>
-                            </tr>
-                          ))}
+                          {couponReport.length === 0 ? (
+                            <tr><td colSpan={3} className="text-center py-8 text-gray-400">{isRTL ? 'لم تُستخدم أي كوبونات في هذا النطاق الزمني' : 'No coupons were used in this scope.'}</td></tr>
+                          ) : (
+                            couponReport.map((r, i) => (
+                              <tr key={i} className="hover:bg-white/50">
+                                <td className="py-3 px-4 font-black"><span className="bg-purple-100 text-primary px-2.5 py-1 rounded-lg font-mono text-xs">{r.code}</span></td>
+                                <td className="py-3 px-4 text-center font-bold text-slate-800 text-sm">{r.count}</td>
+                                <td className="py-3 px-4 text-right text-secondary font-black text-sm">-{formatSAR(r.savings, adminLang)}</td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     )}

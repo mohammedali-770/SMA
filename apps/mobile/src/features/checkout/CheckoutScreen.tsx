@@ -19,8 +19,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { useI18n } from '../../i18n/I18nProvider';
-import { addresses, coupons, orders, payments } from '../../services/api';
+import { addresses, checkout, coupons, orders, payments } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
+import { legalTitle } from '../../lib/legal';
 import {
   availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
   type PaymentMethod,
@@ -31,6 +32,8 @@ import { useAuth, useCart, useCatalog } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { OrderType, SavedAddress } from '../../types/models';
+import { recoverPendingSession } from './pendingSession';
+import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -59,7 +62,9 @@ export function CheckoutScreen() {
   const [error, setError] = useState<string | null>(null);
   // Online-payment (Tap) flow overlay. null = not paying.
   type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
-  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId: string; message?: string } | null>(null);
+  // orderId is the LEGACY (order-first) flow; sessionId is the new checkout-session
+  // flow where the order does not exist until payment is verified.
+  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId?: string; sessionId?: string; message?: string } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
 
   const branchOpen = branchIsOpen(selectedBranch);
@@ -92,6 +97,26 @@ export function CheckoutScreen() {
         }
       })
       .catch(() => setAddressList([]));
+  }, []);
+
+  // On entry, resolve any payment interrupted by an app kill / cold start BEFORE
+  // the customer can act. A captured charge routes to its receipt; an unresolved
+  // one resumes THAT session — never a new charge. Runs once; recovery is
+  // idempotent (verify is read-only, resume reopens the same charge).
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (!active) return;
+      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
+      else if (rec.kind === 'resume') { void runTapPaymentSession(rec.sessionId); }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Select a saved location: use its coords + recenter the map on it.
@@ -165,6 +190,19 @@ export function CheckoutScreen() {
     setError(null);
     setPlacing(true);
     try {
+      // Resolve any interrupted online payment FIRST — before creating ANY new
+      // order, cash included. Otherwise a customer with an unresolved online charge
+      // could switch to cash and place a second order while that charge may still
+      // be captured. Recovery is idempotent (verify is read-only; resume reopens
+      // the SAME charge).
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
+      if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
+
       // Resolve the delivery address: reuse the selected saved address when the
       // pin hasn't moved off it, otherwise persist the map-picked coordinates.
       let deliveryAddressId: string | null = null;
@@ -196,17 +234,26 @@ export function CheckoutScreen() {
         paymentMethod,
       };
       const isOnline = paymentMethod === 'online';
-      // Online orders are created pending and are NOT sent to the POS until the
-      // payment is verified (the DB trigger holds them in 'awaiting_payment');
-      // cash orders sync to the POS now, as before.
-      const order = isOnline ? await orders.place(orderInput) : await orders.placeAndSync(orderInput);
-      cart.clear();
-
-      // Zero-total (e.g. full coupon/loyalty) never touches Tap — go straight to
-      // the receipt. Online orders with a real total go through Tap checkout.
-      if (isOnline && Number(order.total) > 0) {
-        await runTapPayment(order.id);
+      if (isOnline) {
+        // Any interrupted charge was already resolved at the top of placeOrder,
+        // so beginning a new session here is safe.
+        // NEW online flow: create a temporary checkout SESSION (not an order). The
+        // real order is created only after the backend verifies the payment. A
+        // zero-total online order (fully covered) is settled server-side and comes
+        // back with order_id already set → straight to the receipt.
+        const session = await checkout.begin(orderInput);
+        if (session.order_id) {
+          cart.clear();
+          router.replace(`/receipt/${session.order_id}`);
+        } else {
+          // Keep the cart until payment actually succeeds — a failed/abandoned
+          // payment must not wipe it, and there is no order to strand.
+          await runTapPaymentSession(session.id);
+        }
       } else {
+        // Cash: unchanged. The order is created + synced to the POS now.
+        const order = await orders.placeAndSync(orderInput);
+        cart.clear();
         router.replace(`/receipt/${order.id}`);
       }
     } catch (e) {
@@ -217,52 +264,74 @@ export function CheckoutScreen() {
   };
 
   // ---- Tap online-payment flow (open hosted checkout → server verify) --------
-  const runTapPayment = async (orderId: string) => {
-    setPayFlow({ state: 'opening', orderId });
+  // Session-based: the order is created by the backend ONLY after the charge is
+  // verified. `verifySession` returns the created order id, which we use to open
+  // the receipt. The redirect result is never trusted — server verify decides.
+  const runTapPaymentSession = async (sessionId: string) => {
+    // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
+    // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
+    // forget) so the write is committed before we hand off to the browser — the
+    // exact window this recovery is meant to survive (see pendingSession.ts).
+    await savePendingSession(sessionId, Date.now());
+    setPayFlow({ state: 'opening', sessionId });
     try {
-      const init = await payments.initiate(orderId, lang === 'ar' ? 'ar' : 'en');
-      if (init.status === 'already_paid') { router.replace(`/receipt/${orderId}`); return; }
+      const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
+      if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
-        setPayFlow({ state: 'error', orderId, message: t('payUnavailable') });
+        setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });
         return;
       }
       if (init.checkoutUrl) {
-        // Opens the Tap hosted page; returns when it redirects to spicymeal://.
-        // The result is NOT trusted — server verify is authoritative.
         await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
       }
-      await verifyPayment(orderId);
+      await verifyPaymentSession(sessionId);
     } catch (e) {
-      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     }
   };
 
-  const verifyPayment = async (orderId: string) => {
-    setPayFlow({ state: 'verifying', orderId });
+  const verifyPaymentSession = async (sessionId: string) => {
+    setPayFlow({ state: 'verifying', sessionId });
     setPayBusy(true);
     try {
-      const res = await payments.verify(orderId);
-      if (res.status === 'paid') { setPayFlow(null); router.replace(`/receipt/${orderId}`); return; }
+      const res = await payments.verifySession(sessionId);
+      if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
+      // Only an EXPLICITLY terminal charge (failed/cancelled/expired) clears the
+      // persisted session. An 'unknown' status — and 'paid' without a resolved
+      // order id yet — the backend still treats as open, so we keep the session
+      // and show it as pending (verify again), never abandoning a charge that may
+      // still settle into a second one.
+      const isTerminal = res.status === 'failed' || res.status === 'cancelled' || res.status === 'expired';
       const state: PayState =
         res.status === 'cancelled' ? 'cancelled'
         : res.status === 'expired' ? 'expired'
-        : res.status === 'pending' ? 'pending'
-        : 'failed';
+        : res.status === 'failed' ? 'failed'
+        : 'pending';
+      if (isTerminal) void clearPendingSession();
       const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
         state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
       );
-      setPayFlow({ state, orderId, message: t(msgKey as never) });
+      setPayFlow({ state, sessionId, message: t(msgKey as never) });
     } catch (e) {
-      setPayFlow({ state: 'error', orderId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+      // Transient verify error — KEEP the persisted session so recovery can
+      // resolve it on the next launch / checkout entry (never a new charge).
+      setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       setPayBusy(false);
     }
   };
 
-  const dismissPayFlowToReceipt = () => {
-    const id = payFlow?.orderId;
+  // Dismiss the payment modal without paying. In the session flow no order exists
+  // yet, so we simply close and keep the cart intact for a retry.
+  const dismissPayFlow = () => setPayFlow(null);
+
+  // Retry after a TERMINAL payment (failed/cancelled/expired): that session is
+  // dead server-side, so clear it and begin a brand-new checkout. Never reuse a
+  // consumed/expired sessionId (Phase-1 requirement: expired retry = fresh session).
+  const retryFresh = async () => {
+    await clearPendingSession();
     setPayFlow(null);
-    if (id) router.replace(`/receipt/${id}`);
+    await placeOrder();
   };
 
   return (
@@ -424,6 +493,16 @@ export function CheckoutScreen() {
 
       {/* Sticky place-order */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+        {/* Policy links shown before Confirm & Order (does not block checkout). */}
+        <Text style={styles.policy}>
+          {pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
+          {pick(', ', '، ')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/delivery_pickup_policy')}>{legalTitle('delivery_pickup_policy', lang)}</Text>
+          {pick(', and ', '، و')}
+          <Text style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
+          {'.'}
+        </Text>
         {blockReason ? <Text style={styles.blockReason}>{blockReason}</Text> : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <Button
@@ -450,11 +529,15 @@ export function CheckoutScreen() {
                 <Text style={styles.payMsg}>{payFlow.message ?? t('payFailed')}</Text>
                 <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
                   {payFlow.state === 'pending' ? (
-                    <Button label={t('payVerifyAgain')} onPress={() => void verifyPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                    <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
+                  ) : payFlow.state === 'error' ? (
+                    // Transient error: the session may still be alive — resume it (same charge).
+                    <Button label={t('payTryAgain')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
                   ) : (
-                    <Button label={t('payTryAgain')} onPress={() => void runTapPayment(payFlow.orderId)} loading={payBusy} variant="danger" />
+                    // Terminal (failed/cancelled/expired): open a FRESH session, never reuse.
+                    <Button label={t('payTryAgain')} onPress={() => void retryFresh()} loading={payBusy} variant="danger" />
                   )}
-                  <Button label={t('payViewOrder')} onPress={dismissPayFlowToReceipt} variant="secondary" />
+                  <Button label={pick('Close', 'إغلاق')} onPress={dismissPayFlow} variant="secondary" />
                 </View>
               </>
             ) : null}
@@ -545,6 +628,8 @@ const styles = StyleSheet.create({
   },
   blockReason: { color: colors.warning, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
   error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
+  policy: { color: colors.muted, fontSize: font.xs, lineHeight: 17, textAlign: 'center' },
+  policyLink: { color: colors.purple, fontWeight: '800' },
 
   payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.xl },

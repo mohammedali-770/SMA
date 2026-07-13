@@ -3,24 +3,18 @@ import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, MapPin, 
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
-import { IntegrationCard } from './IntegrationCard';
-import { LazywaitPanel } from './LazywaitPanel';
-import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
-import { EmailServerPanel } from './EmailServerPanel';
-import { TapPaymentPanel } from './TapPaymentPanel';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 
 export const SettingsPanel: React.FC = () => {
   const {
     brandSettings, updateBrandSettings, loyaltySettings, updateLoyaltySettings,
-    integrationSettings, integrationsLoading, integrationsError, loadIntegrations, saveIntegration,
     profiles, updateCustomerPoints, loyaltyMutationsEnabled, currentUser, adminLang,
     paymentSettings, updatePaymentSettings,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
-  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'integrations' | 'payments' | 'maps' | 'loyalty'>('brand');
+  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'payments' | 'maps' | 'loyalty'>('brand');
   const [pointAdjustments, setPointAdjustments] = useState<{ [profileId: string]: string }>({});
 
   // ---- Payment-method availability (admin-editable, accountant read-only) ----
@@ -91,10 +85,10 @@ export const SettingsPanel: React.FC = () => {
                 <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
                   <div>
                     <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                      {isRTL ? 'لوحة التحكم والربط السحابي' : 'Integrations & System Settings'}
+                      {isRTL ? 'إعدادات النظام' : 'System Settings'}
                     </h3>
                     <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                      {isRTL ? 'تخصيص الهوية التجارية وبوابات الدفع والربط مع الكاشير والتوصيل' : 'Customize branding, payment gateways, SMS alerts, and Lazywait POS syncing'}
+                      {isRTL ? 'تخصيص الهوية التجارية والضريبة وطرق الدفع والخرائط وبرنامج الولاء' : 'Customize branding, VAT, payment methods, maps, and the loyalty program'}
                     </p>
                   </div>
                 </div>
@@ -111,18 +105,6 @@ export const SettingsPanel: React.FC = () => {
                   >
                     <Sliders className="w-3.5 h-3.5" />
                     <span>{isRTL ? 'الهوية والضريبة' : 'Brand & VAT'}</span>
-                  </button>
-
-                  <button
-                    onClick={() => setSettingsSubTab('integrations')}
-                    className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
-                      settingsSubTab === 'integrations'
-                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
-                        : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
-                    }`}
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                    <span>{isRTL ? 'التكامل والربط' : 'Integrations'}</span>
                   </button>
 
                   <button
@@ -342,61 +324,6 @@ export const SettingsPanel: React.FC = () => {
                       </div>
                     </div>
                   )}
-
-                  {/* SUB-TAB: INTEGRATIONS (secure, server-side settings) */}
-                  {settingsSubTab === 'integrations' && (
-                    <div className="space-y-4">
-                      <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
-                        <div>
-                          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'إعدادات التكامل الآمنة' : 'Secure Integration Settings'}</span>
-                          <span className="text-[9.5px] text-slate-400 font-bold">{isRTL ? 'تُحفظ في قاعدة البيانات — المفاتيح السرية لا تُرسل للمتصفح أبداً' : 'Persisted in Supabase — secret keys are never sent to the browser'}</span>
-                        </div>
-                        <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
-                          <ShieldCheck className="w-3 h-3" /> {isRTL ? 'للمشرف فقط' : 'Admin only'}
-                        </span>
-                      </div>
-
-                      {isAccountant ? (
-                        <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                          {isRTL ? 'إعدادات التكامل متاحة للمشرف فقط.' : 'Integration settings are available to admins only.'}
-                        </div>
-                      ) : integrationsError ? (
-                        <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center justify-between gap-2">
-                          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />{integrationsError}</span>
-                          <button onClick={() => { void loadIntegrations(); }} className="bg-red-600 text-white text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
-                        </div>
-                      ) : integrationsLoading ? (
-                        <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
-                      ) : (
-                        <>
-                          {(['payment', 'sms', 'push', 'lazywait', 'whatsapp', 'email'] as const).map(pt => (
-                            <IntegrationCard
-                              key={pt}
-                              providerType={pt}
-                              row={integrationSettings.find(r => r.provider_type === pt)}
-                              disabled={isAccountant}
-                              onSave={saveIntegration}
-                            />
-                          ))}
-                          <TapPaymentPanel disabled={isAccountant} />
-                          <WhatsAppOtpPanel disabled={isAccountant} />
-                          <EmailServerPanel disabled={isAccountant} />
-                          <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
-                            <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'تخزين آمن' : 'Secure storage'}</span>
-                              {isRTL
-                                ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. Lazywait ومدفوعات Tap مفعّلة من جهة الخادم (Tap يبقى معطّلاً حتى تُدخل المفاتيح وتفعّله)؛ الرسائل غير مفعّلة بعد.'
-                                : 'Secrets are stored server-side and never reach the browser. Lazywait sync and Tap payments are wired server-side (Tap stays disabled until you enter keys and enable it); SMS is not activated yet.'}
-                            </div>
-                          </div>
-                          <LazywaitPanel disabled={isAccountant} />
-                        </>
-                      )}
-                    </div>
-                  )}
-
 
                   {/* SUB-TAB: PAYMENT METHODS (admin-configurable availability) */}
                   {settingsSubTab === 'payments' && (

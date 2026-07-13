@@ -88,6 +88,7 @@ describe('order mapper', () => {
     } as unknown as DbOrderWithItems;
     const o = mapOrder(row);
     expect(o.orderNumber).toBe('SM-2026-000001');
+    expect(o.couponCode).toBe('SPICY15'); // real coupon code carried through for reports
     expect(o.orderSyncStatus).toBe('pending_sync'); // 'syncing' -> 'pending_sync'
     expect(o.paymentStatus).toBe('pending');
     expect(o.address?.nationalShortAddress).toBe('RRBB1234');

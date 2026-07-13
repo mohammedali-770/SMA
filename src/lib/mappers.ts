@@ -214,6 +214,7 @@ export function mapOrder(o: DbOrderWithItems): Order {
     orderType: o.order_type,
     subtotal: Number(o.subtotal),
     deliveryFee: Number(o.delivery_fee),
+    couponCode: o.coupon_code ?? undefined,
     discountAmount: Number(o.discount_amount),
     loyaltyDiscountAmount: Number(o.loyalty_discount_amount),
     total: Number(o.total),

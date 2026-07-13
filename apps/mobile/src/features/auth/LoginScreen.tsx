@@ -22,6 +22,7 @@ import { Logo } from '../../components/Logo';
 import { Screen } from '../../components/Screen';
 import { LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
+import { legalTitle } from '../../lib/legal';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
 import { PhoneOtpLogin } from './PhoneOtpLogin';
@@ -30,7 +31,7 @@ type Method = 'whatsapp' | 'email';
 type Mode = 'signin' | 'signup';
 
 export function LoginScreen() {
-  const { t } = useI18n();
+  const { t, pick, lang } = useI18n();
   const [method, setMethod] = useState<Method | null>(null);
   const [waEnabled, setWaEnabled] = useState(false);
 
@@ -72,6 +73,19 @@ export function LoginScreen() {
           ) : (
             <EmailAuth showWhatsAppSwitch={waEnabled} onUseWhatsApp={() => setMethod('whatsapp')} />
           )}
+
+          {/* Legal links — open the relevant documents (no forced acceptance). */}
+          <Text style={styles.policy}>
+            {pick('By continuing, you agree to the ', 'بمتابعتك، فإنك توافق على ')}
+            <Text style={styles.policyLink} onPress={() => router.push('/legal/terms_conditions')}>
+              {legalTitle('terms_conditions', lang)}
+            </Text>
+            {pick(' and ', ' و')}
+            <Text style={styles.policyLink} onPress={() => router.push('/legal/privacy_policy')}>
+              {legalTitle('privacy_policy', lang)}
+            </Text>
+            {'.'}
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
@@ -219,4 +233,6 @@ const styles = StyleSheet.create({
   switch: { marginTop: spacing.xl, alignItems: 'center' },
   switchAlt: { marginTop: spacing.md, alignItems: 'center' },
   switchText: { color: colors.purple, fontSize: font.md, fontWeight: '700' },
+  policy: { marginTop: spacing.xl, textAlign: 'center', color: colors.muted, fontSize: font.sm, lineHeight: 20 },
+  policyLink: { color: colors.purple, fontWeight: '800' },
 });

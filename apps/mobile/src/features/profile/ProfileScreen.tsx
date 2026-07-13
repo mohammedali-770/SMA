@@ -64,6 +64,17 @@ export function ProfileScreen() {
           <LangBtn label={t('arabic')} active={lang === 'ar'} onPress={() => setLang('ar')} />
         </View>
 
+        {/* Legal & Support */}
+        <Text style={styles.sectionTitle}>{pick('Legal & Support', 'المستندات والدعم')}</Text>
+        <Pressable
+          style={[styles.card, shadow.card, styles.legalRow]}
+          onPress={() => router.push('/legal')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.legalText}>{pick('Policies, privacy & contact', 'السياسات والخصوصية والتواصل')}</Text>
+          <Text style={styles.legalChevron}>{lang === 'ar' ? '‹' : '›'}</Text>
+        </Pressable>
+
         <Button label={t('signOut')} onPress={onSignOut} variant="secondary" style={{ marginTop: spacing.xl }} />
 
         <Text style={styles.footerNote}>{pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار ١٫٠٫٠')}</Text>
@@ -114,6 +125,10 @@ const styles = StyleSheet.create({
   langBtnActive: { borderColor: colors.purple, backgroundColor: '#f1edfb' },
   langBtnText: { fontSize: font.md, fontWeight: '800', color: colors.muted },
   langBtnTextActive: { color: colors.purple },
+
+  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  legalText: { fontSize: font.md, color: colors.text, fontWeight: '700' },
+  legalChevron: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
 
   footerNote: { textAlign: 'center', color: colors.muted, fontSize: font.xs, marginTop: spacing.xl },
 });

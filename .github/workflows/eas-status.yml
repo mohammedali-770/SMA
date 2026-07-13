@@ -1,0 +1,63 @@
+name: EAS Build Status (read-only)
+
+# Read-only helper: polls EAS for the status + artifact (APK) URL of an already
+# submitted build and prints them to this job's log. It runs `eas build:view`
+# (a QUERY) — it never starts a build. Triggered only when this file changes, so
+# adding/editing it kicks off exactly one status check. Requires EXPO_TOKEN.
+
+on:
+  push:
+    paths:
+      - '.github/workflows/eas-status.yml'
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup EAS / Expo
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Poll EAS build until it finishes
+        env:
+          BID: 7a6a01b3-ea61-491c-8463-27d5190bef74
+          EXPO_NO_TELEMETRY: "1"
+        run: |
+          set +e
+          for i in $(seq 1 40); do
+            # eas-cli can prepend update-notice lines to stdout; strip everything
+            # before the first JSON bracket so jq always gets clean JSON.
+            # Run from a neutral dir: `eas build:view <id>` otherwise eagerly loads
+            # apps/mobile/app.json and fails to resolve expo-router without node_modules.
+            RAW=$(cd "$HOME" && eas build:view "$BID" --json 2>/dev/null)
+            JSON=$(printf '%s\n' "$RAW" | awk '/^[[{]/{f=1} f{print}')
+            STATUS=$(printf '%s' "$JSON" | jq -r '.status // empty' 2>/dev/null)
+            echo "poll $i: status=${STATUS:-unparsed}"
+            if [ -z "$STATUS" ]; then
+              echo "--- raw head (first 3 lines) ---"; printf '%s\n' "$RAW" | head -3
+            fi
+            if [ "$STATUS" = "FINISHED" ] || [ "$STATUS" = "ERRORED" ] || [ "$STATUS" = "CANCELED" ]; then
+              echo "=== FINAL BUILD SUMMARY ==="
+              printf '%s' "$JSON" | jq '{id, status, platform, appVersion, gitCommitHash, createdAt, completedAt, error}'
+              echo "=== ARTIFACTS ==="
+              printf '%s' "$JSON" | jq '.artifacts'
+              echo "=== APK_URL ==="
+              printf '%s' "$JSON" | jq -r '.artifacts.applicationArchiveUrl // .artifacts.buildUrl // "none"'
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out; build still not terminal."
