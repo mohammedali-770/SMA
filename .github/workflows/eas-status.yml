@@ -40,7 +40,9 @@ jobs:
           for i in $(seq 1 40); do
             # eas-cli can prepend update-notice lines to stdout; strip everything
             # before the first JSON bracket so jq always gets clean JSON.
-            RAW=$(eas build:view "$BID" --json 2>/dev/null)
+            # Run from a neutral dir: `eas build:view <id>` otherwise eagerly loads
+            # apps/mobile/app.json and fails to resolve expo-router without node_modules.
+            RAW=$(cd "$HOME" && eas build:view "$BID" --json 2>/dev/null)
             JSON=$(printf '%s\n' "$RAW" | awk '/^[[{]/{f=1} f{print}')
             STATUS=$(printf '%s' "$JSON" | jq -r '.status // empty' 2>/dev/null)
             echo "poll $i: status=${STATUS:-unparsed}"
