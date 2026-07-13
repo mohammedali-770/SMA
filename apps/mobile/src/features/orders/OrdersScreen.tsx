@@ -25,7 +25,7 @@ const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | '
 };
 
 export function OrdersScreen() {
-  const { t, pick, lang } = useI18n();
+  const { t, lang, isRTL, rtlText, rtlRow } = useI18n();
   const [list, setList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +51,7 @@ export function OrdersScreen() {
   return (
     <Screen background={colors.bg}>
       <View style={styles.header}>
-        <Text style={styles.title}>{t('orderHistory')}</Text>
+        <Text style={[styles.title, rtlText]}>{t('orderHistory')}</Text>
       </View>
       {loading ? (
         <LoadingView label={t('loading')} />
@@ -67,23 +67,23 @@ export function OrdersScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} tintColor={colors.purple} />}
           renderItem={({ item }) => (
             <Pressable style={[styles.card, shadow.card]} onPress={() => router.push(`/receipt/${item.id}`)} accessibilityRole="button">
-              <View style={styles.cardTop}>
+              <View style={[styles.cardTop, rtlRow]}>
                 {(() => { const d = orderDisplayNumber(item); return (
                   <View style={{ flexShrink: 1 }}>
-                    <Text style={styles.orderNo}>{d.primary}</Text>
-                    {d.secondary ? <Text style={styles.orderRef}>{d.secondary}</Text> : null}
+                    <Text style={[styles.orderNo, rtlText]}>{d.primary}</Text>
+                    {d.secondary ? <Text style={[styles.orderRef, rtlText]}>{d.secondary}</Text> : null}
                   </View>
                 ); })()}
                 <StatusBadge label={t(STATUS_KEY[item.status])} status={item.status} />
               </View>
-              <Text style={styles.date}>{formatRiyadhDateTime(item.createdAt)}</Text>
-              <View style={styles.cardBottom}>
-                <Text style={styles.itemsCount}>
+              <Text style={[styles.date, rtlText]}>{formatRiyadhDateTime(item.createdAt)}</Text>
+              <View style={[styles.cardBottom, rtlRow]}>
+                <Text style={[styles.itemsCount, rtlText]}>
                   {item.items.reduce((n, it) => n + it.quantity, 0)} {t('items')} · {item.orderType === 'delivery' ? t('delivery') : t('pickup')}
                 </Text>
                 <Text style={styles.total}>{formatSAR(item.total, lang)}</Text>
               </View>
-              <Text style={styles.viewReceipt}>{t('viewReceipt')} ›</Text>
+              <Text style={[styles.viewReceipt, rtlText]}>{t('viewReceipt')} {isRTL ? '‹' : '›'}</Text>
             </Pressable>
           )}
         />

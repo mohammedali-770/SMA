@@ -15,7 +15,7 @@ import { useAuth } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 
 export function ProfileScreen() {
-  const { t, pick, lang, setLang } = useI18n();
+  const { t, pick, lang, setLang, rtlText, rtlRow } = useI18n();
   const { profile, signOut } = useAuth();
 
   const onSignOut = async () => {
@@ -32,18 +32,18 @@ export function ProfileScreen() {
           <Text style={styles.title}>{t('profile')}</Text>
         </View>
 
-        <View style={[styles.card, shadow.card, styles.identity]}>
+        <View style={[styles.card, shadow.card, styles.identity, rtlRow]}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{profile?.fullName || t('guest')}</Text>
-            {profile?.email ? <Text style={styles.muted}>{profile.email}</Text> : null}
+            <Text style={[styles.name, rtlText]}>{profile?.fullName || t('guest')}</Text>
+            {profile?.email ? <Text style={[styles.muted, rtlText]}>{profile.email}</Text> : null}
           </View>
         </View>
 
         {/* Loyalty */}
-        <View style={[styles.card, shadow.card, styles.loyalty]}>
+        <View style={[styles.card, shadow.card, styles.loyalty, rtlRow]}>
           <Text style={styles.loyaltyLabel}>⭐ {t('loyaltyPoints')}</Text>
           <Text style={styles.loyaltyValue}>{profile?.loyaltyPoints ?? 0}</Text>
         </View>
@@ -58,34 +58,35 @@ export function ProfileScreen() {
         {profile ? <VerifyPhoneWhatsApp /> : null}
 
         {/* Language */}
-        <Text style={styles.sectionTitle}>{t('language')}</Text>
+        <Text style={[styles.sectionTitle, rtlText]}>{t('language')}</Text>
         <View style={[styles.card, shadow.card, styles.langRow]}>
           <LangBtn label={t('english')} active={lang === 'en'} onPress={() => setLang('en')} />
           <LangBtn label={t('arabic')} active={lang === 'ar'} onPress={() => setLang('ar')} />
         </View>
 
         {/* Legal & Support */}
-        <Text style={styles.sectionTitle}>{t('legalSupport')}</Text>
+        <Text style={[styles.sectionTitle, rtlText]}>{t('legalSupport')}</Text>
         <Pressable
-          style={[styles.card, shadow.card, styles.legalRow]}
+          style={[styles.card, shadow.card, styles.legalRow, rtlRow]}
           onPress={() => router.push('/legal')}
           accessibilityRole="button"
         >
-          <Text style={styles.legalText}>{pick('Policies, privacy & contact', 'السياسات والخصوصية والتواصل')}</Text>
+          <Text style={[styles.legalText, rtlText]}>{pick('Policies, privacy & contact', 'السياسات والخصوصية والتواصل')}</Text>
           <Text style={styles.legalChevron}>{lang === 'ar' ? '‹' : '›'}</Text>
         </Pressable>
 
         <Button label={t('signOut')} onPress={onSignOut} variant="secondary" style={{ marginTop: spacing.xl }} />
 
-        <Text style={styles.footerNote}>{pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار ١٫٠٫٠')}</Text>
+        <Text style={styles.footerNote}>{pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار 1.0.0')}</Text>
       </ScrollView>
     </Screen>
   );
 }
 
 function DetailRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const { rtlRow } = useI18n();
   return (
-    <View style={[styles.detailRow, !last && styles.detailBorder]}>
+    <View style={[styles.detailRow, rtlRow, !last && styles.detailBorder]}>
       <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
     </View>

@@ -39,7 +39,7 @@ import { chooseCheckoutTransport } from './paymentFlow';
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang } = useI18n();
+  const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const { profile } = useAuth();
   const { selectedBranch, brand, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
   const cart = useCart();
@@ -395,8 +395,8 @@ export function CheckoutScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 190 }} keyboardShouldPersistTaps="handled">
           {/* Order type — no preselection */}
-          <Text style={styles.sectionTitle}>{t('orderType')}</Text>
-          <Text style={styles.hint}>{t('chooseOrderType')}</Text>
+          <Text style={[styles.sectionTitle, rtlText]}>{t('orderType')}</Text>
+          <Text style={[styles.hint, rtlText]}>{t('chooseOrderType')}</Text>
           <View style={styles.segment}>
             <SegmentBtn label={t('delivery')} active={orderType === 'delivery'} onPress={() => setOrderType('delivery')} />
             <SegmentBtn label={t('pickup')} active={orderType === 'pickup'} onPress={() => setOrderType('pickup')} />
@@ -404,9 +404,9 @@ export function CheckoutScreen() {
 
           {/* Payment method — availability is admin-controlled */}
           <View style={styles.block}>
-            <Text style={styles.sectionTitle}>{t('paymentMethodTitle')}</Text>
+            <Text style={[styles.sectionTitle, rtlText]}>{t('paymentMethodTitle')}</Text>
             {paymentBlocked ? (
-              <Text style={[styles.note, { color: colors.red, fontWeight: '700' }]}>
+              <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700' }]}>
                 {pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
               </Text>
             ) : (
@@ -422,10 +422,10 @@ export function CheckoutScreen() {
                   })}
                 </View>
                 {paymentMethod === 'cash' ? (
-                  <Text style={styles.note}>{pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')}</Text>
+                  <Text style={[styles.note, rtlText]}>{pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')}</Text>
                 ) : null}
                 {showOnlineOutageNotice ? (
-                  <Text style={[styles.note, { color: colors.purple, fontWeight: '700' }]}>
+                  <Text style={[styles.note, rtlText, { color: colors.purple, fontWeight: '700' }]}>
                     {pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')}
                   </Text>
                 ) : null}
@@ -436,7 +436,7 @@ export function CheckoutScreen() {
           {/* Delivery location — map picker + optional details */}
           {orderType === 'delivery' ? (
             <View style={styles.block}>
-              <Text style={styles.sectionTitle}>{pick('Select your delivery location', 'حدّد موقع التوصيل')}</Text>
+              <Text style={[styles.sectionTitle, rtlText]}>{pick('Select your delivery location', 'حدّد موقع التوصيل')}</Text>
               <LocationPickerMap
                 key={recenterSeed}
                 lat={pickedLat ?? selectedBranch?.latitude ?? 24.7136}
@@ -454,24 +454,24 @@ export function CheckoutScreen() {
                 onChangeText={setAddrLabel}
                 placeholder={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
                 placeholderTextColor={colors.muted}
-                style={[styles.couponInput, { marginTop: spacing.md }]}
+                style={[styles.couponInput, rtlText, { marginTop: spacing.md }]}
               />
 
               {addressList.length > 0 ? (
                 <View style={{ marginTop: spacing.md }}>
-                  <Text style={styles.note}>{pick('Saved locations', 'المواقع المحفوظة')}</Text>
+                  <Text style={[styles.note, rtlText]}>{pick('Saved locations', 'المواقع المحفوظة')}</Text>
                   {addressList.map((a) => (
                     <Pressable
                       key={a.id}
                       accessibilityRole="button"
                       accessibilityState={{ selected: addressId === a.id }}
-                      style={[styles.addrRow, addressId === a.id && styles.addrRowActive]}
+                      style={[styles.addrRow, rtlRow, addressId === a.id && styles.addrRowActive]}
                       onPress={() => chooseSavedAddress(a)}
                     >
                       <View style={[styles.radioDot, addressId === a.id && styles.radioDotOn]} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.addrLabel}>{a.label || t('deliveryAddress')}</Text>
-                        {a.description ? <Text style={styles.addrDesc}>{a.description}</Text> : null}
+                        <Text style={[styles.addrLabel, rtlText]}>{a.label || t('deliveryAddress')}</Text>
+                        {a.description ? <Text style={[styles.addrDesc, rtlText]}>{a.description}</Text> : null}
                       </View>
                     </Pressable>
                   ))}
@@ -479,27 +479,27 @@ export function CheckoutScreen() {
               ) : null}
 
               {deliveryBlockReason ? (
-                <Text style={[styles.note, { color: colors.red, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
+                <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
               ) : null}
             </View>
           ) : null}
 
           {/* Coupon */}
           <View style={styles.block}>
-            <Text style={styles.sectionTitle}>{t('couponTitle')}</Text>
-            <View style={styles.couponRow}>
+            <Text style={[styles.sectionTitle, rtlText]}>{t('couponTitle')}</Text>
+            <View style={[styles.couponRow, rtlRow]}>
               <TextInput
                 value={couponCode}
                 onChangeText={(v) => { setCouponCode(v); setCouponResult(null); }}
                 placeholder={t('couponPlaceholder')}
                 placeholderTextColor={colors.muted}
                 autoCapitalize="characters"
-                style={styles.couponInput}
+                style={[styles.couponInput, rtlText]}
               />
               <Button label={t('applyCoupon')} onPress={applyCoupon} loading={checkingCoupon} variant="secondary" style={styles.couponBtn} />
             </View>
             {couponResult ? (
-              <Text style={[styles.couponMsg, { color: couponResult.ok ? colors.success : colors.red }]}>
+              <Text style={[styles.couponMsg, rtlText, { color: couponResult.ok ? colors.success : colors.red }]}>
                 {couponResult.ok ? `${t('couponApplied')} −${formatSAR(couponResult.discount, lang)}` : couponResult.message}
               </Text>
             ) : null}
@@ -509,7 +509,7 @@ export function CheckoutScreen() {
           {loyaltyEnabled ? (
             <View style={styles.block}>
               <Pressable
-                style={styles.toggleRow}
+                style={[styles.toggleRow, rtlRow]}
                 onPress={() => setRedeemPoints((v) => !v)}
                 accessibilityRole="switch"
                 accessibilityState={{ checked: redeemPoints }}
@@ -519,23 +519,23 @@ export function CheckoutScreen() {
                   <View style={[styles.knob, redeemPoints && styles.knobOn]} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.toggleLabel}>{t('useLoyalty')}</Text>
-                  <Text style={styles.toggleSub}>{availablePoints} {t('pointsAvailable')}</Text>
+                  <Text style={[styles.toggleLabel, rtlText]}>{t('useLoyalty')}</Text>
+                  <Text style={[styles.toggleSub, rtlText]}>{availablePoints} {t('pointsAvailable')}</Text>
                 </View>
               </Pressable>
-              <Text style={styles.note}>{t('redeemHint')}</Text>
+              <Text style={[styles.note, rtlText]}>{t('redeemHint')}</Text>
             </View>
           ) : null}
 
           {/* Notes */}
           <View style={styles.block}>
-            <Text style={styles.sectionTitle}>{t('orderNotes')}</Text>
+            <Text style={[styles.sectionTitle, rtlText]}>{t('orderNotes')}</Text>
             <TextInput
               value={notes}
               onChangeText={setNotes}
               placeholder={t('notesPlaceholder')}
               placeholderTextColor={colors.muted}
-              style={styles.notesInput}
+              style={[styles.notesInput, rtlText]}
               multiline
             />
           </View>
@@ -549,7 +549,7 @@ export function CheckoutScreen() {
             <Row label={t('vat')} value="" muted />
             <View style={styles.totalDivider} />
             <Row label={t('total')} value={formatSAR(totalEst, lang)} big />
-            <Text style={styles.serverNote}>{`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}</Text>
+            <Text style={[styles.serverNote, rtlText]}>{`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}</Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -630,8 +630,9 @@ function SegmentBtn({ label, active, onPress }: { label: string; active: boolean
 }
 
 function Row({ label, value, big, accent, muted }: { label: string; value: string; big?: boolean; accent?: boolean; muted?: boolean }) {
+  const { rtlRow } = useI18n();
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, rtlRow]}>
       <Text style={[styles.rowLabel, big && styles.rowLabelBig, muted && styles.rowMuted]}>{label}</Text>
       <Text style={[styles.rowValue, big && styles.rowValueBig, accent && { color: colors.success }]}>{value}</Text>
     </View>
