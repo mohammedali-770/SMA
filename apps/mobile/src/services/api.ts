@@ -5,7 +5,7 @@
  * calls the EXACT SAME tables and RPCs created by supabase/migrations. RLS is
  * enforced server-side, so these calls are safe from the client:
  *   - anon/customer read the active catalog + app_settings,
- *   - a customer sees only their own orders / addresses / loyalty ledger,
+ *   - a customer sees only their own orders / addresses,
  *   - orders are created ONLY via the place_order RPC, which recomputes every
  *     amount (subtotal, modifiers, delivery fee, coupon, VAT, loyalty) server-side.
  *
@@ -16,7 +16,7 @@
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbLegalDocument, DbLoyaltyTransaction, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
   DbProduct, DbProductModifierGroup, DbProfile, OrderType,
 } from '../types/db';
 
@@ -157,6 +157,9 @@ export const legal = {
   },
 };
 
+/** Order + nested lines/modifiers — the one nested order shape the app reads. */
+const ORDER_WITH_ITEMS_SELECT = '*, order_items(*, order_item_modifiers(*))';
+
 export const orders = {
   /** Server-authoritative order creation (place_order RPC). */
   async place(input: PlaceOrderInput): Promise<DbOrder> {
@@ -216,7 +219,7 @@ export const orders = {
   listWithItems: async (limit = 20) =>
     ok<DbOrderWithItems[]>(await supabase
       .from('orders')
-      .select('*, order_items(*, order_item_modifiers(*))')
+      .select(ORDER_WITH_ITEMS_SELECT)
       .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
       .order('created_at', { ascending: false })
       .limit(limit)),
@@ -224,7 +227,7 @@ export const orders = {
   byId: async (id: string) =>
     ok<DbOrderWithItems>(await supabase
       .from('orders')
-      .select('*, order_items(*, order_item_modifiers(*))')
+      .select(ORDER_WITH_ITEMS_SELECT)
       .eq('id', id)
       .single()),
 };
@@ -350,15 +353,6 @@ export const addresses = {
     if (patch.isDefault !== undefined) row.is_default = patch.isDefault;
     return ok<DbAddress>(await supabase.from('addresses').update(row).eq('id', id).select('*').single());
   },
-};
-
-// ---------------------------------------------------------------------------
-// Loyalty (read-only for the customer; points mutate only inside place_order)
-// ---------------------------------------------------------------------------
-export const loyalty = {
-  myLedger: async () =>
-    ok<DbLoyaltyTransaction[]>(await supabase
-      .from('loyalty_transactions').select('*').order('created_at', { ascending: false })),
 };
 
 // ---------------------------------------------------------------------------

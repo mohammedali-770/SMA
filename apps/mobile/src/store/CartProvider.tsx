@@ -8,11 +8,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { CART_STORAGE_KEY as CART_KEY } from '../lib/storageKeys';
 import { computeUnitPrice, makeCartItemId, cartSubtotal } from '../utils/format';
 import { uuidv4 } from '../utils/uuid';
 import type { CartItem, Modifier, Product } from '../types/models';
-
-const CART_KEY = 'spicymeal.cart';
 
 interface CartValue {
   items: CartItem[];

@@ -10,10 +10,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
+import { LANGUAGE_STORAGE_KEY as STORAGE_KEY } from '../lib/storageKeys';
 import { rtlRow, rtlText } from './rtl';
 import { STRINGS, type Lang, type StringKey } from './strings';
-
-const STORAGE_KEY = 'spicymeal.lang';
 
 interface I18nValue {
   lang: Lang;
