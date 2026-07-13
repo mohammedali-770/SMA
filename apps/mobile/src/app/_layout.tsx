@@ -42,6 +42,7 @@ export default function RootLayout() {
               <Stack.Screen name="product/[id]" />
               <Stack.Screen name="cart" />
               <Stack.Screen name="checkout" />
+              <Stack.Screen name="payment/return" options={{ gestureEnabled: false }} />
               <Stack.Screen name="legal/index" />
               <Stack.Screen name="legal/[type]" />
               <Stack.Screen name="receipt/[id]" options={{ gestureEnabled: false }} />

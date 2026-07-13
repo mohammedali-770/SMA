@@ -32,6 +32,8 @@ import { useAuth, useCart, useCatalog } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { OrderType, SavedAddress } from '../../types/models';
+import { recoverPendingSession } from './pendingSession';
+import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -95,6 +97,26 @@ export function CheckoutScreen() {
         }
       })
       .catch(() => setAddressList([]));
+  }, []);
+
+  // On entry, resolve any payment interrupted by an app kill / cold start BEFORE
+  // the customer can act. A captured charge routes to its receipt; an unresolved
+  // one resumes THAT session — never a new charge. Runs once; recovery is
+  // idempotent (verify is read-only, resume reopens the same charge).
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (!active) return;
+      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
+      else if (rec.kind === 'resume') { void runTapPaymentSession(rec.sessionId); }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Select a saved location: use its coords + recenter the map on it.
@@ -168,6 +190,19 @@ export function CheckoutScreen() {
     setError(null);
     setPlacing(true);
     try {
+      // Resolve any interrupted online payment FIRST — before creating ANY new
+      // order, cash included. Otherwise a customer with an unresolved online charge
+      // could switch to cash and place a second order while that charge may still
+      // be captured. Recovery is idempotent (verify is read-only; resume reopens
+      // the SAME charge).
+      const rec = await recoverPendingSession({
+        read: loadPendingSession,
+        verify: (id) => payments.verifySession(id),
+        clear: clearPendingSession,
+      });
+      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
+      if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
+
       // Resolve the delivery address: reuse the selected saved address when the
       // pin hasn't moved off it, otherwise persist the map-picked coordinates.
       let deliveryAddressId: string | null = null;
@@ -200,6 +235,8 @@ export function CheckoutScreen() {
       };
       const isOnline = paymentMethod === 'online';
       if (isOnline) {
+        // Any interrupted charge was already resolved at the top of placeOrder,
+        // so beginning a new session here is safe.
         // NEW online flow: create a temporary checkout SESSION (not an order). The
         // real order is created only after the backend verifies the payment. A
         // zero-total online order (fully covered) is settled server-side and comes
@@ -231,10 +268,15 @@ export function CheckoutScreen() {
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
   const runTapPaymentSession = async (sessionId: string) => {
+    // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
+    // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
+    // forget) so the write is committed before we hand off to the browser — the
+    // exact window this recovery is meant to survive (see pendingSession.ts).
+    await savePendingSession(sessionId, Date.now());
     setPayFlow({ state: 'opening', sessionId });
     try {
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
-      if (init.status === 'already_paid' && init.orderId) { cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
+      if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
         setPayFlow({ state: 'error', sessionId, message: t('payUnavailable') });
         return;
@@ -253,17 +295,26 @@ export function CheckoutScreen() {
     setPayBusy(true);
     try {
       const res = await payments.verifySession(sessionId);
-      if (res.status === 'paid' && res.orderId) { cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
+      if (res.status === 'paid' && res.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${res.orderId}`); return; }
+      // Only an EXPLICITLY terminal charge (failed/cancelled/expired) clears the
+      // persisted session. An 'unknown' status — and 'paid' without a resolved
+      // order id yet — the backend still treats as open, so we keep the session
+      // and show it as pending (verify again), never abandoning a charge that may
+      // still settle into a second one.
+      const isTerminal = res.status === 'failed' || res.status === 'cancelled' || res.status === 'expired';
       const state: PayState =
         res.status === 'cancelled' ? 'cancelled'
         : res.status === 'expired' ? 'expired'
-        : res.status === 'pending' ? 'pending'
-        : 'failed';
+        : res.status === 'failed' ? 'failed'
+        : 'pending';
+      if (isTerminal) void clearPendingSession();
       const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
         state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
       );
       setPayFlow({ state, sessionId, message: t(msgKey as never) });
     } catch (e) {
+      // Transient verify error — KEEP the persisted session so recovery can
+      // resolve it on the next launch / checkout entry (never a new charge).
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       setPayBusy(false);
@@ -273,6 +324,15 @@ export function CheckoutScreen() {
   // Dismiss the payment modal without paying. In the session flow no order exists
   // yet, so we simply close and keep the cart intact for a retry.
   const dismissPayFlow = () => setPayFlow(null);
+
+  // Retry after a TERMINAL payment (failed/cancelled/expired): that session is
+  // dead server-side, so clear it and begin a brand-new checkout. Never reuse a
+  // consumed/expired sessionId (Phase-1 requirement: expired retry = fresh session).
+  const retryFresh = async () => {
+    await clearPendingSession();
+    setPayFlow(null);
+    await placeOrder();
+  };
 
   return (
     <View style={styles.root}>
@@ -470,8 +530,12 @@ export function CheckoutScreen() {
                 <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
                   {payFlow.state === 'pending' ? (
                     <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
-                  ) : (
+                  ) : payFlow.state === 'error' ? (
+                    // Transient error: the session may still be alive — resume it (same charge).
                     <Button label={t('payTryAgain')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
+                  ) : (
+                    // Terminal (failed/cancelled/expired): open a FRESH session, never reuse.
+                    <Button label={t('payTryAgain')} onPress={() => void retryFresh()} loading={payBusy} variant="danger" />
                   )}
                   <Button label={pick('Close', 'إغلاق')} onPress={dismissPayFlow} variant="secondary" />
                 </View>

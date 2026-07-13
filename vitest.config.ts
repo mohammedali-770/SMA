@@ -7,7 +7,13 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    // Pure app logic under src/, plus pure Edge-Function helpers (no Deno APIs).
-    include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts'],
+    // Pure app logic under src/, pure Edge-Function helpers (no Deno APIs), and
+    // pure mobile logic (e.g. checkout-session recovery). Mobile test files MUST
+    // import only framework-free modules — no React Native / Expo / Supabase.
+    include: [
+      'src/**/*.test.{ts,tsx}',
+      'supabase/functions/**/*.test.ts',
+      'apps/mobile/src/**/*.test.{ts,tsx}',
+    ],
   },
 });
