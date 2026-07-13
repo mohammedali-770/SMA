@@ -12,17 +12,20 @@ import { buildReturnDeepLink, escapeHtmlAttr } from './returnLink.ts';
  * the single `order` / `session` parameter is passed through only after strict
  * UUID validation. Tap's tap_id and any other query params are IGNORED (untrusted).
  *
- * RENDER FIX: the previous version carried an inline <script> that did a
- * window.location redirect. Cloudflare's edge classified that as an active
- * client-side redirect and NEUTRALISED the response — serving it as `text/plain`
- * under a `default-src 'none'; sandbox` CSP, which showed the HTML as raw source
- * AND blocked the redirect. This version uses the same platform-safe shape as
- * tap-admin-test-return: NO inline script (a passive <meta http-equiv="refresh">
- * plus a manual button handle the return), the HTML emitted as explicit UTF-8
- * bytes, and a fixed `text/html; charset=utf-8` Content-Type. No sensitive data,
- * no confirmation logic. In the in-app WebView flow this page is intercepted by
- * the navigation policy and never actually rendered; this keeps the browser
- * fallback / cold-start path correct too.
+ * RENDER FIX (content-type CASE — verified live): the Supabase shared *.functions
+ * edge rewrites the exact lowercase token `text/html` to `text/plain` + a
+ * `default-src 'none'; sandbox` CSP (an anti-phishing measure on *.supabase.co),
+ * which shows the page as RAW SOURCE and blocks its redirect. The cased subtype
+ * `text/HTML` is matched case-insensitively by browsers (RFC 2045) yet is NOT
+ * caught by that lowercase rewrite — so the page renders as real HTML and the
+ * redirect fires. (Same technique the tap-admin-test-return page documents; the
+ * inline <script>/meta-refresh/app-scheme were NOT the trigger — the lowercase
+ * content-type was.) The body is emitted as explicit UTF-8 bytes so the runtime
+ * cannot reinterpret the encoding, and the <meta charset> in the head keeps the
+ * Arabic correct even if a downstream charset were dropped. No sensitive data, no
+ * confirmation logic. In the in-app WebView (TEST) flow this page is intercepted
+ * by the navigation policy and never rendered; this keeps the external-browser /
+ * cold-start path correct too.
  */
 Deno.serve((req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -65,7 +68,9 @@ Deno.serve((req: Request) => {
     status: 200,
     headers: {
       ...corsHeaders,
-      'Content-Type': 'text/html; charset=utf-8',
+      // Cased subtype avoids the platform's lowercase text/html -> text/plain +
+      // sandbox rewrite; browsers still treat it as HTML. See the note above.
+      'Content-Type': 'text/HTML; charset=utf-8',
       'Content-Length': String(body.byteLength),
       'Cache-Control': 'no-store',
     },
