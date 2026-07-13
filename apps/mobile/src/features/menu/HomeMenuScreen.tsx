@@ -7,24 +7,38 @@
  *  - Product cards: "Add" for simple items, "Customize & Add" when a product
  *    has modifier groups (opens the product detail screen).
  *  - A sticky cart bar sits above the safe area whenever the cart has items.
+ *
+ * Performance: the menu is a VIRTUALIZED SectionList (only ~a screenful of
+ * cards is mounted at a time), ProductCard is memoized with stable props (a
+ * cart tap re-renders the screen but not the cards), search runs against a
+ * lowercased index built once per catalog load, and per-card hasModifiers is
+ * precomputed in the sections instead of calling groupsForProduct per render.
  */
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Pressable, ScrollView, StyleSheet, Text, TextInput, View,
-  type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent,
+  Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View,
+  type LayoutChangeEvent, type SectionListData, type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BannerCarousel } from './BannerCarousel';
+import { buildMenuSections, buildSearchIndex, type MenuSection, type MenuSectionItem } from './menuSections';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
-import type { Category, Product } from '../../types/models';
+import type { Product } from '../../types/models';
+
+// Approximate rendered height of a section header (title + margin) so a chip
+// tap positions the SECTION TITLE at the top, not the first card.
+const SECTION_HEADER_OFFSET = 40;
+
+// SectionList requires a stable viewabilityConfig identity across renders.
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen() {
   const insets = useSafeAreaInsets();
@@ -34,10 +48,10 @@ export function HomeMenuScreen() {
     isAvailable, branchIsOpen, groupsForProduct,
   } = useCatalog();
   const cart = useCart();
+  const { addItem } = cart;
 
   const [search, setSearch] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
-  const offsets = useRef<Record<string, number>>({});
+  const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null);
   // Active category (for the highlighted chip) + horizontal chip-row scrolling.
   const chipScrollRef = useRef<ScrollView>(null);
   const chipOffsets = useRef<Record<string, { x: number; width: number }>>({});
@@ -45,46 +59,56 @@ export function HomeMenuScreen() {
 
   const branchOpen = branchIsOpen(selectedBranch);
 
-  // Products visible for the chosen branch + search, grouped by category.
-  const sections = useMemo(() => {
-    if (!selectedBranchId) return [] as { category: Category; items: Product[] }[];
-    const q = search.trim().toLowerCase();
-    const visible = products.filter((p) => {
-      if (!p.isActive || !isAvailable(p.id, selectedBranchId)) return false;
-      if (!q) return true;
-      return (
-        p.nameEn.toLowerCase().includes(q) ||
-        p.nameAr.toLowerCase().includes(q) ||
-        p.descriptionEn.toLowerCase().includes(q)
-      );
-    });
-    return [...categories]
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((category) => ({ category, items: visible.filter((p) => p.categoryId === category.id) }))
-      .filter((s) => s.items.length > 0);
-  }, [products, categories, selectedBranchId, isAvailable, search]);
+  // Lowercased searchable text, built once per catalog load (not per keystroke).
+  const searchIndex = useMemo(() => buildSearchIndex(products), [products]);
+  const hasModifiers = useCallback(
+    (p: Product) => groupsForProduct(p).length > 0,
+    [groupsForProduct],
+  );
 
+  // Products visible for the chosen branch + search, grouped by category. Item
+  // objects carry precomputed hasModifiers so cards never resolve groups in render.
+  const sections = useMemo(
+    () => buildMenuSections({
+      products, categories, branchId: selectedBranchId, query: search, searchIndex, isAvailable, hasModifiers,
+    }),
+    [products, categories, selectedBranchId, search, searchIndex, isAvailable, hasModifiers],
+  );
+
+  // Scroll-spy: the topmost visible item's section drives the highlighted chip.
+  // Empty-deps callback = stable identity, which SectionList requires.
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined;
+    if (section) setActiveCatId((prev) => (prev === section.category.id ? prev : section.category.id));
+  }, []);
+
+  // Chip tap → jump to that section. A far-off section may not be measured yet
+  // (virtualization); onScrollToIndexFailed jumps approximately, then retries
+  // once so the landing is exact.
+  const pendingScroll = useRef<{ sectionIndex: number; retried: boolean } | null>(null);
   const scrollToCategory = (catId: string) => {
     setActiveCatId(catId);
-    const y = offsets.current[catId];
-    if (y != null) scrollRef.current?.scrollTo({ y: Math.max(0, y - spacing.sm), animated: true });
+    const sectionIndex = sections.findIndex((s) => s.category.id === catId);
+    if (sectionIndex < 0) return;
+    pendingScroll.current = { sectionIndex, retried: false };
+    listRef.current?.scrollToLocation({ sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true });
+  };
+  const onScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => {
+    listRef.current?.getScrollResponder()?.scrollTo({ y: info.averageItemLength * info.index, animated: false });
+    const pending = pendingScroll.current;
+    if (pending && !pending.retried) {
+      pending.retried = true;
+      setTimeout(() => {
+        listRef.current?.scrollToLocation({
+          sectionIndex: pending.sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true,
+        });
+      }, 120);
+    }
   };
 
   // Which chip is highlighted: the category tapped, else the section currently
   // scrolled into view, else the first section.
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
-
-  // Scroll-spy: as the menu scrolls, highlight the category whose section top has
-  // passed the top of the viewport.
-  const onMenuScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y + spacing.sm + 1;
-    let current = sections[0]?.category.id ?? null;
-    for (const s of sections) {
-      const oy = offsets.current[s.category.id];
-      if (oy != null && oy <= y) current = s.category.id;
-    }
-    if (current && current !== activeCatId) setActiveCatId(current);
-  };
 
   // Keep the highlighted chip visible in the horizontal chip row.
   useEffect(() => {
@@ -92,13 +116,18 @@ export function HomeMenuScreen() {
     if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - spacing.lg), animated: true });
   }, [activeCatIdResolved]);
 
-  const onAdd = (product: Product) => {
-    if (groupsForProduct(product).length > 0) {
-      router.push(`/product/${product.id}`);
-    } else {
-      cart.addItem(product, {}, 1);
-    }
-  };
+  // Stable add handler so memoized cards never re-render from a new closure.
+  const handleAdd = useCallback((product: Product, withModifiers: boolean) => {
+    if (withModifiers) router.push(`/product/${product.id}`);
+    else addItem(product, {}, 1);
+  }, [addItem]);
+
+  const renderItem = useCallback(
+    ({ item }: { item: MenuSectionItem }) => (
+      <ProductCard product={item.product} hasModifiers={item.hasModifiers} onAdd={handleAdd} />
+    ),
+    [handleAdd],
+  );
 
   return (
     <View style={styles.root}>
@@ -195,41 +224,30 @@ export function HomeMenuScreen() {
             </View>
           ) : null}
 
-          {/* Menu sections */}
+          {/* Menu — virtualized; only the visible window of cards is mounted. */}
           {sections.length === 0 ? (
             <EmptyView emoji="🍽️" title={t('noProducts')} />
           ) : (
-            <ScrollView
-              ref={scrollRef}
-              onScroll={onMenuScroll}
-              scrollEventThrottle={16}
+            <SectionList
+              ref={listRef}
+              sections={sections}
+              keyExtractor={(item) => item.product.id}
+              renderItem={renderItem}
+              renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => (
+                <Text style={[styles.sectionTitle, rtlText]}>{pick(section.category.nameEn, section.category.nameAr)}</Text>
+              )}
+              renderSectionFooter={SectionFooter}
+              ItemSeparatorComponent={ItemSeparator}
+              stickySectionHeadersEnabled={false}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={VIEWABILITY_CONFIG}
+              onScrollToIndexFailed={onScrollToIndexFailed}
+              initialNumToRender={8}
+              maxToRenderPerBatch={8}
+              windowSize={9}
               contentContainerStyle={{ padding: spacing.lg, paddingBottom: cart.count > 0 ? 120 : spacing.xxl }}
               showsVerticalScrollIndicator={false}
-            >
-              {sections.map((s) => (
-                <View
-                  key={s.category.id}
-                  onLayout={(e: LayoutChangeEvent) => { offsets.current[s.category.id] = e.nativeEvent.layout.y; }}
-                  style={styles.section}
-                >
-                  <Text style={[styles.sectionTitle, rtlText]}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
-                  <View style={{ gap: spacing.md }}>
-                    {s.items.map((p) => (
-                      <ProductCard
-                        key={p.id}
-                        product={p}
-                        priceLabel={formatSAR(p.price, lang)}
-                        kcalLabel={p.calories ? `${p.calories} ${t('kcal')}` : ''}
-                        name={pick(p.nameEn, p.nameAr)}
-                        description={pick(p.descriptionEn, p.descriptionAr)}
-                        actionLabel={groupsForProduct(p).length > 0 ? t('customizeAdd') : t('addToCart')}
-                        onAdd={() => onAdd(p)}
-                      />
-                    ))}
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
+            />
           )}
         </>
       )}
@@ -250,17 +268,43 @@ export function HomeMenuScreen() {
   );
 }
 
-function ProductCard({
-  product, name, description, priceLabel, kcalLabel, actionLabel, onAdd,
+function ItemSeparator() {
+  return <View style={{ height: spacing.md }} />;
+}
+
+function SectionFooter() {
+  return <View style={{ height: spacing.xl }} />;
+}
+
+/**
+ * One menu card. Memoized with stable props (product ref, boolean, stable
+ * handler) so cart taps and searches don't re-render every card; language
+ * changes still propagate because useI18n reads context (which bypasses memo).
+ */
+const ProductCard = React.memo(function ProductCard({
+  product, hasModifiers, onAdd,
 }: {
-  product: Product; name: string; description: string; priceLabel: string;
-  kcalLabel: string; actionLabel: string; onAdd: () => void;
+  product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
 }) {
-  const { rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const name = pick(product.nameEn, product.nameAr);
+  const description = pick(product.descriptionEn, product.descriptionAr);
+  const priceLabel = formatSAR(product.price, lang);
+  const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
+  const actionLabel = hasModifiers ? t('customizeAdd') : t('addToCart');
   return (
     // Mirrored in Arabic: image on the right, text block reading right-to-left.
     <View style={[styles.card, rtlRow, shadow.card]}>
-      <Image source={{ uri: product.imageUrl }} style={styles.cardImg} contentFit="cover" transition={150} />
+      <Image
+        source={{ uri: product.imageUrl }}
+        style={styles.cardImg}
+        contentFit="cover"
+        transition={150}
+        // Keep decoded thumbnails in memory so cards scrolled back into view
+        // don't re-decode from disk; recyclingKey pairs with virtualization.
+        cachePolicy="memory-disk"
+        recyclingKey={product.id}
+      />
       <View style={styles.cardBody}>
         <Text style={[styles.cardName, rtlText]} numberOfLines={1}>{name}</Text>
         {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
@@ -269,14 +313,14 @@ function ProductCard({
             <Text style={styles.cardPrice}>{priceLabel}</Text>
             {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
           </View>
-          <Pressable style={styles.addBtn} onPress={onAdd} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
+          <Pressable style={styles.addBtn} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
             <Text style={styles.addBtnText}>{actionLabel}</Text>
           </Pressable>
         </View>
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
@@ -305,7 +349,6 @@ const styles = StyleSheet.create({
   branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
-
   closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
   closedNoticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
 
@@ -327,7 +370,6 @@ const styles = StyleSheet.create({
   chipText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
   chipTextActive: { color: colors.white },
 
-  section: { marginBottom: spacing.xl },
   sectionTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
 
   card: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden' },
