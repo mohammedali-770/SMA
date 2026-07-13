@@ -185,6 +185,8 @@ export function OrderTypeSelectScreen() {
                 key={b.id}
                 onPress={() => choosePickup(b)}
                 disabled={!open}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !open, selected }}
                 style={[styles.card, shadow.card, selected && styles.cardSelected, !open && styles.cardDisabled]}
               >
                 <View style={styles.cardTop}>
@@ -211,7 +213,7 @@ export function OrderTypeSelectScreen() {
                 <Text style={styles.muted}>{t('otNoSaved')}</Text>
               ) : (
                 savedAddresses.map((a) => (
-                  <Pressable key={a.id} onPress={() => chooseSavedAddress(a)} style={[styles.card, shadow.card]}>
+                  <Pressable key={a.id} onPress={() => chooseSavedAddress(a)} accessibilityRole="button" style={[styles.card, shadow.card]}>
                     <Text style={styles.name}>{a.label || t('deliveryAddress')}</Text>
                     {a.description ? <Text style={styles.address}>{a.description}</Text> : null}
                   </Pressable>
