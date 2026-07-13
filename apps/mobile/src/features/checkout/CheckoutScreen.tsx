@@ -64,9 +64,9 @@ export function CheckoutScreen() {
   const [error, setError] = useState<string | null>(null);
   // Online-payment (Tap) flow overlay. null = not paying.
   type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
-  // orderId is the LEGACY (order-first) flow; sessionId is the new checkout-session
-  // flow where the order does not exist until payment is verified.
-  const [payFlow, setPayFlow] = useState<{ state: PayState; orderId?: string; sessionId?: string; message?: string } | null>(null);
+  // sessionId is the checkout-session flow: the order does not exist until
+  // payment is verified server-side.
+  const [payFlow, setPayFlow] = useState<{ state: PayState; sessionId?: string; message?: string } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
   // Only ONE Tap run may be in flight at a time. Without this, a fast double-tap
   // on Continue, or a slow-network mount-recovery racing a manual Place Order,

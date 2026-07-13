@@ -53,7 +53,6 @@ export const STRINGS = {
 
     // branch
     selectBranch: 'Select Branch',
-    chooseBranch: 'Choose a branch',
     changeBranch: 'Change',
     tapToChooseBranch: 'Tap to choose your branch',
     open: 'Open',
@@ -129,7 +128,6 @@ export const STRINGS = {
     // Online payment (Tap)
     payTitle: 'Online payment',
     payOpening: 'Opening secure checkout…',
-    payWaiting: 'Waiting for payment…',
     payVerifying: 'Verifying payment…',
     paySuccess: 'Payment successful',
     payFailed: 'We could not process the payment. Please try again.',
@@ -141,7 +139,6 @@ export const STRINGS = {
     payUnavailable: 'Online payment is unavailable right now.',
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
-    payViewOrder: 'View my order',
     // In-app secure-payment WebView screen
     payScreenTitle: 'Secure Payment',
     payScreenLoading: 'Loading secure payment…',
@@ -252,7 +249,6 @@ export const STRINGS = {
     useWhatsappInstead: 'تسجيل الدخول عبر واتساب بدلاً من ذلك',
 
     selectBranch: 'اختر الفرع',
-    chooseBranch: 'اختر فرعاً',
     changeBranch: 'تغيير',
     tapToChooseBranch: 'اضغط لاختيار الفرع',
     open: 'مفتوح',
@@ -324,7 +320,6 @@ export const STRINGS = {
     // الدفع الإلكتروني (Tap)
     payTitle: 'الدفع الإلكتروني',
     payOpening: 'جارٍ فتح صفحة الدفع الآمنة…',
-    payWaiting: 'بانتظار إتمام الدفع…',
     payVerifying: 'جارٍ التحقق من الدفع…',
     paySuccess: 'تم الدفع بنجاح',
     payFailed: 'تعذّر إتمام الدفع. يرجى المحاولة مرة أخرى.',
@@ -336,7 +331,6 @@ export const STRINGS = {
     payUnavailable: 'الدفع الإلكتروني غير متاح حالياً.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
-    payViewOrder: 'عرض طلبي',
     // شاشة الدفع الآمن داخل التطبيق (WebView)
     payScreenTitle: 'الدفع الآمن',
     payScreenLoading: 'جارٍ تحميل صفحة الدفع الآمنة…',

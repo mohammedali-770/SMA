@@ -10,17 +10,6 @@ export function formatSAR(amount: number, lang: 'en' | 'ar' = 'en'): string {
   return `${amount.toFixed(2)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
 }
 
-/** Extract the VAT portion of a VAT-inclusive amount (Saudi prices are inclusive). */
-export function getVATBreakdown(totalInclusive: number, vatPercentage = 15) {
-  const rate = vatPercentage / 100;
-  const subtotalExcludingVat = totalInclusive / (1 + rate);
-  return {
-    subtotalExcludingVat: Number(subtotalExcludingVat.toFixed(2)),
-    vatAmount: Number((totalInclusive - subtotalExcludingVat).toFixed(2)),
-    totalInclusive: Number(totalInclusive.toFixed(2)),
-  };
-}
-
 const RIYADH_TZ = 'Asia/Riyadh';
 
 /** "YYYY-MM-DD HH:mm" in Riyadh (UTC+3) local time. */
