@@ -131,6 +131,12 @@ export const STRINGS = {
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
     payViewOrder: 'View my order',
+    // In-app secure-payment WebView screen
+    payScreenTitle: 'Secure Payment',
+    payScreenLoading: 'Loading secure payment…',
+    payScreenError: 'We couldn’t load the secure payment page. Please check your connection and try again.',
+    payNotCompleted: 'Payment was not completed. You can continue or try again.',
+    payContinue: 'Continue payment',
     branchClosedError: 'This branch is closed. Please choose an open branch.',
     minOrderError: 'Below the branch minimum for delivery.',
 
@@ -309,6 +315,12 @@ export const STRINGS = {
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
     payViewOrder: 'عرض طلبي',
+    // شاشة الدفع الآمن داخل التطبيق (WebView)
+    payScreenTitle: 'الدفع الآمن',
+    payScreenLoading: 'جارٍ تحميل صفحة الدفع الآمنة…',
+    payScreenError: 'تعذّر تحميل صفحة الدفع الآمنة. يرجى التحقق من اتصالك والمحاولة مرة أخرى.',
+    payNotCompleted: 'لم يكتمل الدفع. يمكنك المتابعة أو المحاولة مرة أخرى.',
+    payContinue: 'متابعة الدفع',
     branchClosedError: 'هذا الفرع مغلق. الرجاء اختيار فرع مفتوح.',
     minOrderError: 'أقل من الحد الأدنى للفرع للتوصيل.',
 

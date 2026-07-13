@@ -42,6 +42,9 @@ export default function RootLayout() {
               <Stack.Screen name="product/[id]" />
               <Stack.Screen name="cart" />
               <Stack.Screen name="checkout" />
+              {/* In-app Tap hosted checkout — gestures off so a mid-payment swipe
+                  can't silently abandon the WebView (dismiss goes via its header). */}
+              <Stack.Screen name="payment/checkout" options={{ gestureEnabled: false }} />
               <Stack.Screen name="payment/return" options={{ gestureEnabled: false }} />
               <Stack.Screen name="legal/index" />
               <Stack.Screen name="legal/[type]" />
