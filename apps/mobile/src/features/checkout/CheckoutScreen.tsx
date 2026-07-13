@@ -9,6 +9,7 @@
  * The idempotency key from the cart store makes a retried submit safe.
  */
 import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -34,6 +35,7 @@ import type { OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
+import { chooseCheckoutTransport } from './paymentFlow';
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -300,13 +302,22 @@ export function CheckoutScreen() {
         return;
       }
       if (init.checkoutUrl) {
-        // Open Tap's hosted checkout INSIDE the app (in-app WebView) instead of the
-        // external browser. Hide the overlay first — the WebView screen owns the UI
-        // while it's up. Whether the user completes or dismisses it, the server
-        // verify below (never the WebView) decides the real outcome.
+        // Present Tap's hosted checkout. TEST → in-app WebView (strict allow-list,
+        // Tap-hosted 3DS). LIVE/unknown → the external auth browser, which can
+        // follow the issuer-bank ACS redirects a live 3DS challenge uses off-Tap.
+        // Hide the overlay first — the chosen surface owns the UI while it's up.
+        // The redirect result is NEVER trusted; verifyPaymentSession (server) below
+        // decides the real outcome for BOTH transports.
         setPayFlow(null);
-        const result = await openInAppTapCheckout(sessionId, init.checkoutUrl);
-        await verifyPaymentSession(sessionId, { dismissed: result === 'dismissed' });
+        let dismissed = false;
+        if (chooseCheckoutTransport(init.mode) === 'in-app-webview') {
+          const result = await openInAppTapCheckout(sessionId, init.checkoutUrl);
+          dismissed = result === 'dismissed';
+        } else {
+          const result = await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
+          dismissed = result.type === 'cancel' || result.type === 'dismiss';
+        }
+        await verifyPaymentSession(sessionId, { dismissed });
       } else {
         await verifyPaymentSession(sessionId);
       }
