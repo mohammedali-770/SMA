@@ -7,11 +7,13 @@
  * + code and reflects the result. When WhatsApp is not configured/enabled the
  * server returns `disabled` and we show a graceful not-available state.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { useI18n } from '../../i18n/I18nProvider';
+import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
+import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
 import { whatsappOtp } from '../../services/api';
 import { colors, font, radius, shadow, spacing } from '../../theme';
@@ -29,21 +31,7 @@ export function VerifyPhoneWhatsApp() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [notAvailable, setNotAvailable] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
-
-  const startCooldown = (seconds: number) => {
-    setCooldown(seconds);
-    if (timer.current) clearInterval(timer.current);
-    timer.current = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1 && timer.current) { clearInterval(timer.current); timer.current = null; return 0; }
-        return c - 1;
-      });
-    }, 1000);
-  };
+  const { cooldown, startCooldown } = useOtpCooldown();
 
   const sendCode = async () => {
     setError(null); setNotice(null);
@@ -54,11 +42,11 @@ export function VerifyPhoneWhatsApp() {
       if (res.status === 'disabled') { setNotAvailable(true); return; }
       setPhase('code');
       setNotice(t('weSentWhatsappCode'));
-      startCooldown(60);
+      startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
     } catch {
       setNotice(t('weSentWhatsappCode')); // stay generic; never reveal validity
       setPhase('code');
-      startCooldown(60);
+      startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
     } finally { setBusy(false); }
   };
 
@@ -112,7 +100,7 @@ export function VerifyPhoneWhatsApp() {
             <>
               <TextInput
                 value={code}
-                onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+                onChangeText={(v) => setCode(sanitizeOtpDigits(v, 6))}
                 keyboardType="number-pad"
                 placeholder={t('enterVerificationCode')}
                 placeholderTextColor={colors.muted}
