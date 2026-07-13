@@ -52,9 +52,9 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
             {(() => {
               const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
               const methodText =
-                methodKey === 'online' ? pick('Online Payment', 'الدفع الإلكتروني')
-                : methodKey === 'cash_delivery' ? pick('Cash on Delivery', 'نقداً عند التوصيل')
-                : methodKey === 'cash_pickup' ? pick('Cash on Pickup', 'نقداً عند الاستلام')
+                methodKey === 'online' ? t('payOnline')
+                : methodKey === 'cash_delivery' ? t('cashOnDelivery')
+                : methodKey === 'cash_pickup' ? t('cashOnPickup')
                 : methodKey === 'cash' ? pick('Cash Payment', 'دفع نقدي')
                 : pick('Payment method not set', 'لم تُحدَّد طريقة الدفع');
               const state = paymentDisplayState(order);
@@ -79,7 +79,7 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                         strong
                       />
                     ); })()}
-                    <Row label={pick('Payment method', 'طريقة الدفع')} value={methodText} />
+                    <Row label={t('paymentMethodTitle')} value={methodText} />
                     <Row label={t('paymentStatus')} value={statusText} />
                     <Row label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />
                     <Row label={pick('Branch', 'الفرع')} value={pick(order.branchNameEn, order.branchNameAr)} />

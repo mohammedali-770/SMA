@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BannerCarousel } from './BannerCarousel';
+import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
@@ -127,13 +128,7 @@ export function HomeMenuScreen() {
             {selectedBranch ? pick(selectedBranch.nameEn, selectedBranch.nameAr) : t('tapToChooseBranch')}
           </Text>
         </View>
-        {selectedBranch ? (
-          <View style={[styles.badge, branchOpen ? styles.badgeOpen : styles.badgeClosed]}>
-            <Text style={[styles.badgeText, { color: branchOpen ? colors.success : colors.red }]}>
-              {branchOpen ? t('open') : t('closed')}
-            </Text>
-          </View>
-        ) : null}
+        {selectedBranch ? <OpenClosedBadge open={branchOpen} /> : null}
         <Text style={styles.change}>{t('changeBranch')}</Text>
       </Pressable>
 
@@ -187,6 +182,7 @@ export function HomeMenuScreen() {
                         chipOffsets.current[s.category.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
                       }}
                       onPress={() => scrollToCategory(s.category.id)}
+                      hitSlop={6}
                       style={[styles.chip, active && styles.chipActive]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
@@ -271,7 +267,7 @@ function ProductCard({
             <Text style={styles.cardPrice}>{priceLabel}</Text>
             {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
           </View>
-          <Pressable style={styles.addBtn} onPress={onAdd} accessibilityRole="button">
+          <Pressable style={styles.addBtn} onPress={onAdd} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
             <Text style={styles.addBtnText}>{actionLabel}</Text>
           </Pressable>
         </View>
@@ -307,12 +303,8 @@ const styles = StyleSheet.create({
   branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
-  badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill },
-  badgeOpen: { backgroundColor: '#e7f6ee' },
-  badgeClosed: { backgroundColor: '#fdeaec' },
-  badgeText: { fontSize: font.xs, fontWeight: '800' },
 
-  closedNotice: { backgroundColor: '#fdeaec', marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
+  closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
   closedNoticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
 
   searchWrap: {

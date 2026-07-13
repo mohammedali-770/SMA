@@ -21,6 +21,11 @@ export const colors = {
   danger: '#e02d3d',
   warning: '#c47f17',
 
+  // Status tints (previously inlined per-screen; single source of truth here)
+  successBg: '#e7f6ee',
+  dangerBg: '#fdeaec',
+  purpleBg: '#f1edfb',
+
   // states
   disabled: '#c9c4d6',
   overlay: 'rgba(28,22,48,0.45)',

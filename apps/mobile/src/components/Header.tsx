@@ -15,7 +15,7 @@ interface Props {
 }
 
 export function Header({ title, showBack, onBack, right, left }: Props) {
-  const { isRTL } = useI18n();
+  const { isRTL, t } = useI18n();
   const back = () => {
     if (onBack) onBack();
     else if (router.canGoBack()) router.back();
@@ -27,7 +27,7 @@ export function Header({ title, showBack, onBack, right, left }: Props) {
     <View style={styles.wrap}>
       <View style={styles.side}>
         {showBack ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={back} hitSlop={10} style={styles.backBtn}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('back')} onPress={back} hitSlop={10} style={styles.backBtn}>
             <Text style={styles.chevron}>{chevron}</Text>
           </Pressable>
         ) : left ?? null}

@@ -45,7 +45,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
       ]}
     >
       <View style={styles.row}>
-        {loading && <ActivityIndicator size="small" color={fg} style={{ marginRight: spacing.sm }} />}
+        {loading && <ActivityIndicator size="small" color={fg} style={{ marginEnd: spacing.sm }} />}
         <Text style={[styles.label, { color: isDisabled && variant !== 'primary' ? colors.muted : fg }]}>
           {label}
         </Text>
