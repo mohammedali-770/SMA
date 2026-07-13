@@ -9,7 +9,6 @@
  * The idempotency key from the cart store makes a retried submit safe.
  */
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -34,6 +33,7 @@ import { formatSAR } from '../../utils/format';
 import type { OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
+import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -270,8 +270,8 @@ export function CheckoutScreen() {
   const runTapPaymentSession = async (sessionId: string) => {
     // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
     // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
-    // forget) so the write is committed before we hand off to the browser — the
-    // exact window this recovery is meant to survive (see pendingSession.ts).
+    // forget) so the write is committed before we hand off to the in-app WebView —
+    // the exact window this recovery is meant to survive (see pendingSession.ts).
     await savePendingSession(sessionId, Date.now());
     setPayFlow({ state: 'opening', sessionId });
     try {
@@ -282,15 +282,31 @@ export function CheckoutScreen() {
         return;
       }
       if (init.checkoutUrl) {
-        await WebBrowser.openAuthSessionAsync(init.checkoutUrl, 'spicymeal://payment/return');
+        // Open Tap's hosted checkout INSIDE the app (in-app WebView) instead of the
+        // external browser. Hide the overlay first — the WebView screen owns the UI
+        // while it's up. Whether the user completes or dismisses it, the server
+        // verify below (never the WebView) decides the real outcome.
+        setPayFlow(null);
+        const result = await openInAppTapCheckout(sessionId, init.checkoutUrl);
+        await verifyPaymentSession(sessionId, { dismissed: result === 'dismissed' });
+      } else {
+        await verifyPaymentSession(sessionId);
       }
-      await verifyPaymentSession(sessionId);
     } catch (e) {
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     }
   };
 
-  const verifyPaymentSession = async (sessionId: string) => {
+  // Push the in-app Tap checkout WebView and await its result. The Tap checkout
+  // URL (which carries a short-lived token) is handed over IN MEMORY only — the
+  // route param is just the non-secret checkout-session id.
+  const openInAppTapCheckout = (sessionId: string, checkoutUrl: string): Promise<CheckoutHandoffResult> => {
+    const done = startCheckoutHandoff(sessionId, checkoutUrl);
+    router.push({ pathname: '/payment/checkout', params: { session: sessionId } });
+    return done;
+  };
+
+  const verifyPaymentSession = async (sessionId: string, opts?: { dismissed?: boolean }) => {
     setPayFlow({ state: 'verifying', sessionId });
     setPayBusy(true);
     try {
@@ -308,9 +324,17 @@ export function CheckoutScreen() {
         : res.status === 'failed' ? 'failed'
         : 'pending';
       if (isTerminal) void clearPendingSession();
-      const msgKey = res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey : (
-        state === 'cancelled' ? 'payCancelled' : state === 'expired' ? 'payExpired' : state === 'pending' ? 'payPending' : 'payFailed'
-      );
+      // A user who closed the in-app checkout WITHOUT paying, on a still-open
+      // (pending) charge, sees the "not completed — continue or try again" copy.
+      // An automatic verify that simply lands on pending keeps the neutral copy.
+      // Terminal/declined states never show a raw Tap error — only safe strings.
+      const msgKey =
+        state === 'pending' && opts?.dismissed ? 'payNotCompleted'
+        : res.messageKey && res.messageKey.startsWith('pay') ? res.messageKey
+        : state === 'cancelled' ? 'payCancelled'
+        : state === 'expired' ? 'payExpired'
+        : state === 'pending' ? 'payPending'
+        : 'payFailed';
       setPayFlow({ state, sessionId, message: t(msgKey as never) });
     } catch (e) {
       // Transient verify error — KEEP the persisted session so recovery can
@@ -529,7 +553,12 @@ export function CheckoutScreen() {
                 <Text style={styles.payMsg}>{payFlow.message ?? t('payFailed')}</Text>
                 <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
                   {payFlow.state === 'pending' ? (
-                    <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
+                    <>
+                      {/* Continue reopens the SAME Tap session (no new charge — the
+                          server reuses the existing one); Check status re-verifies. */}
+                      <Button label={t('payContinue')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
+                      <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="secondary" />
+                    </>
                   ) : payFlow.state === 'error' ? (
                     // Transient error: the session may still be alive — resume it (same charge).
                     <Button label={t('payTryAgain')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
