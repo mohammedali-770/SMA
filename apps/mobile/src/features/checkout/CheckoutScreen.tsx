@@ -9,7 +9,7 @@
  * The idempotency key from the cart store makes a retried submit safe.
  */
 import { router } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
@@ -66,6 +66,13 @@ export function CheckoutScreen() {
   // flow where the order does not exist until payment is verified.
   const [payFlow, setPayFlow] = useState<{ state: PayState; orderId?: string; sessionId?: string; message?: string } | null>(null);
   const [payBusy, setPayBusy] = useState(false);
+  // Only ONE Tap run may be in flight at a time. Without this, a fast double-tap
+  // on Continue, or a slow-network mount-recovery racing a manual Place Order,
+  // could push two Tap WebViews and fire two verifies for the same session.
+  const payRunningRef = useRef(false);
+  // Disables Place Order while an interrupted payment is still being resolved on
+  // mount, so the user can't start a second run before recovery decides.
+  const [recovering, setRecovering] = useState(true);
 
   const branchOpen = branchIsOpen(selectedBranch);
   const vatPct = brand?.vatPercentage ?? 15;
@@ -106,14 +113,20 @@ export function CheckoutScreen() {
   useEffect(() => {
     let active = true;
     void (async () => {
-      const rec = await recoverPendingSession({
-        read: loadPendingSession,
-        verify: (id) => payments.verifySession(id),
-        clear: clearPendingSession,
-      });
-      if (!active) return;
-      if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
-      else if (rec.kind === 'resume') { void runTapPaymentSession(rec.sessionId); }
+      try {
+        const rec = await recoverPendingSession({
+          read: loadPendingSession,
+          verify: (id) => payments.verifySession(id),
+          clear: clearPendingSession,
+        });
+        if (!active) return;
+        if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); }
+        else if (rec.kind === 'resume') { void runTapPaymentSession(rec.sessionId); }
+      } finally {
+        // Re-enable Place Order once recovery has decided (a resumed charge takes
+        // over the pay flow; anything else leaves a normal, placeable checkout).
+        if (active) setRecovering(false);
+      }
     })();
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,7 +196,7 @@ export function CheckoutScreen() {
     return null;
   }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick, deliveryBlockReason]);
 
-  const canPlace = !blockReason && cart.items.length > 0 && !placing;
+  const canPlace = !blockReason && cart.items.length > 0 && !placing && !recovering;
 
   const placeOrder = async () => {
     if (!canPlace || !selectedBranch || !orderType) return;
@@ -268,13 +281,18 @@ export function CheckoutScreen() {
   // verified. `verifySession` returns the created order id, which we use to open
   // the receipt. The redirect result is never trusted — server verify decides.
   const runTapPaymentSession = async (sessionId: string) => {
-    // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
-    // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
-    // forget) so the write is committed before we hand off to the in-app WebView —
-    // the exact window this recovery is meant to survive (see pendingSession.ts).
-    await savePendingSession(sessionId, Date.now());
-    setPayFlow({ state: 'opening', sessionId });
+    // Single-flight: a second concurrent run for the same (or any) session would
+    // stack a duplicate Tap WebView and fire a redundant verify. Bail if one is
+    // already in progress; the ref is reset in the finally below.
+    if (payRunningRef.current) return;
+    payRunningRef.current = true;
     try {
+      // Persist the in-flight session BEFORE opening Tap so an app kill / cold start
+      // recovers THIS charge instead of opening a new one. Awaited (not fire-and-
+      // forget) so the write is committed before we hand off to the in-app WebView —
+      // the exact window this recovery is meant to survive (see pendingSession.ts).
+      await savePendingSession(sessionId, Date.now());
+      setPayFlow({ state: 'opening', sessionId });
       const init = await payments.initiateSession(sessionId, lang === 'ar' ? 'ar' : 'en');
       if (init.status === 'already_paid' && init.orderId) { void clearPendingSession(); cart.clear(); setPayFlow(null); router.replace(`/receipt/${init.orderId}`); return; }
       if (init.status === 'disabled' || (!init.checkoutUrl && !init.needsVerify)) {
@@ -294,6 +312,8 @@ export function CheckoutScreen() {
       }
     } catch (e) {
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
+    } finally {
+      payRunningRef.current = false;
     }
   };
 
@@ -538,8 +558,10 @@ export function CheckoutScreen() {
         />
       </View>
 
-      {/* Online-payment (Tap) overlay */}
-      <Modal visible={payFlow !== null} transparent animationType="fade" onRequestClose={() => {}}>
+      {/* Online-payment (Tap) overlay. onRequestClose (Android back) dismisses the
+          modal like Close — it never touches the persisted session, so recovery
+          still resolves an in-flight charge; it never confirms/creates anything. */}
+      <Modal visible={payFlow !== null} transparent animationType="fade" onRequestClose={dismissPayFlow}>
         <View style={styles.payBackdrop}>
           <View style={styles.payCard}>
             <Text style={styles.payTitle}>{t('payTitle')}</Text>
@@ -547,6 +569,9 @@ export function CheckoutScreen() {
               <View style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg }}>
                 <ActivityIndicator size="large" color={colors.purple} />
                 <Text style={styles.payMsg}>{t(payFlow.state === 'opening' ? 'payOpening' : 'payVerifying')}</Text>
+                {/* Escape hatch if initiate/verify stalls: dismiss keeps the session,
+                    so a still-open charge is resolved by recovery on next entry. */}
+                <Button label={pick('Cancel', 'إلغاء')} onPress={dismissPayFlow} variant="secondary" style={{ alignSelf: 'stretch' }} />
               </View>
             ) : payFlow ? (
               <>

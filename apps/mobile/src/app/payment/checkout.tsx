@@ -140,9 +140,15 @@ export default function PaymentCheckoutScreen() {
           <WebView
             ref={webRef}
             source={{ uri: checkoutUrl }}
-            // Only https ever loads in-frame; the app scheme is caught by our
-            // handler (returns false) rather than erroring.
-            originWhitelist={['https://*', 'spicymeal://*']}
+            // originWhitelist MUST be ['*'] so EVERY navigation reaches our
+            // onShouldStartLoadWithRequest gate. react-native-webview checks the
+            // whitelist FIRST and, for any non-matching URL, silently does
+            // Linking.openURL(url) (external browser / arbitrary app) instead of
+            // calling our handler. A narrow list would therefore hand http://,
+            // tel:, intent://, market:// … to the OS behind our back. With ['*']
+            // our decideNavigation is the sole authority: it 'block's everything
+            // non-Tap (returns false → not loaded AND not opened externally).
+            originWhitelist={['*']}
             onShouldStartLoadWithRequest={onShouldStart}
             onNavigationStateChange={onNavStateChange}
             onLoadStart={() => setLoading(true)}
