@@ -201,7 +201,9 @@ export const orders = {
     return res.order;
   },
   /**
-   * RLS returns only the signed-in customer's own orders, newest first.
+   * RLS returns only the signed-in customer's own orders, newest first, capped
+   * to a recent page (`limit`) — My Orders is a recent-history view and must
+   * not re-download the customer's entire nested history on every tab focus.
    *
    * An unpaid ONLINE order is a checkout-in-progress, not a real order, and must
    * never surface in My Orders until the backend has verified payment. We hide
@@ -211,12 +213,13 @@ export const orders = {
    * tightened — payment-verify, the retry flow, and the receipt screen still
    * read the pending order by id.
    */
-  listWithItems: async () =>
+  listWithItems: async (limit = 20) =>
     ok<DbOrderWithItems[]>(await supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
       .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
-      .order('created_at', { ascending: false })),
+      .order('created_at', { ascending: false })
+      .limit(limit)),
   /** A single order with its lines (RLS still scopes it to the owner). */
   byId: async (id: string) =>
     ok<DbOrderWithItems>(await supabase

@@ -3,13 +3,14 @@
  * Pull-to-refresh; tapping an order opens its receipt.
  */
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
 import { Screen } from '../../components/Screen';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
+import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
@@ -30,23 +31,34 @@ export function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // True once any load has delivered data — the gate for stale-while-revalidate.
+  const hasData = useRef(false);
 
-  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    if (mode === 'refresh') setRefreshing(true); else setLoading(true);
-    setError(null);
+  const load = useCallback(async (mode: 'focus' | 'refresh' = 'focus') => {
+    // Stale-while-revalidate: once orders are on screen, focus refreshes run
+    // silently in the background (the list stays visible); the full-screen
+    // spinner is reserved for the very first load, and pull-to-refresh owns
+    // its own indicator.
+    if (mode === 'refresh') setRefreshing(true);
+    else if (!hasData.current) setLoading(true);
     try {
-      const rows = await orders.listWithItems();
+      const rows = await orders.listWithItems(ORDERS_PAGE_LIMIT);
       setList(rows.map(mapOrder));
+      setError(null);
+      hasData.current = true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('somethingWentWrong'));
+      // A failed background refresh never wipes the list already on screen;
+      // the error state only shows when there is nothing to show instead.
+      if (!hasData.current) setError(e instanceof Error ? e.message : t('somethingWentWrong'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [t]);
 
-  // Refetch whenever the tab regains focus (e.g. after placing an order).
-  useFocusEffect(useCallback(() => { void load('initial'); }, [load]));
+  // Refetch whenever the tab regains focus (e.g. after placing an order) —
+  // silently once data exists, so status changes appear without a blank flash.
+  useFocusEffect(useCallback(() => { void load('focus'); }, [load]));
 
   return (
     <Screen background={colors.bg}>
@@ -56,7 +68,7 @@ export function OrdersScreen() {
       {loading ? (
         <LoadingView label={t('loading')} />
       ) : error ? (
-        <ErrorView message={error} onRetry={() => load('initial')} retryLabel={t('retry')} />
+        <ErrorView message={error} onRetry={() => load('focus')} retryLabel={t('retry')} />
       ) : list.length === 0 ? (
         <EmptyView emoji="🧾" title={t('noOrders')} subtitle={t('noOrdersSub')} />
       ) : (

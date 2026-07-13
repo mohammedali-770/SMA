@@ -3,8 +3,8 @@
  * the owner) and shows the server-authoritative amounts. Payment stays pending
  * — no payment is faked (payment integration is a later, server-side track).
  */
-import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
@@ -12,6 +12,7 @@ import { Screen } from '../../components/Screen';
 import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
+import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
@@ -23,16 +24,43 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Mirror for the focus/poll callbacks (stable identities, no stale closures).
+  const orderRef = useRef<Order | null>(null);
 
   const load = () => {
     setLoading(true);
     setError(null);
     orders.byId(orderId)
-      .then((row) => setOrder(mapOrder(row)))
+      .then((row) => { const o = mapOrder(row); orderRef.current = o; setOrder(o); })
       .catch((e) => setError(e instanceof Error ? e.message : t('somethingWentWrong')))
       .finally(() => setLoading(false));
   };
   useEffect(load, [orderId]);
+
+  // Silent status refresh: re-reads the order without blanking what's on
+  // screen; a failed tick is ignored (the next tick/focus retries). Read-only —
+  // no payment or order-creation logic is involved.
+  const refreshSilently = useCallback(async () => {
+    try {
+      const row = await orders.byId(orderId);
+      const o = mapOrder(row);
+      orderRef.current = o;
+      setOrder(o);
+    } catch { /* keep the receipt currently shown */ }
+  }, [orderId]);
+
+  // While the receipt is FOCUSED: refresh once on focus, then poll lightly so
+  // the status (received → preparing → …) doesn't sit stale. Ticks no-op once
+  // the order is terminal (delivered/cancelled), and the interval is torn down
+  // on blur/unmount — Supabase is never polled from the background.
+  useFocusEffect(useCallback(() => {
+    if (orderRef.current) void refreshSilently();
+    const id = setInterval(() => {
+      const current = orderRef.current;
+      if (current && !isTerminalOrderStatus(current.status)) void refreshSilently();
+    }, RECEIPT_POLL_MS);
+    return () => clearInterval(id);
+  }, [refreshSilently]));
 
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.bg}>
