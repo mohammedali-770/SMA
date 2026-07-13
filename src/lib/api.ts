@@ -486,6 +486,12 @@ export const catalog = {
 // ---------------------------------------------------------------------------
 // Orders
 // ---------------------------------------------------------------------------
+
+/** Recent-orders window the admin live poll fetches to keep the frequent refetch
+ *  bounded. The full load (which the reports read from) is intentionally UNBOUNDED
+ *  so no delivered order is ever dropped from a report. */
+export const ORDERS_POLL_LIMIT = 500;
+
 export interface PlaceOrderInput {
   branchId: string;
   orderType: OrderType;
@@ -521,12 +527,21 @@ export const orders = {
    * Same as list(), but embeds each order's items + item modifiers in one round
    * trip (PostgREST resource embedding). RLS is applied to the embedded tables
    * too, so a customer still only sees their own orders' lines.
+   *
+   * UNBOUNDED by default so the full load (which the reports filter in memory)
+   * sees every order — a cap here would silently drop delivered orders from
+   * revenue/VAT/coupon totals. Pass `limit` ONLY for the admin live poll, which
+   * keeps its frequent refetch bounded and merges its recent window back into the
+   * full in-memory list.
    */
-  listWithItems: async () =>
-    ok<DbOrderWithItems[]>(await supabase
+  listWithItems: async (limit?: number) => {
+    let q = supabase
       .from('orders')
       .select('*, order_items(*, order_item_modifiers(*))')
-      .order('created_at', { ascending: false })),
+      .order('created_at', { ascending: false });
+    if (limit) q = q.limit(limit);
+    return ok<DbOrderWithItems[]>(await q);
+  },
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>

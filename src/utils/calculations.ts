@@ -84,6 +84,21 @@ export function riyadhDateOnly(iso: string): string {
 }
 
 /**
+ * First and last calendar day ("YYYY-MM-DD", Riyadh local) of the month that
+ * contains `now` (defaults to the current instant). Used to default report date
+ * ranges to the current month instead of a hardcoded window that never rolls
+ * over. Kept in Riyadh time so the boundaries agree with riyadhDateOnly().
+ */
+export function riyadhMonthRange(now: Date = new Date()): { start: string; end: string } {
+  const today = now.toLocaleDateString('en-CA', { timeZone: RIYADH_TZ }); // YYYY-MM-DD
+  const [year, month] = today.split('-').map(Number);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  // Day 0 of the *next* month is the last day of this month (handles 28–31).
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return { start: `${year}-${pad(month)}-01`, end: `${year}-${pad(month)}-${pad(lastDay)}` };
+}
+
+/**
  * Creates a sample CSV data URL for menu import.
  */
 export function getCSVTemplateData(): string {

@@ -137,6 +137,7 @@ export interface Order {
   orderType: 'delivery' | 'pickup';
   subtotal: number;
   deliveryFee: number;
+  couponCode?: string; // the actual coupon code applied at checkout, if any
   discountAmount?: number; // coupon discount applied at checkout
   loyaltyDiscountAmount?: number; // value of loyalty points redeemed at checkout
   loyaltyPointsEarned?: number; // points credited by place_order for this order
