@@ -37,7 +37,9 @@ interface CatalogValue {
 
   selectedBranchId: string | null;
   selectedBranch: Branch | null;
-  setSelectedBranch: (id: string) => void;
+  // Driven by OrderContextProvider (the single source of truth): pass a branch id
+  // to mirror the chosen branch, or null to clear it when the context is reset.
+  setSelectedBranch: (id: string | null) => void;
 
   getProduct: (id: string) => Product | undefined;
   groupsForProduct: (product: Product) => ModifierGroup[];
@@ -99,9 +101,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted.current = false; };
   }, [reloadTick]);
 
-  // In-memory only: the choice is kept for the current session but never
-  // persisted, so the next app launch requires selecting a branch again.
-  const setSelectedBranch = useCallback((id: string) => {
+  // Mirror of the order context's branch. The persisted source of truth lives in
+  // OrderContextProvider; this stays the accessor the menu/product/checkout
+  // screens already read (selectedBranch), so those screens are untouched.
+  const setSelectedBranch = useCallback((id: string | null) => {
     setSelectedBranchId(id);
   }, []);
 

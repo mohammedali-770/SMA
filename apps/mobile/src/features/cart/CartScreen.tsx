@@ -13,7 +13,7 @@ import { Header } from '../../components/Header';
 import { QtyStepper } from '../../components/QtyStepper';
 import { EmptyView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
-import { useCart } from '../../store';
+import { useCart, useOrderContext } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { CartItem } from '../../types/models';
@@ -22,6 +22,7 @@ export function CartScreen() {
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
   const cart = useCart();
+  const orderCtx = useOrderContext();
 
   if (cart.items.length === 0) {
     return (
@@ -64,10 +65,17 @@ export function CartScreen() {
           <Text style={styles.subtotalLabel}>{t('subtotal')}</Text>
           <Text style={styles.subtotalValue}>{formatSAR(cart.subtotal, lang)}</Text>
         </View>
-        <Pressable style={styles.checkoutBtn} onPress={() => router.push('/checkout')} accessibilityRole="button">
-          <Text style={styles.checkoutText}>{t('goToCheckout')}</Text>
-          <Text style={styles.checkoutCount}>{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text>
-        </Pressable>
+        {orderCtx.valid ? (
+          <Pressable style={styles.checkoutBtn} onPress={() => router.push('/checkout')} accessibilityRole="button">
+            <Text style={styles.checkoutText}>{t('goToCheckout')}</Text>
+            <Text style={styles.checkoutCount}>{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text>
+          </Pressable>
+        ) : (
+          // No valid order context — checkout is blocked; send back to selection.
+          <Pressable style={[styles.checkoutBtn, styles.checkoutBtnDisabled]} onPress={() => router.replace('/select')} accessibilityRole="button">
+            <Text style={styles.checkoutText}>{t('otSelectToOrder')}</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
@@ -122,6 +130,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: colors.purple, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
   },
+  checkoutBtnDisabled: { backgroundColor: colors.muted, justifyContent: 'center' },
   checkoutText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
   checkoutCount: { color: colors.white, fontWeight: '700', fontSize: font.sm, opacity: 0.9 },
 });

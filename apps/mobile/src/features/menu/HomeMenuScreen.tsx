@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerCarousel } from './BannerCarousel';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
-import { useCart, useCatalog } from '../../store';
+import { useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { Category, Product } from '../../types/models';
@@ -33,6 +33,15 @@ export function HomeMenuScreen() {
     isAvailable, branchIsOpen, groupsForProduct,
   } = useCatalog();
   const cart = useCart();
+  const orderCtx = useOrderContext();
+
+  // BLOCKING GATE: no valid order context → the menu is not usable; send the
+  // customer to the full-screen order-type selection first. Runs once the
+  // persisted context is read and the catalog has loaded (so we never redirect
+  // during load or before hydration).
+  useEffect(() => {
+    if (orderCtx.ready && !loading && !error && !orderCtx.valid) router.replace('/select');
+  }, [orderCtx.ready, orderCtx.valid, loading, error]);
 
   const [search, setSearch] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -119,23 +128,35 @@ export function HomeMenuScreen() {
         </Pressable>
       </View>
 
-      {/* Branch selector — always manual */}
-      <Pressable style={styles.branchRow} onPress={() => router.push('/branch')} accessibilityRole="button">
-        <View style={{ flex: 1 }}>
-          <Text style={styles.branchLabel}>{t('selectBranch')}</Text>
-          <Text style={styles.branchValue} numberOfLines={1}>
-            {selectedBranch ? pick(selectedBranch.nameEn, selectedBranch.nameAr) : t('tapToChooseBranch')}
-          </Text>
-        </View>
-        {selectedBranch ? (
-          <View style={[styles.badge, branchOpen ? styles.badgeOpen : styles.badgeClosed]}>
-            <Text style={[styles.badgeText, { color: branchOpen ? colors.success : colors.red }]}>
-              {branchOpen ? t('open') : t('closed')}
+      {/* Selected order-context card (above the banners + search). Tapping it
+          re-opens the same blocking Pickup/Delivery selection flow. */}
+      {orderCtx.context ? (
+        <Pressable style={styles.branchRow} onPress={() => router.push('/select')} accessibilityRole="button">
+          <View style={{ flex: 1 }}>
+            <Text style={styles.branchLabel}>
+              {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
             </Text>
+            <Text style={styles.branchValue} numberOfLines={1}>
+              {pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}
+            </Text>
+            {orderCtx.context.orderType === 'delivery' ? (
+              <Text style={styles.branchSub} numberOfLines={1}>
+                {[orderCtx.context.deliveryDescription,
+                  orderCtx.context.deliveryFee != null ? `${t('deliveryFee')} ${formatSAR(orderCtx.context.deliveryFee, lang)}` : null]
+                  .filter(Boolean).join(' · ')}
+              </Text>
+            ) : null}
           </View>
-        ) : null}
-        <Text style={styles.change}>{t('changeBranch')}</Text>
-      </Pressable>
+          {selectedBranch ? (
+            <View style={[styles.badge, branchOpen ? styles.badgeOpen : styles.badgeClosed]}>
+              <Text style={[styles.badgeText, { color: branchOpen ? colors.success : colors.red }]}>
+                {branchOpen ? t('open') : t('closed')}
+              </Text>
+            </View>
+          ) : null}
+          <Text style={styles.change}>{t('otChange')}</Text>
+        </Pressable>
+      ) : null}
 
       {/* Promotional banners — below the branch selector, above the search bar.
           Self-fetching; renders nothing when there are no active banners. */}
@@ -145,13 +166,9 @@ export function HomeMenuScreen() {
         <LoadingView label={t('loading')} />
       ) : error ? (
         <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} />
-      ) : !selectedBranchId ? (
-        <EmptyView
-          emoji="📍"
-          title={t('selectBranchFirst')}
-          actionLabel={t('selectBranchCta')}
-          onAction={() => router.push('/branch')}
-        />
+      ) : !orderCtx.valid ? (
+        // No valid context yet — the gate effect is redirecting to /select.
+        <LoadingView label={t('loading')} />
       ) : (
         <>
           {!branchOpen ? (
@@ -305,6 +322,7 @@ const styles = StyleSheet.create({
   },
   branchLabel: { fontSize: font.xs, color: colors.muted, fontWeight: '700', textTransform: 'uppercase' },
   branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
+  branchSub: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill },
