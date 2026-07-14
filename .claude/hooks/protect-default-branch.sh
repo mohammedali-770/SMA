@@ -192,15 +192,19 @@ any_branch_rules() {
   if str_matches "$C" "${GIT_PRE}[^[:space:]]*[\$]"; then
     deny "a git subcommand containing a shell variable or ANSI-C-quoted fragment cannot be vetted and is denied. ${WORKFLOW_HINT}"
   fi
-  # ref-writing subcommands with variable arguments cannot be vetted either:
-  # the expansion could name a protected ref
-  if str_matches "$C" "${GIT_PRE}(push|fetch|pull|update-ref)${WB}" && str_matches "$C" '[\$]'; then
-    deny "git push/fetch/pull/update-ref with shell-variable arguments is denied; use literal ref names. ${WORKFLOW_HINT}"
+  # ref-writing subcommands whose arguments contain shell-EXPANSION
+  # metacharacters cannot be vetted: variable ($x), brace ({a,b} expands to
+  # HEAD:main among others), glob (*?[), tilde (~) or command substitution
+  # (backtick) could all name a protected ref after the shell rewrites the
+  # word. Require literal ref names for these subcommands.
+  EXPANDY='[$`{}*?~[]'
+  if str_matches "$C" "${GIT_PRE}(push|fetch|pull|update-ref)${WB}" && str_matches "$C" "$EXPANDY"; then
+    deny "git push/fetch/pull/update-ref with shell-expansion metacharacters in its arguments is denied; use literal ref names (no \$, {}, *, ?, ~, backtick). ${WORKFLOW_HINT}"
   fi
   if str_matches "$C" "${GIT_PRE}(branch|checkout|switch)${WB}" \
     && str_matches "$C" '(^|[[:space:]])(-[bBcCdDfmMu]|--delete|--force|--move|--copy|--set-upstream-to|--track)' \
-    && str_matches "$C" '[\$]'; then
-    deny "git branch/checkout/switch mutation flags combined with shell-variable arguments are denied; use literal branch names. ${WORKFLOW_HINT}"
+    && str_matches "$C" "$EXPANDY"; then
+    deny "git branch/checkout/switch mutation flags combined with shell-expansion metacharacters are denied; use literal branch names. ${WORKFLOW_HINT}"
   fi
   return 0
 }
@@ -322,7 +326,10 @@ fi
 # 7g. fail-closed read-only allowlist, checked per pipeline/command segment.
 #     sed/awk/tree are deliberately absent (write/exec-capable); sort, uniq
 #     and rg get dedicated argument screens in check_segment below.
-SAFE_SIMPLE='ls cat head tail wc grep egrep fgrep diff cmp file stat du df pwd printf echo true false jq cut tr comm column nl md5sum sha1sum sha256sum shasum cksum basename dirname readlink realpath which command type date whoami id uname hostname printenv shellcheck find'
+# NOTE: `command`/`builtin` are NOT here — they are wrappers that could run
+# a write-capable command (command sort -o FILE), so they get a dedicated
+# recursive screen in check_segment below.
+SAFE_SIMPLE='ls cat head tail wc grep egrep fgrep diff cmp file stat du df pwd printf echo true false jq cut tr comm column nl md5sum sha1sum sha256sum shasum cksum basename dirname readlink realpath which type date whoami id uname hostname printenv shellcheck find'
 
 check_git_branch_args() {
   local prev='' a
@@ -431,6 +438,22 @@ check_segment() {
   case "$first" in
     git)
       check_git_segment "$@"
+      return 0 ;;
+    command|builtin)
+      # `command NAME …` / `builtin NAME …` run the wrapped command, so the
+      # wrapped command must itself pass the screen. The read-only lookup
+      # forms `command -v/-V NAME` are allowed; `-p` is skipped.
+      while [ $# -ge 1 ]; do
+        case "$1" in
+          -p) shift ;;
+          -v|-V) return 0 ;;
+          --) shift; break ;;
+          -*) deny "protected branch: this ${first} option is not allowed. ${WORKFLOW_HINT}" ;;
+          *) break ;;
+        esac
+      done
+      [ $# -ge 1 ] || return 0
+      check_segment "$*"
       return 0 ;;
     sort)
       for a in "$@"; do
