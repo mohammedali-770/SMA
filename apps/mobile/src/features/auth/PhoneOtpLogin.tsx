@@ -11,12 +11,14 @@
  * function, and never fakes a session — Supabase Auth is the login authority.
  */
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { useI18n } from '../../i18n/I18nProvider';
 import { toE164 } from '../../lib/phone';
+import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
+import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
 
@@ -31,21 +33,7 @@ export function PhoneOtpLogin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(0);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => () => { if (timer.current) clearInterval(timer.current); }, []);
-
-  const startCooldown = (seconds: number) => {
-    setCooldown(seconds);
-    if (timer.current) clearInterval(timer.current);
-    timer.current = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1 && timer.current) { clearInterval(timer.current); timer.current = null; return 0; }
-        return c - 1;
-      });
-    }, 1000);
-  };
+  const { cooldown, startCooldown, resetCooldown } = useOtpCooldown();
 
   const sendCode = async () => {
     setError(null); setNotice(null);
@@ -57,7 +45,7 @@ export function PhoneOtpLogin() {
       setE164(normalized);
       setPhase('code');
       setNotice(t('weSentLoginCode'));
-      startCooldown(60);
+      startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
     } catch (err) {
       // Surface a safe message; Supabase returns an error when the hook can't
       // deliver (e.g. WhatsApp login disabled) or when rate-limited.
@@ -88,8 +76,7 @@ export function PhoneOtpLogin() {
 
   const changeNumber = () => {
     setPhase('phone'); setCode(''); setError(null); setNotice(null);
-    if (timer.current) { clearInterval(timer.current); timer.current = null; }
-    setCooldown(0);
+    resetCooldown();
   };
 
   return (
@@ -119,7 +106,7 @@ export function PhoneOtpLogin() {
             <Text style={styles.fieldLabel}>{t('enterLoginCode')}</Text>
             <TextInput
               value={code}
-              onChangeText={(v) => setCode(v.replace(/\D/g, '').slice(0, 8))}
+              onChangeText={(v) => setCode(sanitizeOtpDigits(v, 8))}
               keyboardType="number-pad"
               placeholder={t('enterLoginCode')}
               placeholderTextColor={colors.muted}
