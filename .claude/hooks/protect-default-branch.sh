@@ -135,32 +135,81 @@ GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(g
 # ---------------------------------------------------------------------------
 # 4. ANY-BRANCH rules: protected refs may never be pushed/updated/deleted/
 #    force-moved, no matter which branch is checked out.
+#
+#    The rules run twice: once against the raw command and once against a
+#    quote/backslash-stripped rendering, so shell quoting cannot hide the
+#    real subcommand or refspec from the regexes (the shell removes those
+#    characters before git ever sees the words).
 # ---------------------------------------------------------------------------
+
+str_matches()  { printf '%s' "$1" | grep -Eq  "$2"; }
+str_matchesi() { printf '%s' "$1" | grep -Eqi "$2"; }
+
+GIT_PUSH_SEEN=0
+
+any_branch_rules() {
+  local C="$1"
+  if str_matches "$C" "${GIT_PRE}push${WB}"; then
+    GIT_PUSH_SEEN=1
+    str_matches "$C" "$PROT_WORD" \
+      && deny "git push referencing a protected branch (claude/project-build-ie4b56 or main) is denied from every branch. ${WORKFLOW_HINT}"
+    str_matches "$C" '(^|[[:space:]])--(mirror|all)([^[:alnum:]-]|$)' \
+      && deny "git push --all/--mirror would update protected remote refs and is denied. ${WORKFLOW_HINT}"
+  fi
+  if str_matches "$C" "${GIT_PRE}update-ref${WB}" && str_matches "$C" "$PROT_WORD"; then
+    deny "git update-ref targeting a protected ref is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  if str_matches "$C" "${GIT_PRE}(push|fetch|pull)${WB}" \
+    && str_matches "$C" ":(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
+    deny "a refspec targeting a protected branch (…:claude/project-build-ie4b56 or …:main) is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  if str_matches "$C" "${GIT_PRE}branch${WB}" \
+    && str_matches "$C" '(^|[[:space:]])(-[dDmMfcCu]+|--delete|--force|--move|--copy|--set-upstream-to[^[:space:]]*|--track[^[:space:]]*)([^[:alnum:]-]|$)' \
+    && str_matches "$C" "$PROT_WORD"; then
+    deny "git branch delete/move/force/upstream changes targeting a protected branch are denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  if str_matches "$C" "${GIT_PRE}(checkout|switch)${WB}" \
+    && str_matches "$C" "(^|[[:space:]])-[BC][[:space:]]+(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
+    deny "git checkout -B / git switch -C onto a protected branch name is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  # alias definitions can smuggle a push under another name (git -c
+  # alias.p=push p ..., git config alias.x '...', GIT_CONFIG_KEY_0=alias.p);
+  # config keys are case-insensitive, so match case-insensitively
+  if str_matches "$C" "$GIT_WORD" && str_matchesi "$C" '(^|[^[:alnum:]_])alias\.'; then
+    deny "defining or using git aliases (alias.* configuration in any form) is denied because it can disguise protected-ref operations. ${WORKFLOW_HINT}"
+  fi
+  # so can configuration that redirects where a push lands
+  if str_matches "$C" "$GIT_WORD" \
+    && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.push|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
+    deny "git configuration that redirects push destinations (push.default, remote.*.push, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
+  fi
+  # a variable or ANSI-C-quoted word in subcommand position cannot be vetted
+  if str_matches "$C" '(^|[^[:alnum:]._-])git[[:space:]]+\$'; then
+    deny "a git subcommand supplied via a shell variable or ANSI-C quoting cannot be vetted and is denied. ${WORKFLOW_HINT}"
+  fi
+  return 0
+}
 
 if [ "$TOOL_NAME" = "Bash" ]; then
   [ -n "$TOOL_COMMAND" ] || deny "change-control guard: Bash call with no command string; failing closed."
 
-  if cmd_matches "${GIT_PRE}push${WB}"; then
-    cmd_matches "$PROT_WORD" \
-      && deny "git push referencing a protected branch (claude/project-build-ie4b56 or main) is denied from every branch. ${WORKFLOW_HINT}"
-    cmd_matches '(^|[[:space:]])--(mirror|all)([^[:alnum:]-]|$)' \
-      && deny "git push --all/--mirror would update protected remote refs and is denied. ${WORKFLOW_HINT}"
-  fi
-  if cmd_matches "${GIT_PRE}update-ref${WB}" && cmd_matches "$PROT_WORD"; then
-    deny "git update-ref targeting a protected ref is denied from every branch. ${WORKFLOW_HINT}"
-  fi
-  if cmd_matches "${GIT_PRE}(push|fetch|pull)${WB}" \
-    && cmd_matches ":(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
-    deny "a refspec targeting a protected branch (…:claude/project-build-ie4b56 or …:main) is denied from every branch. ${WORKFLOW_HINT}"
-  fi
-  if cmd_matches "${GIT_PRE}branch${WB}" \
-    && cmd_matches '(^|[[:space:]])(-[dDmMfcC]+|--delete|--force|--move|--copy)([^[:alnum:]-]|$)' \
-    && cmd_matches "$PROT_WORD"; then
-    deny "git branch delete/move/force targeting a protected branch is denied from every branch. ${WORKFLOW_HINT}"
-  fi
-  if cmd_matches "${GIT_PRE}(checkout|switch)${WB}" \
-    && cmd_matches "(^|[[:space:]])-[BC][[:space:]]+(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
-    deny "git checkout -B / git switch -C onto a protected branch name is denied from every branch. ${WORKFLOW_HINT}"
+  any_branch_rules "$TOOL_COMMAND"
+  NORMALIZED="$(printf '%s' "$TOOL_COMMAND" | tr -d "\\\\\"'")"
+  [ "$NORMALIZED" != "$TOOL_COMMAND" ] && any_branch_rules "$NORMALIZED"
+
+  # even without an explicit protected ref in the command, a bare git push
+  # can land on a protected branch through upstream/push.default config —
+  # resolve the current branch's actual push destination and deny if it is
+  # protected
+  if [ "$GIT_PUSH_SEEN" -eq 1 ]; then
+    PUSH_DEST="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref '@{push}' 2>/dev/null || true)"
+    if [ -n "$PUSH_DEST" ]; then
+      case "$PUSH_DEST" in
+        */*) PUSH_DEST="${PUSH_DEST#*/}" ;;
+      esac
+      is_protected "$PUSH_DEST" \
+        && deny "the current branch's configured push destination resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+    fi
   fi
 fi
 
