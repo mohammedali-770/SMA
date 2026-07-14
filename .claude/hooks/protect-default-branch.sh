@@ -113,7 +113,16 @@ is_protected "$CURRENT_BRANCH" && ON_PROTECTED=1
 # 3. Regex building blocks
 # ---------------------------------------------------------------------------
 
-cmd_matches() { printf '%s' "$TOOL_COMMAND" | grep -Eq "$1"; }
+# Match against the raw command AND, when it differs, a quote/backslash-
+# stripped rendering — the shell removes those characters before the real
+# command runs, so a denied option/name must not be hideable by quoting it
+# (e.g. find . "-delete", git log "--output=leak"). DQ_COMMAND is set in the
+# protected-branch section before any cmd_matches call there.
+cmd_matches() {
+  printf '%s' "$TOOL_COMMAND" | grep -Eq "$1" && return 0
+  [ -n "${DQ_COMMAND:-}" ] && [ "${DQ_COMMAND:-}" != "$TOOL_COMMAND" ] \
+    && printf '%s' "$DQ_COMMAND" | grep -Eq "$1"
+}
 
 PROT_ALT='(claude/project-build-ie4b56|main)'
 PROT_LEAD='(^|[^[:alnum:]_.-])'      # "/" IS a boundary => origin/main matches
@@ -164,6 +173,13 @@ any_branch_rules() {
   if str_matches "$C" "${GIT_PRE}(push|fetch|pull)${WB}" \
     && str_matches "$C" ":(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
     deny "a refspec targeting a protected branch (…:claude/project-build-ie4b56 or …:main) is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  # --stdin feeds refspecs (fetch/push) or ref-update commands (update-ref)
+  # from standard input — often a preceding pipeline segment the per-segment
+  # scan cannot see — so the destination ref cannot be vetted. Deny it.
+  if str_matches "$C" "${GIT_PRE}(push|fetch|pull|update-ref)${WB}" \
+    && str_matches "$C" '(^|[[:space:]])--stdin([=[:space:]]|$)'; then
+    deny "git push/fetch/pull/update-ref with --stdin reads refspecs or ref-update commands from standard input that cannot be vetted; denied from every branch. Use explicit literal refspecs. ${WORKFLOW_HINT}"
   fi
   if str_matches "$C" "${GIT_PRE}branch${WB}" \
     && str_matches "$C" '(^|[[:space:]])(-[dDmMfcCu]+|--delete|--force|--move|--copy|--set-upstream-to[^[:space:]]*|--track[^[:space:]]*)([^[:alnum:]-]|$)' \
@@ -284,7 +300,16 @@ fi
 # 7. On a protected branch: Bash is restricted to read-only inspection.
 #    Specific high-signal denials first (clear reasons), then a fail-closed
 #    read-only allowlist applied to every pipeline/command segment.
+#
+#    DQ_COMMAND is the command with quote/backslash characters removed — the
+#    shell strips those before executing, so option/command-name screens must
+#    see through them (find . "-delete", git log "--output=leak"). It feeds
+#    cmd_matches (above) and the per-segment allowlist below. Redirection (7b)
+#    and command-substitution (7a) are NOT dequoted: quoting a > or $( turns
+#    it into a harmless literal, so the raw form is the correct thing to test.
 # ---------------------------------------------------------------------------
+
+DQ_COMMAND="$(printf '%s' "$TOOL_COMMAND" | tr -d "\\\\\"'")"
 
 # 7a. command/process substitution cannot be safely vetted => deny
 case "$TOOL_COMMAND" in
@@ -493,11 +518,21 @@ check_segment() {
 
 # split on pipes, semicolons, ampersands and newlines; every segment must be
 # read-only. Quoted operators split too — that only over-denies (fail closed).
-SEGS="$(printf '%s' "$STRIPPED" | tr '|;&' '\n')"
-while IFS= read -r SEG; do
-  check_segment "$SEG"
-done <<EOF
+# Scan both the raw (redirection-stripped) command and a dequoted rendering of
+# it, so a denied option cannot be smuggled past a per-command arg screen by
+# quoting it (sort "-o" FILE, git log "--output=FILE").
+scan_readonly_segments() {
+  local SEGS SEG
+  SEGS="$(printf '%s' "$1" | tr '|;&' '\n')"
+  while IFS= read -r SEG; do
+    check_segment "$SEG"
+  done <<EOF
 $SEGS
 EOF
+}
+
+DQ_STRIPPED="$(printf '%s' "$STRIPPED" | tr -d "\\\\\"'")"
+scan_readonly_segments "$STRIPPED"
+[ "$DQ_STRIPPED" != "$STRIPPED" ] && scan_readonly_segments "$DQ_STRIPPED"
 
 allow
