@@ -35,8 +35,7 @@
       │  │  order-intake            │◀─────┘  admin live  │
       │  │  payment-webhook  ───────┼──▶ confirm_order_payment
       │  │  lazywait-sync    ───────┼──▶ record_order_sync
-      │  │  lazywait-create-order   │                     │
-      │  │  send-otp / push-dispatch│                     │
+      │  │  push-dispatch           │                     │
       │  └──────────┬───────────────┘                     │
       └─────────────┼───────────────────────────────────┘
                     │ server-side only (secrets never leave here)
@@ -151,10 +150,14 @@ Composite/partial indexes added for the hot paths (`20260707121200_perf_indexes`
 
 ```bash
 # DB migrations (CLI, against a linked project)
+# NOTE: do NOT run `supabase db push` against the live project until the
+# migration-history reconciliation task is completed — the live
+# schema_migrations history was recorded with different version stamps than
+# the repo files, so `db push` would try to re-apply migrations.
 supabase db push
 # Edge Functions
 supabase functions deploy order-intake payment-webhook lazywait-sync \
-  lazywait-create-order send-otp push-dispatch
+  push-dispatch
 # Advisors
 #   (MCP) get_advisors type=security ; get_advisors type=performance
 # Frontend build
