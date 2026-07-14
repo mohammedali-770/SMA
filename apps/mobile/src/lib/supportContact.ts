@@ -49,11 +49,18 @@ export function telLink(raw: string | null | undefined): string | null {
   return `tel:${plus ? '+' : ''}${digits}`;
 }
 
-/** WhatsApp deep link built from DIGITS ONLY: https://wa.me/9665XXXXXXXX. */
+/**
+ * WhatsApp deep link built from DIGITS ONLY: https://wa.me/9665XXXXXXXX.
+ * wa.me requires the FULL international number, so only values entered in
+ * international format ("+9665…" or "009665…") are accepted — a local number
+ * like "0551234567" would silently become a wrong wa.me target after zero
+ * stripping, so it is rejected (channel hidden + admin sees the warning).
+ */
 export function whatsappLink(raw: string | null | undefined): string | null {
   if (!raw || isPlaceholderValue(raw)) return null;
-  // wa.me requires the international number without + or leading zeros.
-  const digits = raw.replace(/\D/g, '').replace(/^0+/, '');
+  const v = raw.trim();
+  if (!v.startsWith('+') && !v.startsWith('00')) return null;
+  const digits = v.replace(/\D/g, '').replace(/^0+/, '');
   if (digits.length < 7 || digits.length > 15) return null;
   return `https://wa.me/${digits}`;
 }

@@ -40,6 +40,10 @@ describe('link construction (only tel:/mailto:/https://wa.me allowed)', () => {
     expect(whatsappLink('+966 55 123 4567')).toBe('https://wa.me/966551234567');
     expect(whatsappLink('00966551234567')).toBe('https://wa.me/966551234567');
   });
+  it('wa.me REJECTS local-format numbers (review finding: wrong target after zero-strip)', () => {
+    expect(whatsappLink('0551234567')).toBeNull();   // local KSA format → hidden, not wa.me/551234567
+    expect(whatsappLink('551234567')).toBeNull();    // no international prefix → hidden
+  });
   it('mailto validates the address', () => {
     expect(mailtoLink('support@spicymeal.sa')).toBe('mailto:support@spicymeal.sa');
     expect(mailtoLink('not-an-email')).toBeNull();
