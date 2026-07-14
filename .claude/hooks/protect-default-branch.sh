@@ -136,10 +136,12 @@ GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(g
 # 4. ANY-BRANCH rules: protected refs may never be pushed/updated/deleted/
 #    force-moved, no matter which branch is checked out.
 #
-#    The rules run twice: once against the raw command and once against a
-#    quote/backslash-stripped rendering, so shell quoting cannot hide the
-#    real subcommand or refspec from the regexes (the shell removes those
-#    characters before git ever sees the words).
+#    The rules run per pipeline/command segment (so unrelated segments of a
+#    compound command cannot cause false denials), and each variant runs
+#    twice: once against the raw text and once against a quote/backslash-
+#    stripped rendering, so shell quoting cannot hide the real subcommand
+#    or refspec from the regexes. Configured git aliases are enumerated at
+#    runtime and their invocation is denied outright.
 # ---------------------------------------------------------------------------
 
 str_matches()  { printf '%s' "$1" | grep -Eq  "$2"; }
@@ -190,12 +192,45 @@ any_branch_rules() {
   return 0
 }
 
+# run the rules on each pipeline/command segment separately so a safe
+# operation in one segment is not denied because ANOTHER segment mentions a
+# protected name (example: git push origin feature && gh pr create --base
+# main must stay allowed — the push segment itself is clean)
+scan_variant_segments() {
+  local V="$1" SEG SEGS
+  SEGS="$(printf '%s' "$V" | tr '|;&' '\n')"
+  while IFS= read -r SEG; do
+    [ -n "$SEG" ] && any_branch_rules "$SEG"
+  done <<EOSEG
+$SEGS
+EOSEG
+}
+
 if [ "$TOOL_NAME" = "Bash" ]; then
   [ -n "$TOOL_COMMAND" ] || deny "change-control guard: Bash call with no command string; failing closed."
 
-  any_branch_rules "$TOOL_COMMAND"
   NORMALIZED="$(printf '%s' "$TOOL_COMMAND" | tr -d "\\\\\"'")"
-  [ "$NORMALIZED" != "$TOOL_COMMAND" ] && any_branch_rules "$NORMALIZED"
+  scan_variant_segments "$TOOL_COMMAND"
+  [ "$NORMALIZED" != "$TOOL_COMMAND" ] && scan_variant_segments "$NORMALIZED"
+
+  # invoking an ALREADY-CONFIGURED git alias can hide any operation behind an
+  # arbitrary name (git p behaves as git push when the p alias is configured),
+  # so any invocation of a configured alias is denied from every branch.
+  # Names shadowing real builtins are skipped (git ignores such aliases);
+  # a name the guard cannot safely match fails closed.
+  GIT_ALIASES="$(git -C "$PROJECT_DIR" config --get-regexp '^alias\.' 2>/dev/null | sed -E 's/^alias\.([^[:space:]]+).*/\1/' || true)"
+  for AL in $GIT_ALIASES; do
+    printf '%s' "$AL" | grep -Eq '^[A-Za-z0-9-]+$' \
+      || deny "a git alias with an unvettable name is configured; failing closed. ${WORKFLOW_HINT}"
+    case "$AL" in
+      status|log|show|diff|push|pull|commit|add|fetch|branch|checkout|switch|tag|config|remote|grep|blame|stash|merge|rebase|reset|revert|rm|mv|clean|describe|shortlog|worktree|init|clone)
+        continue ;;
+    esac
+    if str_matches "$TOOL_COMMAND" "${GIT_PRE}${AL}${WB}" \
+      || str_matches "$NORMALIZED" "${GIT_PRE}${AL}${WB}"; then
+      deny "invoking a configured git alias is denied from every branch because aliases cannot be vetted by the change-control guard. ${WORKFLOW_HINT}"
+    fi
+  done
 
   # even without an explicit protected ref in the command, a bare git push
   # can land on a protected branch through upstream/push.default config —
