@@ -48,9 +48,12 @@ const CHUNK = 100;
 const MAX_SEND_ATTEMPTS = 5;
 // A 'processing' claim is a LEASE, not a permanent lock: if the function
 // crashed/timed out mid-send, the row would otherwise stay 'processing'
-// forever and the notification would never retry. Edge Functions are
-// wall-clock bounded far below this, so an older claim is provably dead.
-const PROCESSING_LEASE_MS = 3 * 60_000;
+// forever and the notification would never retry. The lease MUST exceed the
+// platform's maximum invocation wall-clock (Supabase Edge Functions: 400s) —
+// a shorter lease could "reclaim" a claim whose owner is still alive waiting
+// on Expo I/O and double-send (review finding). 10 min > 400s, so an expired
+// lease is provably a dead owner.
+const PROCESSING_LEASE_MS = 10 * 60_000;
 
 type OrderStatus = 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -208,6 +211,10 @@ Deno.serve(async (req: Request) => {
     //                        send_status='failed') for a controlled retry —
     //                        only TOTAL failures are retryable, so no device
     //                        can ever receive the same status twice.
+    // The attempt number this invocation claims is a FENCING TOKEN: every
+    // completion write below is guarded by it, so even if a zombie owner
+    // outlives its lease its late write matches zero rows (review finding).
+    let myAttempt = 1; // fresh insert → attempt_count default 1
     const { error: claimError } = await admin.from('notification_log')
       .insert({ kind: 'order_status', order_id: orderId, status, send_status: 'processing' });
     if (claimError) {
@@ -232,10 +239,12 @@ Deno.serve(async (req: Request) => {
         const { data: released } = await admin.from('notification_log')
           .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1, last_error_safe: 'stale processing lease reclaimed' })
           .eq('id', existing.id).eq('send_status', 'processing')
+          .eq('attempt_count', existing.attempt_count ?? 1)
           .lt('updated_at', new Date(Date.now() - PROCESSING_LEASE_MS).toISOString())
           .select('id')
           .maybeSingle();
         if (!released) return json({ status: 'in_progress', reason: 'stale lease already reclaimed elsewhere' }, 200);
+        myAttempt = (existing.attempt_count ?? 1) + 1;
       } else {
         // failed → BOUNDED reclaim: exhausted failures are terminal (review
         // finding — reclaiming must not retry forever against a dead provider).
@@ -247,10 +256,12 @@ Deno.serve(async (req: Request) => {
         const { data: reclaimed } = await admin.from('notification_log')
           .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1 })
           .eq('id', existing.id).eq('send_status', 'failed')
+          .eq('attempt_count', existing.attempt_count ?? 1)
           .lt('attempt_count', MAX_SEND_ATTEMPTS)
           .select('id')
           .maybeSingle();
         if (!reclaimed) return json({ status: 'in_progress', reason: 'retry already claimed elsewhere' }, 200);
+        myAttempt = (existing.attempt_count ?? 1) + 1;
       }
     }
 
@@ -267,7 +278,7 @@ Deno.serve(async (req: Request) => {
       await admin.from('notification_log')
         .update({ send_status: 'failed', last_error_safe: 'device lookup failed (transient)' })
         .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
-        .eq('send_status', 'processing');
+        .eq('send_status', 'processing').eq('attempt_count', myAttempt);
       return json({ status: 'error', send_status: 'failed', reason: 'device lookup failed (transient)' }, 500);
     }
 
@@ -275,7 +286,8 @@ Deno.serve(async (req: Request) => {
     if (targets.length === 0) {
       await admin.from('notification_log')
         .update({ send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 })
-        .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status);
+        .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
+        .eq('send_status', 'processing').eq('attempt_count', myAttempt);
       return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
     }
 
@@ -290,7 +302,8 @@ Deno.serve(async (req: Request) => {
       : null;
     await admin.from('notification_log')
       .update({ send_status: sendStatus, last_error_safe: lastError, ...result })
-      .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status);
+      .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
+      .eq('send_status', 'processing').eq('attempt_count', myAttempt);
     return json({ status: 'ok', send_status: sendStatus, ...result }, 200);
   }
 

@@ -122,4 +122,27 @@ describe('order-status send lifecycle (claim / retry semantics)', () => {
     registry = complete(registry, KEY, { targeted: 2, sent: 2, failed: 0 });
     expect(releaseFailedLookup(registry, KEY)[0].sendStatus).toBe('sent'); // no-op on terminal rows
   });
+
+  it('completion is FENCED by the claimed attempt — a zombie owner cannot clobber its successor (review finding)', () => {
+    const t0 = 1_000_000;
+    // A claims (attempt 1) and stalls past its lease:
+    let registry = (claim([], KEY, t0) as { registry: SendRecord[] }).registry;
+    // B reclaims the expired lease (attempt 2):
+    const later = t0 + PROCESSING_LEASE_MS + 1;
+    registry = (claim(registry, KEY, later) as { registry: SendRecord[] }).registry;
+    expect(registry[0].attemptCount).toBe(2);
+    // Zombie A wakes up mid-B and tries to record ITS result with its own
+    // fencing token (attempt 1) → fenced out, B's live claim untouched:
+    registry = complete(registry, KEY, { targeted: 1, sent: 0, failed: 1 }, later + 1, 1);
+    expect(registry[0].sendStatus).toBe('processing');
+    expect(registry[0].attemptCount).toBe(2);
+    // B completes with its token (attempt 2) → result recorded:
+    registry = complete(registry, KEY, { targeted: 1, sent: 1, failed: 0 }, later + 2, 2);
+    expect(registry[0].sendStatus).toBe('sent');
+    // A's even-later write (and a zombie releaseFailedLookup) both no-op:
+    registry = complete(registry, KEY, { targeted: 1, sent: 0, failed: 1 }, later + 3, 1);
+    registry = releaseFailedLookup(registry, KEY, 1);
+    expect(registry[0].sendStatus).toBe('sent');
+    expect(registry[0].sent).toBe(1);
+  });
 });
