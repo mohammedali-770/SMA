@@ -160,6 +160,12 @@ GIT_PUSH_SEEN=0
 
 any_branch_rules() {
   local C="$1"
+  # low-level push plumbing (send-pack, http-push) exists only to update
+  # remote refs and can target a protected branch (git send-pack ../r.git
+  # HEAD:refs/heads/main); deny outright from every branch.
+  if str_matches "$C" "${GIT_PRE}(send-pack|http-push)${WB}"; then
+    deny "git send-pack / http-push are low-level commands that push objects and can update protected remote refs; denied from every branch. ${WORKFLOW_HINT}"
+  fi
   if str_matches "$C" "${GIT_PRE}push${WB}"; then
     GIT_PUSH_SEEN=1
     str_matches "$C" "$PROT_WORD" \
@@ -186,9 +192,17 @@ any_branch_rules() {
     && str_matches "$C" "$PROT_WORD"; then
     deny "git branch delete/move/force/upstream changes targeting a protected branch are denied from every branch. ${WORKFLOW_HINT}"
   fi
+  # cuddled short-option form: git branch -Dmain / -Mmain glues the protected
+  # name to the option letter, so PROT_WORD's word boundary would miss it
+  if str_matches "$C" "${GIT_PRE}branch${WB}" \
+    && str_matches "$C" "(^|[[:space:]])-[dDmMfcCu]*[dDmM][[:space:]]*(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
+    deny "git branch delete/move targeting a protected branch (including the cuddled -Dmain form) is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  # -B/-C accept a cuddled name (git checkout -Bmain, git switch -Cmain), so
+  # allow zero-or-more spaces between the option and the protected name
   if str_matches "$C" "${GIT_PRE}(checkout|switch)${WB}" \
-    && str_matches "$C" "(^|[[:space:]])-[BC][[:space:]]+(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
-    deny "git checkout -B / git switch -C onto a protected branch name is denied from every branch. ${WORKFLOW_HINT}"
+    && str_matches "$C" "(^|[[:space:]])-[BC][[:space:]]*(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
+    deny "git checkout -B / git switch -C onto a protected branch name (including the cuddled -Bmain form) is denied from every branch. ${WORKFLOW_HINT}"
   fi
   # alias definitions can smuggle a push under another name (git -c
   # alias.p=push p ..., git config alias.x '...', GIT_CONFIG_KEY_0=alias.p);
