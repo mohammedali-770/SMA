@@ -159,7 +159,7 @@ production.
 | 35 | 20260712170000 | checkout_sessions_hardening | `9f1d8844c9a7` | 20260713044036 | checkout_sessions_hardening | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 36 | 20260714070000 | support_contact | `f02603422918` | 20260714070000 | support_contact | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned to the repository filename by an approved single-row history write |
 | 37 | 20260714090000 | push_notifications | `d686d8f6e428` | 20260714090000 | push_notifications | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned as above |
-| 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; service_role grant remained; function bodies and trigger definitions unchanged |
+| 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; the pre-existing explicit `service_role=X` ACL entry remained — it originates from Supabase's platform **default function privileges** applied at creation (CONFIRMED in `pg_default_acl`: postgres-owned functions default-grant EXECUTE to anon/authenticated/service_role), NOT from any live-only grant, so it is not production drift and reproduces identically in any environment built from these repository migrations; function bodies and trigger definitions unchanged |
 
 Reconciliation check: 38 repository rows (3×A + 30×B + 3×C + 2×H) and
 39 live rows (3×A + 30×B + 3×C + 3×F) — totals match §4 exactly.
@@ -177,7 +177,7 @@ any safer — the permanent production prohibition stands. Risks:
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (36 junk records even on success);
+- **duplicate or misleading history rows** (35 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly.
@@ -267,11 +267,18 @@ any safer — the permanent production prohibition stands. Risks:
 - **Effect (verified):** PUBLIC/anon/authenticated EXECUTE removed from
   `public.handle_auth_user_phone_confirmed()`,
   `public.set_lazywait_initial_sync()` and
-  `public.stamp_payment_record_ts()`; service_role EXECUTE retained;
-  function bodies, owners, SECURITY DEFINER/INVOKER state, `search_path`
-  and all three trigger definitions unchanged; Security Advisor
-  trigger-function findings cleared; business tables and push state
-  untouched.
+  `public.stamp_payment_record_ts()`; the explicit `service_role` EXECUTE
+  entry remained. **Provenance of that entry (CONFIRMED, not drift):**
+  Supabase's platform default function privileges (`pg_default_acl`) grant
+  EXECUTE on every postgres-owned function to anon/authenticated/
+  service_role at creation time — the hardening migration revoked the
+  first two plus PUBLIC, and the platform-default service_role entry
+  remains. No repository or live-only `GRANT` statement is involved, and
+  any environment created from these repository migrations on a Supabase
+  project reproduces the identical end-state. Function bodies, owners,
+  SECURITY DEFINER/INVOKER state, `search_path` and all three trigger
+  definitions unchanged; Security Advisor trigger-function findings
+  cleared; business tables and push state untouched.
 
 ## 11. New environment guidance
 
