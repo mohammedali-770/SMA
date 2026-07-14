@@ -383,23 +383,30 @@ export const whatsappOtp = {
 export const pushDevices = {
   /** All of MY device rows (RLS-scoped). */
   mine: async () => ok<DbPushDevice[]>(await supabase.from('push_devices').select('*')),
-  /** Register or refresh THIS device by its Expo token (RLS insert/update-own). */
-  async upsert(input: {
-    customerId: string; token: string; platform: 'android' | 'ios'; lang: 'en' | 'ar';
+  /**
+   * Register or refresh THIS device. SECURITY DEFINER RPC: upserts by token
+   * and reassigns the row to the calling user when the device changed hands
+   * (a shared phone must never keep receiving the previous account's pushes).
+   */
+  async register(input: {
+    token: string; platform: 'android' | 'ios'; lang: 'en' | 'ar';
     orderUpdatesEnabled: boolean; promosEnabled: boolean;
   }): Promise<DbPushDevice> {
-    return ok<DbPushDevice>(await supabase.from('push_devices').upsert({
-      customer_id: input.customerId,
-      expo_push_token: input.token,
-      platform: input.platform,
-      lang: input.lang,
-      is_active: true,
-      order_updates_enabled: input.orderUpdatesEnabled,
-      promos_enabled: input.promosEnabled,
-    }, { onConflict: 'expo_push_token' }).select('*').single());
+    return ok<DbPushDevice>(await supabase.rpc('register_push_device', {
+      p_token: input.token,
+      p_platform: input.platform,
+      p_lang: input.lang,
+      p_order_updates: input.orderUpdatesEnabled,
+      p_promos: input.promosEnabled,
+    }));
   },
   /** Update preferences / active state for one of MY devices. */
   async update(id: string, patch: { order_updates_enabled?: boolean; promos_enabled?: boolean; is_active?: boolean; lang?: 'en' | 'ar' }): Promise<DbPushDevice> {
     return ok<DbPushDevice>(await supabase.from('push_devices').update(patch).eq('id', id).select('*').single());
+  },
+  /** Deactivate THIS device's token (sign-out path; works across owners). */
+  async deactivateToken(token: string): Promise<void> {
+    const { error } = await supabase.rpc('deactivate_push_device', { p_token: token });
+    if (error) throw new Error(error.message);
   },
 };

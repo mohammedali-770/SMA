@@ -69,7 +69,7 @@ export function NotificationSettings() {
         });
         setDevice(updated);
       } else if (deviceShouldStayActive(next)) {
-        const created = await registerThisDevice(userId, lang, next);
+        const created = await registerThisDevice(lang, next);
         if (!created) { setPrefs(prev); setSupported(false); return; }
         setDevice(created);
       }

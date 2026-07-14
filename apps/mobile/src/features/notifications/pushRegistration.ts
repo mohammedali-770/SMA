@@ -59,23 +59,37 @@ export async function findThisDevice(): Promise<DbPushDevice | null> {
 
 /**
  * Register (or refresh) this device with the given preferences. Requires the
- * OS permission to already be granted and a signed-in customer.
+ * OS permission to already be granted and a signed-in customer. The RPC
+ * reassigns the token's row when the device changed accounts, so a shared
+ * phone never keeps the previous owner's targeting.
  */
 export async function registerThisDevice(
-  customerId: string,
   lang: 'en' | 'ar',
   prefs: DevicePrefs = DEFAULT_DEVICE_PREFS,
 ): Promise<DbPushDevice | null> {
   const token = await getExpoPushToken();
   if (!token) return null;
-  return pushDevices.upsert({
-    customerId,
+  return pushDevices.register({
     token,
     platform: Platform.OS === 'ios' ? 'ios' : 'android',
     lang,
     orderUpdatesEnabled: prefs.orderUpdatesEnabled,
     promosEnabled: prefs.promosEnabled,
   });
+}
+
+/**
+ * Silence THIS device (sign-out path). Deactivates by token regardless of
+ * which account owns the row — pushes must stop when the account leaves the
+ * phone. Best-effort: failures are swallowed (sign-out must never block).
+ */
+export async function deactivateThisDevice(): Promise<void> {
+  try {
+    if (!Device.isDevice) return;
+    const token = await getExpoPushToken();
+    if (!token) return;
+    await pushDevices.deactivateToken(token);
+  } catch { /* best-effort */ }
 }
 
 /** Android needs an explicit channel for heads-up notifications. */

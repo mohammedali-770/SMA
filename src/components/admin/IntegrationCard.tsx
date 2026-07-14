@@ -47,10 +47,13 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
   },
   push: {
     title: 'Push Notifications',
-    subtitle: 'Mobile push provider — stored only, not activated yet',
-    providerOptions: ['onesignal', 'expo', 'sandbox'],
-    publicFields: [{ key: 'app_id', label: 'App ID', type: 'text', placeholder: 'app-id…' }],
-    secretFields: [{ key: 'api_key', label: 'API Key' }],
+    subtitle: 'Expo Push sender (push-dispatch). Enable ONLY after EAS push credentials are configured — see supabase/functions/README.md',
+    // Expo is the implemented sender; other options removed until a sender
+    // for them exists (a stale 'sandbox' row is normalized to expo by the
+    // 20260714090000 migration).
+    providerOptions: ['expo'],
+    publicFields: [],
+    secretFields: [],
   },
   lazywait: {
     title: 'Lazywait POS',

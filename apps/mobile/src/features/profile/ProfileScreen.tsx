@@ -10,6 +10,7 @@ import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { NotificationSettings } from '../notifications/NotificationSettings';
+import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { VerifyPhoneWhatsApp } from './VerifyPhoneWhatsApp';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
@@ -20,6 +21,10 @@ export function ProfileScreen() {
   const { profile, signOut } = useAuth();
 
   const onSignOut = async () => {
+    // Silence this device BEFORE the JWT disappears — on a shared phone the
+    // next account must not receive this account's pushes. Best-effort and
+    // fast; sign-out proceeds regardless.
+    await deactivateThisDevice();
     await signOut();
     router.replace('/(auth)/login');
   };
