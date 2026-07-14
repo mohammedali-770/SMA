@@ -57,8 +57,13 @@ describe('link construction (only tel:/mailto:/https://wa.me allowed)', () => {
     expect(whatsappLink('00551234567')).toBeNull();      // 00 + Brazil-style digits — NOT 966551234567
     expect(whatsappLink('+00551234567')).toBeNull();     // +00 garbage
     expect(whatsappLink('+551234567')).toBeNull();       // +55… is Brazil, not a local Saudi mobile
+    expect(whatsappLink('0044551234567')).toBeNull();    // 0044… is the UK, hidden — never rewritten
     expect(whatsappLink('0000966551234567')).toBeNull(); // malformed prefix soup
     expect(normalizeSaudiMobile('966551234567')).toBe('966551234567'); // bare intl digits stay OK
+  });
+  it('safe separators (spaces / parentheses / hyphens) are tolerated in accepted formats', () => {
+    expect(whatsappLink('(055) 123-4567')).toBe('https://wa.me/966551234567');
+    expect(whatsappLink('+966 (55) 123-45-67')).toBe('https://wa.me/966551234567');
   });
   it('mailto validates the address', () => {
     expect(mailtoLink('support@spicymeal.sa')).toBe('mailto:support@spicymeal.sa');
