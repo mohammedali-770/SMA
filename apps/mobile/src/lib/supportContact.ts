@@ -62,11 +62,22 @@ export function normalizeSaudiMobile(raw: string | null | undefined): string | n
   const compact = raw.trim().replace(/[\s()-]/g, '');
   // Digits with at most one leading '+' — kills text, URLs, and schemes.
   if (!/^\+?\d+$/.test(compact)) return null;
-  let digits = compact.startsWith('+') ? compact.slice(1) : compact;
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  if (/^05\d{8}$/.test(digits)) digits = `966${digits.slice(1)}`; // 05XXXXXXXX
-  else if (/^5\d{8}$/.test(digits)) digits = `966${digits}`;      // 5XXXXXXXX
-  // Saudi MOBILE only (9665 + 8 digits) — landlines and other countries hide.
+
+  const hasPlus = compact.startsWith('+');
+  let digits = hasPlus ? compact.slice(1) : compact;
+  const hasIntlPrefix = hasPlus || digits.startsWith('00');
+  if (!hasPlus && digits.startsWith('00')) digits = digits.slice(2);
+
+  if (hasIntlPrefix) {
+    // Explicitly international input must ALREADY be the full Saudi mobile
+    // number — never rewrite it (review finding: 00551234567 / +551234567
+    // must hide, not morph into a fabricated 9665… number).
+    return /^9665\d{8}$/.test(digits) ? digits : null;
+  }
+  // Local rewriting applies ONLY to prefix-free input.
+  if (/^05\d{8}$/.test(digits)) return `966${digits.slice(1)}`; // 05XXXXXXXX
+  if (/^5\d{8}$/.test(digits)) return `966${digits}`;           // 5XXXXXXXX
+  // Bare international digits (9665XXXXXXXX) are unambiguous — accept.
   return /^9665\d{8}$/.test(digits) ? digits : null;
 }
 
