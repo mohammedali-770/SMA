@@ -15,11 +15,16 @@
 - Repository-only pending (merged, **not applied** to production):
   `20260714130000_trigger_function_execute_hardening.sql`
 - Latest live version: **`20260714090000`** (`push_notifications`)
-- The current production schema is considered **functionally aligned** with
-  the repository, based on catalog/object-state verification (tables, columns,
-  functions and exact signatures, SECURITY DEFINER/INVOKER state, pinned
-  `search_path`, grants, RLS policies, triggers, indexes, storage bucket and
-  policies, realtime publication membership).
+- The current production schema is considered **functionally aligned with the
+  repository through `20260714090000`** (i.e. every repository migration
+  EXCEPT the pending `20260714130000` grant hardening), based on
+  catalog/object-state verification (tables, columns, functions and exact
+  signatures, SECURITY DEFINER/INVOKER state, pinned `search_path`, grants,
+  RLS policies, triggers, indexes, storage bucket and policies, realtime
+  publication membership). **One deliberate production drift remains**: the
+  three trigger-only functions targeted by `20260714130000` still carry
+  client EXECUTE grants live until that migration's separately approved
+  application (§10).
 - **Historical version identifiers and several migration boundaries differ**
   between the repository and production. This is a *history* divergence, not a
   *schema* divergence. The full mapping is in §5.
