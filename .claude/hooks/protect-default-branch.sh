@@ -185,9 +185,22 @@ any_branch_rules() {
     && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.push|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
     deny "git configuration that redirects push destinations (push.default, remote.*.push, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
   fi
-  # a variable or ANSI-C-quoted word in subcommand position cannot be vetted
-  if str_matches "$C" '(^|[^[:alnum:]._-])git[[:space:]]+\$'; then
-    deny "a git subcommand supplied via a shell variable or ANSI-C quoting cannot be vetted and is denied. ${WORKFLOW_HINT}"
+  # a variable or ANSI-C-quoted fragment ANYWHERE in the subcommand word
+  # cannot be vetted: the shell concatenates the fragments before git runs
+  # (git dollar-X, git pu-dollar-quoted-sh, ...). The bracket class matches
+  # a dollar or a leftover backslash — both are obfuscation in this spot.
+  if str_matches "$C" "${GIT_PRE}[^[:space:]]*[\$]"; then
+    deny "a git subcommand containing a shell variable or ANSI-C-quoted fragment cannot be vetted and is denied. ${WORKFLOW_HINT}"
+  fi
+  # ref-writing subcommands with variable arguments cannot be vetted either:
+  # the expansion could name a protected ref
+  if str_matches "$C" "${GIT_PRE}(push|fetch|pull|update-ref)${WB}" && str_matches "$C" '[\$]'; then
+    deny "git push/fetch/pull/update-ref with shell-variable arguments is denied; use literal ref names. ${WORKFLOW_HINT}"
+  fi
+  if str_matches "$C" "${GIT_PRE}(branch|checkout|switch)${WB}" \
+    && str_matches "$C" '(^|[[:space:]])(-[bBcCdDfmMu]|--delete|--force|--move|--copy|--set-upstream-to|--track)' \
+    && str_matches "$C" '[\$]'; then
+    deny "git branch/checkout/switch mutation flags combined with shell-variable arguments are denied; use literal branch names. ${WORKFLOW_HINT}"
   fi
   return 0
 }
