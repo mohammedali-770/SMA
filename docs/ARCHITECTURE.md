@@ -149,11 +149,14 @@ Composite/partial indexes added for the hot paths (`20260707121200_perf_indexes`
 ## 9. Deploy & test commands
 
 ```bash
-# DB migrations (CLI, against a linked project)
-# NOTE: do NOT run `supabase db push` against the live project until the
-# migration-history reconciliation task is completed — the live
-# schema_migrations history was recorded with different version stamps than
-# the repo files, so `db push` would try to re-apply migrations.
+# DB migrations
+# PRODUCTION: `supabase db push` is PERMANENTLY FORBIDDEN for the live
+# project — the reconciliation outcome (see docs/MIGRATIONS.md, the
+# authoritative history ledger) is that live schema_migrations uses
+# different version stamps AND different migration boundaries than the repo
+# files, so `db push` would replay history. Production changes go ONLY
+# through the owner-approved apply_migration workflow in docs/MIGRATIONS.md.
+# NEW/EMPTY environments only (e.g. a fresh staging database):
 supabase db push
 # Edge Functions
 supabase functions deploy order-intake payment-webhook lazywait-sync \
