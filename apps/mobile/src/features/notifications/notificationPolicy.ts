@@ -65,3 +65,39 @@ export function toggleRequiresPermission(before: DevicePrefs, after: DevicePrefs
   const nowOn = after.orderUpdatesEnabled || after.promosEnabled;
   return wasOff && nowOn;
 }
+
+export type RegistrationStep =
+  | 'ensure_android_channel'  // Android channel MUST exist before permission/token (iOS no-op)
+  | 'request_permission'
+  | 'get_token'
+  | 'register_device';
+
+/**
+ * The MANDATORY enable-flow order. Android requires its notification channel
+ * to exist before the permission prompt / token fetch so the first
+ * notification can present heads-up correctly; iOS treats the channel step as
+ * a no-op. The UI executes exactly this sequence (NotificationSettings).
+ */
+export function enableFlowPlan(): readonly RegistrationStep[] {
+  return ['ensure_android_channel', 'request_permission', 'get_token', 'register_device'];
+}
+
+/** Stable identity of a notification RESPONSE (tap), for exactly-once handling. */
+export function notificationResponseKey(response: unknown): string {
+  const r = response as { notification?: { request?: { identifier?: unknown } }; actionIdentifier?: unknown } | null;
+  const id = r?.notification?.request?.identifier;
+  const action = r?.actionIdentifier;
+  return `${typeof id === 'string' ? id : 'unknown'}|${typeof action === 'string' ? action : 'default'}`;
+}
+
+/**
+ * Exactly-once guard: the same response may reach us TWICE (cold-start
+ * getLastNotificationResponseAsync + the live listener). The first caller
+ * wins and marks the key handled; duplicates are ignored — never a double
+ * navigation.
+ */
+export function shouldHandleResponse(handled: Set<string>, key: string): boolean {
+  if (handled.has(key)) return false;
+  handled.add(key);
+  return true;
+}

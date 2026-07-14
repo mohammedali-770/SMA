@@ -191,10 +191,38 @@ Deno.serve(async (req: Request) => {
     if (!order) return json({ error: 'order not found' }, 404);
     if (order.status !== status) return json({ status: 'skipped', reason: 'status mismatch' }, 200);
 
-    // IDEMPOTENCY FIRST: unique(order_id,status) — a duplicate call stops here.
-    const { error: logError } = await admin.from('notification_log')
-      .insert({ kind: 'order_status', order_id: orderId, status });
-    if (logError) return json({ status: 'duplicate', reason: 'already sent for this status' }, 200);
+    // CLAIM FIRST (unique(order_id,status) + send_status lifecycle):
+    //  - fresh transition → INSERT 'processing' wins the claim;
+    //  - conflict → inspect the existing row:
+    //      sent/no_targets → terminal, idempotent no-op;
+    //      processing      → another call is in flight, back off (no double send);
+    //      failed          → atomically reclaim (…SET 'processing' WHERE
+    //                        send_status='failed') for a controlled retry —
+    //                        only TOTAL failures are retryable, so no device
+    //                        can ever receive the same status twice.
+    const { error: claimError } = await admin.from('notification_log')
+      .insert({ kind: 'order_status', order_id: orderId, status, send_status: 'processing' });
+    if (claimError) {
+      const { data: existing } = await admin.from('notification_log')
+        .select('id, send_status, attempt_count')
+        .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
+        .maybeSingle();
+      if (!existing) return json({ status: 'retry', reason: 'claim race, call again' }, 200);
+      if (existing.send_status === 'sent' || existing.send_status === 'no_targets') {
+        return json({ status: 'duplicate', reason: `already ${existing.send_status}` }, 200);
+      }
+      if (existing.send_status === 'processing') {
+        return json({ status: 'in_progress', reason: 'another dispatch call owns this send' }, 200);
+      }
+      // failed → reclaim atomically (the send_status guard makes exactly one
+      // racer win; the loser matches zero rows and backs off).
+      const { data: reclaimed } = await admin.from('notification_log')
+        .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1 })
+        .eq('id', existing.id).eq('send_status', 'failed')
+        .select('id')
+        .maybeSingle();
+      if (!reclaimed) return json({ status: 'in_progress', reason: 'retry already claimed elsewhere' }, 200);
+    }
 
     const { data: devices } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
@@ -202,11 +230,27 @@ Deno.serve(async (req: Request) => {
       .eq('is_active', true)
       .eq('order_updates_enabled', true);
 
-    const result = await sendToDevices(admin, (devices ?? []) as DeviceRow[], STATUS_COPY[status],
-      { type: 'order', orderId });
-    await admin.from('notification_log').update(result)
-      .eq('order_id', orderId).eq('status', status).eq('kind', 'order_status');
-    return json({ status: 'ok', ...result }, 200);
+    const targets = (devices ?? []) as DeviceRow[];
+    if (targets.length === 0) {
+      await admin.from('notification_log')
+        .update({ send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 })
+        .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status);
+      return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
+    }
+
+    const result = await sendToDevices(admin, targets, STATUS_COPY[status], { type: 'order', orderId });
+    // Outcome: any successful delivery → terminal 'sent' (partial failures
+    // recorded but NOT retryable — already-delivered devices stay protected);
+    // zero deliveries → 'failed' (safe to retry: nobody received anything).
+    const sendStatus = result.sent > 0 ? 'sent' : 'failed';
+    const lastError =
+      sendStatus === 'failed' ? 'total send failure (transient?)'
+      : result.failed > 0 ? `partial: ${result.failed}/${result.targeted} failed (not retryable)`
+      : null;
+    await admin.from('notification_log')
+      .update({ send_status: sendStatus, last_error_safe: lastError, ...result })
+      .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status);
+    return json({ status: 'ok', send_status: sendStatus, ...result }, 200);
   }
 
   // ------------------------------------------------------------------------ test

@@ -56,9 +56,11 @@ export function NotificationSettings() {
     setPrefs(next); // optimistic; reverted on failure
     try {
       if (toggleRequiresPermission(prev, next)) {
+        // Order per enableFlowPlan(): the Android channel must exist BEFORE
+        // the permission prompt / token fetch (iOS: channel step is a no-op).
+        await ensureAndroidChannel();
         const granted = await ensureNotificationPermission();
         if (!granted) { setPrefs(prev); setDenied(true); return; }
-        await ensureAndroidChannel();
       }
       if (device) {
         const updated = await pushDevices.update(device.id, {

@@ -61,18 +61,38 @@ create policy push_devices_admin_select on public.push_devices
 -- --------------------------------------------------------------------------
 
 create table if not exists public.notification_log (
-  id          uuid primary key default gen_random_uuid(),
-  kind        text not null check (kind in ('order_status', 'test', 'broadcast')),
-  order_id    uuid references public.orders(id) on delete cascade,
-  status      text,
-  targeted    integer not null default 0,
-  sent        integer not null default 0,
-  failed      integer not null default 0,
-  deactivated integer not null default 0,
-  created_at  timestamptz not null default now()
+  id              uuid primary key default gen_random_uuid(),
+  kind            text not null check (kind in ('order_status', 'test', 'broadcast')),
+  order_id        uuid references public.orders(id) on delete cascade,
+  status          text,
+  -- Send lifecycle (order_status rows): processing → sent | failed | no_targets.
+  --   processing → another call is in flight; concurrent callers back off.
+  --   sent / no_targets → terminal, idempotent (never re-sent).
+  --   failed (TOTAL transient failure, zero devices reached) → may be
+  --     atomically reclaimed for a controlled retry.
+  -- PARTIAL sends (some devices ok, some failed) are recorded as 'sent' with
+  -- counts + last_error_safe — deliberately NOT retryable, so devices that
+  -- already received the push can never get it twice.
+  send_status     text not null default 'processing'
+                    check (send_status in ('processing', 'sent', 'failed', 'no_targets')),
+  attempt_count   integer not null default 1,
+  last_error_safe text,
+  targeted        integer not null default 0,
+  sent            integer not null default 0,
+  failed          integer not null default 0,
+  deactivated     integer not null default 0,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
--- Idempotency: at most ONE send per (order, status).
+drop trigger if exists set_notification_log_updated_at on public.notification_log;
+create trigger set_notification_log_updated_at
+  before update on public.notification_log
+  for each row execute function public.set_updated_at();
+
+-- Idempotency/claim key: at most ONE row per (order, status); the row's
+-- send_status is the lifecycle lock (insert-first claim, atomic reclaim of
+-- 'failed' rows only).
 create unique index if not exists notification_log_order_status_uq
   on public.notification_log (order_id, status)
   where kind = 'order_status';
@@ -175,36 +195,56 @@ grant execute on function public.deactivate_push_device(text) to authenticated;
 -- (20260707121000_integration_settings.sql), but the shipped sender supports
 -- Expo — align the seed so enabling the card is sufficient (review P2). The
 -- master flag (enabled) is intentionally NOT touched here.
-update public.integration_settings
-   set provider_name = 'expo'
- where provider_type = 'push'
-   and provider_name = 'sandbox';
-
--- Migration self-assertion (review P2): the push row must now be provider
--- 'expo' AND still disabled, and no other integration row may have changed
--- provider as a side effect. Fails the migration loudly instead of leaving a
--- half-normalized state.
+-- Normalize + self-assert in ONE atomic block (scoped, row-count-based —
+-- never judges unrelated rows by their values, so pre-existing data can't
+-- fail it):
+--   * only the (push, sandbox) row is updated (WHERE clause + row count ≤ 1);
+--   * enabled is untouched (asserted before/after);
+--   * if the row WAS sandbox it must now be expo;
+--   * a push row an admin already pointed elsewhere is left alone;
+--   * unrelated rows are untouched by construction (scoped UPDATE) and
+--     asserted via the total-row fingerprint.
 do $$
 declare
-  v_push record;
-  v_other_sandbox_push int;
+  v_before record;
+  v_after record;
+  v_updated integer;
+  v_rows_before integer;
+  v_rows_after integer;
 begin
-  select provider_name, enabled into v_push
+  select count(*) into v_rows_before from public.integration_settings;
+  select provider_name, enabled into v_before
     from public.integration_settings where provider_type = 'push';
-  if v_push is null then
-    raise notice 'no push integration row seeded — nothing to assert';
+
+  if v_before is null then
+    raise notice 'no push integration row seeded — nothing to normalize';
     return;
   end if;
-  if v_push.provider_name is distinct from 'expo' then
-    raise exception 'push integration row not normalized to expo (got %)', v_push.provider_name;
+
+  update public.integration_settings
+     set provider_name = 'expo'
+   where provider_type = 'push'
+     and provider_name = 'sandbox';
+  get diagnostics v_updated = row_count;
+
+  if v_updated > 1 then
+    raise exception 'expected at most one (push, sandbox) row, updated %', v_updated;
   end if;
-  if v_push.enabled then
-    raise exception 'push integration must remain DISABLED after this migration';
+
+  select provider_name, enabled into v_after
+    from public.integration_settings where provider_type = 'push';
+  select count(*) into v_rows_after from public.integration_settings;
+
+  if v_rows_after is distinct from v_rows_before then
+    raise exception 'integration_settings row count changed (% -> %)', v_rows_before, v_rows_after;
   end if;
-  select count(*) into v_other_sandbox_push
-    from public.integration_settings
-   where provider_type <> 'push' and provider_name = 'expo';
-  if v_other_sandbox_push > 0 then
-    raise exception 'unrelated integration rows must not be touched by this migration';
+  if v_after.enabled is distinct from v_before.enabled then
+    raise exception 'push integration enabled flag must be unchanged';
+  end if;
+  if v_before.provider_name = 'sandbox' and v_after.provider_name is distinct from 'expo' then
+    raise exception 'sandbox push row was not normalized to expo (got %)', v_after.provider_name;
+  end if;
+  if v_before.provider_name <> 'sandbox' and v_after.provider_name is distinct from v_before.provider_name then
+    raise exception 'non-sandbox push row must not be modified (was %, now %)', v_before.provider_name, v_after.provider_name;
   end if;
 end $$;

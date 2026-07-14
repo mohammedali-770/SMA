@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_DEVICE_PREFS, deviceShouldStayActive, NOTIFICATION_FALLBACK_ROUTE,
-  resolveNotificationRoute, toggleRequiresPermission,
+  DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan, NOTIFICATION_FALLBACK_ROUTE,
+  notificationResponseKey, resolveNotificationRoute, shouldHandleResponse, toggleRequiresPermission,
 } from './notificationPolicy';
 
 const OID = 'a1b2c3d4-0000-4000-8000-000000000001';
@@ -24,6 +24,38 @@ describe('resolveNotificationRoute (allow-listed internal routes ONLY)', () => {
     expect(resolveNotificationRoute({ type: 'external', route: '/checkout' })).toBe(NOTIFICATION_FALLBACK_ROUTE);
     expect(resolveNotificationRoute('https://evil.example')).toBe(NOTIFICATION_FALLBACK_ROUTE);
     expect(resolveNotificationRoute(null)).toBe(NOTIFICATION_FALLBACK_ROUTE);
+  });
+});
+
+describe('enableFlowPlan (Android channel MUST precede permission/token)', () => {
+  it('orders the steps: channel → permission → token → register', () => {
+    const plan = enableFlowPlan();
+    expect(plan.indexOf('ensure_android_channel')).toBeLessThan(plan.indexOf('request_permission'));
+    expect(plan.indexOf('request_permission')).toBeLessThan(plan.indexOf('get_token'));
+    expect(plan.indexOf('get_token')).toBeLessThan(plan.indexOf('register_device'));
+    expect(plan).toEqual(['ensure_android_channel', 'request_permission', 'get_token', 'register_device']);
+  });
+});
+
+describe('exactly-once tap handling (cold start + listener see the SAME response)', () => {
+  const response = { notification: { request: { identifier: 'notif-1', content: { data: { type: 'order', orderId: OID } } } }, actionIdentifier: 'default' };
+  it('a response is handled exactly once', () => {
+    const handled = new Set<string>();
+    const key = notificationResponseKey(response);
+    expect(shouldHandleResponse(handled, key)).toBe(true);
+    expect(shouldHandleResponse(handled, key)).toBe(false); // duplicate ignored
+  });
+  it('distinct responses are handled independently', () => {
+    const handled = new Set<string>();
+    expect(shouldHandleResponse(handled, notificationResponseKey(response))).toBe(true);
+    const other = { ...response, notification: { request: { identifier: 'notif-2' } } };
+    expect(shouldHandleResponse(handled, notificationResponseKey(other))).toBe(true);
+  });
+  it('malformed responses still produce a stable key (no crash, safe fallback route)', () => {
+    expect(notificationResponseKey(null)).toBe('unknown|default');
+    expect(notificationResponseKey({})).toBe('unknown|default');
+    // and their payloads resolve to the safe route, never an arbitrary target
+    expect(resolveNotificationRoute(undefined)).toBe(NOTIFICATION_FALLBACK_ROUTE);
   });
 });
 
