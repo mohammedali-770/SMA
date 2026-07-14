@@ -11,10 +11,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { catalog } from '../services/api';
 import {
   buildAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory, mapDeliveryZone, mapLoyaltySettings,
-  mapModifierGroup, mapPaymentMethodSettings, mapProduct,
+  mapModifierGroup, mapPaymentMethodSettings, mapProduct, mapSupportSettings,
 } from '../lib/mappers';
 import type { Branch, BrandSettings, Category, DeliveryZone, LoyaltySettings, ModifierGroup, Product } from '../types/models';
 import type { PaymentMethodSettings } from '../lib/payment';
+import type { SupportSettings } from '../lib/supportContact';
 
 // Safe fallback matching the DB defaults (cash on, online off) so the customer
 // is never blocked before settings finish loading.
@@ -34,6 +35,7 @@ interface CatalogValue {
   brand: BrandSettings | null;
   loyalty: LoyaltySettings | null;
   payment: PaymentMethodSettings;
+  support: SupportSettings | null;
   deliveryZones: DeliveryZone[];
 
   selectedBranchId: string | null;
@@ -60,6 +62,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [brand, setBrand] = useState<BrandSettings | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltySettings | null>(null);
   const [payment, setPayment] = useState<PaymentMethodSettings>(DEFAULT_PAYMENT_SETTINGS);
+  const [support, setSupport] = useState<SupportSettings | null>(null);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
   const [availability, setAvailability] = useState<{ [p: string]: { [b: string]: boolean } }>({});
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -94,6 +97,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setBrand(mapBrandSettings(raw.settings));
         setLoyalty(mapLoyaltySettings(raw.settings));
         setPayment(mapPaymentMethodSettings(raw.settings));
+        setSupport(mapSupportSettings(raw.settings));
         setDeliveryZones((raw.deliveryZones ?? []).map(mapDeliveryZone));
       } catch (e) {
         if (mounted.current) setError(e instanceof Error ? e.message : 'Failed to load the menu.');
@@ -136,11 +140,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<CatalogValue>(() => ({
     loading, error, reload,
-    branches, categories, products, modifierGroupsById, brand, loyalty, payment, deliveryZones,
+    branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch,
     getProduct, groupsForProduct, isAvailable, branchIsOpen,
   }), [
-    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty, payment, deliveryZones,
+    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable, branchIsOpen,
   ]);
 

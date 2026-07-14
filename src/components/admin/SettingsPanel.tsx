@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, MapPin, ShieldCheck, Sliders, Wallet } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, LifeBuoy, MapPin, ShieldCheck, Sliders, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
+import { admin, catalog } from '../../lib/api';
+import { isPlaceholderValue, mailtoLink, telLink, whatsappLink } from '../../lib/supportContact';
 
 export const SettingsPanel: React.FC = () => {
   const {
@@ -14,7 +16,7 @@ export const SettingsPanel: React.FC = () => {
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
-  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'payments' | 'maps' | 'loyalty'>('brand');
+  const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'payments' | 'maps' | 'loyalty' | 'support'>('brand');
   const [pointAdjustments, setPointAdjustments] = useState<{ [profileId: string]: string }>({});
 
   // ---- Payment-method availability (admin-editable, accountant read-only) ----
@@ -141,6 +143,18 @@ export const SettingsPanel: React.FC = () => {
                   >
                     <Gift className="w-3.5 h-3.5" />
                     <span>{isRTL ? 'برنامج النقاط والولاء' : 'Loyalty Program'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSettingsSubTab('support')}
+                    className={`py-2 px-3.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 border ${
+                      settingsSubTab === 'support'
+                        ? 'bg-primary/10 text-primary border-primary/20 shadow-xs'
+                        : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'
+                    }`}
+                  >
+                    <LifeBuoy className="w-3.5 h-3.5" />
+                    <span>{isRTL ? 'التواصل والدعم' : 'Support & Contact'}</span>
                   </button>
                 </div>
 
@@ -773,7 +787,202 @@ export const SettingsPanel: React.FC = () => {
                     </div>
                   )}
 
+                  {/* SUB-TAB 5: SUPPORT & CONTACT */}
+                  {settingsSubTab === 'support' && (
+                    <SupportContactSection isRTL={isRTL} readOnly={isAccountant} />
+                  )}
+
                 </div>
               </div>
             );
+};
+
+/**
+ * Contact & Support settings — admin-configurable channels shown in the mobile
+ * app's Legal & Support screen. Self-contained: reads/writes the app_settings
+ * singleton directly (RLS: public SELECT, admin-only UPDATE — customers can
+ * never write). Values that would be hidden in the app (invalid or template/
+ * placeholder text) get an inline warning so the admin sees exactly what the
+ * customer will see.
+ */
+const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = ({ isRTL, readOnly }) => {
+  const empty = {
+    support_phone: '', support_whatsapp: '', support_email: '',
+    support_hours_en: '', support_hours_ar: '', support_desc_en: '', support_desc_ar: '',
+    support_phone_enabled: false, support_whatsapp_enabled: false, support_email_enabled: false,
+  };
+  const [form, setForm] = useState(empty);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const s = await catalog.settings();
+        if (!active) return;
+        setForm({
+          support_phone: s.support_phone ?? '', support_whatsapp: s.support_whatsapp ?? '',
+          support_email: s.support_email ?? '',
+          support_hours_en: s.support_hours_en ?? '', support_hours_ar: s.support_hours_ar ?? '',
+          support_desc_en: s.support_desc_en ?? '', support_desc_ar: s.support_desc_ar ?? '',
+          support_phone_enabled: s.support_phone_enabled ?? false,
+          support_whatsapp_enabled: s.support_whatsapp_enabled ?? false,
+          support_email_enabled: s.support_email_enabled ?? false,
+        });
+      } catch (e) {
+        if (active) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const set = (k: keyof typeof empty, v: string | boolean) => {
+    setSaved(false);
+    setForm((f) => ({ ...f, [k]: v }));
+  };
+
+  // What the CUSTOMER will actually get (same pure rules as the mobile app).
+  const phoneOk = telLink(form.support_phone) !== null;
+  const whatsOk = whatsappLink(form.support_whatsapp) !== null;
+  const emailOk = mailtoLink(form.support_email) !== null;
+
+  const warn = (enabled: boolean, value: string, ok: boolean): string | null => {
+    if (!enabled) return isRTL ? 'القناة غير مفعّلة — لن تظهر للعملاء.' : 'Channel disabled — hidden from customers.';
+    if (!value.trim()) return isRTL ? 'لا توجد قيمة — القناة ستبقى مخفية.' : 'No value — the channel stays hidden.';
+    if (isPlaceholderValue(value)) return isRTL ? 'قيمة مؤقتة (Placeholder) — لن تُعرض للعملاء أبداً.' : 'Placeholder value — will never be shown to customers.';
+    if (!ok) return isRTL ? 'قيمة غير صالحة — القناة ستبقى مخفية.' : 'Invalid value — the channel stays hidden.';
+    return null;
+  };
+
+  const save = () => {
+    setSaving(true); setError(null); setSaved(false);
+    void (async () => {
+      try {
+        await admin.updateSettings({
+          support_phone: form.support_phone.trim() || null,
+          support_whatsapp: form.support_whatsapp.trim() || null,
+          support_email: form.support_email.trim() || null,
+          support_hours_en: form.support_hours_en.trim() || null,
+          support_hours_ar: form.support_hours_ar.trim() || null,
+          support_desc_en: form.support_desc_en.trim() || null,
+          support_desc_ar: form.support_desc_ar.trim() || null,
+          support_phone_enabled: form.support_phone_enabled,
+          support_whatsapp_enabled: form.support_whatsapp_enabled,
+          support_email_enabled: form.support_email_enabled,
+        });
+        setSaved(true);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setSaving(false);
+      }
+    })();
+  };
+
+  if (loading) return <p className="text-[10px] font-bold text-slate-400">{isRTL ? 'جارٍ التحميل…' : 'Loading…'}</p>;
+
+  const channelRows: {
+    key: 'phone' | 'whatsapp' | 'email';
+    label: string; placeholder: string; value: string; enabled: boolean; ok: boolean;
+    valueKey: 'support_phone' | 'support_whatsapp' | 'support_email';
+    enabledKey: 'support_phone_enabled' | 'support_whatsapp_enabled' | 'support_email_enabled';
+  }[] = [
+    { key: 'phone', label: isRTL ? 'هاتف الدعم' : 'Support phone', placeholder: '+9665XXXXXXXX'.replace('XXXXXXXX', '51234567'), value: form.support_phone, enabled: form.support_phone_enabled, ok: phoneOk, valueKey: 'support_phone', enabledKey: 'support_phone_enabled' },
+    { key: 'whatsapp', label: isRTL ? 'واتساب الدعم' : 'WhatsApp number', placeholder: '+966512345678', value: form.support_whatsapp, enabled: form.support_whatsapp_enabled, ok: whatsOk, valueKey: 'support_whatsapp', enabledKey: 'support_whatsapp_enabled' },
+    { key: 'email', label: isRTL ? 'بريد الدعم' : 'Support email', placeholder: 'support@spicymeal.sa', value: form.support_email, enabled: form.support_email_enabled, ok: emailOk, valueKey: 'support_email', enabledKey: 'support_email_enabled' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
+        <div>
+          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'التواصل والدعم' : 'Support & Contact'}</span>
+          <span className="text-[9.5px] text-slate-400 font-bold">
+            {isRTL ? 'القنوات الظاهرة في تطبيق العملاء (المستندات والدعم). تُخفى أي قناة غير مفعّلة أو غير صالحة.' : 'Channels shown in the customer app (Legal & Support). Disabled or invalid channels are hidden automatically.'}
+          </span>
+        </div>
+        <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
+          <ShieldCheck className="w-3 h-3" /> {isRTL ? 'تعديل للمشرف فقط' : 'Admin-only writes'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {channelRows.map((row) => {
+          const w = warn(row.enabled, row.value, row.ok);
+          return (
+            <div key={row.key} className="p-3 bg-white border border-slate-100 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-black text-slate-500 uppercase">{row.label}</span>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={row.enabled}
+                    disabled={readOnly}
+                    onChange={(e) => set(row.enabledKey, e.target.checked)}
+                  />
+                  <span className="text-[9px] font-bold text-slate-500">{isRTL ? 'مفعّلة' : 'Enabled'}</span>
+                </label>
+              </div>
+              <input
+                type="text"
+                dir="ltr"
+                value={row.value}
+                disabled={readOnly}
+                placeholder={row.placeholder}
+                onChange={(e) => set(row.valueKey, e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold"
+              />
+              {w ? <p className="text-[9px] font-bold text-amber-600 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {w}</p>
+                 : <p className="text-[9px] font-bold text-green-600 flex items-center gap-1"><Check className="w-3 h-3" /> {isRTL ? 'ستظهر للعملاء' : 'Visible to customers'}</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
+          <span className="text-[9px] font-black text-slate-500 uppercase">{isRTL ? 'ساعات العمل (إنجليزي)' : 'Working hours (English)'}</span>
+          <input type="text" value={form.support_hours_en} disabled={readOnly} placeholder="Daily 11:00–23:00"
+            onChange={(e) => set('support_hours_en', e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
+        </div>
+        <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
+          <span className="text-[9px] font-black text-slate-500 uppercase">{isRTL ? 'ساعات العمل (عربي)' : 'Working hours (Arabic)'}</span>
+          <input type="text" dir="rtl" value={form.support_hours_ar} disabled={readOnly} placeholder="يومياً ١١:٠٠–٢٣:٠٠"
+            onChange={(e) => set('support_hours_ar', e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
+        </div>
+        <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
+          <span className="text-[9px] font-black text-slate-500 uppercase">{isRTL ? 'وصف الدعم (إنجليزي، اختياري)' : 'Support description (English, optional)'}</span>
+          <input type="text" value={form.support_desc_en} disabled={readOnly} placeholder="We reply within minutes."
+            onChange={(e) => set('support_desc_en', e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
+        </div>
+        <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
+          <span className="text-[9px] font-black text-slate-500 uppercase">{isRTL ? 'وصف الدعم (عربي، اختياري)' : 'Support description (Arabic, optional)'}</span>
+          <input type="text" dir="rtl" value={form.support_desc_ar} disabled={readOnly} placeholder="نرد خلال دقائق."
+            onChange={(e) => set('support_desc_ar', e.target.value)}
+            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={readOnly || saving}
+          className="bg-primary text-white text-xs font-black px-4 py-2 rounded-xl disabled:opacity-50"
+        >
+          {saving ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'حفظ' : 'Save')}
+        </button>
+        {saved ? <span className="text-[10px] font-black text-green-600 flex items-center gap-1"><Check className="w-3.5 h-3.5" /> {isRTL ? 'تم الحفظ' : 'Saved'}</span> : null}
+        {error ? <span className="text-[10px] font-black text-red-600 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> {error}</span> : null}
+        {readOnly ? <span className="text-[9px] font-bold text-slate-400">{isRTL ? 'عرض فقط (محاسب)' : 'View-only (accountant)'}</span> : null}
+      </div>
+    </div>
+  );
 };

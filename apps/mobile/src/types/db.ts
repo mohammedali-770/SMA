@@ -85,6 +85,18 @@ export interface DbAppSettings {
   cash_payment_enabled?: boolean;
   default_payment_method?: 'online' | 'cash' | null;
   payment_outage_mode_enabled?: boolean;
+  // Contact & Support (optional so a pre-migration project still parses; every
+  // channel defaults to hidden until the admin configures AND enables it).
+  support_phone?: string | null;
+  support_whatsapp?: string | null;
+  support_email?: string | null;
+  support_hours_en?: string | null;
+  support_hours_ar?: string | null;
+  support_desc_en?: string | null;
+  support_desc_ar?: string | null;
+  support_phone_enabled?: boolean;
+  support_whatsapp_enabled?: boolean;
+  support_email_enabled?: boolean;
 }
 export interface DbProfile {
   id: string; full_name: string | null; phone_number: string | null;

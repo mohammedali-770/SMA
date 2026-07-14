@@ -13,6 +13,7 @@ import type {
   Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
+import type { SupportSettings } from './supportContact';
 
 /** A neutral food image used when a product has no image_url. */
 const FALLBACK_IMAGE =
@@ -253,6 +254,21 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     pointsPerRiyal: Number(s.points_per_riyal),
     minPointsToRedeem: s.min_points_to_redeem,
     discountPerPoint: Number(s.discount_per_point),
+  };
+}
+
+export function mapSupportSettings(s: DbAppSettings): SupportSettings {
+  return {
+    phone: s.support_phone ?? null,
+    whatsapp: s.support_whatsapp ?? null,
+    email: s.support_email ?? null,
+    hoursEn: s.support_hours_en ?? null,
+    hoursAr: s.support_hours_ar ?? null,
+    descEn: s.support_desc_en ?? null,
+    descAr: s.support_desc_ar ?? null,
+    phoneEnabled: s.support_phone_enabled ?? false,
+    whatsappEnabled: s.support_whatsapp_enabled ?? false,
+    emailEnabled: s.support_email_enabled ?? false,
   };
 }
 
