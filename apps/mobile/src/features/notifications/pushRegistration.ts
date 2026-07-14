@@ -79,16 +79,26 @@ export async function registerThisDevice(
 }
 
 /**
- * Silence THIS device (sign-out path). Deactivates by token regardless of
- * which account owns the row — pushes must stop when the account leaves the
- * phone. Best-effort: failures are swallowed (sign-out must never block).
+ * Silence THIS device — STRICT variant: throws on token/RPC failure so the
+ * caller can surface the error and revert optimistic UI (the Profile opt-out
+ * toggles must never show "off" while the server row is still active —
+ * review finding).
+ */
+export async function deactivateThisDeviceStrict(): Promise<void> {
+  if (!Device.isDevice) return;
+  const token = await getExpoPushToken();
+  if (!token) throw new Error('push token unavailable');
+  await pushDevices.deactivateToken(token);
+}
+
+/**
+ * Silence THIS device — BEST-EFFORT variant for the sign-out path only:
+ * failures are swallowed because sign-out must never block. (Deliberately
+ * NOT used by the settings opt-out flow, which needs the strict variant.)
  */
 export async function deactivateThisDevice(): Promise<void> {
   try {
-    if (!Device.isDevice) return;
-    const token = await getExpoPushToken();
-    if (!token) return;
-    await pushDevices.deactivateToken(token);
+    await deactivateThisDeviceStrict();
   } catch { /* best-effort */ }
 }
 

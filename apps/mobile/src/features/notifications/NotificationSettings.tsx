@@ -18,7 +18,7 @@ import {
   deviceShouldStayActive, toggleRequiresPermission, type DevicePrefs,
 } from './notificationPolicy';
 import {
-  deactivateThisDevice, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
+  deactivateThisDeviceStrict, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
 } from './pushRegistration';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import type { DbPushDevice } from '../../types/db';
@@ -69,7 +69,10 @@ export function NotificationSettings() {
         if (!row) { setPrefs(prev); setSupported(false); return; }
         setDevice(row);
       } else if (device) {
-        await deactivateThisDevice();
+        // STRICT deactivation: a failure must throw so the catch below
+        // reverts the optimistic toggles — the UI may never show "off"
+        // while the server row is still active (review finding).
+        await deactivateThisDeviceStrict();
         setDevice({ ...device, is_active: false, order_updates_enabled: false, promos_enabled: false });
       }
     } catch {
