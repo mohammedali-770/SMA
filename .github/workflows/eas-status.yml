@@ -33,7 +33,7 @@ jobs:
 
       - name: Poll EAS build until it finishes
         env:
-          BID: 7a6a01b3-ea61-491c-8463-27d5190bef74
+          BID: a168a7f1-bfc5-482c-85ae-4a3afce3aa76
           EXPO_NO_TELEMETRY: "1"
         run: |
           set +e
