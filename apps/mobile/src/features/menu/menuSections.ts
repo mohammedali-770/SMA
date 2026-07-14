@@ -20,6 +20,19 @@ export interface MenuSection {
   data: MenuSectionItem[];
 }
 
+/**
+ * Key for a menu list row. RN's VirtualizedSectionList also feeds SYNTHETIC
+ * rows (section header/footer tokens whose item is undefined) through
+ * keyExtractor while converting viewable items — reproduced crash: selecting a
+ * branch mounted the menu, the viewability pass hit a section footer, and a
+ * plain `item.product.id` threw "Cannot read properties of undefined
+ * (reading 'id')", killing the release app. Real rows keep their stable
+ * product id; synthetic rows get a positional key.
+ */
+export function menuItemKey(item: MenuSectionItem | null | undefined, index: number): string {
+  return item?.product ? item.product.id : `menu-row-${index}`;
+}
+
 /** Lowercased searchable text per product, computed once per catalog load. */
 export function buildSearchIndex(products: Product[]): Map<string, string> {
   return new Map(

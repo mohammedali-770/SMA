@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMenuSections, buildSearchIndex } from './menuSections';
+import { buildMenuSections, buildSearchIndex, menuItemKey } from './menuSections';
 import type { Category, Product } from '../../types/models';
 
 function product(id: string, over: Partial<Product> = {}): Product {
@@ -30,6 +30,23 @@ function build(over: Partial<Parameters<typeof buildMenuSections>[0]> = {}) {
     ...over,
   });
 }
+
+describe('menuItemKey (branch-selection crash regression)', () => {
+  it('returns the stable product id for real rows', () => {
+    expect(menuItemKey({ product: product('p9'), hasModifiers: false }, 4)).toBe('p9');
+  });
+  it('NEVER throws on the synthetic header/footer rows RN feeds through keyExtractor', () => {
+    // Reproduced crash: VirtualizedSectionList._convertViewable calls
+    // keyExtractor(undefined, index) for section header/footer tokens the
+    // moment the menu mounts after selecting a branch. This must not throw.
+    expect(() => menuItemKey(undefined, 7)).not.toThrow();
+    expect(menuItemKey(undefined, 7)).toBe('menu-row-7');
+    expect(menuItemKey(null, 0)).toBe('menu-row-0');
+  });
+  it('synthetic keys are positional and distinct', () => {
+    expect(menuItemKey(undefined, 1)).not.toBe(menuItemKey(undefined, 2));
+  });
+});
 
 describe('buildSearchIndex', () => {
   it('lowercases EN name, AR name and EN description per product', () => {

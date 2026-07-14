@@ -11,3 +11,4 @@
  */
 export const CART_STORAGE_KEY = 'spicymeal.cart';
 export const LANGUAGE_STORAGE_KEY = 'spicymeal.lang';
+export const ORDER_CONTEXT_STORAGE_KEY = 'spicymeal.orderContext';
