@@ -17,7 +17,7 @@ import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
-  DbProduct, DbProductModifierGroup, DbProfile, OrderType,
+  DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
 
 /** Return the data or throw the PostgREST error (never a silent null). */
@@ -371,5 +371,42 @@ export const whatsappOtp = {
     const { data, error } = await supabase.functions.invoke('whatsapp-verify-otp', { body: { phone, code, purpose } });
     if (error) throw new Error(error.message);
     return data as { verified: boolean; session?: boolean; message?: string };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Push devices (customer-owned rows; RLS restricts every operation to
+// auth.uid() = customer_id). Registration happens ONLY after the customer
+// turns a notification toggle on (clear-context permission flow); sending is
+// entirely server-side (push-dispatch) and admin/master-flag gated.
+// ---------------------------------------------------------------------------
+export const pushDevices = {
+  /** All of MY device rows (RLS-scoped). */
+  mine: async () => ok<DbPushDevice[]>(await supabase.from('push_devices').select('*')),
+  /**
+   * Register or refresh THIS device. SECURITY DEFINER RPC: upserts by token
+   * and reassigns the row to the calling user when the device changed hands
+   * (a shared phone must never keep receiving the previous account's pushes).
+   */
+  async register(input: {
+    token: string; platform: 'android' | 'ios'; lang: 'en' | 'ar';
+    orderUpdatesEnabled: boolean; promosEnabled: boolean;
+  }): Promise<DbPushDevice> {
+    return ok<DbPushDevice>(await supabase.rpc('register_push_device', {
+      p_token: input.token,
+      p_platform: input.platform,
+      p_lang: input.lang,
+      p_order_updates: input.orderUpdatesEnabled,
+      p_promos: input.promosEnabled,
+    }));
+  },
+  // NOTE: there is intentionally NO direct update() — RLS exposes no client
+  // write path. Preference changes re-register through the RPC (which owns
+  // the token-format guard and ownership rules); turning everything off goes
+  // through deactivateToken.
+  /** Deactivate THIS device's token (sign-out path; works across owners). */
+  async deactivateToken(token: string): Promise<void> {
+    const { error } = await supabase.rpc('deactivate_push_device', { p_token: token });
+    if (error) throw new Error(error.message);
   },
 };

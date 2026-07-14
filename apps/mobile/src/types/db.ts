@@ -33,6 +33,18 @@ export interface DbCategory {
   id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean;
 }
 /** Legal/policy document (RLS returns only active rows to customers). */
+export interface DbPushDevice {
+  id: string;
+  customer_id: string;
+  expo_push_token: string;
+  platform: 'android' | 'ios';
+  lang: 'en' | 'ar';
+  is_active: boolean;
+  order_updates_enabled: boolean;
+  promos_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
 export interface DbLegalDocument {
   id: string;
   document_type: string;

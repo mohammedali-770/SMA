@@ -70,6 +70,28 @@ Deno.serve(async (req: Request) => {
     } catch { /* never block/fail the order on a POS hiccup — background retry covers it */ }
   }
 
+  // Best-effort "order received" push (cash/order-first path — the order now
+  // exists with status 'received'). push-dispatch is master-flag gated and
+  // idempotent per (order,status); a push failure never affects the order.
+  // The task is REGISTERED with the Edge Runtime (waitUntil) so returning the
+  // response cannot kill it mid-flight; when waitUntil is unavailable the
+  // call is awaited, bounded by its 4s timeout.
+  try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (url && serviceKey) {
+      const pushPromise = fetch(`${url}/functions/v1/push-dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ action: 'order_status', orderId, status: 'received' }),
+        signal: AbortSignal.timeout(4000),
+      }).then(() => undefined, () => undefined); // never throws
+      const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+      if (runtime?.waitUntil) runtime.waitUntil(pushPromise);
+      else await pushPromise;
+    }
+  } catch { /* notification is best-effort only */ }
+
   // Return the fresh RLS-scoped order row so the client sees the POS number if it
   // arrived in time; otherwise it carries the SM-… number and syncs in the tail.
   const { data: fresh } = await supa.from('orders').select('*').eq('id', orderId).maybeSingle();

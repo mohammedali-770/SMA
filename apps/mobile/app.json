@@ -42,7 +42,13 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#422e87"
+        }
+      ]
     ],
     "extra": {
       "router": {},

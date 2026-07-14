@@ -6,6 +6,7 @@ import { LazywaitPanel } from './LazywaitPanel';
 import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
 import { EmailServerPanel } from './EmailServerPanel';
 import { TapPaymentPanel } from './TapPaymentPanel';
+import { PushToolsPanel } from './PushToolsPanel';
 
 /**
  * Admin-only "Integrations" console — split out of Settings because the secure
@@ -105,6 +106,7 @@ export const IntegrationsPanel: React.FC = () => {
                 <IntegrationCard providerType="email" row={rowFor('email')} disabled={isAccountant} onSave={saveIntegration} />
                 <EmailServerPanel disabled={isAccountant} />
                 <IntegrationCard providerType="push" row={rowFor('push')} disabled={isAccountant} onSave={saveIntegration} />
+                <PushToolsPanel disabled={isAccountant} />
               </>
             )}
 

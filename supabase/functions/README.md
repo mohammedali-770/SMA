@@ -15,7 +15,7 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `lazywait-webhook` | Lazywait | false | **Lazywait** | Verifies the `X-LazyWait-Signature` HMAC (hex), records POS status; unknown events are logged + accepted safely. |
 | `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
 | `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
-| `push-dispatch` | server | false | placeholder (501) | Push send (Expo/OneSignal TBD). |
+| `push-dispatch` | server + admin (browser) | false | **active (flag-gated)** | Expo Push sender. Actions: `order_status` (service-role/internal or admin; idempotent per (order,status) via `notification_log`; anti-spoof re-reads the order's real status), `test` (admin → own devices), `broadcast` (admin → opted-in devices only, returns counts). Batches of 100; ticket-level `DeviceNotRegistered` deactivates the device row. **No-ops until the `push` integration row (provider `expo`) is ENABLED** — seeded disabled. Payloads carry only `{type, orderId}` — never customer/order/payment data. |
 | `auth-send-sms-whatsapp` | Supabase Auth (Send SMS Hook) | false | active | **Real customer login delivery leg.** Supabase Phone Auth generates the login OTP and calls this hook (Standard Webhooks signed) to deliver it via WhatsApp. Supabase Auth stays the sole login authority — this issues no session, generates no code, stores no challenge. Fails closed until `whatsapp_login_enabled` + Meta creds + template. |
 | `whatsapp-send-otp` | app (pre-login) | false | active (secondary) | **Phone _verification_ only, NOT login.** Send WhatsApp OTP (Meta Cloud API) for a signed-in user to verify their profile phone. Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
 | `whatsapp-verify-otp` | app | false | active (secondary) | Verify the *verification* OTP (timing-safe); marks the signed-in user's `phone_verified`. Never issues a session; not part of login. |
@@ -78,3 +78,23 @@ select public.upsert_integration_settings(
 pays → Geidea POSTs the signed callback to `payment-webhook` → verified
 `Paid`+`000` → `confirm_order_payment` flips the order to `paid`. The client is
 never trusted to set payment status.
+
+## Push notification credentials (required BEFORE enabling the push integration)
+
+The `push-dispatch` function itself needs no provider secret for Expo's public
+push API, but **device tokens only work when the app's native push credentials
+are configured in EAS**:
+
+- **Android — FCM V1:** create a Firebase project for the app's Android
+  package (`app.json → android.package`), download the FCM service-account
+  JSON, and upload it with `eas credentials` (Android → Google Service
+  Account Key → FCM V1). Without it, Android tokens are issued but Expo cannot
+  deliver.
+- **iOS — APNs:** upload an APNs key (`eas credentials` → iOS → Push
+  Notifications) under the Apple Developer team that owns the bundle id.
+- Optional hardening: an Expo Access Token can be added later as an
+  `Authorization` header on the Expo Push API call — not required for launch.
+
+Rollout order: (1) configure EAS credentials, (2) build + install the app so
+devices register, (3) enable the `push` integration row (provider `expo`) in
+Admin → Integrations, (4) use "Send test notification" in the admin Push tools.

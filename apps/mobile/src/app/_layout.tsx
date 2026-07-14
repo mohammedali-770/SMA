@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { NotificationTapBridge } from '../features/notifications/NotificationTapBridge';
 import { I18nProvider } from '../i18n/I18nProvider';
 import { AppStoreProvider, useAuth } from '../store';
 import { colors } from '../theme';
@@ -34,6 +35,8 @@ export default function RootLayout() {
         <AppStoreProvider>
           <SplashGate>
             <StatusBar style="dark" />
+            {/* Push-notification taps → allow-listed internal routes only. */}
+            <NotificationTapBridge />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
