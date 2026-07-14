@@ -17,7 +17,7 @@ import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
-  DbProduct, DbProductModifierGroup, DbProfile, OrderType,
+  DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
 
 /** Return the data or throw the PostgREST error (never a silent null). */
@@ -371,5 +371,35 @@ export const whatsappOtp = {
     const { data, error } = await supabase.functions.invoke('whatsapp-verify-otp', { body: { phone, code, purpose } });
     if (error) throw new Error(error.message);
     return data as { verified: boolean; session?: boolean; message?: string };
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Push devices (customer-owned rows; RLS restricts every operation to
+// auth.uid() = customer_id). Registration happens ONLY after the customer
+// turns a notification toggle on (clear-context permission flow); sending is
+// entirely server-side (push-dispatch) and admin/master-flag gated.
+// ---------------------------------------------------------------------------
+export const pushDevices = {
+  /** All of MY device rows (RLS-scoped). */
+  mine: async () => ok<DbPushDevice[]>(await supabase.from('push_devices').select('*')),
+  /** Register or refresh THIS device by its Expo token (RLS insert/update-own). */
+  async upsert(input: {
+    customerId: string; token: string; platform: 'android' | 'ios'; lang: 'en' | 'ar';
+    orderUpdatesEnabled: boolean; promosEnabled: boolean;
+  }): Promise<DbPushDevice> {
+    return ok<DbPushDevice>(await supabase.from('push_devices').upsert({
+      customer_id: input.customerId,
+      expo_push_token: input.token,
+      platform: input.platform,
+      lang: input.lang,
+      is_active: true,
+      order_updates_enabled: input.orderUpdatesEnabled,
+      promos_enabled: input.promosEnabled,
+    }, { onConflict: 'expo_push_token' }).select('*').single());
+  },
+  /** Update preferences / active state for one of MY devices. */
+  async update(id: string, patch: { order_updates_enabled?: boolean; promos_enabled?: boolean; is_active?: boolean; lang?: 'en' | 'ar' }): Promise<DbPushDevice> {
+    return ok<DbPushDevice>(await supabase.from('push_devices').update(patch).eq('id', id).select('*').single());
   },
 };

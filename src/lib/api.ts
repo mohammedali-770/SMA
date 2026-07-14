@@ -556,6 +556,14 @@ export const orders = {
   async setStatus(orderId: string, status: OrderStatus) {
     const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
     if (error) throw new Error(error.message);
+    // Fire-and-forget push notification for the customer. Server-side
+    // push-dispatch re-verifies the caller is an admin, re-reads the order's
+    // REAL status (anti-spoof), is idempotent per (order,status), and no-ops
+    // entirely while the push master flag is disabled — a push failure never
+    // fails the status change itself.
+    void supabase.functions.invoke('push-dispatch', {
+      body: { action: 'order_status', orderId, status },
+    }).catch(() => {});
   },
   /** Admin-only: re-queue a failed/blocked/dead-lettered order for Lazywait sync. */
   async requeueLazywait(orderId: string): Promise<DbOrder> {
@@ -744,4 +752,32 @@ export const legalDocs = {
   list: async () => ok<DbLegalDocument[]>(await supabase.from('legal_documents').select('*')),
   update: async (id: string, patch: Partial<DbLegalDocument>) =>
     ok<DbLegalDocument>(await supabase.from('legal_documents').update(patch).eq('id', id).select('*').single()),
+};
+
+// ---------------------------------------------------------------------------
+// Push notifications (admin tools). All calls hit the push-dispatch Edge
+// Function with the ADMIN's JWT; the function re-verifies the role server-side
+// and no-ops entirely while the push master flag is disabled.
+// ---------------------------------------------------------------------------
+export interface PushSendResult { status: string; targeted?: number; sent?: number; failed?: number; deactivated?: number; hint?: string; reason?: string }
+
+export const pushAdmin = {
+  async test(): Promise<PushSendResult> {
+    const { data, error } = await supabase.functions.invoke('push-dispatch', { body: { action: 'test' } });
+    if (error) throw new Error(error.message);
+    return data as PushSendResult;
+  },
+  async broadcast(input: { titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }): Promise<PushSendResult> {
+    const { data, error } = await supabase.functions.invoke('push-dispatch', { body: { action: 'broadcast', ...input } });
+    if (error) throw new Error(error.message);
+    return data as PushSendResult;
+  },
+  /** Device / opt-in counts for the panel (admin-only RLS select). */
+  async deviceCounts(): Promise<{ activeDevices: number; promoOptIns: number }> {
+    const [{ count: active }, { count: promos }] = await Promise.all([
+      supabase.from('push_devices').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      supabase.from('push_devices').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('promos_enabled', true),
+    ]);
+    return { activeDevices: active ?? 0, promoOptIns: promos ?? 0 };
+  },
 };

@@ -102,6 +102,15 @@ export const STRINGS = {
     otRemoveContinue: 'Remove unavailable items and continue',
     otReviewCart: 'Review cart',
 
+    // notifications
+    notificationsTitle: 'Notifications',
+    notificationsSub: 'Choose what we can notify you about on this device.',
+    notifOrderUpdates: 'Order updates',
+    notifOrderUpdatesSub: 'Status of your orders (preparing, ready, delivered…)',
+    notifPromos: 'Offers & promotions',
+    notifPromosSub: 'Occasional deals — only if you opt in.',
+    notifPermissionDenied: 'Notifications are blocked for this app. Enable them in your device settings, then try again.',
+
     // contact & support
     supportTitle: 'Contact & Support',
     callSupport: 'Call Support',
@@ -333,6 +342,15 @@ export const STRINGS = {
     otCartWarnBody: 'بعض المنتجات في السلة غير متوفرة في الفرع أو طريقة الطلب الجديدة. هل تريد إزالة المنتجات غير المتوفرة والمتابعة؟',
     otRemoveContinue: 'إزالة غير المتوفرة والمتابعة',
     otReviewCart: 'مراجعة السلة',
+
+    // الإشعارات
+    notificationsTitle: 'الإشعارات',
+    notificationsSub: 'اختر ما يمكننا إشعارك به على هذا الجهاز.',
+    notifOrderUpdates: 'تحديثات الطلب',
+    notifOrderUpdatesSub: 'حالة طلباتك (قيد التحضير، جاهز، تم التوصيل…)',
+    notifPromos: 'العروض والترويجات',
+    notifPromosSub: 'عروض من حين لآخر — فقط إذا اشتركت.',
+    notifPermissionDenied: 'الإشعارات محظورة لهذا التطبيق. فعّلها من إعدادات جهازك ثم حاول مرة أخرى.',
 
     // التواصل والدعم
     supportTitle: 'التواصل والدعم',

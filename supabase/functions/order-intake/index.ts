@@ -70,6 +70,22 @@ Deno.serve(async (req: Request) => {
     } catch { /* never block/fail the order on a POS hiccup — background retry covers it */ }
   }
 
+  // Fire-and-forget "order received" push (cash/order-first path — the order
+  // now exists with status 'received'). push-dispatch is master-flag gated,
+  // idempotent per (order,status), and a failure never affects the order.
+  try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (url && serviceKey) {
+      void fetch(`${url}/functions/v1/push-dispatch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ action: 'order_status', orderId, status: 'received' }),
+        signal: AbortSignal.timeout(4000),
+      }).catch(() => {});
+    }
+  } catch { /* notification is best-effort only */ }
+
   // Return the fresh RLS-scoped order row so the client sees the POS number if it
   // arrived in time; otherwise it carries the SM-… number and syncs in the tail.
   const { data: fresh } = await supa.from('orders').select('*').eq('id', orderId).maybeSingle();
