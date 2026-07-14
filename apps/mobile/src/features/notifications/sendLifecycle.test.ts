@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { claim, complete, type SendRecord } from './sendLifecycle';
+import { claim, complete, MAX_SEND_ATTEMPTS, type SendRecord } from './sendLifecycle';
 
 const KEY = 'order-1|preparing';
 
@@ -44,6 +44,23 @@ describe('order-status send lifecycle (claim / retry semantics)', () => {
     expect(registry[0].sendStatus).toBe('sent');
     expect(registry[0].lastErrorSafe).toContain('partial: 1/3');
     expect(claim(registry, KEY).action).toBe('duplicate'); // already-delivered devices protected
+  });
+
+  it('failed retries are BOUNDED — exhausted failures become terminal (review finding)', () => {
+    let registry: SendRecord[] = (claim([], KEY) as { registry: SendRecord[] }).registry;
+    registry = complete(registry, KEY, { targeted: 1, sent: 0, failed: 1 });
+    // burn through the retry budget
+    for (let attempt = 2; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
+      const c = claim(registry, KEY);
+      expect(c.action).toBe('proceed');
+      registry = (c as { registry: SendRecord[] }).registry;
+      expect(registry[0].attemptCount).toBe(attempt);
+      registry = complete(registry, KEY, { targeted: 1, sent: 0, failed: 1 });
+    }
+    // budget spent → terminal, no matter how many more calls arrive
+    expect(claim(registry, KEY).action).toBe('exhausted');
+    expect(claim(registry, KEY).action).toBe('exhausted');
+    expect(registry[0].attemptCount).toBe(MAX_SEND_ATTEMPTS);
   });
 
   it('different (order,status) transitions are independent', () => {

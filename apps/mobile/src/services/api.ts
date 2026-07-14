@@ -400,10 +400,10 @@ export const pushDevices = {
       p_promos: input.promosEnabled,
     }));
   },
-  /** Update preferences / active state for one of MY devices. */
-  async update(id: string, patch: { order_updates_enabled?: boolean; promos_enabled?: boolean; is_active?: boolean; lang?: 'en' | 'ar' }): Promise<DbPushDevice> {
-    return ok<DbPushDevice>(await supabase.from('push_devices').update(patch).eq('id', id).select('*').single());
-  },
+  // NOTE: there is intentionally NO direct update() — RLS exposes no client
+  // write path. Preference changes re-register through the RPC (which owns
+  // the token-format guard and ownership rules); turning everything off goes
+  // through deactivateToken.
   /** Deactivate THIS device's token (sign-out path; works across owners). */
   async deactivateToken(token: string): Promise<void> {
     const { error } = await supabase.rpc('deactivate_push_device', { p_token: token });

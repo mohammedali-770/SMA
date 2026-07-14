@@ -10,11 +10,15 @@
  *    caller finds the row and backs off (never double-sends).
  *  - 'sent' and 'no_targets' are TERMINAL and idempotent.
  *  - 'failed' means a TOTAL failure (zero devices reached) and may be
- *    reclaimed atomically for a controlled retry (attempt_count++).
+ *    reclaimed atomically for a controlled retry (attempt_count++) — but
+ *    only up to MAX_SEND_ATTEMPTS; after that the failure is TERMINAL
+ *    (exhausted) so a dead provider is never hammered forever.
  *  - PARTIAL sends resolve to 'sent' (with counts + a safe error note) and
  *    are NOT retryable — a device that already received the push can never
  *    receive it again.
  */
+
+export const MAX_SEND_ATTEMPTS = 5;
 
 export type SendStatus = 'processing' | 'sent' | 'failed' | 'no_targets';
 
@@ -31,9 +35,10 @@ export interface SendRecord {
 export type ClaimOutcome =
   | { action: 'proceed'; registry: SendRecord[] }        // caller owns the send
   | { action: 'duplicate' }                              // terminal — idempotent no-op
-  | { action: 'in_progress' };                           // someone else owns it
+  | { action: 'in_progress' }                            // someone else owns it
+  | { action: 'exhausted' };                             // retry budget spent — terminal
 
-/** Attempt to claim (order,status) — mirrors insert-first + reclaim-failed. */
+/** Attempt to claim (order,status) — mirrors insert-first + bounded reclaim. */
 export function claim(registry: SendRecord[], key: string): ClaimOutcome {
   const existing = registry.find((r) => r.key === key);
   if (!existing) {
@@ -44,7 +49,9 @@ export function claim(registry: SendRecord[], key: string): ClaimOutcome {
   }
   if (existing.sendStatus === 'sent' || existing.sendStatus === 'no_targets') return { action: 'duplicate' };
   if (existing.sendStatus === 'processing') return { action: 'in_progress' };
-  // failed → atomic reclaim (exactly one racer can flip failed→processing)
+  // failed → BOUNDED atomic reclaim (exactly one racer can flip
+  // failed→processing, and never beyond the attempt budget).
+  if (existing.attemptCount >= MAX_SEND_ATTEMPTS) return { action: 'exhausted' };
   return {
     action: 'proceed',
     registry: registry.map((r) =>

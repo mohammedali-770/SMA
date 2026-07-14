@@ -37,21 +37,23 @@ create trigger set_push_devices_updated_at
 
 alter table public.push_devices enable row level security;
 
--- Customers manage ONLY their own devices. No DELETE policy — devices are
--- deactivated (is_active=false), never client-deleted, so dispatch history
--- stays consistent. Service role (push-dispatch) bypasses RLS for send-time
--- reads and DeviceNotRegistered deactivation.
+-- READ: customers see ONLY their own devices (the Profile toggles read the
+-- current registration state).
+--
+-- WRITE: there are deliberately NO client insert/update/delete policies —
+-- the SECURITY DEFINER RPCs below (register_push_device /
+-- deactivate_push_device) are the ONLY client write path, so the token
+-- format guard and the ownership-transfer rules cannot be bypassed with a
+-- direct REST write (review finding). The service role (push-dispatch)
+-- bypasses RLS for send-time reads and DeviceNotRegistered deactivation.
 drop policy if exists push_devices_select_own on public.push_devices;
 create policy push_devices_select_own on public.push_devices
   for select using (auth.uid() = customer_id);
 
+-- Defensive: drop the earlier client write policies if a previous version of
+-- this migration ever created them.
 drop policy if exists push_devices_insert_own on public.push_devices;
-create policy push_devices_insert_own on public.push_devices
-  for insert with check (auth.uid() = customer_id);
-
 drop policy if exists push_devices_update_own on public.push_devices;
-create policy push_devices_update_own on public.push_devices
-  for update using (auth.uid() = customer_id) with check (auth.uid() = customer_id);
 
 -- Admin dashboard: read-only visibility (device/opt-in counts).
 drop policy if exists push_devices_admin_select on public.push_devices;

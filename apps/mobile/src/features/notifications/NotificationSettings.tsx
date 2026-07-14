@@ -18,9 +18,8 @@ import {
   deviceShouldStayActive, toggleRequiresPermission, type DevicePrefs,
 } from './notificationPolicy';
 import {
-  ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
+  deactivateThisDevice, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
 } from './pushRegistration';
-import { pushDevices } from '../../services/api';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import type { DbPushDevice } from '../../types/db';
 
@@ -62,18 +61,16 @@ export function NotificationSettings() {
         const granted = await ensureNotificationPermission();
         if (!granted) { setPrefs(prev); setDenied(true); return; }
       }
-      if (device) {
-        const updated = await pushDevices.update(device.id, {
-          order_updates_enabled: next.orderUpdatesEnabled,
-          promos_enabled: next.promosEnabled,
-          is_active: deviceShouldStayActive(next),
-          lang,
-        });
-        setDevice(updated);
-      } else if (deviceShouldStayActive(next)) {
-        const created = await registerThisDevice(lang, next);
-        if (!created) { setPrefs(prev); setSupported(false); return; }
-        setDevice(created);
+      // ALL writes go through the SECURITY DEFINER RPCs (RLS exposes no
+      // direct client write path): any-channel-on → (re)register with the
+      // new preferences; everything-off → deactivate this device's token.
+      if (deviceShouldStayActive(next)) {
+        const row = await registerThisDevice(lang, next);
+        if (!row) { setPrefs(prev); setSupported(false); return; }
+        setDevice(row);
+      } else if (device) {
+        await deactivateThisDevice();
+        setDevice({ ...device, is_active: false, order_updates_enabled: false, promos_enabled: false });
       }
     } catch {
       setPrefs(prev);

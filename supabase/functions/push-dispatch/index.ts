@@ -43,6 +43,9 @@ import { getProviderConfig } from '../_shared/secrets.ts';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
 const CHUNK = 100;
+// Bounded retry: a TOTAL send failure may be reclaimed until this many
+// attempts have been made; after that the failure is TERMINAL (exhausted).
+const MAX_SEND_ATTEMPTS = 5;
 
 type OrderStatus = 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -214,11 +217,17 @@ Deno.serve(async (req: Request) => {
       if (existing.send_status === 'processing') {
         return json({ status: 'in_progress', reason: 'another dispatch call owns this send' }, 200);
       }
-      // failed → reclaim atomically (the send_status guard makes exactly one
-      // racer win; the loser matches zero rows and backs off).
+      // failed → BOUNDED reclaim: exhausted failures are terminal (review
+      // finding — reclaiming must not retry forever against a dead provider).
+      if ((existing.attempt_count ?? 1) >= MAX_SEND_ATTEMPTS) {
+        return json({ status: 'exhausted', reason: `retry attempts exhausted (${MAX_SEND_ATTEMPTS})` }, 200);
+      }
+      // Atomic reclaim: the send_status + attempt_count guards make exactly
+      // one racer win; the loser matches zero rows and backs off.
       const { data: reclaimed } = await admin.from('notification_log')
         .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1 })
         .eq('id', existing.id).eq('send_status', 'failed')
+        .lt('attempt_count', MAX_SEND_ATTEMPTS)
         .select('id')
         .maybeSingle();
       if (!reclaimed) return json({ status: 'in_progress', reason: 'retry already claimed elsewhere' }, 200);
