@@ -13,8 +13,6 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
 | `lazywait-sync` | schedule/cron | false | **Lazywait** | POS sync worker: claims due orders (SKIP LOCKED), `POST /pos/orders/create` (pickup only), records via `record_lazywait_sync` with retry/backoff/dead-letter. See `docs/LAZYWAIT.md`. |
 | `lazywait-catalog` | admin (browser) | true | **Lazywait** | Admin-only catalog pull: GETs branches/categories/items/addons/addon-groups server-side and caches them in `lazywait_catalog_items` for id-mapping review. Extra `is_admin()` check; never returns a secret. |
 | `lazywait-webhook` | Lazywait | false | **Lazywait** | Verifies the `X-LazyWait-Signature` HMAC (hex), records POS status; unknown events are logged + accepted safely. |
-| `lazywait-create-order` | — | false | superseded | Order creation now lives in `lazywait-sync`. Stub retained for the deploy slot. |
-| `send-otp` | app (pre-login) | false | placeholder (501) | SMS/OTP send (provider TBD). Rate-limit + E.164 TODO. |
 | `push-dispatch` | server + admin (browser) | false | **active (flag-gated)** | Expo Push sender. Actions: `order_status` (service-role/internal or admin; idempotent per (order,status) via `notification_log`; anti-spoof re-reads the order's real status), `test` (admin → own devices), `broadcast` (admin → opted-in devices only, returns counts). Batches of 100; ticket-level `DeviceNotRegistered` deactivates the device row. **No-ops until the `push` integration row (provider `expo`) is ENABLED** — seeded disabled. Payloads carry only `{type, orderId}` — never customer/order/payment data. |
 | `auth-send-sms-whatsapp` | Supabase Auth (Send SMS Hook) | false | active | **Real customer login delivery leg.** Supabase Phone Auth generates the login OTP and calls this hook (Standard Webhooks signed) to deliver it via WhatsApp. Supabase Auth stays the sole login authority — this issues no session, generates no code, stores no challenge. Fails closed until `whatsapp_login_enabled` + Meta creds + template. |
 | `whatsapp-send-otp` | app (pre-login) | false | active (secondary) | **Phone _verification_ only, NOT login.** Send WhatsApp OTP (Meta Cloud API) for a signed-in user to verify their profile phone. Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
@@ -28,6 +26,33 @@ only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
   `userClient(authHeader)` (acts as the calling user so RLS/auth.uid() apply).
 - `secrets.ts` — `getProviderConfig()` reads `integration_settings.secret_config`
   server-side (service role). Secrets never leave the function.
+
+## WhatsApp OTP architecture — TWO intentional paths (do not consolidate)
+
+**A. Customer login (active mobile login flow).** Supabase Auth is the sole
+login authority: it generates AND verifies the OTP
+(`signInWithOtp`/`verifyOtp`). The project's **Send-SMS Auth hook** (configured
+in the Supabase dashboard) calls `auth-send-sms-whatsapp`, which only
+*delivers* the Auth-generated code over WhatsApp (Standard-Webhooks-signed
+call; it issues no session, generates no code, stores no challenge).
+
+**B. Profile phone verification (signed-in customers).**
+`whatsapp-send-otp` creates the custom challenge (`otp_challenges` +
+`otp_begin_send`/`otp_get_active_challenge`/`otp_increment_attempt`);
+`whatsapp-verify-otp` verifies and consumes it (`otp_consume`) and calls
+`mark_phone_verified` to update the signed-in user's verified profile phone.
+**This path never issues or fabricates an Auth session** — it is not a login
+path.
+
+**C. Shared delivery logging.** Both paths send through
+`_shared/whatsappSend.ts`, which records every delivery in
+`whatsapp_message_logs` (via `record_whatsapp_message`); `whatsapp-webhook`
+records Meta delivery-status callbacks into the same table. These objects
+support BOTH paths and must remain.
+
+The two paths are **intentional** (different jobs: login delivery vs. profile
+verification). Do **not** remove or consolidate either one as "cleanup" —
+consolidation would be a feature redesign requiring separate owner approval.
 
 ## Secrets / environment
 The Supabase runtime injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
@@ -46,7 +71,7 @@ curl -i -X POST http://127.0.0.1:54321/functions/v1/payment-webhook -d '{}'
 ## Deploy
 ```bash
 supabase functions deploy order-intake payment-initiate payment-webhook \
-  lazywait-sync lazywait-catalog lazywait-create-order send-otp push-dispatch
+  lazywait-sync lazywait-catalog push-dispatch
 # secrets that are NOT in integration_settings (rare) go via:
 # supabase secrets set SOME_KEY=... 
 ```

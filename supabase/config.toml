@@ -32,12 +32,6 @@ verify_jwt = true
 [functions.lazywait-webhook]
 verify_jwt = false
 
-[functions.lazywait-create-order]
-verify_jwt = false
-
-[functions.send-otp]
-verify_jwt = false
-
 [functions.push-dispatch]
 verify_jwt = false
 
