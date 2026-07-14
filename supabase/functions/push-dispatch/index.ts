@@ -46,6 +46,11 @@ const CHUNK = 100;
 // Bounded retry: a TOTAL send failure may be reclaimed until this many
 // attempts have been made; after that the failure is TERMINAL (exhausted).
 const MAX_SEND_ATTEMPTS = 5;
+// A 'processing' claim is a LEASE, not a permanent lock: if the function
+// crashed/timed out mid-send, the row would otherwise stay 'processing'
+// forever and the notification would never retry. Edge Functions are
+// wall-clock bounded far below this, so an older claim is provably dead.
+const PROCESSING_LEASE_MS = 3 * 60_000;
 
 type OrderStatus = 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 
@@ -207,7 +212,7 @@ Deno.serve(async (req: Request) => {
       .insert({ kind: 'order_status', order_id: orderId, status, send_status: 'processing' });
     if (claimError) {
       const { data: existing } = await admin.from('notification_log')
-        .select('id, send_status, attempt_count')
+        .select('id, send_status, attempt_count, updated_at')
         .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
         .maybeSingle();
       if (!existing) return json({ status: 'retry', reason: 'claim race, call again' }, 200);
@@ -215,29 +220,56 @@ Deno.serve(async (req: Request) => {
         return json({ status: 'duplicate', reason: `already ${existing.send_status}` }, 200);
       }
       if (existing.send_status === 'processing') {
-        return json({ status: 'in_progress', reason: 'another dispatch call owns this send' }, 200);
+        // LIVE lease → back off. EXPIRED lease (crashed/timed-out run) →
+        // atomically reclaim, still bounded by the attempt budget.
+        const leaseAge = Date.now() - new Date(existing.updated_at as string).getTime();
+        if (!(leaseAge > PROCESSING_LEASE_MS)) {
+          return json({ status: 'in_progress', reason: 'another dispatch call owns this send' }, 200);
+        }
+        if ((existing.attempt_count ?? 1) >= MAX_SEND_ATTEMPTS) {
+          return json({ status: 'exhausted', reason: `retry attempts exhausted (${MAX_SEND_ATTEMPTS})` }, 200);
+        }
+        const { data: released } = await admin.from('notification_log')
+          .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1, last_error_safe: 'stale processing lease reclaimed' })
+          .eq('id', existing.id).eq('send_status', 'processing')
+          .lt('updated_at', new Date(Date.now() - PROCESSING_LEASE_MS).toISOString())
+          .select('id')
+          .maybeSingle();
+        if (!released) return json({ status: 'in_progress', reason: 'stale lease already reclaimed elsewhere' }, 200);
+      } else {
+        // failed → BOUNDED reclaim: exhausted failures are terminal (review
+        // finding — reclaiming must not retry forever against a dead provider).
+        if ((existing.attempt_count ?? 1) >= MAX_SEND_ATTEMPTS) {
+          return json({ status: 'exhausted', reason: `retry attempts exhausted (${MAX_SEND_ATTEMPTS})` }, 200);
+        }
+        // Atomic reclaim: the send_status + attempt_count guards make exactly
+        // one racer win; the loser matches zero rows and backs off.
+        const { data: reclaimed } = await admin.from('notification_log')
+          .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1 })
+          .eq('id', existing.id).eq('send_status', 'failed')
+          .lt('attempt_count', MAX_SEND_ATTEMPTS)
+          .select('id')
+          .maybeSingle();
+        if (!reclaimed) return json({ status: 'in_progress', reason: 'retry already claimed elsewhere' }, 200);
       }
-      // failed → BOUNDED reclaim: exhausted failures are terminal (review
-      // finding — reclaiming must not retry forever against a dead provider).
-      if ((existing.attempt_count ?? 1) >= MAX_SEND_ATTEMPTS) {
-        return json({ status: 'exhausted', reason: `retry attempts exhausted (${MAX_SEND_ATTEMPTS})` }, 200);
-      }
-      // Atomic reclaim: the send_status + attempt_count guards make exactly
-      // one racer win; the loser matches zero rows and backs off.
-      const { data: reclaimed } = await admin.from('notification_log')
-        .update({ send_status: 'processing', attempt_count: (existing.attempt_count ?? 1) + 1 })
-        .eq('id', existing.id).eq('send_status', 'failed')
-        .lt('attempt_count', MAX_SEND_ATTEMPTS)
-        .select('id')
-        .maybeSingle();
-      if (!reclaimed) return json({ status: 'in_progress', reason: 'retry already claimed elsewhere' }, 200);
     }
 
-    const { data: devices } = await admin.from('push_devices')
+    const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
       .eq('customer_id', order.customer_id)
       .eq('is_active', true)
       .eq('order_updates_enabled', true);
+    if (devicesError) {
+      // A FAILED device lookup is NOT an empty audience (review finding):
+      // release the claim as 'failed' (retryable via the bounded reclaim
+      // path) instead of terminally recording no_targets — nobody was
+      // targeted, so a later retry can still deliver the notification.
+      await admin.from('notification_log')
+        .update({ send_status: 'failed', last_error_safe: 'device lookup failed (transient)' })
+        .eq('kind', 'order_status').eq('order_id', orderId).eq('status', status)
+        .eq('send_status', 'processing');
+      return json({ status: 'error', send_status: 'failed', reason: 'device lookup failed (transient)' }, 500);
+    }
 
     const targets = (devices ?? []) as DeviceRow[];
     if (targets.length === 0) {
@@ -267,10 +299,11 @@ Deno.serve(async (req: Request) => {
     const adminId = await callingAdminId(req, admin);
     if (!adminId) return json({ error: 'forbidden' }, 403);
 
-    const { data: devices } = await admin.from('push_devices')
+    const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
       .eq('customer_id', adminId)
       .eq('is_active', true);
+    if (devicesError) return json({ status: 'error', reason: 'device lookup failed (transient)' }, 500);
     if (!devices || devices.length === 0) {
       return json({
         status: 'no_devices',
@@ -299,10 +332,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // OPT-IN ONLY: active devices whose owner opted into promotions.
-    const { data: devices } = await admin.from('push_devices')
+    const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
       .eq('is_active', true)
       .eq('promos_enabled', true);
+    if (devicesError) return json({ status: 'error', reason: 'device lookup failed (transient)' }, 500);
 
     const result = await sendToDevices(admin, (devices ?? []) as DeviceRow[], {
       en: { title: titleEn, body: bodyEn },
