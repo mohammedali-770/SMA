@@ -11,20 +11,19 @@
 ## 1. Purpose and production status
 
 - Repository migration files: **38**
-- Live `schema_migrations` rows: **38**
-- Repository-only pending (merged, **not applied** to production):
-  `20260714130000_trigger_function_execute_hardening.sql`
-- Latest live version: **`20260714090000`** (`push_notifications`)
-- The current production schema is considered **functionally aligned with the
-  repository through `20260714090000`** (i.e. every repository migration
-  EXCEPT the pending `20260714130000` grant hardening), based on
+- Live `schema_migrations` rows: **39**
+- Latest live version: **`20260714130000`**
+  (`trigger_function_execute_hardening`)
+- The current production schema is **functionally aligned with the repository
+  through `20260714130000`** — every repository migration, including the
+  trigger-function grant hardening, is applied and verified — based on
   catalog/object-state verification (tables, columns, functions and exact
   signatures, SECURITY DEFINER/INVOKER state, pinned `search_path`, grants,
   RLS policies, triggers, indexes, storage bucket and policies, realtime
-  publication membership). **One deliberate production drift remains**: the
-  three trigger-only functions targeted by `20260714130000` still carry
-  client EXECUTE grants live until that migration's separately approved
-  application (§10).
+  publication membership). The grant hardening was **applied and verified on
+  2026-07-14** (§10): PUBLIC/anon/authenticated EXECUTE removed from the
+  three trigger-only functions, service_role EXECUTE retained, function and
+  trigger definitions unchanged.
 - **Historical version identifiers and several migration boundaries differ**
   between the repository and production. This is a *history* divergence, not a
   *schema* divergence. The full mapping is in §5.
@@ -55,14 +54,16 @@ Claims in this document are labelled: **CONFIRMED** (directly verified),
 witnessed), **POSSIBLE** (plausible, incomplete evidence), **UNKNOWN**.
 
 The following live facts are **CONFIRMED** (read-only inspection of
-`supabase_migrations.schema_migrations`, 2026-07-14):
+`supabase_migrations.schema_migrations`, 2026-07-14, post-Stage-4):
 
-- 38 migration rows exist;
-- all 38 store their SQL as **one statements-array entry** (a single blob);
-- all 38 share the **same `created_by` value** (the owner's account);
-- all 38 have **NULL `idempotency_key`**;
-- all 38 have **no rollback entries**;
-- earliest version is **`20260708062345`**; latest is **`20260714090000`**;
+- 39 migration rows exist;
+- all 39 store their SQL as **one statements-array entry** (a single blob);
+- all 39 share the **same `created_by` value** (the owner's account);
+- all 39 have **NULL `idempotency_key`**;
+- all 39 have **no rollback entries**;
+- earliest version is **`20260708062345`**; latest is **`20260714130000`**;
+- `trigger_function_execute_hardening` exists exactly once; the generated
+  version `20260714153905` no longer exists;
 - table shape: `version` (PK), `statements text[]`, `name`, `created_by`,
   `idempotency_key` (UNIQUE), `rollback text[]`.
 
@@ -72,22 +73,28 @@ executed through the Supabase **MCP `apply_migration`** tool is
 timestamp-version recording pattern matches that tool exactly, and does not
 match CLI `db push`, which splits statements; the Dashboard SQL editor writes
 no history rows at all) — but execution logs do not independently prove the
-mechanism for each historical row. The two 2026-07-14 applications
-(`support_contact`, `push_notifications`) are **CONFIRMED** MCP
+mechanism for each historical row. The three 2026-07-14 applications
+(`support_contact`, `push_notifications`,
+`trigger_function_execute_hardening`) are **CONFIRMED** first-hand MCP
 `apply_migration` runs, including the observed behavior that the tool stamps
 an apply-time version (e.g. `support_contact` was first recorded as
 `20260714111153` before its approved single-row alignment to
-`20260714070000`).
+`20260714070000`). For `trigger_function_execute_hardening` the following is
+**CONFIRMED** first-hand: it was applied via `apply_migration` on
+2026-07-14; the generated version was `20260714153905`; a separately
+approved, exactly-one-row version alignment changed it to `20260714130000`;
+**only the version column changed** during that alignment (all non-version
+fields byte-identical before/after, fingerprint-verified).
 
 ## 4. Classification summary
 
 | primary classification | count |
 |---|---|
-| A. `EXACT_MATCH` (version + name + content) | **2** |
+| A. `EXACT_MATCH` (version + name + content) | **3** |
 | B. `SAME_CONTENT_DIFFERENT_VERSION` | **30** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
 | H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
 
@@ -152,23 +159,25 @@ production.
 | 35 | 20260712170000 | checkout_sessions_hardening | `9f1d8844c9a7` | 20260713044036 | checkout_sessions_hardening | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 36 | 20260714070000 | support_contact | `f02603422918` | 20260714070000 | support_contact | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned to the repository filename by an approved single-row history write |
 | 37 | 20260714090000 | push_notifications | `d686d8f6e428` | 20260714090000 | push_notifications | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned as above |
-| 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | — | — | — | **E** | pending (live grants still present — verified) | CONFIRMED | **apply after separate approval (§10)** | n/a (unapplied) | merged in the repository; NOT applied to production |
+| 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; the pre-existing explicit `service_role=X` ACL entry remained — it originates from Supabase's platform **default function privileges** applied at creation (CONFIRMED in `pg_default_acl`: postgres-owned functions default-grant EXECUTE to anon/authenticated/service_role), NOT from any live-only grant, so it is not production drift and reproduces identically in any environment built from these repository migrations; function bodies and trigger definitions unchanged |
 
-Reconciliation check: 38 repository rows (2×A + 30×B + 3×C + 2×H + 1×E) and
-38 live rows (2×A + 30×B + 3×C + 3×F) — totals match §4 exactly.
+Reconciliation check: 38 repository rows (3×A + 30×B + 3×C + 2×H) and
+39 live rows (3×A + 30×B + 3×C + 3×F) — totals match §4 exactly.
 
 ## 6. Why `db push` is unsafe
 
-Only the two aligned July-14 migrations (`20260714070000`, `20260714090000`)
-share repository versions with live history. The Supabase CLI compares by
-**version**, so it would consider up to **36 repository files unapplied** and
-attempt to replay them against production. Risks:
+Only the three aligned July-14 migrations (`20260714070000`,
+`20260714090000`, `20260714130000`) share repository versions with live
+history. The Supabase CLI compares by **version**, so it would consider up to
+**35 repository files considered unapplied** and attempt to replay them
+against production. Aligning a third migration does **not** make `db push`
+any safer — the permanent production prohibition stands. Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (36 junk records even on success);
+- **duplicate or misleading history rows** (35 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly.
@@ -241,22 +250,35 @@ attempt to replay them against production. Risks:
 5. Run application smoke tests.
 6. Update this ledger (§5) and document the final state.
 
-## 10. Pending migration
+## 10. Completed migration: trigger-function EXECUTE hardening (Stage 4)
 
 `supabase/migrations/20260714130000_trigger_function_execute_hardening.sql`
 
-- **Status:** repository merged (base `a058e2b`); **production UNAPPLIED**
-  (the three functions' client EXECUTE grants are still present live —
-  verified 2026-07-14).
-- **Purpose:** revoke PUBLIC/anon/authenticated EXECUTE from the trigger-only
-  functions `public.handle_auth_user_phone_confirmed()`,
+- **Status: merged, applied to production, version-aligned, verified —
+  COMPLETE.**
+- **Application date:** 2026-07-14.
+- **Application method:** MCP `apply_migration` (exact merged file content;
+  Stage 4A) — **not** `db push`.
+- **Generated version:** `20260714153905` (apply-time stamp).
+- **Version alignment:** a separately approved, exactly-one-row version
+  update changed the recorded version to the final aligned version
+  **`20260714130000`** (Stage 4B); only the version column changed.
+- **Migration count after completion:** **39**.
+- **Effect (verified):** PUBLIC/anon/authenticated EXECUTE removed from
+  `public.handle_auth_user_phone_confirmed()`,
   `public.set_lazywait_initial_sync()` and
-  `public.stamp_payment_record_ts()`.
-- **Shape:** no table change, no data change, no trigger definition change;
-  three independent, idempotent REVOKE statements with no dependency on any
-  other unapplied change.
-- **Application:** requires its own separate explicit owner approval, through
-  the §9 workflow. **Must not be applied through `db push`.**
+  `public.stamp_payment_record_ts()`; the explicit `service_role` EXECUTE
+  entry remained. **Provenance of that entry (CONFIRMED, not drift):**
+  Supabase's platform default function privileges (`pg_default_acl`) grant
+  EXECUTE on every postgres-owned function to anon/authenticated/
+  service_role at creation time — the hardening migration revoked the
+  first two plus PUBLIC, and the platform-default service_role entry
+  remains. No repository or live-only `GRANT` statement is involved, and
+  any environment created from these repository migrations on a Supabase
+  project reproduces the identical end-state. Function bodies, owners,
+  SECURITY DEFINER/INVOKER state, `search_path` and all three trigger
+  definitions unchanged; Security Advisor trigger-function findings
+  cleared; business tables and push state untouched.
 
 ## 11. New environment guidance
 
@@ -271,10 +293,17 @@ attempt to replay them against production. Risks:
 
 ## 12. Historical audit reference
 
-- Audit date: **2026-07-14**
+- Original audit date: **2026-07-14**
 - Audited production project: **`wxfmmnihidsdyemasstf`**
-- Audited repository base: **`a058e2b436774c323f50320a2a32b44b8dc5ccfe`**
-- This ledger records the state at that commit/date. It **must be updated
-  after every approved live migration application** (new row, classification
-  A expected, fingerprints recorded), and re-validated if any tooling other
-  than the §9 workflow ever touches `schema_migrations`.
+- Originally audited repository base:
+  **`a058e2b436774c323f50320a2a32b44b8dc5ccfe`**
+- **Ledger update (Stage 4):** Stage 4A application completed **2026-07-14**;
+  Stage 4B version alignment completed **2026-07-14**; repository base used
+  for the live operation:
+  **`efb92aaf68c0e3331de7cda51903539a85835df6`**; current documented live
+  migration count: **39**; current documented latest version:
+  **`20260714130000`**.
+- This ledger records the state as of the Stage-4 update. It **must be
+  updated after every approved live migration application** (new row,
+  classification A expected, fingerprints recorded), and re-validated if any
+  tooling other than the §9 workflow ever touches `schema_migrations`.
