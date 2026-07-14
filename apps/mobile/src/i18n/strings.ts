@@ -102,6 +102,14 @@ export const STRINGS = {
     otRemoveContinue: 'Remove unavailable items and continue',
     otReviewCart: 'Review cart',
 
+    // contact & support
+    supportTitle: 'Contact & Support',
+    callSupport: 'Call Support',
+    whatsappSupport: 'WhatsApp Support',
+    emailSupport: 'Email Support',
+    workingHours: 'Working Hours',
+    supportOpenFailed: 'Could not open this action on your device.',
+
     // shared UI strings (promoted from repeated inline literals)
     paymentMethodTitle: 'Payment method',
     payOnline: 'Online Payment',
@@ -325,6 +333,14 @@ export const STRINGS = {
     otCartWarnBody: 'بعض المنتجات في السلة غير متوفرة في الفرع أو طريقة الطلب الجديدة. هل تريد إزالة المنتجات غير المتوفرة والمتابعة؟',
     otRemoveContinue: 'إزالة غير المتوفرة والمتابعة',
     otReviewCart: 'مراجعة السلة',
+
+    // التواصل والدعم
+    supportTitle: 'التواصل والدعم',
+    callSupport: 'الاتصال بالدعم',
+    whatsappSupport: 'الدعم عبر واتساب',
+    emailSupport: 'الدعم عبر البريد الإلكتروني',
+    workingHours: 'ساعات العمل',
+    supportOpenFailed: 'تعذّر فتح هذا الإجراء على جهازك.',
 
     // نصوص واجهة مشتركة (نُقلت من نصوص مكررة داخل الشاشات)
     paymentMethodTitle: 'طريقة الدفع',
