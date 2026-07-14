@@ -50,19 +50,35 @@ export function telLink(raw: string | null | undefined): string | null {
 }
 
 /**
- * WhatsApp deep link built from DIGITS ONLY: https://wa.me/9665XXXXXXXX.
- * wa.me requires the FULL international number, so only values entered in
- * international format ("+9665…" or "009665…") are accepted — a local number
- * like "0551234567" would silently become a wrong wa.me target after zero
- * stripping, so it is rejected (channel hidden + admin sees the warning).
+ * Normalize a SAUDI MOBILE number to canonical international digits
+ * (9665XXXXXXXX), or null when the value must be hidden. Accepted input
+ * formats (separators/spaces allowed):
+ *   05XXXXXXXX · 5XXXXXXXX · +9665XXXXXXXX · 009665XXXXXXXX
+ * Rejected: wrong lengths, landlines (011…/+96611…), non-Saudi international
+ * numbers, arbitrary text, URLs/schemes, placeholder values.
+ */
+export function normalizeSaudiMobile(raw: string | null | undefined): string | null {
+  if (!raw || isPlaceholderValue(raw)) return null;
+  const compact = raw.trim().replace(/[\s()-]/g, '');
+  // Digits with at most one leading '+' — kills text, URLs, and schemes.
+  if (!/^\+?\d+$/.test(compact)) return null;
+  let digits = compact.startsWith('+') ? compact.slice(1) : compact;
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (/^05\d{8}$/.test(digits)) digits = `966${digits.slice(1)}`; // 05XXXXXXXX
+  else if (/^5\d{8}$/.test(digits)) digits = `966${digits}`;      // 5XXXXXXXX
+  // Saudi MOBILE only (9665 + 8 digits) — landlines and other countries hide.
+  return /^9665\d{8}$/.test(digits) ? digits : null;
+}
+
+/**
+ * WhatsApp deep link for a Saudi mobile: https://wa.me/9665XXXXXXXX.
+ * Built from the normalized digits ONLY — an admin-stored value can never
+ * become a wrong-country target (review finding: 0551234567 must map to
+ * 966551234567, never wa.me/551234567) or inject a URL.
  */
 export function whatsappLink(raw: string | null | undefined): string | null {
-  if (!raw || isPlaceholderValue(raw)) return null;
-  const v = raw.trim();
-  if (!v.startsWith('+') && !v.startsWith('00')) return null;
-  const digits = v.replace(/\D/g, '').replace(/^0+/, '');
-  if (digits.length < 7 || digits.length > 15) return null;
-  return `https://wa.me/${digits}`;
+  const normalized = normalizeSaudiMobile(raw);
+  return normalized ? `https://wa.me/${normalized}` : null;
 }
 
 /** "support@spicymeal.sa" → "mailto:support@spicymeal.sa"; null when invalid. */
@@ -92,8 +108,8 @@ export function visibleSupportChannels(s: SupportSettings | null | undefined): S
   const out: SupportChannel[] = [];
   const tel = s.phoneEnabled ? telLink(s.phone) : null;
   if (tel && s.phone) out.push({ kind: 'phone', display: s.phone.trim(), url: tel });
-  const wa = s.whatsappEnabled ? whatsappLink(s.whatsapp) : null;
-  if (wa && s.whatsapp) out.push({ kind: 'whatsapp', display: s.whatsapp.trim(), url: wa });
+  const waDigits = s.whatsappEnabled ? normalizeSaudiMobile(s.whatsapp) : null;
+  if (waDigits) out.push({ kind: 'whatsapp', display: `+${waDigits}`, url: `https://wa.me/${waDigits}` });
   const mail = s.emailEnabled ? mailtoLink(s.email) : null;
   if (mail && s.email) out.push({ kind: 'email', display: s.email.trim(), url: mail });
   return out;

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  isPlaceholderValue, mailtoLink, supportDescription, telLink, visibleSupportChannels,
-  whatsappLink, workingHoursText, type SupportSettings,
+  isPlaceholderValue, mailtoLink, normalizeSaudiMobile, supportDescription, telLink,
+  visibleSupportChannels, whatsappLink, workingHoursText, type SupportSettings,
 } from './supportContact';
 
 function settings(over: Partial<SupportSettings> = {}): SupportSettings {
@@ -36,13 +36,22 @@ describe('link construction (only tel:/mailto:/https://wa.me allowed)', () => {
     expect(telLink('0551234567')).toBe('tel:0551234567');
     expect(telLink('12345')).toBeNull(); // too short
   });
-  it('wa.me is digits only, no + and no leading zeros', () => {
-    expect(whatsappLink('+966 55 123 4567')).toBe('https://wa.me/966551234567');
-    expect(whatsappLink('00966551234567')).toBe('https://wa.me/966551234567');
+  it('wa.me accepts ALL Saudi mobile formats and normalizes to 9665XXXXXXXX', () => {
+    expect(whatsappLink('0551234567')).toBe('https://wa.me/966551234567');      // 05XXXXXXXX
+    expect(whatsappLink('551234567')).toBe('https://wa.me/966551234567');       // 5XXXXXXXX
+    expect(whatsappLink('+966551234567')).toBe('https://wa.me/966551234567');   // +9665XXXXXXXX
+    expect(whatsappLink('00966551234567')).toBe('https://wa.me/966551234567');  // 009665XXXXXXXX
+    expect(whatsappLink('+966 55 123 4567')).toBe('https://wa.me/966551234567'); // separators ok
+    expect(normalizeSaudiMobile('0551234567')).toBe('966551234567');
   });
-  it('wa.me REJECTS local-format numbers (review finding: wrong target after zero-strip)', () => {
-    expect(whatsappLink('0551234567')).toBeNull();   // local KSA format → hidden, not wa.me/551234567
-    expect(whatsappLink('551234567')).toBeNull();    // no international prefix → hidden
+  it('wa.me hides invalid lengths, landlines, and unsupported international numbers', () => {
+    expect(whatsappLink('12345')).toBeNull();            // invalid length
+    expect(whatsappLink('05512345')).toBeNull();         // too short
+    expect(whatsappLink('055123456789')).toBeNull();     // too long
+    expect(whatsappLink('0112345678')).toBeNull();       // Saudi landline
+    expect(whatsappLink('+966112345678')).toBeNull();    // Saudi landline (intl)
+    expect(whatsappLink('+14155551234')).toBeNull();     // non-Saudi international
+    expect(whatsappLink('some text')).toBeNull();        // arbitrary text
   });
   it('mailto validates the address', () => {
     expect(mailtoLink('support@spicymeal.sa')).toBe('mailto:support@spicymeal.sa');
