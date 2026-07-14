@@ -38,7 +38,9 @@ export default function RootLayout() {
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="branch" options={{ presentation: 'modal' }} />
+              {/* Blocking order-type/branch selection — gestures off so the menu
+                  can't be reached without a valid order context. */}
+              <Stack.Screen name="select" options={{ gestureEnabled: false }} />
               <Stack.Screen name="product/[id]" />
               <Stack.Screen name="cart" />
               <Stack.Screen name="checkout" />

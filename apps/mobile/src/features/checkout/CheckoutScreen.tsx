@@ -28,7 +28,7 @@ import {
 } from '../../lib/payment';
 import { pointInPolygon } from '../../lib/geo';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
-import { useAuth, useCart, useCatalog } from '../../store';
+import { useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { OrderType, SavedAddress } from '../../types/models';
@@ -44,7 +44,12 @@ export function CheckoutScreen() {
   const { selectedBranch, brand, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
   const cart = useCart();
 
-  const [orderType, setOrderType] = useState<OrderType | null>(null); // never preselected
+  // Order type + branch are PRESELECTED from the order context (chosen in the
+  // blocking selection flow) — never re-picked inline. "Change" re-opens that
+  // flow after a confirmation (see the modal below).
+  const orderCtx = useOrderContext();
+  const orderType: OrderType | null = orderCtx.context?.orderType ?? null;
+  const [showTypeChange, setShowTypeChange] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(resolveDefaultMethod(payment));
   const [addressList, setAddressList] = useState<SavedAddress[]>([]);
   const [addressId, setAddressId] = useState<string | null>(null);
@@ -98,7 +103,10 @@ export function CheckoutScreen() {
       .then((rows) => {
         const mapped = rows.map(mapAddress);
         setAddressList(mapped);
-        const def = mapped.find((a) => a.isDefault) ?? mapped[0];
+        // Preselect the address chosen in the order context (delivery), falling
+        // back to the customer's default.
+        const ctxId = orderCtx.context?.orderType === 'delivery' ? orderCtx.context.addressId : null;
+        const def = (ctxId ? mapped.find((a) => a.id === ctxId) : undefined) ?? mapped.find((a) => a.isDefault) ?? mapped[0];
         if (def && Number.isFinite(def.lat) && Number.isFinite(def.lng)) {
           setAddressId(def.id);
           setPickedLat(def.lat);
@@ -106,6 +114,8 @@ export function CheckoutScreen() {
         }
       })
       .catch(() => setAddressList([]));
+    // Runs once on mount; the order context is read for the initial preselection only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // On entry, resolve any payment interrupted by an app kill / cold start BEFORE
@@ -394,12 +404,19 @@ export function CheckoutScreen() {
       <Header title={t('checkout')} showBack />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 190 }} keyboardShouldPersistTaps="handled">
-          {/* Order type — no preselection */}
-          <Text style={[styles.sectionTitle, rtlText]}>{t('orderType')}</Text>
-          <Text style={[styles.hint, rtlText]}>{t('chooseOrderType')}</Text>
-          <View style={styles.segment}>
-            <SegmentBtn label={t('delivery')} active={orderType === 'delivery'} onPress={() => setOrderType('delivery')} />
-            <SegmentBtn label={t('pickup')} active={orderType === 'pickup'} onPress={() => setOrderType('pickup')} />
+          {/* Order type + branch — PRESELECTED from the order context (read-only).
+              Change re-opens the selection flow after a confirmation. */}
+          <View style={[styles.otRow, rtlRow]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionTitle, rtlText]}>{t('orderType')}</Text>
+              <Text style={[styles.otValue, rtlText]} numberOfLines={1}>
+                {orderType === 'pickup' ? t('otPickup') : orderType === 'delivery' ? t('otDelivery') : ''}
+                {selectedBranch ? ` · ${pick(selectedBranch.nameEn, selectedBranch.nameAr)}` : ''}
+              </Text>
+            </View>
+            <Pressable onPress={() => setShowTypeChange(true)} accessibilityRole="button" hitSlop={8}>
+              <Text style={styles.otChange}>{t('otChange')}</Text>
+            </Pressable>
           </View>
 
           {/* Payment method — availability is admin-controlled */}
@@ -617,6 +634,21 @@ export function CheckoutScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Confirm before changing order type — it can change the branch, delivery
+          fee, item availability and cart contents. Confirm → re-open selection. */}
+      <Modal visible={showTypeChange} transparent animationType="fade" onRequestClose={() => setShowTypeChange(false)}>
+        <View style={styles.payBackdrop}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>{t('otChangeTypeTitle')}</Text>
+            <Text style={styles.payMsg}>{t('otChangeTypeBody')}</Text>
+            <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
+              <Button label={t('otChange')} onPress={() => { setShowTypeChange(false); router.push('/select'); }} variant="danger" />
+              <Button label={t('cancel')} onPress={() => setShowTypeChange(false)} variant="secondary" />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -643,6 +675,9 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
   hint: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
+  otRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+  otValue: { fontSize: font.md, color: colors.text, fontWeight: '700', marginTop: 2 },
+  otChange: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
   block: { marginTop: spacing.xl },
   note: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
 

@@ -1,9 +1,10 @@
 /**
  * Catalog + settings state. Loads the whole menu graph from Supabase once on
  * mount (catalog.all()), maps it to domain models, and exposes selectors the
- * screens use. Also owns the manually-chosen branch. The app NEVER auto-selects
- * a branch AND never remembers it across launches — the branch is a per-session
- * choice, so every time the app is opened the customer must pick a branch.
+ * screens use. The selected branch is a MIRROR of the order context (see
+ * OrderContextProvider — the persisted pickup/delivery decision): the app never
+ * auto-selects a branch; an invalid/missing context forces the blocking
+ * selection screen before the menu is usable.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -37,7 +38,9 @@ interface CatalogValue {
 
   selectedBranchId: string | null;
   selectedBranch: Branch | null;
-  setSelectedBranch: (id: string) => void;
+  // Driven by OrderContextProvider (the single source of truth): pass a branch id
+  // to mirror the chosen branch, or null to clear it when the context is reset.
+  setSelectedBranch: (id: string | null) => void;
 
   getProduct: (id: string) => Product | undefined;
   groupsForProduct: (product: Product) => ModifierGroup[];
@@ -63,9 +66,11 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
 
-  // NOTE: the chosen branch is intentionally NOT restored from storage. It lives
-  // in memory only, so a fresh app launch always starts with no branch selected
-  // and the customer is prompted to choose one (never auto-selected).
+  // NOTE: the branch itself is not persisted here — OrderContextProvider owns
+  // the persisted pickup/delivery decision and mirrors its (re-validated)
+  // branch into this provider on launch. A context that is no longer valid
+  // sends the customer back to the blocking selection screen instead of ever
+  // auto-selecting a branch.
 
   useEffect(() => {
     mounted.current = true;
@@ -99,9 +104,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted.current = false; };
   }, [reloadTick]);
 
-  // In-memory only: the choice is kept for the current session but never
-  // persisted, so the next app launch requires selecting a branch again.
-  const setSelectedBranch = useCallback((id: string) => {
+  // Mirror of the order context's branch. The persisted source of truth lives in
+  // OrderContextProvider; this stays the accessor the menu/product/checkout
+  // screens already read (selectedBranch), so those screens are untouched.
+  const setSelectedBranch = useCallback((id: string | null) => {
     setSelectedBranchId(id);
   }, []);
 
