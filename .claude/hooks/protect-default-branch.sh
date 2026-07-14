@@ -127,8 +127,10 @@ LB='(^|[^[:alnum:]._-])'
 # "git <real global flags>* <subcommand>" adjacency. This keeps the any-branch
 # rules from firing on words that merely appear inside quoted text (for
 # example a commit message that mentions "push" or a protected branch name)
-# while still catching git -C/-c/--git-dir forms that retarget the repo.
-GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--git-dir=[^[:space:]]+|--work-tree=[^[:space:]]+|--no-pager|-[Pp]))*[[:space:]]+'
+# while still catching git global-option forms that retarget the repo —
+# including the space-separated value forms (--git-dir .git) and the
+# no-value globals (--literal-pathspecs, --no-pager, --bare, ...).
+GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|config-env|super-prefix)(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--no-pager|--paginate|--no-replace-objects|--no-optional-locks|--no-lazy-fetch|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--bare|-[Pp]))*[[:space:]]+'
 
 # ---------------------------------------------------------------------------
 # 4. ANY-BRANCH rules: protected refs may never be pushed/updated/deleted/
@@ -207,21 +209,23 @@ if cmd_matches '(^|[;&|([:space:]])(npm|npx|yarn|pnpm|bun|pip|pip3|corepack|gem|
   deny "protected branch: package manager and skills CLI commands (npm, npx, yarn, pnpm, pip, ...) are denied because they install files into the repository. ${WORKFLOW_HINT}"
 fi
 
-# 7e. in-place editors => deny
-if cmd_matches "${LB}sed${WB}" && cmd_matches '(^|[[:space:]])(-i[^[:space:]]*|--in-place)([[:space:]]|$)'; then
-  deny "protected branch: sed -i (in-place edit) is denied. ${WORKFLOW_HINT}"
-fi
-if cmd_matches "${LB}find${WB}" && cmd_matches '(^|[[:space:]])(-delete|-exec|-execdir|-ok|-okdir|-fprintf|-fprint|-fls)([[:space:]]|$)'; then
-  deny "protected branch: find with -delete/-exec/-ok is denied. ${WORKFLOW_HINT}"
+# 7e. find write/exec actions => deny (-fprint matched with any suffix so
+#     -fprint0/-fprintf cannot slip through)
+if cmd_matches "${LB}find${WB}" && cmd_matches '(^|[[:space:]])(-delete|-exec|-execdir|-ok|-okdir|-f(print|ls)[^[:space:]]*)([[:space:]]|$)'; then
+  deny "protected branch: find with -delete/-exec/-ok/-fprint is denied. ${WORKFLOW_HINT}"
 fi
 
-# 7f. common file mutators / interpreters at a command position => deny
-if cmd_matches '(^|[;&|([:space:]])(tee|touch|cp|mv|rm|rmdir|mkdir|ln|chmod|chown|truncate|dd|install|rsync|patch|shred|tar|unzip|zip|gzip|gunzip|xargs|env|eval|exec|source|sh|bash|zsh|dash|ksh|perl|python|python3|node|deno|ruby|php)([[:space:]]|$)'; then
-  deny "protected branch: file-modifying commands and interpreters (tee, touch, cp, mv, rm, chmod, python, node, sh, ...) are denied. ${WORKFLOW_HINT}"
+# 7f. common file mutators / interpreters at a command position => deny.
+#     sed and awk are NOT read-only: sed can write files (w/W commands, -i)
+#     and GNU sed can execute commands (e); awk has system() and print>file.
+if cmd_matches '(^|[;&|([:space:]])(tee|touch|cp|mv|rm|rmdir|mkdir|ln|chmod|chown|truncate|dd|install|rsync|patch|shred|tar|unzip|zip|gzip|gunzip|xargs|env|eval|exec|source|sh|bash|zsh|dash|ksh|perl|python|python3|node|deno|ruby|php|sed|awk|gawk|mawk)([[:space:]]|$)'; then
+  deny "protected branch: file-modifying commands and interpreters (tee, touch, cp, mv, rm, chmod, sed, awk, python, node, sh, ...) are denied. ${WORKFLOW_HINT}"
 fi
 
-# 7g. fail-closed read-only allowlist, checked per pipeline/command segment
-SAFE_SIMPLE='ls cat head tail wc grep rg egrep fgrep diff cmp file stat du df pwd printf echo true false jq sort uniq cut tr awk sed comm column nl md5sum sha1sum sha256sum shasum cksum basename dirname readlink realpath which command type date whoami id uname hostname printenv shellcheck find tree'
+# 7g. fail-closed read-only allowlist, checked per pipeline/command segment.
+#     sed/awk/tree are deliberately absent (write/exec-capable); sort, uniq
+#     and rg get dedicated argument screens in check_segment below.
+SAFE_SIMPLE='ls cat head tail wc grep egrep fgrep diff cmp file stat du df pwd printf echo true false jq cut tr comm column nl md5sum sha1sum sha256sum shasum cksum basename dirname readlink realpath which command type date whoami id uname hostname printenv shellcheck find'
 
 check_git_branch_args() {
   local prev='' a
@@ -271,10 +275,20 @@ check_git_checkout_args() {
 check_git_segment() {
   [ $# -ge 1 ] || return 0   # bare "git" prints help
   local sub="$1"; shift
+  local a
   case "$sub" in
     -*)
       deny "protected branch: git global options (-C, --git-dir, --work-tree, ...) are denied; run plain git subcommands. ${WORKFLOW_HINT}" ;;
     status|log|show|diff|rev-parse|rev-list|ls-files|ls-remote|ls-tree|cat-file|grep|blame|shortlog|describe|name-rev|merge-base|fetch|var|count-objects|fsck|version|help|check-ignore|show-ref|for-each-ref)
+      # even read-only subcommands have options that write files or execute
+      # external commands (log/diff --output, grep -O/--open-files-in-pager,
+      # fetch/ls-remote --upload-pack) — deny those
+      for a in "$@"; do
+        case "$a" in
+          --output|--output=*|-O*|--open-files-in-pager*|--upload-pack*|--receive-pack*|--ext-diff|--textconv*)
+            deny "protected branch: a git option that writes files or executes external commands (--output, -O, --upload-pack, ...) is denied. ${WORKFLOW_HINT}" ;;
+        esac
+      done
       return 0 ;;
     remote)
       [ $# -eq 0 ] && return 0
@@ -314,13 +328,42 @@ check_segment() {
   # shellcheck disable=SC2086
   set -- $seg
   [ $# -ge 1 ] || return 0
-  local first="$1"
+  local first="$1" a pos
   first="${first##*/}"
-  if [ "$first" = "git" ]; then
-    shift
-    check_git_segment "$@"
-    return 0
-  fi
+  shift
+  case "$first" in
+    git)
+      check_git_segment "$@"
+      return 0 ;;
+    sort)
+      for a in "$@"; do
+        case "$a" in
+          -o|--output|--output=*)
+            deny "protected branch: sort with an output file (-o/--output) is denied. ${WORKFLOW_HINT}" ;;
+        esac
+      done
+      return 0 ;;
+    uniq)
+      # "uniq INPUT OUTPUT" writes OUTPUT — allow at most one positional arg
+      pos=0
+      for a in "$@"; do
+        case "$a" in
+          -*) ;;
+          *) pos=$((pos+1)) ;;
+        esac
+      done
+      [ "$pos" -ge 2 ] \
+        && deny "protected branch: uniq with an output file argument is denied. ${WORKFLOW_HINT}"
+      return 0 ;;
+    rg)
+      for a in "$@"; do
+        case "$a" in
+          --pre|--pre=*|--hostname-bin*)
+            deny "protected branch: rg --pre (preprocessor command execution) is denied. ${WORKFLOW_HINT}" ;;
+        esac
+      done
+      return 0 ;;
+  esac
   local w
   for w in $SAFE_SIMPLE; do
     [ "$first" = "$w" ] && return 0
