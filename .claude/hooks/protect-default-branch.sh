@@ -240,8 +240,8 @@ any_branch_rules() {
   fi
   # so can configuration that redirects where a push lands
   if str_matches "$C" "$GIT_WORD" \
-    && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.push|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
-    deny "git configuration that redirects push destinations (push.default, remote.*.push, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
+    && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.(push|mirror)|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
+    deny "git configuration that redirects push destinations (push.default, remote.*.push, remote.*.mirror, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
   fi
   # include.path / includeIf pull in an arbitrary config file that could set
   # any of the above (aliases, remote.*.push, ...) out of the scanner's view;
@@ -338,19 +338,28 @@ if [ "$TOOL_NAME" = "Bash" ]; then
       is_protected "$PUSH_DEST" \
         && deny "the current branch's configured push destination resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
     fi
-    # (b) a preconfigured per-remote push refspec (remote.<name>.push) whose
-    #     DESTINATION is a protected ref, or a wildcard that could include one.
-    #     This is what @{push} does NOT reflect (it tracks upstream, not the
-    #     push refspec). Only these two dangerous shapes are denied, so a benign
-    #     remote.*.push=HEAD (push current branch) stays allowed.
-    PUSH_CFG="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.push$' 2>/dev/null || true)"
-    if [ -n "$PUSH_CFG" ]; then
-      printf '%s' "$PUSH_CFG" | grep -Eq ":(refs/heads/)?(claude/project-build-ie4b56|main)([^[:alnum:]_./-]|\$)" \
-        && deny "a configured push refspec (remote.*.push) targets a protected branch, so git push is denied. ${WORKFLOW_HINT}"
-      printf '%s' "$PUSH_CFG" | grep -Eq '[*]' \
-        && deny "a configured push refspec (remote.*.push) uses a wildcard destination that could include a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+    # (b) a preconfigured per-remote push refspec (remote.<name>.push) that
+    #     could touch a protected ref. @{push} does NOT reflect this (it tracks
+    #     upstream, not the push refspec). Danger shapes, tested on the VALUE
+    #     only (the key is stripped so a remote literally named "main" is not a
+    #     false hit): a protected ref as source OR destination (a source-only
+    #     refspec like `main` pushes to same-named remote main); the matching
+    #     refspec (`:` / `+:`); or a wildcard. A benign remote.*.push=HEAD
+    #     (push the current branch) stays allowed.
+    PUSH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.push$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
+    if [ -n "$PUSH_VALS" ]; then
+      printf '%s' "$PUSH_VALS" | grep -Eq "$PROT_WORD" \
+        && deny "a configured push refspec (remote.*.push) names a protected branch as its source or destination, so git push is denied. ${WORKFLOW_HINT}"
+      printf '%s' "$PUSH_VALS" | grep -Eq '(^|[[:space:]])\+?:([[:space:]]|$)' \
+        && deny "a configured matching push refspec (remote.*.push = ':' / '+:') pushes all matching branches including protected ones, so git push is denied. ${WORKFLOW_HINT}"
+      printf '%s' "$PUSH_VALS" | grep -Eq '[*]' \
+        && deny "a configured push refspec (remote.*.push) uses a wildcard that could include a protected branch, so git push is denied. ${WORKFLOW_HINT}"
     fi
-    # (c) push.default=matching pushes every branch present on both ends,
+    # (c) remote.<name>.mirror=true makes a plain push behave like --mirror,
+    #     updating every ref (including protected ones)
+    git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.mirror$' 2>/dev/null | grep -Eqi '(^|[[:space:]])(true|yes|on|1)$' \
+      && deny "remote.*.mirror=true makes git push mirror all refs including protected ones; git push is denied. ${WORKFLOW_HINT}"
+    # (d) push.default=matching pushes every branch present on both ends,
     #     including a protected one, when the push names no refspec
     [ "$(git -C "$PROJECT_DIR" config --get push.default 2>/dev/null || true)" = "matching" ] \
       && deny "push.default=matching would push all matching branches including protected ones; git push is denied. Use an explicit refspec. ${WORKFLOW_HINT}"
