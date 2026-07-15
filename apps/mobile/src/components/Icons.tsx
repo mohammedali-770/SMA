@@ -107,6 +107,28 @@ export function AlertIcon({ size = 40, color = '#e02d3d' }: IconProps) {
   );
 }
 
+/** Shopping bag: rounded body + handle arch — used for the empty cart. */
+export function BagIcon({ size = 40, color = '#c9c4d6' }: IconProps) {
+  const stroke = Math.max(2, Math.round(size / 16));
+  const bodyW = Math.round(size * 0.72);
+  const handleW = Math.round(size * 0.36);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end' }} pointerEvents="none">
+      <View style={{
+        width: handleW, height: Math.round(handleW * 0.62),
+        borderTopLeftRadius: handleW / 2, borderTopRightRadius: handleW / 2,
+        borderWidth: stroke, borderBottomWidth: 0, borderColor: color,
+        marginBottom: -stroke,
+      }} />
+      <View style={{
+        width: bodyW, height: Math.round(size * 0.58), borderWidth: stroke, borderColor: color,
+        borderTopLeftRadius: 4, borderTopRightRadius: 4,
+        borderBottomLeftRadius: Math.round(size * 0.16), borderBottomRightRadius: Math.round(size * 0.16),
+      }} />
+    </View>
+  );
+}
+
 /** Plate: concentric circles — used for empty menu / missing dish imagery. */
 export function DishIcon({ size = 40, color = '#c9c4d6' }: IconProps) {
   const stroke = Math.max(2, Math.round(size / 16));
