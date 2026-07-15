@@ -8,8 +8,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { AlertIcon, AwardIcon, CheckCircleIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
-import { ErrorView, LoadingView } from '../../components/StateViews';
+import { ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
@@ -65,14 +66,17 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.bg}>
       {loading ? (
-        <LoadingView label={t('loading')} />
+        // Static skeleton shaped like the loaded receipt (hero, metadata card,
+        // summary card) so the first paint lands without a jump. Rendered in
+        // the same `loading` branch; silent refreshes never re-enter it.
+        <ReceiptSkeleton />
       ) : error || !order ? (
-        <ErrorView message={error ?? t('somethingWentWrong')} onRetry={load} retryLabel={t('retry')} />
+        <ErrorView message={error ?? t('somethingWentWrong')} onRetry={load} retryLabel={t('retry')} icon={<AlertIcon />} />
       ) : (
         <View style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }} showsVerticalScrollIndicator={false}>
             <View style={styles.hero}>
-              <Text style={styles.check}>✅</Text>
+              <CheckCircleIcon size={56} color={colors.success} />
               <Text style={styles.title}>{t('orderPlaced')}</Text>
               <Text style={styles.sub}>{t('orderPlacedSub')}</Text>
             </View>
@@ -113,7 +117,14 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                     <Row label={pick('Branch', 'الفرع')} value={pick(order.branchNameEn, order.branchNameAr)} />
                     <Row label={pick('Placed', 'وقت الطلب')} value={formatRiyadhDateTime(order.createdAt)} />
                   </View>
-                  {note ? <Text style={styles.notPaid}>⚠ {note}</Text> : null}
+                  {note ? (
+                    // Warning callout — informational tone, never styled as an
+                    // error; the note text and visibility rules are unchanged.
+                    <View style={[styles.noteBox, rtlRow]}>
+                      <AlertIcon size={20} color={colors.warning} />
+                      <Text style={[styles.notPaid, rtlText, { flex: 1 }]}>{note}</Text>
+                    </View>
+                  ) : null}
                 </>
               );
             })()}
@@ -124,8 +135,10 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                 <View key={it.id} style={[styles.itemRow, rtlRow]}>
                   <Text style={styles.itemQty}>{it.quantity}×</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemName, rtlText]}>{pick(it.nameEn, it.nameAr)}</Text>
+                    <Text style={[styles.itemName, rtlText]} numberOfLines={2}>{pick(it.nameEn, it.nameAr)}</Text>
                     {it.selectedModifiers.length > 0 ? (
+                      // The receipt is the detailed order record: every selected
+                      // modifier stays visible in full — no line cap, no ellipsis.
                       <Text style={[styles.itemMods, rtlText]}>
                         {it.selectedModifiers.map((m) => pick(m.nameEn, m.nameAr)).join(' · ')}
                       </Text>
@@ -143,9 +156,12 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               <View style={styles.divider} />
               <Row label={t('total')} value={formatSAR(order.total, lang)} strong big />
               {order.loyaltyPointsEarned > 0 ? (
-                <Text style={[styles.earned, rtlText]}>
-                  ⭐ +{order.loyaltyPointsEarned} {t('loyaltyPoints')}
-                </Text>
+                <View style={[styles.earnedRow, rtlRow]}>
+                  <AwardIcon size={18} color={colors.warning} />
+                  <Text style={[styles.earned, rtlText]}>
+                    +{order.loyaltyPointsEarned} {t('loyaltyPoints')}
+                  </Text>
+                </View>
               ) : null}
             </View>
           </ScrollView>
@@ -175,14 +191,16 @@ function Row({ label, value, secondary, strong, big, muted }: { label: string; v
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs },
-  check: { fontSize: 56 },
-  title: { fontSize: font.xxl, fontWeight: '800', color: colors.purple },
+  hero: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
+  title: { fontSize: font.xxl, fontWeight: '800', color: colors.purple, textAlign: 'center' },
   sub: { fontSize: font.md, color: colors.muted, textAlign: 'center' },
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.md,
+  },
   summaryTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
-  rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.sm - 2 },
+  rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600', flexShrink: 1 },
   rowValueCol: { alignItems: 'flex-end', flexShrink: 1 },
   rowValueColRTL: { alignItems: 'flex-start' },
   rowValue: { fontSize: font.md, color: colors.text, fontWeight: '700' },
@@ -190,13 +208,78 @@ const styles = StyleSheet.create({
   muted: { color: colors.muted, fontSize: font.sm },
   strong: { fontWeight: '800' },
   big: { fontSize: font.lg, color: colors.purple },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.xs },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.sm - 2 },
   itemQty: { fontSize: font.md, fontWeight: '800', color: colors.purple, minWidth: 28 },
   itemName: { fontSize: font.md, fontWeight: '700', color: colors.text },
-  itemMods: { fontSize: font.sm, color: colors.muted },
+  itemMods: { fontSize: font.sm, color: colors.muted, marginTop: 1 },
   itemPrice: { fontSize: font.md, fontWeight: '700', color: colors.text },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
-  earned: { marginTop: spacing.sm, color: colors.warning, fontWeight: '800', fontSize: font.sm },
-  notPaid: { marginTop: spacing.md, color: colors.warning, fontWeight: '800', fontSize: font.sm, textAlign: 'center' },
+  earnedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
+  earned: { color: colors.warning, fontWeight: '800', fontSize: font.sm },
+  noteBox: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md,
+    backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.md, borderCurve: 'continuous', padding: spacing.md,
+  },
+  notPaid: { color: colors.warning, fontWeight: '700', fontSize: font.sm },
   footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
+});
+
+/**
+ * Static ghost receipt matching the loaded layout — no animation loops.
+ * The WRAPPER is the single accessible element (VoiceOver/TalkBack announce
+ * one "loading" progress state via the existing translation); the decorative
+ * ghost shapes stay excluded from the accessibility tree, so there are no
+ * per-block announcements.
+ */
+function ReceiptSkeleton() {
+  const { t } = useI18n();
+  return (
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('loading')}
+      accessibilityState={{ busy: true }}
+      accessibilityLiveRegion="polite"
+      style={{ flex: 1 }}
+    >
+      <View
+        style={{ padding: spacing.lg, gap: spacing.md }}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm }}>
+          <View style={skeleton.circle} />
+          <View style={[skeleton.line, { width: '50%', height: 18 }]} />
+          <View style={[skeleton.line, { width: '70%' }]} />
+        </View>
+        <View style={skeleton.card}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+              <View style={[skeleton.line, { width: '30%' }]} />
+              <View style={[skeleton.line, { width: '38%' }]} />
+            </View>
+          ))}
+        </View>
+        <View style={skeleton.card}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+              <View style={[skeleton.line, { width: '55%' }]} />
+              <View style={[skeleton.line, { width: 64 }]} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const skeleton = StyleSheet.create({
+  circle: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
+  },
+  line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
 });

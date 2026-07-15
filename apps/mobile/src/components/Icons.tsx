@@ -107,6 +107,25 @@ export function AlertIcon({ size = 40, color = '#e02d3d' }: IconProps) {
   );
 }
 
+/** Check inside a ring — used for success/confirmation states. */
+export function CheckCircleIcon({ size = 48, color = '#1f9d55' }: IconProps) {
+  const stroke = Math.max(2, Math.round(size / 14));
+  const checkW = Math.round(size * 0.42);
+  const checkH = Math.round(size * 0.24);
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: color,
+      alignItems: 'center', justifyContent: 'center',
+    }} pointerEvents="none">
+      <View style={{
+        width: checkW, height: checkH,
+        borderLeftWidth: stroke, borderBottomWidth: stroke, borderColor: color,
+        transform: [{ rotate: '-45deg' }], marginTop: -Math.round(checkH * 0.4),
+      }} />
+    </View>
+  );
+}
+
 /** Medal: ring + core + ribbon legs — used for the loyalty balance. */
 export function AwardIcon({ size = 24, color = '#422e87' }: IconProps) {
   const stroke = Math.max(2, Math.round(size / 12));
