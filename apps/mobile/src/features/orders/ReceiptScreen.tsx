@@ -137,7 +137,9 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.itemName, rtlText]} numberOfLines={2}>{pick(it.nameEn, it.nameAr)}</Text>
                     {it.selectedModifiers.length > 0 ? (
-                      <Text style={[styles.itemMods, rtlText]} numberOfLines={2}>
+                      // The receipt is the detailed order record: every selected
+                      // modifier stays visible in full — no line cap, no ellipsis.
+                      <Text style={[styles.itemMods, rtlText]}>
                         {it.selectedModifiers.map((m) => pick(m.nameEn, m.nameAr)).join(' · ')}
                       </Text>
                     ) : null}
@@ -223,30 +225,51 @@ const styles = StyleSheet.create({
   footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
 });
 
-/** Static ghost receipt matching the loaded layout — no animation loops. */
+/**
+ * Static ghost receipt matching the loaded layout — no animation loops.
+ * The WRAPPER is the single accessible element (VoiceOver/TalkBack announce
+ * one "loading" progress state via the existing translation); the decorative
+ * ghost shapes stay excluded from the accessibility tree, so there are no
+ * per-block announcements.
+ */
 function ReceiptSkeleton() {
+  const { t } = useI18n();
   return (
-    <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
-      <View style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm }}>
-        <View style={skeleton.circle} />
-        <View style={[skeleton.line, { width: '50%', height: 18 }]} />
-        <View style={[skeleton.line, { width: '70%' }]} />
-      </View>
-      <View style={skeleton.card}>
-        {[0, 1, 2, 3].map((i) => (
-          <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
-            <View style={[skeleton.line, { width: '30%' }]} />
-            <View style={[skeleton.line, { width: '38%' }]} />
-          </View>
-        ))}
-      </View>
-      <View style={skeleton.card}>
-        {[0, 1, 2].map((i) => (
-          <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
-            <View style={[skeleton.line, { width: '55%' }]} />
-            <View style={[skeleton.line, { width: 64 }]} />
-          </View>
-        ))}
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel={t('loading')}
+      accessibilityState={{ busy: true }}
+      accessibilityLiveRegion="polite"
+      style={{ flex: 1 }}
+    >
+      <View
+        style={{ padding: spacing.lg, gap: spacing.md }}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={{ alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm }}>
+          <View style={skeleton.circle} />
+          <View style={[skeleton.line, { width: '50%', height: 18 }]} />
+          <View style={[skeleton.line, { width: '70%' }]} />
+        </View>
+        <View style={skeleton.card}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+              <View style={[skeleton.line, { width: '30%' }]} />
+              <View style={[skeleton.line, { width: '38%' }]} />
+            </View>
+          ))}
+        </View>
+        <View style={skeleton.card}>
+          {[0, 1, 2].map((i) => (
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm }}>
+              <View style={[skeleton.line, { width: '55%' }]} />
+              <View style={[skeleton.line, { width: 64 }]} />
+            </View>
+          ))}
+        </View>
       </View>
     </View>
   );
