@@ -274,6 +274,46 @@ scan_interpreter_payloads() {
 
 GIT_PUSH_SEEN=0
 GIT_FETCH_SEEN=0
+GIT_TARGETS=''
+
+# Deny a bare push whose EFFECTIVE config in directory $1 would route it to a
+# protected ref: upstream @{push}, a per-remote push refspec (protected source
+# or destination / matching / wildcard), a mirror flag, or push.default=matching.
+check_push_config() {
+  local D="$1" pd pv
+  pd="$(git -C "$D" rev-parse --abbrev-ref '@{push}' 2>/dev/null || true)"
+  [ -n "$pd" ] && printf '%s' "$pd" | grep -Eq "(^|/)(claude/project-build-ie4b56|main)\$" \
+    && deny "a configured push destination (@{push}) resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+  pv="$(git -C "$D" config --get-regexp '^remote\..+\.push$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
+  if [ -n "$pv" ]; then
+    printf '%s' "$pv" | grep -Eq "$PROT_WORD" \
+      && deny "a configured push refspec (remote.*.push) names a protected branch as its source or destination, so git push is denied. ${WORKFLOW_HINT}"
+    printf '%s' "$pv" | grep -Eq '(^|[[:space:]])\+?:([[:space:]]|$)' \
+      && deny "a configured matching push refspec (remote.*.push = ':' / '+:') pushes all matching branches including protected ones, so git push is denied. ${WORKFLOW_HINT}"
+    printf '%s' "$pv" | grep -Eq '[*]' \
+      && deny "a configured push refspec (remote.*.push) uses a wildcard that could include a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+  fi
+  git -C "$D" config --get-regexp '^remote\..+\.mirror$' 2>/dev/null | grep -Eqi '(^|[[:space:]])(true|yes|on|1)$' \
+    && deny "remote.*.mirror=true makes git push mirror all refs including protected ones; git push is denied. ${WORKFLOW_HINT}"
+  [ "$(git -C "$D" config --get push.default 2>/dev/null || true)" = "matching" ] \
+    && deny "push.default=matching would push all matching branches including protected ones; git push is denied. Use an explicit refspec. ${WORKFLOW_HINT}"
+  return 0
+}
+
+# Deny a plain fetch/pull whose EFFECTIVE config in $1 has a fetch refspec that
+# writes a protected LOCAL head (or a wildcard into local heads). A normal
+# refspec writing refs/remotes/... is unaffected.
+check_fetch_config() {
+  local D="$1" fv
+  fv="$(git -C "$D" config --get-regexp '^remote\..+\.fetch$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
+  if [ -n "$fv" ]; then
+    printf '%s' "$fv" | grep -Eq ":(refs/heads/)?(claude/project-build-ie4b56|main)([^[:alnum:]_./-]|\$)" \
+      && deny "a configured fetch refspec (remote.*.fetch) writes a protected local ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
+    printf '%s' "$fv" | grep -Eq ':refs/heads/[*]' \
+      && deny "a configured fetch refspec (remote.*.fetch) writes local branches via a wildcard that could include a protected ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
+  fi
+  return 0
+}
 
 any_branch_rules() {
   local C="$1"
@@ -372,6 +412,14 @@ any_branch_rules() {
   if str_matches "$C" "$GIT_WORD" && str_matchesi "$C" '(^|[^[:alnum:]_])include(if)?[.]'; then
     deny "git include.path / includeIf configuration can pull in unvettable settings (aliases, remote.*.push, ...) and is denied from every branch. ${WORKFLOW_HINT}"
   fi
+  # GIT_CONFIG* environment overrides point git at an arbitrary config file or
+  # inject config keys the runtime config read cannot see (GIT_CONFIG_GLOBAL,
+  # GIT_CONFIG_SYSTEM, GIT_CONFIG, GIT_CONFIG_COUNT/KEY_n/VALUE_n) — deny them
+  # on any git command (env-var names are case-sensitive/uppercase)
+  if str_matches "$C" "$GIT_WORD" \
+    && str_matches "$C" '(^|[^[:alnum:]_])GIT_CONFIG(_GLOBAL|_SYSTEM|_COUNT|_KEY_[0-9]+|_VALUE_[0-9]+)?='; then
+    deny "GIT_CONFIG* environment overrides point git at unvettable configuration and are denied from every branch. ${WORKFLOW_HINT}"
+  fi
   # a variable or ANSI-C-quoted fragment ANYWHERE in the subcommand word
   # cannot be vetted: the shell concatenates the fragments before git runs
   # (git dollar-X, git pu-dollar-quoted-sh, ...). The bracket class matches
@@ -465,62 +513,24 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     fi
   done
 
-  # even without an explicit protected ref in the command, a bare git push
-  # can land on a protected branch through configuration the command text does
-  # not spell out. Check the effective push config at runtime:
-  if [ "$GIT_PUSH_SEEN" -eq 1 ]; then
-    # (a) the current branch's upstream push destination (@{push}); empty for a
-    #     brand-new branch with no upstream, which is the normal first-push case
-    # @{push} is "<remote>/<branch>", but BOTH the remote name and the branch
-    # name can contain slashes (origin/main, foo/bar/main, or the protected
-    # claude/project-build-ie4b56). Rather than guess where the remote prefix
-    # ends, match a protected branch name anchored at the END on a "/" (or
-    # string-start) boundary — this catches every remote-prefix shape.
-    PUSH_DEST="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref '@{push}' 2>/dev/null || true)"
-    if [ -n "$PUSH_DEST" ]; then
-      printf '%s' "$PUSH_DEST" | grep -Eq "(^|/)(claude/project-build-ie4b56|main)\$" \
-        && deny "the current branch's configured push destination resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
-    fi
-    # (b) a preconfigured per-remote push refspec (remote.<name>.push) that
-    #     could touch a protected ref. @{push} does NOT reflect this (it tracks
-    #     upstream, not the push refspec). Danger shapes, tested on the VALUE
-    #     only (the key is stripped so a remote literally named "main" is not a
-    #     false hit): a protected ref as source OR destination (a source-only
-    #     refspec like `main` pushes to same-named remote main); the matching
-    #     refspec (`:` / `+:`); or a wildcard. A benign remote.*.push=HEAD
-    #     (push the current branch) stays allowed.
-    PUSH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.push$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
-    if [ -n "$PUSH_VALS" ]; then
-      printf '%s' "$PUSH_VALS" | grep -Eq "$PROT_WORD" \
-        && deny "a configured push refspec (remote.*.push) names a protected branch as its source or destination, so git push is denied. ${WORKFLOW_HINT}"
-      printf '%s' "$PUSH_VALS" | grep -Eq '(^|[[:space:]])\+?:([[:space:]]|$)' \
-        && deny "a configured matching push refspec (remote.*.push = ':' / '+:') pushes all matching branches including protected ones, so git push is denied. ${WORKFLOW_HINT}"
-      printf '%s' "$PUSH_VALS" | grep -Eq '[*]' \
-        && deny "a configured push refspec (remote.*.push) uses a wildcard that could include a protected branch, so git push is denied. ${WORKFLOW_HINT}"
-    fi
-    # (c) remote.<name>.mirror=true makes a plain push behave like --mirror,
-    #     updating every ref (including protected ones)
-    git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.mirror$' 2>/dev/null | grep -Eqi '(^|[[:space:]])(true|yes|on|1)$' \
-      && deny "remote.*.mirror=true makes git push mirror all refs including protected ones; git push is denied. ${WORKFLOW_HINT}"
-    # (d) push.default=matching pushes every branch present on both ends,
-    #     including a protected one, when the push names no refspec
-    [ "$(git -C "$PROJECT_DIR" config --get push.default 2>/dev/null || true)" = "matching" ] \
-      && deny "push.default=matching would push all matching branches including protected ones; git push is denied. Use an explicit refspec. ${WORKFLOW_HINT}"
-  fi
-
-  # a configured fetch refspec (remote.<name>.fetch) whose LOCAL destination
-  # (after the ':') is a protected head, or a wildcard writing local heads,
-  # updates the protected ref on a plain `git fetch` even though the command
-  # names no ref. A normal refspec writing refs/remotes/... is unaffected.
-  if [ "$GIT_FETCH_SEEN" -eq 1 ]; then
-    FETCH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.fetch$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
-    if [ -n "$FETCH_VALS" ]; then
-      printf '%s' "$FETCH_VALS" | grep -Eq ":(refs/heads/)?(claude/project-build-ie4b56|main)([^[:alnum:]_./-]|\$)" \
-        && deny "a configured fetch refspec (remote.*.fetch) writes a protected local ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
-      printf '%s' "$FETCH_VALS" | grep -Eq ':refs/heads/[*]' \
-        && deny "a configured fetch refspec (remote.*.fetch) writes local branches via a wildcard that could include a protected ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
-    fi
-  fi
+  # even without an explicit protected ref in the command, a bare git push /
+  # fetch can land on a protected branch through configuration the command
+  # text does not spell out. Check the EFFECTIVE config — and, because a
+  # command can retarget git with -C / --git-dir / --work-tree, check each of
+  # those target contexts too (the CLAUDE_PROJECT_DIR default plus every
+  # redirect target). GIT_TARGETS is filled by the -C resolver above.
+  CONFIG_CONTEXTS="$PROJECT_DIR"
+  for T in ${GIT_TARGETS:-}; do
+    [ -n "$T" ] && CONFIG_CONTEXTS="$CONFIG_CONTEXTS
+$T"
+  done
+  while IFS= read -r D; do
+    [ -n "$D" ] || continue
+    if [ "$GIT_PUSH_SEEN" -eq 1 ]; then check_push_config "$D"; fi
+    if [ "$GIT_FETCH_SEEN" -eq 1 ]; then check_fetch_config "$D"; fi
+  done <<EOCTX
+$CONFIG_CONTEXTS
+EOCTX
 fi
 
 # ---------------------------------------------------------------------------
