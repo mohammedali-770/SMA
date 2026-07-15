@@ -167,6 +167,51 @@ GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(g
 str_matches()  { printf '%s' "$1" | grep -Eq  "$2"; }
 str_matchesi() { printf '%s' "$1" | grep -Eqi "$2"; }
 
+# Resolve shell quoting/backslashes the way the shell does before it runs the
+# command, producing the text the any-branch rules scan. The goal is that a
+# quoted ARGUMENT that merely *mentions* a git command (a commit message, a
+# PR body: git commit -m "run git push origin main") is not mistaken for a
+# real command, while quoting used to OBFUSCATE a command token
+# (git "push", gi"t" push, git pu\sh) is still seen through:
+#   * a single-quoted or double-quoted span with NO whitespace is dequoted
+#     (its content is kept, joined to the surrounding word) — this is how a
+#     command/subcommand/refspec token gets fragmented, so we must see it;
+#   * a quoted span that CONTAINS whitespace is a multi-word argument (a
+#     message/body) and is replaced by a single space — its inner text is not
+#     command syntax and must not be scanned as such;
+#   * a backslash escapes the next character (kept literally).
+# Unterminated quotes fall through to raw text (fail toward matching).
+sanitize() {
+  local s="$1"
+  local out='' buf='' q='' ch i=0 n
+  n=${#s}
+  while [ "$i" -lt "$n" ]; do
+    ch="${s:$i:1}"
+    if [ -n "$q" ]; then
+      if [ "$ch" = "$q" ]; then
+        case "$buf" in
+          *[[:space:]]*) out="$out " ;;   # multi-word quoted arg -> mask
+          *) out="$out$buf" ;;            # single-word quoted -> dequote
+        esac
+        q=''; buf=''
+      elif [ "$ch" = '\' ] && [ "$q" = '"' ]; then
+        i=$((i+1)); buf="$buf${s:$i:1}"   # backslash escape inside dquotes
+      else
+        buf="$buf$ch"
+      fi
+    else
+      case "$ch" in
+        "'"|'"') q="$ch" ;;
+        '\') i=$((i+1)); out="$out${s:$i:1}" ;;
+        *) out="$out$ch" ;;
+      esac
+    fi
+    i=$((i+1))
+  done
+  [ -n "$q" ] && out="$out$buf"
+  printf '%s' "$out"
+}
+
 GIT_PUSH_SEEN=0
 
 any_branch_rules() {
@@ -290,20 +335,23 @@ EOSEG
 if [ "$TOOL_NAME" = "Bash" ]; then
   [ -n "$TOOL_COMMAND" ] || deny "change-control guard: Bash call with no command string; failing closed."
 
-  NORMALIZED="$(printf '%s' "$TOOL_COMMAND" | tr -d "\\\\\"'")"
-  # a MORE aggressive rendering that reassembles a command/subcommand name
-  # split with a variable or ANSI-C quote the way the shell does before
-  # executing, so the git/push/branch detection cannot be dodged by
-  # fragmenting the word:
-  #   * whole ${...} expansions are removed  (gi${x}t -> git, empty-value case)
-  #   * a leftover bare $ is removed          (gi$'t' -> gi$t -> git, ANSI-C case)
+  # SANITIZED resolves quoting the shell's way: multi-word quoted arguments
+  # (messages/bodies) are masked so a git command mentioned inside them is not
+  # denied, while quote/backslash obfuscation of a real command token is seen
+  # through. This is the primary rendering the any-branch rules scan.
+  SANITIZED="$(sanitize "$TOOL_COMMAND")"
+  # a MORE aggressive rendering that also reassembles a command/subcommand name
+  # split with a variable or ANSI-C quote (gi${x}t -> git, gi$'t' -> git):
+  #   * whole ${...} expansions are removed  (empty-value case)
+  #   * a leftover bare $ is removed          (ANSI-C case)
   # GIT_PRE still requires the subcommand to sit right after git, so a commit
   # MESSAGE that merely contains the word "push" is not falsely matched.
-  NORM_AGGRESSIVE="$(printf '%s' "$NORMALIZED" | sed -E 's/\$\{[^}]*\}//g' | tr -d '${}')"
-  scan_variant_segments "$TOOL_COMMAND"
-  [ "$NORMALIZED" != "$TOOL_COMMAND" ] && scan_variant_segments "$NORMALIZED"
-  { [ "$NORM_AGGRESSIVE" != "$NORMALIZED" ] && [ "$NORM_AGGRESSIVE" != "$TOOL_COMMAND" ]; } \
-    && scan_variant_segments "$NORM_AGGRESSIVE"
+  NORM_AGGRESSIVE="$(printf '%s' "$SANITIZED" | sed -E 's/\$\{[^}]*\}//g' | tr -d '${}')"
+  scan_variant_segments "$SANITIZED"
+  [ "$NORM_AGGRESSIVE" != "$SANITIZED" ] && scan_variant_segments "$NORM_AGGRESSIVE"
+  # NORMALIZED (all quote/backslash chars removed, content kept) is still used
+  # by the configured-alias-invocation check below.
+  NORMALIZED="$SANITIZED"
 
   # invoking an ALREADY-CONFIGURED git alias can hide any operation behind an
   # arbitrary name (git p behaves as git push when the p alias is configured),
@@ -318,8 +366,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
       status|log|show|diff|push|pull|commit|add|fetch|branch|checkout|switch|tag|config|remote|grep|blame|stash|merge|rebase|reset|revert|rm|mv|clean|describe|shortlog|worktree|init|clone)
         continue ;;
     esac
-    if str_matches "$TOOL_COMMAND" "${GIT_PRE}${AL}${WB}" \
-      || str_matches "$NORMALIZED" "${GIT_PRE}${AL}${WB}"; then
+    if str_matches "$SANITIZED" "${GIT_PRE}${AL}${WB}"; then
       deny "invoking a configured git alias is denied from every branch because aliases cannot be vetted by the change-control guard. ${WORKFLOW_HINT}"
     fi
   done
@@ -330,12 +377,14 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   if [ "$GIT_PUSH_SEEN" -eq 1 ]; then
     # (a) the current branch's upstream push destination (@{push}); empty for a
     #     brand-new branch with no upstream, which is the normal first-push case
+    # @{push} is "<remote>/<branch>", but BOTH the remote name and the branch
+    # name can contain slashes (origin/main, foo/bar/main, or the protected
+    # claude/project-build-ie4b56). Rather than guess where the remote prefix
+    # ends, match a protected branch name anchored at the END on a "/" (or
+    # string-start) boundary — this catches every remote-prefix shape.
     PUSH_DEST="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref '@{push}' 2>/dev/null || true)"
     if [ -n "$PUSH_DEST" ]; then
-      case "$PUSH_DEST" in
-        */*) PUSH_DEST="${PUSH_DEST#*/}" ;;
-      esac
-      is_protected "$PUSH_DEST" \
+      printf '%s' "$PUSH_DEST" | grep -Eq "(^|/)(claude/project-build-ie4b56|main)\$" \
         && deny "the current branch's configured push destination resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
     fi
     # (b) a preconfigured per-remote push refspec (remote.<name>.push) that
@@ -346,7 +395,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     #     refspec like `main` pushes to same-named remote main); the matching
     #     refspec (`:` / `+:`); or a wildcard. A benign remote.*.push=HEAD
     #     (push the current branch) stays allowed.
-    PUSH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.push$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
+    PUSH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.push$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
     if [ -n "$PUSH_VALS" ]; then
       printf '%s' "$PUSH_VALS" | grep -Eq "$PROT_WORD" \
         && deny "a configured push refspec (remote.*.push) names a protected branch as its source or destination, so git push is denied. ${WORKFLOW_HINT}"
@@ -357,7 +406,7 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     fi
     # (c) remote.<name>.mirror=true makes a plain push behave like --mirror,
     #     updating every ref (including protected ones)
-    git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.mirror$' 2>/dev/null | grep -Eqi '(^|[[:space:]])(true|yes|on|1)$' \
+    git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.mirror$' 2>/dev/null | grep -Eqi '(^|[[:space:]])(true|yes|on|1)$' \
       && deny "remote.*.mirror=true makes git push mirror all refs including protected ones; git push is denied. ${WORKFLOW_HINT}"
     # (d) push.default=matching pushes every branch present on both ends,
     #     including a protected one, when the push names no refspec
