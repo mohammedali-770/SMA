@@ -4,12 +4,14 @@
  * empty state with a shortcut back to the menu. Sticky checkout bar above the
  * safe area.
  */
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Header } from '../../components/Header';
+import { BagIcon, DishIcon } from '../../components/Icons';
 import { QtyStepper } from '../../components/QtyStepper';
 import { EmptyView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -27,9 +29,9 @@ export function CartScreen() {
   if (cart.items.length === 0) {
     return (
       <View style={styles.root}>
-        <Header title={t('myCart')} showBack />
+        <Header title={t('myCart')} showBack safeTop />
         <EmptyView
-          emoji="🛒"
+          icon={<BagIcon size={48} />}
           title={t('emptyCartTitle')}
           subtitle={t('emptyCartSub')}
           actionLabel={t('browseMenu')}
@@ -41,7 +43,7 @@ export function CartScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title={t('myCart')} showBack />
+      <Header title={t('myCart')} showBack safeTop />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
         <View style={{ gap: spacing.md }}>
           {cart.items.map((it) => (
@@ -93,18 +95,46 @@ function CartLine({
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
   const { rtlText, rtlRow } = useI18n();
+  const [imgFailed, setImgFailed] = useState(false);
+  // The full Product travels with every cart line, so the thumbnail reuses the
+  // image already in the menu's memory-disk cache — no fetch is introduced.
+  const showImage = !!item.product.imageUrl && !imgFailed;
   return (
-    <View style={[styles.line, shadow.card]}>
-      <View style={[styles.lineTop, rtlRow]}>
-        <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
-        <Text style={styles.lineTotal}>{lineTotal}</Text>
-      </View>
-      {summary ? <Text style={[styles.lineMods, rtlText]}>{summary}</Text> : null}
-      <View style={[styles.lineBottom, rtlRow]}>
-        <QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small />
-        <Pressable onPress={onRemove} hitSlop={14} accessibilityRole="button" accessibilityLabel={removeLabel}>
-          <Text style={styles.remove}>{removeLabel}</Text>
-        </Pressable>
+    // Mirrored in Arabic: thumbnail on the reading edge, like the menu cards.
+    <View style={[styles.line, rtlRow, shadow.card]}>
+      {showImage ? (
+        <Image
+          source={{ uri: item.product.imageUrl }}
+          style={styles.lineImg}
+          contentFit="cover"
+          transition={150}
+          cachePolicy="memory-disk"
+          recyclingKey={item.product.id}
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <View style={[styles.lineImg, styles.lineImgEmpty]}>
+          <DishIcon size={26} />
+        </View>
+      )}
+      <View style={styles.lineBody}>
+        <View style={[styles.lineTop, rtlRow]}>
+          <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
+          <Text style={styles.lineTotal}>{lineTotal}</Text>
+        </View>
+        {summary ? <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>{summary}</Text> : null}
+        <View style={[styles.lineBottom, rtlRow]}>
+          <QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small />
+          <Pressable
+            onPress={onRemove}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={removeLabel}
+            style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.remove}>{removeLabel}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -112,12 +142,23 @@ function CartLine({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  line: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm },
+  line: {
+    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
+    borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
+    padding: spacing.md, gap: spacing.md,
+  },
+  lineImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.bgAlt },
+  lineImgEmpty: { alignItems: 'center', justifyContent: 'center' },
+  lineBody: { flex: 1, gap: spacing.xs },
   lineTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   lineName: { flex: 1, fontSize: font.md, fontWeight: '800', color: colors.text },
   lineTotal: { fontSize: font.md, fontWeight: '800', color: colors.purple },
   lineMods: { fontSize: font.sm, color: colors.muted },
   lineBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  removeBtn: {
+    minHeight: 34, justifyContent: 'center', paddingHorizontal: spacing.md,
+    borderRadius: radius.pill, backgroundColor: colors.dangerBg,
+  },
   remove: { color: colors.red, fontWeight: '800', fontSize: font.sm },
 
   footer: {
@@ -126,10 +167,11 @@ const styles = StyleSheet.create({
   },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   subtotalLabel: { fontSize: font.md, color: colors.muted, fontWeight: '700' },
-  subtotalValue: { fontSize: font.lg, color: colors.text, fontWeight: '800' },
+  subtotalValue: { fontSize: font.lg, color: colors.purple, fontWeight: '800' },
   checkoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.purple, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
+    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
   },
   checkoutBtnDisabled: { backgroundColor: colors.muted, justifyContent: 'center' },
   checkoutText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
