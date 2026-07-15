@@ -90,6 +90,13 @@ fi
 
 [ -n "$TOOL_NAME" ] || deny "change-control guard: hook input has no tool_name; failing closed."
 
+# Collapse Bash line continuations (a backslash immediately followed by a
+# newline) the way the shell does before execution, so a token split across
+# physical lines (git push origin HEAD:mai\<newline>n -> HEAD:main) cannot hide
+# a protected ref or subcommand from the scanners below. Bare newlines (no
+# preceding backslash) are left intact — they separate commands.
+TOOL_COMMAND="${TOOL_COMMAND//\\$'\n'/}"
+
 # ---------------------------------------------------------------------------
 # 2. Verify the project root and the current branch (fail closed)
 # ---------------------------------------------------------------------------
@@ -182,6 +189,11 @@ any_branch_rules() {
   if str_matches "$C" "${GIT_PRE}update-ref${WB}" && str_matches "$C" "$PROT_WORD"; then
     deny "git update-ref targeting a protected ref is denied from every branch. ${WORKFLOW_HINT}"
   fi
+  # symbolic-ref <name> <ref> rewrites <name> (refs/heads/main -> …); its
+  # write/delete forms targeting a protected ref are denied like update-ref
+  if str_matches "$C" "${GIT_PRE}symbolic-ref${WB}" && str_matches "$C" "$PROT_WORD"; then
+    deny "git symbolic-ref writing or deleting a protected ref is denied from every branch. ${WORKFLOW_HINT}"
+  fi
   if str_matches "$C" "${GIT_PRE}(push|fetch|pull)${WB}" \
     && str_matches "$C" ":(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
     deny "a refspec targeting a protected branch (…:claude/project-build-ie4b56 or …:main) is denied from every branch. ${WORKFLOW_HINT}"
@@ -210,6 +222,12 @@ any_branch_rules() {
     && str_matches "$C" "(^|[[:space:]])-[BC][[:space:]]*(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
     deny "git checkout -B / git switch -C onto a protected branch name (including the cuddled -Bmain form) is denied from every branch. ${WORKFLOW_HINT}"
   fi
+  # git worktree add -b/-B <name> also creates/resets a branch (-B force-
+  # resets), so it can force-move a protected local ref from any checkout
+  if str_matches "$C" "${GIT_PRE}worktree${WB}" \
+    && str_matches "$C" "(^|[[:space:]])-[bB][[:space:]]*(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
+    deny "git worktree add -b/-B onto a protected branch name is denied from every branch. ${WORKFLOW_HINT}"
+  fi
   # alias definitions can smuggle a push under another name (git -c
   # alias.p=push p ..., git config alias.x '...', GIT_CONFIG_KEY_0=alias.p);
   # config keys are case-insensitive, so match case-insensitively
@@ -220,6 +238,12 @@ any_branch_rules() {
   if str_matches "$C" "$GIT_WORD" \
     && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.push|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
     deny "git configuration that redirects push destinations (push.default, remote.*.push, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
+  fi
+  # include.path / includeIf pull in an arbitrary config file that could set
+  # any of the above (aliases, remote.*.push, ...) out of the scanner's view;
+  # the one-shot -c form is also not reflected by the @{push} fallback below
+  if str_matches "$C" "$GIT_WORD" && str_matchesi "$C" '(^|[^[:alnum:]_])include(if)?[.]'; then
+    deny "git include.path / includeIf configuration can pull in unvettable settings (aliases, remote.*.push, ...) and is denied from every branch. ${WORKFLOW_HINT}"
   fi
   # a variable or ANSI-C-quoted fragment ANYWHERE in the subcommand word
   # cannot be vetted: the shell concatenates the fragments before git runs
