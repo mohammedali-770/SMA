@@ -212,10 +212,72 @@ sanitize() {
   printf '%s' "$out"
 }
 
+# Split a command into shell WORDS, honoring ' " and \ so a multi-word quoted
+# string stays ONE word (quotes removed). Unlike sanitize(), quoted content is
+# kept — this is used to find an interpreter code payload (bash -c '<payload>',
+# python -c '<payload>') so the payload can be scanned AS A COMMAND rather than
+# masked as data. A word standing alone as `bash` is a real interpreter; the
+# string `bash -c "…"` sitting inside ONE quoted argument stays a single word
+# whose first token is not `bash`, so a message that merely mentions it is not
+# treated as code. One word per output line.
+tokenize_words() {
+  local s="$1"
+  local buf='' q='' ch i=0 n inword=0
+  n=${#s}
+  while [ "$i" -lt "$n" ]; do
+    ch="${s:$i:1}"
+    if [ -n "$q" ]; then
+      if [ "$ch" = "$q" ]; then q=''; inword=1
+      elif [ "$ch" = '\' ] && [ "$q" = '"' ]; then i=$((i+1)); buf="$buf${s:$i:1}"; inword=1
+      else buf="$buf$ch"; inword=1; fi
+    else
+      case "$ch" in
+        "'"|'"') q="$ch"; inword=1 ;;
+        '\') i=$((i+1)); buf="$buf${s:$i:1}"; inword=1 ;;
+        ' '|'	') if [ "$inword" = 1 ]; then printf '%s\n' "$buf"; buf=''; inword=0; fi ;;
+        *) buf="$buf$ch"; inword=1 ;;
+      esac
+    fi
+    i=$((i+1))
+  done
+  [ "$inword" = 1 ] && printf '%s\n' "$buf"
+}
+
+# Scan interpreter code payloads (bash -c '<code>', python -c '<code>',
+# eval <code>) as commands, so a protected operation wrapped in an interpreter
+# string is not hidden by the quote-masking in sanitize().
+scan_interpreter_payloads() {
+  local -a W=()
+  local line
+  while IFS= read -r line; do W+=("$line"); done < <(tokenize_words "$1")
+  local k j base
+  for ((k=0; k<${#W[@]}; k++)); do
+    base="${W[k]##*/}"
+    case "$base" in
+      sh|bash|zsh|dash|ksh|ash|python|python2|python3|perl|ruby|node|deno|php)
+        j=$((k+1))
+        while [ "$j" -lt "${#W[@]}" ]; do
+          case "${W[j]}" in
+            -c|-e|-[a-z]*c|-[a-z]*e)
+              [ $((j+1)) -lt "${#W[@]}" ] && { scan_variant_segments "${W[j+1]}"; scan_interpreter_payloads "${W[j+1]}"; }
+              break ;;
+            -*) j=$((j+1)) ;;
+            *) break ;;
+          esac
+        done ;;
+      eval|source|.)
+        [ $((k+1)) -lt "${#W[@]}" ] && { scan_variant_segments "${W[*]:$((k+1))}"; scan_interpreter_payloads "${W[*]:$((k+1))}"; }
+        break ;;
+    esac
+  done
+}
+
 GIT_PUSH_SEEN=0
+GIT_FETCH_SEEN=0
 
 any_branch_rules() {
   local C="$1"
+  str_matches "$C" "${GIT_PRE}(fetch|pull)${WB}" && GIT_FETCH_SEEN=1
   # low-level push plumbing (send-pack, http-push) exists only to update
   # remote refs and can target a protected branch (git send-pack ../r.git
   # HEAD:refs/heads/main); deny outright from every branch.
@@ -298,10 +360,11 @@ any_branch_rules() {
   if str_matches "$C" "$GIT_WORD" && str_matchesi "$C" '(^|[^[:alnum:]_])alias\.'; then
     deny "defining or using git aliases (alias.* configuration in any form) is denied because it can disguise protected-ref operations. ${WORKFLOW_HINT}"
   fi
-  # so can configuration that redirects where a push lands
+  # so can configuration that redirects where a push lands, or a fetch refspec
+  # that writes a local protected ref
   if str_matches "$C" "$GIT_WORD" \
-    && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.(push|mirror)|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
-    deny "git configuration that redirects push destinations (push.default, remote.*.push, remote.*.mirror, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
+    && str_matchesi "$C" '(push\.default|pushinsteadof|remote\.[^[:space:]=]*\.(push|mirror|fetch)|branch\.[^[:space:]=]*\.(merge|remote|pushremote))'; then
+    deny "git configuration that redirects push/fetch destinations (push.default, remote.*.push/mirror/fetch, branch.*.merge/remote, pushInsteadOf) is denied. ${WORKFLOW_HINT}"
   fi
   # include.path / includeIf pull in an arbitrary config file that could set
   # any of the above (aliases, remote.*.push, ...) out of the scanner's view;
@@ -364,6 +427,9 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   NORM_AGGRESSIVE="$(printf '%s' "$SANITIZED" | sed -E 's/\$\{[^}]*\}//g' | tr -d '${}')"
   scan_variant_segments "$SANITIZED"
   [ "$NORM_AGGRESSIVE" != "$SANITIZED" ] && scan_variant_segments "$NORM_AGGRESSIVE"
+  # an interpreter code payload (bash -c '…', python -c '…', eval …) is CODE,
+  # not data, so scan it as a command rather than let sanitize() mask it
+  scan_interpreter_payloads "$TOOL_COMMAND"
   # NORMALIZED (all quote/backslash chars removed, content kept) is still used
   # by the configured-alias-invocation check below.
   NORMALIZED="$SANITIZED"
@@ -440,6 +506,20 @@ if [ "$TOOL_NAME" = "Bash" ]; then
     #     including a protected one, when the push names no refspec
     [ "$(git -C "$PROJECT_DIR" config --get push.default 2>/dev/null || true)" = "matching" ] \
       && deny "push.default=matching would push all matching branches including protected ones; git push is denied. Use an explicit refspec. ${WORKFLOW_HINT}"
+  fi
+
+  # a configured fetch refspec (remote.<name>.fetch) whose LOCAL destination
+  # (after the ':') is a protected head, or a wildcard writing local heads,
+  # updates the protected ref on a plain `git fetch` even though the command
+  # names no ref. A normal refspec writing refs/remotes/... is unaffected.
+  if [ "$GIT_FETCH_SEEN" -eq 1 ]; then
+    FETCH_VALS="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\..+\.fetch$' 2>/dev/null | sed -E 's/^[^[:space:]]+[[:space:]]+//' || true)"
+    if [ -n "$FETCH_VALS" ]; then
+      printf '%s' "$FETCH_VALS" | grep -Eq ":(refs/heads/)?(claude/project-build-ie4b56|main)([^[:alnum:]_./-]|\$)" \
+        && deny "a configured fetch refspec (remote.*.fetch) writes a protected local ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
+      printf '%s' "$FETCH_VALS" | grep -Eq ':refs/heads/[*]' \
+        && deny "a configured fetch refspec (remote.*.fetch) writes local branches via a wildcard that could include a protected ref, so git fetch/pull is denied. ${WORKFLOW_HINT}"
+    fi
   fi
 fi
 
