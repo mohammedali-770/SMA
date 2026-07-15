@@ -259,6 +259,13 @@ any_branch_rules() {
     && str_matches "$C" "$PROT_WORD"; then
     deny "git branch delete/move/force/upstream changes targeting a protected branch are denied from every branch. ${WORKFLOW_HINT}"
   fi
+  # cuddled upstream value: git branch -uorigin/main feature glues the
+  # upstream ref to -u, so the boundary in the rule above would miss it
+  if str_matches "$C" "${GIT_PRE}branch${WB}" \
+    && str_matches "$C" '(^|[[:space:]])-[dDmMfcC]*u[^[:space:]]' \
+    && str_matches "$C" "$PROT_WORD"; then
+    deny "git branch -u<upstream> (cuddled) targeting a protected branch is denied from every branch. ${WORKFLOW_HINT}"
+  fi
   # cuddled short-option form: git branch -Dmain / -Mmain glues the protected
   # name to the option letter, so PROT_WORD's word boundary would miss it
   if str_matches "$C" "${GIT_PRE}branch${WB}" \
@@ -276,6 +283,14 @@ any_branch_rules() {
   if str_matches "$C" "${GIT_PRE}worktree${WB}" \
     && str_matches "$C" "(^|[[:space:]])-[bB][[:space:]]*(refs/heads/)?${PROT_ALT}${PROT_TRAIL}"; then
     deny "git worktree add -b/-B onto a protected branch name is denied from every branch. ${WORKFLOW_HINT}"
+  fi
+  # git worktree add <path> <protected> checks the protected branch out into a
+  # new working tree, from which later mutations would land on it — deny any
+  # worktree add that names a protected branch (the -b/-B cuddled form above
+  # covers the glued case that this word-boundary rule would miss)
+  if str_matches "$C" "${GIT_PRE}worktree${WB}" && str_matches "$C" "${LB}add${WB}" \
+    && str_matches "$C" "$PROT_WORD"; then
+    deny "git worktree add checking out a protected branch is denied from every branch (mutations in that worktree would modify the protected branch). ${WORKFLOW_HINT}"
   fi
   # alias definitions can smuggle a push under another name (git -c
   # alias.p=push p ..., git config alias.x '...', GIT_CONFIG_KEY_0=alias.p);
@@ -352,6 +367,19 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   # NORMALIZED (all quote/backslash chars removed, content kept) is still used
   # by the configured-alias-invocation check below.
   NORMALIZED="$SANITIZED"
+
+  # git -C <path> / --git-dir <path> / --work-tree <path> retarget git at
+  # ANOTHER working tree or repo, escaping the ON_PROTECTED check (which
+  # reflects only CLAUDE_PROJECT_DIR). Resolve each such target's checked-out
+  # branch and deny operating there when it is a protected branch — this
+  # catches git -C /other/wt commit|push|... when /other/wt is on main. (The
+  # setup step, git worktree add <path> main, is already denied above.)
+  GIT_TARGETS="$(printf '%s' "$SANITIZED" | grep -oE '(-C[[:space:]]+[^[:space:]]+|--git-dir[=[:space:]][^[:space:]]+|--work-tree[=[:space:]][^[:space:]]+)' | sed -E 's/^(-C|--git-dir|--work-tree)[=[:space:]]+//' || true)"
+  for T in $GIT_TARGETS; do
+    TB="$(git -C "$T" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+    { [ -n "$TB" ] && is_protected "$TB"; } \
+      && deny "a git -C / --git-dir / --work-tree target is on a protected branch (${TB}); operating there is denied. ${WORKFLOW_HINT}"
+  done
 
   # invoking an ALREADY-CONFIGURED git alias can hide any operation behind an
   # arbitrary name (git p behaves as git push when the p alias is configured),
