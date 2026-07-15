@@ -6,8 +6,9 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
+import { AlertIcon, ReceiptIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
-import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
+import { EmptyView, ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
@@ -60,49 +61,95 @@ export function OrdersScreen() {
   // silently once data exists, so status changes appear without a blank flash.
   useFocusEffect(useCallback(() => { void load('focus'); }, [load]));
 
+  function renderOrder({ item }: { item: Order }) {
+    const d = orderDisplayNumber(item);
+    const statusLabel = t(STATUS_KEY[item.status]);
+    const itemCount = item.items.reduce((n, it) => n + it.quantity, 0);
+    const meta = `${itemCount} ${t('items')} · ${item.orderType === 'delivery' ? t('delivery') : t('pickup')}`;
+    const totalLabel = formatSAR(item.total, lang);
+    return (
+      <Pressable
+        style={({ pressed }) => [styles.card, shadow.card, pressed && styles.cardPressed]}
+        onPress={() => router.push(`/receipt/${item.id}`)}
+        accessibilityRole="button"
+        // Composed only from values already displayed on the card.
+        accessibilityLabel={`${d.primary} · ${statusLabel} · ${totalLabel}`}
+      >
+        <View style={[styles.cardTop, rtlRow]}>
+          <View style={{ flexShrink: 1 }}>
+            <Text style={[styles.orderNo, rtlText]}>{d.primary}</Text>
+            {d.secondary ? <Text style={[styles.orderRef, rtlText]} numberOfLines={1}>{d.secondary}</Text> : null}
+          </View>
+          <StatusBadge label={statusLabel} status={item.status} />
+        </View>
+        <Text style={[styles.date, rtlText]}>{formatRiyadhDateTime(item.createdAt)}</Text>
+        <View style={[styles.cardBottom, rtlRow]}>
+          <Text style={[styles.itemsCount, rtlText]}>{meta}</Text>
+          <Text style={styles.total}>{totalLabel}</Text>
+        </View>
+        <View style={styles.receiptRow}>
+          <Text style={[styles.viewReceipt, rtlText]}>{t('viewReceipt')} {isRTL ? '‹' : '›'}</Text>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Screen background={colors.bg}>
       <View style={styles.header}>
         <Text style={[styles.title, rtlText]}>{t('orderHistory')}</Text>
       </View>
       {loading ? (
-        <LoadingView label={t('loading')} />
+        // Static skeleton shaped like the final order cards so the first load
+        // lands without a jump. Shown only before any data has ever arrived
+        // (stale-while-revalidate keeps the real list on screen afterwards).
+        <OrdersSkeleton />
       ) : error ? (
-        <ErrorView message={error} onRetry={() => load('focus')} retryLabel={t('retry')} />
+        <ErrorView message={error} onRetry={() => load('focus')} retryLabel={t('retry')} icon={<AlertIcon />} />
       ) : list.length === 0 ? (
-        <EmptyView emoji="🧾" title={t('noOrders')} subtitle={t('noOrdersSub')} />
+        <EmptyView icon={<ReceiptIcon size={44} color={colors.disabled} />} title={t('noOrders')} subtitle={t('noOrdersSub')} />
       ) : (
         <FlatList
           data={list}
           keyExtractor={(o) => o.id}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} tintColor={colors.purple} />}
-          renderItem={({ item }) => (
-            <Pressable style={[styles.card, shadow.card]} onPress={() => router.push(`/receipt/${item.id}`)} accessibilityRole="button">
-              <View style={[styles.cardTop, rtlRow]}>
-                {(() => { const d = orderDisplayNumber(item); return (
-                  <View style={{ flexShrink: 1 }}>
-                    <Text style={[styles.orderNo, rtlText]}>{d.primary}</Text>
-                    {d.secondary ? <Text style={[styles.orderRef, rtlText]}>{d.secondary}</Text> : null}
-                  </View>
-                ); })()}
-                <StatusBadge label={t(STATUS_KEY[item.status])} status={item.status} />
-              </View>
-              <Text style={[styles.date, rtlText]}>{formatRiyadhDateTime(item.createdAt)}</Text>
-              <View style={[styles.cardBottom, rtlRow]}>
-                <Text style={[styles.itemsCount, rtlText]}>
-                  {item.items.reduce((n, it) => n + it.quantity, 0)} {t('items')} · {item.orderType === 'delivery' ? t('delivery') : t('pickup')}
-                </Text>
-                <Text style={styles.total}>{formatSAR(item.total, lang)}</Text>
-              </View>
-              <Text style={[styles.viewReceipt, rtlText]}>{t('viewReceipt')} {isRTL ? '‹' : '›'}</Text>
-            </Pressable>
-          )}
+          renderItem={renderOrder}
         />
       )}
     </Screen>
   );
 }
+
+/** Static ghost cards matching the loaded layout — no animation loops. */
+function OrdersSkeleton() {
+  return (
+    <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} style={skeleton.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={[skeleton.line, { width: '40%' }]} />
+            <View style={skeleton.badge} />
+          </View>
+          <View style={[skeleton.line, { width: '55%' }]} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+            <View style={[skeleton.line, { width: '35%' }]} />
+            <View style={[skeleton.line, { width: 72 }]} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const skeleton = StyleSheet.create({
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm,
+  },
+  line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
+  badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: colors.bgAlt },
+});
 
 function StatusBadge({ label, status }: { label: string; status: OrderStatus }) {
   const tone =
@@ -119,15 +166,22 @@ function StatusBadge({ label, status }: { label: string; status: OrderStatus }) 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   title: { fontSize: font.xxl, fontWeight: '800', color: colors.text },
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.xs,
+  },
+  cardPressed: { opacity: 0.9 },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   orderNo: { fontSize: font.md, fontWeight: '800', color: colors.text },
   orderRef: { fontSize: font.sm, color: colors.muted, fontWeight: '600', marginTop: 1 },
   date: { fontSize: font.sm, color: colors.muted },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
-  itemsCount: { fontSize: font.sm, color: colors.text, fontWeight: '600' },
+  itemsCount: { fontSize: font.sm, color: colors.text, fontWeight: '600', flexShrink: 1 },
   total: { fontSize: font.lg, fontWeight: '800', color: colors.purple },
-  viewReceipt: { color: colors.purple, fontWeight: '800', fontSize: font.sm, marginTop: spacing.xs },
-  badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill },
-  badgeText: { fontSize: font.xs, fontWeight: '800' },
+  receiptRow: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.sm },
+  viewReceipt: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  // Badge sizes to its label and may wrap on narrow widths — long Arabic
+  // status names shrink the reference column instead of clipping.
+  badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, maxWidth: '55%' },
+  badgeText: { fontSize: font.xs, fontWeight: '800', textAlign: 'center' },
 });
