@@ -170,8 +170,14 @@ any_branch_rules() {
     GIT_PUSH_SEEN=1
     str_matches "$C" "$PROT_WORD" \
       && deny "git push referencing a protected branch (claude/project-build-ie4b56 or main) is denied from every branch. ${WORKFLOW_HINT}"
-    str_matches "$C" '(^|[[:space:]])--(mirror|all)([^[:alnum:]-]|$)' \
-      && deny "git push --all/--mirror would update protected remote refs and is denied. ${WORKFLOW_HINT}"
+    # --all/--branches/--mirror push every matching local branch (incl. a
+    # local main) to the remote; --branches is a documented alias of --all
+    str_matches "$C" '(^|[[:space:]])--(mirror|all|branches)([^[:alnum:]-]|$)' \
+      && deny "git push --all/--branches/--mirror would update protected remote refs and is denied. ${WORKFLOW_HINT}"
+    # the matching refspec (a bare ':' or '+:') pushes every branch that
+    # exists on both ends — including a protected one — without naming it
+    str_matches "$C" '(^|[[:space:]])\+?:([[:space:]]|$)' \
+      && deny "git push with a matching refspec (bare ':' or '+:') updates all matching branches including protected ones and is denied. ${WORKFLOW_HINT}"
   fi
   if str_matches "$C" "${GIT_PRE}update-ref${WB}" && str_matches "$C" "$PROT_WORD"; then
     deny "git update-ref targeting a protected ref is denied from every branch. ${WORKFLOW_HINT}"
@@ -257,8 +263,19 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   [ -n "$TOOL_COMMAND" ] || deny "change-control guard: Bash call with no command string; failing closed."
 
   NORMALIZED="$(printf '%s' "$TOOL_COMMAND" | tr -d "\\\\\"'")"
+  # a MORE aggressive rendering that reassembles a command/subcommand name
+  # split with a variable or ANSI-C quote the way the shell does before
+  # executing, so the git/push/branch detection cannot be dodged by
+  # fragmenting the word:
+  #   * whole ${...} expansions are removed  (gi${x}t -> git, empty-value case)
+  #   * a leftover bare $ is removed          (gi$'t' -> gi$t -> git, ANSI-C case)
+  # GIT_PRE still requires the subcommand to sit right after git, so a commit
+  # MESSAGE that merely contains the word "push" is not falsely matched.
+  NORM_AGGRESSIVE="$(printf '%s' "$NORMALIZED" | sed -E 's/\$\{[^}]*\}//g' | tr -d '${}')"
   scan_variant_segments "$TOOL_COMMAND"
   [ "$NORMALIZED" != "$TOOL_COMMAND" ] && scan_variant_segments "$NORMALIZED"
+  { [ "$NORM_AGGRESSIVE" != "$NORMALIZED" ] && [ "$NORM_AGGRESSIVE" != "$TOOL_COMMAND" ]; } \
+    && scan_variant_segments "$NORM_AGGRESSIVE"
 
   # invoking an ALREADY-CONFIGURED git alias can hide any operation behind an
   # arbitrary name (git p behaves as git push when the p alias is configured),
