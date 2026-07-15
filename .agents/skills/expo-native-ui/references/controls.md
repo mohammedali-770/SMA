@@ -172,24 +172,6 @@ const [date, setDate] = useState(new Date());
 />
 ```
 
-## Stepper
-
-Increment/decrement numeric values.
-
-```tsx
-import { Stepper } from "react-native";
-import { useState } from "react";
-
-const [count, setCount] = useState(0);
-
-<Stepper
-  value={count}
-  onValueChange={setCount}
-  minimumValue={0}
-  maximumValue={10}
-/>;
-```
-
 ## TextInput
 
 Native text input with various keyboard types.
