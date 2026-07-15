@@ -16,8 +16,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
-  canSubmitDeletion, deletionStatusMessageKey, isLikelyOffline,
-  SUPPORT_EMAIL, SUPPORT_PHONE, type ReverifyMethod,
+  canSubmitDeletion, chooseReverifyMethod, deletionStatusMessageKey, isLikelyOffline,
+  otpDeliverable, SUPPORT_EMAIL, SUPPORT_PHONE, type ReverifyMethod,
 } from './accountDeletion';
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
@@ -31,7 +31,7 @@ import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 
-type Phase = 'checking' | 'pending' | 'intro' | 'reverify' | 'submitting' | 'success';
+type Phase = 'checking' | 'pending' | 'intro' | 'reverify' | 'unavailable' | 'submitting' | 'success';
 
 const CONSEQUENCE_KEYS = [
   'delBulletAccess', 'delBulletAddresses', 'delBulletProfile', 'delBulletLoyalty',
@@ -73,13 +73,17 @@ export function DeleteAccountScreen() {
     setError(null); setNotice(null); setBusy(true);
     try {
       const res = await accountDeletion.sendOtp(lang);
-      if (res.status === 'sent') {
-        setOtpAvailable(true); setMethod('otp'); setNotice(t('weSentWhatsappCode')); startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-      } else if (res.status === 'rate_limited') {
-        setOtpAvailable(true); setMethod('otp'); startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-      } else {
-        // disabled / no_phone / error → password fallback.
+      // Never present OTP unless the channel actually delivered it; fall back to
+      // the password reauth; if neither is possible, show the support state.
+      const choice = chooseReverifyMethod({ otp: otpDeliverable(res.status), reauth: res.reauthAvailable !== false });
+      if (choice === 'otp') {
+        setOtpAvailable(true); setMethod('otp');
+        if (res.status === 'sent') setNotice(t('weSentWhatsappCode'));
+        startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
+      } else if (choice === 'reauth') {
         setOtpAvailable(false); setMethod('reauth'); setNotice(t('delOtpUnavailable'));
+      } else {
+        setPhase('unavailable');
       }
     } catch (e) {
       // Offline / transient → still allow the password fallback.
@@ -153,6 +157,8 @@ export function DeleteAccountScreen() {
             <PendingCard statusKey={deletionStatusMessageKey(pendingStatus)} />
           ) : phase === 'success' ? (
             <SuccessCard />
+          ) : phase === 'unavailable' ? (
+            <UnavailableCard />
           ) : phase === 'intro' ? (
             <>
               <Text style={[styles.subtitle, rtlText]}>{t('delSubtitle')}</Text>
@@ -275,6 +281,8 @@ export function DeleteAccountScreen() {
         <View style={[styles.card, shadow.card, styles.successCard]}>
           <Text style={[styles.h2, rtlText]}>{t('delSuccessTitle')}</Text>
           <Text style={[styles.bodyText, rtlText]}>{t('delSuccessBody')}</Text>
+          {/* Honest: no completion message is sent (no operational channel). */}
+          <Text style={[styles.muted, rtlText]}>{t('delNoNotice')}</Text>
         </View>
         <Button label={t('delDone')} onPress={() => void finish()} variant="primary" style={{ marginTop: spacing.lg }} />
         <SupportBlock onOpen={openSupport} />
@@ -283,11 +291,26 @@ export function DeleteAccountScreen() {
   }
 
   function PendingCard({ statusKey }: { statusKey: Parameters<typeof t>[0] }) {
+    // Reached on login/session-restore for an account that is being deleted. The
+    // account is locked server-side; the only forward action is to sign out.
     return (
       <View accessible accessibilityLiveRegion="polite">
         <View style={[styles.card, shadow.card]}>
           <Text style={[styles.h2, rtlText]}>{t('delPendingTitle')}</Text>
           <Text style={[styles.bodyText, rtlText]}>{t(statusKey)}</Text>
+        </View>
+        <Button label={t('signOut')} onPress={() => void finish()} variant="secondary" style={{ marginTop: spacing.lg }} />
+        <SupportBlock onOpen={openSupport} />
+      </View>
+    );
+  }
+
+  function UnavailableCard() {
+    return (
+      <View accessible accessibilityLiveRegion="polite">
+        <View style={[styles.card, shadow.card]}>
+          <Text style={[styles.h2, rtlText]}>{t('delTitle')}</Text>
+          <Text style={[styles.bodyText, rtlText]}>{t('delUnavailable')}</Text>
         </View>
         <Button label={t('back')} onPress={() => router.back()} variant="secondary" style={{ marginTop: spacing.lg }} />
         <SupportBlock onOpen={openSupport} />
@@ -313,6 +336,7 @@ function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
 
 const styles = StyleSheet.create({
   subtitle: { fontSize: font.md, color: colors.muted, marginBottom: spacing.md },
+  muted: { fontSize: font.sm, color: colors.muted, marginTop: spacing.sm, lineHeight: font.sm + 6 },
   h2: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
   bodyText: { fontSize: font.md, color: colors.text, lineHeight: font.md + 8 },
   card: {

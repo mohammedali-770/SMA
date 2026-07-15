@@ -70,6 +70,26 @@ export function isLikelyOffline(error: unknown): boolean {
 
 export type ReverifyMethod = 'otp' | 'reauth';
 
+/** Availability of each re-verification factor, resolved from the server. */
+export interface ReverifyAvailability { otp: boolean; reauth: boolean }
+
+/**
+ * Choose the re-verification method to present. OTP is only ever offered when
+ * the messaging channel can actually deliver it; otherwise the password reauth
+ * fallback is used. When neither factor is usable the caller must show a safe
+ * "unavailable — contact support" state (never a dead OTP field).
+ */
+export function chooseReverifyMethod(a: ReverifyAvailability): ReverifyMethod | 'unavailable' {
+  if (a.otp) return 'otp';
+  if (a.reauth) return 'reauth';
+  return 'unavailable';
+}
+
+/** Map a raw send-OTP status to whether OTP is actually deliverable right now. */
+export function otpDeliverable(status: string | null | undefined): boolean {
+  return status === 'sent' || status === 'rate_limited';
+}
+
 /**
  * Whether the destructive submit may proceed: the consequences must be
  * acknowledged AND a valid re-verification factor must be present (a 6-digit

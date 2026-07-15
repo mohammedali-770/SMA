@@ -30,6 +30,9 @@ declare
   v_total numeric; v_subtotal numeric; v_ordernum text;
   v_addr int; v_dev int;
   v_dupe boolean := false;
+  v_uid2 uuid := gen_random_uuid();
+  v_req5 public.account_deletion_requests;
+  v_claimed int;
 begin
   -- ---- Fixtures -----------------------------------------------------------
   insert into public.profiles (id, full_name, phone_number, email)
@@ -99,6 +102,20 @@ begin
    where id = v_req1.id;
   -- Must NOT raise now that no active request exists.
   perform public.create_account_deletion_request(v_uid, 'otp');
+
+  -- ---- 5) Partial-failure recovery: a request stuck 'processing' with an
+  -- EXPIRED lease (a crashed processor run) is reclaimable; an actively-leased
+  -- one is never double-claimed. ----------------------------------------------
+  insert into public.profiles (id, full_name, phone_number) values (v_uid2, 'P2', '+966555000002');
+  v_req5 := public.create_account_deletion_request(v_uid2, 'reauth');
+  update public.account_deletion_requests
+     set status = 'processing', locked_until = now() - interval '1 minute', lock_token = gen_random_uuid()
+   where id = v_req5.id;
+  select count(*) into v_claimed from public.claim_due_account_deletions(10, 300);
+  if v_claimed < 1 then raise exception 'FAIL(5): stale processing lease was not reclaimed'; end if;
+  -- Everything just claimed now holds a FRESH (future) lease → a second run gets none.
+  select count(*) into v_claimed from public.claim_due_account_deletions(10, 300);
+  if v_claimed <> 0 then raise exception 'FAIL(5): a freshly-leased request was double-claimed'; end if;
 
   raise notice 'account_deletion_test: ALL CASES PASSED';
 end $$;

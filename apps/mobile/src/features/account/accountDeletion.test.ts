@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canSubmitDeletion,
+  chooseReverifyMethod,
   deletionStatusMessageKey,
   isActiveDeletionStatus,
   isLikelyOffline,
+  otpDeliverable,
   SUPPORT_EMAIL,
   SUPPORT_PHONE,
 } from './accountDeletion';
@@ -65,6 +67,27 @@ describe('canSubmitDeletion — acknowledgment + a valid factor required', () =>
   });
 });
 
+describe('chooseReverifyMethod / otpDeliverable — never present OTP when undeliverable', () => {
+  it('prefers OTP only when deliverable', () => {
+    expect(chooseReverifyMethod({ otp: true, reauth: true })).toBe('otp');
+    expect(chooseReverifyMethod({ otp: true, reauth: false })).toBe('otp');
+  });
+  it('falls back to password reauth when OTP is unavailable', () => {
+    expect(chooseReverifyMethod({ otp: false, reauth: true })).toBe('reauth');
+  });
+  it('reports unavailable when neither factor is usable (safe support state)', () => {
+    expect(chooseReverifyMethod({ otp: false, reauth: false })).toBe('unavailable');
+  });
+  it('otpDeliverable only for sent/rate_limited, never disabled/no_phone/error', () => {
+    expect(otpDeliverable('sent')).toBe(true);
+    expect(otpDeliverable('rate_limited')).toBe(true);
+    expect(otpDeliverable('disabled')).toBe(false);
+    expect(otpDeliverable('no_phone')).toBe(false);
+    expect(otpDeliverable('error')).toBe(false);
+    expect(otpDeliverable(undefined)).toBe(false);
+  });
+});
+
 describe('isLikelyOffline — safe offline handling for submission failures', () => {
   it('flags network / offline failures', () => {
     expect(isLikelyOffline(new Error('Network request failed'))).toBe(true);
@@ -88,7 +111,7 @@ describe('localization coverage — all delete-account strings exist EN + AR', (
     'delWrongPassword', 'delVerifyContinue', 'delFinalTitle', 'delFinalBody', 'delFinalConfirm',
     'delSubmitting', 'delSuccessTitle', 'delSuccessBody', 'delDone', 'delPendingTitle',
     'delReceived', 'delWaitingOrder', 'delWaitingFinancial', 'delManualReview', 'delCompleted',
-    'delOffline', 'delError', 'delSupport',
+    'delOffline', 'delError', 'delSupport', 'delUnavailable', 'delNoNotice',
   ] as const;
 
   it('has a non-empty EN and AR value for every key', () => {

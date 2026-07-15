@@ -434,13 +434,14 @@ export const accountDeletion = {
     if (error) throw new Error(error.message);
     return (data as DeletionRequestState | null) ?? null;
   },
-  /** Send an OTP to the account's REGISTERED phone (server-derived). */
-  sendOtp: async (language: 'ar' | 'en'): Promise<{ status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone' }> => {
+  /** Send an OTP to the account's REGISTERED phone (server-derived). Also reports
+   *  whether the password reauth fallback is possible (account has an email). */
+  sendOtp: async (language: 'ar' | 'en'): Promise<{ status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone'; reauthAvailable?: boolean }> => {
     const { data, error } = await supabase.functions.invoke('account-delete-request', {
       body: { action: 'send_otp', language },
     });
     if (error) throw new Error(error.message);
-    return data as { status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone' };
+    return data as { status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone'; reauthAvailable?: boolean };
   },
   /** Re-verify identity (OTP code or account password) and enqueue the request. */
   submit: async (method: 'otp' | 'reauth', factors: { code?: string; password?: string }): Promise<DeletionSubmitResult> => {

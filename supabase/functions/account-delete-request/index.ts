@@ -81,10 +81,14 @@ Deno.serve(async (req: Request) => {
 
   // ---- action: send_otp --------------------------------------------------
   if (body.action === 'send_otp') {
-    if (!norm.ok) return json({ status: 'no_phone' }, 200); // no phone → client uses reauth
+    // reauthAvailable tells the app whether the password fallback is possible
+    // (the account has an email to reauthenticate against). When neither OTP nor
+    // reauth is possible the app shows a safe "contact support" state.
+    const reauthAvailable = email.trim().length > 0;
+    if (!norm.ok) return json({ status: 'no_phone', reauthAvailable }, 200); // no phone → reauth (or support)
     const outcome = await sendOtpViaWhatsApp(admin, norm.e164, OTP_PURPOSE, lang(body.language));
     // outcome: 'sent' | 'disabled' | 'rate_limited' | 'error' — own phone, no enumeration risk.
-    return json({ status: outcome }, 200);
+    return json({ status: outcome, reauthAvailable }, 200);
   }
 
   // ---- action: submit ----------------------------------------------------
@@ -118,6 +122,16 @@ Deno.serve(async (req: Request) => {
     });
     if (error || !created) return json({ error: 'request_failed', code: 'request_failed' }, 500);
     const row = Array.isArray(created) ? created[0] : created;
+
+    // Immediate global session revocation: revoke ALL of this user's refresh
+    // tokens so other devices cannot keep refreshing normal access. Best-effort
+    // (the DB-level account-deletion lock is the authoritative control, and
+    // GoTrue deleteUser at the end revokes everything anyway). Never fails the
+    // request; never logs tokens.
+    try {
+      const token = authHeader.replace(/^Bearer\s+/i, '');
+      await admin.auth.admin.signOut(token, 'global');
+    } catch { /* best-effort — DB lock still enforces immediately */ }
 
     // Best-effort: kick the processor so a no-blocker request completes promptly.
     // Failure here never fails the request (the processor also runs on schedule).

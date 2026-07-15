@@ -283,6 +283,8 @@ export const STRINGS = {
     delOffline: 'You appear to be offline. Please check your connection and try again.',
     delError: 'We couldn’t complete that just now. Please try again.',
     delSupport: 'Need help? Contact us:',
+    delUnavailable: 'Account deletion isn’t available in the app right now. Please contact support to request deletion.',
+    delNoNotice: 'You won’t receive a separate confirmation message. You can contact support anytime to check the status of your request.',
 
     // status
     status_received: 'Received',
@@ -562,6 +564,8 @@ export const STRINGS = {
     delOffline: 'يبدو أنك غير متصل بالإنترنت. تحقق من اتصالك وحاول مرة أخرى.',
     delError: 'تعذّر إتمام العملية الآن. يرجى المحاولة مرة أخرى.',
     delSupport: 'تحتاج مساعدة؟ تواصل معنا:',
+    delUnavailable: 'حذف الحساب غير متاح في التطبيق حاليًا. يرجى التواصل مع الدعم لطلب الحذف.',
+    delNoNotice: 'لن تصلك رسالة تأكيد منفصلة. يمكنك التواصل مع الدعم في أي وقت للاطلاع على حالة طلبك.',
 
     status_received: 'تم الاستلام',
     status_preparing: 'قيد التحضير',
