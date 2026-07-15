@@ -159,12 +159,15 @@ export function OrderTypeSelectScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title={t('otTitle')} showBack={valid} onBack={done} />
+      <Header title={t('otTitle')} showBack={valid} onBack={done} safeTop />
 
-      {/* Pickup / Delivery tabs */}
-      <View style={styles.tabs}>
-        <TabButton label={t('otPickup')} active={tab === 'pickup'} onPress={() => { setTab('pickup'); setResolveError(null); }} />
-        <TabButton label={t('otDelivery')} active={tab === 'delivery'} onPress={() => { setTab('delivery'); setResolveError(null); }} />
+      {/* Pickup / Delivery — a single segmented control so the two order
+          types read as one choice, not two separate buttons. */}
+      <View style={styles.tabsBar}>
+        <View style={styles.tabs}>
+          <TabButton label={t('otPickup')} active={tab === 'pickup'} onPress={() => { setTab('pickup'); setResolveError(null); }} />
+          <TabButton label={t('otDelivery')} active={tab === 'delivery'} onPress={() => { setTab('delivery'); setResolveError(null); }} />
+        </View>
       </View>
 
       {loading ? (
@@ -288,11 +291,17 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  tabs: { flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tab: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.purple, alignItems: 'center', backgroundColor: colors.white },
+  tabsBar: { padding: spacing.lg, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabs: {
+    flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.pill,
+    padding: 4, gap: 4,
+  },
+  // Segments keep identical metrics in both states — only fill/color change,
+  // so switching tabs never shifts the layout.
+  tab: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.pill, alignItems: 'center', backgroundColor: 'transparent' },
   tabActive: { backgroundColor: colors.purple },
-  tabText: { color: colors.purple, fontWeight: '800', fontSize: font.md },
-  tabTextActive: { color: colors.white },
+  tabText: { color: colors.text, fontWeight: '700', fontSize: font.md },
+  tabTextActive: { color: colors.white, fontWeight: '800' },
 
   list: { padding: spacing.lg, gap: spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
@@ -300,8 +309,11 @@ const styles = StyleSheet.create({
   muted: { fontSize: font.sm, color: colors.muted },
   label: { fontSize: font.sm, fontWeight: '800', color: colors.text },
 
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, borderWidth: 1.5, borderColor: 'transparent', gap: spacing.xs },
-  cardSelected: { borderColor: colors.purple },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    padding: spacing.lg, borderWidth: 1.5, borderColor: 'transparent', gap: spacing.xs,
+  },
+  cardSelected: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
   cardDisabled: { opacity: 0.55 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   name: { fontSize: font.md, fontWeight: '800', color: colors.text, flex: 1, paddingRight: spacing.sm },

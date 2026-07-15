@@ -14,10 +14,16 @@ export function LoadingView({ label }: { label?: string }) {
   );
 }
 
-export function ErrorView({ message, onRetry, retryLabel }: { message: string; onRetry?: () => void; retryLabel?: string }) {
+export function ErrorView({
+  message, onRetry, retryLabel, icon,
+}: {
+  message: string; onRetry?: () => void; retryLabel?: string;
+  /** Drawn icon (see components/Icons); falls back to the legacy emoji glyph. */
+  icon?: React.ReactNode;
+}) {
   return (
     <View style={styles.center}>
-      <Text style={styles.emoji}>⚠️</Text>
+      {icon ?? <Text style={styles.emoji}>⚠️</Text>}
       <Text style={styles.title}>{message}</Text>
       {onRetry ? (
         <Button label={retryLabel ?? 'Try Again'} onPress={onRetry} variant="secondary" style={{ marginTop: spacing.lg }} />
@@ -27,13 +33,15 @@ export function ErrorView({ message, onRetry, retryLabel }: { message: string; o
 }
 
 export function EmptyView({
-  emoji, title, subtitle, actionLabel, onAction,
+  emoji, title, subtitle, actionLabel, onAction, icon,
 }: {
   emoji?: string; title: string; subtitle?: string; actionLabel?: string; onAction?: () => void;
+  /** Drawn icon (see components/Icons); falls back to the legacy emoji glyph. */
+  icon?: React.ReactNode;
 }) {
   return (
     <View style={styles.center}>
-      <Text style={styles.emoji}>{emoji ?? '🛒'}</Text>
+      {icon ?? <Text style={styles.emoji}>{emoji ?? '🛒'}</Text>}
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
       {actionLabel && onAction ? (

@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BannerCarousel } from './BannerCarousel';
 import { buildMenuSections, buildSearchIndex, menuItemKey, type MenuSection, type MenuSectionItem } from './menuSections';
+import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -43,7 +44,7 @@ const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, toggle, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, toggle, isRTL, rtlText, rtlRow } = useI18n();
   const {
     loading, error, reload, categories, products, selectedBranch, selectedBranchId,
     isAvailable, branchIsOpen, groupsForProduct,
@@ -163,13 +164,20 @@ export function HomeMenuScreen() {
 
       {/* Selected order-context card (above the banners + search). Tapping it
           re-opens the same blocking Pickup/Delivery selection flow. Mirrored in
-          Arabic (info → badge → action). */}
+          Arabic (accent → info → action), with a purple accent bar on the
+          reading edge so the current context scans instantly. */}
       {orderCtx.context ? (
         <Pressable style={[styles.branchRow, rtlRow]} onPress={() => router.push('/select')} accessibilityRole="button">
+          <View style={styles.ctxAccent} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.branchLabel, rtlText]}>
-              {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
-            </Text>
+            <View style={[styles.ctxTopRow, rtlRow]}>
+              <View style={styles.otChip}>
+                <Text style={styles.otChipText}>
+                  {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
+                </Text>
+              </View>
+              {selectedBranch ? <OpenClosedBadge open={branchOpen} /> : null}
+            </View>
             <Text style={[styles.branchValue, rtlText]} numberOfLines={1}>
               {pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}
             </Text>
@@ -181,8 +189,9 @@ export function HomeMenuScreen() {
               </Text>
             ) : null}
           </View>
-          {selectedBranch ? <OpenClosedBadge open={branchOpen} /> : null}
-          <Text style={styles.change}>{t('otChange')}</Text>
+          <View style={styles.changeBtn}>
+            <Text style={styles.change}>{t('otChange')}</Text>
+          </View>
         </Pressable>
       ) : null}
 
@@ -191,9 +200,11 @@ export function HomeMenuScreen() {
       <BannerCarousel />
 
       {loading ? (
-        <LoadingView label={t('loading')} />
+        // Static skeleton shaped like the final layout (chips + cards) so the
+        // menu doesn't shift when data lands. No animation loops.
+        <MenuSkeleton />
       ) : error ? (
-        <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} />
+        <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} icon={<AlertIcon />} />
       ) : !orderCtx.valid ? (
         // No valid context yet — the gate effect is redirecting to /select.
         <LoadingView label={t('loading')} />
@@ -207,7 +218,7 @@ export function HomeMenuScreen() {
 
           {/* Search — mirrored so the icon sits on the reading edge in Arabic. */}
           <View style={[styles.searchWrap, rtlRow]}>
-            <Text style={styles.searchIcon}>🔍</Text>
+            <SearchIcon color={colors.muted} />
             <TextInput
               value={search}
               onChangeText={setSearch}
@@ -219,10 +230,18 @@ export function HomeMenuScreen() {
             />
           </View>
 
-          {/* Horizontal categories */}
+          {/* Horizontal categories. In Arabic the row is laid out right-to-left
+              and starts scrolled to the reading edge, so the first category is
+              where the eye lands; tap/scroll-spy behavior is unchanged. */}
           {sections.length > 0 ? (
             <View style={styles.chipsWrap}>
-              <ScrollView ref={chipScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              <ScrollView
+                ref={chipScrollRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[styles.chips, isRTL && styles.chipsRTL]}
+                onContentSizeChange={() => { if (isRTL) chipScrollRef.current?.scrollToEnd({ animated: false }); }}
+              >
                 {sections.map((s) => {
                   const active = s.category.id === activeCatIdResolved;
                   return (
@@ -247,7 +266,7 @@ export function HomeMenuScreen() {
 
           {/* Menu — virtualized; only the visible window of cards is mounted. */}
           {sections.length === 0 ? (
-            <EmptyView emoji="🍽️" title={t('noProducts')} />
+            <EmptyView icon={<DishIcon />} title={t('noProducts')} />
           ) : (
             <SectionList
               ref={listRef}
@@ -293,6 +312,46 @@ function ItemSeparator() {
   return <View style={{ height: spacing.md }} />;
 }
 
+/**
+ * Static loading skeleton mirroring the loaded layout (context strip, chip
+ * row, product cards) so content lands without a jump. Deliberately not
+ * animated: no shimmer loop to burn frames, and nothing to disturb users
+ * with reduced-motion preferences.
+ */
+function MenuSkeleton() {
+  return (
+    <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
+      <View style={[skeleton.block, { height: 64 }]} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <View style={[skeleton.chip, { width: 88 }]} />
+        <View style={[skeleton.chip, { width: 72 }]} />
+        <View style={[skeleton.chip, { width: 96 }]} />
+      </View>
+      {[0, 1, 2, 3].map((i) => (
+        <View key={i} style={skeleton.card}>
+          <View style={skeleton.img} />
+          <View style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
+            <View style={[skeleton.line, { width: '70%' }]} />
+            <View style={[skeleton.line, { width: '95%' }]} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+              <View style={[skeleton.line, { width: 64 }]} />
+              <View style={[skeleton.chip, { width: 76 }]} />
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const skeleton = StyleSheet.create({
+  block: { backgroundColor: colors.bgAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
+  chip: { height: 34, borderRadius: radius.pill, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
+  card: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  img: { width: 104, minHeight: 112, backgroundColor: colors.bgAlt },
+  line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
+});
+
 function SectionFooter() {
   return <View style={{ height: spacing.xl }} />;
 }
@@ -308,26 +367,36 @@ const ProductCard = React.memo(function ProductCard({
   product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
 }) {
   const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const [imgFailed, setImgFailed] = useState(false);
   const name = pick(product.nameEn, product.nameAr);
   const description = pick(product.descriptionEn, product.descriptionAr);
   const priceLabel = formatSAR(product.price, lang);
   const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
   const actionLabel = hasModifiers ? t('customizeAdd') : t('addToCart');
+  const showImage = !!product.imageUrl && !imgFailed;
   return (
     // Mirrored in Arabic: image on the right, text block reading right-to-left.
     <View style={[styles.card, rtlRow, shadow.card]}>
-      <Image
-        source={{ uri: product.imageUrl }}
-        style={styles.cardImg}
-        contentFit="cover"
-        transition={150}
-        // Keep decoded thumbnails in memory so cards scrolled back into view
-        // don't re-decode from disk; recyclingKey pairs with virtualization.
-        cachePolicy="memory-disk"
-        recyclingKey={product.id}
-      />
+      {showImage ? (
+        <Image
+          source={{ uri: product.imageUrl }}
+          style={styles.cardImg}
+          contentFit="cover"
+          transition={150}
+          // Keep decoded thumbnails in memory so cards scrolled back into view
+          // don't re-decode from disk; recyclingKey pairs with virtualization.
+          cachePolicy="memory-disk"
+          recyclingKey={product.id}
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        // Missing/broken image → quiet plate glyph instead of a blank block.
+        <View style={[styles.cardImg, styles.cardImgEmpty]}>
+          <DishIcon size={34} />
+        </View>
+      )}
       <View style={styles.cardBody}>
-        <Text style={[styles.cardName, rtlText]} numberOfLines={1}>{name}</Text>
+        <Text style={[styles.cardName, rtlText]} numberOfLines={2}>{name}</Text>
         {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
         <View style={[styles.cardBottom, rtlRow]}>
           <View>
@@ -364,11 +433,22 @@ const styles = StyleSheet.create({
   branchRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
   },
-  branchLabel: { fontSize: font.xs, color: colors.muted, fontWeight: '700', textTransform: 'uppercase' },
+  ctxAccent: { alignSelf: 'stretch', width: 4, borderRadius: 2, backgroundColor: colors.purple },
+  ctxTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 },
+  otChip: {
+    paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radius.pill,
+    backgroundColor: colors.purpleBg,
+  },
+  otChipText: { fontSize: font.xs, color: colors.purple, fontWeight: '800' },
   branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
   branchSub: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
+  changeBtn: {
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.purple,
+  },
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
   closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
@@ -377,32 +457,43 @@ const styles = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
     marginHorizontal: spacing.lg, marginTop: spacing.md, paddingHorizontal: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border,
   },
-  searchIcon: { fontSize: font.md },
   searchInput: { flex: 1, paddingVertical: spacing.md, fontSize: font.md, color: colors.text },
 
   chipsWrap: { marginTop: spacing.md },
   chips: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  chipsRTL: { flexDirection: 'row-reverse' },
+  // Neutral resting chips keep purple meaningful: only the SELECTED category
+  // is purple. Identical padding + border width in both states → no layout
+  // jump when the selection moves.
   chip: {
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.white,
-    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.purple,
+    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
-  chipText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
-  chipTextActive: { color: colors.white },
+  chipText: { color: colors.text, fontWeight: '700', fontSize: font.sm },
+  chipTextActive: { color: colors.white, fontWeight: '800' },
 
   sectionTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
 
-  card: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden' },
+  card: {
+    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
+    borderCurve: 'continuous', overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
+  },
   cardImg: { width: 104, alignSelf: 'stretch', minHeight: 116, backgroundColor: colors.bgAlt },
+  cardImgEmpty: { alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
   cardName: { fontSize: font.md, fontWeight: '800', color: colors.text },
   cardDesc: { fontSize: font.sm, color: colors.muted, marginTop: 2 },
   cardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.sm },
   cardPrice: { fontSize: font.md, fontWeight: '800', color: colors.purple },
   cardKcal: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
-  addBtn: { backgroundColor: colors.red, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill },
+  addBtn: {
+    backgroundColor: colors.red, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
+    borderRadius: radius.pill, minHeight: 36, justifyContent: 'center',
+  },
   addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
 
   cartBar: {
@@ -411,7 +502,7 @@ const styles = StyleSheet.create({
   },
   cartBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.purple, borderRadius: radius.md,
+    backgroundColor: colors.purple, borderRadius: radius.lg, borderCurve: 'continuous',
     paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, ...shadow.card,
   },
   cartCount: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },

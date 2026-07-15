@@ -21,7 +21,7 @@ import type { Modifier, ModifierGroup } from '../../types/models';
 
 export function ProductDetailScreen({ productId }: { productId: string }) {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang } = useI18n();
+  const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const { loading, getProduct, groupsForProduct } = useCatalog();
   const cart = useCart();
 
@@ -35,7 +35,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
   if (loading && !product) {
     return (
       <View style={styles.root}>
-        <Header showBack />
+        <Header showBack safeTop />
         <LoadingView label={t('loading')} />
       </View>
     );
@@ -43,7 +43,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
   if (!product) {
     return (
       <View style={styles.root}>
-        <Header showBack />
+        <Header showBack safeTop />
         <ErrorView message={t('somethingWentWrong')} onRetry={() => router.back()} retryLabel={t('back')} />
       </View>
     );
@@ -84,15 +84,15 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
 
   return (
     <View style={styles.root}>
-      <Header showBack title={pick(product.nameEn, product.nameAr)} />
+      <Header showBack safeTop title={pick(product.nameEn, product.nameAr)} />
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         <Image source={{ uri: product.imageUrl }} style={styles.hero} contentFit="cover" transition={150} />
         <View style={styles.body}>
-          <Text style={styles.name}>{pick(product.nameEn, product.nameAr)}</Text>
+          <Text style={[styles.name, rtlText]}>{pick(product.nameEn, product.nameAr)}</Text>
           {pick(product.descriptionEn, product.descriptionAr) ? (
-            <Text style={styles.desc}>{pick(product.descriptionEn, product.descriptionAr)}</Text>
+            <Text style={[styles.desc, rtlText]}>{pick(product.descriptionEn, product.descriptionAr)}</Text>
           ) : null}
-          <View style={styles.metaRow}>
+          <View style={[styles.metaRow, rtlRow]}>
             <Text style={styles.price}>{formatSAR(product.price, lang)}</Text>
             {product.calories ? <Text style={styles.kcal}>{product.calories} {t('kcal')}</Text> : null}
           </View>
@@ -102,9 +102,12 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             const min = g.isRequired ? Math.max(1, g.minSelection) : g.minSelection;
             const unmet = showErrors && count < min;
             return (
-              <View key={g.id} style={styles.group}>
-                <View style={styles.groupHead}>
-                  <Text style={styles.groupTitle}>{pick(g.nameEn, g.nameAr)}</Text>
+              // Each modifier group sits on its own surface so groups read as
+              // separate decisions; the unmet-required outline makes a missed
+              // group obvious without hiding the message.
+              <View key={g.id} style={[styles.group, unmet && styles.groupUnmet]}>
+                <View style={[styles.groupHead, rtlRow]}>
+                  <Text style={[styles.groupTitle, rtlText, { flex: 1 }]}>{pick(g.nameEn, g.nameAr)}</Text>
                   <View style={[styles.reqPill, g.isRequired ? styles.reqYes : styles.reqNo]}>
                     <Text style={[styles.reqText, { color: g.isRequired ? colors.red : colors.muted }]}>
                       {g.isRequired ? t('required') : t('optional')}
@@ -112,7 +115,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                   </View>
                 </View>
                 {unmet ? (
-                  <Text style={styles.groupError}>
+                  <Text style={[styles.groupError, rtlText]}>
                     {t('required')} · {min}
                   </Text>
                 ) : null}
@@ -120,11 +123,17 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                   {g.modifiers.map((m) => {
                     const checked = (selected[g.id] ?? []).some((x) => x.id === m.id);
                     return (
-                      <Pressable key={m.id} style={styles.modRow} onPress={() => toggle(g, m)} accessibilityRole="button">
+                      <Pressable
+                        key={m.id}
+                        style={[styles.modRow, rtlRow, checked && styles.modRowOn]}
+                        onPress={() => toggle(g, m)}
+                        accessibilityRole={g.maxSelection === 1 ? 'radio' : 'checkbox'}
+                        accessibilityState={{ checked }}
+                      >
                         <View style={[styles.check, g.maxSelection === 1 ? styles.radio : null, checked && styles.checkOn]}>
                           {checked ? <Text style={styles.checkMark}>✓</Text> : null}
                         </View>
-                        <Text style={styles.modName}>{pick(m.nameEn, m.nameAr)}</Text>
+                        <Text style={[styles.modName, rtlText]}>{pick(m.nameEn, m.nameAr)}</Text>
                         {m.price > 0 ? <Text style={styles.modPrice}>+ {formatSAR(m.price, lang)}</Text> : null}
                       </Pressable>
                     );
@@ -134,7 +143,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             );
           })}
 
-          <View style={styles.qtyRow}>
+          <View style={[styles.qtyRow, rtlRow]}>
             <Text style={styles.qtyLabel}>{t('quantity')}</Text>
             <QtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} />
           </View>
@@ -145,7 +154,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
         <Pressable
           onPress={add}
-          style={({ pressed }) => [styles.addBtn, !canAdd && styles.addBtnDim, pressed && canAdd && { opacity: 0.9 }]}
+          style={({ pressed }) => [styles.addBtn, rtlRow, !canAdd && styles.addBtnDim, pressed && canAdd && { opacity: 0.9 }]}
           accessibilityRole="button"
           accessibilityState={{ disabled: !canAdd }}
         >
@@ -159,15 +168,19 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  hero: { width: '100%', height: 240, backgroundColor: colors.bgAlt },
+  hero: { width: '100%', height: 260, backgroundColor: colors.bgAlt },
   body: { padding: spacing.lg },
-  name: { fontSize: font.xxl, fontWeight: '800', color: colors.text },
-  desc: { fontSize: font.md, color: colors.muted, marginTop: spacing.xs },
+  name: { fontSize: font.xxl, fontWeight: '800', color: colors.text, lineHeight: font.xxl + 8 },
+  desc: { fontSize: font.md, color: colors.muted, marginTop: spacing.xs, lineHeight: font.md + 7 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.md },
   price: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
   kcal: { fontSize: font.sm, color: colors.muted },
 
-  group: { marginTop: spacing.xl },
+  group: {
+    marginTop: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg,
+    borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border, padding: spacing.md,
+  },
+  groupUnmet: { borderColor: colors.red },
   groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
   groupTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
   reqPill: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill },
@@ -178,8 +191,10 @@ const styles = StyleSheet.create({
 
   modRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white,
-    borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.md,
+    borderRadius: radius.md, borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
+    padding: spacing.md, minHeight: 48,
   },
+  modRowOn: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
   check: {
     width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.border,
     alignItems: 'center', justifyContent: 'center',
@@ -199,7 +214,8 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.red, borderRadius: radius.md, paddingHorizontal: spacing.xl, paddingVertical: spacing.lg,
+    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
+    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
   },
   addBtnDim: { backgroundColor: colors.disabled },
   addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
