@@ -1,19 +1,15 @@
 /**
  * Bottom tabs: Home (menu lives here — NO separate Menu tab), Orders, Profile.
  * Guards the whole group: an unauthenticated deep link bounces to login.
- * Icons are emoji to avoid pulling an icon font into the first pass.
+ * Icons are drawn primitives (components/Icons) — crisp, tintable, no font.
  */
 import { Redirect, Tabs } from 'expo-router';
 import React from 'react';
-import { Text, type ColorValue } from 'react-native';
 
+import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
 import { colors } from '../../theme';
-
-function TabEmoji({ emoji, color, size }: { emoji: string; color: ColorValue; size: number }) {
-  return <Text style={{ fontSize: size, color, lineHeight: size + 2 }}>{emoji}</Text>;
-}
 
 export default function TabsLayout() {
   const { status } = useAuth();
@@ -35,21 +31,21 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: pick('Home', 'الرئيسية'),
-          tabBarIcon: ({ color, size }) => <TabEmoji emoji="🏠" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="orders"
         options={{
           title: t('orderHistory'),
-          tabBarIcon: ({ color, size }) => <TabEmoji emoji="🧾" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <ReceiptIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: t('profile'),
-          tabBarIcon: ({ color, size }) => <TabEmoji emoji="👤" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <PersonIcon color={color} size={size} />,
         }}
       />
     </Tabs>

@@ -2,6 +2,7 @@
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, spacing } from '../theme';
 import { useI18n } from '../i18n/I18nProvider';
@@ -12,9 +13,15 @@ interface Props {
   onBack?: () => void;
   right?: React.ReactNode;
   left?: React.ReactNode;
+  /**
+   * Pads the header below the status bar / notch. Opt-in so screens that
+   * already wrap their content in a safe-area container keep their spacing.
+   */
+  safeTop?: boolean;
 }
 
-export function Header({ title, showBack, onBack, right, left }: Props) {
+export function Header({ title, showBack, onBack, right, left, safeTop }: Props) {
+  const insets = useSafeAreaInsets();
   const { isRTL, t, rtlRow } = useI18n();
   const back = () => {
     if (onBack) onBack();
@@ -26,7 +33,7 @@ export function Header({ title, showBack, onBack, right, left }: Props) {
   return (
     // Mirrored in Arabic so Back sits on the trailing (right) edge, matching
     // native RTL convention; the chevron above already points the correct way.
-    <View style={[styles.wrap, rtlRow]}>
+    <View style={[styles.wrap, rtlRow, safeTop && { paddingTop: insets.top + spacing.md }]}>
       <View style={styles.side}>
         {showBack ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('back')} onPress={back} hitSlop={10} style={styles.backBtn}>
