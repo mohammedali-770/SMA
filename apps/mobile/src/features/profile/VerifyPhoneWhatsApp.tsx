@@ -21,7 +21,7 @@ import { colors, font, radius, shadow, spacing } from '../../theme';
 type Phase = 'phone' | 'code' | 'verified';
 
 export function VerifyPhoneWhatsApp() {
-  const { t, lang } = useI18n();
+  const { t, lang, rtlText, rtlRow } = useI18n();
   const { profile, refreshProfile } = useAuth();
 
   const [phase, setPhase] = useState<Phase>(profile?.phoneVerified ? 'verified' : 'phone');
@@ -68,22 +68,27 @@ export function VerifyPhoneWhatsApp() {
     } finally { setBusy(false); }
   };
 
+  const verified = phase === 'verified' || profile?.phoneVerified;
+
   return (
     <View style={[styles.card, shadow.card]}>
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>{t('verifyPhoneTitle')}</Text>
-        {(phase === 'verified' || profile?.phoneVerified) && (
-          <Text style={styles.badge}>✓ {t('phoneVerifiedBadge')}</Text>
+      <View style={[styles.headerRow, rtlRow]}>
+        <Text style={[styles.title, rtlText, { flex: 1 }]}>{t('verifyPhoneTitle')}</Text>
+        {verified && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>✓ {t('phoneVerifiedBadge')}</Text>
+          </View>
         )}
       </View>
-      <Text style={styles.sub}>{t('verifyPhoneSub')}</Text>
+      <Text style={[styles.sub, rtlText]}>{t('verifyPhoneSub')}</Text>
 
       {notAvailable ? (
-        <Text style={styles.notAvailable}>{t('whatsappNotAvailable')}</Text>
+        <Text style={[styles.notAvailable, rtlText]}>{t('whatsappNotAvailable')}</Text>
       ) : phase === 'verified' ? (
-        <Text style={styles.success}>{t('phoneVerifiedSuccess')}</Text>
+        <Text style={[styles.success, rtlText]}>{t('phoneVerifiedSuccess')}</Text>
       ) : (
         <>
+          {/* Digits stay LTR in both languages so numbers read correctly. */}
           <TextInput
             value={phone}
             onChangeText={setPhone}
@@ -92,6 +97,7 @@ export function VerifyPhoneWhatsApp() {
             placeholder="+9665XXXXXXXX"
             placeholderTextColor={colors.muted}
             style={[styles.input, phase !== 'phone' && styles.inputMuted]}
+            accessibilityLabel={t('phone')}
           />
 
           {phase === 'phone' ? (
@@ -106,6 +112,7 @@ export function VerifyPhoneWhatsApp() {
                 placeholderTextColor={colors.muted}
                 style={[styles.input, styles.codeInput]}
                 maxLength={6}
+                accessibilityLabel={t('enterVerificationCode')}
               />
               <Button label={t('verifyBtn')} onPress={verify} loading={busy} />
               <Button
@@ -120,17 +127,21 @@ export function VerifyPhoneWhatsApp() {
         </>
       )}
 
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {notice ? <Text style={[styles.notice, rtlText]}>{notice}</Text> : null}
+      {error ? <Text style={[styles.error, rtlText]}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
+  },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   title: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  badge: { fontSize: font.sm, fontWeight: '800', color: colors.success },
+  badge: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.successBg },
+  badgeText: { fontSize: font.xs, fontWeight: '800', color: colors.success },
   sub: { fontSize: font.sm, color: colors.muted, marginTop: 2, marginBottom: spacing.md },
   input: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,

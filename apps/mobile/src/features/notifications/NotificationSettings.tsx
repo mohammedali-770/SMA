@@ -103,7 +103,7 @@ export function NotificationSettings() {
         />
       </View>
 
-      <View style={[styles.row, rtlRow]}>
+      <View style={[styles.row, styles.rowDivider, rtlRow]}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.rowLabel, rtlText]}>{t('notifPromos')}</Text>
           <Text style={[styles.rowSub, rtlText]}>{t('notifPromosSub')}</Text>
@@ -123,10 +123,14 @@ export function NotificationSettings() {
 }
 
 const styles = StyleSheet.create({
-  card: { backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg, marginBottom: spacing.md },
+  card: {
+    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
+  },
   title: { fontSize: font.lg, fontWeight: '800', color: colors.text },
   sub: { fontSize: font.sm, color: colors.muted, marginTop: 2, marginBottom: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
+  rowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   rowLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
   rowSub: { fontSize: font.xs, color: colors.muted, marginTop: 1 },
   denied: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
