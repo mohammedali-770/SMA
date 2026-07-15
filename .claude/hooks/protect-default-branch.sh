@@ -258,8 +258,19 @@ scan_interpreter_payloads() {
         j=$((k+1))
         while [ "$j" -lt "${#W[@]}" ]; do
           case "${W[j]}" in
-            -c|-e|-[a-z]*c|-[a-z]*e)
-              # the code flag: the NEXT word is the code payload -> scan it
+            -c|-e)
+              # code flag with a SEPARATE-word payload -> scan the next word
+              [ $((j+1)) -lt "${#W[@]}" ] && { scan_variant_segments "${W[j+1]}"; scan_interpreter_payloads "${W[j+1]}"; }
+              break ;;
+            -c?*)
+              # cuddled code payload: python3 -c'import os; ...' -> -cimport...
+              scan_variant_segments "${W[j]#-c}"; scan_interpreter_payloads "${W[j]#-c}"; break ;;
+            -e?*)
+              # cuddled -eCODE (perl -e'...', ruby -e'...')
+              scan_variant_segments "${W[j]#-e}"; scan_interpreter_payloads "${W[j]#-e}"; break ;;
+            -[a-z]*[ce])
+              # combined boolean flags ending in the code flag (bash -lc CODE):
+              # payload is the next word
               [ $((j+1)) -lt "${#W[@]}" ] && { scan_variant_segments "${W[j+1]}"; scan_interpreter_payloads "${W[j+1]}"; }
               break ;;
             -o|-O|-W|--rcfile|--init-file)
@@ -485,18 +496,33 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   # by the configured-alias-invocation check below.
   NORMALIZED="$SANITIZED"
 
-  # git -C <path> / --git-dir <path> / --work-tree <path> retarget git at
-  # ANOTHER working tree or repo, escaping the ON_PROTECTED check (which
-  # reflects only CLAUDE_PROJECT_DIR). Resolve each such target's checked-out
-  # branch and deny operating there when it is a protected branch — this
-  # catches git -C /other/wt commit|push|... when /other/wt is on main. (The
-  # setup step, git worktree add <path> main, is already denied above.)
+  # GIT_CONFIG* env overrides can be EXPORTED in an earlier command segment and
+  # take effect on a later git call, so check the WHOLE command (not just a git
+  # segment). These variables only affect git, so any assignment is denied.
+  if str_matches "$SANITIZED" '(^|[^[:alnum:]_])GIT_CONFIG(_GLOBAL|_SYSTEM|_COUNT|_KEY_[0-9]+|_VALUE_[0-9]+)?='; then
+    deny "GIT_CONFIG* environment overrides (including exported assignments) point git at unvettable configuration and are denied from every branch. ${WORKFLOW_HINT}"
+  fi
+
+  # A command can retarget git at ANOTHER working tree/repo, escaping the
+  # ON_PROTECTED check (which reflects only CLAUDE_PROJECT_DIR):
+  #   * git -C <path> / --git-dir <path> / --work-tree <path>
+  #   * a preceding `cd <path>` that changes the working directory before git
+  # Resolve every such target's checked-out branch and deny operating there
+  # when it is a protected branch (git -C /wt commit, cd /wt && git commit).
+  # The setup step git worktree add <path> main is already denied above.
   GIT_TARGETS="$(printf '%s' "$SANITIZED" | grep -oE '(-C[[:space:]]+[^[:space:]]+|--git-dir[=[:space:]][^[:space:]]+|--work-tree[=[:space:]][^[:space:]]+)' | sed -E 's/^(-C|--git-dir|--work-tree)[=[:space:]]+//' || true)"
-  for T in $GIT_TARGETS; do
+  CD_TARGETS="$(printf '%s' "$SANITIZED" | tr ';|&' '\n' | sed -nE 's/^[[:space:]]*cd[[:space:]]+([^[:space:]]+).*/\1/p' || true)"
+  RETARGETS="$GIT_TARGETS
+$CD_TARGETS"
+  while IFS= read -r T; do
+    [ -n "$T" ] || continue
+    case "$T" in -|-*|'~'*) continue ;; esac   # cd -, options, home-relative: skip
     TB="$(git -C "$T" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
     { [ -n "$TB" ] && is_protected "$TB"; } \
-      && deny "a git -C / --git-dir / --work-tree target is on a protected branch (${TB}); operating there is denied. ${WORKFLOW_HINT}"
-  done
+      && deny "a redirected git context (-C / --git-dir / --work-tree / cd target) is on a protected branch (${TB}); operating there is denied. ${WORKFLOW_HINT}"
+  done <<EORT
+$RETARGETS
+EORT
 
   # invoking an ALREADY-CONFIGURED git alias can hide any operation behind an
   # arbitrary name (git p behaves as git push when the p alias is configured),
@@ -522,13 +548,11 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   # command can retarget git with -C / --git-dir / --work-tree, check each of
   # those target contexts too (the CLAUDE_PROJECT_DIR default plus every
   # redirect target). GIT_TARGETS is filled by the -C resolver above.
-  CONFIG_CONTEXTS="$PROJECT_DIR"
-  for T in ${GIT_TARGETS:-}; do
-    [ -n "$T" ] && CONFIG_CONTEXTS="$CONFIG_CONTEXTS
-$T"
-  done
+  CONFIG_CONTEXTS="$PROJECT_DIR
+$RETARGETS"
   while IFS= read -r D; do
     [ -n "$D" ] || continue
+    case "$D" in -|-*|'~'*) continue ;; esac
     if [ "$GIT_PUSH_SEEN" -eq 1 ]; then check_push_config "$D"; fi
     if [ "$GIT_FETCH_SEEN" -eq 1 ]; then check_fetch_config "$D"; fi
   done <<EOCTX
