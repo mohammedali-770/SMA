@@ -259,10 +259,13 @@ scan_interpreter_payloads() {
         while [ "$j" -lt "${#W[@]}" ]; do
           case "${W[j]}" in
             -c|-e|-[a-z]*c|-[a-z]*e)
+              # the code flag: the NEXT word is the code payload -> scan it
               [ $((j+1)) -lt "${#W[@]}" ] && { scan_variant_segments "${W[j+1]}"; scan_interpreter_payloads "${W[j+1]}"; }
               break ;;
-            -*) j=$((j+1)) ;;
-            *) break ;;
+            -o|-O|-W|--rcfile|--init-file)
+              j=$((j+2)) ;;   # option takes a SEPARATE-word operand: skip both
+            -*) j=$((j+1)) ;; # boolean/attached-value option: skip one
+            *) break ;;       # first non-option positional = script file, stop
           esac
         done ;;
       eval|source|.)
@@ -735,8 +738,8 @@ check_segment() {
     sort)
       for a in "$@"; do
         case "$a" in
-          -o|--output|--output=*)
-            deny "protected branch: sort with an output file (-o/--output) is denied. ${WORKFLOW_HINT}" ;;
+          -o*|--output|--output=*)
+            deny "protected branch: sort with an output file (-o/--output, including the cuddled -oFILE form) is denied. ${WORKFLOW_HINT}" ;;
         esac
       done
       return 0 ;;
