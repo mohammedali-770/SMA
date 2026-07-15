@@ -97,12 +97,12 @@ Add `isInteractive` for buttons and pressable glass:
 
 ```tsx
 import { GlassView } from "expo-glass-effect";
-import { SymbolView } from "expo-symbols";
+import { Image } from "expo-image";
 import { colors } from "@/theme/colors";
 
 <GlassView isInteractive style={{ borderRadius: 50 }}>
   <Pressable style={{ padding: 12 }} onPress={handlePress}>
-    <SymbolView name="plus" tintColor={colors.label} size={36} />
+    <Image source="sf:plus" tintColor={colors.label} contentFit="contain" style={{ width: 36, height: 36 }} />
   </Pressable>
 </GlassView>
 ```
@@ -116,7 +116,7 @@ function GlassButton({ icon, onPress }) {
   return (
     <GlassView isInteractive style={{ borderRadius: 50 }}>
       <Pressable style={{ padding: 12 }} onPress={onPress}>
-        <SymbolView name={icon} tintColor={colors.label} size={24} />
+        <Image source={`sf:${icon}`} tintColor={colors.label} contentFit="contain" style={{ width: 24, height: 24 }} />
       </Pressable>
     </GlassView>
   );

@@ -412,29 +412,6 @@ function Particles({ count = 500 }) {
 }
 ```
 
-## Touch Controls (Orbit)
-
-See the full `orbit-controls.tsx` implementation in the lib files. Usage:
-
-```tsx
-import { View } from "react-native";
-import { FiberCanvas } from "@/lib/fiber-canvas";
-import useControls from "@/lib/orbit-controls";
-
-function Scene() {
-  const [OrbitControls, events] = useControls();
-
-  return (
-    <View style={{ flex: 1 }} {...events}>
-      <FiberCanvas style={{ flex: 1 }}>
-        <OrbitControls />
-        {/* Your 3D content */}
-      </FiberCanvas>
-    </View>
-  );
-}
-```
-
 ## Common Issues & Solutions
 
 ### 1. "X is not part of the THREE namespace"

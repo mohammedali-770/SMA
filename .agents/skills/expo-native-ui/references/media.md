@@ -16,7 +16,6 @@ import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
 import * as ImagePicker from "expo-image-picker";
 import * as Haptics from "expo-haptics";
-import { SymbolView } from "expo-symbols";
 import { colors } from "@/theme/colors";
 import { GlassView } from "expo-glass-effect";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -175,7 +174,7 @@ if (granted) {
 `MediaLibrary.saveToLibraryAsync` only accepts local file paths. Save base64 strings to disk first:
 
 ```tsx
-import { File, Paths } from "expo-file-system/next";
+import { File, Paths } from "expo-file-system";
 
 function base64ToLocalUri(base64: string, filename?: string) {
   if (!filename) {

@@ -4,14 +4,16 @@ Use SF Symbols for native feel. Never use FontAwesome or Ionicons.
 
 ## Basic Usage
 
+Render SF Symbols with `expo-image` using the `sf:` source prefix:
+
 ```tsx
-import { SymbolView } from "expo-symbols";
+import { Image } from "expo-image";
 import { colors } from "@/theme/colors";
 
-<SymbolView
+<Image
+  source="sf:square.and.arrow.down"
   tintColor={colors.label}
-  resizeMode="scaleAspectFit"
-  name="square.and.arrow.down"
+  contentFit="contain"
   style={{ width: 16, height: 16 }}
 />;
 ```
@@ -19,14 +21,11 @@ import { colors } from "@/theme/colors";
 ## Props
 
 ```tsx
-<SymbolView
-  name="star.fill"                    // SF Symbol name (required)
+<Image
+  source="sf:star.fill"               // SF Symbol name with sf: prefix (required)
   tintColor={colors.label}            // Icon color
-  size={24}                           // Shorthand for width/height
-  resizeMode="scaleAspectFit"         // How to scale
-  weight="regular"                    // thin | ultraLight | light | regular | medium | semibold | bold | heavy | black
-  scale="medium"                      // small | medium | large
-  style={{ width: 16, height: 16 }}   // Standard style props
+  contentFit="contain"                // How to scale
+  style={{ width: 24, height: 24 }}   // Icon size via standard style props
 />
 ```
 
@@ -120,81 +119,14 @@ import { colors } from "@/theme/colors";
 
 ## Animated Symbols
 
-```tsx
-<SymbolView
-  name="checkmark.circle"
-  animationSpec={{
-    effect: {
-      type: "bounce",
-      direction: "up",
-    },
-  }}
-/>
-```
-
-### Animation Effects
-
-- `bounce` - Bouncy animation
-- `pulse` - Pulsing effect
-- `variableColor` - Color cycling
-- `scale` - Scale animation
+Use the `sfEffect` prop of `expo-image` to apply SF Symbol effects:
 
 ```tsx
-// Bounce with direction
-animationSpec={{
-  effect: { type: "bounce", direction: "up" }  // up | down
-}}
-
-// Pulse
-animationSpec={{
-  effect: { type: "pulse" }
-}}
-
-// Variable color (multicolor symbols)
-animationSpec={{
-  effect: {
-    type: "variableColor",
-    cumulative: true,
-    reversing: true
-  }
-}}
-```
-
-## Symbol Weights
-
-```tsx
-// Lighter weights
-<SymbolView name="star" weight="ultraLight" />
-<SymbolView name="star" weight="thin" />
-<SymbolView name="star" weight="light" />
-
-// Default
-<SymbolView name="star" weight="regular" />
-
-// Heavier weights
-<SymbolView name="star" weight="medium" />
-<SymbolView name="star" weight="semibold" />
-<SymbolView name="star" weight="bold" />
-<SymbolView name="star" weight="heavy" />
-<SymbolView name="star" weight="black" />
-```
-
-## Symbol Scales
-
-```tsx
-<SymbolView name="star" scale="small" />
-<SymbolView name="star" scale="medium" />  // default
-<SymbolView name="star" scale="large" />
-```
-
-## Multicolor Symbols
-
-Some symbols support multiple colors:
-
-```tsx
-<SymbolView
-  name="cloud.sun.rain.fill"
-  type="multicolor"
+<Image
+  source="sf:checkmark.circle"
+  tintColor={colors.label}
+  sfEffect="bounce"
+  style={{ width: 24, height: 24 }}
 />
 ```
 
@@ -206,8 +138,8 @@ Some symbols support multiple colors:
 
 ## Best Practices
 
-- Always use SF Symbols over vector icon libraries
-- Match symbol weight to nearby text weight
+- Use `expo-image` with `sf:` sources for iOS SF Symbols (never `expo-symbols` — see SKILL.md "Library Preferences")
+- Use `tintColor` from the shared semantic color helper (see SKILL.md "Colors") to support dark mode
 - Use `.fill` variants for selected/active states
-- Use the cross-platform `colors` helper (see SKILL.md "Colors") for tint to support dark mode
 - Keep icons at consistent sizes (16, 20, 24, 32)
+- Provide a deliberate Android/web fallback when the screen is cross-platform (`sf:` sources are iOS-only)
