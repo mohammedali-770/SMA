@@ -107,6 +107,55 @@ export function AlertIcon({ size = 40, color = '#e02d3d' }: IconProps) {
   );
 }
 
+/** Medal: ring + core + ribbon legs — used for the loyalty balance. */
+export function AwardIcon({ size = 24, color = '#422e87' }: IconProps) {
+  const stroke = Math.max(2, Math.round(size / 12));
+  const ring = Math.round(size * 0.58);
+  const core = Math.round(size * 0.2);
+  const legW = stroke + 1;
+  const legH = Math.round(size * 0.34);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center' }} pointerEvents="none">
+      <View style={{
+        width: ring, height: ring, borderRadius: ring / 2, borderWidth: stroke, borderColor: color,
+        alignItems: 'center', justifyContent: 'center',
+      }}>
+        <View style={{ width: core, height: core, borderRadius: core / 2, backgroundColor: color }} />
+      </View>
+      <View style={{ flexDirection: 'row', gap: Math.round(size * 0.14), marginTop: -2 }}>
+        <View style={{ width: legW, height: legH, borderRadius: legW / 2, backgroundColor: color, transform: [{ rotate: '16deg' }] }} />
+        <View style={{ width: legW, height: legH, borderRadius: legW / 2, backgroundColor: color, transform: [{ rotate: '-16deg' }] }} />
+      </View>
+    </View>
+  );
+}
+
+/** Door + outward arrow — used for the sign-out action. */
+export function SignOutIcon({ size = 20, color = '#ffffff' }: IconProps) {
+  const stroke = Math.max(2, Math.round(size / 10));
+  const frameH = Math.round(size * 0.9);
+  const frameW = Math.round(size * 0.46);
+  const tip = Math.round(size * 0.3);
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center' }} pointerEvents="none">
+      <View style={{
+        position: 'absolute', left: 0, width: frameW, height: frameH,
+        borderWidth: stroke, borderRightWidth: 0, borderColor: color,
+        borderTopLeftRadius: 4, borderBottomLeftRadius: 4,
+      }} />
+      <View style={{
+        position: 'absolute', left: Math.round(size * 0.3), right: Math.round(size * 0.12),
+        height: stroke, borderRadius: stroke / 2, backgroundColor: color,
+      }} />
+      <View style={{
+        position: 'absolute', right: Math.round(size * 0.06),
+        width: tip, height: tip, borderTopWidth: stroke, borderRightWidth: stroke, borderColor: color,
+        transform: [{ rotate: '45deg' }],
+      }} />
+    </View>
+  );
+}
+
 /** Shopping bag: rounded body + handle arch — used for the empty cart. */
 export function BagIcon({ size = 40, color = '#c9c4d6' }: IconProps) {
   const stroke = Math.max(2, Math.round(size / 16));
