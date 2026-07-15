@@ -140,13 +140,17 @@ GIT_WORD='(^|[^[:alnum:]._-])git([[:space:]]|$)'
 WB='([^[:alnum:]._-]|$)'
 LB='(^|[^[:alnum:]._-])'
 
-# "git <real global flags>* <subcommand>" adjacency. This keeps the any-branch
+# "git <global flags>* <subcommand>" adjacency. This keeps the any-branch
 # rules from firing on words that merely appear inside quoted text (for
 # example a commit message that mentions "push" or a protected branch name)
-# while still catching git global-option forms that retarget the repo —
-# including the space-separated value forms (--git-dir .git) and the
-# no-value globals (--literal-pathspecs, --no-pager, --bare, ...).
-GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|config-env|super-prefix)(=[^[:space:]]+|[[:space:]]+[^[:space:]]+)|--no-pager|--paginate|--no-replace-objects|--no-optional-locks|--no-lazy-fetch|--literal-pathspecs|--glob-pathspecs|--noglob-pathspecs|--icase-pathspecs|--bare|-[Pp]))*[[:space:]]+'
+# while still catching git global-option forms that retarget the repo. The
+# global-flag class is intentionally GENERAL so an unknown/new global option
+# cannot slip a subcommand past the scanner:
+#   * -c VALUE / -C VALUE                        (short, space-separated value)
+#   * --long VALUE for the known value-taking globals (space-separated value)
+#   * --anything or --anything=VALUE             (any long option, incl. new ones)
+#   * -p / -P                                    (short boolean)
+GIT_PRE='(^|[^[:alnum:]._-])git([[:space:]]+(-[cC][[:space:]]+[^[:space:]]+|--(git-dir|work-tree|namespace|exec-path|config-env|super-prefix|attr-source)[[:space:]]+[^[:space:]]+|--[a-zA-Z][a-zA-Z0-9-]*(=[^[:space:]]+)?|-[Pp]))*[[:space:]]+'
 
 # ---------------------------------------------------------------------------
 # 4. ANY-BRANCH rules: protected refs may never be pushed/updated/deleted/
@@ -321,10 +325,11 @@ if [ "$TOOL_NAME" = "Bash" ]; then
   done
 
   # even without an explicit protected ref in the command, a bare git push
-  # can land on a protected branch through upstream/push.default config —
-  # resolve the current branch's actual push destination and deny if it is
-  # protected
+  # can land on a protected branch through configuration the command text does
+  # not spell out. Check the effective push config at runtime:
   if [ "$GIT_PUSH_SEEN" -eq 1 ]; then
+    # (a) the current branch's upstream push destination (@{push}); empty for a
+    #     brand-new branch with no upstream, which is the normal first-push case
     PUSH_DEST="$(git -C "$PROJECT_DIR" rev-parse --abbrev-ref '@{push}' 2>/dev/null || true)"
     if [ -n "$PUSH_DEST" ]; then
       case "$PUSH_DEST" in
@@ -333,6 +338,22 @@ if [ "$TOOL_NAME" = "Bash" ]; then
       is_protected "$PUSH_DEST" \
         && deny "the current branch's configured push destination resolves to a protected branch, so git push is denied. ${WORKFLOW_HINT}"
     fi
+    # (b) a preconfigured per-remote push refspec (remote.<name>.push) whose
+    #     DESTINATION is a protected ref, or a wildcard that could include one.
+    #     This is what @{push} does NOT reflect (it tracks upstream, not the
+    #     push refspec). Only these two dangerous shapes are denied, so a benign
+    #     remote.*.push=HEAD (push current branch) stays allowed.
+    PUSH_CFG="$(git -C "$PROJECT_DIR" config --get-regexp '^remote\.[^.]+\.push$' 2>/dev/null || true)"
+    if [ -n "$PUSH_CFG" ]; then
+      printf '%s' "$PUSH_CFG" | grep -Eq ":(refs/heads/)?(claude/project-build-ie4b56|main)([^[:alnum:]_./-]|\$)" \
+        && deny "a configured push refspec (remote.*.push) targets a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+      printf '%s' "$PUSH_CFG" | grep -Eq '[*]' \
+        && deny "a configured push refspec (remote.*.push) uses a wildcard destination that could include a protected branch, so git push is denied. ${WORKFLOW_HINT}"
+    fi
+    # (c) push.default=matching pushes every branch present on both ends,
+    #     including a protected one, when the push names no refspec
+    [ "$(git -C "$PROJECT_DIR" config --get push.default 2>/dev/null || true)" = "matching" ] \
+      && deny "push.default=matching would push all matching branches including protected ones; git push is denied. Use an explicit refspec. ${WORKFLOW_HINT}"
   fi
 fi
 
