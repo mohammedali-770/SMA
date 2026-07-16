@@ -1,9 +1,14 @@
 -- ============================================================================
 -- Account deletion scheduler job
 --
--- Invokes the existing account-delete-process Edge Function every minute using
--- the dedicated Vault-backed processor secret. The secret value is never stored
--- in cron.job and is read only at execution time inside this restricted function.
+-- Invokes the account-delete-scheduler GATEWAY Edge Function every minute using
+-- the dedicated Vault-backed processor secret. The gateway re-verifies that
+-- secret inside Postgres (verify_account_deletion_process_secret) and then calls
+-- account-delete-process with its own built-in service-role bearer — so the
+-- service-role key never appears in cron.job or Vault, and the scheduler secret
+-- is never stored in Edge Function environment variables. The secret value is
+-- never stored in cron.job and is read only at execution time inside this
+-- restricted function.
 -- ============================================================================
 
 create or replace function public.invoke_account_deletion_processor()
@@ -32,7 +37,7 @@ begin
   end if;
 
   select net.http_post(
-    url := v_project_url || '/functions/v1/account-delete-process',
+    url := rtrim(v_project_url, '/') || '/functions/v1/account-delete-scheduler',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'x-process-secret', v_process_secret
