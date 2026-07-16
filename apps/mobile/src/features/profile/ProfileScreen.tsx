@@ -101,6 +101,18 @@ export function ProfileScreen() {
           <Text style={styles.signOutText}>{t('signOut')}</Text>
         </Pressable>
 
+        {/* Delete account — destructive, de-emphasized (text only) so it is
+            discoverable but not tapped by accident. Opens the guarded flow. */}
+        <Pressable
+          onPress={() => router.push('/account/delete')}
+          accessibilityRole="button"
+          accessibilityLabel={t('delAccount')}
+          accessibilityHint={pick('Opens account deletion', 'يفتح حذف الحساب')}
+          style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+        >
+          <Text style={styles.deleteText}>{t('delAccount')}</Text>
+        </Pressable>
+
         <Text style={styles.footerNote}>{pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار 1.0.0')}</Text>
       </ScrollView>
     </Screen>
@@ -176,6 +188,12 @@ const styles = StyleSheet.create({
     minHeight: 52, paddingHorizontal: spacing.lg, marginTop: spacing.xl,
   },
   signOutText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
+
+  deleteBtn: {
+    alignItems: 'center', justifyContent: 'center', minHeight: 44,
+    marginTop: spacing.md,
+  },
+  deleteText: { color: colors.red, fontWeight: '700', fontSize: font.md, textDecorationLine: 'underline' },
 
   footerNote: { textAlign: 'center', color: colors.muted, fontSize: font.xs, marginTop: spacing.xl },
 });

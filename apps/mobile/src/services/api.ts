@@ -410,3 +410,45 @@ export const pushDevices = {
     if (error) throw new Error(error.message);
   },
 };
+
+// ---------------------------------------------------------------------------
+// Account deletion (customer self-service). The mobile app NEVER performs the
+// destructive deletion — it only re-verifies identity and enqueues a request via
+// the `account-delete-request` Edge Function (JWT identity is the source of
+// truth). Reading the request state is RLS-scoped to the caller's own row.
+// ---------------------------------------------------------------------------
+export interface DeletionRequestState { id: string; status: string }
+export interface DeletionSubmitResult {
+  status?: string; requestId?: string | null; verified?: boolean; existing?: boolean; code?: string;
+}
+export const accountDeletion = {
+  /** My current in-flight deletion request, if any (RLS returns only my row). */
+  current: async (): Promise<DeletionRequestState | null> => {
+    const { data, error } = await supabase
+      .from('account_deletion_requests')
+      .select('id, status')
+      .in('status', ['queued', 'waiting_for_active_order', 'waiting_for_financial_process', 'processing', 'retry_scheduled', 'manual_review'])
+      .order('requested_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return (data as DeletionRequestState | null) ?? null;
+  },
+  /** Send an OTP to the account's REGISTERED phone (server-derived). Also reports
+   *  whether the password reauth fallback is possible (account has an email). */
+  sendOtp: async (language: 'ar' | 'en'): Promise<{ status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone'; reauthAvailable?: boolean }> => {
+    const { data, error } = await supabase.functions.invoke('account-delete-request', {
+      body: { action: 'send_otp', language },
+    });
+    if (error) throw new Error(error.message);
+    return data as { status: 'sent' | 'disabled' | 'rate_limited' | 'error' | 'no_phone'; reauthAvailable?: boolean };
+  },
+  /** Re-verify identity (OTP code or account password) and enqueue the request. */
+  submit: async (method: 'otp' | 'reauth', factors: { code?: string; password?: string }): Promise<DeletionSubmitResult> => {
+    const { data, error } = await supabase.functions.invoke('account-delete-request', {
+      body: { action: 'submit', method, code: factors.code, password: factors.password },
+    });
+    if (error) throw new Error(error.message);
+    return data as DeletionSubmitResult;
+  },
+};

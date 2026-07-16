@@ -83,3 +83,17 @@ verify_jwt = true
 # TEST checkout. Informational only; marks nothing. No JWT (public page).
 [functions.tap-admin-test-return]
 verify_jwt = false
+
+# ---- Account deletion ----------------------------------------------------
+# Customer requests deletion of their OWN account. Requires a valid user JWT; the
+# user id comes from the JWT (never the body). Sends an OTP to the registered
+# phone and/or re-verifies the password, then idempotently enqueues the request.
+[functions.account-delete-request]
+verify_jwt = true
+
+# Service-role processor for the deletion queue. verify_jwt=false because it is
+# called by the trusted backend (service-role bearer) or a scheduler (shared
+# secret) — NEVER by a client. It performs the anonymization + GoTrue Auth
+# deletion; it must never be reachable with only a user JWT.
+[functions.account-delete-process]
+verify_jwt = false

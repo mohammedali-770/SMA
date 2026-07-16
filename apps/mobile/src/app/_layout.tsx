@@ -54,6 +54,7 @@ export default function RootLayout() {
               <Stack.Screen name="legal/index" />
               <Stack.Screen name="legal/[type]" />
               <Stack.Screen name="receipt/[id]" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="account/delete" />
             </Stack>
           </SplashGate>
         </AppStoreProvider>
