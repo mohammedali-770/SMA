@@ -38,7 +38,7 @@ begin
   end if;
 
   select net.http_post(
-    url := rtrim(v_project_url, '/') || '/functions/v1/account-delete-process',
+    url := rtrim(v_project_url, '/') || '/functions/v1/account-delete-scheduler',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'x-process-secret', v_process_secret
@@ -62,7 +62,7 @@ grant execute on function public.invoke_account_deletion_processor()
   to service_role;
 
 comment on function public.invoke_account_deletion_processor() is
-  'Invokes account-delete-process using Vault-backed URL and scheduler secret; intended for pg_cron and trusted service-role diagnostics only.';
+  'Invokes the account deletion scheduler wrapper using Vault-backed configuration; intended for pg_cron and trusted service-role diagnostics only.';
 
 do $$
 declare

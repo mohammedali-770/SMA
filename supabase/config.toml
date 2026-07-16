@@ -92,8 +92,11 @@ verify_jwt = false
 verify_jwt = true
 
 # Service-role processor for the deletion queue. verify_jwt=false because it is
-# called by the trusted backend (service-role bearer) or a scheduler (shared
-# secret) — NEVER by a client. It performs the anonymization + GoTrue Auth
-# deletion; it must never be reachable with only a user JWT.
+# called only by a service-role bearer or an independently authenticated backend.
 [functions.account-delete-process]
+verify_jwt = false
+
+# Vault-authenticated cron gateway. It verifies the dedicated scheduler secret
+# in Postgres, then calls account-delete-process with its built-in service role.
+[functions.account-delete-scheduler]
 verify_jwt = false
