@@ -68,6 +68,19 @@ export function isLikelyOffline(error: unknown): boolean {
   return /network|fetch failed|failed to fetch|offline|unable to resolve host|unknownhostexception|connection|timed out|timeout|enotfound|econnrefused|net::err/.test(msg);
 }
 
+/**
+ * Delete-account flow phases in which the app is LOCKED to the deletion state:
+ * the customer must not be able to navigate back into the authenticated app
+ * (hardware back, header back, and gestures are all suppressed). 'submitting'
+ * (in flight), 'success' (accepted → auto sign-out) and 'pending' (an active
+ * request found on open / login) are all locked.
+ */
+export const DELETION_LOCKED_PHASES = ['submitting', 'success', 'pending'] as const;
+
+export function isDeletionLockedPhase(phase: string): boolean {
+  return (DELETION_LOCKED_PHASES as readonly string[]).includes(phase);
+}
+
 export type ReverifyMethod = 'otp' | 'reauth';
 
 /** Availability of each re-verification factor, resolved from the server. */

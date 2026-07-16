@@ -12,12 +12,12 @@
  * strings.
  */
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import {
-  canSubmitDeletion, chooseReverifyMethod, deletionStatusMessageKey, isLikelyOffline,
-  otpDeliverable, SUPPORT_EMAIL, SUPPORT_PHONE, type ReverifyMethod,
+  canSubmitDeletion, chooseReverifyMethod, deletionStatusMessageKey, isDeletionLockedPhase,
+  isLikelyOffline, otpDeliverable, SUPPORT_EMAIL, SUPPORT_PHONE, type ReverifyMethod,
 } from './accountDeletion';
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
@@ -55,6 +55,16 @@ export function DeleteAccountScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const { cooldown, startCooldown, resetCooldown } = useOtpCooldown();
+  const finishedRef = useRef(false);
+
+  // Once the request is accepted (or an active one is found), the app is LOCKED
+  // to the deletion state: swallow hardware back so it cannot escape into the
+  // authenticated app. Header back is hidden and gestures off (below).
+  useEffect(() => {
+    const locked = isDeletionLockedPhase(phase);
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => locked);
+    return () => sub.remove();
+  }, [phase]);
 
   // On open: if a deletion request is already in flight, show its friendly state.
   useEffect(() => {
@@ -123,6 +133,8 @@ export function DeleteAccountScreen() {
   }, [method, code, password, t]);
 
   const finish = useCallback(async () => {
+    if (finishedRef.current) return; // once only — the auto-timer and Done may both fire
+    finishedRef.current = true;
     // Sign-out ONLY after the request is accepted. Silence this device first so a
     // shared phone never keeps this account's push registration.
     try { await deactivateThisDevice(); } catch { /* best-effort */ }
@@ -130,13 +142,22 @@ export function DeleteAccountScreen() {
     router.replace('/(auth)/login');
   }, [signOut]);
 
+  // After acceptance, sign out AUTOMATICALLY after a brief readable moment —
+  // safety must not depend on the customer pressing Done. The DB-level lock is
+  // the authoritative protection; this closes the local access window.
+  useEffect(() => {
+    if (phase !== 'success') return;
+    const id = setTimeout(() => { void finish(); }, 4000);
+    return () => clearTimeout(id);
+  }, [phase, finish]);
+
   const openSupport = (url: string) => { Linking.openURL(url).catch(() => { /* ignore */ }); };
 
   const canContinue = canSubmitDeletion({ acknowledged, method, code, password });
 
   return (
     <Screen background={colors.bg} edges={['top', 'left', 'right', 'bottom']}>
-      <Header title={t('delTitle')} showBack={phase !== 'submitting'} />
+      <Header title={t('delTitle')} showBack={!isDeletionLockedPhase(phase)} />
 
       {phase === 'checking' ? (
         <LoadingView label={t('loading')} />

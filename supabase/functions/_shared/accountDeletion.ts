@@ -110,3 +110,63 @@ export function isTerminal(s: DeletionStatus): boolean {
 export function safeFailureCode(stage: FailureStage): string {
   return `deletion_${stage}_failed`;
 }
+
+// ---------------------------------------------------------------------------
+// Identity binding for destructive re-verification (Issue 1).
+// ---------------------------------------------------------------------------
+
+/** Re-verification factors, derived ONLY from GoTrue-owned auth.getUser fields. */
+export interface AuthOwnedFactors {
+  /** E.164-ish phone to send an OTP to, or null when the AUTH user has no phone. */
+  otpPhone: string | null;
+  /** Email to reauthenticate against, or null when the AUTH user has no email. */
+  reauthEmail: string | null;
+}
+
+/**
+ * Destructive account-deletion re-verification must bind to AUTH-OWNED
+ * credentials (auth.getUser().email / .phone), never to customer-editable
+ * profile fields — otherwise editing a profile row could redirect the OTP or
+ * change which email authorizes deletion. This returns only the auth-owned
+ * values (trimmed; empty → null). Profile data is never an input here.
+ */
+export function authOwnedFactors(user: { email?: string | null; phone?: string | null }): AuthOwnedFactors {
+  const phone = typeof user.phone === 'string' && user.phone.trim() ? user.phone.trim() : null;
+  const email = typeof user.email === 'string' && user.email.trim() ? user.email.trim() : null;
+  return { otpPhone: phone, reauthEmail: email };
+}
+
+/**
+ * Password reauthentication authorizes deletion ONLY when signInWithPassword
+ * returned the SAME authenticated user id. A valid password for any other
+ * account (or a null/absent user) must never satisfy re-verification.
+ */
+export function passwordReauthUserMatches(
+  signInUserId: string | null | undefined,
+  authUserId: string | null | undefined,
+): boolean {
+  return !!signInUserId && !!authUserId && signInUserId === authUserId;
+}
+
+// ---------------------------------------------------------------------------
+// Fenced transition interpretation (Issue 3).
+// ---------------------------------------------------------------------------
+
+/** Outcome of processing one queued request. */
+export type TransitionOutcome =
+  | 'completed'
+  | 'waiting'
+  | 'retry'
+  | 'manual_review'
+  | 'lost_lease'
+  | 'completion_deferred';
+
+/**
+ * A fencing-guarded status transition is only successful when its
+ * `lock_token`-guarded UPDATE actually matched our row. If it matched no row the
+ * lease was lost/stale (another processor owns the request) — never report the
+ * intended transition as successful, and never overwrite the newer owner.
+ */
+export function interpretTransition(matchedRow: boolean, intended: TransitionOutcome): TransitionOutcome {
+  return matchedRow ? intended : 'lost_lease';
+}

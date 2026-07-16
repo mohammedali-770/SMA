@@ -5,6 +5,7 @@
  */
 import { Redirect, Tabs } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -24,10 +25,16 @@ export default function TabsLayout() {
   useEffect(() => {
     if (status !== 'signed_in') { setDeletionPending(false); return; }
     let alive = true;
-    accountDeletion.current()
-      .then((r) => { if (alive) setDeletionPending(!!r); })
-      .catch(() => { if (alive) setDeletionPending(false); });
-    return () => { alive = false; };
+    const check = () => {
+      accountDeletion.current()
+        .then((r) => { if (alive) setDeletionPending(!!r); })
+        .catch(() => { /* keep the prior state; the DB lock is authoritative */ });
+    };
+    check();
+    // Re-check on every foreground so an active deletion re-locks the app
+    // mid-session (not depending only on an auth-status change that may not fire).
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') check(); });
+    return () => { alive = false; sub.remove(); };
   }, [status]);
 
   if (status === 'signed_out') return <Redirect href="/(auth)/login" />;

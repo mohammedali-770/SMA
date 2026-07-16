@@ -5,6 +5,7 @@ import {
   chooseReverifyMethod,
   deletionStatusMessageKey,
   isActiveDeletionStatus,
+  isDeletionLockedPhase,
   isLikelyOffline,
   otpDeliverable,
   SUPPORT_EMAIL,
@@ -64,6 +65,20 @@ describe('canSubmitDeletion — acknowledgment + a valid factor required', () =>
   it('reauth: requires a non-empty password', () => {
     expect(canSubmitDeletion({ ...base, method: 'reauth', password: 'pw' })).toBe(true);
     expect(canSubmitDeletion({ ...base, method: 'reauth', password: '' })).toBe(false);
+  });
+});
+
+describe('isDeletionLockedPhase — no back-navigation escape after acceptance', () => {
+  it('locks submitting / success / pending (hardware+header back suppressed)', () => {
+    expect(isDeletionLockedPhase('submitting')).toBe(true);
+    expect(isDeletionLockedPhase('success')).toBe(true);
+    expect(isDeletionLockedPhase('pending')).toBe(true);
+  });
+  it('does not lock the pre-acceptance phases (the user may still cancel)', () => {
+    expect(isDeletionLockedPhase('intro')).toBe(false);
+    expect(isDeletionLockedPhase('reverify')).toBe(false);
+    expect(isDeletionLockedPhase('unavailable')).toBe(false);
+    expect(isDeletionLockedPhase('checking')).toBe(false);
   });
 });
 

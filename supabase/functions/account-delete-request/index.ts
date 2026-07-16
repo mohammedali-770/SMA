@@ -15,6 +15,7 @@
 //  - Raw errors are never returned; only safe codes/generic messages.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
+import { authOwnedFactors, passwordReauthUserMatches } from '../_shared/accountDeletion.ts';
 import { normalizePhoneE164, hashOtp, timingSafeEqual } from '../_shared/whatsapp.ts';
 import { getOtpPepper, sendOtpViaWhatsApp, type Language } from '../_shared/whatsappSend.ts';
 
@@ -46,12 +47,18 @@ async function verifyDeletionOtp(admin: ReturnType<typeof adminClient>, e164: st
   return true;
 }
 
-/** Re-check the account password without persisting a session. Never logs it. */
-async function verifyPassword(email: string, password: string): Promise<boolean> {
+/**
+ * Re-check the account password without persisting a session. Authorizes ONLY
+ * when signInWithPassword returns the SAME authenticated user id — a valid
+ * password for any other account must never satisfy re-verification. Never logs
+ * the password, email, or any auth response.
+ */
+async function verifyPassword(email: string, password: string, authUserId: string): Promise<boolean> {
   if (!email || !password) return false;
   try {
     const { data, error } = await userClient(null).auth.signInWithPassword({ email, password });
-    return !error && !!data?.user;
+    if (error || !data?.user) return false;
+    return passwordReauthUserMatches(data.user.id, authUserId);
   } catch {
     return false;
   }
@@ -73,11 +80,14 @@ Deno.serve(async (req: Request) => {
 
   const admin = adminClient();
 
-  // The account's registered phone/email — server-derived, authoritative.
-  const { data: profile } = await admin
-    .from('profiles').select('phone_number, email').eq('id', user.id).maybeSingle();
-  const norm = normalizePhoneE164(profile?.phone_number ?? user.phone ?? null);
-  const email = String(profile?.email ?? user.email ?? '');
+  // Re-verification binds ONLY to AUTH-OWNED credentials (auth.getUser().phone /
+  // .email) — NEVER to customer-editable profile fields. Editing a profile row
+  // must not be able to redirect the OTP or change which email authorizes
+  // deletion. If the auth user has no phone → OTP is unavailable; no email →
+  // password reauth is unavailable (the app then shows the safe support state).
+  const factors = authOwnedFactors(user);
+  const norm = normalizePhoneE164(factors.otpPhone);
+  const email = factors.reauthEmail ?? '';
 
   // ---- action: send_otp --------------------------------------------------
   if (body.action === 'send_otp') {
@@ -112,7 +122,7 @@ Deno.serve(async (req: Request) => {
     if (method === 'otp') {
       verified = norm.ok ? await verifyDeletionOtp(admin, norm.e164, String(body.code ?? '').trim()) : false;
     } else {
-      verified = await verifyPassword(email, String(body.password ?? ''));
+      verified = await verifyPassword(email, String(body.password ?? ''), user.id);
     }
     if (!verified) return json({ verified: false, code: 'verification_failed', message: GENERIC_FAIL }, 200);
 

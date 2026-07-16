@@ -12,10 +12,12 @@ import { adminClient } from '../_shared/supabaseClient.ts';
 import {
   classifyBlockers,
   decideAfterFailure,
+  interpretTransition,
   safeFailureCode,
   statusForBlocker,
   WAITING_RECHECK_MS,
   type FailureStage,
+  type TransitionOutcome,
 } from '../_shared/accountDeletion.ts';
 
 // A request blocked (waiting) this long since it was requested is escalated to a
@@ -41,17 +43,25 @@ async function countOrThrow(q: PromiseLike<{ count: number | null; error: unknow
   return count ?? 0;
 }
 
-/** Transition a claimed request to a new state, guarded by its fencing token. */
+/**
+ * Fenced status transition. Throws on a DB error (handled safely by the caller);
+ * returns true ONLY when the `lock_token`-guarded UPDATE matched exactly our row.
+ * A false result means the lease was lost/stale — a newer processor owns the
+ * request and we must not report the intended transition as successful.
+ */
 async function transition(
   admin: Admin,
   id: string,
   token: string,
   patch: Record<string, unknown>,
-): Promise<void> {
-  await admin.from('account_deletion_requests')
+): Promise<boolean> {
+  const { data, error } = await admin.from('account_deletion_requests')
     .update({ ...patch, locked_until: null, lock_token: null })
     .eq('id', id)
-    .eq('lock_token', token);
+    .eq('lock_token', token)
+    .select('id');
+  if (error) throw error;
+  return Array.isArray(data) && data.length === 1;
 }
 
 /** Delete the GoTrue user; treat an already-deleted user as success (idempotent). */
@@ -64,7 +74,7 @@ async function deleteAuthUser(admin: Admin, userId: string): Promise<void> {
   }
 }
 
-async function processOne(admin: Admin, row: Record<string, unknown>): Promise<'completed' | 'waiting' | 'retry' | 'manual_review'> {
+async function processOne(admin: Admin, row: Record<string, unknown>): Promise<TransitionOutcome> {
   const id = String(row.id);
   const token = String(row.lock_token);
   const userId = row.user_id ? String(row.user_id) : null;
@@ -72,10 +82,12 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<'
   const requestedAt = new Date(String(row.requested_at ?? Date.now())).getTime();
   let stage: FailureStage = 'blockers';
 
-  // The Auth user is already gone (SET NULL) → deletion effectively done.
+  // The Auth user is already gone (SET NULL) → deletion effectively done. This is
+  // also the recovery path for "Auth deleted but the completion transition did
+  // not persist": a later run reclaims the row and finalizes it here.
   if (!userId) {
-    await transition(admin, id, token, { status: 'completed', completed_at: new Date().toISOString() });
-    return 'completed';
+    const ok = await transition(admin, id, token, { status: 'completed', completed_at: new Date().toISOString() });
+    return interpretTransition(ok, 'completed');
   }
 
   try {
@@ -93,14 +105,14 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<'
     if (blocker !== 'none') {
       // Waited past the SLA while still blocked → hand to manual review.
       if (Date.now() - requestedAt > MAX_WAIT_MS) {
-        await transition(admin, id, token, { status: 'manual_review', manual_review_reason: `blocked_${blocker}_over_sla` });
-        return 'manual_review';
+        const ok = await transition(admin, id, token, { status: 'manual_review', manual_review_reason: `blocked_${blocker}_over_sla` });
+        return interpretTransition(ok, 'manual_review');
       }
-      await transition(admin, id, token, {
+      const ok = await transition(admin, id, token, {
         status: statusForBlocker(blocker),
         next_attempt_at: new Date(Date.now() + WAITING_RECHECK_MS).toISOString(),
       });
-      return 'waiting';
+      return interpretTransition(ok, 'waiting');
     }
 
     // ---- Stage: anonymize application data (idempotent) ----
@@ -113,19 +125,23 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<'
     await deleteAuthUser(admin, userId);
 
     // ---- Stage: mark completed with a non-sensitive retention summary ----
+    // If this transition did NOT persist (lost/stale lease, or a transient DB
+    // failure surfaced as 0 matched rows), do NOT report completed. Recovery is
+    // safe: the Auth user is now deleted (user_id SET NULL), so a later run's
+    // !userId branch finalizes it. The account stays locked until then.
     stage = 'complete';
-    await transition(admin, id, token, {
+    const ok = await transition(admin, id, token, {
       status: 'completed',
       completed_at: new Date().toISOString(),
       retention_summary: summary ?? {},
       failure_code: null,
       failure_stage: null,
     });
-    return 'completed';
+    return ok ? 'completed' : 'completion_deferred';
   } catch (_e) {
     // Never surface raw errors: decide retry vs. manual review on a safe code.
     const decision = decideAfterFailure(attempts + 1);
-    await transition(admin, id, token, {
+    const ok = await transition(admin, id, token, {
       status: decision.status,
       attempt_count: attempts + 1,
       failure_code: safeFailureCode(stage),
@@ -133,6 +149,9 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<'
       next_attempt_at: decision.nextAttemptMs != null ? new Date(Date.now() + decision.nextAttemptMs).toISOString() : null,
       ...(decision.status === 'manual_review' ? { manual_review_reason: safeFailureCode(stage) } : {}),
     });
+    // If even the failure transition lost the lease, a newer run owns the row —
+    // do not report the intended failure state as ours.
+    if (!ok) return 'lost_lease';
     return decision.status === 'manual_review' ? 'manual_review' : 'retry';
   }
 }
@@ -151,11 +170,22 @@ Deno.serve(async (req: Request) => {
   if (error) return json({ error: 'claim_failed', code: safeFailureCode('claim') }, 500);
 
   const rows = Array.isArray(claimed) ? claimed : [];
-  const tally = { processed: 0, completed: 0, waiting: 0, retry: 0, manual_review: 0 };
+  const tally: Record<string, number> = {
+    processed: 0, completed: 0, waiting: 0, retry: 0, manual_review: 0,
+    lost_lease: 0, completion_deferred: 0, errored: 0,
+  };
   for (const row of rows) {
-    const outcome = await processOne(admin, row as Record<string, unknown>);
     tally.processed += 1;
-    tally[outcome] += 1;
+    try {
+      const outcome = await processOne(admin, row as Record<string, unknown>);
+      tally[outcome] += 1;
+    } catch {
+      // A thrown DB error (including one while recording a failure) is contained
+      // here and NEVER surfaced raw. The row keeps its lease and is safely
+      // re-claimed once it expires — no raw PostgreSQL/Supabase error reaches
+      // the caller, and no partial state is reported as a successful transition.
+      tally.errored += 1;
+    }
   }
 
   return json({ ok: true, ...tally }, 200);
