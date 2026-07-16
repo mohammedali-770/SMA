@@ -1,5 +1,6 @@
 // account-delete-process — service-role processor for the account-deletion queue
-// (verify_jwt=false; authenticated by the service-role bearer or a shared secret).
+// (verify_jwt=false; authenticated by the service-role bearer or a Vault-backed
+// shared secret verified server-side through a restricted SECURITY DEFINER RPC).
 //
 // Claims due requests (FOR UPDATE SKIP LOCKED via claim_due_account_deletions),
 // then for each: checks REAL blockers → waits; otherwise anonymizes application
@@ -27,14 +28,26 @@ const TERMINAL_ORDER_STATES = ['delivered', 'cancelled'];
 
 type Admin = ReturnType<typeof adminClient>;
 
-/** Only the service role (or an explicit shared secret) may run the processor. */
-function authorized(req: Request): boolean {
-  const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+/**
+ * Only the service role or the dedicated scheduler secret may run the processor.
+ *
+ * The scheduler secret is never stored in Edge Function environment variables.
+ * It is held only in Supabase Vault and compared inside Postgres by a restricted
+ * SECURITY DEFINER RPC. This avoids duplicating or exposing the secret while still
+ * allowing pg_cron/pg_net to invoke the worker securely.
+ */
+async function authorized(req: Request, admin: Admin): Promise<boolean> {
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const auth = req.headers.get('Authorization') ?? '';
-  if (key && auth === `Bearer ${key}`) return true;
-  const secret = Deno.env.get('ACCOUNT_DELETION_PROCESS_SECRET');
-  if (secret && req.headers.get('x-process-secret') === secret) return true;
-  return false;
+  if (serviceRoleKey && auth === `Bearer ${serviceRoleKey}`) return true;
+
+  const candidate = req.headers.get('x-process-secret');
+  if (!candidate) return false;
+
+  const { data, error } = await admin.rpc('verify_account_deletion_process_secret', {
+    p_secret: candidate,
+  });
+  return !error && data === true;
 }
 
 async function countOrThrow(q: PromiseLike<{ count: number | null; error: unknown }>): Promise<number> {
@@ -159,9 +172,9 @@ async function processOne(admin: Admin, row: Record<string, unknown>): Promise<T
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
-  if (!authorized(req)) return json({ error: 'Forbidden' }, 403);
 
   const admin = adminClient();
+  if (!(await authorized(req, admin))) return json({ error: 'Forbidden' }, 403);
 
   // Claim a bounded batch. Concurrent invocations skip each other's rows.
   const { data: claimed, error } = await admin.rpc('claim_due_account_deletions', {
