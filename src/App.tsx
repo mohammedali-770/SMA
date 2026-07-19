@@ -5,7 +5,6 @@
 
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { MobileEmulator } from './components/MobileEmulator';
 import { AuthScreen } from './components/AuthScreen';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
@@ -113,14 +112,21 @@ const WriteErrorBanner: React.FC = () => {
   );
 };
 
-/** The customer-facing storefront (role = customer). */
-const CustomerApp: React.FC = () => (
-  <main className="flex-grow p-4 md:p-6 max-w-md mx-auto w-full">
-    <div className="flex flex-col items-center py-2">
-      <MobileEmulator />
-    </div>
-  </main>
-);
+/**
+ * Customer accounts land in the REAL app, served at /app (the Expo application
+ * rendered with React Native Web — single customer UI, no duplicated preview).
+ * The Supabase session is shared (same origin + storage key), so the redirect
+ * is seamless. A visible link covers any blocked client-side navigation.
+ */
+const CustomerApp: React.FC = () => {
+  React.useEffect(() => { window.location.replace('/app'); }, []);
+  return (
+    <main className="flex-grow p-6 max-w-md mx-auto w-full text-center space-y-3">
+      <p className="text-sm font-black text-slate-700">Opening the Spicy Meal app…</p>
+      <a href="/app" className="text-primary text-sm font-black underline">/app</a>
+    </main>
+  );
+};
 
 /** The staff console (role = admin or accountant). */
 const StaffApp: React.FC = () => {

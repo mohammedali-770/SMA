@@ -28,7 +28,7 @@
       ]
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
@@ -55,6 +55,9 @@
       "eas": {
         "projectId": "c8422901-b27a-40b3-91c7-b6ce99d97936"
       }
+    },
+    "experiments": {
+      "baseUrl": "/app"
     }
   }
 }
