@@ -5,7 +5,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Branch, DeliveryZone } from '../../types';
-import { mapConfig } from '../../lib/map';
+import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
+import { geometryToPolygons, loadGoogleMaps, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import { MapSearchBox } from '../MapSearchBox';
 
@@ -19,11 +20,26 @@ interface DeliveryZoneModalProps {
   onClear: (branchId: string) => Promise<void>;
 }
 
+const ZONE_STYLE = { fillColor: '#7c3aed', fillOpacity: 0.12, strokeColor: '#7c3aed', strokeWeight: 2 };
+
+// @types/google.maps ships the drawing library as an empty class (legacy-lib
+// sparse typing) — the runtime API below is documented and stable, so model
+// just the members we use.
+interface GDrawingManager {
+  setMap(map: google.maps.Map | null): void;
+  setDrawingMode(mode: string | null): void;
+}
+interface GOverlayCompleteEvent {
+  type: string;
+  overlay?: { setMap(map: google.maps.Map | null): void };
+}
+
 /**
- * Admin delivery-zone drawing. Renders a Mapbox map centered on the branch with
- * mapbox-gl-draw polygon tools. Save extracts a single GeoJSON Geometry (Polygon
- * or MultiPolygon) and calls the admin RPC (which re-validates server-side).
- * Falls back to a clear "map setup required" message when the token is absent.
+ * Admin delivery-zone drawing. Provider-switched (lib/map.ts): Google Maps JS
+ * (DrawingManager) or Mapbox (mapbox-gl-draw). Either way, Save extracts one
+ * GeoJSON Geometry (Polygon or MultiPolygon) and calls the admin RPC (which
+ * re-validates server-side). Falls back to a clear "map setup required"
+ * message when the provider has no key/token.
  */
 export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   branch, existingZone, disabled, isRTL, onClose, onSave, onClear,
@@ -31,26 +47,94 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
+  const gMapRef = useRef<google.maps.Map | null>(null);
+  const gDrawRef = useRef<GDrawingManager | null>(null);
+  const gPolysRef = useRef<google.maps.Polygon[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   const hasBranchCoords = Number.isFinite(branch.latitude) && Number.isFinite(branch.longitude)
     && !(branch.latitude === 0 && branch.longitude === 0);
+  const center = hasBranchCoords
+    ? { lng: branch.longitude, lat: branch.latitude }
+    : mapConfig.defaultCenter;
+  const initialZoom = hasBranchCoords ? 12 : mapConfig.defaultZoom;
 
+  // ---- Google provider --------------------------------------------------
   useEffect(() => {
-    if (!mapConfig.isConfigured || !mapContainer.current) return;
-    mapboxgl.accessToken = mapConfig.publicToken;
+    if (mapConfig.provider !== 'google' || !mapConfig.isConfigured || !mapContainer.current) return;
+    let cancelled = false;
+    loadGoogleMaps(isRTL, ['drawing']).then(() => {
+      if (cancelled || !mapContainer.current) return;
+      const g = window.google!.maps;
+      const map = new g.Map(mapContainer.current, {
+        center, zoom: initialZoom,
+        clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+      });
+      gMapRef.current = map;
 
-    const center: [number, number] = hasBranchCoords
-      ? [branch.longitude, branch.latitude]
-      : [mapConfig.defaultCenter.lng, mapConfig.defaultCenter.lat];
+      if (hasBranchCoords) {
+        const marker = new g.Marker({ position: center, map, title: isRTL ? branch.nameAr : branch.nameEn });
+        const info = new g.InfoWindow({ content: isRTL ? branch.nameAr : branch.nameEn });
+        marker.addListener('click', () => info.open({ map, anchor: marker }));
+      }
+
+      // Preload the saved zone so the admin previews/edits it.
+      if (existingZone?.geojson) {
+        try {
+          const bounds = new g.LatLngBounds();
+          for (const rings of geometryToPolygons(existingZone.geojson)) {
+            const poly = new g.Polygon({
+              ...ZONE_STYLE, map,
+              paths: rings.map(ring => ring.map(([lng, lat]) => ({ lng, lat }))),
+            });
+            gPolysRef.current.push(poly);
+            rings.forEach(ring => ring.forEach(([lng, lat]) => bounds.extend({ lng, lat })));
+          }
+          if (!bounds.isEmpty()) map.fitBounds(bounds, 40);
+        } catch { /* ignore malformed preload */ }
+      }
+
+      const DrawingManagerCtor = g.drawing.DrawingManager as unknown as new (opts: object) => GDrawingManager;
+      const draw = new DrawingManagerCtor({
+        map,
+        drawingControl: false, // our own buttons drive the modes
+        polygonOptions: { ...ZONE_STYLE, editable: false },
+      });
+      gDrawRef.current = draw;
+      g.event.addListener(draw as unknown as object, 'overlaycomplete', (e: GOverlayCompleteEvent) => {
+        if (e.type === g.drawing.OverlayType.POLYGON) {
+          gPolysRef.current.push(e.overlay as unknown as google.maps.Polygon);
+          draw.setDrawingMode(null); // one shape per gesture, like the Mapbox editor
+        } else {
+          e.overlay?.setMap(null);
+        }
+      });
+      setReady(true);
+    }).catch(() => setError(isRTL ? 'تعذّر تحميل خرائط Google.' : 'Google Maps failed to load.'));
+    return () => {
+      cancelled = true;
+      gPolysRef.current.forEach(p => p.setMap(null));
+      gPolysRef.current = [];
+      gDrawRef.current?.setMap(null);
+      gDrawRef.current = null;
+      gMapRef.current = null; // the Maps API has no destroy(); dropping refs releases the container
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---- Mapbox provider (fallback) ---------------------------------------
+  useEffect(() => {
+    if (mapConfig.provider !== 'mapbox' || !mapConfig.isConfigured || !mapContainer.current) return;
+    mapboxgl.accessToken = mapConfig.publicToken;
+    ensureRtlTextPlugin(mapboxgl); // Arabic label shaping (idempotent)
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
       style: mapConfig.styleUrl,
-      center,
-      zoom: hasBranchCoords ? 12 : mapConfig.defaultZoom,
+      center: [center.lng, center.lat],
+      zoom: initialZoom,
       projection: 'mercator', // flat street map, not the globe — clearer for drawing zones
     });
     mapRef.current = map;
@@ -95,11 +179,37 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startDraw = () => { drawRef.current?.changeMode('draw_polygon'); };
-  const startEdit = () => { drawRef.current?.changeMode('simple_select'); };
-  const clearDrawing = () => { drawRef.current?.deleteAll(); };
+  const isGoogle = mapConfig.provider === 'google';
+
+  const startDraw = () => {
+    if (isGoogle) gDrawRef.current?.setDrawingMode(window.google!.maps.drawing.OverlayType.POLYGON);
+    else drawRef.current?.changeMode('draw_polygon');
+  };
+  const startEdit = () => {
+    if (isGoogle) gPolysRef.current.forEach(p => p.setEditable(true));
+    else drawRef.current?.changeMode('simple_select');
+  };
+  const clearDrawing = () => {
+    if (isGoogle) {
+      gPolysRef.current.forEach(p => p.setMap(null));
+      gPolysRef.current = [];
+      gDrawRef.current?.setDrawingMode(null);
+    } else {
+      drawRef.current?.deleteAll();
+    }
+  };
+  const flyTo = (lng: number, lat: number) => {
+    if (isGoogle) { gMapRef.current?.panTo({ lng, lat }); gMapRef.current?.setZoom(13); }
+    else mapRef.current?.flyTo({ center: [lng, lat], zoom: 13, duration: 800 });
+  };
 
   const collectGeometry = (): GeoJSONGeometry | null => {
+    if (isGoogle) {
+      const polygons: LngLat[][][] = gPolysRef.current.map(p =>
+        p.getPaths().getArray().map(path =>
+          path.getArray().map(pt => [pt.lng(), pt.lat()] as LngLat)));
+      return polygonsToGeometry(polygons) as GeoJSONGeometry | null;
+    }
     const draw = drawRef.current;
     if (!draw) return null;
     const polys = draw.getAll().features.filter(f => f.geometry?.type === 'Polygon');
@@ -160,9 +270,13 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
             <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
             <p className="text-sm font-black text-slate-700">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</p>
             <p className="text-[11px] text-slate-500 font-bold max-w-sm mx-auto">
-              {isRTL
-                ? 'أضف رمز Mapbox العام (VITE_MAPBOX_PUBLIC_TOKEN) لتفعيل رسم مناطق التوصيل.'
-                : 'Set VITE_MAPBOX_PUBLIC_TOKEN to enable delivery-area drawing. The rest of the dashboard is unaffected.'}
+              {isGoogle
+                ? (isRTL
+                  ? 'أضف مفتاح Google Maps ‏(VITE_GOOGLE_MAPS_API_KEY) لتفعيل رسم مناطق التوصيل.'
+                  : 'Set VITE_GOOGLE_MAPS_API_KEY to enable delivery-area drawing. The rest of the dashboard is unaffected.')
+                : (isRTL
+                  ? 'أضف رمز Mapbox العام (VITE_MAPBOX_PUBLIC_TOKEN) لتفعيل رسم مناطق التوصيل.'
+                  : 'Set VITE_MAPBOX_PUBLIC_TOKEN to enable delivery-area drawing. The rest of the dashboard is unaffected.')}
             </p>
           </div>
         ) : (
@@ -174,7 +288,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               </div>
             )}
 
-            <MapSearchBox isRTL={isRTL} onSelect={(lng, lat) => mapRef.current?.flyTo({ center: [lng, lat], zoom: 13, duration: 800 })} />
+            <MapSearchBox isRTL={isRTL} onSelect={flyTo} />
             <div ref={mapContainer} className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200" />
 
             {error && (

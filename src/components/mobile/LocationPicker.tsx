@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
-import { mapConfig } from '../../lib/map';
+import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
+import { loadGoogleMaps } from '../../lib/googleMaps';
 import { MapSearchBox } from '../MapSearchBox';
 
 interface LocationPickerProps {
@@ -13,7 +14,8 @@ interface LocationPickerProps {
 }
 
 /**
- * Customer delivery-location picker (web): a Mapbox map with a draggable pin.
+ * Customer delivery-location picker (web): a provider-switched map (Google
+ * Maps JS or Mapbox) with a draggable pin.
  * Drag the marker or tap the map to set coordinates. When the map token is
  * absent it renders a setup hint and the caller's manual lat/lng inputs remain
  * the fallback — delivery still requires coordinates, validated server-side.
@@ -22,6 +24,38 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
   const container = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
+  const gMapRef = useRef<google.maps.Map | null>(null);
+  const gMarkerRef = useRef<google.maps.Marker | null>(null);
+
+  // ---- Google provider --------------------------------------------------
+  useEffect(() => {
+    if (mapConfig.provider !== 'google' || !mapConfig.isConfigured || !container.current) return;
+    let cancelled = false;
+    const hasCoords = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+    const start = hasCoords ? { lat, lng } : { lat: mapConfig.defaultCenter.lat, lng: mapConfig.defaultCenter.lng };
+    loadGoogleMaps(isRTL, []).then(() => {
+      if (cancelled || !container.current) return;
+      const g = window.google!.maps;
+      const map = new g.Map(container.current, {
+        center: start, zoom: hasCoords ? 14 : mapConfig.defaultZoom,
+        clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+      });
+      gMapRef.current = map;
+      const marker = new g.Marker({ position: start, map, draggable: true });
+      gMarkerRef.current = marker;
+      marker.addListener('dragend', () => {
+        const p = marker.getPosition();
+        if (p) onChange(Number(p.lat().toFixed(6)), Number(p.lng().toFixed(6)));
+      });
+      map.addListener('click', (e: google.maps.MapMouseEvent) => {
+        if (!e.latLng) return;
+        marker.setPosition(e.latLng);
+        onChange(Number(e.latLng.lat().toFixed(6)), Number(e.latLng.lng().toFixed(6)));
+      });
+    }).catch(() => { /* setup hint + manual inputs remain the fallback */ });
+    return () => { cancelled = true; gMarkerRef.current?.setMap(null); gMarkerRef.current = null; gMapRef.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!mapConfig.isConfigured || !container.current) return;
@@ -71,9 +105,9 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
 
   // Keep the marker in sync when the parent updates coords (e.g. manual inputs).
   useEffect(() => {
-    if (markerRef.current && Number.isFinite(lat) && Number.isFinite(lng)) {
-      markerRef.current.setLngLat([lng, lat]);
-    }
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    markerRef.current?.setLngLat([lng, lat]);
+    gMarkerRef.current?.setPosition({ lat, lng });
   }, [lat, lng]);
 
   // Address search picked a place → drop the pin there, fly to it, set coords.
@@ -81,6 +115,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
     onChange(Number(rlat.toFixed(6)), Number(rlng.toFixed(6)));
     markerRef.current?.setLngLat([rlng, rlat]);
     mapRef.current?.flyTo({ center: [rlng, rlat], zoom: 15, duration: 800 });
+    gMarkerRef.current?.setPosition({ lat: rlat, lng: rlng });
+    if (gMapRef.current) { gMapRef.current.panTo({ lat: rlat, lng: rlng }); gMapRef.current.setZoom(15); }
   };
 
   if (!mapConfig.isConfigured) {

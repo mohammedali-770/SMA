@@ -16,9 +16,10 @@ interface MapSearchBoxProps {
 }
 
 /**
- * Lightweight address/place search for the admin maps. Uses the Mapbox Geocoding
- * API directly via fetch (no extra dependency; api.mapbox.com is already allowed
- * by the CSP), biased toward Saudi Arabia. Lets an admin type their branch's
+ * Lightweight address/place search for the admin maps. Provider-switched:
+ * Google Places Text Search or the Mapbox Geocoding API, both called directly
+ * via fetch (no extra dependency; both hosts are allowed by the CSP), biased
+ * toward Saudi Arabia. Lets an admin type their branch's
  * address and jump the map there instead of hunting for it — so a pin that ended
  * up in the wrong place (or an unset branch) is easy to correct.
  */
@@ -32,13 +33,52 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
 
   const runSearch = async () => {
     const query = q.trim();
-    if (query.length < 2 || !mapConfig.publicToken) { setResults([]); setOpen(false); return; }
+    if (query.length < 2 || !mapConfig.isConfigured) { setResults([]); setOpen(false); return; }
     abortRef.current?.abort();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     setLoading(true);
     setSearched(true);
     try {
+      if (mapConfig.provider === 'google') {
+        // Places API (New) Text Search — key + field mask travel as headers, so
+        // only places.googleapis.com needs allowing in connect-src. Region/
+        // location bias mirror the Mapbox branch (KSA-biased, not restricted).
+        const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Goog-Api-Key': mapConfig.googleKey,
+            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+          },
+          body: JSON.stringify({
+            textQuery: query,
+            languageCode: isRTL ? 'ar' : 'en',
+            regionCode: 'SA',
+            pageSize: 5,
+            locationBias: { circle: { center: { latitude: mapConfig.defaultCenter.lat, longitude: mapConfig.defaultCenter.lng }, radius: 50000 } },
+          }),
+        });
+        const data = await res.json();
+        const places: GeoResult[] = (Array.isArray(data?.places) ? data.places : [])
+          .map((p: Record<string, unknown>) => {
+            const loc = (p.location ?? {}) as { latitude?: number; longitude?: number };
+            const name = (p.displayName as { text?: string } | undefined)?.text ?? '';
+            const label = [name, typeof p.formattedAddress === 'string' ? p.formattedAddress : '']
+              .filter(Boolean).join(' — ');
+            return {
+              id: (typeof p.id === 'string' && p.id) || `${loc.longitude},${loc.latitude}`,
+              label,
+              lng: Number(loc.longitude),
+              lat: Number(loc.latitude),
+            };
+          })
+          .filter((r: GeoResult) => Number.isFinite(r.lng) && Number.isFinite(r.lat) && r.label);
+        setResults(places);
+        setOpen(true);
+        return;
+      }
       const url = new URL('https://api.mapbox.com/search/geocode/v6/forward');
       url.searchParams.set('q', query);
       url.searchParams.set('access_token', mapConfig.publicToken);

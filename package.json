@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
+    "@types/google.maps": "^3.65.2",
     "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@types/node": "^22.14.0",
     "jsdom": "^29.1.1",
