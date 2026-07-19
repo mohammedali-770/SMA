@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.spicymeal.app",
+      "package": "sa.com.spicymeal.app",
       "permissions": [
         "INTERNET",
         "ACCESS_COARSE_LOCATION",
