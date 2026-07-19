@@ -1,7 +1,8 @@
 /**
  * Customer delivery-location picker (mobile).
  *
- * Renders a real interactive Mapbox map + draggable pin inside a WebView — which
+ * Renders a real interactive map (Google Maps JS or Mapbox, provider-switched
+ * in lib/map.ts) + draggable pin inside a WebView — which
  * runs in Expo Go today with no native map module or EAS build. The pin position
  * is posted back to React Native via `postMessage`. `expo-location` optionally
  * centers on the user; if permission is denied the map still works by manual
@@ -22,6 +23,31 @@ interface LocationPickerMapProps {
   lng: number;
   onChange: (lat: number, lng: number) => void;
   labels: { moveHint: string; useMyLocation: string; setupRequired: string };
+}
+
+function buildGoogleHtml(key: string, lat: number, lng: number): string {
+  // Google Maps JS API in the WebView. Arabic street names are shaped natively.
+  // The key must be referrer-restricted; the WebView is loaded with a baseUrl
+  // from an allowed domain so requests carry that referrer.
+  return `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<style>html,body,#map{margin:0;padding:0;height:100%;width:100%}</style>
+</head><body><div id="map"></div><script>
+  var map, marker;
+  function post(){ if (marker && window.ReactNativeWebView) { var p = marker.getPosition(); window.ReactNativeWebView.postMessage(JSON.stringify({lat:p.lat(),lng:p.lng()})); } }
+  window.__init = function(){
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: {lat:${lat}, lng:${lng}}, zoom: 14,
+      clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false, disableDefaultUI: true, zoomControl: true
+    });
+    marker = new google.maps.Marker({ position: {lat:${lat}, lng:${lng}}, map: map, draggable: true });
+    marker.addListener('dragend', post);
+    map.addListener('click', function(e){ marker.setPosition(e.latLng); post(); });
+  };
+  window.recenter = function(la, ln){ if (map && marker) { map.panTo({lat:la, lng:ln}); marker.setPosition({lat:la, lng:ln}); post(); } };
+</script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=__init"></script>
+</body></html>`;
 }
 
 function buildHtml(token: string, style: string, lat: number, lng: number): string {
@@ -47,7 +73,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
   const [locating, setLocating] = useState(false);
   // Build the HTML once from the initial coords; further updates go through
   // injectJavaScript so the WebView is not reloaded on every pin move.
-  const htmlRef = useRef(buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng));
+  const htmlRef = useRef(mapConfig.provider === 'google'
+    ? buildGoogleHtml(mapConfig.googleKey, lat, lng)
+    : buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng));
 
   if (!mapConfig.isConfigured) {
     return (
@@ -80,7 +108,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
         <WebView
           ref={webRef}
           originWhitelist={['*']}
-          source={{ html: htmlRef.current }}
+          source={mapConfig.webviewBaseUrl
+            ? { html: htmlRef.current, baseUrl: mapConfig.webviewBaseUrl }
+            : { html: htmlRef.current }}
           style={styles.web}
           onMessage={(e) => {
             try {

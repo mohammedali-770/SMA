@@ -20,5 +20,16 @@ export const isSupabaseConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 export const MAP_PROVIDER = (process.env.EXPO_PUBLIC_MAP_PROVIDER ?? 'mapbox').toLowerCase();
 export const MAPBOX_PUBLIC_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_PUBLIC_TOKEN ?? '';
 
-/** True only when the active map provider has the public token it needs. */
-export const isMapConfigured = MAP_PROVIDER === 'mapbox' ? Boolean(MAPBOX_PUBLIC_TOKEN) : false;
+/**
+ * Google Maps browser (JS API) key — public by design, but MUST be
+ * referrer-restricted in Google Cloud. The WebView map page is loaded with
+ * MAP_WEBVIEW_BASE_URL as its base URL so requests carry an allowed referrer
+ * (inline WebView HTML otherwise has none and a restricted key would 403).
+ */
+export const GOOGLE_MAPS_BROWSER_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY ?? '';
+export const MAP_WEBVIEW_BASE_URL = process.env.EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL ?? '';
+
+/** True only when the active map provider has the public key/token it needs. */
+export const isMapConfigured = MAP_PROVIDER === 'mapbox'
+  ? Boolean(MAPBOX_PUBLIC_TOKEN)
+  : Boolean(GOOGLE_MAPS_BROWSER_KEY);
