@@ -6,7 +6,7 @@ import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { AlertTriangle, LocateFixed, MapPin } from 'lucide-react';
 import { Branch, DeliveryZone } from '../../types';
 import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
-import { geometryToPolygons, loadGoogleMaps, locateMe, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
+import { circleRing, geometryToPolygons, loadGoogleMaps, locateMe, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import { MapSearchBox } from '../MapSearchBox';
 
@@ -22,16 +22,10 @@ interface DeliveryZoneModalProps {
 
 const ZONE_STYLE = { fillColor: '#7c3aed', fillOpacity: 0.12, strokeColor: '#7c3aed', strokeWeight: 2 };
 
-// Manual polygon drawing (click to add vertices, double-click to finish).
-// Google REMOVED DrawingManager from the Maps JS API in v3.65, so the editor
-// implements drawing itself with map click listeners + google.maps.Polygon —
-// which is also Google's recommended replacement.
-interface GDrawState {
-  active: boolean;
-  path: google.maps.LatLngLiteral[];
-  preview: google.maps.Polyline | null;
-  listeners: google.maps.MapsEventListener[];
-}
+// "Draw" seeds a ready-made circular zone (editable + draggable) instead of
+// point-by-point clicking — Google removed DrawingManager in v3.65, and the
+// seeded-shape pattern is the easier UX anyway: drag the handles to fit,
+// drag between handles to add detail, drag the shape to move it.
 
 /**
  * Admin delivery-zone drawing. Provider-switched (lib/map.ts): Google Maps JS
@@ -47,9 +41,8 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const gMapRef = useRef<google.maps.Map | null>(null);
-  const gDrawStateRef = useRef<GDrawState>({ active: false, path: [], preview: null, listeners: [] });
   const gPolysRef = useRef<google.maps.Polygon[]>([]);
-  const [gDrawing, setGDrawing] = useState(false);
+  const [gAdjusting, setGAdjusting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -109,7 +102,6 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
       cancelled = true;
       gPolysRef.current.forEach(p => p.setMap(null));
       gPolysRef.current = [];
-      cancelGDraw();
       gMapRef.current = null; // the Maps API has no destroy(); dropping refs releases the container
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,68 +164,49 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
   const isGoogle = mapConfig.provider === 'google';
 
-  /** Tear down an in-progress google draw gesture (no-op when idle). */
-  const cancelGDraw = () => {
-    const st = gDrawStateRef.current;
-    st.listeners.forEach(l => l.remove());
-    st.listeners = [];
-    st.preview?.setMap(null);
-    st.preview = null;
-    st.path = [];
-    if (st.active) {
-      st.active = false;
-      setGDrawing(false);
-      gMapRef.current?.setOptions({ draggableCursor: undefined, disableDoubleClickZoom: false });
-    }
-  };
-
-  /** Finish the google draw gesture: ≥3 distinct points → editable polygon. */
-  const finishGDraw = () => {
-    const st = gDrawStateRef.current;
-    if (!st.active) return;
-    // A double-click delivers its position twice via 'click' — collapse
-    // consecutive duplicates before validating the ring.
-    const pts = st.path.filter((p, i, a) => i === 0 || p.lat !== a[i - 1].lat || p.lng !== a[i - 1].lng);
-    cancelGDraw();
-    if (pts.length >= 3 && gMapRef.current) {
-      gPolysRef.current.push(new window.google!.maps.Polygon({ ...ZONE_STYLE, map: gMapRef.current, paths: pts }));
-    }
-  };
-
-  const startGDraw = () => {
+  /**
+   * Seed a ready-made circular zone at the current view center, immediately
+   * editable + draggable — the admin stretches it into shape instead of
+   * clicking vertex by vertex. Sized to ~1/5 of the visible map so it always
+   * appears at a comfortable, grabbable size.
+   */
+  const seedGZone = () => {
     const map = gMapRef.current;
-    if (!map || gDrawStateRef.current.active) return;
+    if (!map) return;
     const g = window.google!.maps;
-    const st = gDrawStateRef.current;
-    st.active = true;
-    setGDrawing(true);
-    st.path = [];
-    map.setOptions({ draggableCursor: 'crosshair', disableDoubleClickZoom: true });
-    st.preview = new g.Polyline({ map, path: [], strokeColor: ZONE_STYLE.strokeColor, strokeWeight: ZONE_STYLE.strokeWeight });
-    st.listeners.push(map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (!e.latLng) return;
-      st.path.push(e.latLng.toJSON());
-      st.preview?.setPath(st.path);
+    const c = map.getCenter()?.toJSON() ?? center;
+    let radius = 2000;
+    const b = map.getBounds();
+    if (b) {
+      const latSpanMeters = (b.getNorthEast().lat() - b.getSouthWest().lat()) * 111_320;
+      radius = Math.max(300, Math.min(8000, latSpanMeters / 5));
+    }
+    const ring = circleRing(c, radius, 16);
+    gPolysRef.current.push(new g.Polygon({
+      ...ZONE_STYLE, map,
+      paths: ring.map(([lng, lat]) => ({ lng, lat })),
+      editable: true, draggable: true,
     }));
-    st.listeners.push(map.addListener('dblclick', (e: google.maps.MapMouseEvent) => {
-      e.stop();
-      finishGDraw();
-    }));
+    setGAdjusting(true);
   };
 
   const startDraw = () => {
-    if (isGoogle) startGDraw();
+    if (isGoogle) seedGZone();
     else drawRef.current?.changeMode('draw_polygon');
   };
   const startEdit = () => {
-    if (isGoogle) { finishGDraw(); gPolysRef.current.forEach(p => p.setEditable(true)); }
-    else drawRef.current?.changeMode('simple_select');
+    if (isGoogle) {
+      gPolysRef.current.forEach(p => { p.setEditable(true); p.setDraggable(true); });
+      if (gPolysRef.current.length > 0) setGAdjusting(true);
+    } else {
+      drawRef.current?.changeMode('simple_select');
+    }
   };
   const clearDrawing = () => {
     if (isGoogle) {
-      cancelGDraw();
       gPolysRef.current.forEach(p => p.setMap(null));
       gPolysRef.current = [];
+      setGAdjusting(false);
     } else {
       drawRef.current?.deleteAll();
     }
@@ -258,7 +231,6 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
   const collectGeometry = (): GeoJSONGeometry | null => {
     if (isGoogle) {
-      finishGDraw(); // an unfinished gesture with >=3 points still counts
       const polygons: LngLat[][][] = gPolysRef.current.map(p =>
         p.getPaths().getArray().map(path =>
           path.getArray().map(pt => [pt.lng(), pt.lat()] as LngLat)));
@@ -357,9 +329,11 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               </button>
             </div>
 
-            {gDrawing && (
+            {gAdjusting && (
               <div className="p-2 bg-primary/5 border border-primary/15 rounded-xl text-primary text-[10px] font-bold text-center">
-                {isRTL ? 'انقر على الخريطة لإضافة النقاط، وانقر نقرًا مزدوجًا للإنهاء.' : 'Click the map to add points; double-click to finish.'}
+                {isRTL
+                  ? 'اسحب النقاط لتشكيل منطقة التوصيل، واسحب بين النقاط لإضافة نقطة، واسحب الشكل لنقله — ثم احفظ.'
+                  : 'Drag the points to shape the area, drag between points to add one, drag the shape to move it — then Save.'}
               </div>
             )}
             {error && (

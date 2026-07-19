@@ -68,6 +68,24 @@ export function geometryToPolygons(geometry: { type: string; coordinates: unknow
 }
 
 /**
+ * Build an OPEN ring approximating a circle — the seed shape for delivery-zone
+ * editing (drop a ready-made zone, then drag its vertices), matching the
+ * familiar delivery-area editors admins already know. Pure spherical-ish math
+ * (no google.* dependency) so it is unit-tested.
+ */
+export function circleRing(center: { lat: number; lng: number }, radiusMeters: number, points = 16): LngLat[] {
+  const ring: LngLat[] = [];
+  const latRad = (center.lat * Math.PI) / 180;
+  const dLat = radiusMeters / 111_320;
+  const dLng = radiusMeters / (111_320 * Math.max(0.05, Math.cos(latRad)));
+  for (let i = 0; i < points; i++) {
+    const a = (2 * Math.PI * i) / points;
+    ring.push([center.lng + dLng * Math.cos(a), center.lat + dLat * Math.sin(a)]);
+  }
+  return ring;
+}
+
+/**
  * Load the Google Maps JS API once. Language follows the admin UI so control
  * tooltips localize; street names themselves are rendered by Google with
  * correct Arabic shaping in every language (the reason for this provider).

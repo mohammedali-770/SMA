@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { closeRing, geometryToPolygons, openRing, polygonsToGeometry, type LngLat } from './googleMaps';
+import { circleRing, closeRing, geometryToPolygons, openRing, polygonsToGeometry, type LngLat } from './googleMaps';
 
 const openSquare: LngLat[] = [[0, 0], [1, 0], [1, 1], [0, 1]];
 const closedSquare: LngLat[] = [...openSquare, [0, 0]];
@@ -62,5 +62,33 @@ describe('geometryToPolygons — loading a saved zone back into the editor', () 
     const stored = { type: 'MultiPolygon' as const, coordinates: [[closedSquare.map(p => [...p])], [[...closeRing([[5, 5], [6, 5], [6, 6]]).map(p => [...p])]]] };
     const roundTripped = polygonsToGeometry(geometryToPolygons(stored));
     expect(roundTripped).toEqual(stored);
+  });
+});
+
+describe('circleRing — the seeded delivery-zone shape', () => {
+  const RIYADH = { lat: 24.7136, lng: 46.6753 };
+  const haversineMeters = (a: LngLat, c: { lat: number; lng: number }) => {
+    const R = 6371000, toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(a[1] - c.lat), dLng = toRad(a[0] - c.lng);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(c.lat)) * Math.cos(toRad(a[1])) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
+  it('produces an OPEN ring with the requested number of points', () => {
+    const ring = circleRing(RIYADH, 2000, 16);
+    expect(ring).toHaveLength(16);
+    expect(ring[0]).not.toEqual(ring[ring.length - 1]); // open (editor form)
+  });
+  it('every vertex sits ~radius from the center (within 5%)', () => {
+    for (const p of circleRing(RIYADH, 2000, 16)) {
+      const d = haversineMeters(p, RIYADH);
+      expect(d).toBeGreaterThan(2000 * 0.95);
+      expect(d).toBeLessThan(2000 * 1.05);
+    }
+  });
+  it('closes into a valid GeoJSON Polygon via polygonsToGeometry', () => {
+    const geom = polygonsToGeometry([[circleRing(RIYADH, 1000, 12)]]);
+    expect(geom?.type).toBe('Polygon');
+    expect((geom as { coordinates: number[][][] }).coordinates[0]).toHaveLength(13); // 12 + closing point
   });
 });
