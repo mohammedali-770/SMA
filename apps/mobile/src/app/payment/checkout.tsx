@@ -16,7 +16,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WebView, type WebViewNavigation } from 'react-native-webview';
+import { type WebViewNavigation } from 'react-native-webview';
+// Platform-split: native re-exports react-native-webview verbatim (frozen Tap
+// flow unchanged); web renders a clean "app-only" state for online payment.
+import { WebView } from '../../components/TapWebView';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
 import { Button } from '../../components/Button';
