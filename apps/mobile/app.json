@@ -16,7 +16,7 @@
       }
     },
     "android": {
-      "package": "com.spicymeal.app",
+      "package": "sa.com.spicymeal.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
