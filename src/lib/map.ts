@@ -31,3 +31,35 @@ export const mapConfig = {
   defaultCenter: { lng: 46.6753, lat: 24.7136 },
   defaultZoom: 11,
 } as const;
+
+// ---------------------------------------------------------------------------
+// Arabic / RTL label shaping.
+//
+// Mapbox GL renders Arabic labels as disconnected, reversed glyphs unless the
+// official RTL-text plugin is loaded. The plugin is self-hosted (bundled from
+// the npm package and served from our own origin as a Vite asset) so the strict
+// `script-src 'self'` CSP in vercel.json keeps working — the worker loads it
+// via importScripts, which is governed by script-src.
+// ---------------------------------------------------------------------------
+// Vendored from @mapbox/mapbox-gl-rtl-text@0.4.0 (dist/mapbox-gl-rtl-text.js) —
+// the package's exports map forbids subpath imports, so the UMD file lives in
+// public/vendor/ and is served from our own origin.
+const rtlTextPluginUrl = '/vendor/mapbox-gl-rtl-text-v0.4.0.js';
+// Type-only import: must never pull mapbox-gl (~1.8 MB) into the main bundle —
+// callers pass their already-loaded instance in.
+import type mapboxgl from 'mapbox-gl';
+
+/**
+ * Idempotently register the RTL text plugin on a loaded mapbox-gl instance.
+ * Call once before creating a map. `lazy: true` defers execution until a map
+ * actually renders RTL text. Safe to call from every map component — repeat
+ * calls and plugin failures are swallowed (labels just fall back to unshaped
+ * text rather than breaking the map).
+ */
+export function ensureRtlTextPlugin(gl: typeof mapboxgl): void {
+  try {
+    if (gl.getRTLTextPluginStatus() === 'unavailable') {
+      gl.setRTLTextPlugin(rtlTextPluginUrl, () => { /* errors surface per-label only */ }, true);
+    }
+  } catch { /* already set or unsupported — keep the map usable */ }
+}

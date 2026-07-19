@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin } from 'lucide-react';
-import { mapConfig } from '../../lib/map';
+import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
 import { MapSearchBox } from '../MapSearchBox';
 
 interface LocationPickerProps {
@@ -26,6 +26,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
   useEffect(() => {
     if (!mapConfig.isConfigured || !container.current) return;
     mapboxgl.accessToken = mapConfig.publicToken;
+    ensureRtlTextPlugin(mapboxgl); // Arabic label shaping (idempotent)
     // Treat (0,0) and non-finite coords as "no location yet": centre on the
     // default (Riyadh) at city zoom so the admin gets a clear, recognisable map
     // to click on — NOT the middle of the ocean at Null Island (0,0), which

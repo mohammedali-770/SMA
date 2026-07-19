@@ -5,7 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { Branch, DeliveryZone } from '../../types';
-import { mapConfig } from '../../lib/map';
+import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import { MapSearchBox } from '../MapSearchBox';
 
@@ -41,6 +41,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   useEffect(() => {
     if (!mapConfig.isConfigured || !mapContainer.current) return;
     mapboxgl.accessToken = mapConfig.publicToken;
+    ensureRtlTextPlugin(mapboxgl); // Arabic label shaping (idempotent)
 
     const center: [number, number] = hasBranchCoords
       ? [branch.longitude, branch.latitude]
