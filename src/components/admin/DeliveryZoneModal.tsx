@@ -3,10 +3,10 @@ import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { AlertTriangle, MapPin } from 'lucide-react';
+import { AlertTriangle, LocateFixed, MapPin } from 'lucide-react';
 import { Branch, DeliveryZone } from '../../types';
 import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
-import { geometryToPolygons, loadGoogleMaps, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
+import { geometryToPolygons, loadGoogleMaps, locateMe, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import { MapSearchBox } from '../MapSearchBox';
 
@@ -67,6 +67,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
     let cancelled = false;
     loadGoogleMaps(isRTL, ['drawing']).then(() => {
       if (cancelled || !mapContainer.current) return;
+      try {
       const g = window.google!.maps;
       const map = new g.Map(mapContainer.current, {
         center, zoom: initialZoom,
@@ -112,6 +113,12 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
         }
       });
       setReady(true);
+      } catch (e) {
+        // The map may already be on screen — report init failure accurately
+        // instead of claiming the whole API failed to load.
+        console.error('google map init failed', e);
+        setError(isRTL ? 'تعذّرت تهيئة الخريطة.' : 'Map initialization failed.');
+      }
     }).catch(() => setError(isRTL ? 'تعذّر تحميل خرائط Google.' : 'Google Maps failed to load.'));
     return () => {
       cancelled = true;
@@ -198,6 +205,19 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
       drawRef.current?.deleteAll();
     }
   };
+  const [locating, setLocating] = useState(false);
+  const handleLocate = async () => {
+    setLocating(true);
+    try {
+      const { lat, lng } = await locateMe();
+      flyTo(lng, lat);
+    } catch {
+      setError(isRTL ? 'تعذّر تحديد موقعك — تأكد من السماح بالوصول إلى الموقع.' : 'Could not get your location — make sure location access is allowed.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
   const flyTo = (lng: number, lat: number) => {
     if (isGoogle) { gMapRef.current?.panTo({ lng, lat }); gMapRef.current?.setZoom(13); }
     else mapRef.current?.flyTo({ center: [lng, lat], zoom: 13, duration: 800 });
@@ -289,7 +309,19 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
             )}
 
             <MapSearchBox isRTL={isRTL} onSelect={flyTo} />
-            <div ref={mapContainer} className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200" />
+            <div className="relative">
+              <div ref={mapContainer} className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200" />
+              <button
+                type="button"
+                onClick={() => void handleLocate()}
+                disabled={locating || !ready}
+                title={isRTL ? 'موقعي' : 'My location'}
+                aria-label={isRTL ? 'موقعي' : 'My location'}
+                className="absolute bottom-3 end-3 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-primary hover:bg-slate-50 disabled:opacity-40"
+              >
+                <LocateFixed className={locating ? 'w-4 h-4 animate-pulse' : 'w-4 h-4'} />
+              </button>
+            </div>
 
             {error && (
               <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold">{error}</div>

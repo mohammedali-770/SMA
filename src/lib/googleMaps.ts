@@ -72,7 +72,7 @@ export function geometryToPolygons(geometry: { type: string; coordinates: unknow
  * tooltips localize; street names themselves are rendered by Google with
  * correct Arabic shaping in every language (the reason for this provider).
  */
-export function loadGoogleMaps(isRTL: boolean, libraries: string[] = ['drawing']): Promise<void> {
+function loadCore(isRTL: boolean): Promise<void> {
   if (window.google?.maps) return Promise.resolve();
   if (window.__gmapsReady) return window.__gmapsReady;
   window.__gmapsReady = new Promise<void>((resolve, reject) => {
@@ -83,7 +83,6 @@ export function loadGoogleMaps(isRTL: boolean, libraries: string[] = ['drawing']
       key: mapConfig.googleKey,
       v: 'weekly',
       loading: 'async',
-      libraries: libraries.join(','),
       language: isRTL ? 'ar' : 'en',
       callback: cb,
     });
@@ -93,4 +92,28 @@ export function loadGoogleMaps(isRTL: boolean, libraries: string[] = ['drawing']
     document.head.appendChild(s);
   });
   return window.__gmapsReady;
+}
+
+export async function loadGoogleMaps(isRTL: boolean, libraries: string[] = []): Promise<void> {
+  await loadCore(isRTL);
+  // importLibrary is the officially guaranteed way to have a library ready
+  // before use with async loading — URL `libraries=` + callback can race,
+  // which surfaced as "google.maps.drawing is undefined" after the map drew.
+  await Promise.all(['maps', ...libraries].map(name => window.google!.maps.importLibrary(name)));
+}
+
+/**
+ * Browser geolocation as a small promise helper. Rejects when unsupported,
+ * denied, or when the page's Permissions-Policy blocks it (the vercel.json
+ * header must allow `geolocation=(self)`).
+ */
+export function locateMe(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) { reject(new Error('unsupported')); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      err => reject(err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
+    );
+  });
 }

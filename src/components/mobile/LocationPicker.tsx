@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { MapPin } from 'lucide-react';
+import { LocateFixed, MapPin } from 'lucide-react';
 import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
-import { loadGoogleMaps } from '../../lib/googleMaps';
+import { loadGoogleMaps, locateMe } from '../../lib/googleMaps';
 import { MapSearchBox } from '../MapSearchBox';
 
 interface LocationPickerProps {
@@ -128,10 +128,28 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
     );
   }
 
+  const handleLocate = async () => {
+    try {
+      const pos = await locateMe();
+      goToSearchResult(pos.lng, pos.lat); // sets pin + coords + recenters (both providers)
+    } catch { /* denied/unavailable — search + manual pin still work */ }
+  };
+
   return (
     <div className="space-y-1.5">
       <MapSearchBox isRTL={isRTL} onSelect={goToSearchResult} />
-      <div ref={container} className="w-full h-56 rounded-lg overflow-hidden border border-gray-200" />
+      <div className="relative">
+        <div ref={container} className="w-full h-56 rounded-lg overflow-hidden border border-gray-200" />
+        <button
+          type="button"
+          onClick={() => void handleLocate()}
+          title={isRTL ? 'موقعي' : 'My location'}
+          aria-label={isRTL ? 'موقعي' : 'My location'}
+          className="absolute bottom-2 end-2 z-10 w-8 h-8 rounded-full bg-white shadow border border-gray-200 flex items-center justify-center text-primary hover:bg-gray-50"
+        >
+          <LocateFixed className="w-4 h-4" />
+        </button>
+      </div>
       <p className="text-[9px] text-gray-400 font-bold">
         {isRTL ? 'ابحث عن العنوان أعلاه، أو حرّك الدبوس إلى موقعك بالضبط.' : 'Search the address above, or move the pin to your exact location.'}
       </p>
