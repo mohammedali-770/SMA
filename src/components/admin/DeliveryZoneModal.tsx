@@ -22,16 +22,15 @@ interface DeliveryZoneModalProps {
 
 const ZONE_STYLE = { fillColor: '#7c3aed', fillOpacity: 0.12, strokeColor: '#7c3aed', strokeWeight: 2 };
 
-// @types/google.maps ships the drawing library as an empty class (legacy-lib
-// sparse typing) — the runtime API below is documented and stable, so model
-// just the members we use.
-interface GDrawingManager {
-  setMap(map: google.maps.Map | null): void;
-  setDrawingMode(mode: string | null): void;
-}
-interface GOverlayCompleteEvent {
-  type: string;
-  overlay?: { setMap(map: google.maps.Map | null): void };
+// Manual polygon drawing (click to add vertices, double-click to finish).
+// Google REMOVED DrawingManager from the Maps JS API in v3.65, so the editor
+// implements drawing itself with map click listeners + google.maps.Polygon —
+// which is also Google's recommended replacement.
+interface GDrawState {
+  active: boolean;
+  path: google.maps.LatLngLiteral[];
+  preview: google.maps.Polyline | null;
+  listeners: google.maps.MapsEventListener[];
 }
 
 /**
@@ -48,8 +47,9 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<MapboxDraw | null>(null);
   const gMapRef = useRef<google.maps.Map | null>(null);
-  const gDrawRef = useRef<GDrawingManager | null>(null);
+  const gDrawStateRef = useRef<GDrawState>({ active: false, path: [], preview: null, listeners: [] });
   const gPolysRef = useRef<google.maps.Polygon[]>([]);
+  const [gDrawing, setGDrawing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -65,7 +65,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   useEffect(() => {
     if (mapConfig.provider !== 'google' || !mapConfig.isConfigured || !mapContainer.current) return;
     let cancelled = false;
-    loadGoogleMaps(isRTL, ['drawing']).then(() => {
+    loadGoogleMaps(isRTL).then(() => {
       if (cancelled || !mapContainer.current) return;
       try {
       const g = window.google!.maps;
@@ -97,21 +97,6 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
         } catch { /* ignore malformed preload */ }
       }
 
-      const DrawingManagerCtor = g.drawing.DrawingManager as unknown as new (opts: object) => GDrawingManager;
-      const draw = new DrawingManagerCtor({
-        map,
-        drawingControl: false, // our own buttons drive the modes
-        polygonOptions: { ...ZONE_STYLE, editable: false },
-      });
-      gDrawRef.current = draw;
-      g.event.addListener(draw as unknown as object, 'overlaycomplete', (e: GOverlayCompleteEvent) => {
-        if (e.type === g.drawing.OverlayType.POLYGON) {
-          gPolysRef.current.push(e.overlay as unknown as google.maps.Polygon);
-          draw.setDrawingMode(null); // one shape per gesture, like the Mapbox editor
-        } else {
-          e.overlay?.setMap(null);
-        }
-      });
       setReady(true);
       } catch (e) {
         // The map may already be on screen — report init failure accurately
@@ -124,8 +109,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
       cancelled = true;
       gPolysRef.current.forEach(p => p.setMap(null));
       gPolysRef.current = [];
-      gDrawRef.current?.setMap(null);
-      gDrawRef.current = null;
+      cancelGDraw();
       gMapRef.current = null; // the Maps API has no destroy(); dropping refs releases the container
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,19 +172,68 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
   const isGoogle = mapConfig.provider === 'google';
 
+  /** Tear down an in-progress google draw gesture (no-op when idle). */
+  const cancelGDraw = () => {
+    const st = gDrawStateRef.current;
+    st.listeners.forEach(l => l.remove());
+    st.listeners = [];
+    st.preview?.setMap(null);
+    st.preview = null;
+    st.path = [];
+    if (st.active) {
+      st.active = false;
+      setGDrawing(false);
+      gMapRef.current?.setOptions({ draggableCursor: undefined, disableDoubleClickZoom: false });
+    }
+  };
+
+  /** Finish the google draw gesture: ≥3 distinct points → editable polygon. */
+  const finishGDraw = () => {
+    const st = gDrawStateRef.current;
+    if (!st.active) return;
+    // A double-click delivers its position twice via 'click' — collapse
+    // consecutive duplicates before validating the ring.
+    const pts = st.path.filter((p, i, a) => i === 0 || p.lat !== a[i - 1].lat || p.lng !== a[i - 1].lng);
+    cancelGDraw();
+    if (pts.length >= 3 && gMapRef.current) {
+      gPolysRef.current.push(new window.google!.maps.Polygon({ ...ZONE_STYLE, map: gMapRef.current, paths: pts }));
+    }
+  };
+
+  const startGDraw = () => {
+    const map = gMapRef.current;
+    if (!map || gDrawStateRef.current.active) return;
+    const g = window.google!.maps;
+    const st = gDrawStateRef.current;
+    st.active = true;
+    setGDrawing(true);
+    st.path = [];
+    map.setOptions({ draggableCursor: 'crosshair', disableDoubleClickZoom: true });
+    st.preview = new g.Polyline({ map, path: [], strokeColor: ZONE_STYLE.strokeColor, strokeWeight: ZONE_STYLE.strokeWeight });
+    st.listeners.push(map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng) return;
+      st.path.push(e.latLng.toJSON());
+      st.preview?.setPath(st.path);
+    }));
+    st.listeners.push(map.addListener('dblclick', (e: google.maps.MapMouseEvent) => {
+      e.stop();
+      finishGDraw();
+    }));
+  };
+
   const startDraw = () => {
-    if (isGoogle) gDrawRef.current?.setDrawingMode(window.google!.maps.drawing.OverlayType.POLYGON);
+    if (isGoogle) startGDraw();
     else drawRef.current?.changeMode('draw_polygon');
   };
   const startEdit = () => {
-    if (isGoogle) gPolysRef.current.forEach(p => p.setEditable(true));
+    if (isGoogle) { finishGDraw(); gPolysRef.current.forEach(p => p.setEditable(true)); }
     else drawRef.current?.changeMode('simple_select');
   };
   const clearDrawing = () => {
     if (isGoogle) {
+      cancelGDraw();
       gPolysRef.current.forEach(p => p.setMap(null));
       gPolysRef.current = [];
-      gDrawRef.current?.setDrawingMode(null);
     } else {
       drawRef.current?.deleteAll();
     }
@@ -225,6 +258,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
   const collectGeometry = (): GeoJSONGeometry | null => {
     if (isGoogle) {
+      finishGDraw(); // an unfinished gesture with >=3 points still counts
       const polygons: LngLat[][][] = gPolysRef.current.map(p =>
         p.getPaths().getArray().map(path =>
           path.getArray().map(pt => [pt.lng(), pt.lat()] as LngLat)));
@@ -323,6 +357,11 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               </button>
             </div>
 
+            {gDrawing && (
+              <div className="p-2 bg-primary/5 border border-primary/15 rounded-xl text-primary text-[10px] font-bold text-center">
+                {isRTL ? 'انقر على الخريطة لإضافة النقاط، وانقر نقرًا مزدوجًا للإنهاء.' : 'Click the map to add points; double-click to finish.'}
+              </div>
+            )}
             {error && (
               <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold">{error}</div>
             )}
