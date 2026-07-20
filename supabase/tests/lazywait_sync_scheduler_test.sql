@@ -58,6 +58,7 @@ declare
   v_col      int;
   v_rid      bigint;
   v_timeout  int;
+  v_secret_uuid uuid;
 begin
   -- CASE 17: exactly one active, every-minute 'lazywait-sync' cron job.
   select count(*) into v_count from cron.job where jobname = 'lazywait-sync';
@@ -93,10 +94,27 @@ begin
      and column_name ~* 'secret|token|x_sync|header|body|content|authorization|customer|order';
   if v_col <> 0 then raise exception 'CASE 15 FAILED: unsafe column on ledger/view'; end if;
 
-  -- Baseline config: valid project URL + secret.
-  insert into vault.decrypted_secrets(name, decrypted_secret)
-  values ('lazywait_sync_project_url','https://proj-ref.supabase.co')
-  on conflict do nothing;
+  -- Baseline: seed the project URL through the REAL Vault WRITE API — never the
+  -- decrypted read view. Transaction-safe + repeatable: reuse an existing secret
+  -- (temporarily) if present, else create one; the outer rollback restores any
+  -- pre-existing Vault state and leaves no persistent data.
+  select id into v_secret_uuid from vault.secrets where name = 'lazywait_sync_project_url';
+  if v_secret_uuid is null then
+    v_secret_uuid := vault.create_secret('https://proj-ref.supabase.co', 'lazywait_sync_project_url', 'lazywait sync scheduler test');
+  else
+    perform vault.update_secret(v_secret_uuid, new_secret := 'https://proj-ref.supabase.co');
+  end if;
+
+  -- Prove the decrypted view's secret column is READ-ONLY in the test model
+  -- (catalog check — no DML against decrypted_secrets). In real Supabase and in
+  -- this hermetic stub, decrypted_secret is a computed (decryption) expression,
+  -- so is_updatable = 'NO' and any write to it fails — a future test that tries
+  -- to write the decrypted view is caught. Reads still work (CASE 6 succeeds).
+  if (select is_updatable from information_schema.columns
+       where table_schema='vault' and table_name='decrypted_secrets'
+         and column_name='decrypted_secret') is distinct from 'NO' then
+    raise exception 'READONLY FAILED: vault.decrypted_secrets.decrypted_secret must be read-only (use create_secret/update_secret)';
+  end if;
 
   -- CASE 1 + 2: run row created BEFORE preflight; missing row -> durable
   -- preflight_failed + zero HTTP.
@@ -128,14 +146,17 @@ begin
   end loop;
 
   -- CASE 4: valid secret but missing project URL -> preflight_failed (project_url_missing), zero HTTP.
-  delete from vault.decrypted_secrets where name='lazywait_sync_project_url';
+  -- Temporarily RENAME the Vault secret via update_secret so the migration's
+  -- lookup by name finds nothing — never delete/insert the decrypted view.
+  perform vault.update_secret(v_secret_uuid, new_name := 'lazywait_sync_project_url__unset_for_test');
   update public.integration_settings set secret_config='{"sync_trigger_secret":"valid-secret"}'::jsonb where provider_type='lazywait';
   select count(*) into v_calls from public._t_http_calls;
   perform public.invoke_lazywait_sync_processor();
   select outcome, error_code into v_outcome, v_ec from public.lazywait_sync_requests order by id desc limit 1;
   if v_outcome <> 'preflight_failed' or v_ec <> 'project_url_missing' then raise exception 'CASE 4 FAILED: outcome=% ec=%', v_outcome, v_ec; end if;
   if (select count(*) from public._t_http_calls) <> v_calls then raise exception 'CASE 4 FAILED: HTTP call made'; end if;
-  insert into vault.decrypted_secrets(name, decrypted_secret) values ('lazywait_sync_project_url','https://proj-ref.supabase.co');
+  -- Restore the expected name + URL (via update_secret) for later cases.
+  perform vault.update_secret(v_secret_uuid, new_name := 'lazywait_sync_project_url', new_secret := 'https://proj-ref.supabase.co');
 
   -- CASE 6 + 7: secret sent VERBATIM; queued run row shows 'pending' (success NULL).
   update public.integration_settings set secret_config='{"sync_trigger_secret":"  Sp Ac ed-Secret  "}'::jsonb where provider_type='lazywait';
