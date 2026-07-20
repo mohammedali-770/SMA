@@ -23,7 +23,7 @@ create table if not exists net._http_response (
 );
 create sequence if not exists public._t_req_seq;
 create table if not exists public._t_http_calls (
-  request_id bigint, url text, headers jsonb, body jsonb, at timestamptz default now()
+  request_id bigint, url text, headers jsonb, body jsonb, timeout_ms int, at timestamptz default now()
 );
 create or replace function net.http_post(
   url text, headers jsonb default '{}'::jsonb, body jsonb default '{}'::jsonb, timeout_milliseconds int default 5000
@@ -31,7 +31,8 @@ create or replace function net.http_post(
 declare v_id bigint;
 begin
   v_id := nextval('public._t_req_seq');
-  insert into public._t_http_calls(request_id, url, headers, body) values (v_id, url, headers, body);
+  insert into public._t_http_calls(request_id, url, headers, body, timeout_ms)
+  values (v_id, url, headers, body, timeout_milliseconds);
   return v_id;
 end $f$;
 
@@ -56,6 +57,7 @@ declare
   v_affected int;
   v_col      int;
   v_rid      bigint;
+  v_timeout  int;
 begin
   -- CASE 17: exactly one active, every-minute 'lazywait-sync' cron job.
   select count(*) into v_count from cron.job where jobname = 'lazywait-sync';
@@ -141,6 +143,12 @@ begin
   select headers->>'x-sync-secret' into v_hdr from public._t_http_calls where request_id=v_rid;
   if v_hdr is distinct from '  Sp Ac ed-Secret  ' then raise exception 'CASE 6 FAILED: secret altered -> [%]', v_hdr; end if;
   if (select body->>'limit' from public._t_http_calls where request_id=v_rid) <> '5' then raise exception 'CASE 6 FAILED: batch not bounded'; end if;
+  -- CASE 6 (timeout): scheduler sends 140000ms — covers the worker's ~115s
+  -- worst-case sequential batch and stays below Supabase's 150s idle timeout.
+  select timeout_ms into v_timeout from public._t_http_calls where request_id=v_rid;
+  if v_timeout <> 140000 then raise exception 'CASE 6 FAILED: timeout_ms=% (expected 140000)', v_timeout; end if;
+  if v_timeout <= 115000 then raise exception 'CASE 6 FAILED: timeout % does not exceed worst-case batch budget 115000', v_timeout; end if;
+  if v_timeout >= 150000 then raise exception 'CASE 6 FAILED: timeout % not below 150000', v_timeout; end if;
   select outcome, success into v_outcome, v_success from public.lazywait_sync_cron_health where request_id=v_rid;
   if v_outcome <> 'pending' or v_success is not null then raise exception 'CASE 7 FAILED: outcome=% success=%', v_outcome, v_success; end if;
 
@@ -183,6 +191,15 @@ begin
   select outcome, success into v_outcome, v_success from public.lazywait_sync_cron_health where request_id=95001;
   if v_outcome <> 'expired_unknown' or v_success is not null then raise exception 'CASE 11 FAILED: outcome=% success=%', v_outcome, v_success; end if;
   if (select completed_at from public.lazywait_sync_requests where request_id=95001) is null then raise exception 'CASE 11 FAILED: completed_at null'; end if;
+
+  -- CASE 11b: the expired_unknown threshold is substantially LATER than the HTTP
+  -- timeout — a row already older than the 140s timeout (here 5 min) is still
+  -- 'pending', not prematurely expired.
+  insert into public.lazywait_sync_requests(request_id, started_at, outcome) values (95002, now() - interval '5 minutes', 'pending');
+  perform public.invoke_lazywait_sync_processor();
+  if (select outcome from public.lazywait_sync_cron_health where request_id=95002) <> 'pending' then
+    raise exception 'CASE 11b FAILED: a 5-min-old row (>> 140s HTTP timeout) was expired prematurely';
+  end if;
 
   -- CASE 12: reconciliation idempotent; terminal outcomes cannot regress.
   perform public.invoke_lazywait_sync_processor();

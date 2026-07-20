@@ -50,8 +50,10 @@
 --   * A queued row shows 'pending' only within a conservative window; a row with
 --     no observed response older than 15 minutes is reconciled to
 --     'expired_unknown' (never fabricated as success/failure). 15 min is safely
---     longer than the 10s HTTP timeout and far shorter than pg_net's ~6h default
---     response retention, so a real response is always snapshotted first.
+--     longer than the 140s HTTP timeout (see net.http_post below — sized for the
+--     worker's ~115s worst-case sequential batch) and far shorter than pg_net's
+--     ~6h default response retention, so a real response is always snapshotted
+--     first. The 15-min threshold is intentionally left well above the timeout.
 --   * Reconciliation is idempotent: it only touches rows still in
 --     ('starting','pending'), so terminal rows can never regress and overlapping
 --     ticks cannot corrupt state. One request id maps to one run row (unique
@@ -189,7 +191,7 @@ begin
          and led.outcome in ('starting', 'pending');   -- terminal rows immutable
 
       -- (b) age out rows with no observed response beyond the conservative
-      -- window (15 min >> 10s timeout, << pg_net's ~6h response retention).
+      -- window (15 min >> the 140s HTTP timeout, << pg_net's ~6h response retention).
       update public.lazywait_sync_requests led
          set outcome = 'expired_unknown', completed_at = now()
        where led.outcome in ('starting', 'pending')
@@ -237,11 +239,17 @@ begin
     end if;
 
     -- Send. Secret passed VERBATIM. Bounded batch. Async fire-and-forget.
+    -- Timeout must cover the worker's worst-case SEQUENTIAL batch: up to 5 orders
+    -- (claim_lazywait_sync_batch p_limit=5), each up to 8s CRM lookup
+    -- (lazywaitFetch timeoutMs 8000) + 15s Create Order (timeoutMs 15000) = 23s,
+    -- so ~115s, plus reaper/claim/record overhead. 140s safely covers that and
+    -- stays below Supabase's 150s HTTP request idle timeout, while still
+    -- surfacing a genuinely stalled request. The worker itself is UNCHANGED.
     select net.http_post(
       url := rtrim(v_project_url, '/') || '/functions/v1/lazywait-sync',
       headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-secret', v_trigger_secret),
       body := jsonb_build_object('limit', 5),
-      timeout_milliseconds := 10000
+      timeout_milliseconds := 140000
     ) into v_request_id;
 
     update public.lazywait_sync_requests
