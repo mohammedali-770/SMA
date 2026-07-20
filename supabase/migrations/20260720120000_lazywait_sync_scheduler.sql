@@ -28,25 +28,27 @@
 --   * stale-claim recovery             — reap_stale_lazywait_syncs runs at the
 --     start of every worker invocation (10-min lease).
 --
--- SECRET HANDLING — mirrors the account-deletion scheduler exactly. A SECURITY
--- DEFINER function reads the project URL + the worker's shared trigger secret
--- from Supabase Vault at execution time and passes the secret ONLY in the
--- x-sync-secret request header. The secret is NEVER stored in cron.job, in an
--- Edge Function env var, or in logs. lazywait-sync is verify_jwt=false and gated
+-- SECRET HANDLING — single source of truth. A SECURITY DEFINER function reads
+-- the worker's shared trigger secret LIVE from the authoritative
+-- integration_settings row (provider_type = 'lazywait') at execution time, and
+-- passes it ONLY in the x-sync-secret request header. That is the exact same
+-- secret the worker compares against (secret_config.sync_trigger_secret), so
+-- rotating it in the Admin UI takes effect on the very next tick with NO
+-- migration, NO Vault change and NO redeploy. The secret is NEVER copied into
+-- Vault, stored in cron.job, placed in an Edge Function env var, exposed by the
+-- observability view, or logged. lazywait-sync is verify_jwt=false and gated
 -- solely by that header (constant-time compare), so the caller needs no JWT and
--- no service-role key. cron.job stores only the bare function call.
+-- no service-role key; cron.job stores only the bare function call.
 --
--- VAULT ENTRIES REQUIRED (operational; created separately under the owner-
--- approved apply workflow — NOT in this migration, so no secret is committed):
---   * lazywait_sync_project_url    = https://<project-ref>.supabase.co
---   * lazywait_sync_trigger_secret = the SAME value as
---       integration_settings.secret_config ->> 'sync_trigger_secret'
--- COUPLING NOTE: the worker compares x-sync-secret against
--- integration_settings.secret_config.sync_trigger_secret. If that secret is ever
--- rotated (Admin UI), the Vault entry lazywait_sync_trigger_secret MUST be
--- updated to match, or the worker will answer 401 and sync will silently stop.
--- Until BOTH Vault entries exist the job no-ops safely (raises 'Vault
--- configuration is incomplete'; no HTTP request is made).
+-- VAULT ENTRY REQUIRED (operational; created separately under the owner-approved
+-- apply workflow — NOT in this migration). Only the NON-secret project URL:
+--   * lazywait_sync_project_url = https://<project-ref>.supabase.co
+-- The trigger secret is NOT in Vault; it lives only in integration_settings.
+--
+-- FAIL CLOSED — before any HTTP request, the driver raises (and sends nothing)
+-- when: the lazywait integration_settings row is missing; more than one such row
+-- exists; secret_config is null; sync_trigger_secret is null/empty/blank; or the
+-- lazywait_sync_project_url Vault entry is missing.
 --
 -- ROLLBACK / DISABLE (safe, immediate — never affects order intake or payments;
 -- the worker simply stops being auto-invoked, exactly as before this migration):
@@ -74,7 +76,8 @@ begin
   end if;
 end $$;
 
--- The driver. SECURITY DEFINER so it can read Vault; service-role-only EXECUTE.
+-- The driver. SECURITY DEFINER so it can read the (client-revoked)
+-- integration_settings row and Vault; service-role-only EXECUTE.
 create or replace function public.invoke_lazywait_sync_processor()
 returns bigint
 language plpgsql
@@ -82,22 +85,46 @@ security definer
 set search_path = public, vault, extensions, net
 as $$
 declare
-  v_project_url    text;
+  v_row_count      integer;
+  v_secret_config  jsonb;
   v_trigger_secret text;
+  v_project_url    text;
   v_request_id     bigint;
 begin
+  -- ---- Trigger secret: read LIVE from the authoritative integration row. -----
+  -- Canonical key = provider_type ('lazywait'), which is UNIQUE. We still assert
+  -- exactly one row (defence in depth) and fail closed otherwise. The secret is
+  -- held only in a local variable and used solely as a request header below.
+  select count(*)
+    into v_row_count
+    from public.integration_settings
+   where provider_type = 'lazywait';
+  if v_row_count = 0 then
+    raise exception 'lazywait integration_settings row is missing';
+  elsif v_row_count > 1 then
+    raise exception 'multiple lazywait integration_settings rows found (expected exactly one)';
+  end if;
+
+  select secret_config
+    into v_secret_config
+    from public.integration_settings
+   where provider_type = 'lazywait';
+  if v_secret_config is null then
+    raise exception 'lazywait secret_config is null';
+  end if;
+
+  v_trigger_secret := nullif(btrim(coalesce(v_secret_config ->> 'sync_trigger_secret', '')), '');
+  if v_trigger_secret is null then
+    raise exception 'lazywait sync_trigger_secret is not configured';
+  end if;
+
+  -- ---- Project URL: NON-secret, from Vault. ---------------------------------
   select decrypted_secret
     into v_project_url
     from vault.decrypted_secrets
    where name = 'lazywait_sync_project_url';
-
-  select decrypted_secret
-    into v_trigger_secret
-    from vault.decrypted_secrets
-   where name = 'lazywait_sync_trigger_secret';
-
-  if v_project_url is null or v_trigger_secret is null then
-    raise exception 'lazywait sync scheduler Vault configuration is incomplete';
+  if v_project_url is null then
+    raise exception 'lazywait_sync_project_url Vault entry is missing';
   end if;
 
   -- Fire-and-forget async POST. The worker does the real work (claim → Create
@@ -124,13 +151,14 @@ grant execute on function public.invoke_lazywait_sync_processor()
   to service_role;
 
 comment on function public.invoke_lazywait_sync_processor() is
-  'Vault-backed pg_cron driver for the lazywait-sync worker. Reads lazywait_sync_project_url + lazywait_sync_trigger_secret from Supabase Vault at run time and POSTs {"limit":5} to /functions/v1/lazywait-sync with the x-sync-secret header. The secret is never stored in cron.job, Edge env, or logs. Adds no change to payment, order-intake, Create Order payload mapping, delivery, or POS logic.';
+  'Vault-URL + live-secret pg_cron driver for the lazywait-sync worker. Reads sync_trigger_secret at run time from the authoritative integration_settings row (provider_type=lazywait) — never from Vault — and the non-secret project URL from Vault (lazywait_sync_project_url), then POSTs {"limit":5} to /functions/v1/lazywait-sync with the x-sync-secret header. The secret is never stored in cron.job, Vault, Edge env, the health view, or logs; rotating it in the Admin UI needs no migration/redeploy. No change to payment, order-intake, Create Order payload mapping, delivery, or POS logic.';
 
 -- Read-only observability over the driver's OWN firing history: whether each
--- cron tick's command succeeded and the async request id it queued. (Sync
--- OUTCOMES — synced/failed/blocked/dead_letter/reaped — live in
--- integration_sync_logs and the orders sync columns, surfaced by the Admin
--- "Lazywait Sync Monitor".) service-role only.
+-- cron tick's command succeeded and the async request id it queued. It carries
+-- NO secret (only job metadata + run status/message/timing). Sync OUTCOMES —
+-- synced/failed/blocked/dead_letter/reaped — live in integration_sync_logs and
+-- the orders sync columns, surfaced by the Admin "Lazywait Sync Monitor".
+-- service-role only.
 create or replace view public.lazywait_sync_cron_health as
   select
     j.jobid,
@@ -150,7 +178,7 @@ revoke all on public.lazywait_sync_cron_health from public, anon, authenticated;
 grant select on public.lazywait_sync_cron_health to service_role;
 
 comment on view public.lazywait_sync_cron_health is
-  'Recent lazywait-sync cron ticks (command status + queued pg_net request id). Sync outcomes live in integration_sync_logs / the orders sync columns.';
+  'Recent lazywait-sync cron ticks (command status + queued pg_net request id). Contains no secret. Sync outcomes live in integration_sync_logs / the orders sync columns.';
 
 -- Schedule: every minute (pg_cron's finest granularity; satisfies the "every
 -- 1-2 minutes" cadence and matches the account-deletion processor). cron.job
