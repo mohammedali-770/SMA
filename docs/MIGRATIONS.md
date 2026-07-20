@@ -190,18 +190,24 @@ recorded in §1.
 
 ## 6. Why `db push` is unsafe
 
-Only the three aligned July-14 migrations (`20260714070000`,
-`20260714090000`, `20260714130000`) share repository versions with live
-history. The Supabase CLI compares by **version**, so it would consider up to
-**35 repository files considered unapplied** and attempt to replay them
-against production. Aligning a third migration does **not** make `db push`
-any safer — the permanent production prohibition stands. Risks:
+Currently **eight** repository versions match live migration-history versions:
+the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
+`20260714130000`) and the five account-deletion migrations (`20260715120000`,
+`20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
+repository filenames were applied under matching version stamps. The Supabase
+CLI compares by **version**, so it would still consider the remaining
+**36 repository files** (44 − 8) unapplied and attempt to replay them against
+production. Eight shared versions do **not** make `db push` any safer — the
+permanent production prohibition stands, because **36 repository versions still
+do not match live history**, content boundaries differ for consolidated/split
+migrations, and replaying historical migrations against a live database remains
+unsafe regardless. Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (35 junk records even on success);
+- **duplicate or misleading history rows** (36 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly.
