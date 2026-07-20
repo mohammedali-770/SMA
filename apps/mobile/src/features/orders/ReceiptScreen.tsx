@@ -14,6 +14,7 @@ import { ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
+import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycleTone } from './posLifecycle';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
@@ -80,6 +81,8 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               <Text style={styles.title}>{t('orderPlaced')}</Text>
               <Text style={styles.sub}>{t('orderPlacedSub')}</Text>
             </View>
+
+            <PosLifecycleBanner order={order} />
 
             {(() => {
               const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
@@ -175,6 +178,58 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     </Screen>
   );
 }
+
+/**
+ * Customer-facing POS confirmation banner. Renders ONLY when the order has a
+ * derivable POS lifecycle (pickup, post-payment). Copy is the approved AR/EN
+ * message; the derivation guarantees "confirmed" is shown only after Lazywait
+ * returned a real order reference. Polite live-region so status changes picked
+ * up by the silent refresh are announced.
+ */
+const POS_TONE: Record<PosLifecycleTone, { bg: string; fg: string }> = {
+  info: { bg: colors.purpleBg, fg: colors.purple },
+  success: { bg: colors.successBg, fg: colors.success },
+  warning: { bg: colors.bgAlt, fg: colors.warning },
+  danger: { bg: colors.dangerBg, fg: colors.danger },
+};
+
+function PosLifecycleBanner({ order }: { order: Order }) {
+  const { t, rtlText, rtlRow } = useI18n();
+  const lc = deriveCustomerPosLifecycle({
+    orderType: order.orderType,
+    syncState: order.lazywaitSyncState,
+    firstFailureAt: order.firstPosSyncFailureAt,
+    nextAttemptAt: order.syncNextAttemptAt,
+  });
+  if (!lc) return null;
+  const p = posLifecyclePresentation(lc);
+  const tone = POS_TONE[p.tone];
+  return (
+    <View
+      style={[banner.box, rtlRow, { backgroundColor: tone.bg, borderColor: tone.fg }]}
+      accessibilityLiveRegion="polite"
+      accessible
+      accessibilityLabel={`${t(p.labelKey)}. ${t(p.bodyKey)}`}
+    >
+      <View style={[banner.dot, { backgroundColor: tone.fg }]} />
+      <View style={{ flex: 1 }}>
+        <Text style={[banner.title, rtlText, { color: tone.fg }]}>{t(p.labelKey)}</Text>
+        <Text style={[banner.body, rtlText]}>{t(p.bodyKey)}</Text>
+      </View>
+    </View>
+  );
+}
+
+const banner = StyleSheet.create({
+  box: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+    borderWidth: 1, borderRadius: radius.md, borderCurve: 'continuous',
+    padding: spacing.md, marginTop: spacing.md,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
+  title: { fontSize: font.md, fontWeight: '800' },
+  body: { fontSize: font.sm, color: colors.text, fontWeight: '600', marginTop: 2, lineHeight: 20 },
+});
 
 function Row({ label, value, secondary, strong, big, muted }: { label: string; value: string; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
   const { isRTL, rtlRow } = useI18n();

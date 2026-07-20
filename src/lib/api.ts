@@ -511,6 +511,23 @@ export interface PlaceOrderInput {
   /** 'online' | 'cash' — validated server-side against admin payment settings. */
   paymentMethod?: 'online' | 'cash' | null;
 }
+/** One row of the read-only "Orders Requiring Verification" admin feed (safe fields only). */
+export interface PosConfirmationRequiredItem {
+  id: string;
+  order_number: string;
+  order_type: string;
+  total: number;
+  created_at: string;
+  pos_sync_started_at: string | null;
+  first_pos_sync_failure_at: string | null;
+  /** Stable machine reason: timeout | connection | missing_ref | ambiguous_response | provider_5xx. */
+  reason: string;
+}
+export interface PosConfirmationRequired {
+  total: number;
+  items: PosConfirmationRequiredItem[];
+}
+
 export const orders = {
   /** Server-authoritative order creation (recomputes all amounts + coupon + VAT + loyalty). */
   async place(input: PlaceOrderInput): Promise<DbOrder> {
@@ -568,6 +585,17 @@ export const orders = {
   /** Admin-only: re-queue a failed/blocked/dead-lettered order for Lazywait sync. */
   async requeueLazywait(orderId: string): Promise<DbOrder> {
     return ok<DbOrder>(await supabase.rpc('requeue_lazywait_order', { p_order_id: orderId }));
+  },
+  /**
+   * Admin-only READ-ONLY feed for the "Orders Requiring Verification" card:
+   * ambiguous POS outcomes (state 'confirmation_required'), oldest-first, top N,
+   * with only safe fields (no phone, no secrets, no payment refs). The RPC is
+   * is_admin()-gated server-side.
+   */
+  async posConfirmationRequired(limit = 20): Promise<PosConfirmationRequired> {
+    return ok<PosConfirmationRequired>(
+      await supabase.rpc('list_pos_confirmation_required', { p_limit: limit }),
+    );
   },
 };
 

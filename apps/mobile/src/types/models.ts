@@ -160,6 +160,10 @@ export interface Order {
   notes?: string;
   createdAt: string;
   lazywaitOrderNumber?: string; // POS number once synced; primary display ref
+  // POS confirmation lifecycle inputs (customer-facing status derivation).
+  lazywaitSyncState?: string;
+  firstPosSyncFailureAt?: string;
+  syncNextAttemptAt?: string;
   address?: SavedAddress;
   items: OrderItem[];
 }

@@ -12,6 +12,7 @@ import { EmptyView, ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
+import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycleTone } from './posLifecycle';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
@@ -83,6 +84,7 @@ export function OrdersScreen() {
           <StatusBadge label={statusLabel} status={item.status} />
         </View>
         <Text style={[styles.date, rtlText]}>{formatRiyadhDateTime(item.createdAt)}</Text>
+        <PosLifecycleChip order={item} />
         <View style={[styles.cardBottom, rtlRow]}>
           <Text style={[styles.itemsCount, rtlText]}>{meta}</Text>
           <Text style={styles.total}>{totalLabel}</Text>
@@ -151,6 +153,37 @@ const skeleton = StyleSheet.create({
   badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: colors.bgAlt },
 });
 
+/**
+ * Compact POS confirmation chip on the order card. Renders only when a POS
+ * lifecycle is derivable (pickup, post-payment). "Confirmed" appears only after
+ * Lazywait returned a real order reference (guaranteed by the derivation).
+ */
+const CHIP_TONE: Record<PosLifecycleTone, { bg: string; fg: string }> = {
+  info: { bg: colors.purpleBg, fg: colors.purple },
+  success: { bg: colors.successBg, fg: colors.success },
+  warning: { bg: colors.bgAlt, fg: colors.warning },
+  danger: { bg: colors.dangerBg, fg: colors.red },
+};
+
+function PosLifecycleChip({ order }: { order: Order }) {
+  const { t } = useI18n();
+  const lc = deriveCustomerPosLifecycle({
+    orderType: order.orderType,
+    syncState: order.lazywaitSyncState,
+    firstFailureAt: order.firstPosSyncFailureAt,
+    nextAttemptAt: order.syncNextAttemptAt,
+  });
+  if (!lc) return null;
+  const p = posLifecyclePresentation(lc);
+  const tone = CHIP_TONE[p.tone];
+  return (
+    <View style={[styles.posChip, { backgroundColor: tone.bg }]}>
+      <View style={[styles.posDot, { backgroundColor: tone.fg }]} />
+      <Text style={[styles.posChipText, { color: tone.fg }]} numberOfLines={1}>{t(p.labelKey)}</Text>
+    </View>
+  );
+}
+
 function StatusBadge({ label, status }: { label: string; status: OrderStatus }) {
   const tone =
     status === 'delivered' ? { bg: colors.successBg, fg: colors.success }
@@ -184,4 +217,10 @@ const styles = StyleSheet.create({
   // status names shrink the reference column instead of clipping.
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, maxWidth: '55%' },
   badgeText: { fontSize: font.xs, fontWeight: '800', textAlign: 'center' },
+  posChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill, marginTop: spacing.xs,
+  },
+  posDot: { width: 7, height: 7, borderRadius: 4 },
+  posChipText: { fontSize: font.xs, fontWeight: '800', flexShrink: 1 },
 });

@@ -2,8 +2,8 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
-  buildCreateOrderPayload, classifyLazywaitError, computeBackoffMs, DEFAULT_BASE_URL,
-  lazywaitFetch, MAX_SYNC_ATTEMPTS, normalizePhone, shouldResendCreateOrder,
+  buildCreateOrderPayload, classifyCreateOrderResult, computePosNextAttempt, DEFAULT_BASE_URL,
+  lazywaitFetch, MAX_POS_ATTEMPTS, normalizePhone, shouldResendCreateOrder,
   STALE_SYNC_TIMEOUT_MINUTES, timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 
@@ -65,16 +65,20 @@ Deno.serve(async (req: Request) => {
   // ref to 'synced' (never re-POST — Create Order has no idempotency key) and
   // requeues ref-less rows to 'failed' with backoff (or dead-letters at max
   // attempts). Non-fatal: a reaper hiccup must not stop the sync run.
-  let reaped: Record<string, unknown> = { recovered_synced: 0, requeued: 0, dead_lettered: 0 };
+  let reaped: Record<string, unknown> = {
+    recovered_synced: 0, requeued: 0, dead_lettered: 0, confirmation_required: 0, deadline_failed: 0,
+  };
   const { data: reapData, error: reapErr } = await admin.rpc('reap_stale_lazywait_syncs', {
     p_timeout_minutes: STALE_SYNC_TIMEOUT_MINUTES,
-    p_max_attempts: MAX_SYNC_ATTEMPTS,
+    p_max_attempts: MAX_POS_ATTEMPTS,
   });
   if (reapErr) {
     console.error('reap_stale_lazywait_syncs failed (non-fatal):', safeErr(reapErr.message));
   } else if (reapData && typeof reapData === 'object') {
     reaped = reapData as Record<string, unknown>;
-    const n = Number(reaped.recovered_synced ?? 0) + Number(reaped.requeued ?? 0) + Number(reaped.dead_lettered ?? 0);
+    const n = Number(reaped.recovered_synced ?? 0) + Number(reaped.requeued ?? 0)
+      + Number(reaped.dead_lettered ?? 0) + Number(reaped.confirmation_required ?? 0)
+      + Number(reaped.deadline_failed ?? 0);
     if (n > 0) console.log('reaped stale lazywait syncing rows:', JSON.stringify(reaped));
   }
 
@@ -84,10 +88,16 @@ Deno.serve(async (req: Request) => {
   if (claimErr) return json({ error: claimErr.message }, 500);
   const orders = (claimed ?? []) as Array<Record<string, unknown>>;
 
-  const summary = { claimed: orders.length, synced: 0, failed: 0, blocked: 0, dead_letter: 0 };
+  const summary = {
+    claimed: orders.length, synced: 0, retrying: 0,
+    confirmation_required: 0, dead_letter: 0, blocked: 0,
+  };
 
   for (const order of orders) {
     const orderId = String(order.id);
+    // Phase marker for THIS attempt: flips true the instant before the request
+    // leaves. Read in the catch to tell proven-not-sent from may-have-sent.
+    let posAttempted = false;
     try {
       // ---- Duplicate-send guard --------------------------------------------
       // If this order already carries a Lazywait ref, the Create Order already
@@ -106,6 +116,8 @@ Deno.serve(async (req: Request) => {
           },
           p_log_status: 'skipped',
           p_error: 'already_created_no_resend',
+          // If a prior failure was already surfaced, close it with "confirmed".
+          p_notify_status: order.first_pos_sync_failure_at != null ? 'pos_confirmed' : null,
         });
         continue;
       }
@@ -159,117 +171,170 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      // ---- POST /pos/orders/create -----------------------------------------
+      // ---- Phase marker, then POST /pos/orders/create ----------------------
+      // Persist "about to send" IMMEDIATELY before the request leaves so a crash
+      // mid-flight is treated as may-have-sent (confirmation_required), never
+      // as a safe resend. claim_lazywait_sync_batch cleared this on claim.
+      await admin.from('orders')
+        .update({ pos_create_attempted_at: new Date().toISOString() }).eq('id', orderId);
+      posAttempted = true;
+
       const res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown> }>(lw, {
         method: 'POST', path: '/pos/orders/create', body: built.payload, timeoutMs: 15000,
       });
 
-      const lwOrder = (res.data?.order ?? {}) as Record<string, unknown>;
-      const trimmedResponse = {
-        success: res.data?.success ?? res.ok,
-        order_ref: lwOrder.order_ref ?? null,
-        order_id: lwOrder.order_id ?? null,
-        order_number: lwOrder.order_number ?? null,
-        order_status_id: lwOrder.order_status_id ?? null,
-      };
+      const outcome = classifyCreateOrderResult({ status: res.status, data: res.data, error: res.error });
+      const attempt = Number(order.sync_attempt_count ?? 0) + 1;
+      const nowIso = new Date().toISOString();
+      const priorFailureAt = (order.first_pos_sync_failure_at as string | null) ?? null;
+      const trimmedResponse = { success: res.data?.success ?? res.ok, order_ref: outcome.orderRef };
+      const reqMeta = { order_items_count: mappedItems.length, branch_id: built.payload.branch_id };
 
-      if (res.ok) {
-        if (res.data?.success === true && lwOrder.order_ref) {
-          // Persist the POS ref IMMEDIATELY, before finalizing. If the worker
-          // dies between here and record_lazywait_sync, the reaper will find a
-          // 'syncing' row that already has a ref and recover it to 'synced'
-          // instead of re-POSTing (which would duplicate the ticket).
-          await admin.from('orders').update({
-            lazywait_ref: String(lwOrder.order_ref),
-            lazywait_order_id: lwOrder.order_id != null ? String(lwOrder.order_id) : null,
-            lazywait_order_number: lwOrder.order_number != null ? String(lwOrder.order_number) : null,
-            lazywait_status: lwOrder.order_status_id != null ? String(lwOrder.order_status_id) : null,
-          }).eq('id', orderId);
+      // ---- OK: a usable order_ref -> the ONLY path that says "confirmed" ----
+      if (outcome.kind === 'ok') {
+        const ref = outcome.orderRef as string;
+        const lwOrder = (res.data?.order ?? {}) as Record<string, unknown>;
+        // Persist the ref first (crash-safe: the reaper recovers a ref-bearing
+        // 'syncing' row to 'synced' rather than re-POSTing).
+        await admin.from('orders').update({
+          lazywait_ref: ref,
+          lazywait_order_id: lwOrder.order_id != null ? String(lwOrder.order_id) : null,
+          lazywait_order_number: lwOrder.order_number != null ? String(lwOrder.order_number) : null,
+          lazywait_status: lwOrder.order_status_id != null ? String(lwOrder.order_status_id) : null,
+        }).eq('id', orderId);
 
-          summary.synced++;
-          await admin.rpc('record_lazywait_sync', {
-            p_order_id: orderId,
-            p_patch: {
-              lazywait_sync_state: 'synced',
-              lazywait_ref: String(lwOrder.order_ref),
-              lazywait_order_id: lwOrder.order_id != null ? String(lwOrder.order_id) : null,
-              lazywait_order_number: lwOrder.order_number != null ? String(lwOrder.order_number) : null,
-              lazywait_status: lwOrder.order_status_id != null ? String(lwOrder.order_status_id) : null,
-              sync_last_error: null,
-              synced_at: new Date().toISOString(),
-            },
-            p_log_status: 'success',
-            p_request: { order_items_count: mappedItems.length, branch_id: built.payload.branch_id },
-            p_response: trimmedResponse,
-          });
-          continue;
-        }
-
-        // 2xx but NOT a clean {success:true, order_ref}: ambiguous. The POS may
-        // or may not have created the order, and Create Order has no idempotency
-        // key, so re-POSTing risks a DUPLICATE ticket. Do NOT retry — BLOCK for
-        // admin review (they confirm in Lazywait, then Retry or resolve manually).
-        summary.blocked++;
-        const ambiguousReason = res.data?.success === true ? 'created_without_ref' : 'unexpected_response';
+        summary.synced++;
         await admin.rpc('record_lazywait_sync', {
           p_order_id: orderId,
           p_patch: {
-            lazywait_sync_state: 'blocked',
-            sync_blocked_reason: ambiguousReason,
-            sync_attempt_count: Number(order.sync_attempt_count ?? 0) + 1,
-            sync_last_error: `lazywait 2xx without usable order_ref (${ambiguousReason})`,
+            lazywait_sync_state: 'synced',
+            lazywait_ref: ref,
+            lazywait_order_id: lwOrder.order_id != null ? String(lwOrder.order_id) : null,
+            lazywait_order_number: lwOrder.order_number != null ? String(lwOrder.order_number) : null,
+            lazywait_status: lwOrder.order_status_id != null ? String(lwOrder.order_status_id) : null,
+            sync_last_error: null,
+            synced_at: nowIso,
           },
-          p_log_status: 'failed',
-          p_request: { order_items_count: mappedItems.length, branch_id: built.payload.branch_id },
+          p_log_status: 'success',
+          p_request: reqMeta,
           p_response: trimmedResponse,
-          p_error: ambiguousReason,
+          // Only announce "confirmed" if the customer previously saw a failure.
+          p_notify_status: priorFailureAt ? 'pos_confirmed' : null,
         });
         continue;
       }
 
-      // ---- Failure classification (non-2xx only) ---------------------------
-      const cls = classifyLazywaitError(res.status, res.code);
-      const attempt = Number(order.sync_attempt_count ?? 0) + 1;
-      if (cls.kind === 'terminal') {
-        summary.blocked++;
-        await admin.rpc('record_lazywait_sync', {
-          p_order_id: orderId,
-          p_patch: { lazywait_sync_state: 'blocked', sync_blocked_reason: cls.reason,
-            sync_attempt_count: attempt, sync_last_error: safeErr(res.error) },
-          p_log_status: 'failed',
-          p_error: cls.reason,
-        });
-      } else {
-        const dead = attempt >= MAX_SYNC_ATTEMPTS;
-        if (dead) summary.dead_letter++; else summary.failed++;
-        const nextMs = res.retryAfterMs ?? computeBackoffMs(attempt);
+      // ---- SAFE RETRY: explicit not-processed (429). Bounded auto-retry -----
+      if (outcome.kind === 'safe_retry') {
+        const startedMs = order.pos_sync_started_at ? Date.parse(String(order.pos_sync_started_at)) : Date.now();
+        const deadlineMs = order.pos_sync_deadline_at ? Date.parse(String(order.pos_sync_deadline_at)) : null;
+        const dec = computePosNextAttempt(startedMs, attempt, deadlineMs);
+        if (dec.final) {
+          summary.dead_letter++;
+          await admin.rpc('record_lazywait_sync', {
+            p_order_id: orderId,
+            p_patch: {
+              lazywait_sync_state: 'dead_letter',
+              sync_attempt_count: attempt,
+              sync_next_attempt_at: null,
+              first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+              sync_last_error: safeErr(res.error) || outcome.reason,
+            },
+            p_log_status: 'failed', p_request: reqMeta, p_response: trimmedResponse,
+            p_error: outcome.reason, p_notify_status: 'pos_failed',
+          });
+        } else {
+          summary.retrying++;
+          await admin.rpc('record_lazywait_sync', {
+            p_order_id: orderId,
+            p_patch: {
+              lazywait_sync_state: 'failed',
+              sync_attempt_count: attempt,
+              sync_next_attempt_at: new Date(dec.nextAttemptAtMs as number).toISOString(),
+              first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+              sync_last_error: safeErr(res.error) || outcome.reason,
+            },
+            p_log_status: 'failed', p_request: reqMeta, p_response: trimmedResponse,
+            p_error: outcome.reason,
+            // First safe retryable failure -> "we're retrying" (deduped once).
+            p_notify_status: 'pos_retrying',
+          });
+        }
+        continue;
+      }
+
+      // ---- AMBIGUOUS: may have been created. Never resend -> verify ---------
+      if (outcome.kind === 'ambiguous') {
+        summary.confirmation_required++;
         await admin.rpc('record_lazywait_sync', {
           p_order_id: orderId,
           p_patch: {
-            lazywait_sync_state: dead ? 'dead_letter' : 'failed',
+            lazywait_sync_state: 'confirmation_required',
             sync_attempt_count: attempt,
-            sync_next_attempt_at: dead ? null : new Date(Date.now() + nextMs).toISOString(),
-            sync_last_error: safeErr(res.error),
+            sync_next_attempt_at: null,
+            first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+            pos_confirmation_reason: outcome.confirmationReason ?? 'ambiguous_response',
+            sync_last_error: `ambiguous_create_order (${outcome.reason})`,
           },
-          p_log_status: 'failed',
-          p_error: `${cls.reason}: ${safeErr(res.error)}`,
+          p_log_status: 'failed', p_request: reqMeta, p_response: trimmedResponse,
+          p_error: outcome.reason, p_notify_status: 'pos_confirmation_required',
         });
+        continue;
       }
-    } catch (e) {
-      // Unexpected error — treat as retryable so the order isn't lost.
-      summary.failed++;
-      const attempt = Number(order.sync_attempt_count ?? 0) + 1;
+
+      // ---- TERMINAL: definitively rejected (auth/license/payload) -----------
+      summary.blocked++;
       await admin.rpc('record_lazywait_sync', {
         p_order_id: orderId,
         p_patch: {
-          lazywait_sync_state: attempt >= MAX_SYNC_ATTEMPTS ? 'dead_letter' : 'failed',
+          lazywait_sync_state: 'blocked',
+          sync_blocked_reason: outcome.reason,
           sync_attempt_count: attempt,
-          sync_next_attempt_at: attempt >= MAX_SYNC_ATTEMPTS ? null : new Date(Date.now() + computeBackoffMs(attempt)).toISOString(),
-          sync_last_error: safeErr(e instanceof Error ? e.message : String(e)),
+          first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+          sync_last_error: safeErr(res.error) || outcome.reason,
         },
-        p_log_status: 'failed',
-        p_error: 'worker_exception',
-      }).then(() => {}, () => {});
+        p_log_status: 'failed', p_error: outcome.reason, p_notify_status: 'pos_failed',
+      });
+    } catch (e) {
+      // Unexpected error. If the request may already have left (marker set),
+      // this is AMBIGUOUS -> confirmation_required (never blind-resend).
+      // Otherwise it is proven-not-sent -> safe retry within the same budget.
+      const attempt = Number(order.sync_attempt_count ?? 0) + 1;
+      const nowIso = new Date().toISOString();
+      const priorFailureAt = (order.first_pos_sync_failure_at as string | null) ?? null;
+      if (posAttempted) {
+        summary.confirmation_required++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: 'confirmation_required',
+            sync_attempt_count: attempt,
+            sync_next_attempt_at: null,
+            first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+            pos_confirmation_reason: 'connection',
+            sync_last_error: safeErr(e instanceof Error ? e.message : String(e)),
+          },
+          p_log_status: 'failed', p_error: 'worker_exception_after_send',
+          p_notify_status: 'pos_confirmation_required',
+        }).then(() => {}, () => {});
+      } else {
+        const startedMs = order.pos_sync_started_at ? Date.parse(String(order.pos_sync_started_at)) : Date.now();
+        const deadlineMs = order.pos_sync_deadline_at ? Date.parse(String(order.pos_sync_deadline_at)) : null;
+        const dec = computePosNextAttempt(startedMs, attempt, deadlineMs);
+        if (dec.final) summary.dead_letter++; else summary.retrying++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: dec.final ? 'dead_letter' : 'failed',
+            sync_attempt_count: attempt,
+            sync_next_attempt_at: dec.final ? null : new Date(dec.nextAttemptAtMs as number).toISOString(),
+            first_pos_sync_failure_at: priorFailureAt ?? nowIso,
+            sync_last_error: safeErr(e instanceof Error ? e.message : String(e)),
+          },
+          p_log_status: 'failed', p_error: 'worker_exception_before_send',
+          p_notify_status: dec.final ? 'pos_failed' : 'pos_retrying',
+        }).then(() => {}, () => {});
+      }
     }
   }
 

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Eye, AlertTriangle } from 'lucide-react';
+import { Eye, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
 import { getVATBreakdown, formatSAR } from '../../utils/calculations';
 import { ADMIN_LOCALES } from './adminLocales';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { orderDisplayNumber } from '../../lib/mappers';
-import { paymentGateway, DbPaymentRecord } from '../../lib/api';
+import { paymentGateway, DbPaymentRecord, orders as ordersApi, PosConfirmationRequired } from '../../lib/api';
 
 // Statuses an order should not reach while an ONLINE payment is still unverified.
 // "Received" is always allowed and "Cancelled" needs no payment. Cash orders are
@@ -113,6 +113,91 @@ const TapPaymentDetails: React.FC<{ order: Order; isAccountant: boolean; isRTL: 
   );
 };
 
+/**
+ * Read-only "Orders Requiring Verification" card. Lists ambiguous POS outcomes
+ * (state 'confirmation_required') oldest-first with a count badge and safe
+ * fields only. NO resend / resolve / refund / cancel actions — a "View" link
+ * opens the existing read-only receipt modal. Data comes from the is_admin()-
+ * gated list_pos_confirmation_required RPC; it self-hides when the queue is
+ * empty. Refreshes on mount and every 60s (no aggressive polling).
+ */
+const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }> = ({ onView }) => {
+  const { adminLang } = useApp();
+  const t = ADMIN_LOCALES[adminLang];
+  const [data, setData] = useState<PosConfirmationRequired | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try { const d = await ordersApi.posConfirmationRequired(10); if (alive) setData(d); }
+      catch { if (alive) setData(null); }
+      finally { if (alive) setLoading(false); }
+    };
+    void load();
+    const id = setInterval(() => void load(), 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+
+  const reasonText = (r: string): string => {
+    switch (r) {
+      case 'timeout': return t.verify_reason_timeout;
+      case 'connection': return t.verify_reason_connection;
+      case 'missing_ref': return t.verify_reason_missing_ref;
+      case 'provider_5xx': return t.verify_reason_provider_5xx;
+      default: return t.verify_reason_ambiguous_response;
+    }
+  };
+  const whenText = (iso: string | null): string =>
+    iso ? new Date(iso).toLocaleString(adminLang === 'ar' ? 'ar' : 'en', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+
+  const total = data?.total ?? 0;
+  // Hide entirely once nothing needs verification (no empty clutter on the busy
+  // live-orders view).
+  if (!loading && total === 0) return null;
+
+  return (
+    <div className="glass-card rounded-2xl p-4 border border-amber-200/60 bg-amber-50/40">
+      <div className="flex items-center gap-2 mb-1">
+        <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+        <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest">{t.verify_title}</h3>
+        {total > 0 && (
+          <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black">{total}</span>
+        )}
+      </div>
+      <p className="text-[10px] text-amber-700/80 font-semibold mb-3">{t.verify_sub}</p>
+      {loading ? (
+        <div className="text-[11px] text-amber-700 font-bold animate-pulse">…</div>
+      ) : data && data.items.length > 0 ? (
+        <div className="space-y-1.5">
+          {data.items.map(it => (
+            <div key={it.id} className="flex items-center justify-between gap-2 bg-white/70 border border-amber-100 rounded-xl px-3 py-2">
+              <div className="min-w-0">
+                <div className="font-black text-primary text-xs truncate">{it.order_number}</div>
+                <div className="text-[9.5px] text-gray-500 font-semibold truncate">
+                  {reasonText(it.reason)} · {t.verify_since} {whenText(it.first_pos_sync_failure_at ?? it.created_at)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="font-bold text-secondary text-[11px]">{formatSAR(it.total, adminLang)}</span>
+                <button
+                  onClick={() => onView(it.id)}
+                  className="bg-primary/5 hover:bg-primary hover:text-white border border-primary/10 text-primary py-1 px-2.5 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
+                >
+                  <Eye className="w-3 h-3" />
+                  <span>{t.view_details}</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[11px] text-amber-700 font-bold">{t.verify_empty}</div>
+      )}
+    </div>
+  );
+};
+
 export const LiveOrdersPanel: React.FC = () => {
   const { orders, branches, updateOrderStatus, brandSettings, currentUser, adminLang } = useApp();
   const t = ADMIN_LOCALES[adminLang];
@@ -157,6 +242,13 @@ export const LiveOrdersPanel: React.FC = () => {
   const phoneLabel = (phone: string | undefined): string =>
     (phone && phone.trim()) ? phone : (isRTL ? 'لا يوجد رقم جوال' : 'No phone provided');
 
+  // "View" from the verification card opens the same read-only receipt modal by
+  // resolving the full order from the in-memory (realtime) list.
+  const viewById = (id: string) => {
+    const match = orders.find(o => o.id === id);
+    if (match) setActiveReceiptOrder(match);
+  };
+
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
     if (isAccountant) return; // accountant is view-only (also enforced by RLS server-side)
     const target = orders.find(o => o.id === orderId) ?? activeReceiptOrder ?? undefined;
@@ -193,7 +285,10 @@ export const LiveOrdersPanel: React.FC = () => {
   return (
     <>
             <div className="space-y-4 animate-fade-in">
-              
+
+              {/* Orders Requiring Verification — read-only ambiguous-POS feed */}
+              <OrdersRequiringVerificationCard onView={viewById} />
+
               {/* Filter controls bar */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">{t.live_alerts}</h3>

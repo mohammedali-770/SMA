@@ -85,6 +85,47 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
   },
 };
 
+// POS confirmation-lifecycle copy (EN/AR). Body strings are the EXACT approved
+// customer messages. Data-free like STATUS_COPY. These correspond to the four
+// deduplicated pos_sync transitions the sync worker/reaper enqueue.
+type PosSyncStatus = 'pos_retrying' | 'pos_confirmed' | 'pos_confirmation_required' | 'pos_failed';
+const POS_SYNC_COPY: Record<PosSyncStatus, { en: { title: string; body: string }; ar: { title: string; body: string } }> = {
+  pos_confirmed: {
+    en: { title: 'Order confirmed ✅', body: 'Your order has been confirmed by the restaurant' },
+    ar: { title: 'تم تأكيد الطلب ✅', body: 'تم تأكيد وصول طلبك إلى المطعم' },
+  },
+  pos_retrying: {
+    en: {
+      title: 'Confirming your order…',
+      body: 'We received your order, but could not yet confirm that it reached the restaurant. We are retrying automatically. Please do not place another order.',
+    },
+    ar: {
+      title: 'جارٍ تأكيد طلبك…',
+      body: 'استلمنا طلبك، لكن لم نتمكن من تأكيد وصوله إلى المطعم حتى الآن.\nنعيد المحاولة تلقائيًا. فضلاً لا تنشئ طلبًا جديدًا.',
+    },
+  },
+  pos_confirmation_required: {
+    en: {
+      title: 'Verifying your order',
+      body: 'We could not verify whether your order reached the restaurant. Our team is reviewing it. Please do not place another order.',
+    },
+    ar: {
+      title: 'جارٍ التحقق من طلبك',
+      body: 'تعذر علينا التحقق من وصول طلبك إلى المطعم.\nفريقنا يراجع الطلب. فضلاً لا تنشئ طلبًا جديدًا.',
+    },
+  },
+  pos_failed: {
+    en: {
+      title: 'Order not confirmed',
+      body: 'We could not send your order to the restaurant, and the order was not confirmed. Our team will follow up.',
+    },
+    ar: {
+      title: 'لم يتم تأكيد الطلب',
+      body: 'تعذر إرسال طلبك إلى المطعم، ولم يتم تأكيد الطلب.\nفريقنا سيتابع الحالة.',
+    },
+  },
+};
+
 interface DeviceRow {
   id: string;
   expo_push_token: string;
@@ -357,6 +398,78 @@ Deno.serve(async (req: Request) => {
     }, { type: 'promo' });
     await admin.from('notification_log').insert({ kind: 'broadcast', ...result });
     return json({ status: 'ok', ...result }, 200);
+  }
+
+  // ---------------------------------------------------------------- pos_sync
+  // Customer-facing POS confirmation-lifecycle push. The sync worker/reaper have
+  // already enqueued a deduplicated notification_log row (kind='pos_sync',
+  // unique(order_id,status)); this action renders + sends it. Caller: service
+  // role (internal) or an authenticated admin. Idempotent: a row already 'sent'
+  // (or 'no_targets') is a no-op, so a status is delivered to a device at most
+  // once. (Push stays master-flag disabled, so this path is dormant in prod.)
+  if (body.action === 'pos_sync') {
+    const fromService = isServiceRoleCall(req);
+    const adminId = fromService ? null : await callingAdminId(req, admin);
+    if (!fromService && !adminId) return json({ error: 'forbidden' }, 403);
+
+    const status = String(body.status ?? '') as PosSyncStatus;
+    if (!(status in POS_SYNC_COPY)) return json({ error: 'unknown status' }, 400);
+    const orderId = String(body.orderId ?? '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+      return json({ error: 'invalid orderId' }, 400);
+    }
+
+    const { data: order } = await admin.from('orders')
+      .select('id, customer_id').eq('id', orderId).maybeSingle();
+    if (!order) return json({ error: 'order not found' }, 404);
+
+    // Claim: the worker's dedup insert may already exist. Insert-first; on
+    // conflict, a terminal row is an idempotent no-op, otherwise reclaim the
+    // (dedup/failed) row to 'processing' and send.
+    const { error: claimError } = await admin.from('notification_log')
+      .insert({ kind: 'pos_sync', order_id: orderId, status, send_status: 'processing' });
+    if (claimError) {
+      const { data: existing } = await admin.from('notification_log')
+        .select('id, send_status')
+        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
+        .maybeSingle();
+      if (!existing) return json({ status: 'retry', reason: 'claim race, call again' }, 200);
+      if (existing.send_status === 'sent' || existing.send_status === 'no_targets') {
+        return json({ status: 'duplicate', reason: `already ${existing.send_status}` }, 200);
+      }
+      const { data: reclaimed } = await admin.from('notification_log')
+        .update({ send_status: 'processing' })
+        .eq('id', existing.id).neq('send_status', 'sent').neq('send_status', 'no_targets')
+        .select('id').maybeSingle();
+      if (!reclaimed) return json({ status: 'duplicate', reason: 'already delivered' }, 200);
+    }
+
+    const { data: devices, error: devicesError } = await admin.from('push_devices')
+      .select('id, expo_push_token, lang')
+      .eq('customer_id', order.customer_id)
+      .eq('is_active', true)
+      .eq('order_updates_enabled', true);
+    if (devicesError) {
+      await admin.from('notification_log')
+        .update({ send_status: 'failed', last_error_safe: 'device lookup failed (transient)' })
+        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
+      return json({ status: 'error', send_status: 'failed', reason: 'device lookup failed (transient)' }, 500);
+    }
+
+    const targets = (devices ?? []) as DeviceRow[];
+    if (targets.length === 0) {
+      await admin.from('notification_log')
+        .update({ send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 })
+        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
+      return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
+    }
+
+    const result = await sendToDevices(admin, targets, POS_SYNC_COPY[status], { type: 'order', orderId });
+    const sendStatus = result.sent > 0 ? 'sent' : 'failed';
+    await admin.from('notification_log')
+      .update({ send_status: sendStatus, ...result })
+      .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
+    return json({ status: 'ok', send_status: sendStatus, ...result }, 200);
   }
 
   return json({ error: 'unknown action' }, 400);
