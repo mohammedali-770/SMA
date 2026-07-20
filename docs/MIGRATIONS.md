@@ -10,10 +10,10 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **38**
-- Live `schema_migrations` rows: **39**
-- Latest live version: **`20260714130000`**
-  (`trigger_function_execute_hardening`)
+- Repository migration files: **44**
+- Live `schema_migrations` rows: **45**
+- Latest live version: **`20260720075244`**
+  (`lazywait_sync_scheduler`; repository version `20260720120000`)
 - The current production schema is **functionally aligned with the repository
   through `20260714130000`** — every repository migration, including the
   trigger-function grant hardening, is applied and verified — based on
@@ -27,6 +27,18 @@
 - **Historical version identifiers and several migration boundaries differ**
   between the repository and production. This is a *history* divergence, not a
   *schema* divergence. The full mapping is in §5.
+- **Post–Stage-4 applications.** Since the 2026-07-14 audit (§3, §10) six
+  further migrations were applied to production, taking the live count from 39
+  to 45 and the repository count from 38 to 44:
+  - **Lazywait POS sync scheduler** — repository `20260720120000` → live
+    `20260720075244`; owner-approved and applied via `apply_migration` on
+    **2026-07-20**, verified (§13). It is fully itemized in §5 (row 39) and §13.
+  - **Five account-deletion migrations** — live versions `20260715120000`,
+    `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`
+    (repository files of the same names). These are applied and live but are
+    **not yet itemized/classified in §4/§5** — a known documentation gap to be
+    reconciled in a **separate** documentation PR (they are intentionally not
+    detailed here so this PR stays scoped to the Lazywait scheduler activation).
 
 ## 2. Non-negotiable safety rules
 
@@ -91,7 +103,7 @@ fields byte-identical before/after, fingerprint-verified).
 | primary classification | count |
 |---|---|
 | A. `EXACT_MATCH` (version + name + content) | **3** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **30** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **31** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
 | E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
@@ -103,6 +115,14 @@ live-only row whose content was later consolidated into a repository file is
 both "live-only" and "superseded-by-consolidation"); **each ledger entry below
 carries exactly one primary classification**, with overlaps explained in its
 notes.
+
+> **Scope of these counts.** The table above itemizes the **39 repository /
+> 40 live** rows detailed in §5 (through the Lazywait sync scheduler, row 39).
+> The five account-deletion migrations now live in production (§1) are **not
+> yet itemized** here; adding them brings the true production totals to
+> **44 repository / 45 live** (see §1 and §13). The Lazywait sync scheduler is
+> class **B** (`SAME_CONTENT_DIFFERENT_VERSION`): repository `20260720120000`
+> vs. the apply-time live version `20260720075244`, same reviewed content.
 
 Fingerprints: `skel` = MD5 (first 12 hex) of the SQL after removing `--`
 comments, all whitespace and semicolons, lowercased — computed with identical
@@ -160,9 +180,13 @@ production.
 | 36 | 20260714070000 | support_contact | `f02603422918` | 20260714070000 | support_contact | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned to the repository filename by an approved single-row history write |
 | 37 | 20260714090000 | push_notifications | `d686d8f6e428` | 20260714090000 | push_notifications | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned as above |
 | 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; the pre-existing explicit `service_role=X` ACL entry remained — it originates from Supabase's platform **default function privileges** applied at creation (CONFIRMED in `pg_default_acl`: postgres-owned functions default-grant EXECUTE to anon/authenticated/service_role), NOT from any live-only grant, so it is not production drift and reproduces identically in any environment built from these repository migrations; function bodies and trigger definitions unchanged |
+| 39 | 20260720120000 | lazywait_sync_scheduler | `26b85de4256e` | 20260720075244 | lazywait_sync_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Lazywait POS sync pg_cron driver + durable run ledger.** Owner-approved; applied **2026-07-20** via MCP `apply_migration` (exact merged content from PR #67, squash `c6579e6…`); generated apply-time live version `20260720075244` — **not** version-aligned (repository filename version `20260720120000` differs; no §9-D write performed). Verified live objects: `public.lazywait_sync_requests`, `public.lazywait_sync_cron_health`, `public.invoke_lazywait_sync_processor()`, cron job `lazywait-sync` (jobid 2, `* * * * *`, active). No payment/order-intake/worker/payload/delivery/POS change. Full detail in §13 |
 
-Reconciliation check: 38 repository rows (3×A + 30×B + 3×C + 2×H) and
-39 live rows (3×A + 30×B + 3×C + 3×F) — totals match §4 exactly.
+Reconciliation check: the rows above detail **39 repository** rows
+(3×A + 31×B + 3×C + 2×H) and **40 live** rows (3×A + 31×B + 3×C + 3×F).
+Adding the five applied-but-not-yet-itemized account-deletion migrations
+(§1, §4 note) yields the true production totals of **44 repository / 45 live**
+recorded in §1.
 
 ## 6. Why `db push` is unsafe
 
@@ -303,7 +327,72 @@ any safer — the permanent production prohibition stands. Risks:
   **`efb92aaf68c0e3331de7cda51903539a85835df6`**; current documented live
   migration count: **39**; current documented latest version:
   **`20260714130000`**.
-- This ledger records the state as of the Stage-4 update. It **must be
+- **Ledger update (2026-07-20):** the Lazywait POS sync scheduler
+  (repository `20260720120000` → live `20260720075244`) was owner-approved,
+  applied via MCP `apply_migration`, and verified — see §13. Current documented
+  live migration count: **45**; current documented latest live version:
+  **`20260720075244`**. Repository base (default branch) for the live
+  operation: **`c6579e6414106abb6940ea4a19e789fec9754c04`**. The five
+  account-deletion migrations applied after Stage 4 remain to be itemized in
+  §4/§5 (documentation gap; see §1).
+- This ledger records the state as of the **2026-07-20** update. It **must be
   updated after every approved live migration application** (new row,
   classification A expected, fingerprints recorded), and re-validated if any
   tooling other than the §9 workflow ever touches `schema_migrations`.
+
+## 13. Completed migration: Lazywait POS sync scheduler (2026-07-20)
+
+`supabase/migrations/20260720120000_lazywait_sync_scheduler.sql`
+
+- **Status: merged (PR #67, squash `c6579e6414106abb6940ea4a19e789fec9754c04`),
+  owner-approved, applied to production, verified — COMPLETE.**
+- **Application date:** 2026-07-20.
+- **Application method:** MCP `apply_migration` (exact merged file content) —
+  **not** `db push`, **not** `migration repair`.
+- **Repository version:** `20260720120000`. **Generated live version:**
+  `20260720075244` (apply-time stamp). **Not** version-aligned — no §9-D
+  history write was performed, so the repository and live versions
+  intentionally differ (classification **B**, `SAME_CONTENT_DIFFERENT_VERSION`).
+- **Owner approval:** explicit owner approval for this activation was given in
+  the working conversation (create the Vault URL entry + apply the migration),
+  per §2 rule 8. Merge approval (PR #67) and apply approval were separate.
+- **Live migration count after completion:** **45** (see §1).
+- **Verified objects (post-apply, read-only):**
+  - `public.lazywait_sync_requests` — durable per-tick run ledger; RLS enabled;
+    all client grants revoked; service-role-only; no secret/customer/order-data
+    columns.
+  - `public.lazywait_sync_cron_health` — durable health view; service-role-only;
+    exposes no secret/headers/response body/customer data.
+  - `public.invoke_lazywait_sync_processor()` — `SECURITY DEFINER`, pinned
+    `search_path`, service-role-only `EXECUTE` (no PUBLIC/anon/authenticated).
+  - cron job **`lazywait-sync`** — jobid 2, schedule `* * * * *`, active; the
+    stored command is only `select public.invoke_lazywait_sync_processor();`
+    (no secret, token, Authorization header, or project URL). Exactly one such
+    scheduler exists; the pre-existing `account-deletion-processor` cron
+    (jobid 1) is unchanged.
+- **Live health verification:** across **five-plus consecutive one-minute
+  ticks** the driver reconciled to `success_2xx` / **HTTP 200** (Edge Function
+  `lazywait-sync` `POST | 200`), with **no** `auth_failed` / `preflight_failed`
+  / `driver_error` / `rate_limited` / `server_error_5xx` / `timeout` /
+  `transport_error` / unexpected `expired_unknown`, and **no** duplicate cron
+  executions.
+- **Vault:** contains only the **non-secret** project URL
+  `lazywait_sync_project_url` (created exactly once; value
+  `https://wxfmmnihidsdyemasstf.supabase.co`). The Lazywait
+  `sync_trigger_secret` is **not** stored in Vault — it remains sourced live
+  from `integration_settings.secret_config` and is passed byte-for-byte.
+- **Backlog / data safety:** the eligible sync backlog was **0 before and
+  after**; **no** new/duplicate Lazywait/POS ticket was created; **no** real
+  test order or payment was created.
+- **Scope (unchanged):** no change to payment verification, order intake, the
+  `lazywait-sync` worker, the Lazywait Create Order payload mapping, delivery
+  behaviour, or POS logic; no Edge Function deployed or edited; no unrelated
+  cron modified; no audit/business log deleted.
+- **Config invariants (verified in the applied function):** every-minute
+  schedule; bounded `{"limit":5}` batch; 140 000 ms pg_net timeout; 15-minute
+  `expired_unknown` threshold; 14-day ledger retention on every path; trigger
+  secret from `integration_settings`; project URL from Vault; no second
+  scheduler.
+- **Follow-up (documentation debt):** the five account-deletion migrations
+  applied after Stage 4 (§1) are not yet itemized in §4/§5 and should be
+  reconciled in a separate documentation PR.
