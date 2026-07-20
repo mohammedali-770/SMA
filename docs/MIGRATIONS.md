@@ -342,9 +342,21 @@ unsafe regardless. Risks:
   account-deletion migrations applied after Stage 4 remain to be itemized in
   §4/§5 (documentation gap; see §1).
 - This ledger records the state as of the **2026-07-20** update. It **must be
-  updated after every approved live migration application** (new row,
-  classification A expected, fingerprints recorded), and re-validated if any
-  tooling other than the §9 workflow ever touches `schema_migrations`.
+  updated after every approved live migration application** (new §5 row +
+  fingerprints recorded), and re-validated if any tooling other than the §9
+  workflow ever touches `schema_migrations`.
+- **Expected classification of a newly applied migration.** **Class B**
+  (`SAME_CONTENT_DIFFERENT_VERSION`) is the normal, expected result immediately
+  after `apply_migration`, because the tool stamps a **generated apply-time
+  version** that differs from the repository filename version — this is exactly
+  what happened for the Lazywait scheduler (repo `20260720120000` → live
+  `20260720075244`, §5 row 39 / §13). **Class A** (`EXACT_MATCH`) applies **only**
+  when the live version already exactly equals the repository version, or after a
+  **separate, explicitly owner-approved §9-D version-alignment** write changes the
+  live version to match. Applying a migration **never** requires, implies, or
+  pressures maintainers to perform a version-alignment write; version alignment
+  is optional, separate, and needs its own explicit owner approval. **No
+  version-alignment action is authorized by this documentation PR.**
 
 ## 13. Completed migration: Lazywait POS sync scheduler (2026-07-20)
 
