@@ -55,7 +55,11 @@
 --   * Reconciliation is idempotent: it only touches rows still in
 --     ('starting','pending'), so terminal rows can never regress and overlapping
 --     ticks cannot corrupt state. One request id maps to one run row (unique
---     partial index). Ledger rows older than 14 days are pruned by started_at;
+--     partial index). Retention runs at the START of every tick (before any
+--     preflight validation / early return, in the outer block) so ledger rows
+--     older than 14 days are pruned by started_at on EVERY path —
+--     preflight_failed, driver_error, pending and success alike — never leaving
+--     the ledger to grow during prolonged configuration failures.
 --     integration_sync_logs, orders, payment/business/audit records are NEVER
 --     touched.
 --   * success = TRUE only for observed HTTP 2xx; FALSE for observed failures and
@@ -141,6 +145,17 @@ begin
   insert into public.lazywait_sync_requests (outcome, started_at)
   values ('starting', now())
   returning id into v_run_id;
+
+  -- Retention runs FIRST, in the OUTER block, so it executes on EVERY path
+  -- (preflight_failed / driver_error / pending / success) — even prolonged
+  -- configuration failures — and is never rolled back by the inner handler's
+  -- savepoint. Idempotent + concurrency-safe: a plain indexed DELETE of rows
+  -- older than 14 days by started_at. The just-inserted run row (started_at =
+  -- now()) and anything newer are excluded, so the current run and recent rows
+  -- are never deleted. Never touches integration_sync_logs, orders, payment
+  -- records, or any business/audit record.
+  delete from public.lazywait_sync_requests
+   where started_at < now() - interval '14 days';
 
   begin
     -- FIX 1: reconcile prior non-terminal rows into a DURABLE snapshot. Best
@@ -232,11 +247,6 @@ begin
     update public.lazywait_sync_requests
        set request_id = v_request_id, queued_at = now(), outcome = 'pending'
      where id = v_run_id;
-
-    -- Retention: 14 days by started_at. Never touches integration_sync_logs,
-    -- orders, payment records, or any business/audit record.
-    delete from public.lazywait_sync_requests
-     where started_at < now() - interval '14 days';
 
     return v_request_id;
 

@@ -199,25 +199,44 @@ begin
   if v_affected <> 0 then raise exception 'CASE 13 FAILED: finalized row was writable by reconcile guard'; end if;
   if (select outcome from public.lazywait_sync_cron_health where request_id=91429) <> 'rate_limited' then raise exception 'CASE 13 FAILED: 429 changed'; end if;
 
-  -- CASE 14: retention prunes only rows older than 14 days; business rows untouched.
+  -- CASE 14a: retention prunes >14d rows on a SUCCESSFUL tick; recent + business rows remain.
+  update public.integration_settings set secret_config='{"sync_trigger_secret":"valid-secret"}'::jsonb where provider_type='lazywait';
   insert into public.lazywait_sync_requests(request_id, started_at, outcome) values
     (70001, now() - interval '20 days', 'success_2xx'),
     (70002, now() - interval '2 days',  'success_2xx');
-  perform public.invoke_lazywait_sync_processor();   -- prunes on tick
-  if exists (select 1 from public.lazywait_sync_requests where request_id=70001) then raise exception 'CASE 14 FAILED: stale (>14d) row not pruned'; end if;
-  if not exists (select 1 from public.lazywait_sync_requests where request_id=70002) then raise exception 'CASE 14 FAILED: recent (<14d) row pruned'; end if;
-  if not exists (select 1 from public.integration_settings where provider_type='lazywait') then raise exception 'CASE 14 FAILED: business row (integration_settings) touched'; end if;
+  perform public.invoke_lazywait_sync_processor();   -- success tick; prune runs first
+  if exists (select 1 from public.lazywait_sync_requests where request_id=70001) then raise exception 'CASE 14a FAILED: stale (>14d) row not pruned on success'; end if;
+  if not exists (select 1 from public.lazywait_sync_requests where request_id=70002) then raise exception 'CASE 14a FAILED: recent (<14d) row pruned'; end if;
+  if not exists (select 1 from public.integration_settings where provider_type='lazywait') then raise exception 'CASE 14a FAILED: business row (integration_settings) touched'; end if;
+
+  -- CASE 14b: retention runs even when the SAME tick ends in preflight_failed.
+  insert into public.lazywait_sync_requests(request_id, started_at, outcome) values (70003, now() - interval '20 days', 'success_2xx');
+  update public.integration_settings set secret_config='{}'::jsonb where provider_type='lazywait';   -- force preflight_failed
+  perform public.invoke_lazywait_sync_processor();
+  if (select outcome from public.lazywait_sync_requests order by id desc limit 1) <> 'preflight_failed' then raise exception 'CASE 14b FAILED: tick was not preflight_failed'; end if;
+  if exists (select 1 from public.lazywait_sync_requests where request_id=70003) then raise exception 'CASE 14b FAILED: stale row not pruned on preflight_failed'; end if;
+  if not exists (select 1 from public.lazywait_sync_requests where request_id=70002) then raise exception 'CASE 14b FAILED: recent row pruned'; end if;
+
+  -- CASE 14 (idempotent/overlapping): repeated cleanup is safe and keeps recent rows.
+  update public.integration_settings set secret_config='{"sync_trigger_secret":"valid-secret"}'::jsonb where provider_type='lazywait';
+  perform public.invoke_lazywait_sync_processor();
+  perform public.invoke_lazywait_sync_processor();
+  if not exists (select 1 from public.lazywait_sync_requests where request_id=70002) then raise exception 'CASE 14 FAILED: repeated cleanup removed a recent row'; end if;
 
   -- CASE 5: an unexpected internal failure is caught and persisted as driver_error
   -- (no raw SQLERRM). Swap net.http_post to raise; valid config so preflight passes.
   create or replace function net.http_post(url text, headers jsonb default '{}'::jsonb, body jsonb default '{}'::jsonb, timeout_milliseconds int default 5000)
   returns bigint language plpgsql as $f$ begin raise exception 'simulated pg_net failure with secret-ish text'; end $f$;
+  -- CASE 14c: a stale row must still be pruned when this tick ends in driver_error
+  -- (the prune is in the outer block, so the inner handler's rollback can't undo it).
+  insert into public.lazywait_sync_requests(request_id, started_at, outcome) values (70005, now() - interval '20 days', 'success_2xx');
   update public.integration_settings set secret_config='{"sync_trigger_secret":"valid-secret"}'::jsonb where provider_type='lazywait';
   perform public.invoke_lazywait_sync_processor();
   select outcome, error_code, safe_error_message into v_outcome, v_ec, v_command from public.lazywait_sync_requests order by id desc limit 1;
   if v_outcome <> 'driver_error' then raise exception 'CASE 5 FAILED: outcome=%', v_outcome; end if;
   if v_ec is null then raise exception 'CASE 5 FAILED: no SQLSTATE error_code'; end if;
   if coalesce(v_command,'') ~* 'secret' then raise exception 'CASE 5 FAILED: raw error leaked (secret-ish) -> %', v_command; end if;
+  if exists (select 1 from public.lazywait_sync_requests where request_id=70005) then raise exception 'CASE 14c FAILED: stale row not pruned on driver_error'; end if;
 
   raise notice 'ALL LAZYWAIT SYNC SCHEDULER CASES PASSED';
 end $$;
