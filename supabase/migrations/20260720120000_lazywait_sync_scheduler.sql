@@ -1,61 +1,70 @@
 -- ============================================================================
--- Lazywait POS sync scheduler (pg_cron driver)
+-- Lazywait POS sync scheduler (pg_cron driver) + durable run ledger
 --
 -- Adds the MISSING recurring driver for the lazywait-sync worker. Until now the
 -- worker was invoked only opportunistically: synchronously by order-intake at
 -- checkout, and once by paymentSync after a verified online payment flips an
 -- order to 'pending'. There was NO time-based driver, so retry/backoff,
 -- dead-letter promotion and the stale-'syncing' reaper only advanced when the
--- NEXT order happened to trigger a run (or an admin pressed Retry). During a
--- quiet period — or for the last order of a session — a 'failed' or stale
--- 'syncing' row could sit un-advanced indefinitely. This job closes that gap.
+-- NEXT order happened to trigger a run (or an admin pressed Retry). This job
+-- closes that gap and records durable, safe operational observability.
 --
 -- SCOPE — pure infrastructure. This migration does NOT change payment
 -- verification, order intake, the Lazywait Create Order payload mapping,
 -- delivery behaviour, or any POS logic. The worker
--- (supabase/functions/lazywait-sync) and every RPC it uses
--- (claim_lazywait_sync_batch, record_lazywait_sync, reap_stale_lazywait_syncs)
--- are UNCHANGED. This migration only invokes the existing worker on a fixed
--- cadence. All safety properties stay where they already live, in the worker:
---   * idempotency / no duplicate send  — shouldResendCreateOrder never re-POSTs
---     an order that already carries a lazywait_ref.
---   * duplicate concurrent processing  — claim_lazywait_sync_batch claims with
---     FOR UPDATE SKIP LOCKED and flips rows to 'syncing'.
---   * retry / backoff / dead-letter    — record_lazywait_sync + computeBackoffMs.
---   * stale-claim recovery             — reap_stale_lazywait_syncs (10-min lease).
+-- (supabase/functions/lazywait-sync) and every RPC it uses are UNCHANGED. All
+-- safety properties (idempotent no-resend, FOR UPDATE SKIP LOCKED claim,
+-- retry/backoff/dead-letter, stale-claim reaper) stay in the worker.
 --
--- SECRET HANDLING — single source of truth. A SECURITY DEFINER function reads
--- the worker's shared trigger secret LIVE from the authoritative
--- integration_settings row (provider_type = 'lazywait') at execution time and
--- passes it VERBATIM in the x-sync-secret request header. The stored value is
--- used EXACTLY as stored — btrim() is used ONLY to decide whether it is
--- blank/unconfigured, never to transform what is sent — because the worker
--- compares the header against secret_config.sync_trigger_secret byte-for-byte.
--- Rotating it in the Admin UI takes effect on the next tick with NO migration,
--- NO Vault change and NO redeploy. The secret is NEVER copied into Vault, stored
--- in cron.job, placed in an Edge Function env var, exposed by the request ledger
--- or the health view, or logged. lazywait-sync is verify_jwt=false and gated
--- solely by that header, so the caller needs no JWT and no service-role key;
--- cron.job stores only the bare function call.
+-- SECRET HANDLING — single source of truth, sent VERBATIM. A SECURITY DEFINER
+-- function reads sync_trigger_secret LIVE from the authoritative
+-- integration_settings row (provider_type='lazywait') and passes it byte-for-
+-- byte in the x-sync-secret header. btrim() is used ONLY to reject a
+-- null/empty/blank value, never to transform what is sent (the worker compares
+-- it exactly). Rotating it in the Admin UI takes effect on the next tick with NO
+-- migration, NO Vault change and NO redeploy. Only the NON-secret project URL
+-- lives in Vault (lazywait_sync_project_url). The secret is NEVER copied into
+-- Vault, cron.job, Edge env, the ledger, the health view, or logs.
 --
--- OBSERVABILITY — the request ledger (lazywait_sync_requests) records the pg_net
--- request id of each queued tick; the health view (lazywait_sync_cron_health)
--- joins that ledger to the real pg_net response so operators can see the ACTUAL
--- HTTP outcome per tick — pending, HTTP 2xx success, 401/403 auth failure, 429,
--- 5xx, timeout, or transport error — NOT merely that the cron command queued a
--- request. Both are service-role-only and expose no secret, headers, response
--- body, or customer/order data. The ledger is bounded by a 14-day retention
--- prune (business audit / integration_sync_logs are never touched).
+-- DURABLE OBSERVABILITY (lazywait_sync_requests + lazywait_sync_cron_health) —
+--   * Every tick inserts a run row (outcome 'starting') BEFORE any validation,
+--     so preflight/driver failures are always visible even though they make no
+--     HTTP request.
+--   * Transaction-safe failure persistence: the 'starting' INSERT is in the
+--     OUTER block; preflight/send run in an inner handled sub-block. Expected
+--     preflight failures UPDATE the run row to 'preflight_failed' and RETURN
+--     (never re-raise — re-raising would roll the run row back and recreate the
+--     observability gap). An unexpected internal exception is caught and the row
+--     is updated to 'driver_error' (SQLSTATE only; raw SQLERRM is never stored,
+--     so configuration cannot leak). It is EXPECTED that cron.job_run_details
+--     reports the wrapper command as completed while the ledger authoritatively
+--     records 'preflight_failed'/'driver_error' — the ledger, not cron status,
+--     is the source of truth for tick health.
+--   * FIX 1 — durable snapshot: at the start of each tick the driver reconciles
+--     prior non-terminal rows by joining net._http_response on request_id and
+--     SNAPSHOTS responded_at/completed_at/http_status/timed_out/outcome/
+--     error_code into the ledger. Once snapshotted, a terminal outcome is
+--     immutable and survives pg_net pruning the response row. The health view
+--     reads ONLY the durable ledger — it never reclassifies a completed row as
+--     'pending' because the pg_net response expired.
+--   * A queued row shows 'pending' only within a conservative window; a row with
+--     no observed response older than 15 minutes is reconciled to
+--     'expired_unknown' (never fabricated as success/failure). 15 min is safely
+--     longer than the 10s HTTP timeout and far shorter than pg_net's ~6h default
+--     response retention, so a real response is always snapshotted first.
+--   * Reconciliation is idempotent: it only touches rows still in
+--     ('starting','pending'), so terminal rows can never regress and overlapping
+--     ticks cannot corrupt state. One request id maps to one run row (unique
+--     partial index). Ledger rows older than 14 days are pruned by started_at;
+--     integration_sync_logs, orders, payment/business/audit records are NEVER
+--     touched.
+--   * success = TRUE only for observed HTTP 2xx; FALSE for observed failures and
+--     preflight/driver failures; NULL for 'pending'/'starting'/'expired_unknown'
+--     (final HTTP result unknown).
 --
--- VAULT ENTRY REQUIRED (operational; created separately under the owner-approved
--- apply workflow — NOT in this migration). Only the NON-secret project URL:
---   * lazywait_sync_project_url = https://<project-ref>.supabase.co
--- The trigger secret is NOT in Vault; it lives only in integration_settings.
---
--- FAIL CLOSED — before any HTTP request, the driver raises (and sends nothing)
--- when: the lazywait integration_settings row is missing; more than one such row
--- exists; secret_config is null; sync_trigger_secret is null/empty/blank; or the
--- lazywait_sync_project_url Vault entry is missing.
+-- FAIL CLOSED — no HTTP request, no claim, no worker invocation occurs with
+-- incomplete configuration (missing/duplicate row, null secret_config,
+-- null/empty/blank secret, or missing project URL).
 --
 -- ROLLBACK / DISABLE (safe, immediate — never affects order intake or payments):
 --   select cron.unschedule('lazywait-sync');
@@ -66,12 +75,9 @@
 -- SELF-VERIFYING: refuses to apply if a 'lazywait-sync' cron job already exists.
 -- ============================================================================
 
--- pg_net (async HTTP) + pg_cron (scheduler). Both already required by the
--- account-deletion scheduler; `if not exists` keeps this idempotent.
 create extension if not exists pg_net with schema extensions;
 create extension if not exists pg_cron;
 
--- Guard: never create a SECOND lazywait-sync driver.
 do $$
 begin
   if exists (select 1 from cron.job where jobname = 'lazywait-sync') then
@@ -81,23 +87,39 @@ begin
   end if;
 end $$;
 
--- ---- Request ledger: correlates each queued tick with its pg_net response. ---
--- Holds ONLY the pg_net request id + when it was queued. No secret, no headers,
--- no customer/order data. Service-role-only; RLS enabled; growth bounded by the
--- 14-day prune inside the driver.
+-- ---- Durable scheduler-run ledger. Safe operational fields only. -------------
 create table if not exists public.lazywait_sync_requests (
-  request_id bigint primary key,
-  queued_at  timestamptz not null default now()
+  id                 bigint generated always as identity primary key,
+  request_id         bigint,
+  started_at         timestamptz not null default now(),
+  queued_at          timestamptz,
+  responded_at       timestamptz,
+  completed_at       timestamptz,
+  outcome            text not null default 'starting'
+    check (outcome in (
+      'starting','pending','success_2xx','auth_failed','rate_limited',
+      'client_error_4xx','server_error_5xx','timeout','transport_error',
+      'expired_unknown','preflight_failed','driver_error')),
+  http_status        integer,
+  timed_out          boolean not null default false,
+  error_code         text,
+  safe_error_message text
 );
-create index if not exists lazywait_sync_requests_queued_at_idx
-  on public.lazywait_sync_requests (queued_at);
+-- One pg_net request id maps to exactly one run row.
+create unique index if not exists lazywait_sync_requests_request_id_key
+  on public.lazywait_sync_requests (request_id) where request_id is not null;
+-- Retention + reconciliation scans.
+create index if not exists lazywait_sync_requests_started_at_idx
+  on public.lazywait_sync_requests (started_at);
+create index if not exists lazywait_sync_requests_open_idx
+  on public.lazywait_sync_requests (outcome) where outcome in ('starting','pending');
 
 alter table public.lazywait_sync_requests enable row level security;
 revoke all on public.lazywait_sync_requests from public, anon, authenticated;
 grant select on public.lazywait_sync_requests to service_role;
 
 comment on table public.lazywait_sync_requests is
-  'One row per lazywait-sync cron tick: the pg_net request id + queued_at, used to correlate the tick with its actual HTTP response in lazywait_sync_cron_health. Contains no secret or customer data; pruned after 14 days.';
+  'Durable per-tick scheduler run ledger for lazywait-sync: outcome + HTTP result snapshot (no secret, headers, response body, or customer/order data). Reconciled from net._http_response before pg_net retention; pruned after 14 days.';
 
 -- ---- The driver. SECURITY DEFINER; service-role-only EXECUTE. ----------------
 create or replace function public.invoke_lazywait_sync_processor()
@@ -107,77 +129,127 @@ security definer
 set search_path = public, vault, extensions, net
 as $$
 declare
+  v_run_id         bigint;
   v_row_count      integer;
   v_secret_config  jsonb;
   v_trigger_secret text;
   v_project_url    text;
   v_request_id     bigint;
 begin
-  -- Trigger secret: read LIVE from the authoritative integration row. Canonical
-  -- key = provider_type ('lazywait'), which is UNIQUE. Assert exactly one row
-  -- (defence in depth) and fail closed otherwise.
-  select count(*)
-    into v_row_count
-    from public.integration_settings
-   where provider_type = 'lazywait';
-  if v_row_count = 0 then
-    raise exception 'lazywait integration_settings row is missing';
-  elsif v_row_count > 1 then
-    raise exception 'multiple lazywait integration_settings rows found (expected exactly one)';
-  end if;
+  -- FIX 2 (transaction-safe): persist the run row BEFORE any validation, in the
+  -- OUTER block, so the inner handler's rollback-to-savepoint cannot erase it.
+  insert into public.lazywait_sync_requests (outcome, started_at)
+  values ('starting', now())
+  returning id into v_run_id;
 
-  select secret_config
-    into v_secret_config
-    from public.integration_settings
-   where provider_type = 'lazywait';
-  if v_secret_config is null then
-    raise exception 'lazywait secret_config is null';
-  end if;
+  begin
+    -- FIX 1: reconcile prior non-terminal rows into a DURABLE snapshot. Best
+    -- effort: a reconcile hiccup must never abort the tick.
+    begin
+      -- (a) snapshot rows that now have an OBSERVED pg_net response.
+      update public.lazywait_sync_requests led
+         set responded_at = r.created,
+             completed_at = r.created,
+             http_status  = r.status_code,
+             timed_out    = coalesce(r.timed_out, false),
+             safe_error_message = left(r.error_msg, 200),
+             error_code = case
+               when coalesce(r.timed_out, false)      then 'timeout'
+               when r.status_code is null             then 'transport_error'
+               when r.status_code between 200 and 299 then null
+               else 'http_' || r.status_code::text
+             end,
+             outcome = case
+               when coalesce(r.timed_out, false)      then 'timeout'
+               when r.status_code is null             then 'transport_error'
+               when r.status_code between 200 and 299 then 'success_2xx'
+               when r.status_code in (401, 403)       then 'auth_failed'
+               when r.status_code = 429               then 'rate_limited'
+               when r.status_code >= 500              then 'server_error_5xx'
+               when r.status_code >= 400              then 'client_error_4xx'
+               else 'transport_error'
+             end
+        from net._http_response r
+       where led.request_id = r.id
+         and led.outcome in ('starting', 'pending');   -- terminal rows immutable
 
-  -- Load the RAW stored secret. btrim() is used ONLY to reject a blank/empty
-  -- value; the value SENT is v_trigger_secret unchanged (the worker compares it
-  -- byte-for-byte, so trimming here would break a secret with surrounding
-  -- whitespace).
-  v_trigger_secret := v_secret_config ->> 'sync_trigger_secret';
-  if v_trigger_secret is null or btrim(v_trigger_secret) = '' then
-    raise exception 'lazywait sync_trigger_secret is not configured';
-  end if;
+      -- (b) age out rows with no observed response beyond the conservative
+      -- window (15 min >> 10s timeout, << pg_net's ~6h response retention).
+      update public.lazywait_sync_requests led
+         set outcome = 'expired_unknown', completed_at = now()
+       where led.outcome in ('starting', 'pending')
+         and led.id <> v_run_id
+         and led.started_at < now() - interval '15 minutes'
+         and not exists (select 1 from net._http_response r where r.id = led.request_id);
+    exception when others then
+      null;  -- reconciliation is best-effort
+    end;
 
-  -- Project URL: NON-secret, from Vault.
-  select decrypted_secret
-    into v_project_url
-    from vault.decrypted_secrets
-   where name = 'lazywait_sync_project_url';
-  if v_project_url is null then
-    raise exception 'lazywait_sync_project_url Vault entry is missing';
-  end if;
+    -- FIX 2 preflight: expected failures UPDATE the run row and RETURN (no
+    -- re-raise). No HTTP request, no claim, no worker invocation.
+    select count(*) into v_row_count
+      from public.integration_settings where provider_type = 'lazywait';
+    if v_row_count = 0 then
+      update public.lazywait_sync_requests
+         set outcome='preflight_failed', error_code='lazywait_integration_missing', completed_at=now()
+       where id = v_run_id;
+      return null;
+    elsif v_row_count > 1 then
+      update public.lazywait_sync_requests
+         set outcome='preflight_failed', error_code='lazywait_integration_duplicate', completed_at=now()
+       where id = v_run_id;
+      return null;
+    end if;
 
-  -- Fire-and-forget async POST (bounded batch). The worker does the real work
-  -- and returns its own summary; pg_net stores the HTTP response in
-  -- net._http_response keyed by this request id.
-  select net.http_post(
-    url := rtrim(v_project_url, '/') || '/functions/v1/lazywait-sync',
-    headers := jsonb_build_object(
-      'Content-Type', 'application/json',
-      'x-sync-secret', v_trigger_secret
-    ),
-    body := jsonb_build_object('limit', 5),
-    timeout_milliseconds := 10000
-  ) into v_request_id;
+    select secret_config into v_secret_config
+      from public.integration_settings where provider_type = 'lazywait';
+    -- RAW value: btrim only decides blankness; the value SENT is unchanged.
+    v_trigger_secret := v_secret_config ->> 'sync_trigger_secret';
+    if v_secret_config is null or v_trigger_secret is null or btrim(v_trigger_secret) = '' then
+      update public.lazywait_sync_requests
+         set outcome='preflight_failed', error_code='sync_secret_missing', completed_at=now()
+       where id = v_run_id;
+      return null;
+    end if;
 
-  -- Record the request id so the health view can correlate the ACTUAL response.
-  if v_request_id is not null then
-    insert into public.lazywait_sync_requests (request_id)
-    values (v_request_id)
-    on conflict (request_id) do nothing;
-  end if;
+    select decrypted_secret into v_project_url
+      from vault.decrypted_secrets where name = 'lazywait_sync_project_url';
+    if v_project_url is null then
+      update public.lazywait_sync_requests
+         set outcome='preflight_failed', error_code='project_url_missing', completed_at=now()
+       where id = v_run_id;
+      return null;
+    end if;
 
-  -- Conservative retention: keep ~14 days of correlation rows. Never touches
-  -- integration_sync_logs or any business/audit record.
-  delete from public.lazywait_sync_requests
-   where queued_at < now() - interval '14 days';
+    -- Send. Secret passed VERBATIM. Bounded batch. Async fire-and-forget.
+    select net.http_post(
+      url := rtrim(v_project_url, '/') || '/functions/v1/lazywait-sync',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-sync-secret', v_trigger_secret),
+      body := jsonb_build_object('limit', 5),
+      timeout_milliseconds := 10000
+    ) into v_request_id;
 
-  return v_request_id;
+    update public.lazywait_sync_requests
+       set request_id = v_request_id, queued_at = now(), outcome = 'pending'
+     where id = v_run_id;
+
+    -- Retention: 14 days by started_at. Never touches integration_sync_logs,
+    -- orders, payment records, or any business/audit record.
+    delete from public.lazywait_sync_requests
+     where started_at < now() - interval '14 days';
+
+    return v_request_id;
+
+  exception when others then
+    -- Unexpected internal error: record a DURABLE driver_error with only the
+    -- SQLSTATE (never raw SQLERRM, which could disclose configuration). The
+    -- 'starting' insert survives the savepoint rollback (it is in the outer block).
+    update public.lazywait_sync_requests
+       set outcome='driver_error', error_code = nullif(sqlstate, ''),
+           safe_error_message = 'internal error', completed_at = now()
+     where id = v_run_id;
+    return null;
+  end;
 end;
 $$;
 
@@ -187,44 +259,34 @@ grant execute on function public.invoke_lazywait_sync_processor()
   to service_role;
 
 comment on function public.invoke_lazywait_sync_processor() is
-  'Vault-URL + live-secret pg_cron driver for the lazywait-sync worker. Reads sync_trigger_secret at run time from the authoritative integration_settings row (provider_type=lazywait) and sends it VERBATIM in x-sync-secret; reads the non-secret project URL from Vault (lazywait_sync_project_url); POSTs {"limit":5} to /functions/v1/lazywait-sync; records the pg_net request id in lazywait_sync_requests and prunes rows older than 14 days. The secret is never stored in cron.job, Vault, Edge env, the ledger, the health view, or logs. No change to payment, order-intake, Create Order payload mapping, delivery, or POS logic.';
+  'pg_cron driver for lazywait-sync. Inserts a durable run row before validation; reconciles prior ticks from net._http_response into an immutable snapshot; reads sync_trigger_secret live from integration_settings (provider_type=lazywait) and sends it VERBATIM in x-sync-secret; reads the non-secret project URL from Vault; POSTs {"limit":5}. Persists preflight_failed/driver_error without re-raising (no rollback). Secret never stored in cron.job/Vault/ledger/view/logs. No change to payment, order-intake, payload mapping, delivery, or POS logic.';
 
--- ---- Health view: ACTUAL per-tick HTTP outcome (not just cron status). -------
--- Joins the request ledger to the real pg_net response. Exposes only safe
--- operational fields: request id, queued/response times, completion state, HTTP
--- status, timed_out, a truncated transport-error string, a 2xx success boolean
--- and a coarse outcome label. NEVER exposes the secret, request headers, the
--- response body, or customer/order data. Service-role-only.
+-- ---- Health view: reads ONLY the durable ledger (never net._http_response). --
 create or replace view public.lazywait_sync_cron_health as
   select
-    led.request_id,
-    led.queued_at,
-    r.created                                    as responded_at,
-    (r.id is not null)                           as completed,
-    case when r.id is null then null
-         else (r.status_code between 200 and 299) end as success,
-    r.status_code                                as http_status,
-    coalesce(r.timed_out, false)                 as timed_out,
+    id           as run_id,
+    request_id,
+    started_at,
+    queued_at,
+    responded_at,
+    completed_at,
+    outcome,
     case
-      when r.id is null                       then 'pending'
-      when coalesce(r.timed_out, false)       then 'timeout'
-      when r.status_code is null              then 'transport_error'
-      when r.status_code between 200 and 299  then 'success_2xx'
-      when r.status_code in (401, 403)        then 'auth_failed'
-      when r.status_code = 429                then 'rate_limited'
-      when r.status_code >= 500               then 'server_error_5xx'
-      when r.status_code >= 400               then 'client_error_4xx'
-      else 'other'
-    end                                          as outcome,
-    left(r.error_msg, 200)                       as error_message
-  from public.lazywait_sync_requests led
-  left join net._http_response r on r.id = led.request_id;
+      when outcome = 'success_2xx'                              then true
+      when outcome in ('starting', 'pending', 'expired_unknown') then null
+      else false
+    end          as success,
+    http_status,
+    timed_out,
+    error_code,
+    left(safe_error_message, 200) as error_message
+  from public.lazywait_sync_requests;
 
 revoke all on public.lazywait_sync_cron_health from public, anon, authenticated;
 grant select on public.lazywait_sync_cron_health to service_role;
 
 comment on view public.lazywait_sync_cron_health is
-  'Per-tick lazywait-sync HTTP outcome: joins lazywait_sync_requests to the pg_net response (net._http_response). Distinguishes pending / success_2xx / auth_failed (401,403) / rate_limited (429) / server_error_5xx / client_error_4xx / timeout / transport_error. Exposes no secret, headers, response body, or customer data.';
+  'Durable per-tick lazywait-sync health from lazywait_sync_requests. outcome: starting/pending/success_2xx/auth_failed/rate_limited/client_error_4xx/server_error_5xx/timeout/transport_error/expired_unknown/preflight_failed/driver_error. success=true only for observed HTTP 2xx, false for observed/preflight/driver failures, null when unknown. Exposes no secret, headers, response body, or customer/order data.';
 
 -- Schedule: every minute. cron.job stores ONLY the bare function call.
 select cron.schedule(
