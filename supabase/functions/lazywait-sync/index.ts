@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
 
   const summary = {
     claimed: orders.length, synced: 0, retrying: 0,
-    confirmation_required: 0, dead_letter: 0, blocked: 0,
+    confirmation_required: 0, dead_letter: 0, blocked: 0, skipped: 0,
   };
 
   for (const order of orders) {
@@ -171,13 +171,93 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      // ---- Phase marker, then POST /pos/orders/create ----------------------
-      // Persist "about to send" IMMEDIATELY before the request leaves so a crash
-      // mid-flight is treated as may-have-sent (confirmation_required), never
-      // as a safe resend. claim_lazywait_sync_batch cleared this on claim.
-      await admin.from('orders')
-        .update({ pos_create_attempted_at: new Date().toISOString() }).eq('id', orderId);
+      // ---- Fenced pre-send gate (deadline re-check + DURABLE phase marker) --
+      // ONE locked service-role RPC, immediately before the POST and AFTER all
+      // preparatory work (branch/item load + optional CRM), re-validates the row
+      // from authoritative state and — only when the send is allowed — durably
+      // commits the phase marker + a unique attempt token in the same statement.
+      //   * Finding 1: no Create Order may begin after pos_sync_deadline_at, no
+      //     matter how long prep/CRM took (-> 'deadline_expired').
+      //   * Finding 2: the marker is DURABLY confirmed (RPC committed) before we
+      //     send, so a crash after the POST can never be misread as not-sent.
+      // We inspect BOTH data and error; the POST leaves ONLY on 'ready_to_send'.
+      const attemptToken = crypto.randomUUID();
+      const { data: gate, error: gateErr } = await admin.rpc('begin_lazywait_create_attempt', {
+        p_order_id: orderId, p_attempt_token: attemptToken,
+      });
+      if (gateErr) {
+        // The marker was NOT durably confirmed for this attempt -> DO NOT send.
+        // Leave the row 'syncing'; the stale reaper is the backstop (marker null
+        // -> safe requeue within the deadline; if the RPC actually committed but
+        // the reply was lost, marker set -> confirmation_required). Never resend.
+        summary.skipped++;
+        console.error('begin_lazywait_create_attempt failed (no send):', safeErr(gateErr.message));
+        continue;
+      }
+      const gateStatus = String(gate ?? '');
+      const priorFailureGate = (order.first_pos_sync_failure_at as string | null) ?? null;
+
+      if (gateStatus === 'already_synced') {
+        // A ref appeared (e.g. a prior crash after POS creation). Finalize synced
+        // WITHOUT resending; close any prior failure with "confirmed".
+        summary.synced++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: { lazywait_sync_state: 'synced', sync_last_error: null,
+            synced_at: order.synced_at ?? new Date().toISOString() },
+          p_log_status: 'skipped', p_error: 'already_created_no_resend',
+          p_notify_status: priorFailureGate ? 'pos_confirmed' : null,
+        });
+        continue;
+      }
+      if (gateStatus === 'deadline_expired') {
+        // Hard 10-minute bound: never POST past the absolute deadline. Final
+        // known failure (nothing was sent this attempt).
+        summary.dead_letter++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: 'dead_letter',
+            sync_next_attempt_at: null,
+            first_pos_sync_failure_at: priorFailureGate ?? new Date().toISOString(),
+            sync_last_error: 'pos_sync_deadline_exceeded_before_send',
+          },
+          p_log_status: 'failed', p_error: 'deadline_expired_pre_send',
+          p_notify_status: 'pos_failed',
+        });
+        continue;
+      }
+      if (gateStatus !== 'ready_to_send') {
+        // 'invalid_state' / 'not_found' / anything unexpected -> DO NOT send.
+        // Leave the row for the reaper/next tick; no blind resend, no state churn.
+        summary.skipped++;
+        console.warn('begin_lazywait_create_attempt not ready (no send):', gateStatus);
+        continue;
+      }
+
+      // The marker + token are now DURABLY committed. Only from here may the
+      // request leave — and if the worker dies past this point, the reaper reads
+      // the marker and routes to confirmation_required (never a blind resend).
       posAttempted = true;
+
+      // Defense-in-depth: a final LOCAL clock check the instant before fetch, in
+      // case wall-clock crossed the deadline between the RPC and now.
+      const deadlineMsGuard = order.pos_sync_deadline_at ? Date.parse(String(order.pos_sync_deadline_at)) : null;
+      if (deadlineMsGuard != null && Date.now() >= deadlineMsGuard) {
+        summary.dead_letter++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: 'dead_letter',
+            sync_next_attempt_at: null,
+            first_pos_sync_failure_at: priorFailureGate ?? new Date().toISOString(),
+            sync_last_error: 'pos_sync_deadline_exceeded_local_guard',
+          },
+          p_log_status: 'failed', p_error: 'deadline_expired_local_guard',
+          p_notify_status: 'pos_failed',
+        });
+        continue;
+      }
 
       const res = await lazywaitFetch<{ success?: boolean; order?: Record<string, unknown> }>(lw, {
         method: 'POST', path: '/pos/orders/create', body: built.payload, timeoutMs: 15000,

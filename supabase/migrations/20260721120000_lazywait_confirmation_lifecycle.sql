@@ -26,12 +26,18 @@
 --      becomes eligible ('pending') — covers cash-at-insert AND online-at-paid
 --      WITHOUT modifying the payment or initial-sync functions.
 --   4. Backfill the window for any in-flight rows.
---   5. Claim RPCs: exclude past-deadline rows + clear the phase marker on claim.
+--   5. Claim RPCs: exclude past-deadline rows + clear the phase marker/token.
+--  5b. begin_lazywait_create_attempt: the fenced pre-send gate — re-checks the
+--      deadline AND durably stores the phase marker + attempt token under one
+--      lock, immediately before the worker POSTs (Findings 1 & 2).
 --   6. record_lazywait_sync: persist the new columns + enqueue a deduplicated
---      pos_sync notification atomically with the state change.
+--      pos_sync notification ('pending') atomically with the state change.
 --   7. Stale reaper: phase-marker-aware (proven-not-sent => safe requeue within
 --      budget; may-have-sent => confirmation_required) + past-deadline sweep.
---   8. notification_log: allow kind='pos_sync' + a per-(order,status) dedup index.
+--   8. notification_log: allow kind='pos_sync', a 'pending' send_status, a fencing
+--      claim_token, and a per-(order,status) dedup index.
+--  8b. Fenced pos_sync notification claim/finalize/release RPCs — at-most-once
+--      customer delivery under concurrent dispatch (Finding 3).
 --   9. Admin dashboard RPC: read-only "Orders Requiring Verification" feed.
 --  10. Partial indexes for the deadline-bounded queue and the dashboard query.
 --
@@ -67,11 +73,18 @@ end $$;
 -- pos_confirmation_reason  : stable machine reason for the admin card
 --                            (timeout | connection | missing_ref |
 --                             ambiguous_response | provider_5xx). No secrets.
+-- pos_create_attempt_token : FENCING TOKEN for the current send phase. A unique
+--                            per-attempt token stored ATOMICALLY with the phase
+--                            marker by begin_lazywait_create_attempt() so the
+--                            durable "may have sent" transition is provable and
+--                            two attempts can never both enter the send phase.
+--                            Internal operational metadata — never logged.
 alter table public.orders add column if not exists pos_sync_started_at       timestamptz;
 alter table public.orders add column if not exists pos_sync_deadline_at      timestamptz;
 alter table public.orders add column if not exists first_pos_sync_failure_at timestamptz;
 alter table public.orders add column if not exists pos_create_attempted_at   timestamptz;
 alter table public.orders add column if not exists pos_confirmation_reason   text;
+alter table public.orders add column if not exists pos_create_attempt_token  text;
 
 -- ---- 3. Deadline trigger ---------------------------------------------------
 -- Stamp the 10-minute window the FIRST time an order becomes 'pending'. Fires
@@ -128,6 +141,7 @@ begin
   update public.orders o
      set lazywait_sync_state = 'syncing',
          pos_create_attempted_at = null,
+         pos_create_attempt_token = null,
          updated_at = now()
    where o.id in (
      select id from public.orders
@@ -155,6 +169,7 @@ begin
   update public.orders o
      set lazywait_sync_state = 'syncing',
          pos_create_attempted_at = null,
+         pos_create_attempt_token = null,
          updated_at = now()
    where o.id in (
      select id from public.orders
@@ -169,6 +184,87 @@ end $$;
 
 revoke all on function public.claim_lazywait_sync_one(uuid) from public, anon, authenticated;
 grant execute on function public.claim_lazywait_sync_one(uuid) to service_role;
+
+-- ---- 5b. begin_lazywait_create_attempt(): fenced pre-send gate --------------
+-- The single authoritative gate the worker MUST pass immediately before it POSTs
+-- Create Order — after all preparatory work (branch/item load, optional CRM).
+-- Under ONE row lock it re-validates from authoritative state and, only when the
+-- send is allowed, DURABLY stores the phase marker + a unique attempt token in
+-- the same statement. This closes two duplicate-prevention holes at once:
+--   * FINDING 1 (deadline): no /pos/orders/create may begin after
+--     pos_sync_deadline_at — the gate rejects an expired row (`deadline_expired`)
+--     no matter how long claim→prep→CRM took.
+--   * FINDING 2 (durable marker): the marker is committed by THIS function before
+--     the caller is told `ready_to_send`, so a crash after the POST leaves can
+--     never be misread by the reaper as proven-not-sent (no blind resend).
+-- Concurrency: FOR UPDATE serializes callers; the first to stamp the marker+token
+-- wins, a second caller bearing a DIFFERENT token gets `invalid_state`, and the
+-- SAME token is idempotent (safe retry of this RPC). Returns exactly one of:
+--   ready_to_send | already_synced | deadline_expired | invalid_state | not_found
+create or replace function public.begin_lazywait_create_attempt(
+  p_order_id      uuid,
+  p_attempt_token text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_row public.orders;
+begin
+  if p_attempt_token is null or p_attempt_token = '' then
+    raise exception 'attempt token required' using errcode = '22004';
+  end if;
+
+  select * into v_row from public.orders where id = p_order_id for update;
+  if not found then
+    return 'not_found';
+  end if;
+
+  -- Already created: a usable ref (or a synced row) means the POS ticket exists.
+  -- Create Order has no idempotency key, so NEVER resend — finalize as synced.
+  if v_row.lazywait_ref is not null or v_row.lazywait_sync_state = 'synced' then
+    return 'already_synced';
+  end if;
+
+  -- Only a live claim may enter the send phase. Terminal/ambiguous states
+  -- (confirmation_required/dead_letter/blocked/failed/pending/…) are never 'syncing'.
+  if v_row.lazywait_sync_state <> 'syncing' then
+    return 'invalid_state';
+  end if;
+
+  -- The send phase is single-entry. If the marker is already stamped, only the
+  -- SAME token may proceed (idempotent RPC retry); a different token means a
+  -- concurrent attempt already owns the send phase.
+  if v_row.pos_create_attempted_at is not null then
+    if v_row.pos_create_attempt_token is not distinct from p_attempt_token then
+      return 'ready_to_send';
+    end if;
+    return 'invalid_state';
+  end if;
+
+  -- Absolute 10-minute deadline. It is REQUIRED (set by the deadline trigger /
+  -- backfill for every eligible row) and must not have passed.
+  if v_row.pos_sync_deadline_at is null then
+    return 'invalid_state';
+  end if;
+  if now() >= v_row.pos_sync_deadline_at then
+    return 'deadline_expired';
+  end if;
+
+  -- Durably commit the phase marker + fencing token BEFORE the caller sends.
+  update public.orders
+     set pos_create_attempted_at  = now(),
+         pos_create_attempt_token = p_attempt_token,
+         updated_at               = now()
+   where id = p_order_id;
+
+  return 'ready_to_send';
+end $$;
+
+revoke all on function public.begin_lazywait_create_attempt(uuid, text) from public, anon, authenticated;
+grant execute on function public.begin_lazywait_create_attempt(uuid, text) to service_role;
 
 -- ---- 6. record_lazywait_sync (new columns + deduped notification) ----------
 -- Redefined with two additions:
@@ -236,11 +332,14 @@ begin
     values ('lazywait', p_order_id, p_direction, p_log_status, p_request, p_response, p_error);
 
   -- Deduplicated customer notification event (idempotent per order+status).
-  -- push-dispatch remains master-flag gated (disabled): this only records the
-  -- event so it can never be emitted twice, and so realtime/admin can observe it.
+  -- Enqueued as 'pending' (awaiting dispatch): the unique (order_id,status) index
+  -- guarantees the event is recorded at most once, and 'pending' is the only
+  -- state a dispatcher may atomically claim (see claim_pos_sync_notification),
+  -- so the push fires at most once even under concurrent dispatch. push-dispatch
+  -- stays master-flag gated (disabled); this only records the event.
   if p_notify_status is not null then
-    insert into public.notification_log (kind, order_id, status)
-      values ('pos_sync', p_order_id, p_notify_status)
+    insert into public.notification_log (kind, order_id, status, send_status)
+      values ('pos_sync', p_order_id, p_notify_status, 'pending')
       on conflict do nothing;
   end if;
 end $$;
@@ -343,8 +442,8 @@ begin
        and o.pos_create_attempted_at is not null
      returning o.id
   ), notified_amb as (
-    insert into public.notification_log (kind, order_id, status)
-      select 'pos_sync', id, 'pos_confirmation_required' from ambiguous
+    insert into public.notification_log (kind, order_id, status, send_status)
+      select 'pos_sync', id, 'pos_confirmation_required', 'pending' from ambiguous
       on conflict do nothing
       returning 1
   )
@@ -388,8 +487,8 @@ begin
         from reaped
       returning 1
   ), notified as (
-    insert into public.notification_log (kind, order_id, status)
-      select 'pos_sync', id, 'pos_failed' from reaped where new_state = 'dead_letter'
+    insert into public.notification_log (kind, order_id, status, send_status)
+      select 'pos_sync', id, 'pos_failed', 'pending' from reaped where new_state = 'dead_letter'
       on conflict do nothing
       returning 1
   )
@@ -414,8 +513,8 @@ begin
        and o.pos_sync_deadline_at <= now()
      returning o.id
   ), notified_sweep as (
-    insert into public.notification_log (kind, order_id, status)
-      select 'pos_sync', id, 'pos_failed' from swept
+    insert into public.notification_log (kind, order_id, status, send_status)
+      select 'pos_sync', id, 'pos_failed', 'pending' from swept
       on conflict do nothing
       returning 1
   )
@@ -447,9 +546,125 @@ begin
     check (kind in ('order_status','test','broadcast','pos_sync'));
 end $$;
 
+-- Add a 'pending' send_status (awaiting dispatch) — the state a pos_sync event
+-- is enqueued in, and the ONLY state a dispatcher may atomically claim. This
+-- keeps the worker's dedup enqueue distinct from an in-flight dispatch claim.
+do $$
+begin
+  alter table public.notification_log drop constraint if exists notification_log_send_status_check;
+  alter table public.notification_log add constraint notification_log_send_status_check
+    check (send_status in ('pending','processing','sent','failed','no_targets'));
+end $$;
+
+-- Per-dispatch lease/fencing token. A dispatcher claims a 'pending' row by
+-- writing its token + flipping to 'processing'; every finalize is guarded by the
+-- same token, so only the owner may complete or release the send.
+alter table public.notification_log add column if not exists claim_token text;
+
 create unique index if not exists notification_log_pos_sync_uq
   on public.notification_log (order_id, status)
   where kind = 'pos_sync';
+
+-- ---- 8b. Fenced pos_sync notification claim / finalize / release ------------
+-- Guarantee AT-MOST-ONCE customer delivery even with concurrent dispatchers.
+-- The atomic conditional UPDATE (send_status='pending' -> 'processing') lets
+-- exactly one caller win the send; 'processing' is NOT reclaimable (an ambiguous
+-- post-send result must never be auto-resent), and 'sent'/'no_targets'/'failed'
+-- are terminal no-ops. A pre-send failure (proven not sent) is released back to
+-- 'pending' by the owner for a clean, safe retry. Service-role only.
+create or replace function public.claim_pos_sync_notification(
+  p_order_id uuid, p_status text, p_claim_token text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_send    text;
+  v_claimed uuid;
+begin
+  if p_claim_token is null or p_claim_token = '' then
+    raise exception 'claim token required' using errcode = '22004';
+  end if;
+
+  -- The event row normally already exists (worker/reaper enqueued it as
+  -- 'pending'); ensure it so a dispatch is never lost, idempotently.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', p_order_id, p_status, 'pending')
+    on conflict do nothing;
+
+  -- Atomic single-winner claim: only a 'pending' row flips to 'processing'.
+  update public.notification_log
+     set send_status = 'processing', claim_token = p_claim_token, updated_at = now()
+   where kind = 'pos_sync' and order_id = p_order_id and status = p_status
+     and send_status = 'pending'
+   returning id into v_claimed;
+  if v_claimed is not null then
+    return 'claimed';
+  end if;
+
+  select send_status into v_send from public.notification_log
+    where kind = 'pos_sync' and order_id = p_order_id and status = p_status;
+  if v_send is null then return 'missing'; end if;
+  if v_send in ('sent','no_targets','failed') then return 'duplicate'; end if;
+  return 'in_progress';   -- 'processing' owned by another dispatcher; back off
+end $$;
+
+revoke all on function public.claim_pos_sync_notification(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.claim_pos_sync_notification(uuid, text, text) to service_role;
+
+create or replace function public.finalize_pos_sync_notification(
+  p_order_id uuid, p_status text, p_claim_token text, p_send_status text,
+  p_targeted integer default 0, p_sent integer default 0,
+  p_failed integer default 0, p_deactivated integer default 0
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_id uuid;
+begin
+  if p_send_status not in ('sent','no_targets','failed') then
+    raise exception 'invalid final send_status %', p_send_status;
+  end if;
+  -- Only the owning, still-processing claim may finalize (token-fenced).
+  update public.notification_log
+     set send_status = p_send_status,
+         targeted = p_targeted, sent = p_sent, failed = p_failed, deactivated = p_deactivated,
+         updated_at = now()
+   where kind = 'pos_sync' and order_id = p_order_id and status = p_status
+     and send_status = 'processing' and claim_token = p_claim_token
+   returning id into v_id;
+  return v_id is not null;
+end $$;
+
+revoke all on function public.finalize_pos_sync_notification(uuid, text, text, text, integer, integer, integer, integer) from public, anon, authenticated;
+grant execute on function public.finalize_pos_sync_notification(uuid, text, text, text, integer, integer, integer, integer) to service_role;
+
+create or replace function public.release_pos_sync_notification(
+  p_order_id uuid, p_status text, p_claim_token text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_id uuid;
+begin
+  -- Proven pre-send failure only: return the owned claim to 'pending' so a later
+  -- dispatch can safely retry. Owner-fenced; never touches a foreign claim.
+  update public.notification_log
+     set send_status = 'pending', claim_token = null, updated_at = now()
+   where kind = 'pos_sync' and order_id = p_order_id and status = p_status
+     and send_status = 'processing' and claim_token = p_claim_token
+   returning id into v_id;
+  return v_id is not null;
+end $$;
+
+revoke all on function public.release_pos_sync_notification(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.release_pos_sync_notification(uuid, text, text) to service_role;
 
 -- ---- 9. Admin dashboard RPC: Orders Requiring Verification ------------------
 -- Read-only feed for the admin side card. Returns a total count (for the badge)

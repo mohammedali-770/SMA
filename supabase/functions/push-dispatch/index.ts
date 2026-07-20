@@ -403,10 +403,13 @@ Deno.serve(async (req: Request) => {
   // ---------------------------------------------------------------- pos_sync
   // Customer-facing POS confirmation-lifecycle push. The sync worker/reaper have
   // already enqueued a deduplicated notification_log row (kind='pos_sync',
-  // unique(order_id,status)); this action renders + sends it. Caller: service
-  // role (internal) or an authenticated admin. Idempotent: a row already 'sent'
-  // (or 'no_targets') is a no-op, so a status is delivered to a device at most
-  // once. (Push stays master-flag disabled, so this path is dormant in prod.)
+  // unique(order_id,status), send_status='pending'); this action renders + sends
+  // it. Caller: service role (internal) or an authenticated admin. AT-MOST-ONCE
+  // under concurrency: a token-fenced atomic claim (pending -> processing) lets
+  // exactly one dispatcher send; 'processing' is never reclaimed and terminal
+  // rows are no-ops, so a status reaches a device at most once even if two
+  // dispatchers race. (Push stays master-flag disabled, so this path is dormant
+  // in prod.)
   if (body.action === 'pos_sync') {
     const fromService = isServiceRoleCall(req);
     const adminId = fromService ? null : await callingAdminId(req, admin);
@@ -423,26 +426,22 @@ Deno.serve(async (req: Request) => {
       .select('id, customer_id').eq('id', orderId).maybeSingle();
     if (!order) return json({ error: 'order not found' }, 404);
 
-    // Claim: the worker's dedup insert may already exist. Insert-first; on
-    // conflict, a terminal row is an idempotent no-op, otherwise reclaim the
-    // (dedup/failed) row to 'processing' and send.
-    const { error: claimError } = await admin.from('notification_log')
-      .insert({ kind: 'pos_sync', order_id: orderId, status, send_status: 'processing' });
-    if (claimError) {
-      const { data: existing } = await admin.from('notification_log')
-        .select('id, send_status')
-        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status)
-        .maybeSingle();
-      if (!existing) return json({ status: 'retry', reason: 'claim race, call again' }, 200);
-      if (existing.send_status === 'sent' || existing.send_status === 'no_targets') {
-        return json({ status: 'duplicate', reason: `already ${existing.send_status}` }, 200);
-      }
-      const { data: reclaimed } = await admin.from('notification_log')
-        .update({ send_status: 'processing' })
-        .eq('id', existing.id).neq('send_status', 'sent').neq('send_status', 'no_targets')
-        .select('id').maybeSingle();
-      if (!reclaimed) return json({ status: 'duplicate', reason: 'already delivered' }, 200);
-    }
+    // FENCED CLAIM (Finding 3): an atomic RPC flips the deduped 'pending' event
+    // row to 'processing' with a per-dispatch lease token. Exactly ONE concurrent
+    // caller wins ('claimed'); a 'processing' row is NOT reclaimable by anyone
+    // else ('in_progress'), and terminal rows ('sent'/'no_targets'/'failed') are
+    // idempotent no-ops ('duplicate'). Every later write is fenced by this token,
+    // so at most one dispatcher ever reaches sendToDevices for a given event.
+    const claimToken = crypto.randomUUID();
+    const { data: claim, error: claimError } = await admin.rpc('claim_pos_sync_notification', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+    });
+    if (claimError) return json({ status: 'error', reason: 'claim failed (transient)' }, 500);
+    const claimResult = String(claim ?? '');
+    if (claimResult === 'duplicate') return json({ status: 'duplicate', reason: 'already delivered' }, 200);
+    if (claimResult === 'in_progress') return json({ status: 'in_progress', reason: 'another dispatcher owns this send' }, 200);
+    if (claimResult === 'missing') return json({ status: 'retry', reason: 'event row missing, call again' }, 200);
+    if (claimResult !== 'claimed') return json({ status: 'error', reason: `unexpected claim result: ${claimResult}` }, 500);
 
     const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
@@ -450,25 +449,35 @@ Deno.serve(async (req: Request) => {
       .eq('is_active', true)
       .eq('order_updates_enabled', true);
     if (devicesError) {
-      await admin.from('notification_log')
-        .update({ send_status: 'failed', last_error_safe: 'device lookup failed (transient)' })
-        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
-      return json({ status: 'error', send_status: 'failed', reason: 'device lookup failed (transient)' }, 500);
+      // PROVEN pre-send failure (nobody was targeted): release the claim back to
+      // 'pending' so a later dispatch can safely retry — this cannot double-send.
+      await admin.rpc('release_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      });
+      return json({ status: 'error', send_status: 'pending', reason: 'device lookup failed (transient)' }, 500);
     }
 
     const targets = (devices ?? []) as DeviceRow[];
     if (targets.length === 0) {
-      await admin.from('notification_log')
-        .update({ send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 })
-        .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
+      // Terminal: finalize as no_targets under our token (owner-fenced).
+      await admin.rpc('finalize_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+        p_send_status: 'no_targets', p_targeted: 0, p_sent: 0, p_failed: 0, p_deactivated: 0,
+      });
       return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
     }
 
     const result = await sendToDevices(admin, targets, POS_SYNC_COPY[status], { type: 'order', orderId });
+    // The requests have LEFT for at least some devices. Whether or not any ticket
+    // succeeded, this is a post-send result and must be TERMINAL — never
+    // auto-resent (an ambiguous post-send state could otherwise double-deliver).
+    // 'sent' when any delivered, else 'failed' (terminal, NOT reclaimable).
     const sendStatus = result.sent > 0 ? 'sent' : 'failed';
-    await admin.from('notification_log')
-      .update({ send_status: sendStatus, ...result })
-      .eq('kind', 'pos_sync').eq('order_id', orderId).eq('status', status).eq('send_status', 'processing');
+    await admin.rpc('finalize_pos_sync_notification', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      p_send_status: sendStatus,
+      p_targeted: result.targeted, p_sent: result.sent, p_failed: result.failed, p_deactivated: result.deactivated,
+    });
     return json({ status: 'ok', send_status: sendStatus, ...result }, 200);
   }
 
