@@ -37,10 +37,10 @@
 --   8. notification_log: allow kind='pos_sync', 'pending'/'superseded' send_status,
 --      a fencing claim_token, and a per-(order,status) dedup index.
 --  8b. CONSUME-ONLY fenced pos_sync notification claim/validate/finalize/release
---      RPCs + an authoritative order-state match check — at-most-once customer
---      delivery under concurrent dispatch, a FINAL token-fenced pre-send
---      re-validation (order state can change between claim and send), and only
---      lifecycle producers create events.
+--      RPCs + one canonical pure state-match predicate — at-most-once customer
+--      delivery under concurrent dispatch, and a FINAL pre-send re-validation
+--      that LOCKS the order row (canonical order: orders -> notification_log) so
+--      it serializes against a concurrent worker; only producers create events.
 --   9. Admin dashboard RPC: read-only "Orders Requiring Verification" feed.
 --  10. Partial indexes for the deadline-bounded queue and the dashboard query.
 --
@@ -588,57 +588,72 @@ create unique index if not exists notification_log_pos_sync_uq
 -- keep the dispatcher a pure CONSUMER (only the lifecycle producers
 -- record_lazywait_sync + the stale reaper may CREATE a pos_sync event), and
 -- re-validate authoritative order state a FINAL time immediately before the push
--- leaves (the order can transition between claim and send).
+-- leaves — LOCKING THE ORDER ROW so the check serializes against a concurrent
+-- Lazywait worker, evaluated through one canonical pure predicate so claim-time
+-- and send-time rules cannot drift.
 
--- pos_sync_event_matches_order(): defense-in-depth — does the requested status
--- still match the AUTHORITATIVE order state? A stale event (e.g. a 'pos_retrying'
--- enqueued before the order synced) must never be sent. Never trusts only the
--- request body's status. No secrets/PII — reads only technical state columns.
-create or replace function public.pos_sync_event_matches_order(
-  p_order_id uuid, p_status text
+-- pos_sync_status_matches(): the ONE canonical pure predicate for "does this
+-- lifecycle status still match the order?", evaluated from ALREADY-LOCKED order
+-- column values (state / ref / next-attempt / deadline) so the claim-time and
+-- send-time rules can NEVER drift. STABLE (references now() for the retry/deadline
+-- window), no table access, no secrets/PII. This is the single source of the rules:
+--   pos_confirmed             -> synced + non-empty ref
+--   pos_confirmation_required -> confirmation_required
+--   pos_retrying              -> failed + a FUTURE sync_next_attempt_at + unexpired deadline
+--   pos_failed                -> blocked | dead_letter
+create or replace function public.pos_sync_status_matches(
+  p_status          text,
+  p_state           text,
+  p_ref             text,
+  p_next_attempt_at timestamptz,
+  p_deadline_at     timestamptz
 )
 returns boolean
 language sql
 stable
-security definer
 set search_path = public
 as $$
   select case p_status
-    when 'pos_confirmed' then exists (
-      select 1 from public.orders o
-       where o.id = p_order_id
-         and o.lazywait_sync_state = 'synced'
-         and coalesce(o.lazywait_ref, '') <> '')
-    when 'pos_confirmation_required' then exists (
-      select 1 from public.orders o
-       where o.id = p_order_id
-         and o.lazywait_sync_state = 'confirmation_required')
-    when 'pos_retrying' then exists (
-      select 1 from public.orders o
-       where o.id = p_order_id
-         and o.lazywait_sync_state = 'failed'
-         and o.sync_next_attempt_at is not null
-         and (o.pos_sync_deadline_at is null or now() < o.pos_sync_deadline_at))
-    when 'pos_failed' then exists (
-      select 1 from public.orders o
-       where o.id = p_order_id
-         and o.lazywait_sync_state in ('blocked','dead_letter'))
+    when 'pos_confirmed' then
+      p_state = 'synced' and coalesce(p_ref, '') <> ''
+    when 'pos_confirmation_required' then
+      p_state = 'confirmation_required'
+    when 'pos_retrying' then
+      p_state = 'failed'
+      and p_next_attempt_at is not null and p_next_attempt_at > now()
+      and (p_deadline_at is null or now() < p_deadline_at)
+    when 'pos_failed' then
+      p_state in ('blocked','dead_letter')
     else false
   end;
 $$;
 
-revoke all on function public.pos_sync_event_matches_order(uuid, text) from public, anon, authenticated;
-grant execute on function public.pos_sync_event_matches_order(uuid, text) to service_role;
+revoke all on function public.pos_sync_status_matches(text, text, text, timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.pos_sync_status_matches(text, text, text, timestamptz, timestamptz) to service_role;
+
+-- The earlier UNLOCKED helper pos_sync_event_matches_order(uuid,text) is replaced
+-- by locked order reads + the pure predicate above, so drop it to keep a SINGLE
+-- source of the match rules (no drift, no unlocked read path left behind).
+drop function if exists public.pos_sync_event_matches_order(uuid, text);
+
+-- CANONICAL LOCK ORDER for every pos_sync path that needs BOTH rows:
+--   orders row  ->  notification_log row
+-- This mirrors the lifecycle producer direction (an order's state changes BEFORE
+-- its notification event is inserted), so claim/validate never invert against the
+-- reaper (which locks orders via UPDATE, then inserts notifications) or against
+-- begin_lazywait_create_attempt (orders only). finalize/release lock ONLY the
+-- notification row; no path ever locks notification-then-orders.
 
 -- claim_pos_sync_notification(): CONSUME-ONLY atomic claim. It NEVER inserts an
--- event (so push-dispatch can never manufacture a lifecycle transition). It
--- locks an EXISTING event row and:
---   * no row            -> 'no_event'   (nothing enqueued; send nothing)
+-- event (so push-dispatch can never manufacture a lifecycle transition). Under the
+-- canonical lock order (orders FOR UPDATE, then the notification row FOR UPDATE)
+-- it evaluates the match against the LOCKED order snapshot and returns:
+--   * no order / no row -> 'no_event'   (nothing enqueued; send nothing)
 --   * terminal          -> 'duplicate'  (sent/no_targets/failed/superseded)
 --   * processing         -> 'in_progress' (owned by another dispatcher)
 --   * pending + stale    -> 'superseded' (state no longer matches; terminal no-send)
 --   * pending + valid    -> 'claimed'    (flips to 'processing' with the lease token)
--- FOR UPDATE serializes concurrent claimants so exactly one wins. Service-role only.
+-- Service-role only.
 create or replace function public.claim_pos_sync_notification(
   p_order_id uuid, p_status text, p_claim_token text
 )
@@ -648,14 +663,24 @@ security definer
 set search_path = public
 as $$
 declare
-  v_nid  uuid;
-  v_send text;
+  v_state text; v_ref text; v_next timestamptz; v_dead timestamptz;
+  v_nid   uuid;
+  v_send  text;
 begin
   if p_claim_token is null or p_claim_token = '' then
     raise exception 'claim token required' using errcode = '22004';
   end if;
 
-  -- Lock the EXISTING event (never create it).
+  -- LOCK 1 (canonical): the authoritative order row.
+  select lazywait_sync_state, lazywait_ref, sync_next_attempt_at, pos_sync_deadline_at
+    into v_state, v_ref, v_next, v_dead
+    from public.orders where id = p_order_id
+   for update;
+  if not found then
+    return 'no_event';                                   -- no order (FK) -> no event
+  end if;
+
+  -- LOCK 2 (canonical): the EXISTING event row (never create it).
   select id, send_status into v_nid, v_send
     from public.notification_log
    where kind = 'pos_sync' and order_id = p_order_id and status = p_status
@@ -670,8 +695,8 @@ begin
     return 'in_progress';                                -- another owner
   end if;
 
-  -- v_send = 'pending': the event must still match the authoritative order state.
-  if not public.pos_sync_event_matches_order(p_order_id, p_status) then
+  -- v_send = 'pending': match against the LOCKED order snapshot (pure predicate).
+  if not public.pos_sync_status_matches(p_status, v_state, v_ref, v_next, v_dead) then
     update public.notification_log set send_status = 'superseded', updated_at = now()
      where id = v_nid;
     return 'superseded';                                 -- stale -> terminal no-send
@@ -688,16 +713,21 @@ grant execute on function public.claim_pos_sync_notification(uuid, text, text) t
 
 -- validate_pos_sync_notification_before_send(): the FINAL, token-fenced
 -- authoritative-state re-check the dispatcher MUST pass immediately before the
--- push leaves. The order can transition between the claim and the send (e.g. the
--- sync worker succeeds and moves 'failed' -> 'synced' after a 'pos_retrying' was
--- claimed); this closes that window as tightly as possible without holding a DB
--- lock across the external Expo call. Under ONE row lock it requires the caller
--- to still OWN a 'processing' claim (exact token) and re-checks the current order
--- state via the same rules as pos_sync_event_matches_order. Returns exactly one:
+-- push leaves. The order can transition between the claim and the send (e.g. a
+-- concurrent sync worker completes the due retry and moves 'failed' -> 'synced'
+-- after a 'pos_retrying' was claimed). To SERIALIZE against that worker this
+-- function LOCKS THE ORDER ROW (FOR UPDATE) and evaluates the match against that
+-- locked snapshot — the notification token fence alone does not serialize against
+-- updates to the orders row. Canonical lock order (orders -> notification_log);
+-- no second unlocked orders read is performed. Requires the caller to still OWN a
+-- 'processing' claim (exact token). Returns exactly one of:
 --   ready_to_send | superseded | lost_claim | not_found
 -- On 'superseded' it atomically marks the row terminal 'superseded' (owner-fenced,
--- no retry path); on lost_claim/not_found it changes nothing (never touches a
--- foreign claim). The caller sends ONLY on 'ready_to_send'. Service-role only.
+-- NO release to pending, no retry path); on lost_claim/not_found it changes nothing
+-- (never touches a foreign claim). The caller sends ONLY on 'ready_to_send'.
+-- NOTE: a DB transaction cannot span the external Expo call, so a tiny cross-system
+-- window remains AFTER this function commits and BEFORE fetch() starts — that gap
+-- is unavoidable and is NOT claimed to be atomic. Service-role only.
 create or replace function public.validate_pos_sync_notification_before_send(
   p_order_id uuid, p_status text, p_claim_token text
 )
@@ -707,6 +737,7 @@ security definer
 set search_path = public
 as $$
 declare
+  v_state text; v_ref text; v_next timestamptz; v_dead timestamptz;
   v_nid   uuid;
   v_send  text;
   v_token text;
@@ -715,6 +746,17 @@ begin
     raise exception 'claim token required' using errcode = '22004';
   end if;
 
+  -- LOCK 1 (canonical): the authoritative order row — serializes against a
+  -- concurrent Lazywait worker updating the SAME order.
+  select lazywait_sync_state, lazywait_ref, sync_next_attempt_at, pos_sync_deadline_at
+    into v_state, v_ref, v_next, v_dead
+    from public.orders where id = p_order_id
+   for update;
+  if not found then
+    return 'not_found';
+  end if;
+
+  -- LOCK 2 (canonical): the claimed notification row (owner-fenced).
   select id, send_status, claim_token into v_nid, v_send, v_token
     from public.notification_log
    where kind = 'pos_sync' and order_id = p_order_id and status = p_status
@@ -728,8 +770,8 @@ begin
     return 'lost_claim';
   end if;
 
-  -- Re-check the CURRENT authoritative order state (not the claim-time snapshot).
-  if not public.pos_sync_event_matches_order(p_order_id, p_status) then
+  -- Match against the LOCKED order snapshot (pure predicate; no second read).
+  if not public.pos_sync_status_matches(p_status, v_state, v_ref, v_next, v_dead) then
     update public.notification_log set send_status = 'superseded', updated_at = now()
      where id = v_nid and send_status = 'processing' and claim_token = p_claim_token;
     return 'superseded';

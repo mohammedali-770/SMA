@@ -198,7 +198,20 @@ end $$;
 
 -- ---- FINAL token-fenced pre-send re-validation -----------------------------
 -- The order can transition between the claim and sendToDevices; the dispatcher
--- must re-check authoritative state immediately before sending.
+-- must re-check authoritative state immediately before sending. These are the
+-- deterministic OUTCOME cases (single session). The TRUE cross-session
+-- serialization — the validator LOCKING the orders row so it waits for /
+-- observes a concurrent Lazywait worker — is proven in
+-- supabase/tests/lazywait_presend_concurrency_test.sql (dblink two-backend test).
+--
+-- LOCK-ORDER AUDIT (deadlock safety): every pos_sync path that takes both row
+-- locks acquires them in the SAME canonical order — orders row -> notification_log
+-- row: claim_pos_sync_notification and validate_pos_sync_notification_before_send
+-- (orders FOR UPDATE, then the notification row FOR UPDATE);
+-- begin_lazywait_create_attempt (orders only); the reaper (orders UPDATEs, then
+-- notification inserts); record_lazywait_sync (order update, then notification
+-- insert). finalize/release lock only the notification row. No path locks
+-- notification-then-orders, so no inversion is possible.
 do $$
 declare
   v_retry uuid := gen_random_uuid();  -- pos_retrying, then order syncs
