@@ -449,7 +449,9 @@ grant execute on function public.pos_next_attempt_at(timestamptz, integer) to se
 -- ---- 7. Stale reaper (phase-marker-aware + deadline sweep) ------------------
 -- Replaces the previous "requeue every ref-less stale row" behaviour, which
 -- could blindly resend an order the dead worker had ALREADY POSTed. Now:
---   (a) stale 'syncing' WITH a ref            -> 'synced' (never re-POST);
+--   (a) stale 'syncing' + USABLE ref          -> 'synced' (never re-POST);
+--   (a2) stale 'syncing' + non-null UNUSABLE ref marker
+--                                             -> 'confirmation_required';
 --   (b) stale 'syncing', no ref, marker SET   -> 'confirmation_required'
 --       (the worker may have sent it; verifying beats risking a duplicate);
 --   (c) stale 'syncing', no ref, marker NULL  -> proven not sent: safe requeue
@@ -457,8 +459,11 @@ grant execute on function public.pos_next_attempt_at(timestamptz, integer) to se
 --   (d) past-deadline 'pending'/'failed'      -> 'dead_letter' (budget expired;
 --       these states are only ever reached via proven-not-sent paths, so this
 --       is a known non-delivery, not an ambiguous one).
--- Every reaped row writes an integration_sync_logs row; (b)/(c-dead)/(d) also
--- enqueue the matching deduplicated pos_sync notification.
+-- Branch (a) applies ONLY to a USABLE ref (canonical helper); a NON-NULL but
+-- UNUSABLE stored marker takes branch (a2) -> 'confirmation_required' (ref
+-- preserved as evidence, never resent, surfaced to the admin verification feed).
+-- Every reaped row writes an integration_sync_logs row; (a2)/(b)/(c-dead)/(d)
+-- also enqueue the matching deduplicated pos_sync notification.
 create or replace function public.reap_stale_lazywait_syncs(
   p_timeout_minutes integer default 10,
   p_max_attempts    integer default 5
@@ -475,10 +480,14 @@ declare
   v_recovered_synced      integer := 0;
   v_requeued              integer := 0;
   v_dead_lettered         integer := 0;
-  v_confirmation_required integer := 0;
+  v_confirmation_required integer := 0;  -- sum of (a2) unusable-marker + (b) may-have-sent
   v_deadline_failed       integer := 0;
+  v_rows                  integer := 0;
 begin
-  -- (a) WITH ref -> synced. Create Order already succeeded; NEVER re-POST. If the
+  -- (a) WITH a USABLE ref -> synced. Create Order provably succeeded; NEVER
+  --     re-POST. Only the canonical usable-ref test may finalize a recovery as
+  --     customer-confirmed — a merely-STORED marker (blank/whitespace/malformed)
+  --     is handled by branch (a2) below, mutually exclusive with this one. If the
   --     order had a PRIOR failure (first_pos_sync_failure_at set — the customer
   --     may have already seen a retrying/verifying message), enqueue the deduped
   --     'pos_confirmed' event in the SAME transaction so the "confirmed after a
@@ -494,26 +503,56 @@ begin
            updated_at          = now()
      where o.lazywait_sync_state = 'syncing'
        and o.updated_at < v_cutoff
-       and o.lazywait_ref is not null
-     returning o.id, o.first_pos_sync_failure_at as first_failure, o.lazywait_ref as ref
+       and public.lazywait_pos_ref_is_usable(o.lazywait_ref)
+     returning o.id, o.first_pos_sync_failure_at as first_failure
   ), notified_confirmed as (
-    -- Only enqueue the customer "confirmed" event when the recovered ref is a
-    -- USABLE POS reference — the SAME canonical helper the dispatch predicate
-    -- applies. A merely-stored (blank/malformed) ref keeps the row 'synced' (a
-    -- response came back; never re-POST) but must NOT tell the customer
-    -- "confirmed"; enqueuing pos_confirmed here would only be superseded at
-    -- send-time AND leave a dedup-blocking terminal event that could suppress a
-    -- later legitimate confirmation.
     insert into public.notification_log (kind, order_id, status, send_status)
       select 'pos_sync', id, 'pos_confirmed', 'pending' from recovered
        where first_failure is not null
-         and public.lazywait_pos_ref_is_usable(ref)
       on conflict do nothing
       returning 1
   )
   insert into public.integration_sync_logs (provider, order_id, direction, status, error)
     select 'lazywait', id, 'push', 'success', 'recovered_stale_syncing_with_ref' from recovered;
   get diagnostics v_recovered_synced = row_count;
+
+  -- (a2) WITH a NON-NULL but UNUSABLE ref marker -> confirmation_required. The
+  --     stored value (empty / ASCII- or Unicode-whitespace / BOM / malformed)
+  --     blocks any automatic resend (a response of SOME kind came back, so the
+  --     ticket may exist) but proves nothing — the row must NOT be finalized as
+  --     'synced', or it becomes an operational orphan: no pos_confirmed, no
+  --     verification-feed entry, and a falsely-green sync_status. Route it to
+  --     manual verification instead: the suspicious ref is PRESERVED exactly as
+  --     evidence (not touched by this UPDATE), no synced_at is stamped, retry
+  --     scheduling is cleared (never auto-retried), and the deduped
+  --     'pos_confirmation_required' event tells the customer "verifying" — never
+  --     "confirmed". Surfaces automatically in list_pos_confirmation_required via
+  --     the state change alone. Mutually exclusive with (a): usable vs not.
+  --     The COUNTED (outer) statement is the 1:1 failed sync-log insert.
+  with marker_unverified as (
+    update public.orders o
+       set lazywait_sync_state       = 'confirmation_required',
+           first_pos_sync_failure_at = coalesce(o.first_pos_sync_failure_at, now()),
+           pos_confirmation_reason   = coalesce(o.pos_confirmation_reason, 'missing_ref'),
+           sync_next_attempt_at      = null,
+           sync_last_error           = 'stale_syncing_ref_present_unverified',
+           sync_status               = 'failed'::public.sync_status,
+           updated_at                = now()
+     where o.lazywait_sync_state = 'syncing'
+       and o.updated_at < v_cutoff
+       and o.lazywait_ref is not null
+       and not public.lazywait_pos_ref_is_usable(o.lazywait_ref)
+     returning o.id
+  ), notified_marker as (
+    insert into public.notification_log (kind, order_id, status, send_status)
+      select 'pos_sync', id, 'pos_confirmation_required', 'pending' from marker_unverified
+      on conflict do nothing
+      returning 1
+  )
+  insert into public.integration_sync_logs (provider, order_id, direction, status, error)
+    select 'lazywait', id, 'push', 'failed', 'stale_syncing_ref_present_unverified' from marker_unverified;
+  get diagnostics v_rows = row_count;
+  v_confirmation_required := v_confirmation_required + v_rows;
 
   -- (b) no ref, marker SET (may have sent) -> confirmation_required. Do NOT
   --     resend: the request could have reached the POS. Human verifies.
@@ -541,7 +580,8 @@ begin
   )
   insert into public.integration_sync_logs (provider, order_id, direction, status, error)
     select 'lazywait', id, 'push', 'failed', 'stale_syncing_after_send_confirmation_required' from ambiguous;
-  get diagnostics v_confirmation_required = row_count;
+  get diagnostics v_rows = row_count;
+  v_confirmation_required := v_confirmation_required + v_rows;
 
   -- (c) no ref, marker NULL (proven not sent) -> safe requeue within budget,
   --     else dead_letter. The next attempt is anchored to the fixed schedule
