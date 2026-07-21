@@ -36,9 +36,11 @@
 --      budget; may-have-sent => confirmation_required) + past-deadline sweep.
 --   8. notification_log: allow kind='pos_sync', 'pending'/'superseded' send_status,
 --      a fencing claim_token, and a per-(order,status) dedup index.
---  8b. CONSUME-ONLY fenced pos_sync notification claim/finalize/release RPCs +
---      an authoritative order-state match check — at-most-once customer delivery
---      under concurrent dispatch, and only lifecycle producers create events.
+--  8b. CONSUME-ONLY fenced pos_sync notification claim/validate/finalize/release
+--      RPCs + an authoritative order-state match check — at-most-once customer
+--      delivery under concurrent dispatch, a FINAL token-fenced pre-send
+--      re-validation (order state can change between claim and send), and only
+--      lifecycle producers create events.
 --   9. Admin dashboard RPC: read-only "Orders Requiring Verification" feed.
 --  10. Partial indexes for the deadline-bounded queue and the dashboard query.
 --
@@ -581,10 +583,12 @@ create unique index if not exists notification_log_pos_sync_uq
   on public.notification_log (order_id, status)
   where kind = 'pos_sync';
 
--- ---- 8b. Fenced pos_sync notification claim / finalize / release ------------
+-- ---- 8b. Fenced pos_sync notification claim / validate / finalize / release --
 -- Guarantee AT-MOST-ONCE customer delivery even with concurrent dispatchers,
--- and keep the dispatcher a pure CONSUMER: only the lifecycle producers
--- (record_lazywait_sync, the stale reaper) may ever CREATE a pos_sync event.
+-- keep the dispatcher a pure CONSUMER (only the lifecycle producers
+-- record_lazywait_sync + the stale reaper may CREATE a pos_sync event), and
+-- re-validate authoritative order state a FINAL time immediately before the push
+-- leaves (the order can transition between claim and send).
 
 -- pos_sync_event_matches_order(): defense-in-depth — does the requested status
 -- still match the AUTHORITATIVE order state? A stale event (e.g. a 'pos_retrying'
@@ -681,6 +685,61 @@ end $$;
 
 revoke all on function public.claim_pos_sync_notification(uuid, text, text) from public, anon, authenticated;
 grant execute on function public.claim_pos_sync_notification(uuid, text, text) to service_role;
+
+-- validate_pos_sync_notification_before_send(): the FINAL, token-fenced
+-- authoritative-state re-check the dispatcher MUST pass immediately before the
+-- push leaves. The order can transition between the claim and the send (e.g. the
+-- sync worker succeeds and moves 'failed' -> 'synced' after a 'pos_retrying' was
+-- claimed); this closes that window as tightly as possible without holding a DB
+-- lock across the external Expo call. Under ONE row lock it requires the caller
+-- to still OWN a 'processing' claim (exact token) and re-checks the current order
+-- state via the same rules as pos_sync_event_matches_order. Returns exactly one:
+--   ready_to_send | superseded | lost_claim | not_found
+-- On 'superseded' it atomically marks the row terminal 'superseded' (owner-fenced,
+-- no retry path); on lost_claim/not_found it changes nothing (never touches a
+-- foreign claim). The caller sends ONLY on 'ready_to_send'. Service-role only.
+create or replace function public.validate_pos_sync_notification_before_send(
+  p_order_id uuid, p_status text, p_claim_token text
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_nid   uuid;
+  v_send  text;
+  v_token text;
+begin
+  if p_claim_token is null or p_claim_token = '' then
+    raise exception 'claim token required' using errcode = '22004';
+  end if;
+
+  select id, send_status, claim_token into v_nid, v_send, v_token
+    from public.notification_log
+   where kind = 'pos_sync' and order_id = p_order_id and status = p_status
+   for update;
+  if v_nid is null then
+    return 'not_found';
+  end if;
+  -- Must still be OUR live claim. A non-processing row, or a different (or null)
+  -- token, means we no longer own the send — never mutate a foreign claim.
+  if v_send <> 'processing' or v_token is distinct from p_claim_token then
+    return 'lost_claim';
+  end if;
+
+  -- Re-check the CURRENT authoritative order state (not the claim-time snapshot).
+  if not public.pos_sync_event_matches_order(p_order_id, p_status) then
+    update public.notification_log set send_status = 'superseded', updated_at = now()
+     where id = v_nid and send_status = 'processing' and claim_token = p_claim_token;
+    return 'superseded';
+  end if;
+
+  return 'ready_to_send';
+end $$;
+
+revoke all on function public.validate_pos_sync_notification_before_send(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.validate_pos_sync_notification_before_send(uuid, text, text) to service_role;
 
 create or replace function public.finalize_pos_sync_notification(
   p_order_id uuid, p_status text, p_claim_token text, p_send_status text,

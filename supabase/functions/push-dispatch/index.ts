@@ -471,6 +471,41 @@ Deno.serve(async (req: Request) => {
       return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
     }
 
+    // FINAL token-fenced pre-send re-validation, immediately adjacent to the send.
+    // The order can transition between the claim above and this point (e.g. the
+    // sync worker succeeds, moving 'failed' -> 'synced' after a 'pos_retrying' was
+    // claimed). The copy (POS_SYNC_COPY[status], a constant) and the device list
+    // are ALREADY prepared, and NOTHING async happens between this check and the
+    // send. A DB transaction cannot be held across the external Expo call, so the
+    // only residual gap is the single synchronous step between this RPC committing
+    // and fetch() starting — no awaited work sits in it. Only 'ready_to_send'
+    // proceeds; a superseded event was atomically marked terminal by the RPC.
+    const { data: preSend, error: preErr } = await admin.rpc('validate_pos_sync_notification_before_send', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+    });
+    if (preErr) {
+      // Transient validation failure BEFORE any send: release the claim back to
+      // 'pending' (owner-fenced) so a later dispatch can safely retry — nothing
+      // was delivered, so this cannot double-send. If the RPC actually committed
+      // (e.g. a 'superseded' mark) and only the reply was lost, the release
+      // matches zero rows and is a harmless no-op. Without this the 'processing'
+      // row would strand (no notification_log reaper; the unique index blocks a
+      // fresh 'pending' re-enqueue), silently losing a deliverable notification.
+      await admin.rpc('release_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      });
+      return json({ status: 'error', send_status: 'pending', reason: 'pre-send validation failed (transient)' }, 500);
+    }
+    const preResult = String(preSend ?? '');
+    if (preResult === 'superseded') {
+      return json({ status: 'superseded', reason: 'order state changed before send; not sent' }, 200);
+    }
+    if (preResult !== 'ready_to_send') {
+      // 'lost_claim' / 'not_found' / anything unexpected -> we no longer own the
+      // send (or the event is gone). Never send, never touch a foreign claim.
+      return json({ status: 'no_send', reason: `pre-send validation: ${preResult}` }, 200);
+    }
+
     const result = await sendToDevices(admin, targets, POS_SYNC_COPY[status], { type: 'order', orderId });
     // The requests have LEFT for at least some devices. Whether or not any ticket
     // succeeded, this is a post-send result and must be TERMINAL — never

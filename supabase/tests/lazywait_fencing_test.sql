@@ -196,4 +196,95 @@ begin
   raise notice 'CONSUME-ONLY OK';
 end $$;
 
+-- ---- FINAL token-fenced pre-send re-validation -----------------------------
+-- The order can transition between the claim and sendToDevices; the dispatcher
+-- must re-check authoritative state immediately before sending.
+do $$
+declare
+  v_retry uuid := gen_random_uuid();  -- pos_retrying, then order syncs
+  v_conf  uuid := gen_random_uuid();  -- pos_confirmed stays valid
+  v_noref uuid := gen_random_uuid();  -- pos_confirmed loses its ref
+  v_cr    uuid := gen_random_uuid();  -- pos_confirmation_required order changes
+  v_fail  uuid := gen_random_uuid();  -- pos_failed no longer terminal
+  v_tok   uuid := gen_random_uuid();  -- wrong-token / finalize / not_found
+begin
+  set local session_replication_role = replica;
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
+    lazywait_sync_state, lazywait_ref, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at) values
+    (v_retry, 'V-1', gen_random_uuid(),'pickup',10,10,'failed', null, now()+interval '2m', now()-interval '1m', now()+interval '9m'),
+    (v_conf,  'V-2', gen_random_uuid(),'pickup',10,10,'synced', 'REFV2', null, null, null),
+    (v_noref, 'V-3', gen_random_uuid(),'pickup',10,10,'synced', 'REFV3', null, null, null),
+    (v_cr,    'V-4', gen_random_uuid(),'pickup',10,10,'confirmation_required', null, null, null, null),
+    (v_fail,  'V-5', gen_random_uuid(),'pickup',10,10,'dead_letter', null, null, null, null),
+    (v_tok,   'V-6', gen_random_uuid(),'pickup',10,10,'synced', 'REFV6', null, null, null);
+  set local session_replication_role = origin;
+
+  -- (1) pos_retrying claimed while retryable, order SYNCS before send -> superseded.
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_retry, 'pos_retrying', 'pending');
+  if public.claim_pos_sync_notification(v_retry,'pos_retrying','T1') <> 'claimed' then raise exception 'PRESEND V1 FAILED: claim'; end if;
+  update public.orders set lazywait_sync_state='synced', lazywait_ref='REFV1' where id=v_retry;
+  if public.validate_pos_sync_notification_before_send(v_retry,'pos_retrying','T1') <> 'superseded' then
+    raise exception 'PRESEND V1 FAILED: stale retrying not superseded'; end if;
+  if (select send_status from public.notification_log where order_id=v_retry and status='pos_retrying') <> 'superseded' then
+    raise exception 'PRESEND V1 FAILED: row not marked superseded'; end if;
+
+  -- (2) pos_confirmed still synced+ref -> ready_to_send; row stays 'processing'.
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_conf, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_conf,'pos_confirmed','T2') <> 'claimed' then raise exception 'PRESEND V2 FAILED: claim'; end if;
+  if public.validate_pos_sync_notification_before_send(v_conf,'pos_confirmed','T2') <> 'ready_to_send' then
+    raise exception 'PRESEND V2 FAILED: not ready_to_send'; end if;
+  if (select send_status from public.notification_log where order_id=v_conf and status='pos_confirmed') <> 'processing' then
+    raise exception 'PRESEND V2 FAILED: ready_to_send mutated the row'; end if;
+
+  -- (3) pos_confirmed LOSES its ref before send -> superseded.
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_noref, 'pos_confirmed', 'pending');
+  perform public.claim_pos_sync_notification(v_noref,'pos_confirmed','T3');
+  update public.orders set lazywait_ref=null where id=v_noref;   -- still 'synced', but no ref
+  if public.validate_pos_sync_notification_before_send(v_noref,'pos_confirmed','T3') <> 'superseded' then
+    raise exception 'PRESEND V3 FAILED: ref-less confirmed not superseded'; end if;
+
+  -- (4) pos_confirmation_required order MOVES ON -> superseded (no stale verify msg).
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_cr, 'pos_confirmation_required', 'pending');
+  perform public.claim_pos_sync_notification(v_cr,'pos_confirmation_required','T4');
+  update public.orders set lazywait_sync_state='synced', lazywait_ref='REFV4' where id=v_cr;
+  if public.validate_pos_sync_notification_before_send(v_cr,'pos_confirmation_required','T4') <> 'superseded' then
+    raise exception 'PRESEND V4 FAILED: stale confirmation_required not superseded'; end if;
+
+  -- (5) pos_failed no longer terminal -> superseded.
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_fail, 'pos_failed', 'pending');
+  perform public.claim_pos_sync_notification(v_fail,'pos_failed','T5');
+  update public.orders set lazywait_sync_state='synced', lazywait_ref='REFV5' where id=v_fail;
+  if public.validate_pos_sync_notification_before_send(v_fail,'pos_failed','T5') <> 'superseded' then
+    raise exception 'PRESEND V5 FAILED: stale pos_failed not superseded'; end if;
+
+  -- (6) Wrong claim token -> lost_claim; the owner's row is NOT modified.
+  insert into public.notification_log (kind, order_id, status, send_status) values ('pos_sync', v_tok, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_tok,'pos_confirmed','OWNER') <> 'claimed' then raise exception 'PRESEND V6 FAILED: claim'; end if;
+  if public.validate_pos_sync_notification_before_send(v_tok,'pos_confirmed','INTRUDER') <> 'lost_claim' then
+    raise exception 'PRESEND V6 FAILED: non-owner not lost_claim'; end if;
+  if (select send_status from public.notification_log where order_id=v_tok and status='pos_confirmed') <> 'processing'
+     or (select claim_token from public.notification_log where order_id=v_tok and status='pos_confirmed') <> 'OWNER' then
+    raise exception 'PRESEND V6 FAILED: non-owner mutated the row'; end if;
+  -- the true owner still validates ready.
+  if public.validate_pos_sync_notification_before_send(v_tok,'pos_confirmed','OWNER') <> 'ready_to_send' then
+    raise exception 'PRESEND V6 FAILED: owner not ready_to_send'; end if;
+
+  -- (7) Already finalized ('sent') -> lost_claim (not processing); no send.
+  perform public.finalize_pos_sync_notification(v_tok,'pos_confirmed','OWNER','sent',1,1,0,0);
+  if public.validate_pos_sync_notification_before_send(v_tok,'pos_confirmed','OWNER') <> 'lost_claim' then
+    raise exception 'PRESEND V7 FAILED: finalized row validated ready'; end if;
+
+  -- (8) No event row at all -> not_found.
+  if public.validate_pos_sync_notification_before_send(gen_random_uuid(),'pos_confirmed','T8') <> 'not_found' then
+    raise exception 'PRESEND V8 FAILED: expected not_found'; end if;
+
+  -- (9) Empty/NULL claim token is rejected outright (owner-fence input guard).
+  begin
+    perform public.validate_pos_sync_notification_before_send(v_conf,'pos_confirmed','');
+    raise exception 'PRESEND V9 FAILED: empty token accepted';
+  exception when sqlstate '22004' then null; end;
+
+  raise notice 'PRE-SEND VALIDATION OK';
+end $$;
+
 rollback;
