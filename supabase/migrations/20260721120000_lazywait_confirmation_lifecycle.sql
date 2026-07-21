@@ -430,11 +430,20 @@ begin
      where o.lazywait_sync_state = 'syncing'
        and o.updated_at < v_cutoff
        and o.lazywait_ref is not null
-     returning o.id, o.first_pos_sync_failure_at as first_failure
+     returning o.id, o.first_pos_sync_failure_at as first_failure, o.lazywait_ref as ref
   ), notified_confirmed as (
+    -- Only enqueue the customer "confirmed" event when the recovered ref is a
+    -- USABLE (trimmed, non-empty) POS reference — the same rule (and same full
+    -- ASCII whitespace trim set) the canonical pos_sync_status_matches predicate
+    -- applies at dispatch. A whitespace-only ref keeps the row 'synced' (a
+    -- response came back; never re-POST) but must NOT tell the customer
+    -- "confirmed"; enqueuing pos_confirmed here would only be superseded at
+    -- send-time AND leave a dedup-blocking terminal event that could suppress a
+    -- later legitimate confirmation.
     insert into public.notification_log (kind, order_id, status, send_status)
       select 'pos_sync', id, 'pos_confirmed', 'pending' from recovered
        where first_failure is not null
+         and nullif(btrim(coalesce(ref, ''), E' \t\n\r\f\v'), '') is not null
       on conflict do nothing
       returning 1
   )
@@ -710,7 +719,7 @@ create unique index if not exists notification_log_pos_sync_uq
 -- column values (state / ref / next-attempt / deadline) so the claim-time and
 -- send-time rules can NEVER drift. STABLE (references now() for the retry/deadline
 -- window), no table access, no secrets/PII. This is the single source of the rules:
---   pos_confirmed             -> synced + non-empty ref
+--   pos_confirmed             -> synced + a trimmed, non-empty ref
 --   pos_confirmation_required -> confirmation_required
 --   pos_retrying              -> failed + a FUTURE sync_next_attempt_at + unexpired deadline
 --   pos_failed                -> blocked | dead_letter
@@ -728,7 +737,15 @@ set search_path = public
 as $$
   select case p_status
     when 'pos_confirmed' then
-      p_state = 'synced' and coalesce(p_ref, '') <> ''
+      -- A whitespace-only ref is NOT a usable POS reference. Require a trimmed,
+      -- non-empty ref so the customer is only told "confirmed" when Lazywait
+      -- returned a real order_ref. The trim set is the full ASCII whitespace set
+      -- (space, tab, newline, CR, form-feed, vertical-tab) — NOT single-arg
+      -- btrim(), which strips only spaces and would let a tab/newline-only ref
+      -- through. This mirrors the mobile hasUsablePosRef() rule (JS .trim()) so
+      -- SQL and client can never diverge.
+      p_state = 'synced'
+      and nullif(btrim(coalesce(p_ref, ''), E' \t\n\r\f\v'), '') is not null
     when 'pos_confirmation_required' then
       p_state = 'confirmation_required'
     when 'pos_retrying' then

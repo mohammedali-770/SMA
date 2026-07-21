@@ -27,6 +27,7 @@ declare
   v_synced  uuid := gen_random_uuid();
   v_withref uuid := gen_random_uuid();
   v_reffail uuid := gen_random_uuid();
+  v_wsref   uuid := gen_random_uuid();
   v_amb     uuid := gen_random_uuid();
   v_safe    uuid := gen_random_uuid();
   v_maxed   uuid := gen_random_uuid();
@@ -47,6 +48,7 @@ begin
     (v_synced, 'R-2', gen_random_uuid(), 'pickup', 10, 10, 'synced',  'REF_DONE', null,      now()-interval '5m', now()+interval '5m', 0, now()-interval '30 minutes', null),
     (v_withref,'R-3', gen_random_uuid(), 'pickup', 10, 10, 'syncing', 'REF_LOST', now()-interval '25m', now()-interval '5m', now()+interval '5m', 2, now()-interval '30 minutes', null),
     (v_reffail,'R-7', gen_random_uuid(), 'pickup', 10, 10, 'syncing', 'REF_RECOV', now()-interval '25m', now()-interval '5m', now()+interval '5m', 2, now()-interval '30 minutes', now()-interval '4 minutes'),
+    (v_wsref,  'R-8', gen_random_uuid(), 'pickup', 10, 10, 'syncing', '   ',       now()-interval '25m', now()-interval '5m', now()+interval '5m', 2, now()-interval '30 minutes', now()-interval '4 minutes'),
     (v_amb,    'R-4', gen_random_uuid(), 'pickup', 10, 10, 'syncing', null,       now()-interval '25m', now()-interval '5m', now()+interval '5m', 1, now()-interval '30 minutes', null),
     (v_safe,   'R-5', gen_random_uuid(), 'pickup', 10, 10, 'syncing', null,       null,      now()-interval '2m', now()+interval '8m', 1, now()-interval '30 minutes', null),
     (v_maxed,  'R-6', gen_random_uuid(), 'pickup', 10, 10, 'syncing', null,       null,      now()-interval '5m', now()+interval '5m', 4, now()-interval '30 minutes', null);
@@ -84,6 +86,17 @@ begin
         where order_id = v_reffail and kind = 'pos_sync' and status = 'pos_confirmed' and send_status = 'pending') <> 1 then
     raise exception 'CASE 3b FAILED: expected exactly one pending pos_confirmed event'; end if;
 
+  -- Case 3c: stale WITH a WHITESPACE-only ref AND a prior failure -> still
+  --          recovered to 'synced' (a response came back; never re-POST) but NO
+  --          pos_confirmed enqueued — whitespace is not a usable POS ref, so the
+  --          customer must not be told "confirmed". Mirrors the canonical dispatch
+  --          predicate (pos_sync_status_matches) so SQL never claims a bogus proof.
+  select lazywait_sync_state into v_state from public.orders where id = v_wsref;
+  if v_state <> 'synced' then raise exception 'CASE 3c FAILED: whitespace-ref not recovered -> %', v_state; end if;
+  if (select count(*) from public.notification_log
+        where order_id = v_wsref and kind = 'pos_sync') <> 0 then
+    raise exception 'CASE 3c FAILED: pos_confirmed enqueued for a whitespace-only ref'; end if;
+
   -- Case 4: stale no-ref, marker SET -> confirmation_required (never auto-retry)
   --         + exactly one deduped pos_sync notification.
   select lazywait_sync_state into v_state from public.orders where id = v_amb;
@@ -109,9 +122,10 @@ begin
   if v_state <> 'dead_letter' then raise exception 'CASE 6 FAILED: maxed not dead-lettered -> %', v_state; end if;
   if v_next is not null then raise exception 'CASE 6 FAILED: dead_letter still scheduled -> %', v_next; end if;
 
-  -- Summary counts: 2 recovered (ref, ref+failure), 1 confirmation_required,
-  -- 1 requeued, 1 dead-lettered.
-  if (v_res->>'recovered_synced')::int <> 2
+  -- Summary counts: 3 recovered (ref, ref+failure, whitespace-ref+failure — all
+  -- three flip 'syncing'->'synced'), 1 confirmation_required, 1 requeued,
+  -- 1 dead-lettered.
+  if (v_res->>'recovered_synced')::int <> 3
      or (v_res->>'confirmation_required')::int <> 1
      or (v_res->>'requeued')::int <> 1
      or (v_res->>'dead_lettered')::int <> 1 then
@@ -131,15 +145,15 @@ begin
         where order_id = v_reffail and kind = 'pos_sync' and status = 'pos_confirmed') <> 1 then
     raise exception 'IDEMPOTENCY FAILED: duplicate pos_confirmed after second reap'; end if;
 
-  -- Recovery is logged for Admin visibility (one row per reaped order): two
-  -- ref recoveries + confirmation_required + requeued + dead_letter = 5.
+  -- Recovery is logged for Admin visibility (one row per reaped order): three
+  -- ref recoveries + confirmation_required + requeued + dead_letter = 6.
   if (select count(*) from public.integration_sync_logs
         where provider = 'lazywait'
           and error in ('recovered_stale_syncing_with_ref',
                         'stale_syncing_after_send_confirmation_required',
                         'stale_syncing_no_ref_requeued',
-                        'stale_syncing_no_ref_dead_letter')) <> 5 then
-    raise exception 'LOGGING FAILED: expected 5 recovery log rows';
+                        'stale_syncing_no_ref_dead_letter')) <> 6 then
+    raise exception 'LOGGING FAILED: expected 6 recovery log rows';
   end if;
 
   raise notice 'ALL REAPER CASES PASSED';

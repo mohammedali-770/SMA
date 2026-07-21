@@ -300,4 +300,79 @@ begin
   raise notice 'PRE-SEND VALIDATION OK';
 end $$;
 
+-- ---- Whitespace-only POS ref is NOT a usable confirmation ------------------
+-- A whitespace-only lazywait_ref must be treated exactly like a MISSING ref:
+-- state 'synced' alone never proves POS confirmation. This keeps the canonical
+-- SQL predicate in lock-step with the mobile hasUsablePosRef() rule (JS .trim(),
+-- which strips the full ASCII whitespace set — space, tab, newline, CR, FF, VT),
+-- so the customer is only ever told "confirmed" when Lazywait returned a REAL
+-- order_ref. The trim MUST cover tabs/newlines, not just spaces (single-arg
+-- btrim() would let a tab/newline-only ref slip through and re-open the drift).
+do $$
+begin
+  -- Pure predicate: pos_confirmed requires synced AND a trimmed, non-empty ref.
+  if public.pos_sync_status_matches('pos_confirmed','synced', null,     null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + null ref reported confirmed'; end if;
+  if public.pos_sync_status_matches('pos_confirmed','synced', '',       null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + empty ref reported confirmed'; end if;
+  if public.pos_sync_status_matches('pos_confirmed','synced', '   ',    null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + space-only ref reported confirmed'; end if;
+  if public.pos_sync_status_matches('pos_confirmed','synced', E'\t',    null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + tab-only ref reported confirmed'; end if;
+  if public.pos_sync_status_matches('pos_confirmed','synced', E'\n',    null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + newline-only ref reported confirmed'; end if;
+  if public.pos_sync_status_matches('pos_confirmed','synced', E' \t\r\n ', null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + mixed-whitespace ref reported confirmed'; end if;
+  -- A real ref (including one padded with whitespace) IS a usable confirmation.
+  if not public.pos_sync_status_matches('pos_confirmed','synced', 'REF', null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + real ref not confirmed'; end if;
+  if not public.pos_sync_status_matches('pos_confirmed','synced', E'  REF  ', null, null) then
+    raise exception 'WS PREDICATE FAILED: synced + padded real ref not confirmed'; end if;
+  raise notice 'WS PREDICATE OK';
+end $$;
+
+do $$
+declare
+  v_ws   uuid := gen_random_uuid();  -- synced, whitespace-only ref (claim supersede)
+  v_lose uuid := gen_random_uuid();  -- synced, real ref that becomes whitespace pre-send
+  v_ok   uuid := gen_random_uuid();  -- synced, real ref -> ready_to_send
+begin
+  set local session_replication_role = replica;
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
+    lazywait_sync_state, lazywait_ref) values
+    (v_ws,   'F-WS1', gen_random_uuid(),'pickup',10,10,'synced', '   '),
+    (v_lose, 'F-WS2', gen_random_uuid(),'pickup',10,10,'synced', 'REFWS2'),
+    (v_ok,   'F-WS3', gen_random_uuid(),'pickup',10,10,'synced', 'REFWS3');
+  set local session_replication_role = origin;
+
+  -- CLAIM: a pending pos_confirmed whose order is synced but ref is whitespace-only
+  -- is stale -> superseded (terminal no-send); the customer is NOT told confirmed.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_ws, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_ws,'pos_confirmed','WS1') <> 'superseded' then
+    raise exception 'WS CLAIM FAILED: whitespace-ref pos_confirmed not superseded'; end if;
+  if (select send_status from public.notification_log where order_id=v_ws and status='pos_confirmed') <> 'superseded' then
+    raise exception 'WS CLAIM FAILED: whitespace-ref event not marked superseded'; end if;
+
+  -- PRE-SEND: a claim whose usable ref decays to whitespace (here a tab) before
+  -- send -> superseded (never push "confirmed" on an unusable ref).
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_lose, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_lose,'pos_confirmed','WS2') <> 'claimed' then
+    raise exception 'WS PRESEND FAILED: valid confirmed not claimable'; end if;
+  update public.orders set lazywait_ref = E'\t  ' where id = v_lose;   -- still 'synced', ref now whitespace
+  if public.validate_pos_sync_notification_before_send(v_lose,'pos_confirmed','WS2') <> 'superseded' then
+    raise exception 'WS PRESEND FAILED: whitespace-ref not superseded at send'; end if;
+
+  -- CONTROL: a genuinely usable ref still claims and validates ready_to_send.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_ok, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_ok,'pos_confirmed','WS3') <> 'claimed' then
+    raise exception 'WS CONTROL FAILED: usable-ref confirmed not claimable'; end if;
+  if public.validate_pos_sync_notification_before_send(v_ok,'pos_confirmed','WS3') <> 'ready_to_send' then
+    raise exception 'WS CONTROL FAILED: usable ref not ready_to_send'; end if;
+
+  raise notice 'WS CLAIM/PRESEND OK';
+end $$;
+
 rollback;
