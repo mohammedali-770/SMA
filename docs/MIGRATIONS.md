@@ -10,16 +10,21 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **45**
-- Live `schema_migrations` rows: **45**
-- Latest live version: **`20260720075244`**
-  (`lazywait_sync_scheduler`; repository version `20260720120000`)
-- **Newest repository file is UNAPPLIED.** `20260721120000_lazywait_confirmation_lifecycle`
-  (customer-visible POS confirmation lifecycle) exists in the repository only and
-  has **no live `schema_migrations` row** — it is a forward-only migration awaiting
-  owner-approved application via the §9 `apply_migration` workflow. The live count
-  and the latest live version above are therefore **unchanged** by it. It is the
-  reason the repository count rose from 44 to 45 while the live count stayed at 45.
+- Repository migration files: **47**
+- Live `schema_migrations` rows: **48**
+- Latest live version: **`20260721113811`**
+  (`lazywait_sync_health_summary`; repository version `20260721150000`)
+- **Every repository migration is now applied.** The three 2026-07-21
+  applications (all class B — same content, generated apply-time versions):
+  - `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`**
+    (owner-approved; PR #69)
+  - `20260721130000_lazywait_synced_ref_guard` → live **`20260721084330`**
+    (owner-approved; PR #70; version recorded in the migration file header)
+  - `20260721150000_lazywait_sync_health_summary` → live **`20260721113811`**
+    (owner-approved; PR #71; observability-only — see §14)
+  The one-row repository/live count difference (47 vs 48) is the pre-existing
+  historical divergence documented in §5 (a live-only F-class row), not new
+  drift.
 - The current production schema is **functionally aligned with the repository
   through `20260714130000`** — every repository migration, including the
   trigger-function grant hardening, is applied and verified — based on
@@ -191,13 +196,17 @@ production.
 | 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; the pre-existing explicit `service_role=X` ACL entry remained — it originates from Supabase's platform **default function privileges** applied at creation (CONFIRMED in `pg_default_acl`: postgres-owned functions default-grant EXECUTE to anon/authenticated/service_role), NOT from any live-only grant, so it is not production drift and reproduces identically in any environment built from these repository migrations; function bodies and trigger definitions unchanged |
 | 39 | 20260720120000 | lazywait_sync_scheduler | `26b85de4256e` | 20260720075244 | lazywait_sync_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Lazywait POS sync pg_cron driver + durable run ledger.** Owner-approved; applied **2026-07-20** via MCP `apply_migration` (exact merged content from PR #67, squash `c6579e6…`); generated apply-time live version `20260720075244` — **not** version-aligned (repository filename version `20260720120000` differs; no §9-D write performed). Verified live objects: `public.lazywait_sync_requests`, `public.lazywait_sync_cron_health`, `public.invoke_lazywait_sync_processor()`, cron job `lazywait-sync` (jobid 2, `* * * * *`, active). No payment/order-intake/worker/payload/delivery/POS change. Full detail in §13 |
 
-Reconciliation check: the rows above detail **39 repository** rows
-(3×A + 31×B + 3×C + 2×H) and **40 live** rows (3×A + 31×B + 3×C + 3×F).
+| 40 | 20260721120000 | lazywait_confirmation_lifecycle | — | 20260721082325 | lazywait_confirmation_lifecycle | = | B | ✔ verified live (`list_migrations` + live lifecycle objects in service) | CONFIRMED | none | high if `db push` | **Customer-visible POS confirmation lifecycle** (PR #69). Owner-approved; applied 2026-07-21 via MCP `apply_migration`; generated live version differs from the repository filename (class B, no §9-D alignment). No payment/cron/Vault change |
+| 41 | 20260721130000 | lazywait_synced_ref_guard | — | 20260721084330 | lazywait_synced_ref_guard | = | B | ✔ verified live (`list_migrations`; version recorded in the migration file header) | CONFIRMED | none | high if `db push` | **Producer-side synced/usable-ref invariant guard** (PR #70). Owner-approved; applied 2026-07-21; redefines `record_lazywait_sync` only. No payment/cron/Vault change |
+| 42 | 20260721150000 | lazywait_sync_health_summary | `0f4de301255c` | 20260721113811 | lazywait_sync_health_summary | = | B | ✔ verified live (function properties, grants, live output) | CONFIRMED | none | high if `db push` | **Service-role-only aggregate health summary for the lazywait-sync scheduler** (PR #71, squash `4c3d0bd…`). Owner-approved; applied **2026-07-21** via MCP `apply_migration` with the exact merged file content; observability-only (one new SECURITY DEFINER function; read-only over the ledger, `cron.job`, orders sync state). Full detail in §14 |
+
+Reconciliation check: the rows above detail **42 repository** rows
+(3×A + 34×B + 3×C + 2×H) and **43 live** rows (3×A + 34×B + 3×C + 3×F).
 Adding the five applied-but-not-yet-itemized account-deletion migrations
-(§1, §4 note) — present on both sides — plus the one **repository-only,
-UNAPPLIED** migration `20260721120000_lazywait_confirmation_lifecycle` (no live
-row yet, §1) yields the true production totals of **45 repository / 45 live**
-recorded in §1 (39 + 5 + 1 repository; 40 + 5 live).
+(§1, §4 note) — present on both sides — yields the true production totals of
+**47 repository / 48 live** recorded in §1 (42 + 5 repository; 43 + 5 live).
+The single extra live row remains the historical F-class divergence, not new
+drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -426,3 +435,51 @@ database remains unsafe regardless. Risks:
 - **Follow-up (documentation debt):** the five account-deletion migrations
   applied after Stage 4 (§1) are not yet itemized in §4/§5 and should be
   reconciled in a separate documentation PR.
+
+---
+
+## 14. Completed migration: Lazywait sync health summary (2026-07-21)
+
+`supabase/migrations/20260721150000_lazywait_sync_health_summary.sql`
+
+- **Status: merged (PR #71, squash `4c3d0bdcb419659aaefae21510fcc84e318cfea0`,
+  PR head `213197aceed785a2fa766c48b8872fd801a4e973`), owner-approved, and
+  APPLIED to production on 2026-07-21** via MCP `apply_migration` with the exact
+  merged file content (sha256 `0f4de301255c0005f7345ee2a1f63bbbba07ac408b235400b7f58ccaa47dc829`).
+- **Live version:** generated apply-time `20260721113811`
+  (`lazywait_sync_health_summary`) — class **B** vs the repository filename
+  version `20260721150000`; **no** §9-D version-alignment write performed.
+- **Scope — observability only.** One new function
+  `public.lazywait_sync_health_summary()` (SECURITY DEFINER, `search_path=public`,
+  STABLE, EXECUTE revoked from PUBLIC/anon/authenticated, granted to
+  service_role only). Read-only over `lazywait_sync_requests`, `cron.job` and
+  the orders sync-state columns. **No change** to
+  `invoke_lazywait_sync_processor`, the cron schedule/frequency, the
+  lazywait-sync worker, payment, order intake, the Lazywait payload mapping,
+  POS logic, Vault, secrets, integration settings, orders, or customer data.
+- **Pre-live gate (recorded before apply):** scheduler migration live
+  (`20260720075244`); cron job `lazywait-sync` jobid 2, `* * * * *`, active;
+  `lazywait_sync_requests` present (1 664 rows); target function absent;
+  zero name/version collisions; 47 live rows before apply → 48 after.
+- **Post-apply verification:** function exists with the exact expected
+  properties and grants (anon/authenticated denied, service_role allowed);
+  live output contains exactly the 15 documented keys and no secret/header/
+  body/customer data.
+- **Initial health reading (11:38:34 UTC, same minute as apply):**
+  `overall_state = healthy`, `cron_active = true`, latest tick 11:38:00,
+  latest observed response HTTP 200 (11:37:01, age 93 s), streaks 0/0,
+  due orders 0/0.
+- **Steady-state reading (11:41:21 UTC, after three further one-minute ticks):**
+  `overall_state = healthy`, `cron_active = true`, latest tick 11:41:00,
+  latest observed response HTTP 200 (11:40:00, age 80 s),
+  `consecutive_http_401 = 0`, `consecutive_5xx_or_timeout = 0`,
+  `due_pending_failed_orders = 0`, `due_without_success_since = 0`.
+  (The `latest_failure` field shows a historical 502 from 08:13 UTC — pre-apply
+  history surfaced for operator context; it does not affect the streaks or the
+  state.)
+- **Operator usage:** the service role calls
+  `select public.lazywait_sync_health_summary();` — state rules and the
+  3-minute tick / 5-minute success staleness thresholds are documented in the
+  migration header. An HTTP 2xx proves the worker invocation completed, not
+  that every due order synced; per-order outcomes stay in `orders` /
+  `integration_sync_logs`.
