@@ -23,10 +23,21 @@ export interface PosLifecycleInput {
   orderType: string | null | undefined;
   /** orders.lazywait_sync_state — the authoritative technical state. */
   syncState: string | null | undefined;
+  /** orders.lazywait_ref — the POS order reference; REQUIRED to say "confirmed". */
+  ref?: unknown;
   /** orders.first_pos_sync_failure_at — set the first time a send did not confirm. */
   firstFailureAt?: string | null;
   /** orders.sync_next_attempt_at — a future value means a retry is still queued. */
   nextAttemptAt?: string | null;
+}
+
+/**
+ * A Lazywait order_ref is "usable" only when it is a trimmed, non-empty string.
+ * Anything else (non-string, null, empty, whitespace-only) is treated as ABSENT
+ * — a customer must never be told the restaurant confirmed the order without one.
+ */
+export function hasUsablePosRef(ref: unknown): boolean {
+  return typeof ref === 'string' && ref.trim().length > 0;
 }
 
 export function deriveCustomerPosLifecycle(o: PosLifecycleInput): CustomerPosLifecycle | null {
@@ -36,7 +47,11 @@ export function deriveCustomerPosLifecycle(o: PosLifecycleInput): CustomerPosLif
 
   switch (o.syncState) {
     case 'synced':
-      return 'confirmed_by_restaurant';
+      // CORE INVARIANT: "confirmed by the restaurant" requires a usable POS ref.
+      // A 'synced' row without one is an inconsistent DB state and confirmation
+      // cannot be proven — fall back to the safe "verifying" phase (NOT a final
+      // failure, since we are not certain the order was never created).
+      return hasUsablePosRef(o.ref) ? 'confirmed_by_restaurant' : 'pos_confirmation_required';
     case 'confirmation_required':
       return 'pos_confirmation_required';
     case 'dead_letter':

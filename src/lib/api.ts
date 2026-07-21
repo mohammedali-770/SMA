@@ -105,9 +105,13 @@ export interface DbOrder {
   lazywait_status?: string | null; sync_attempt_count?: number;
   sync_next_attempt_at?: string | null; sync_last_error?: string | null;
   sync_blocked_reason?: string | null; synced_at?: string | null;
+  // Customer-confirmation lifecycle (see 20260721120000). Drive the deadline-safe
+  // manual-retry eligibility check; never customer secrets.
+  pos_sync_deadline_at?: string | null; pos_create_attempted_at?: string | null;
 }
 export type LazywaitSyncState =
-  | 'pending' | 'syncing' | 'synced' | 'failed' | 'blocked' | 'dead_letter' | 'skipped';
+  | 'pending' | 'syncing' | 'synced' | 'failed' | 'blocked' | 'dead_letter' | 'skipped'
+  | 'awaiting_payment' | 'confirmation_required';
 
 // ---- Lazywait catalog mapping ---------------------------------------------
 /** Reference-only price snapshot chosen from a Lazywait item's price list. */

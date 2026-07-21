@@ -34,6 +34,10 @@
 --      pos_sync notification ('pending') atomically with the state change.
 --   7. Stale reaper: phase-marker-aware (proven-not-sent => safe requeue within
 --      budget; may-have-sent => confirmation_required) + past-deadline sweep.
+--  7b. requeue_lazywait_order: deadline-safe manual retry — rejects an expired /
+--      ambiguous / already-sent / attempt-exhausted order (no false success),
+--      preserves the original deadline + attempt count. One shared eligibility
+--      predicate (mirrored by the admin UI to hide the Retry action).
 --   8. notification_log: allow kind='pos_sync', 'pending'/'superseded' send_status,
 --      a fencing claim_token, and a per-(order,status) dedup index.
 --  8b. CONSUME-ONLY fenced pos_sync notification claim/validate/finalize/release
@@ -549,6 +553,115 @@ end $$;
 
 revoke all on function public.reap_stale_lazywait_syncs(integer, integer) from public, anon, authenticated;
 grant execute on function public.reap_stale_lazywait_syncs(integer, integer) to service_role;
+
+-- ---- 7b. requeue_lazywait_order(): deadline-safe manual retry ----------------
+-- REDEFINES the admin "Retry" action to be AUTHORITATIVE and safe. A POS order
+-- that has passed its absolute 10-minute deadline (or is otherwise not proven
+-- safe to resend) must NOT be requeued into the automatic Create Order pipeline —
+-- otherwise the dashboard reports success while the claim RPC rejects the order,
+-- the worker never sends it, and the deadline reaper returns it to dead_letter.
+-- The prior definition (20260708140000) reset the attempt count and left the
+-- expired deadline in place, producing exactly that false success.
+--
+-- The eligibility rule lives in ONE pure predicate (mirrored by the admin UI to
+-- hide the Retry action; the DB stays authoritative). A row is requeuable ONLY
+-- when it is a proven-safe failure still inside its original budget:
+--   delivery                                   -> not_retryable
+--   has a usable ref OR state 'synced'          -> already_synced (never resend)
+--   state 'confirmation_required'               -> confirmation_required (manual only)
+--   phase marker set (Create Order may have left) -> may_have_sent
+--   state not in failed/blocked/dead_letter/skipped -> not_retryable
+--   attempt count >= 5                          -> attempt_limit_reached
+--   past the absolute deadline                   -> deadline_expired
+--   else                                         -> requeued
+create or replace function public.lazywait_requeue_eligibility(
+  p_state         text,
+  p_ref           text,
+  p_deadline_at   timestamptz,
+  p_attempt_count integer,
+  p_marker_at     timestamptz,   -- pos_create_attempted_at (may-have-sent marker)
+  p_order_type    text
+)
+returns text
+language sql
+stable
+set search_path = public
+as $$
+  select case
+    when p_order_type = 'delivery' then 'not_retryable'
+    when coalesce(p_ref, '') <> '' or p_state = 'synced' then 'already_synced'
+    when p_state = 'confirmation_required' then 'confirmation_required'
+    when p_marker_at is not null then 'may_have_sent'
+    when p_state not in ('failed','blocked','dead_letter','skipped') then 'not_retryable'
+    when coalesce(p_attempt_count, 0) >= 5 then 'attempt_limit_reached'
+    when p_deadline_at is not null and now() >= p_deadline_at then 'deadline_expired'
+    else 'requeued'
+  end;
+$$;
+
+revoke all on function public.lazywait_requeue_eligibility(text, text, timestamptz, integer, timestamptz, text) from public, anon;
+grant execute on function public.lazywait_requeue_eligibility(text, text, timestamptz, integer, timestamptz, text) to authenticated;
+
+-- Signature is unchanged (returns the order row) so the existing admin API keeps
+-- working; ineligible requeues RAISE with the reason code + a clear internal
+-- message, so the dashboard never reports a false success. Row-locked so a
+-- concurrent worker claim / admin action cannot bypass the rules. Admin-only.
+drop function if exists public.requeue_lazywait_order(uuid);
+create or replace function public.requeue_lazywait_order(p_order_id uuid)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+  v_elig  text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins may requeue Lazywait sync' using errcode = '42501';
+  end if;
+
+  -- Lock the order row (atomic validation vs. a concurrent worker/admin action).
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'not_found: Order not found' using errcode = 'P0002';
+  end if;
+
+  v_elig := public.lazywait_requeue_eligibility(
+    v_order.lazywait_sync_state, v_order.lazywait_ref, v_order.pos_sync_deadline_at,
+    v_order.sync_attempt_count, v_order.pos_create_attempted_at, v_order.order_type::text);
+
+  if v_elig <> 'requeued' then
+    raise exception '%', v_elig || ': ' || case v_elig
+      when 'deadline_expired'      then 'Automatic POS retry window has expired. Verify the order manually.'
+      when 'confirmation_required' then 'Order needs manual verification; automatic retry is disabled.'
+      when 'already_synced'        then 'Order already has a POS reference / is synced; never resend.'
+      when 'may_have_sent'         then 'A Create Order request may already have been sent; verify manually before any resend.'
+      when 'attempt_limit_reached' then 'Maximum POS retry attempts reached. Verify the order manually.'
+      else                              'Order is not in a safe, retryable state.'
+    end
+    using errcode = 'P0001';
+  end if;
+
+  -- Eligible: move back to a claimable 'pending' NOW. Do NOT reset
+  -- pos_sync_started_at / pos_sync_deadline_at (the one-shot deadline trigger
+  -- preserves the original window; a never-eligible 'skipped' row that has no
+  -- window gets a fresh one from the trigger) or sync_attempt_count.
+  update public.orders set
+    lazywait_sync_state  = 'pending',
+    sync_next_attempt_at = now(),
+    sync_last_error      = null,
+    sync_blocked_reason  = null,
+    sync_status          = 'not_synced'::public.sync_status,
+    updated_at           = now()
+  where id = p_order_id
+  returning * into v_order;
+
+  return v_order;
+end $$;
+
+revoke all on function public.requeue_lazywait_order(uuid) from public, anon;
+grant execute on function public.requeue_lazywait_order(uuid) to authenticated;
 
 -- ---- 8. notification_log: allow kind='pos_sync' + dedup index --------------
 -- Extend the kind check and add a per-(order,status) unique index scoped to the

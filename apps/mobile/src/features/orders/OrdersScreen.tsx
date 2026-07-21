@@ -170,6 +170,7 @@ function PosLifecycleChip({ order }: { order: Order }) {
   const lc = deriveCustomerPosLifecycle({
     orderType: order.orderType,
     syncState: order.lazywaitSyncState,
+    ref: order.lazywaitRef,
     firstFailureAt: order.firstPosSyncFailureAt,
     nextAttemptAt: order.syncNextAttemptAt,
   });

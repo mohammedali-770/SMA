@@ -1,17 +1,46 @@
 import { describe, it, expect } from 'vitest';
 import {
-  deriveCustomerPosLifecycle, posLifecyclePresentation, type CustomerPosLifecycle,
+  deriveCustomerPosLifecycle, hasUsablePosRef, posLifecyclePresentation, type CustomerPosLifecycle,
 } from './posLifecycle';
 
 describe('deriveCustomerPosLifecycle (customer confirmation safety)', () => {
   it('shows NOTHING for non-pickup (delivery is never sent to POS)', () => {
+    expect(deriveCustomerPosLifecycle({ orderType: 'delivery', syncState: 'synced', ref: 'REF' })).toBeNull();
     expect(deriveCustomerPosLifecycle({ orderType: 'delivery', syncState: 'pending' })).toBeNull();
-    expect(deriveCustomerPosLifecycle({ orderType: 'delivery', syncState: 'synced' })).toBeNull();
   });
 
-  it('says "confirmed" ONLY for the synced state', () => {
-    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced' }))
+  it('says "confirmed" ONLY for synced + a usable POS ref', () => {
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: 'REF_1' }))
       .toBe('confirmed_by_restaurant');
+    // trimmed non-empty ref is usable
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: '  REF_2  ' }))
+      .toBe('confirmed_by_restaurant');
+  });
+
+  it('NEVER says confirmed for a synced row without a usable ref (falls back to verify)', () => {
+    // null / missing ref
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced' }))
+      .toBe('pos_confirmation_required');
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: null }))
+      .toBe('pos_confirmation_required');
+    // empty / whitespace-only ref
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: '' }))
+      .toBe('pos_confirmation_required');
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: '   ' }))
+      .toBe('pos_confirmation_required');
+    // non-string ref (defensive; runtime data)
+    expect(deriveCustomerPosLifecycle({ orderType: 'pickup', syncState: 'synced', ref: 123 as unknown }))
+      .toBe('pos_confirmation_required');
+  });
+
+  it('hasUsablePosRef normalizes correctly', () => {
+    expect(hasUsablePosRef('REF')).toBe(true);
+    expect(hasUsablePosRef('  x ')).toBe(true);
+    expect(hasUsablePosRef('')).toBe(false);
+    expect(hasUsablePosRef('   ')).toBe(false);
+    expect(hasUsablePosRef(null)).toBe(false);
+    expect(hasUsablePosRef(undefined)).toBe(false);
+    expect(hasUsablePosRef(42)).toBe(false);
   });
 
   it('never says confirmed for ambiguous/failed states', () => {
