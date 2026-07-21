@@ -19,6 +19,7 @@ import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
 import { MenuManagementPanel } from './admin/MenuManagementPanel';
+import { OrderIntegrityPanel } from './admin/OrderIntegrityPanel';
 
 
 export const AdminDashboard: React.FC = () => {
@@ -29,7 +30,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings' | 'legal'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'integrity' | 'settings' | 'legal'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -204,6 +205,14 @@ export const AdminDashboard: React.FC = () => {
           </button>
 
           <button
+            onClick={() => setActiveTab('integrity')}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrity' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+          >
+            <ShieldAlert className="w-4 h-4" />
+            <span>{isRTL ? 'سلامة الطلبات' : 'Order Integrity'}</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('settings')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
           >
@@ -243,6 +252,9 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}
+
+          {/* TAB: ORDER INTEGRITY WATCHDOG (observe-only monitoring; read + ack/suppress) */}
+          {activeTab === 'integrity' && <OrderIntegrityPanel />}
 
           {/* TAB 7: SYSTEM SETTINGS (brand, payment methods, maps, loyalty) */}
           {activeTab === 'settings' && <SettingsPanel />}

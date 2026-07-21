@@ -10,21 +10,27 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **47**
+- Repository migration files: **48** (47 applied + 1 repository-only/UNAPPLIED —
+  see the watchdog note below)
 - Live `schema_migrations` rows: **48**
 - Latest live version: **`20260721113811`**
   (`lazywait_sync_health_summary`; repository version `20260721150000`)
-- **Every repository migration is now applied.** The three 2026-07-21
-  applications (all class B — same content, generated apply-time versions):
+- **Every repository migration is applied EXCEPT** the repository-only
+  `20260721170000_order_integrity_watchdog` (added by the Order Integrity
+  Watchdog PR; observe-only monitoring). It is **UNAPPLIED**, pending explicit
+  owner approval, and MUST be applied only through the §-documented
+  `apply_migration` workflow — never `db push`/`migration repair`. Until then the
+  repo/live counts coincide at 48 for offsetting reasons: the repo side is 47
+  applied + 1 unapplied (watchdog), and the live side is those same 47 plus the
+  pre-existing live-only F-class historical row documented in §5 (not the
+  watchdog). The three 2026-07-21 applications (all class B — same content,
+  generated apply-time versions):
   - `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`**
     (owner-approved; PR #69)
   - `20260721130000_lazywait_synced_ref_guard` → live **`20260721084330`**
     (owner-approved; PR #70; version recorded in the migration file header)
   - `20260721150000_lazywait_sync_health_summary` → live **`20260721113811`**
     (owner-approved; PR #71; observability-only — see §14)
-  The one-row repository/live count difference (47 vs 48) is the pre-existing
-  historical divergence documented in §5 (a live-only F-class row), not new
-  drift.
 - The current production schema is **functionally aligned with the repository
   through `20260714130000`** — every repository migration, including the
   trigger-function grant hardening, is applied and verified — based on

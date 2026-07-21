@@ -813,3 +813,72 @@ export const pushAdmin = {
     return { activeDevices: active ?? 0, promoOptIns: promos ?? 0 };
   },
 };
+
+// ---------------------------------------------------------------------------
+// Order Integrity Watchdog (observe-only). All access is via SECURITY DEFINER,
+// is_admin()/is_staff()-gated RPCs that return SAFE (no-PII) projections only.
+// ---------------------------------------------------------------------------
+export interface OrderIntegrityHealth {
+  overall_state: 'healthy' | 'degraded' | 'failing' | 'configuration_error';
+  watchdog_cron_active: boolean;
+  latest_run_at: string | null;
+  latest_successful_run_at: string | null;
+  latest_run_age_seconds: number | null;
+  open_critical_count: number;
+  open_warning_count: number;
+  acknowledged_count: number;
+  suppressed_count: number;
+  oldest_open_critical_at: string | null;
+  latest_incident: Record<string, unknown> | null;
+  incidents_opened_last_24h: number;
+  incidents_resolved_last_24h: number;
+}
+export interface OrderIntegrityIncident {
+  id: string;
+  rule_code: string;
+  severity: 'warning' | 'critical';
+  entity_type: string;
+  status: 'open' | 'acknowledged' | 'resolved' | 'suppressed';
+  order_id: string | null;
+  order_number: string | null;
+  branch_id: string | null;
+  first_detected_at: string;
+  last_detected_at: string;
+  occurrence_count: number;
+  consecutive_detection_count: number;
+  consecutive_clean_count: number;
+  acknowledged_at: string | null;
+  suppression_until: string | null;
+  suppression_reason: string | null;
+  resolved_at: string | null;
+  safe_details: Record<string, unknown>;
+}
+
+export const orderIntegrity = {
+  /** Safe aggregate health for the panel (is_staff gated). */
+  summary: async (): Promise<OrderIntegrityHealth> =>
+    ok<OrderIntegrityHealth>(await supabase.rpc('order_integrity_admin_summary')),
+  /** Safe incident list with optional filters (is_staff gated). */
+  list: async (filters: {
+    status?: string | null; severity?: string | null; ruleCode?: string | null;
+    branchId?: string | null; limit?: number;
+  } = {}): Promise<OrderIntegrityIncident[]> =>
+    ok<OrderIntegrityIncident[]>(await supabase.rpc('order_integrity_list_incidents', {
+      p_status: filters.status ?? null, p_severity: filters.severity ?? null,
+      p_rule_code: filters.ruleCode ?? null, p_branch_id: filters.branchId ?? null,
+      p_limit: filters.limit ?? 100,
+    })),
+  /** Safe incident timeline / audit history (is_staff gated). */
+  timeline: async (incidentId: string): Promise<Record<string, unknown>> =>
+    ok<Record<string, unknown>>(await supabase.rpc('order_integrity_incident_timeline', { p_incident_id: incidentId })),
+  /** Acknowledge an open incident (admin-only, audited). */
+  acknowledge: async (incidentId: string, note?: string): Promise<Record<string, unknown>> =>
+    ok<Record<string, unknown>>(await supabase.rpc('order_integrity_acknowledge_incident', {
+      p_incident_id: incidentId, p_note: note ?? null,
+    })),
+  /** Suppress an incident until a future time, with a required reason (admin-only, audited). */
+  suppress: async (incidentId: string, until: string, reason: string): Promise<Record<string, unknown>> =>
+    ok<Record<string, unknown>>(await supabase.rpc('order_integrity_suppress_incident', {
+      p_incident_id: incidentId, p_until: until, p_reason: reason,
+    })),
+};
