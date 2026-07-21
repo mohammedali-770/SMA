@@ -43,10 +43,15 @@
 --                         invocation has ever been observed.
 --   degraded            : any current failure streak (one 401, or one/two
 --                         5xx/timeouts, or the latest observed response is any
---                         non-2xx); OR due_without_success_since > 0; OR due
---                         orders exist while the latest success is stale
---                         (> SUCCESS_STALE); OR the latest tick is stale
---                         (> TICK_STALE) / no tick recorded.
+--                         non-2xx); OR the latest terminal result is
+--                         expired_unknown (a queued request never produced a
+--                         response that could be durably reconciled within the
+--                         15-minute window — an operational problem that must
+--                         never read healthy or idle); OR
+--                         due_without_success_since > 0; OR due orders exist
+--                         while the latest success is stale (> SUCCESS_STALE);
+--                         OR the latest tick is stale (> TICK_STALE) / no tick
+--                         recorded.
 --   idle                : cron active, tick recent, no failure streak, and no
 --                         observed HTTP response yet (scheduler armed, nothing
 --                         observed, nothing stuck — reachable only with no
@@ -166,7 +171,10 @@ begin
    limit 1;
 
   -- Latest failure of any kind: observed HTTP failure, timeout, transport
-  -- error, preflight_failed (config incomplete) or driver_error.
+  -- error, preflight_failed (config incomplete), driver_error, or
+  -- expired_unknown (queued but never durably reconciled — surfaced here with
+  -- its request_id, timestamp and a null HTTP status so operators can see it,
+  -- while latest_response stays restricted to actually OBSERVED responses).
   select jsonb_build_object(
            'request_id', request_id,
            'at', coalesce(completed_at, started_at),
@@ -176,7 +184,7 @@ begin
     from public.lazywait_sync_requests
    where outcome in ('auth_failed','rate_limited','client_error_4xx',
                      'server_error_5xx','timeout','transport_error',
-                     'preflight_failed','driver_error')
+                     'preflight_failed','driver_error','expired_unknown')
    order by coalesce(completed_at, started_at) desc, id desc
    limit 1;
 
@@ -236,6 +244,11 @@ begin
     when v_consec_401 >= 1
       or v_consec_5xx_timeout >= 1
       or (v_latest_response_outcome is not null and v_latest_response_outcome <> 'success_2xx')
+      -- expired_unknown as the latest AUTHORITATIVE result: the last queued
+      -- request never produced a durably reconcilable response — never report
+      -- healthy or idle on top of it. It is NOT an observed HTTP response, so
+      -- it deliberately does not enter latest_response or either streak.
+      or v_latest_terminal = 'expired_unknown'
       or v_due_no_success > 0
       or (v_due_total > 0 and not v_success_recent)
       or not v_tick_recent
@@ -269,4 +282,4 @@ revoke all on function public.lazywait_sync_health_summary() from public, anon, 
 grant execute on function public.lazywait_sync_health_summary() to service_role;
 
 comment on function public.lazywait_sync_health_summary() is
-  'Service-role-only aggregate health for the lazywait-sync pg_cron driver, read from the durable lazywait_sync_requests ledger + cron.job + orders sync state: overall_state (healthy/degraded/failing/idle/configuration_error via the documented deterministic cascade; tick stale >3m, success stale >5m with due orders), cron_active, latest tick/run/request id, latest observed HTTP status, latest 2xx success + age, latest failure, consecutive observed 401s (secret mismatch signature), consecutive 5xx/timeouts, and due pending/failed orders (incl. those with no successful worker invocation since due). An HTTP 2xx proves the worker invocation completed, not that every due order synced — per-order outcomes stay in orders/integration_sync_logs. Exposes no secret, header, response body, or customer data. Observability only — no scheduler/worker/payment/POS behavior change.';
+  'Service-role-only aggregate health for the lazywait-sync pg_cron driver, read from the durable lazywait_sync_requests ledger + cron.job + orders sync state: overall_state (healthy/degraded/failing/idle/configuration_error via the documented deterministic cascade; tick stale >3m, success stale >5m with due orders), cron_active, latest tick/run/request id, latest observed HTTP status, latest 2xx success + age, latest failure (incl. expired_unknown, which always degrades and never reads healthy/idle), consecutive observed 401s (secret mismatch signature), consecutive 5xx/timeouts, and due pending/failed orders (incl. those with no successful worker invocation since due). An HTTP 2xx proves the worker invocation completed, not that every due order synced — per-order outcomes stay in orders/integration_sync_logs. Exposes no secret, header, response body, or customer data. Observability only — no scheduler/worker/payment/POS behavior change.';

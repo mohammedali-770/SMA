@@ -349,6 +349,64 @@ begin
   if s->>'overall_state' <> 'configuration_error' then
     raise exception 'STATE(j): expected driver_error configuration_error -> %', s->>'overall_state'; end if;
 
+  -- (k) CASE A: older success_2xx + NEWER expired_unknown, cron active, tick
+  --     recent, no due orders -> degraded, never healthy. expired_unknown must
+  --     appear in latest_failure (request_id, timestamp, null HTTP status) but
+  --     must NOT appear as an observed response or count in either streak.
+  perform pg_temp.reset_health_fixtures();
+  insert into public.lazywait_sync_requests
+    (request_id, started_at, queued_at, responded_at, completed_at, outcome, http_status) values
+    (215, now()-interval '10m', now()-interval '10m', now()-interval '10m', now()-interval '10m', 'success_2xx', 200);
+  insert into public.lazywait_sync_requests
+    (request_id, started_at, queued_at, completed_at, outcome) values
+    (216, now()-interval '8m', now()-interval '8m', now()-interval '2m', 'expired_unknown');
+  insert into public.lazywait_sync_requests (request_id, started_at, queued_at, outcome)
+    values (217, now()-interval '30 seconds', now()-interval '30 seconds', 'starting');
+  s := public.lazywait_sync_health_summary();
+  if s->>'overall_state' <> 'degraded' then
+    raise exception 'STATE(k): success+newer expired_unknown must be degraded, not %', s->>'overall_state'; end if;
+  if s->'latest_failure'->>'outcome' <> 'expired_unknown'
+     or (s->'latest_failure'->>'request_id')::bigint <> 216
+     or s->'latest_failure'->>'at' is null
+     or s->'latest_failure'->'http_status' is distinct from 'null'::jsonb then
+    raise exception 'STATE(k): latest_failure must surface expired_unknown -> %', s->'latest_failure'; end if;
+  if (s->'latest_response'->>'request_id')::bigint <> 215 then
+    raise exception 'STATE(k): latest_response must stay the OBSERVED 2xx -> %', s->'latest_response'; end if;
+  if (s->>'consecutive_http_401')::int <> 0 or (s->>'consecutive_5xx_or_timeout')::int <> 0 then
+    raise exception 'STATE(k): expired_unknown must not count in streaks'; end if;
+
+  -- (l) CASE B: ONLY an expired_unknown terminal row (no observed response),
+  --     cron active, tick recent, no due orders -> degraded, never idle.
+  perform pg_temp.reset_health_fixtures();
+  insert into public.lazywait_sync_requests
+    (request_id, started_at, queued_at, completed_at, outcome) values
+    (218, now()-interval '20m', now()-interval '20m', now()-interval '2m', 'expired_unknown');
+  insert into public.lazywait_sync_requests (request_id, started_at, queued_at, outcome)
+    values (219, now()-interval '30 seconds', now()-interval '30 seconds', 'starting');
+  s := public.lazywait_sync_health_summary();
+  if s->>'overall_state' <> 'degraded' then
+    raise exception 'STATE(l): only-expired_unknown must be degraded, not %', s->>'overall_state'; end if;
+  if s->'latest_response' is distinct from 'null'::jsonb then
+    raise exception 'STATE(l): expired_unknown must not be represented as an observed response -> %', s->'latest_response'; end if;
+  if s->'latest_failure'->>'outcome' <> 'expired_unknown' then
+    raise exception 'STATE(l): latest_failure must surface expired_unknown -> %', s->'latest_failure'; end if;
+
+  -- (m) CASE C: a NEWER success_2xx after an OLDER expired_unknown -> healthy
+  --     when every other health condition is satisfied (the expired row stays
+  --     visible in latest_failure without degrading the state).
+  perform pg_temp.reset_health_fixtures();
+  insert into public.lazywait_sync_requests
+    (request_id, started_at, queued_at, completed_at, outcome) values
+    (220, now()-interval '30m', now()-interval '30m', now()-interval '20m', 'expired_unknown');
+  insert into public.lazywait_sync_requests
+    (request_id, started_at, queued_at, responded_at, completed_at, outcome, http_status) values
+    (221, now()-interval '1m', now()-interval '1m', now()-interval '1m', now()-interval '1m', 'success_2xx', 200);
+  s := public.lazywait_sync_health_summary();
+  if s->>'overall_state' <> 'healthy' then
+    raise exception 'STATE(m): recovery after old expired_unknown must be healthy -> %', s->>'overall_state'; end if;
+  if s->'latest_failure'->>'outcome' <> 'expired_unknown' then
+    raise exception 'STATE(m): latest_failure should still show the old expired row -> %', s->'latest_failure'; end if;
+
   raise notice 'HEALTH STATE MATRIX OK';
 end $$;
 
