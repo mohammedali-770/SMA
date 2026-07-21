@@ -34,10 +34,11 @@
 --      pos_sync notification ('pending') atomically with the state change.
 --   7. Stale reaper: phase-marker-aware (proven-not-sent => safe requeue within
 --      budget; may-have-sent => confirmation_required) + past-deadline sweep.
---   8. notification_log: allow kind='pos_sync', a 'pending' send_status, a fencing
---      claim_token, and a per-(order,status) dedup index.
---  8b. Fenced pos_sync notification claim/finalize/release RPCs — at-most-once
---      customer delivery under concurrent dispatch (Finding 3).
+--   8. notification_log: allow kind='pos_sync', 'pending'/'superseded' send_status,
+--      a fencing claim_token, and a per-(order,status) dedup index.
+--  8b. CONSUME-ONLY fenced pos_sync notification claim/finalize/release RPCs +
+--      an authoritative order-state match check — at-most-once customer delivery
+--      under concurrent dispatch, and only lifecycle producers create events.
 --   9. Admin dashboard RPC: read-only "Orders Requiring Verification" feed.
 --  10. Partial indexes for the deadline-bounded queue and the dashboard query.
 --
@@ -406,7 +407,13 @@ declare
   v_confirmation_required integer := 0;
   v_deadline_failed       integer := 0;
 begin
-  -- (a) WITH ref -> synced. Create Order already succeeded; NEVER re-POST.
+  -- (a) WITH ref -> synced. Create Order already succeeded; NEVER re-POST. If the
+  --     order had a PRIOR failure (first_pos_sync_failure_at set — the customer
+  --     may have already seen a retrying/verifying message), enqueue the deduped
+  --     'pos_confirmed' event in the SAME transaction so the "confirmed after a
+  --     failure" message closes the lifecycle instead of leaving the customer on
+  --     the last failure copy. First-try recoveries (no prior failure) stay silent.
+  --     The COUNTED (outer) statement is the 1:1 recovery sync-log insert.
   with recovered as (
     update public.orders o
        set lazywait_sync_state = 'synced',
@@ -417,7 +424,13 @@ begin
      where o.lazywait_sync_state = 'syncing'
        and o.updated_at < v_cutoff
        and o.lazywait_ref is not null
-     returning o.id
+     returning o.id, o.first_pos_sync_failure_at as first_failure
+  ), notified_confirmed as (
+    insert into public.notification_log (kind, order_id, status, send_status)
+      select 'pos_sync', id, 'pos_confirmed', 'pending' from recovered
+       where first_failure is not null
+      on conflict do nothing
+      returning 1
   )
   insert into public.integration_sync_logs (provider, order_id, direction, status, error)
     select 'lazywait', id, 'push', 'success', 'recovered_stale_syncing_with_ref' from recovered;
@@ -547,13 +560,16 @@ begin
 end $$;
 
 -- Add a 'pending' send_status (awaiting dispatch) — the state a pos_sync event
--- is enqueued in, and the ONLY state a dispatcher may atomically claim. This
--- keeps the worker's dedup enqueue distinct from an in-flight dispatch claim.
+-- is enqueued in, and the ONLY state a dispatcher may atomically claim — and a
+-- 'superseded' TERMINAL no-send state for a stale event whose order has since
+-- moved on (defense-in-depth in claim_pos_sync_notification). Neither adds an
+-- automatic retry path. 'pending' keeps the worker's dedup enqueue distinct from
+-- an in-flight dispatch claim.
 do $$
 begin
   alter table public.notification_log drop constraint if exists notification_log_send_status_check;
   alter table public.notification_log add constraint notification_log_send_status_check
-    check (send_status in ('pending','processing','sent','failed','no_targets'));
+    check (send_status in ('pending','processing','sent','failed','no_targets','superseded'));
 end $$;
 
 -- Per-dispatch lease/fencing token. A dispatcher claims a 'pending' row by
@@ -566,12 +582,59 @@ create unique index if not exists notification_log_pos_sync_uq
   where kind = 'pos_sync';
 
 -- ---- 8b. Fenced pos_sync notification claim / finalize / release ------------
--- Guarantee AT-MOST-ONCE customer delivery even with concurrent dispatchers.
--- The atomic conditional UPDATE (send_status='pending' -> 'processing') lets
--- exactly one caller win the send; 'processing' is NOT reclaimable (an ambiguous
--- post-send result must never be auto-resent), and 'sent'/'no_targets'/'failed'
--- are terminal no-ops. A pre-send failure (proven not sent) is released back to
--- 'pending' by the owner for a clean, safe retry. Service-role only.
+-- Guarantee AT-MOST-ONCE customer delivery even with concurrent dispatchers,
+-- and keep the dispatcher a pure CONSUMER: only the lifecycle producers
+-- (record_lazywait_sync, the stale reaper) may ever CREATE a pos_sync event.
+
+-- pos_sync_event_matches_order(): defense-in-depth — does the requested status
+-- still match the AUTHORITATIVE order state? A stale event (e.g. a 'pos_retrying'
+-- enqueued before the order synced) must never be sent. Never trusts only the
+-- request body's status. No secrets/PII — reads only technical state columns.
+create or replace function public.pos_sync_event_matches_order(
+  p_order_id uuid, p_status text
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case p_status
+    when 'pos_confirmed' then exists (
+      select 1 from public.orders o
+       where o.id = p_order_id
+         and o.lazywait_sync_state = 'synced'
+         and coalesce(o.lazywait_ref, '') <> '')
+    when 'pos_confirmation_required' then exists (
+      select 1 from public.orders o
+       where o.id = p_order_id
+         and o.lazywait_sync_state = 'confirmation_required')
+    when 'pos_retrying' then exists (
+      select 1 from public.orders o
+       where o.id = p_order_id
+         and o.lazywait_sync_state = 'failed'
+         and o.sync_next_attempt_at is not null
+         and (o.pos_sync_deadline_at is null or now() < o.pos_sync_deadline_at))
+    when 'pos_failed' then exists (
+      select 1 from public.orders o
+       where o.id = p_order_id
+         and o.lazywait_sync_state in ('blocked','dead_letter'))
+    else false
+  end;
+$$;
+
+revoke all on function public.pos_sync_event_matches_order(uuid, text) from public, anon, authenticated;
+grant execute on function public.pos_sync_event_matches_order(uuid, text) to service_role;
+
+-- claim_pos_sync_notification(): CONSUME-ONLY atomic claim. It NEVER inserts an
+-- event (so push-dispatch can never manufacture a lifecycle transition). It
+-- locks an EXISTING event row and:
+--   * no row            -> 'no_event'   (nothing enqueued; send nothing)
+--   * terminal          -> 'duplicate'  (sent/no_targets/failed/superseded)
+--   * processing         -> 'in_progress' (owned by another dispatcher)
+--   * pending + stale    -> 'superseded' (state no longer matches; terminal no-send)
+--   * pending + valid    -> 'claimed'    (flips to 'processing' with the lease token)
+-- FOR UPDATE serializes concurrent claimants so exactly one wins. Service-role only.
 create or replace function public.claim_pos_sync_notification(
   p_order_id uuid, p_status text, p_claim_token text
 )
@@ -581,34 +644,39 @@ security definer
 set search_path = public
 as $$
 declare
-  v_send    text;
-  v_claimed uuid;
+  v_nid  uuid;
+  v_send text;
 begin
   if p_claim_token is null or p_claim_token = '' then
     raise exception 'claim token required' using errcode = '22004';
   end if;
 
-  -- The event row normally already exists (worker/reaper enqueued it as
-  -- 'pending'); ensure it so a dispatch is never lost, idempotently.
-  insert into public.notification_log (kind, order_id, status, send_status)
-    values ('pos_sync', p_order_id, p_status, 'pending')
-    on conflict do nothing;
-
-  -- Atomic single-winner claim: only a 'pending' row flips to 'processing'.
-  update public.notification_log
-     set send_status = 'processing', claim_token = p_claim_token, updated_at = now()
+  -- Lock the EXISTING event (never create it).
+  select id, send_status into v_nid, v_send
+    from public.notification_log
    where kind = 'pos_sync' and order_id = p_order_id and status = p_status
-     and send_status = 'pending'
-   returning id into v_claimed;
-  if v_claimed is not null then
-    return 'claimed';
+   for update;
+  if v_nid is null then
+    return 'no_event';                                   -- nothing to dispatch
+  end if;
+  if v_send in ('sent','no_targets','failed','superseded') then
+    return 'duplicate';                                  -- terminal no-op
+  end if;
+  if v_send = 'processing' then
+    return 'in_progress';                                -- another owner
   end if;
 
-  select send_status into v_send from public.notification_log
-    where kind = 'pos_sync' and order_id = p_order_id and status = p_status;
-  if v_send is null then return 'missing'; end if;
-  if v_send in ('sent','no_targets','failed') then return 'duplicate'; end if;
-  return 'in_progress';   -- 'processing' owned by another dispatcher; back off
+  -- v_send = 'pending': the event must still match the authoritative order state.
+  if not public.pos_sync_event_matches_order(p_order_id, p_status) then
+    update public.notification_log set send_status = 'superseded', updated_at = now()
+     where id = v_nid;
+    return 'superseded';                                 -- stale -> terminal no-send
+  end if;
+
+  update public.notification_log
+     set send_status = 'processing', claim_token = p_claim_token, updated_at = now()
+   where id = v_nid;
+  return 'claimed';
 end $$;
 
 revoke all on function public.claim_pos_sync_notification(uuid, text, text) from public, anon, authenticated;

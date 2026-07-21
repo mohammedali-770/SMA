@@ -113,8 +113,11 @@ do $$
 declare v_oid uuid := gen_random_uuid();
 begin
   set local session_replication_role = replica;
-  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
-    values (v_oid, 'F-6', gen_random_uuid(),'pickup',10,10,'failed');
+  -- A genuinely-retrying order (state 'failed', a scheduled retry, deadline live)
+  -- so 'pos_retrying' matches the authoritative state.
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
+    lazywait_sync_state, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at)
+    values (v_oid, 'F-6', gen_random_uuid(),'pickup',10,10,'failed', now()+interval '2m', now()-interval '1m', now()+interval '9m');
   set local session_replication_role = origin;
   insert into public.notification_log (kind, order_id, status, send_status)
     values ('pos_sync', v_oid, 'pos_retrying', 'pending');
@@ -139,6 +142,58 @@ begin
     raise exception 'RELEASE FAILED: terminal failed row was reclaimable'; end if;
 
   raise notice 'RELEASE OK';
+end $$;
+
+-- ---- Consume-only claim + authoritative state validation (Finding 2) -------
+do $$
+declare v_sync uuid := gen_random_uuid(); v_conf uuid := gen_random_uuid();
+  v_noref uuid := gen_random_uuid(); v_before bigint;
+begin
+  set local session_replication_role = replica;
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
+    lazywait_sync_state, lazywait_ref, first_pos_sync_failure_at) values
+    (v_sync,  'F-7', gen_random_uuid(),'pickup',10,10,'synced', 'REF7', now()-interval '5m'),
+    (v_conf,  'F-8', gen_random_uuid(),'pickup',10,10,'confirmation_required', null, now()-interval '5m'),
+    (v_noref, 'F-9', gen_random_uuid(),'pickup',10,10,'failed', null, now()-interval '5m');
+  set local session_replication_role = origin;
+
+  -- (1) No enqueued event -> 'no_event', and NOTHING is inserted (consume-only).
+  select count(*) into v_before from public.notification_log where kind='pos_sync';
+  if public.claim_pos_sync_notification(v_sync,'pos_confirmed','X1') <> 'no_event' then
+    raise exception 'CONSUME FAILED: expected no_event when no row exists'; end if;
+  if (select count(*) from public.notification_log where kind='pos_sync') <> v_before then
+    raise exception 'CONSUME FAILED: claim manufactured an event'; end if;
+
+  -- (2) A pending 'pos_confirmed' event whose order is NOT synced/no-ref is stale
+  --     -> 'superseded' (terminal no-send); never claimed/sent.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_noref, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_noref,'pos_confirmed','X2') <> 'superseded' then
+    raise exception 'CONSUME FAILED: pos_confirmed on non-synced order was not superseded'; end if;
+  if (select send_status from public.notification_log where order_id=v_noref and status='pos_confirmed') <> 'superseded' then
+    raise exception 'CONSUME FAILED: stale event not marked superseded'; end if;
+
+  -- (3) A stale 'pos_retrying' event whose order has since synced -> 'superseded'.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_sync, 'pos_retrying', 'pending');
+  if public.claim_pos_sync_notification(v_sync,'pos_retrying','X3') <> 'superseded' then
+    raise exception 'CONSUME FAILED: stale pos_retrying after synced was not superseded'; end if;
+
+  -- (4) A VALID pending 'pos_confirmed' (order synced + ref) claims exactly once.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_sync, 'pos_confirmed', 'pending');
+  if public.claim_pos_sync_notification(v_sync,'pos_confirmed','X4') <> 'claimed' then
+    raise exception 'CONSUME FAILED: valid pos_confirmed not claimable'; end if;
+  if public.claim_pos_sync_notification(v_sync,'pos_confirmed','X5') <> 'in_progress' then
+    raise exception 'CONSUME FAILED: claimed event reclaimable'; end if;
+
+  -- (5) A valid pending 'pos_confirmation_required' (matching state) claims.
+  insert into public.notification_log (kind, order_id, status, send_status)
+    values ('pos_sync', v_conf, 'pos_confirmation_required', 'pending');
+  if public.claim_pos_sync_notification(v_conf,'pos_confirmation_required','X6') <> 'claimed' then
+    raise exception 'CONSUME FAILED: valid confirmation_required not claimable'; end if;
+
+  raise notice 'CONSUME-ONLY OK';
 end $$;
 
 rollback;

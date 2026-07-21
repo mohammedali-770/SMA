@@ -438,9 +438,13 @@ Deno.serve(async (req: Request) => {
     });
     if (claimError) return json({ status: 'error', reason: 'claim failed (transient)' }, 500);
     const claimResult = String(claim ?? '');
+    // The dispatcher is a pure CONSUMER: it never creates events. If no lifecycle
+    // producer (record_lazywait_sync / reaper) enqueued this transition, there is
+    // nothing to send. A 'superseded' event no longer matches the order state.
+    if (claimResult === 'no_event') return json({ status: 'no_event', reason: 'no pending pos_sync event to dispatch' }, 200);
+    if (claimResult === 'superseded') return json({ status: 'superseded', reason: 'event no longer matches order state' }, 200);
     if (claimResult === 'duplicate') return json({ status: 'duplicate', reason: 'already delivered' }, 200);
     if (claimResult === 'in_progress') return json({ status: 'in_progress', reason: 'another dispatcher owns this send' }, 200);
-    if (claimResult === 'missing') return json({ status: 'retry', reason: 'event row missing, call again' }, 200);
     if (claimResult !== 'claimed') return json({ status: 'error', reason: `unexpected claim result: ${claimResult}` }, 500);
 
     const { data: devices, error: devicesError } = await admin.from('push_devices')
