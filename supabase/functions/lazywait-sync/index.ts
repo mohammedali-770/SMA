@@ -195,11 +195,26 @@ Deno.serve(async (req: Request) => {
         continue;
       }
       const gateStatus = String(gate ?? '');
-      const priorFailureGate = (order.first_pos_sync_failure_at as string | null) ?? null;
+      let priorFailureGate = (order.first_pos_sync_failure_at as string | null) ?? null;
+
+      // The gate evaluated a freshly LOCKED order row; the claimed `order` object
+      // may be stale. For the ref-present branches, read the authoritative
+      // first-failure marker so the confirm/verify decision is not based on stale
+      // data (do not trust only the claimed object over the gate's newer row).
+      if (gateStatus === 'already_synced' || gateStatus === 'ref_present_unverified') {
+        const { data: authRow } = await admin
+          .from('orders')
+          .select('first_pos_sync_failure_at')
+          .eq('id', orderId)
+          .maybeSingle();
+        if (authRow) priorFailureGate = (authRow.first_pos_sync_failure_at as string | null) ?? null;
+      }
 
       if (gateStatus === 'already_synced') {
-        // A ref appeared (e.g. a prior crash after POS creation). Finalize synced
-        // WITHOUT resending; close any prior failure with "confirmed".
+        // A USABLE ref exists (gate proved it) — Create Order already succeeded.
+        // Finalize synced WITHOUT resending; close any prior failure with
+        // "confirmed". The producer guard in record_lazywait_sync re-checks
+        // synced + usable ref before enqueuing pos_confirmed.
         summary.synced++;
         await admin.rpc('record_lazywait_sync', {
           p_order_id: orderId,
@@ -207,6 +222,27 @@ Deno.serve(async (req: Request) => {
             synced_at: order.synced_at ?? new Date().toISOString() },
           p_log_status: 'skipped', p_error: 'already_created_no_resend',
           p_notify_status: priorFailureGate ? 'pos_confirmed' : null,
+        });
+        continue;
+      }
+      if (gateStatus === 'ref_present_unverified') {
+        // A ref MARKER is stored (or the row is 'synced') but it is NOT usable —
+        // Create Order MAY have produced a ticket, so NEVER resend, but we cannot
+        // prove confirmation. Route to manual verification: keep the suspicious
+        // ref as evidence (omit lazywait_ref from the patch so it is preserved),
+        // record confirmation_required, and tell the customer "verifying" — never
+        // "confirmed". Not auto-retried (confirmation_required is not claimable).
+        summary.confirmation_required++;
+        await admin.rpc('record_lazywait_sync', {
+          p_order_id: orderId,
+          p_patch: {
+            lazywait_sync_state: 'confirmation_required',
+            first_pos_sync_failure_at: priorFailureGate ?? new Date().toISOString(),
+            pos_confirmation_reason: 'missing_ref',
+            sync_last_error: 'ref_present_unverified_no_usable_ref',
+          },
+          p_log_status: 'failed', p_error: 'ref_present_unverified',
+          p_notify_status: 'pos_confirmation_required',
         });
         continue;
       }

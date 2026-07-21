@@ -375,4 +375,79 @@ begin
   raise notice 'WS CLAIM/PRESEND OK';
 end $$;
 
+-- ---- Canonical usable-ref helper: stored marker vs usable ref --------------
+-- lazywait_pos_ref_is_usable is the ONE authority for "usable POS ref" (proves
+-- confirmation). It strips JavaScript String.prototype.trim() whitespace,
+-- including Unicode (NBSP, em/narrow/ideographic space, BOM). It is DISTINCT from
+-- "a ref marker is stored" (any non-null value), which is what blocks a resend.
+-- Non-ASCII inputs are built with chr() so this file stays ASCII.
+do $$
+begin
+  -- NOT usable.
+  if public.lazywait_pos_ref_is_usable(null)       then raise exception 'HELPER: null usable'; end if;
+  if public.lazywait_pos_ref_is_usable('')         then raise exception 'HELPER: empty usable'; end if;
+  if public.lazywait_pos_ref_is_usable('   ')      then raise exception 'HELPER: spaces usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(9))     then raise exception 'HELPER: tab usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(10))    then raise exception 'HELPER: newline usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(160))   then raise exception 'HELPER: NBSP usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(8195))  then raise exception 'HELPER: em-space usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(8239))  then raise exception 'HELPER: narrow-no-break usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(12288)) then raise exception 'HELPER: ideographic usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(65279)) then raise exception 'HELPER: BOM usable'; end if;
+  if public.lazywait_pos_ref_is_usable(chr(9)||chr(160)||chr(12288)) then raise exception 'HELPER: mixed-ws usable'; end if;
+  -- USABLE (incl. a real ref padded with mixed whitespace; ZWSP is NOT trimmed).
+  if not public.lazywait_pos_ref_is_usable('REF-1') then raise exception 'HELPER: normal not usable'; end if;
+  if not public.lazywait_pos_ref_is_usable('  REF '||chr(12288)) then raise exception 'HELPER: padded not usable'; end if;
+  if not public.lazywait_pos_ref_is_usable(chr(8203)) then raise exception 'HELPER: ZWSP should be usable'; end if;
+  raise notice 'USABLE-REF HELPER OK';
+end $$;
+
+-- ---- begin_lazywait_create_attempt: stored marker vs usable ref ------------
+-- A stored ref marker (any non-null) or 'synced' means NEVER resend, but only a
+-- USABLE ref is 'already_synced' (proven created); a non-null-but-unusable marker
+-- (or synced without a usable ref) is 'ref_present_unverified' — still no POST,
+-- no phase marker, routed to manual verification (worker -> confirmation_required).
+do $$
+declare
+  v_use  uuid := gen_random_uuid();  -- syncing + usable ref  -> already_synced
+  v_emp  uuid := gen_random_uuid();  -- syncing + empty ref    -> ref_present_unverified
+  v_ws   uuid := gen_random_uuid();  -- syncing + whitespace   -> ref_present_unverified
+  v_uni  uuid := gen_random_uuid();  -- syncing + NBSP ref     -> ref_present_unverified
+  v_sync uuid := gen_random_uuid();  -- synced, null ref       -> ref_present_unverified
+  v_ok   uuid := gen_random_uuid();  -- syncing, null ref      -> ready_to_send
+begin
+  set local session_replication_role = replica;
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
+    lazywait_sync_state, lazywait_ref, pos_sync_started_at, pos_sync_deadline_at) values
+    (v_use,  'B-1', gen_random_uuid(),'pickup',10,10,'syncing','REFB',    now()-interval '1m', now()+interval '9m'),
+    (v_emp,  'B-2', gen_random_uuid(),'pickup',10,10,'syncing','',        now()-interval '1m', now()+interval '9m'),
+    (v_ws,   'B-3', gen_random_uuid(),'pickup',10,10,'syncing','   ',     now()-interval '1m', now()+interval '9m'),
+    (v_uni,  'B-4', gen_random_uuid(),'pickup',10,10,'syncing',chr(160),  now()-interval '1m', now()+interval '9m'),
+    (v_sync, 'B-5', gen_random_uuid(),'pickup',10,10,'synced', null,      now()-interval '1m', now()+interval '9m'),
+    (v_ok,   'B-6', gen_random_uuid(),'pickup',10,10,'syncing',null,      now()-interval '1m', now()+interval '9m');
+  set local session_replication_role = origin;
+
+  if public.begin_lazywait_create_attempt(v_use,  'tU')  <> 'already_synced' then
+    raise exception 'BEGIN REF: usable ref not already_synced'; end if;
+  if public.begin_lazywait_create_attempt(v_emp,  'tE')  <> 'ref_present_unverified' then
+    raise exception 'BEGIN REF: empty ref not ref_present_unverified'; end if;
+  if public.begin_lazywait_create_attempt(v_ws,   'tW')  <> 'ref_present_unverified' then
+    raise exception 'BEGIN REF: whitespace ref not ref_present_unverified'; end if;
+  if public.begin_lazywait_create_attempt(v_uni,  'tN')  <> 'ref_present_unverified' then
+    raise exception 'BEGIN REF: unicode-ws ref not ref_present_unverified'; end if;
+  if public.begin_lazywait_create_attempt(v_sync, 'tS')  <> 'ref_present_unverified' then
+    raise exception 'BEGIN REF: synced-without-usable-ref not ref_present_unverified'; end if;
+  if public.begin_lazywait_create_attempt(v_ok,   'tOK') <> 'ready_to_send' then
+    raise exception 'BEGIN REF: null ref + syncing not ready_to_send'; end if;
+
+  -- NO Create Order phase marker for any existing-ref result (no send path).
+  if (select pos_create_attempted_at from public.orders where id in (v_use,v_emp,v_ws,v_uni,v_sync)
+        and pos_create_attempted_at is not null limit 1) is not null then
+    raise exception 'BEGIN REF: marker stamped for a no-send existing-ref result'; end if;
+  -- The ready_to_send path DID stamp the marker (send phase entered).
+  if (select pos_create_attempted_at from public.orders where id=v_ok) is null then
+    raise exception 'BEGIN REF: ready_to_send did not stamp the marker'; end if;
+  raise notice 'BEGIN REF CLASSIFICATION OK';
+end $$;
+
 rollback;

@@ -183,4 +183,66 @@ begin
   if not v_denied then raise exception 'CASE 6 FAILED: non-admin was allowed'; end if;
 end $$;
 
+-- Case 7: producer-side pos_confirmed guard in record_lazywait_sync. A
+--         'pos_confirmed' event is enqueued ONLY when the AUTHORITATIVE post-update
+--         row is 'synced' with a USABLE ref. An invalid request is SUPPRESSED (not
+--         inserted-then-superseded), so it never leaves a terminal dedup-blocking
+--         row that would suppress a later legitimate confirmation.
+do $$
+declare
+  v_null uuid := gen_random_uuid();   -- synced, patch ref null       -> no event
+  v_ws   uuid := gen_random_uuid();   -- synced, patch ref whitespace -> no event
+  v_uni  uuid := gen_random_uuid();   -- synced, patch ref NBSP        -> no event
+  v_ok   uuid := gen_random_uuid();   -- synced, usable ref            -> one event
+  v_corr uuid := gen_random_uuid();   -- unusable (suppressed) then usable -> event
+begin
+  set local session_replication_role = replica;
+  insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
+  values (v_null,'PCG-1',gen_random_uuid(),'pickup',10,10,'pending'),
+         (v_ws,  'PCG-2',gen_random_uuid(),'pickup',10,10,'pending'),
+         (v_uni, 'PCG-3',gen_random_uuid(),'pickup',10,10,'pending'),
+         (v_ok,  'PCG-4',gen_random_uuid(),'pickup',10,10,'pending'),
+         (v_corr,'PCG-5',gen_random_uuid(),'pickup',10,10,'pending');
+  set local session_replication_role = origin;
+
+  -- (1) synced + NULL ref -> suppressed.
+  perform public.record_lazywait_sync(v_null,
+    jsonb_build_object('lazywait_sync_state','synced'),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_null and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: pos_confirmed enqueued for null ref'; end if;
+
+  -- (2) synced + whitespace ref -> suppressed.
+  perform public.record_lazywait_sync(v_ws,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','   '),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_ws and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: pos_confirmed enqueued for whitespace ref'; end if;
+
+  -- (2b) synced + Unicode-whitespace (NBSP) ref -> suppressed.
+  perform public.record_lazywait_sync(v_uni,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_uni and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: pos_confirmed enqueued for unicode-ws ref'; end if;
+
+  -- (3)+(4) synced + usable ref -> exactly one event; a duplicate call stays one.
+  perform public.record_lazywait_sync(v_ok,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-OK'),'success','push',null,null,null,'pos_confirmed');
+  perform public.record_lazywait_sync(v_ok,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-OK'),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_ok and status='pos_confirmed' and send_status='pending') <> 1 then
+    raise exception 'CASE 7 FAILED: usable pos_confirmed not exactly one event'; end if;
+
+  -- (5)+(6) an unusable ref leaves NO dedup row, so a LATER unusable->usable
+  --         correction can still create the legitimate confirmation.
+  perform public.record_lazywait_sync(v_corr,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_corr and kind='pos_sync') <> 0 then
+    raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking row'; end if;
+  perform public.record_lazywait_sync(v_corr,
+    jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-FIXED'),'success','push',null,null,null,'pos_confirmed');
+  if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed' and send_status='pending') <> 1 then
+    raise exception 'CASE 7 FAILED: usable correction did not create the confirmation'; end if;
+
+  raise notice 'CASE 7 (producer pos_confirmed guard) OK';
+end $$;
+
 rollback;

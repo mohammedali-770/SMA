@@ -15,12 +15,23 @@ export type RequeueEligibility =
   | 'deadline_expired'
   | 'confirmation_required'
   | 'already_synced'
+  | 'ref_present_unverified'
   | 'may_have_sent'
   | 'attempt_limit_reached'
   | 'not_retryable';
 
 /** Maximum POS Create Order attempts (matches MAX_POS_ATTEMPTS / the SQL rule). */
 export const POS_MAX_ATTEMPTS = 5;
+
+/**
+ * USABLE POS ref — a genuinely non-empty reference (JS String.prototype.trim()).
+ * Mirrors the SQL `lazywait_pos_ref_is_usable` and the mobile `hasUsablePosRef`.
+ * This proves confirmation; it is DIFFERENT from "a ref marker is stored" (any
+ * non-null value), which is what blocks an automatic resend below.
+ */
+export function isUsablePosRef(ref: unknown): boolean {
+  return typeof ref === 'string' && ref.trim().length > 0;
+}
 
 export interface RequeueRow {
   lazywait_sync_state?: string | null;
@@ -38,9 +49,14 @@ export interface RequeueRow {
  */
 export function lazywaitRequeueEligibility(row: RequeueRow, now: number = Date.now()): RequeueEligibility {
   const state = row.lazywait_sync_state ?? '';
-  const ref = typeof row.lazywait_ref === 'string' ? row.lazywait_ref.trim() : '';
   if (row.order_type === 'delivery') return 'not_retryable';
-  if (ref !== '' || state === 'synced') return 'already_synced';
+  // RESEND SAFETY: ANY stored ref marker (even blank/malformed) blocks an
+  // automatic resend — do NOT trim here. A USABLE ref proves creation
+  // (already_synced); a merely-present marker (or 'synced' without a usable ref)
+  // needs manual verification (ref_present_unverified). Mirrors the SQL rule.
+  if (isUsablePosRef(row.lazywait_ref)) return 'already_synced';
+  if (row.lazywait_ref != null) return 'ref_present_unverified';
+  if (state === 'synced') return 'ref_present_unverified';
   if (state === 'confirmation_required') return 'confirmation_required';
   if (row.pos_create_attempted_at != null) return 'may_have_sent';
   if (!['failed', 'blocked', 'dead_letter', 'skipped'].includes(state)) return 'not_retryable';
@@ -55,7 +71,8 @@ export function requeueEligibilityMessage(e: RequeueEligibility): string | null 
     case 'requeued': return null;
     case 'deadline_expired': return 'Automatic POS retry window has expired. Verify the order manually.';
     case 'confirmation_required': return 'Needs manual verification; automatic retry is disabled.';
-    case 'already_synced': return 'Already has a POS reference / synced; never resend.';
+    case 'already_synced': return 'Already has a usable POS reference / synced; never resend.';
+    case 'ref_present_unverified': return 'An existing POS reference marker requires manual verification; automatic resend is disabled.';
     case 'may_have_sent': return 'Create Order may already have been sent; verify manually.';
     case 'attempt_limit_reached': return 'Maximum POS retry attempts reached. Verify manually.';
     case 'not_retryable': return 'Not in a safe, retryable state.';

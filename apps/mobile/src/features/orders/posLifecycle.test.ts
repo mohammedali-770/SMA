@@ -33,7 +33,7 @@ describe('deriveCustomerPosLifecycle (customer confirmation safety)', () => {
       .toBe('pos_confirmation_required');
   });
 
-  it('hasUsablePosRef normalizes correctly', () => {
+  it('hasUsablePosRef normalizes correctly (incl. Unicode whitespace, JS .trim())', () => {
     expect(hasUsablePosRef('REF')).toBe(true);
     expect(hasUsablePosRef('  x ')).toBe(true);
     expect(hasUsablePosRef('')).toBe(false);
@@ -41,6 +41,14 @@ describe('deriveCustomerPosLifecycle (customer confirmation safety)', () => {
     expect(hasUsablePosRef(null)).toBe(false);
     expect(hasUsablePosRef(undefined)).toBe(false);
     expect(hasUsablePosRef(42)).toBe(false);
+    // Unicode whitespace (NBSP, ideographic space, narrow-no-break, BOM) and tab
+    // are all NOT usable — parity with the SQL lazywait_pos_ref_is_usable helper.
+    for (const cp of [0x09, 0x0a, 0x00a0, 0x2003, 0x202f, 0x3000, 0xfeff]) {
+      expect(hasUsablePosRef(String.fromCharCode(cp))).toBe(false);
+    }
+    // A real ref padded with an ideographic space is still usable; ZWSP counts.
+    expect(hasUsablePosRef('REF' + String.fromCharCode(0x3000))).toBe(true);
+    expect(hasUsablePosRef(String.fromCharCode(0x200b))).toBe(true);
   });
 
   it('never says confirmed for ambiguous/failed states', () => {

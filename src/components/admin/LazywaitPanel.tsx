@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Loader2, AlertCircle, Check, PlugZap } from 'lucide-react';
 import { orders as ordersApi, DbOrder } from '../../lib/api';
-import { lazywaitRequeueEligibility, requeueEligibilityMessage } from '../../lib/lazywaitRequeue';
+import { lazywaitRequeueEligibility, requeueEligibilityMessage, isUsablePosRef } from '../../lib/lazywaitRequeue';
 import { LazywaitCatalogMapping } from './LazywaitCatalogMapping';
 
 /**
@@ -125,11 +125,11 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
                       <td className="py-1.5 pr-2 text-slate-500 max-w-[220px] truncate" title={o.sync_last_error || o.sync_blocked_reason || ''}>
                         {o.sync_blocked_reason || o.sync_last_error || (
                           state === 'synced'
-                            // 'synced' is only truly confirmed WITH a POS ref; flag a
-                            // ref-less synced row instead of a misleading "OK".
-                            ? (typeof o.lazywait_ref === 'string' && o.lazywait_ref.trim()
+                            // 'synced' is only truly confirmed WITH a USABLE POS ref;
+                            // flag a marker-only / ref-less synced row instead of "OK".
+                            ? (isUsablePosRef(o.lazywait_ref)
                                 ? 'OK'
-                                : <span className="text-amber-600 font-bold">synced without POS ref — verify</span>)
+                                : <span className="text-amber-600 font-bold">synced without usable POS ref — verify</span>)
                             : '—')}
                       </td>
                       <td className="py-1.5 pr-2 text-right">

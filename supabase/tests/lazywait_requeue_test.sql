@@ -53,6 +53,20 @@ begin
     raise exception 'PREDICATE FAILED: synced'; end if;
   if public.lazywait_requeue_eligibility('blocked', 'REF', now()+interval '5m', 1, null, 'pickup') <> 'already_synced' then
     raise exception 'PREDICATE FAILED: ref-bearing'; end if;
+  -- ANY non-null ref marker blocks resend; a non-usable one is ref_present_unverified
+  -- (NOT already_synced — the reference is not proven usable).
+  if public.lazywait_requeue_eligibility('blocked', '', now()+interval '5m', 1, null, 'pickup') <> 'ref_present_unverified' then
+    raise exception 'PREDICATE FAILED: empty ref marker'; end if;
+  if public.lazywait_requeue_eligibility('blocked', '   ', now()+interval '5m', 1, null, 'pickup') <> 'ref_present_unverified' then
+    raise exception 'PREDICATE FAILED: spaces ref marker'; end if;
+  if public.lazywait_requeue_eligibility('blocked', chr(9), now()+interval '5m', 1, null, 'pickup') <> 'ref_present_unverified' then
+    raise exception 'PREDICATE FAILED: tab ref marker'; end if;
+  if public.lazywait_requeue_eligibility('blocked', chr(160), now()+interval '5m', 1, null, 'pickup') <> 'ref_present_unverified' then
+    raise exception 'PREDICATE FAILED: unicode-ws ref marker'; end if;
+  if public.lazywait_requeue_eligibility('synced', null, now()+interval '5m', 1, null, 'pickup') <> 'ref_present_unverified' then
+    raise exception 'PREDICATE FAILED: synced without usable ref'; end if;
+  if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 1, null, 'pickup') <> 'requeued' then
+    raise exception 'PREDICATE FAILED: null ref safe failure should requeue'; end if;
   if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 5, null, 'pickup') <> 'attempt_limit_reached' then
     raise exception 'PREDICATE FAILED: attempt ceiling'; end if;
   if public.lazywait_requeue_eligibility('blocked', null, now()+interval '5m', 1, now(), 'pickup') <> 'may_have_sent' then
@@ -73,6 +87,7 @@ declare
   v_ref uuid := gen_random_uuid();  -- ref-bearing
   v_max uuid := gen_random_uuid();  -- attempt limit
   v_may uuid := gen_random_uuid();  -- may-have-sent marker
+  v_unv uuid := gen_random_uuid();  -- non-null but UNUSABLE ref marker
   v_ok  uuid := gen_random_uuid();  -- safe failure in budget
   v_skip uuid := gen_random_uuid(); -- skipped (no window)
   v_state text; v_before_deadline timestamptz; v_after_deadline timestamptz;
@@ -88,6 +103,7 @@ begin
     (v_ref, 'RQ-4', gen_random_uuid(),'pickup',10,10,'blocked',     'REFX',1, null, now()-interval '3m', now()+interval '7m'),
     (v_max, 'RQ-5', gen_random_uuid(),'pickup',10,10,'failed',      null,  5, null, now()-interval '3m', now()+interval '7m'),
     (v_may, 'RQ-6', gen_random_uuid(),'pickup',10,10,'blocked',     null,  1, now()-interval '2m', now()-interval '3m', now()+interval '7m'),
+    (v_unv, 'RQ-10', gen_random_uuid(),'pickup',10,10,'blocked',    '   ', 1, null, now()-interval '3m', now()+interval '7m'),
     (v_ok,  'RQ-7', gen_random_uuid(),'pickup',10,10,'blocked',     null,  1, null, now()-interval '3m', now()+interval '7m'),
     (v_skip,'RQ-8', gen_random_uuid(),'pickup',10,10,'skipped',     null,  0, null, null,               null);
   set local session_replication_role = origin;
@@ -99,6 +115,9 @@ begin
   perform pg_temp.reject_requeue(v_ref,  'already_synced');
   perform pg_temp.reject_requeue(v_max,  'attempt_limit_reached');
   perform pg_temp.reject_requeue(v_may,  'may_have_sent');
+  -- A non-null but UNUSABLE ref marker blocks an automatic resend but is NOT
+  -- reported as already_synced (the reference is not proven usable).
+  perform pg_temp.reject_requeue(v_unv,  'ref_present_unverified');
 
   -- Eligible safe failure -> 'pending', deadline + attempt count PRESERVED, and
   -- actually claimable.

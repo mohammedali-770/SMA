@@ -131,6 +131,46 @@ update public.orders
  where lazywait_sync_state in ('pending','failed','syncing')
    and pos_sync_started_at is null;
 
+-- ---- 4b. Canonical USABLE-POS-ref helper -----------------------------------
+-- The ONE authority for "is this lazywait_ref a USABLE POS reference?" — i.e.
+-- may it prove restaurant confirmation, produce pos_confirmed, show the
+-- customer-confirmed UI, or finalize a recovery as confirmed. This is a strictly
+-- DIFFERENT question from "is a ref MARKER stored?" (any non-null value, even
+-- blank/malformed, conservatively blocks an automatic Create Order resend — that
+-- check stays `lazywait_ref is not null`, NOT this helper).
+--
+-- Usable == a non-empty value remains after stripping leading/trailing
+-- whitespace under JavaScript String.prototype.trim() semantics: the Unicode
+-- WhiteSpace + LineTerminator set plus U+FEFF (BOM) — U+0009..U+000D, U+0020,
+-- U+00A0, U+1680, U+2000..U+200A, U+2028, U+2029, U+202F, U+205F, U+3000, U+FEFF.
+-- (U+200B ZERO WIDTH SPACE is NOT in that set, matching .trim().) This mirrors the
+-- mobile hasUsablePosRef(ref.trim()) rule so SQL and client can never diverge.
+-- The trim set is built with chr() (ASCII source) and covers the FULL set, NOT
+-- single-arg btrim() which strips only U+0020 spaces. Pure/immutable, no table
+-- access, no secrets. Callers: pos_sync_status_matches('pos_confirmed'), the
+-- stale reaper's confirmed enqueue, begin_lazywait_create_attempt, the
+-- record_lazywait_sync producer guard, and lazywait_requeue_eligibility.
+create or replace function public.lazywait_pos_ref_is_usable(p_ref text)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $$
+  select nullif(
+    btrim(coalesce(p_ref, ''),
+      E'\t\n\x0b\f\r ' || chr(160) || chr(5760)
+      || chr(8192) || chr(8193) || chr(8194) || chr(8195) || chr(8196)
+      || chr(8197) || chr(8198) || chr(8199) || chr(8200) || chr(8201)
+      || chr(8202) || chr(8232) || chr(8233) || chr(8239) || chr(8287)
+      || chr(12288) || chr(65279)),
+    '') is not null;
+$$;
+
+-- authenticated needs execute because lazywait_requeue_eligibility (granted to
+-- authenticated, plain SQL/not SECURITY DEFINER) calls this helper.
+revoke all on function public.lazywait_pos_ref_is_usable(text) from public, anon;
+grant execute on function public.lazywait_pos_ref_is_usable(text) to authenticated, service_role;
+
 -- ---- 5. Claim RPCs (deadline-bounded + clear phase marker) ------------------
 -- A row is claimable only while it is still WITHIN its deadline. Past-deadline
 -- rows are left for the reaper's sweep (step 7) so they finalize deterministically
@@ -207,7 +247,10 @@ grant execute on function public.claim_lazywait_sync_one(uuid) to service_role;
 -- Concurrency: FOR UPDATE serializes callers; the first to stamp the marker+token
 -- wins, a second caller bearing a DIFFERENT token gets `invalid_state`, and the
 -- SAME token is idempotent (safe retry of this RPC). Returns exactly one of:
---   ready_to_send | already_synced | deadline_expired | invalid_state | not_found
+--   ready_to_send | already_synced | ref_present_unverified | deadline_expired
+--   | invalid_state | not_found
+-- ('ref_present_unverified' = a non-null but UNUSABLE ref marker, or 'synced'
+-- without a usable ref: never resend, never confirm — route to verification.)
 create or replace function public.begin_lazywait_create_attempt(
   p_order_id      uuid,
   p_attempt_token text
@@ -229,10 +272,18 @@ begin
     return 'not_found';
   end if;
 
-  -- Already created: a usable ref (or a synced row) means the POS ticket exists.
-  -- Create Order has no idempotency key, so NEVER resend — finalize as synced.
+  -- A STORED ref marker (any non-null value, even blank/malformed) OR a 'synced'
+  -- row means Create Order MAY already have produced a ticket — it has no
+  -- idempotency key, so NEVER resend. But distinguish PROOF of confirmation from
+  -- a mere marker: only a USABLE ref proves the POS ticket exists (-> synced,
+  -- customer-confirmed). A non-null-but-unusable marker (or 'synced' without a
+  -- usable ref) is ambiguous -> 'ref_present_unverified': still no resend, but
+  -- the worker must route it to manual verification, NOT report confirmation.
   if v_row.lazywait_ref is not null or v_row.lazywait_sync_state = 'synced' then
-    return 'already_synced';
+    if public.lazywait_pos_ref_is_usable(v_row.lazywait_ref) then
+      return 'already_synced';
+    end if;
+    return 'ref_present_unverified';
   end if;
 
   -- Only a live claim may enter the send phase. Terminal/ambiguous states
@@ -301,6 +352,8 @@ set search_path = public
 as $$
 declare
   v_state text := p_patch->>'lazywait_sync_state';
+  v_new_state text;
+  v_new_ref   text;
 begin
   update public.orders set
     lazywait_sync_state   = coalesce(v_state, lazywait_sync_state),
@@ -333,7 +386,8 @@ begin
         when v_state in ('pending','skipped') then 'not_synced'::public.sync_status
         else sync_status end,
     updated_at = now()
-  where id = p_order_id;
+  where id = p_order_id
+  returning lazywait_sync_state, lazywait_ref into v_new_state, v_new_ref;
 
   insert into public.integration_sync_logs (provider, order_id, direction, status, request, response, error)
     values ('lazywait', p_order_id, p_direction, p_log_status, p_request, p_response, p_error);
@@ -344,7 +398,18 @@ begin
   -- state a dispatcher may atomically claim (see claim_pos_sync_notification),
   -- so the push fires at most once even under concurrent dispatch. push-dispatch
   -- stays master-flag gated (disabled); this only records the event.
-  if p_notify_status is not null then
+  --
+  -- PRODUCER-SIDE DEFENSE IN DEPTH: a 'pos_confirmed' event is enqueued ONLY when
+  -- the AUTHORITATIVE post-update row (captured via RETURNING, same transaction)
+  -- is 'synced' with a USABLE ref. This does not merely rely on push-dispatch to
+  -- supersede an invalid event at send-time: an invalid pos_confirmed row would
+  -- become a TERMINAL 'superseded' entry that, via the per-(order,status) unique
+  -- index, would then BLOCK a later legitimate confirmation. Suppressing it here
+  -- keeps that slot free so a subsequent unusable->usable correction can still
+  -- enqueue the real confirmation. Non-confirmed statuses are unaffected.
+  if p_notify_status is not null
+     and (p_notify_status <> 'pos_confirmed'
+          or (v_new_state = 'synced' and public.lazywait_pos_ref_is_usable(v_new_ref))) then
     insert into public.notification_log (kind, order_id, status, send_status)
       values ('pos_sync', p_order_id, p_notify_status, 'pending')
       on conflict do nothing;
@@ -433,9 +498,8 @@ begin
      returning o.id, o.first_pos_sync_failure_at as first_failure, o.lazywait_ref as ref
   ), notified_confirmed as (
     -- Only enqueue the customer "confirmed" event when the recovered ref is a
-    -- USABLE (trimmed, non-empty) POS reference — the same rule (and same full
-    -- ASCII whitespace trim set) the canonical pos_sync_status_matches predicate
-    -- applies at dispatch. A whitespace-only ref keeps the row 'synced' (a
+    -- USABLE POS reference — the SAME canonical helper the dispatch predicate
+    -- applies. A merely-stored (blank/malformed) ref keeps the row 'synced' (a
     -- response came back; never re-POST) but must NOT tell the customer
     -- "confirmed"; enqueuing pos_confirmed here would only be superseded at
     -- send-time AND leave a dedup-blocking terminal event that could suppress a
@@ -443,7 +507,7 @@ begin
     insert into public.notification_log (kind, order_id, status, send_status)
       select 'pos_sync', id, 'pos_confirmed', 'pending' from recovered
        where first_failure is not null
-         and nullif(btrim(coalesce(ref, ''), E' \t\n\r\f\v'), '') is not null
+         and public.lazywait_pos_ref_is_usable(ref)
       on conflict do nothing
       returning 1
   )
@@ -573,16 +637,21 @@ grant execute on function public.reap_stale_lazywait_syncs(integer, integer) to 
 -- expired deadline in place, producing exactly that false success.
 --
 -- The eligibility rule lives in ONE pure predicate (mirrored by the admin UI to
--- hide the Retry action; the DB stays authoritative). A row is requeuable ONLY
+-- hide the Retry action; the DB stays authoritative). RESEND SAFETY uses the
+-- STORED-REF-MARKER test (any non-null lazywait_ref, even blank/malformed),
+-- NOT the usable-ref test: if ANY ref is stored, Create Order may already have
+-- produced a ticket, so an automatic resend is blocked. A row is requeuable ONLY
 -- when it is a proven-safe failure still inside its original budget:
---   delivery                                   -> not_retryable
---   has a usable ref OR state 'synced'          -> already_synced (never resend)
---   state 'confirmation_required'               -> confirmation_required (manual only)
---   phase marker set (Create Order may have left) -> may_have_sent
+--   delivery                                     -> not_retryable
+--   a USABLE ref                                 -> already_synced (proven created; never resend)
+--   any OTHER non-null ref marker, OR 'synced' w/o a usable ref
+--                                                -> ref_present_unverified (marker present; verify, never resend)
+--   state 'confirmation_required'                -> confirmation_required (manual only)
+--   phase marker set (Create Order may have left)-> may_have_sent
 --   state not in failed/blocked/dead_letter/skipped -> not_retryable
---   attempt count >= 5                          -> attempt_limit_reached
---   past the absolute deadline                   -> deadline_expired
---   else                                         -> requeued
+--   attempt count >= 5                           -> attempt_limit_reached
+--   past the absolute deadline                    -> deadline_expired
+--   else                                          -> requeued
 create or replace function public.lazywait_requeue_eligibility(
   p_state         text,
   p_ref           text,
@@ -598,7 +667,10 @@ set search_path = public
 as $$
   select case
     when p_order_type = 'delivery' then 'not_retryable'
-    when coalesce(p_ref, '') <> '' or p_state = 'synced' then 'already_synced'
+    -- ANY stored ref marker blocks an automatic resend (do NOT trim here).
+    when public.lazywait_pos_ref_is_usable(p_ref) then 'already_synced'
+    when p_ref is not null then 'ref_present_unverified'
+    when p_state = 'synced' then 'ref_present_unverified'
     when p_state = 'confirmation_required' then 'confirmation_required'
     when p_marker_at is not null then 'may_have_sent'
     when p_state not in ('failed','blocked','dead_letter','skipped') then 'not_retryable'
@@ -644,7 +716,8 @@ begin
     raise exception '%', v_elig || ': ' || case v_elig
       when 'deadline_expired'      then 'Automatic POS retry window has expired. Verify the order manually.'
       when 'confirmation_required' then 'Order needs manual verification; automatic retry is disabled.'
-      when 'already_synced'        then 'Order already has a POS reference / is synced; never resend.'
+      when 'already_synced'        then 'Order already has a usable POS reference / is synced; never resend.'
+      when 'ref_present_unverified' then 'An existing POS reference marker requires manual verification; automatic resend is disabled.'
       when 'may_have_sent'         then 'A Create Order request may already have been sent; verify manually before any resend.'
       when 'attempt_limit_reached' then 'Maximum POS retry attempts reached. Verify the order manually.'
       else                              'Order is not in a safe, retryable state.'
@@ -719,7 +792,7 @@ create unique index if not exists notification_log_pos_sync_uq
 -- column values (state / ref / next-attempt / deadline) so the claim-time and
 -- send-time rules can NEVER drift. STABLE (references now() for the retry/deadline
 -- window), no table access, no secrets/PII. This is the single source of the rules:
---   pos_confirmed             -> synced + a trimmed, non-empty ref
+--   pos_confirmed             -> synced + a USABLE ref (lazywait_pos_ref_is_usable)
 --   pos_confirmation_required -> confirmation_required
 --   pos_retrying              -> failed + a FUTURE sync_next_attempt_at + unexpired deadline
 --   pos_failed                -> blocked | dead_letter
@@ -737,15 +810,10 @@ set search_path = public
 as $$
   select case p_status
     when 'pos_confirmed' then
-      -- A whitespace-only ref is NOT a usable POS reference. Require a trimmed,
-      -- non-empty ref so the customer is only told "confirmed" when Lazywait
-      -- returned a real order_ref. The trim set is the full ASCII whitespace set
-      -- (space, tab, newline, CR, form-feed, vertical-tab) — NOT single-arg
-      -- btrim(), which strips only spaces and would let a tab/newline-only ref
-      -- through. This mirrors the mobile hasUsablePosRef() rule (JS .trim()) so
-      -- SQL and client can never diverge.
-      p_state = 'synced'
-      and nullif(btrim(coalesce(p_ref, ''), E' \t\n\r\f\v'), '') is not null
+      -- Customer confirmation requires 'synced' AND a USABLE ref (the canonical
+      -- helper trims JS .trim() whitespace incl. Unicode/BOM). A whitespace-only
+      -- or otherwise-blank ref is NOT proof of confirmation.
+      p_state = 'synced' and public.lazywait_pos_ref_is_usable(p_ref)
     when 'pos_confirmation_required' then
       p_state = 'confirmation_required'
     when 'pos_retrying' then
