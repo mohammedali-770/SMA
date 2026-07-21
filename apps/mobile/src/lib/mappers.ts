@@ -218,6 +218,10 @@ export function mapOrder(o: DbOrderWithItems): Order {
     notes: o.notes ?? undefined,
     createdAt: o.created_at,
     lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
+    lazywaitSyncState: o.lazywait_sync_state ?? undefined,
+    lazywaitRef: o.lazywait_ref ?? undefined,
+    firstPosSyncFailureAt: o.first_pos_sync_failure_at ?? undefined,
+    syncNextAttemptAt: o.sync_next_attempt_at ?? undefined,
     address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
   };

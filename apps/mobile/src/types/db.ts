@@ -132,6 +132,11 @@ export interface DbOrder {
   coupon_code: string | null; notes: string | null; created_at: string;
   // Lazywait POS number, set on the order once it syncs (customer-readable).
   lazywait_order_number?: string | null;
+  // POS confirmation lifecycle (drives the customer-facing status; no secrets).
+  lazywait_sync_state?: string | null;
+  lazywait_ref?: string | null; // POS order reference; REQUIRED to show "confirmed"
+  first_pos_sync_failure_at?: string | null;
+  sync_next_attempt_at?: string | null;
   sync_status: DbSyncStatus; address_snapshot: Record<string, unknown> | null;
   loyalty_points_earned: number; loyalty_points_redeemed: number;
 }

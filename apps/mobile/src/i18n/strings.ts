@@ -293,6 +293,18 @@ export const STRINGS = {
     status_out_for_delivery: 'Out for delivery',
     status_delivered: 'Delivered',
     status_cancelled: 'Cancelled',
+
+    // POS confirmation lifecycle (customer-facing). Short label + full message.
+    pos_lc_submitting: 'Sending to restaurant…',
+    pos_lc_submitting_body: 'Sending your order to the restaurant…',
+    pos_lc_retrying: 'Confirming…',
+    pos_lc_retrying_body: 'We received your order, but could not yet confirm that it reached the restaurant. We are retrying automatically. Please do not place another order.',
+    pos_lc_confirmed: 'Confirmed by restaurant',
+    pos_lc_confirmed_body: 'Your order has been confirmed by the restaurant',
+    pos_lc_verify: 'Verifying',
+    pos_lc_verify_body: 'We could not verify whether your order reached the restaurant. Our team is reviewing it. Please do not place another order.',
+    pos_lc_failed: 'Not confirmed',
+    pos_lc_failed_body: 'We could not send your order to the restaurant, and the order was not confirmed. Our team will follow up.',
   },
   ar: {
     appName: 'سبايسي ميل',
@@ -573,6 +585,18 @@ export const STRINGS = {
     status_out_for_delivery: 'قيد التوصيل',
     status_delivered: 'تم التوصيل',
     status_cancelled: 'ملغي',
+
+    // POS confirmation lifecycle (customer-facing). Short label + full message.
+    pos_lc_submitting: 'جارٍ الإرسال إلى المطعم…',
+    pos_lc_submitting_body: 'جارٍ إرسال طلبك إلى المطعم…',
+    pos_lc_retrying: 'جارٍ التأكيد…',
+    pos_lc_retrying_body: 'استلمنا طلبك، لكن لم نتمكن من تأكيد وصوله إلى المطعم حتى الآن.\nنعيد المحاولة تلقائيًا. فضلاً لا تنشئ طلبًا جديدًا.',
+    pos_lc_confirmed: 'تم تأكيد الطلب',
+    pos_lc_confirmed_body: 'تم تأكيد وصول طلبك إلى المطعم',
+    pos_lc_verify: 'قيد المراجعة',
+    pos_lc_verify_body: 'تعذر علينا التحقق من وصول طلبك إلى المطعم.\nفريقنا يراجع الطلب. فضلاً لا تنشئ طلبًا جديدًا.',
+    pos_lc_failed: 'لم يتم التأكيد',
+    pos_lc_failed_body: 'تعذر إرسال طلبك إلى المطعم، ولم يتم تأكيد الطلب.\nفريقنا سيتابع الحالة.',
   },
 } as const;
 

@@ -55,6 +55,16 @@ export const ADMIN_LOCALES = {
     realtime_pulse: 'Incoming order alert buzzer active!',
     dismiss: 'Dismiss Alert',
     role: 'Session Role',
+    verify_title: 'Orders Requiring Verification',
+    verify_sub: 'Ambiguous POS results — verify in Lazywait before any manual action. Read-only.',
+    verify_empty: 'No orders need verification.',
+    verify_reason: 'Reason',
+    verify_since: 'Waiting since',
+    verify_reason_timeout: 'Timeout',
+    verify_reason_connection: 'Connection interrupted',
+    verify_reason_missing_ref: 'Missing POS reference',
+    verify_reason_ambiguous_response: 'Ambiguous provider response',
+    verify_reason_provider_5xx: 'Ambiguous provider response',
   },
   ar: {
     dashboard_title: 'لوحة تحكم سبايسي ميل الإدارية',
@@ -108,6 +118,16 @@ export const ADMIN_LOCALES = {
     realtime_pulse: 'تنبيه طوارئ: تم تلقي طلب جديد حار!',
     dismiss: 'إيقاف التنبيه',
     role: 'دور الجلسة الحالية',
+    verify_title: 'طلبات تحتاج تحقق',
+    verify_sub: 'نتائج غير مؤكدة من نظام الكاشير — تحقّق في Lazywait قبل أي إجراء يدوي. للعرض فقط.',
+    verify_empty: 'لا توجد طلبات تحتاج تحقق.',
+    verify_reason: 'السبب',
+    verify_since: 'بالانتظار منذ',
+    verify_reason_timeout: 'انتهاء المهلة',
+    verify_reason_connection: 'انقطاع الاتصال',
+    verify_reason_missing_ref: 'مرجع الكاشير مفقود',
+    verify_reason_ambiguous_response: 'استجابة غير واضحة من المزود',
+    verify_reason_provider_5xx: 'استجابة غير واضحة من المزود',
   }
 };
 

@@ -10,10 +10,16 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **44**
+- Repository migration files: **45**
 - Live `schema_migrations` rows: **45**
 - Latest live version: **`20260720075244`**
   (`lazywait_sync_scheduler`; repository version `20260720120000`)
+- **Newest repository file is UNAPPLIED.** `20260721120000_lazywait_confirmation_lifecycle`
+  (customer-visible POS confirmation lifecycle) exists in the repository only and
+  has **no live `schema_migrations` row** — it is a forward-only migration awaiting
+  owner-approved application via the §9 `apply_migration` workflow. The live count
+  and the latest live version above are therefore **unchanged** by it. It is the
+  reason the repository count rose from 44 to 45 while the live count stayed at 45.
 - The current production schema is **functionally aligned with the repository
   through `20260714130000`** — every repository migration, including the
   trigger-function grant hardening, is applied and verified — based on
@@ -29,7 +35,9 @@
   *schema* divergence. The full mapping is in §5.
 - **Post–Stage-4 applications.** Since the 2026-07-14 audit (§3, §10) six
   further migrations were applied to production, taking the live count from 39
-  to 45 and the repository count from 38 to 44:
+  to 45 and the repository count from 38 to 44 (the 45th repository file,
+  `20260721120000_lazywait_confirmation_lifecycle`, is UNAPPLIED — see the note
+  above — so it raised only the repository count, not the live count):
   - **Lazywait POS sync scheduler** — repository `20260720120000` → live
     `20260720075244`; owner-approved and applied via `apply_migration` on
     **2026-07-20**, verified (§13). It is fully itemized in §5 (row 39) and §13.
@@ -119,8 +127,9 @@ notes.
 > **Scope of these counts.** The table above itemizes the **39 repository /
 > 40 live** rows detailed in §5 (through the Lazywait sync scheduler, row 39).
 > The five account-deletion migrations now live in production (§1) are **not
-> yet itemized** here; adding them brings the true production totals to
-> **44 repository / 45 live** (see §1 and §13). The Lazywait sync scheduler is
+> yet itemized** here; adding them, plus the one repository-only, UNAPPLIED
+> `20260721120000_lazywait_confirmation_lifecycle` (no live row yet), brings the
+> true totals to **45 repository / 45 live** (see §1 and §13). The Lazywait sync scheduler is
 > class **B** (`SAME_CONTENT_DIFFERENT_VERSION`): repository `20260720120000`
 > vs. the apply-time live version `20260720075244`, same reviewed content.
 
@@ -185,8 +194,10 @@ production.
 Reconciliation check: the rows above detail **39 repository** rows
 (3×A + 31×B + 3×C + 2×H) and **40 live** rows (3×A + 31×B + 3×C + 3×F).
 Adding the five applied-but-not-yet-itemized account-deletion migrations
-(§1, §4 note) yields the true production totals of **44 repository / 45 live**
-recorded in §1.
+(§1, §4 note) — present on both sides — plus the one **repository-only,
+UNAPPLIED** migration `20260721120000_lazywait_confirmation_lifecycle` (no live
+row yet, §1) yields the true production totals of **45 repository / 45 live**
+recorded in §1 (39 + 5 + 1 repository; 40 + 5 live).
 
 ## 6. Why `db push` is unsafe
 
@@ -196,18 +207,19 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**36 repository files** (44 − 8) unapplied and attempt to replay them against
+**37 repository files** (45 − 8) unapplied and attempt to replay them against
 production. Eight shared versions do **not** make `db push` any safer — the
-permanent production prohibition stands, because **36 repository versions still
-do not match live history**, content boundaries differ for consolidated/split
-migrations, and replaying historical migrations against a live database remains
-unsafe regardless. Risks:
+permanent production prohibition stands, because **37 repository versions still
+do not match live history** (including the intentionally-unapplied
+`20260721120000_lazywait_confirmation_lifecycle`), content boundaries differ for
+consolidated/split migrations, and replaying historical migrations against a live
+database remains unsafe regardless. Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (36 junk records even on success);
+- **duplicate or misleading history rows** (37 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly.

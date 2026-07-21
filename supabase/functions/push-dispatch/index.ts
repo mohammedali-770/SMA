@@ -85,6 +85,47 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
   },
 };
 
+// POS confirmation-lifecycle copy (EN/AR). Body strings are the EXACT approved
+// customer messages. Data-free like STATUS_COPY. These correspond to the four
+// deduplicated pos_sync transitions the sync worker/reaper enqueue.
+type PosSyncStatus = 'pos_retrying' | 'pos_confirmed' | 'pos_confirmation_required' | 'pos_failed';
+const POS_SYNC_COPY: Record<PosSyncStatus, { en: { title: string; body: string }; ar: { title: string; body: string } }> = {
+  pos_confirmed: {
+    en: { title: 'Order confirmed ✅', body: 'Your order has been confirmed by the restaurant' },
+    ar: { title: 'تم تأكيد الطلب ✅', body: 'تم تأكيد وصول طلبك إلى المطعم' },
+  },
+  pos_retrying: {
+    en: {
+      title: 'Confirming your order…',
+      body: 'We received your order, but could not yet confirm that it reached the restaurant. We are retrying automatically. Please do not place another order.',
+    },
+    ar: {
+      title: 'جارٍ تأكيد طلبك…',
+      body: 'استلمنا طلبك، لكن لم نتمكن من تأكيد وصوله إلى المطعم حتى الآن.\nنعيد المحاولة تلقائيًا. فضلاً لا تنشئ طلبًا جديدًا.',
+    },
+  },
+  pos_confirmation_required: {
+    en: {
+      title: 'Verifying your order',
+      body: 'We could not verify whether your order reached the restaurant. Our team is reviewing it. Please do not place another order.',
+    },
+    ar: {
+      title: 'جارٍ التحقق من طلبك',
+      body: 'تعذر علينا التحقق من وصول طلبك إلى المطعم.\nفريقنا يراجع الطلب. فضلاً لا تنشئ طلبًا جديدًا.',
+    },
+  },
+  pos_failed: {
+    en: {
+      title: 'Order not confirmed',
+      body: 'We could not send your order to the restaurant, and the order was not confirmed. Our team will follow up.',
+    },
+    ar: {
+      title: 'لم يتم تأكيد الطلب',
+      body: 'تعذر إرسال طلبك إلى المطعم، ولم يتم تأكيد الطلب.\nفريقنا سيتابع الحالة.',
+    },
+  },
+};
+
 interface DeviceRow {
   id: string;
   expo_push_token: string;
@@ -357,6 +398,126 @@ Deno.serve(async (req: Request) => {
     }, { type: 'promo' });
     await admin.from('notification_log').insert({ kind: 'broadcast', ...result });
     return json({ status: 'ok', ...result }, 200);
+  }
+
+  // ---------------------------------------------------------------- pos_sync
+  // Customer-facing POS confirmation-lifecycle push. The sync worker/reaper have
+  // already enqueued a deduplicated notification_log row (kind='pos_sync',
+  // unique(order_id,status), send_status='pending'); this action renders + sends
+  // it. Caller: service role (internal) or an authenticated admin. AT-MOST-ONCE
+  // under concurrency: a token-fenced atomic claim (pending -> processing) lets
+  // exactly one dispatcher send; 'processing' is never reclaimed and terminal
+  // rows are no-ops, so a status reaches a device at most once even if two
+  // dispatchers race. (Push stays master-flag disabled, so this path is dormant
+  // in prod.)
+  if (body.action === 'pos_sync') {
+    const fromService = isServiceRoleCall(req);
+    const adminId = fromService ? null : await callingAdminId(req, admin);
+    if (!fromService && !adminId) return json({ error: 'forbidden' }, 403);
+
+    const status = String(body.status ?? '') as PosSyncStatus;
+    if (!(status in POS_SYNC_COPY)) return json({ error: 'unknown status' }, 400);
+    const orderId = String(body.orderId ?? '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+      return json({ error: 'invalid orderId' }, 400);
+    }
+
+    const { data: order } = await admin.from('orders')
+      .select('id, customer_id').eq('id', orderId).maybeSingle();
+    if (!order) return json({ error: 'order not found' }, 404);
+
+    // FENCED CLAIM (Finding 3): an atomic RPC flips the deduped 'pending' event
+    // row to 'processing' with a per-dispatch lease token. Exactly ONE concurrent
+    // caller wins ('claimed'); a 'processing' row is NOT reclaimable by anyone
+    // else ('in_progress'), and terminal rows ('sent'/'no_targets'/'failed') are
+    // idempotent no-ops ('duplicate'). Every later write is fenced by this token,
+    // so at most one dispatcher ever reaches sendToDevices for a given event.
+    const claimToken = crypto.randomUUID();
+    const { data: claim, error: claimError } = await admin.rpc('claim_pos_sync_notification', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+    });
+    if (claimError) return json({ status: 'error', reason: 'claim failed (transient)' }, 500);
+    const claimResult = String(claim ?? '');
+    // The dispatcher is a pure CONSUMER: it never creates events. If no lifecycle
+    // producer (record_lazywait_sync / reaper) enqueued this transition, there is
+    // nothing to send. A 'superseded' event no longer matches the order state.
+    if (claimResult === 'no_event') return json({ status: 'no_event', reason: 'no pending pos_sync event to dispatch' }, 200);
+    if (claimResult === 'superseded') return json({ status: 'superseded', reason: 'event no longer matches order state' }, 200);
+    if (claimResult === 'duplicate') return json({ status: 'duplicate', reason: 'already delivered' }, 200);
+    if (claimResult === 'in_progress') return json({ status: 'in_progress', reason: 'another dispatcher owns this send' }, 200);
+    if (claimResult !== 'claimed') return json({ status: 'error', reason: `unexpected claim result: ${claimResult}` }, 500);
+
+    const { data: devices, error: devicesError } = await admin.from('push_devices')
+      .select('id, expo_push_token, lang')
+      .eq('customer_id', order.customer_id)
+      .eq('is_active', true)
+      .eq('order_updates_enabled', true);
+    if (devicesError) {
+      // PROVEN pre-send failure (nobody was targeted): release the claim back to
+      // 'pending' so a later dispatch can safely retry — this cannot double-send.
+      await admin.rpc('release_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      });
+      return json({ status: 'error', send_status: 'pending', reason: 'device lookup failed (transient)' }, 500);
+    }
+
+    const targets = (devices ?? []) as DeviceRow[];
+    if (targets.length === 0) {
+      // Terminal: finalize as no_targets under our token (owner-fenced).
+      await admin.rpc('finalize_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+        p_send_status: 'no_targets', p_targeted: 0, p_sent: 0, p_failed: 0, p_deactivated: 0,
+      });
+      return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
+    }
+
+    // FINAL token-fenced pre-send re-validation, immediately adjacent to the send.
+    // The order can transition between the claim above and this point (e.g. the
+    // sync worker succeeds, moving 'failed' -> 'synced' after a 'pos_retrying' was
+    // claimed). The copy (POS_SYNC_COPY[status], a constant) and the device list
+    // are ALREADY prepared, and NOTHING async happens between this check and the
+    // send. A DB transaction cannot be held across the external Expo call, so the
+    // only residual gap is the single synchronous step between this RPC committing
+    // and fetch() starting — no awaited work sits in it. Only 'ready_to_send'
+    // proceeds; a superseded event was atomically marked terminal by the RPC.
+    const { data: preSend, error: preErr } = await admin.rpc('validate_pos_sync_notification_before_send', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+    });
+    if (preErr) {
+      // Transient validation failure BEFORE any send: release the claim back to
+      // 'pending' (owner-fenced) so a later dispatch can safely retry — nothing
+      // was delivered, so this cannot double-send. If the RPC actually committed
+      // (e.g. a 'superseded' mark) and only the reply was lost, the release
+      // matches zero rows and is a harmless no-op. Without this the 'processing'
+      // row would strand (no notification_log reaper; the unique index blocks a
+      // fresh 'pending' re-enqueue), silently losing a deliverable notification.
+      await admin.rpc('release_pos_sync_notification', {
+        p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      });
+      return json({ status: 'error', send_status: 'pending', reason: 'pre-send validation failed (transient)' }, 500);
+    }
+    const preResult = String(preSend ?? '');
+    if (preResult === 'superseded') {
+      return json({ status: 'superseded', reason: 'order state changed before send; not sent' }, 200);
+    }
+    if (preResult !== 'ready_to_send') {
+      // 'lost_claim' / 'not_found' / anything unexpected -> we no longer own the
+      // send (or the event is gone). Never send, never touch a foreign claim.
+      return json({ status: 'no_send', reason: `pre-send validation: ${preResult}` }, 200);
+    }
+
+    const result = await sendToDevices(admin, targets, POS_SYNC_COPY[status], { type: 'order', orderId });
+    // The requests have LEFT for at least some devices. Whether or not any ticket
+    // succeeded, this is a post-send result and must be TERMINAL — never
+    // auto-resent (an ambiguous post-send state could otherwise double-deliver).
+    // 'sent' when any delivered, else 'failed' (terminal, NOT reclaimable).
+    const sendStatus = result.sent > 0 ? 'sent' : 'failed';
+    await admin.rpc('finalize_pos_sync_notification', {
+      p_order_id: orderId, p_status: status, p_claim_token: claimToken,
+      p_send_status: sendStatus,
+      p_targeted: result.targeted, p_sent: result.sent, p_failed: result.failed, p_deactivated: result.deactivated,
+    });
+    return json({ status: 'ok', send_status: sendStatus, ...result }, 200);
   }
 
   return json({ error: 'unknown action' }, 400);

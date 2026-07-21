@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshCw, Loader2, AlertCircle, Check, PlugZap } from 'lucide-react';
 import { orders as ordersApi, DbOrder } from '../../lib/api';
+import { lazywaitRequeueEligibility, requeueEligibilityMessage, isUsablePosRef } from '../../lib/lazywaitRequeue';
 import { LazywaitCatalogMapping } from './LazywaitCatalogMapping';
 
 /**
@@ -105,7 +106,12 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
               <tbody>
                 {orderRows.map((o) => {
                   const state = o.lazywait_sync_state ?? 'pending';
-                  const canRetry = !disabled && RETRYABLE.has(state) && o.order_type !== 'delivery';
+                  // Deadline-safe eligibility (authoritative in the DB; mirrored here
+                  // only to hide the action). Never offer Retry for an expired /
+                  // ambiguous / already-sent / attempt-exhausted order.
+                  const elig = lazywaitRequeueEligibility(o);
+                  const canRetry = !disabled && elig === 'requeued';
+                  const eligMsg = RETRYABLE.has(state) ? requeueEligibilityMessage(elig) : null;
                   return (
                     <tr key={o.id} className="border-t border-slate-100">
                       <td className="py-1.5 pr-2 font-bold text-slate-700">{o.order_number}</td>
@@ -117,10 +123,17 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
                       </td>
                       <td className="py-1.5 pr-2 text-slate-500">{o.sync_attempt_count ?? 0}</td>
                       <td className="py-1.5 pr-2 text-slate-500 max-w-[220px] truncate" title={o.sync_last_error || o.sync_blocked_reason || ''}>
-                        {o.sync_blocked_reason || o.sync_last_error || (state === 'synced' ? 'OK' : '—')}
+                        {o.sync_blocked_reason || o.sync_last_error || (
+                          state === 'synced'
+                            // 'synced' is only truly confirmed WITH a USABLE POS ref;
+                            // flag a marker-only / ref-less synced row instead of "OK".
+                            ? (isUsablePosRef(o.lazywait_ref)
+                                ? 'OK'
+                                : <span className="text-amber-600 font-bold">synced without usable POS ref — verify</span>)
+                            : '—')}
                       </td>
                       <td className="py-1.5 pr-2 text-right">
-                        {canRetry && (
+                        {canRetry ? (
                           <button
                             onClick={() => retry(o.id)}
                             disabled={busy === `order:${o.id}`}
@@ -128,7 +141,11 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
                           >
                             {busy === `order:${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Retry
                           </button>
-                        )}
+                        ) : eligMsg ? (
+                          // No Retry action for an expired / ambiguous order — show a
+                          // clear internal reason instead of a button that would fail.
+                          <span className="text-[8.5px] font-bold text-slate-400 leading-tight block max-w-[150px] ml-auto">{eligMsg}</span>
+                        ) : null}
                       </td>
                     </tr>
                   );

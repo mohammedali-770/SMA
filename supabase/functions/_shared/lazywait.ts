@@ -24,6 +24,25 @@ export const DEFAULT_BASE_URL = 'https://apiv2.lazywait.com/v1';
 export const MAX_SYNC_ATTEMPTS = 8;
 export const SOURCE = 'LWAPI';
 
+// ---------------------------------------------------------------------------
+// Customer-confirmation lifecycle: retry budget + fixed schedule
+// ---------------------------------------------------------------------------
+/**
+ * A customer is never told the restaurant confirmed the order unless Lazywait
+ * returned a usable order_ref. Auto-retry is bounded HARD by BOTH a maximum
+ * attempt count AND an absolute wall-clock deadline measured from first
+ * eligibility — whichever is reached first ends the retries.
+ */
+export const MAX_POS_ATTEMPTS = 5;
+export const POS_DEADLINE_MINUTES = 10;
+/**
+ * Minute offsets from pos_sync_started_at for attempts 1..5:
+ *   attempt 1 immediately, then +1, +3, +6, +9 — all inside the 10-min window.
+ * Index i (0-based) is the schedule for attempt i+1. The SQL helper
+ * public.pos_next_attempt_at mirrors this exactly.
+ */
+export const POS_RETRY_OFFSETS_MIN = [0, 1, 3, 6, 9] as const;
+
 /**
  * How long an order may sit in 'syncing' before the reaper reclaims it. If a
  * worker crashes/times out after claiming (flipping the row to 'syncing') but
@@ -57,6 +76,109 @@ export function classifyLazywaitError(status: number, code?: string | null): {
   if (status === 401) return { kind: 'terminal', reason: 'auth_invalid_key' };
   if (status === 403) return { kind: 'terminal', reason: code === 'LICENSE_EXPIRED' ? 'license_expired' : 'forbidden' };
   return { kind: 'terminal', reason: `client_error_${status}` };
+}
+
+// ---------------------------------------------------------------------------
+// Create Order outcome classification (customer-confirmation safety)
+// ---------------------------------------------------------------------------
+/**
+ * The ONLY outcomes that may be auto-retried are ones with EXPLICIT evidence the
+ * Create Order was NOT processed. Everything else that did not cleanly confirm
+ * is AMBIGUOUS (the POS may or may not hold the order) and — because Create
+ * Order has no idempotency key — must NEVER be blindly resent.
+ *
+ *   ok         2xx + success:true + a usable order_ref  -> synced.
+ *   safe_retry HTTP 429 (rate limited): the gateway rejected us before the POS
+ *              saw it, so a retry cannot duplicate.       -> retry within budget.
+ *   ambiguous  timeout / dropped connection (status 0), 5xx, 2xx-without-ref,
+ *              success:true-without-ref, malformed body   -> confirmation_required.
+ *   terminal   401 / 403 / other 4xx: the request reached the POS and was
+ *              definitively REJECTED (bad auth/license/payload). Known NOT
+ *              created; a resend would fail identically.  -> final known failure.
+ */
+export type CreateOrderOutcomeKind = 'ok' | 'safe_retry' | 'ambiguous' | 'terminal';
+export type PosConfirmationReason =
+  | 'timeout' | 'connection' | 'missing_ref' | 'ambiguous_response' | 'provider_5xx';
+
+export interface CreateOrderResultInput {
+  status: number;                 // 0 = network/timeout (see lazywaitFetch)
+  data?: unknown;                 // parsed provider body (may be malformed)
+  error?: string | null;         // e.g. 'timeout' on AbortError
+}
+export interface CreateOrderOutcome {
+  kind: CreateOrderOutcomeKind;
+  reason: string;                 // stable machine reason (safe to log)
+  orderRef: string | null;        // present only when kind === 'ok'
+  confirmationReason?: PosConfirmationReason; // set only when kind === 'ambiguous'
+}
+
+/** Pull a non-empty `order.order_ref` out of a provider body, or null. */
+export function extractOrderRef(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const order = (data as Record<string, unknown>).order;
+  if (!order || typeof order !== 'object') return null;
+  const ref = (order as Record<string, unknown>).order_ref;
+  if (ref == null) return null;
+  const s = String(ref).trim();
+  return s.length ? s : null;
+}
+
+export function classifyCreateOrderResult(res: CreateOrderResultInput): CreateOrderOutcome {
+  const status = res.status;
+  const success = (res.data && typeof res.data === 'object')
+    ? (res.data as Record<string, unknown>).success : undefined;
+  const orderRef = extractOrderRef(res.data);
+
+  if (status >= 200 && status < 300) {
+    if (success === true && orderRef) return { kind: 'ok', reason: 'created', orderRef };
+    // 2xx but no usable ref: the POS MAY have created it. Never resend.
+    return {
+      kind: 'ambiguous',
+      reason: success === true ? 'created_without_ref' : 'unexpected_response',
+      orderRef: null,
+      confirmationReason: success === true ? 'missing_ref' : 'ambiguous_response',
+    };
+  }
+  if (status === 429) return { kind: 'safe_retry', reason: 'rate_limited', orderRef: null };
+  if (status === 0) {
+    // Network failure: the request may have reached the POS before we lost the
+    // reply. Ambiguous — verify, never auto-resend.
+    const isTimeout = res.error === 'timeout';
+    return {
+      kind: 'ambiguous',
+      reason: isTimeout ? 'timeout' : 'network_error',
+      orderRef: null,
+      confirmationReason: isTimeout ? 'timeout' : 'connection',
+    };
+  }
+  if (status >= 500) {
+    // 5xx: the POS could have processed the order before failing. Ambiguous.
+    return { kind: 'ambiguous', reason: `server_error_${status}`, orderRef: null, confirmationReason: 'provider_5xx' };
+  }
+  if (status === 401) return { kind: 'terminal', reason: 'auth_invalid_key', orderRef: null };
+  if (status === 403) return { kind: 'terminal', reason: 'license_or_forbidden', orderRef: null };
+  return { kind: 'terminal', reason: `client_error_${status}`, orderRef: null };
+}
+
+/**
+ * Given how many Create Order attempts have COMPLETED (and the absolute window),
+ * decide whether another attempt is allowed and when. Enforces BOTH the attempt
+ * ceiling and the deadline. Mirrors the SQL helper public.pos_next_attempt_at.
+ *
+ * @param startedAtMs  pos_sync_started_at in epoch ms (first eligibility).
+ * @param completedAttempts  sync_attempt_count AFTER the attempt that just ran.
+ * @param deadlineMs  pos_sync_deadline_at in epoch ms, or null.
+ */
+export function computePosNextAttempt(
+  startedAtMs: number,
+  completedAttempts: number,
+  deadlineMs: number | null,
+): { final: boolean; nextAttemptAtMs?: number } {
+  if (completedAttempts >= MAX_POS_ATTEMPTS) return { final: true };
+  const offsetMin = POS_RETRY_OFFSETS_MIN[completedAttempts] ?? POS_RETRY_OFFSETS_MIN[POS_RETRY_OFFSETS_MIN.length - 1];
+  const candidate = startedAtMs + offsetMin * 60_000;
+  if (deadlineMs != null && candidate > deadlineMs) return { final: true };
+  return { final: false, nextAttemptAtMs: candidate };
 }
 
 // ---------------------------------------------------------------------------
