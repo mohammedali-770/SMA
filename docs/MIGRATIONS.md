@@ -10,27 +10,28 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **48** (47 applied + 1 repository-only/UNAPPLIED —
-  see the watchdog note below)
-- Live `schema_migrations` rows: **48**
-- Latest live version: **`20260721113811`**
-  (`lazywait_sync_health_summary`; repository version `20260721150000`)
-- **Every repository migration is applied EXCEPT** the repository-only
-  `20260721170000_order_integrity_watchdog` (added by the Order Integrity
-  Watchdog PR; observe-only monitoring). It is **UNAPPLIED**, pending explicit
-  owner approval, and MUST be applied only through the §-documented
-  `apply_migration` workflow — never `db push`/`migration repair`. Until then the
-  repo/live counts coincide at 48 for offsetting reasons: the repo side is 47
-  applied + 1 unapplied (watchdog), and the live side is those same 47 plus the
-  pre-existing live-only F-class historical row documented in §5 (not the
-  watchdog). The three 2026-07-21 applications (all class B — same content,
-  generated apply-time versions):
+- Repository migration files: **48** (all applied)
+- Live `schema_migrations` rows: **49**
+- Latest live version: **`20260722053151`**
+  (`order_integrity_watchdog`; repository version `20260721170000`)
+- **Every repository migration is now applied.** The Order Integrity Watchdog
+  migration `20260721170000_order_integrity_watchdog` (PR #73, squash-merged
+  `411c7c9`) was applied to Production on **2026-07-22** (owner-approved) via the
+  `apply_migration` workflow → live **`20260722053151`** (class B — same content,
+  generated apply-time version). Full pre-live gate + apply + verification record
+  is in **§15**. Its observe-only cron `order-integrity-watchdog` (`*/2`) is active
+  and healthy; the alert outbox stays **unsent** (no dispatcher). The one-row
+  repo/live difference (48 vs 49) is the single pre-existing live-only F-class
+  historical row documented in §5. The four owner-approved 2026-07 applications
+  (all class B — same content, generated apply-time versions):
   - `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`**
     (owner-approved; PR #69)
   - `20260721130000_lazywait_synced_ref_guard` → live **`20260721084330`**
     (owner-approved; PR #70; version recorded in the migration file header)
   - `20260721150000_lazywait_sync_health_summary` → live **`20260721113811`**
     (owner-approved; PR #71; observability-only — see §14)
+  - `20260721170000_order_integrity_watchdog` → live **`20260722053151`**
+    (owner-approved; PR #73; observe-only monitoring — see §15)
 - The current production schema is **functionally aligned with the repository
   through `20260714130000`** — every repository migration, including the
   trigger-function grant hardening, is applied and verified — based on
@@ -489,3 +490,75 @@ database remains unsafe regardless. Risks:
   migration header. An HTTP 2xx proves the worker invocation completed, not
   that every due order synced; per-order outcomes stay in `orders` /
   `integration_sync_logs`.
+
+## 15. Completed migration: Order Integrity Watchdog (2026-07-22)
+
+**Observe-only, shadow-mode monitoring.** Owner-approved application of the merged
+Order Integrity Watchdog migration to Production.
+
+- **Repository file:** `supabase/migrations/20260721170000_order_integrity_watchdog.sql`
+- **Merged commit:** `411c7c9d82392dc7e7aaa6f74d942294361a5b47` (PR #73, squash of
+  `feature/order-integrity-watchdog`; clean Codex review on `1cdd787`).
+- **Applied repository content SHA-256:**
+  `8f8392bc6b818177cddfc983772f3337155f61d5977245435c05fe833e8c0e89` (53991 bytes),
+  read directly from the merged default branch.
+- **Generated live version:** **`20260722053151`** (name `order_integrity_watchdog`).
+  Class **B** (same content; apply-time version differs from the repository
+  filename version `20260721170000`).
+- **Method:** MCP `apply_migration` (single call, byte-exact merged content, no
+  edits). No `db push`, no `migration repair`, no SQL-editor/untracked DDL.
+
+**Pre-live gate (all passed):** default-branch SHA `411c7c9`; migration present at
+that commit; latest live version was `20260721113811`; Production had zero
+`order-integrity-watchdog` cron jobs / zero watchdog tables / zero
+`public.order_integrity_*` functions / no watchdog migration row; existing jobs
+`account-deletion-processor` (jobid 1) and `lazywait-sync` (jobid 2) active;
+dependencies `orders`, `payment_records`, `checkout_sessions`, `profiles`,
+`is_staff()`, `is_admin()`, `lazywait_pos_ref_is_usable(text)`, `pg_cron` all
+present; no name/cron collision. Safe pre-apply baseline (counts only): 17 orders
+all pickup, all `pending` payment (0 paid); sync states synced=13,
+awaiting_payment=3, skipped=1; payment_records 6 failed + 3 initiated (0 paid);
+all 11 supported-rule predicates 0.
+
+**Objects created (isolated, additive):** 4 tables
+(`order_integrity_config`/`_runs`/`_incidents`/`_alert_outbox`), all with RLS
+enabled and no `anon`/`authenticated` direct grants; 7 functions, all
+`SECURITY DEFINER` with `search_path=public` — `order_integrity_watchdog()` and
+`order_integrity_health_summary()` **service-role-only**, and
+`order_integrity_admin_summary`/`list_incidents`/`incident_timeline` (is_staff
+gated) + `acknowledge`/`suppress` (is_admin gated) granted to `authenticated`;
+config seeded with exactly one valid row for `rule_enabled` (object),
+`abandoned_awaiting_payment_since` (timestamp), `excluded_order_ids` (array).
+
+**Cron verification:** exactly one job `order-integrity-watchdog` (jobid 3),
+schedule `*/2 * * * *`, command `select public.order_integrity_watchdog();`,
+`active = true`, no secret/token/URL in `cron.job`. No existing job was changed;
+the every-minute `account-deletion-processor` and `lazywait-sync` cadences are
+unchanged.
+
+**Shadow-mode observation (read-only):**
+- Initial `order_integrity_health_summary()` (05:32 UTC, after the first
+  scheduled run): `healthy`, cron active, `rules_evaluated=11`, 0 incidents.
+- After 6 scheduled runs (through 05:42 UTC): **6 runs, all `success`**, 0
+  non-benign failures, `rules_evaluated=11` each; `overall_state = healthy`,
+  `watchdog_cron_active = true`, `open_critical_count = 0`, `open_warning_count = 0`,
+  `acknowledged_count = 0`, `suppressed_count = 0`, `latest_incident = null`,
+  `incidents_opened_last_24h = 0`, `incidents_resolved_last_24h = 0`.
+- **Incidents:** 0 total, 0 unresolved.
+
+**Observe-only safety (verified):** after 6 runs, `orders` = 17 and
+`payment_records` = 9 (unchanged from baseline), `lazywait_sync_state`
+distribution unchanged (synced=13, awaiting_payment=3, skipped=1), all
+`payment_status` still `pending`. Writes occurred only in the four watchdog
+tables. The watchdog created/cancelled no order, touched no payment or POS/Lazywait
+state, called no external provider, and sent no notification.
+
+**Alert dispatch remains DISABLED.** The `order_integrity_alert_outbox` is
+populated only (0 rows so far; 0 `sent`); no sender exists. Enabling alert
+dispatch, provider-side reconciliation, and any automatic remediation are
+separate future deliverables, each requiring its own explicit owner approval.
+
+**UI activation:** the capability-gated **Order Integrity** admin tab reveals now
+that `order_integrity_admin_summary` is live and granted to `authenticated`
+(it stayed hidden while the RPC was absent); triage controls render for admins
+only, accountants/staff are read-only, and customers have no access.
