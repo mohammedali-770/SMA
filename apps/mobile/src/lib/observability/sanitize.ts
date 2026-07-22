@@ -99,9 +99,14 @@ export function sanitizeObject<T extends Record<string, unknown>>(obj: T): Recor
   return sanitizeValue(obj) as Record<string, unknown>;
 }
 
-/** Strip the query string, then pattern-scrub a URL for breadcrumbs/spans. */
+/**
+ * Strip the query string AND fragment, then pattern-scrub a URL for
+ * breadcrumbs/spans. Fragments matter: OAuth / deep-link callbacks carry
+ * credentials as `#access_token=...&refresh_token=...`, and non-JWT token
+ * shapes there would survive pattern scrubbing alone.
+ */
 export function sanitizeUrl(url: string): string {
-  return sanitizeText(url.split('?')[0]);
+  return sanitizeText(url.split(/[?#]/)[0]);
 }
 
 /**

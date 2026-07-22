@@ -11,6 +11,7 @@
  *  - zero customer data in the captured event (component stack only, which is
  *    sanitized in the observability module).
  */
+import * as SplashScreen from 'expo-splash-screen';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -30,6 +31,11 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: unknown, info: { componentStack?: string | null }): void {
+    // A crash during provider bootstrap can happen BEFORE SplashGate's
+    // hideAsync ever runs; without this, the fallback would render behind the
+    // pinned native splash and the launch screen would appear frozen.
+    // hideAsync is idempotent and safe to call after the splash is gone.
+    SplashScreen.hideAsync().catch(() => {});
     if (shouldCaptureBoundaryError(this.captured)) {
       this.captured = true;
       captureRenderError(error, info.componentStack);

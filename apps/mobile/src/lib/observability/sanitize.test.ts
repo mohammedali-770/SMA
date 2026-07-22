@@ -176,4 +176,10 @@ describe('sanitizeUrl', () => {
   it('strips query strings entirely', () => {
     expect(sanitizeUrl('https://a.b/c?d=e&token=x')).toBe('https://a.b/c');
   });
+
+  it('strips fragments (OAuth/deep-link callback credentials)', () => {
+    expect(sanitizeUrl('spicymeal://auth#access_token=opaque123&refresh_token=r456'))
+      .toBe('spicymeal://auth');
+    expect(sanitizeUrl('https://a.b/return?ok=1#token=x')).toBe('https://a.b/return');
+  });
 });
