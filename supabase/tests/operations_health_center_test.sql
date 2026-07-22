@@ -33,10 +33,12 @@ begin
     raise exception 'anon must not execute operations health summary';
   end if;
   if not has_function_privilege('authenticated', 'public.operations_health_summary()', 'execute') then
-    raise exception 'authenticated staff wrapper grant missing';
+    raise exception 'authenticated staff-wrapper grant missing';
   end if;
-  if has_function_privilege('authenticated',
-      'public.operations_health_overall_state(text,text,text,text)', 'execute') then
+  if has_function_privilege(
+      'authenticated',
+      'public.operations_health_overall_state(text,text,text,text)',
+      'execute') then
     raise exception 'state helper must not be client-executable';
   end if;
 
@@ -58,9 +60,13 @@ begin
   if public.operations_health_overall_state('healthy','failing','idle','healthy') <> 'failing' then
     raise exception 'failing matrix failed';
   end if;
-  if public.operations_health_overall_state('healthy','healthy','configuration_error','failing')
-      <> 'configuration_error' then
+  if public.operations_health_overall_state(
+      'healthy','healthy','configuration_error','failing') <> 'configuration_error' then
     raise exception 'configuration_error precedence failed';
+  end if;
+  if public.operations_health_overall_state(
+      'healthy','healthy','idle','healthy') = 'failing' then
+    raise exception 'idle account deletion must not fail the platform';
   end if;
 
   raise notice 'OVERALL STATE MATRIX OK';
@@ -104,48 +110,88 @@ begin
   end if;
   if s ?& array[
     'generated_at','overall_state','critical_attention_count',
-    'warning_attention_count','systems','jobs','attention'
+    'warning_attention_count','systems_unavailable_count',
+    'systems_disabled_count','systems_not_configured_count',
+    'systems_not_monitored_count','systems','jobs','attention'
   ] is not true then
     raise exception 'summary missing required top-level keys: %', s;
   end if;
 
-  if txt like '%secret_config%'
-     or txt like '%client_id%'
-     or txt like '%merchant_id%'
-     or txt like '%phone_number_id%'
-     or txt like '%business_account_id%'
-     or txt like '%expo_push_token%'
-     or txt like '%customer_name%'
-     or txt like '%customer_phone%'
-     or txt like '%address_snapshot%'
-     or txt like '%return_message%'
+  -- Match exact JSON key names, not broad substrings in harmless prose.
+  if txt like '%"secret_config"%'
+     or txt like '%"client_id"%'
+     or txt like '%"merchant_id"%'
+     or txt like '%"phone_number_id"%'
+     or txt like '%"business_account_id"%'
+     or txt like '%"expo_push_token"%'
+     or txt like '%"customer_name"%'
+     or txt like '%"customer_phone"%'
+     or txt like '%"address_snapshot"%'
+     or txt like '%"return_message"%'
      or txt like '%"command"%'
      or txt like '%"username"%'
-     or txt like '%raw%' then
+     or txt like '%"raw"%'
+     or txt like '%"provider_ref"%'
+     or txt like '%"reference_transaction"%' then
     raise exception 'unsafe field leaked in summary: %', s;
   end if;
 
   if exists (
-    select 1 from jsonb_array_elements(jobs) j
-    where not (j ?& array['job_name','subsystem','active','state','expected_schedule'])
+    select 1
+    from jsonb_array_elements(jobs) j
+    where not (j ?& array[
+      'job_name','subsystem','active','state','expected_schedule'
+    ])
   ) then
     raise exception 'job projection missing safe required fields: %', jobs;
   end if;
 
-  if not exists (select 1 from jsonb_array_elements(systems) x where x->>'id'='payment') then
+  if exists (
+    select 1
+    from jsonb_array_elements(jobs) j
+    where j ?| array['command','username','database','return_message']
+  ) then
+    raise exception 'unsafe cron fields leaked: %', jobs;
+  end if;
+
+  if not exists (
+    select 1 from jsonb_array_elements(systems) x where x->>'id'='payment'
+  ) then
     raise exception 'payment card missing';
   end if;
-  if not exists (select 1 from jsonb_array_elements(systems) x where x->>'id'='order_integrity') then
+  if not exists (
+    select 1 from jsonb_array_elements(systems) x where x->>'id'='order_integrity'
+  ) then
     raise exception 'order integrity card missing';
   end if;
 
   raise notice 'SAFE SHAPE / NO PII OK';
 end $$;
 
--- ---- ENABLED DOES NOT IMPLY HEALTHY ----------------------------------------
+-- ---- TRUTHFUL OPTIONAL-INTEGRATION STATES ----------------------------------
 do $$
-declare payment_state text; email_state text; otp_state text;
+declare
+  payment_state text;
+  email_state text;
+  otp_state text;
+  push_state text;
 begin
+  -- Enabled and configured optional integrations still cannot be called healthy
+  -- without provider availability telemetry.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = coalesce(provider_name, 'configured-provider'),
+         secret_config = case when secret_config is null or secret_config='{}'::jsonb
+                              then '{"configured":true}'::jsonb else secret_config end,
+         public_config = case provider_type
+           when 'payment' then coalesce(public_config,'{}'::jsonb)
+             || '{"mode":"test","currency":"SAR"}'::jsonb
+           when 'email' then coalesce(public_config,'{}'::jsonb)
+             || '{"host":"configured","from_email":"configured@example.invalid"}'::jsonb
+           else coalesce(public_config,'{}'::jsonb)
+         end
+   where provider_type in ('payment','email','whatsapp','push');
+
   select x->>'state' into payment_state
   from jsonb_array_elements(public.operations_health_summary()->'systems') x
   where x->>'id'='payment';
@@ -158,6 +204,10 @@ begin
   from jsonb_array_elements(public.operations_health_summary()->'systems') x
   where x->>'id'='otp';
 
+  select x->>'state' into push_state
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='push';
+
   if payment_state = 'healthy' then
     raise exception 'payment must never be healthy without provider telemetry';
   end if;
@@ -167,8 +217,34 @@ begin
   if otp_state = 'healthy' then
     raise exception 'OTP must never be healthy from enabled/configured alone';
   end if;
+  if push_state = 'healthy' then
+    raise exception 'push must never be healthy from enabled/configured alone';
+  end if;
 
-  raise notice 'TRUTHFUL NOT_MONITORED SEMANTICS OK';
+  raise notice 'TRUTHFUL OPTIONAL-INTEGRATION STATES OK';
+end $$;
+
+-- ---- MISSING OPTIONAL CONFIG DOES NOT CRASH THE PAGE ------------------------
+do $$
+declare
+  s jsonb;
+  state text;
+begin
+  delete from public.integration_settings where provider_type = 'email';
+  s := public.operations_health_summary();
+
+  select x->>'state' into state
+  from jsonb_array_elements(s->'systems') x
+  where x->>'id'='email';
+
+  if state <> 'not_configured' then
+    raise exception 'missing email row should be not_configured, got %', state;
+  end if;
+  if jsonb_array_length(s->'systems') <> 8 then
+    raise exception 'one missing optional config removed other subsystem cards';
+  end if;
+
+  raise notice 'MISSING OPTIONAL CONFIG ISOLATED OK';
 end $$;
 
 -- ---- READ-ONLY GUARANTEE ----------------------------------------------------
