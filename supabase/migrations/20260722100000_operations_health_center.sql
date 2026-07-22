@@ -75,6 +75,8 @@ declare
   v_ad_latest_status text;
   v_ad_latest_run_at timestamptz;
   v_ad_latest_success_at timestamptz;
+  v_ad_latest_terminal_status text;
+  v_ad_latest_terminal_at timestamptz;
   v_ad_due_count integer := 0;
   v_ad_manual_review integer := 0;
   v_ad_oldest_due timestamptz;
@@ -106,7 +108,8 @@ declare
   v_push_active_devices integer := 0;
   v_push_promos_opt_in integer := 0;
   v_push_log_counts jsonb := '{}'::jsonb;
-  v_push_failed_24h integer := 0;
+  v_push_failed_deliveries_24h integer := 0;
+  v_push_failed_events_24h integer := 0;
   v_push_latest_log timestamptz;
   v_push_state text := 'unavailable';
   v_push_error_code text;
@@ -180,14 +183,25 @@ begin
       select
         e.jobname, e.subsystem, e.expected_schedule, e.is_critical,
         j.jobid, j.schedule, coalesce(j.active, false) as active,
+        -- latest-any: the newest run of any kind (may be an in-flight `running`
+        -- row with a null end_time). Used ONLY for safe display.
         lr.status as latest_status, lr.start_time as latest_run_at,
-        lr.end_time as latest_completed_at, ls.end_time as latest_success_at,
+        lr.end_time as latest_completed_at,
+        -- latest-terminal: the most recently COMPLETED run (end_time not null).
+        -- Used to decide whether a recent execution actually failed. pg_cron marks
+        -- an in-flight run `running` with a null end_time; such a row is never a
+        -- failure and never hides an earlier terminal failure.
+        lt.status as latest_terminal_status, lt.end_time as latest_terminal_at,
+        ls.end_time as latest_success_at,
         case
           when j.jobid is null or not coalesce(j.active, false) then 'failing'
           when ls.end_time is null then 'degraded'
           when now() - ls.end_time > interval '6 minutes' then 'failing'
-          when lr.status is not null and lr.status <> 'succeeded'
-               and lr.start_time >= now() - interval '6 minutes' then 'failing'
+          -- Only a recent TERMINAL non-success (e.g. `failed`) fails the job. A
+          -- newer terminal success clears an older terminal failure because lt is
+          -- the most recently completed run.
+          when lt.status is not null and lt.status <> 'succeeded'
+               and lt.end_time >= now() - interval '6 minutes' then 'failing'
           when j.schedule is distinct from e.expected_schedule then 'degraded'
           else 'healthy'
         end as state
@@ -201,9 +215,16 @@ begin
         limit 1
       ) lr on true
       left join lateral (
+        select r.status, r.start_time, r.end_time
+        from cron.job_run_details r
+        where r.jobid = j.jobid and r.end_time is not null
+        order by r.end_time desc
+        limit 1
+      ) lt on true
+      left join lateral (
         select r.end_time
         from cron.job_run_details r
-        where r.jobid = j.jobid and r.status = 'succeeded'
+        where r.jobid = j.jobid and r.status = 'succeeded' and r.end_time is not null
         order by r.end_time desc nulls last
         limit 1
       ) ls on true
@@ -221,6 +242,8 @@ begin
         'latest_status', latest_status,
         'latest_run_at', latest_run_at,
         'latest_completed_at', latest_completed_at,
+        'latest_terminal_status', latest_terminal_status,
+        'latest_terminal_at', latest_terminal_at,
         'latest_success_at', latest_success_at,
         'latest_success_age_seconds', case when latest_success_at is null then null
           else floor(extract(epoch from (now() - latest_success_at)))::bigint end
@@ -239,15 +262,18 @@ begin
       jsonb_build_object('job_name','account-deletion-processor','subsystem','account_deletion',
         'critical',true,'job_id',null,'schedule',null,'expected_schedule','* * * * *',
         'active',false,'state','unavailable','latest_status',null,'latest_run_at',null,
-        'latest_completed_at',null,'latest_success_at',null,'latest_success_age_seconds',null),
+        'latest_completed_at',null,'latest_terminal_status',null,'latest_terminal_at',null,
+        'latest_success_at',null,'latest_success_age_seconds',null),
       jsonb_build_object('job_name','lazywait-sync','subsystem','lazywait',
         'critical',true,'job_id',null,'schedule',null,'expected_schedule','* * * * *',
         'active',false,'state','unavailable','latest_status',null,'latest_run_at',null,
-        'latest_completed_at',null,'latest_success_at',null,'latest_success_age_seconds',null),
+        'latest_completed_at',null,'latest_terminal_status',null,'latest_terminal_at',null,
+        'latest_success_at',null,'latest_success_age_seconds',null),
       jsonb_build_object('job_name','order-integrity-watchdog','subsystem','order_integrity',
         'critical',true,'job_id',null,'schedule',null,'expected_schedule','*/2 * * * *',
         'active',false,'state','unavailable','latest_status',null,'latest_run_at',null,
-        'latest_completed_at',null,'latest_success_at',null,'latest_success_age_seconds',null)
+        'latest_completed_at',null,'latest_terminal_status',null,'latest_terminal_at',null,
+        'latest_success_at',null,'latest_success_age_seconds',null)
     );
   end;
 
@@ -257,8 +283,11 @@ begin
       coalesce((j->>'active')::boolean, false),
       j->>'latest_status',
       (j->>'latest_run_at')::timestamptz,
-      (j->>'latest_success_at')::timestamptz
-    into v_ad_active, v_ad_latest_status, v_ad_latest_run_at, v_ad_latest_success_at
+      (j->>'latest_success_at')::timestamptz,
+      j->>'latest_terminal_status',
+      (j->>'latest_terminal_at')::timestamptz
+    into v_ad_active, v_ad_latest_status, v_ad_latest_run_at, v_ad_latest_success_at,
+      v_ad_latest_terminal_status, v_ad_latest_terminal_at
     from jsonb_array_elements(v_jobs) j
     where j->>'job_name' = 'account-deletion-processor'
     limit 1;
@@ -291,8 +320,10 @@ begin
       when not v_ad_active then 'failing'
       when v_ad_latest_success_at is null
         or now() - v_ad_latest_success_at > interval '6 minutes' then 'failing'
-      when v_ad_latest_status is not null and v_ad_latest_status <> 'succeeded'
-        and v_ad_latest_run_at >= now() - interval '6 minutes' then 'failing'
+      -- Only a recent TERMINAL non-success fails the card. An in-flight `running`
+      -- row (latest_status='running', no terminal outcome yet) never fails it.
+      when v_ad_latest_terminal_status is not null and v_ad_latest_terminal_status <> 'succeeded'
+        and v_ad_latest_terminal_at >= now() - interval '6 minutes' then 'failing'
       when v_ad_manual_review > 0 then 'degraded'
       when v_ad_due_count > 0
         and v_ad_oldest_due < now() - interval '10 minutes' then 'degraded'
@@ -426,16 +457,31 @@ begin
     into v_push_active_devices, v_push_promos_opt_in
     from public.push_devices;
 
-    select
-      coalesce(jsonb_object_agg(send_status, cnt), '{}'::jsonb),
-      coalesce(sum(cnt) filter (where send_status = 'failed'), 0)::integer
-    into v_push_log_counts, v_push_failed_24h
+    -- Grouped lifecycle counts (unchanged safe projection).
+    select coalesce(jsonb_object_agg(send_status, cnt), '{}'::jsonb)
+      into v_push_log_counts
     from (
       select send_status, count(*)::integer cnt
       from public.notification_log
       where created_at >= now() - interval '24 hours'
       group by send_status
     ) s;
+
+    -- Two DISTINCT units, never summed together:
+    --   * failed_deliveries = sum of the per-row `failed` device counter. Push
+    --     records PARTIAL sends as send_status='sent' with failed>0, and
+    --     test/broadcast rows as send_status='processing' with failed>0, so a
+    --     lifecycle-status filter alone misses real delivery failures.
+    --   * failed_events = rows whose lifecycle status is 'failed' (total send
+    --     failure OR a pre-send/device-lookup failure that reached zero devices,
+    --     so failed=0). Counting events separately avoids mixing device counts
+    --     with event counts. `failed` is NOT NULL default 0; guarded anyway.
+    select
+      coalesce(sum(greatest(coalesce(failed, 0), 0)), 0)::integer,
+      count(*) filter (where send_status = 'failed')::integer
+    into v_push_failed_deliveries_24h, v_push_failed_events_24h
+    from public.notification_log
+    where created_at >= now() - interval '24 hours';
 
     select max(created_at)
       into v_push_latest_log
@@ -445,7 +491,7 @@ begin
       when not v_push_exists then 'not_configured'
       when not v_push_enabled then 'disabled'
       when not v_push_configured then 'not_configured'
-      when v_push_failed_24h > 0 then 'degraded'
+      when v_push_failed_deliveries_24h > 0 or v_push_failed_events_24h > 0 then 'degraded'
       else 'not_monitored'
     end;
   exception when others then
@@ -605,7 +651,11 @@ begin
         'active_devices',v_push_active_devices,
         'promotions_opt_in',v_push_promos_opt_in,
         'send_status_counts_24h',v_push_log_counts,
-        'failed_sends_24h',v_push_failed_24h,
+        'failed_deliveries_24h',v_push_failed_deliveries_24h,
+        'failed_send_events_24h',v_push_failed_events_24h,
+        -- Backward-compatible alias for the existing UI field; now reports actual
+        -- failed device deliveries (the more truthful metric).
+        'failed_sends_24h',v_push_failed_deliveries_24h,
         'latest_log_at',v_push_latest_log,
         'provider_probe',false,
         'safe_error_code',v_push_error_code
@@ -691,11 +741,17 @@ begin
       'count',v_payment_stale_initiated,
       'oldest_at',v_payment_oldest_stale
     ) end),
-    (case when v_push_enabled and v_push_failed_24h > 0 then jsonb_build_object(
+    (case when v_push_enabled and (v_push_failed_deliveries_24h > 0 or v_push_failed_events_24h > 0)
+      then jsonb_build_object(
       'code','PUSH_SEND_FAILURES_24H',
       'subsystem','push',
       'severity','warning',
-      'count',v_push_failed_24h
+      -- Single unit only (never delivery + event added together): prefer the
+      -- actual failed-delivery count; fall back to the failed-event count when the
+      -- only evidence is a zero-delivery lifecycle failure.
+      'count',case when v_push_failed_deliveries_24h > 0
+                   then v_push_failed_deliveries_24h
+                   else v_push_failed_events_24h end
     ) end),
     (case when v_database_jobs_state <> 'healthy' then jsonb_build_object(
       'code','SCHEDULED_JOBS_'||upper(v_database_jobs_state),

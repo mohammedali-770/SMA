@@ -564,5 +564,257 @@ begin
   raise notice 'READ-ONLY GUARANTEE OK';
 end $$;
 
+-- ---- CRON: RUNNING RUNS ARE IN-PROGRESS, NOT FAILURES ----------------------
+-- pg_cron marks an in-flight run status='running' with a null end_time. State
+-- must be decided from the latest TERMINAL run (end_time not null), never a
+-- running row. The two non-ADP critical jobs are given a fresh terminal success
+-- so the database_jobs aggregate reflects the account-deletion-processor job.
+do $$
+declare
+  adp bigint;
+  s jsonb;
+  st_job text; st_db text; st_ad text;
+  txt text;
+begin
+  select jobid into adp from cron.job where jobname = 'account-deletion-processor';
+  insert into cron.job_run_details (jobid, status, start_time, end_time)
+  select jobid, 'succeeded', now() - interval '60 seconds', now() - interval '50 seconds'
+  from cron.job where jobname in ('lazywait-sync','order-integrity-watchdog');
+
+  -- helper: reset ADP to a known-good job (active, expected schedule), no runs.
+  -- Case 1: latest running, previous terminal succeeded (recent success).
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '90 seconds', now() - interval '80 seconds'),
+    (adp, 'running',   now() - interval '10 seconds', null);
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='database_jobs'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='account_deletion')
+    into st_job, st_db, st_ad;
+  if st_job <> 'healthy' then raise exception 'case1 job: running over fresh success must be healthy, got %', st_job; end if;
+  if st_db <> 'healthy' then raise exception 'case1 database_jobs must not be failing while a run is in progress, got %', st_db; end if;
+  if st_ad = 'failing' then raise exception 'case1 account_deletion must not fail solely because its run is running, got %', st_ad; end if;
+
+  -- Case 2: latest running, latest terminal FAILED (recent), an older success also recent.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '200 seconds', now() - interval '190 seconds'),
+    (adp, 'failed',    now() - interval '90 seconds',  now() - interval '80 seconds'),
+    (adp, 'running',   now() - interval '10 seconds',  null);
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='database_jobs'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='account_deletion')
+    into st_job, st_db, st_ad;
+  if st_job <> 'failing' then raise exception 'case2 job: running must not mask a recent terminal failure, got %', st_job; end if;
+  if st_db <> 'failing' then raise exception 'case2 database_jobs must surface the terminal failure, got %', st_db; end if;
+  if st_ad <> 'failing' then raise exception 'case2 account_deletion must surface the terminal failure, got %', st_ad; end if;
+
+  -- Case 3: latest terminal FAILED (recent), no running row.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '200 seconds', now() - interval '190 seconds'),
+    (adp, 'failed',    now() - interval '60 seconds',  now() - interval '50 seconds');
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'failing' then raise exception 'case3 recent terminal failure must be failing, got %', st_job; end if;
+
+  -- Case 4: latest terminal SUCCEEDED after an older failure => recovers.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'failed',    now() - interval '300 seconds', now() - interval '290 seconds'),
+    (adp, 'succeeded', now() - interval '60 seconds',  now() - interval '50 seconds');
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'healthy' then raise exception 'case4 newer terminal success must clear an older failure, got %', st_job; end if;
+
+  -- Case 5: latest running, NO success ever => conservative non-healthy (degraded).
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'running', now() - interval '10 seconds', null);
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'degraded' then raise exception 'case5 running with no success ever must be degraded (not healthy), got %', st_job; end if;
+
+  -- Case 6: latest running, latest success STALE (> 6 min) => stale-success failing.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '10 minutes', now() - interval '9 minutes'),
+    (adp, 'running',   now() - interval '10 seconds', null);
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'failing' then raise exception 'case6 stale success under a running run must remain failing, got %', st_job; end if;
+
+  -- Case 7: schedule mismatch while a run is running => degraded (not falsely healthy).
+  update cron.job set active = true, schedule = '*/5 * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '90 seconds', now() - interval '80 seconds'),
+    (adp, 'running',   now() - interval '10 seconds', null);
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'degraded' then raise exception 'case7 schedule mismatch while running must be degraded, got %', st_job; end if;
+
+  -- Case 8: cron inactive => failing.
+  update cron.job set active = false, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '90 seconds', now() - interval '80 seconds');
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
+  if st_job <> 'failing' then raise exception 'case8 inactive cron must be failing, got %', st_job; end if;
+
+  -- Case 9: safe output excludes command/username/database/return_message.
+  update cron.job set active = true, schedule = '* * * * *', command = 'CRONSENTINELCMD'
+    where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time, command, username, database, return_message)
+  values (adp, 'failed', now() - interval '60 seconds', now() - interval '50 seconds',
+          'CRONSENTINELCMD', 'CRONSENTINELUSER', 'CRONSENTINELDB', 'CRONSENTINELMSG');
+  txt := public.operations_health_summary()::text;
+  if txt like '%CRONSENTINELCMD%' or txt like '%CRONSENTINELUSER%'
+     or txt like '%CRONSENTINELDB%' or txt like '%CRONSENTINELMSG%'
+     or lower(txt) like '%"command"%' or lower(txt) like '%"username"%'
+     or lower(txt) like '%"return_message"%' then
+    raise exception 'cron projection leaked command/username/database/return_message';
+  end if;
+
+  raise notice 'CRON RUNNING-VS-TERMINAL SEMANTICS OK';
+end $$;
+
+-- ---- PUSH: ACTUAL FAILED DELIVERIES vs FAILED LIFECYCLE EVENTS --------------
+-- notification_log records PARTIAL sends as send_status='sent' with failed>0 and
+-- test/broadcast rows as send_status='processing' with failed>0, so counting only
+-- send_status='failed' misses real delivery failures. Deliveries (sum of failed)
+-- and lifecycle-failed events (rows with send_status='failed') are distinct units.
+do $$
+declare
+  s jsonb;
+  pst text; dlv int; evt int; alias int;
+begin
+  update public.integration_settings
+     set enabled = true, provider_name = 'expo',
+         public_config = '{"provider":"expo"}'::jsonb, secret_config = '{}'::jsonb
+   where provider_type = 'push';
+
+  -- Case 1: partial send (send_status='sent', failed=1) => 1 delivery, degraded.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'sent', 5, 4, 1, now() - interval '1 hour');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 1 or evt <> 0 then raise exception 'case1 partial: expected 1 delivery/0 events, got %/%', dlv, evt; end if;
+  if pst <> 'degraded' then raise exception 'case1 partial send failure must be degraded, got %', pst; end if;
+
+  -- Case 2: test/broadcast (no lifecycle failed) with failed>0 must still count.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('test', 'processing', 3, 1, 2, now() - interval '2 hours');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 2 or evt <> 0 then raise exception 'case2 test row: expected 2 deliveries/0 events, got %/%', dlv, evt; end if;
+  if pst <> 'degraded' then raise exception 'case2 test delivery failures must be degraded, got %', pst; end if;
+
+  -- Case 3: total send failure (send_status='failed', failed=targeted) => no double count.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'failed', 3, 0, 3, now() - interval '30 minutes');
+  s := public.operations_health_summary();
+  select (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 3 or evt <> 1 then raise exception 'case3 total failure: expected 3 deliveries/1 event (no double count), got %/%', dlv, evt; end if;
+
+  -- Case 4: pre-send/device-lookup lifecycle failure (send_status='failed', failed=0).
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'failed', 0, 0, 0, now() - interval '10 minutes');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 0 or evt <> 1 then raise exception 'case4 device-lookup failure: expected 0 deliveries/1 event, got %/%', dlv, evt; end if;
+  if pst <> 'degraded' then raise exception 'case4 lifecycle-failed event must be degraded, got %', pst; end if;
+
+  -- Case 5: successful row => no failure evidence, not_monitored.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'sent', 4, 4, 0, now() - interval '1 hour');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 0 or evt <> 0 then raise exception 'case5 clean send: expected 0/0, got %/%', dlv, evt; end if;
+  if pst <> 'not_monitored' then raise exception 'case5 no failures must be not_monitored (never healthy), got %', pst; end if;
+
+  -- Case 6: processing row with recorded failed>0 => counted as delivery, no event.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'processing', 5, 3, 2, now() - interval '20 minutes');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 2 or evt <> 0 then raise exception 'case6 processing row: expected 2 deliveries/0 events, got %/%', dlv, evt; end if;
+  if pst <> 'degraded' then raise exception 'case6 processing delivery failures must be degraded, got %', pst; end if;
+
+  -- Case 7: rows older than 24h excluded from both metrics.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'failed', 9, 0, 9, now() - interval '25 hours');
+  s := public.operations_health_summary();
+  select x->>'state', (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_send_events_24h')::int
+    into pst, dlv, evt from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 0 or evt <> 0 then raise exception 'case7 >24h rows must be excluded, got %/%', dlv, evt; end if;
+  if pst <> 'not_monitored' then raise exception 'case7 old failures must not degrade, got %', pst; end if;
+
+  -- Case 8: default counter (failed defaults to 0) is treated safely as zero.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, created_at)
+  values ('order_status', 'sent', 2, 2, now() - interval '1 hour');
+  s := public.operations_health_summary();
+  select (x->'details'->>'failed_deliveries_24h')::int into dlv
+    from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if dlv <> 0 then raise exception 'case8 default failed counter must aggregate as 0, got %', dlv; end if;
+
+  -- Case 9: push disabled with historical failures => state remains disabled.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, created_at)
+  values ('order_status', 'failed', 4, 0, 4, now() - interval '1 hour');
+  update public.integration_settings set enabled = false where provider_type = 'push';
+  s := public.operations_health_summary();
+  select x->>'state' into pst from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if pst <> 'disabled' then raise exception 'case9 disabled push must stay disabled despite failures, got %', pst; end if;
+  update public.integration_settings set enabled = true where provider_type = 'push';
+
+  -- Case 10: enabled/configured, zero failure evidence => not_monitored (never healthy).
+  delete from public.notification_log;
+  s := public.operations_health_summary();
+  select x->>'state' into pst from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if pst <> 'not_monitored' then raise exception 'case10 zero-evidence push must be not_monitored, got %', pst; end if;
+
+  -- Case 11: safe shape — failed_sends_24h is the delivery alias; no raw error leaks.
+  delete from public.notification_log;
+  insert into public.notification_log (kind, send_status, targeted, sent, failed, last_error_safe, created_at)
+  values ('order_status', 'sent', 5, 4, 1, 'PUSHSENTINELERROR', now() - interval '1 hour');
+  s := public.operations_health_summary();
+  select (x->'details'->>'failed_deliveries_24h')::int, (x->'details'->>'failed_sends_24h')::int
+    into dlv, alias from jsonb_array_elements(s->'systems') x where x->>'id'='push';
+  if alias <> dlv then raise exception 'failed_sends_24h alias must equal failed_deliveries_24h, got %/%', alias, dlv; end if;
+  if public.operations_health_summary()::text like '%PUSHSENTINELERROR%'
+     or lower(public.operations_health_summary()::text) like '%"last_error_safe"%'
+     or lower(public.operations_health_summary()::text) like '%"expo_push_token"%' then
+    raise exception 'push card leaked a raw error / token field';
+  end if;
+
+  delete from public.notification_log;
+  raise notice 'PUSH FAILURE METRICS OK';
+end $$;
+
 do $$ begin raise notice 'ALL OPERATIONS HEALTH CENTER CASES PASSED'; end $$;
 rollback;
