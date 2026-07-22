@@ -1,0 +1,208 @@
+-- ============================================================================
+-- Operations Health Center v1 tests (migration 20260722100000).
+-- Transactional, deterministic, no external provider calls.
+-- ============================================================================
+begin;
+
+select set_config('test.is_admin', 'true', true);
+select set_config('test.auth_uid', '', true);
+
+-- ---- OBJECT / SECURITY CONTRACT --------------------------------------------
+do $$
+declare
+  v_secdef boolean;
+  v_config text[];
+begin
+  if to_regprocedure('public.operations_health_summary()') is null then
+    raise exception 'operations_health_summary() missing';
+  end if;
+  if to_regprocedure('public.operations_health_overall_state(text,text,text,text)') is null then
+    raise exception 'operations_health_overall_state() missing';
+  end if;
+
+  select p.prosecdef, p.proconfig into v_secdef, v_config
+  from pg_proc p
+  where p.oid = 'public.operations_health_summary()'::regprocedure;
+
+  if not v_secdef then raise exception 'summary must be SECURITY DEFINER'; end if;
+  if not ('search_path=public' = any(coalesce(v_config, '{}'))) then
+    raise exception 'summary search_path not pinned: %', v_config;
+  end if;
+
+  if has_function_privilege('anon', 'public.operations_health_summary()', 'execute') then
+    raise exception 'anon must not execute operations health summary';
+  end if;
+  if not has_function_privilege('authenticated', 'public.operations_health_summary()', 'execute') then
+    raise exception 'authenticated staff wrapper grant missing';
+  end if;
+  if has_function_privilege('authenticated',
+      'public.operations_health_overall_state(text,text,text,text)', 'execute') then
+    raise exception 'state helper must not be client-executable';
+  end if;
+
+  raise notice 'OBJECT / SECURITY CONTRACT OK';
+end $$;
+
+-- ---- OVERALL STATE MATRIX ---------------------------------------------------
+do $$
+begin
+  if public.operations_health_overall_state('healthy','healthy','idle','healthy') <> 'healthy' then
+    raise exception 'healthy matrix failed';
+  end if;
+  if public.operations_health_overall_state('degraded','healthy','idle','healthy') <> 'degraded' then
+    raise exception 'degraded matrix failed';
+  end if;
+  if public.operations_health_overall_state('unavailable','healthy','idle','healthy') <> 'degraded' then
+    raise exception 'unavailable critical source must degrade';
+  end if;
+  if public.operations_health_overall_state('healthy','failing','idle','healthy') <> 'failing' then
+    raise exception 'failing matrix failed';
+  end if;
+  if public.operations_health_overall_state('healthy','healthy','configuration_error','failing')
+      <> 'configuration_error' then
+    raise exception 'configuration_error precedence failed';
+  end if;
+
+  raise notice 'OVERALL STATE MATRIX OK';
+end $$;
+
+-- ---- STAFF GATE -------------------------------------------------------------
+do $$
+declare denied boolean := false;
+begin
+  perform set_config('test.is_admin', 'false', true);
+  begin
+    perform public.operations_health_summary();
+  exception when sqlstate '42501' then
+    denied := true;
+  end;
+  if not denied then raise exception 'non-staff caller was not denied'; end if;
+
+  perform set_config('test.is_admin', 'true', true);
+  perform public.operations_health_summary();
+  raise notice 'STAFF GATE OK';
+end $$;
+
+-- ---- SAFE SHAPE / NO PII OR SECRET FIELDS ----------------------------------
+do $$
+declare
+  s jsonb;
+  txt text;
+  systems jsonb;
+  jobs jsonb;
+begin
+  s := public.operations_health_summary();
+  txt := lower(s::text);
+  systems := s->'systems';
+  jobs := s->'jobs';
+
+  if jsonb_typeof(systems) <> 'array' or jsonb_array_length(systems) <> 8 then
+    raise exception 'expected 8 subsystem cards, got %', systems;
+  end if;
+  if jsonb_typeof(jobs) <> 'array' or jsonb_array_length(jobs) <> 3 then
+    raise exception 'expected 3 allowlisted jobs, got %', jobs;
+  end if;
+  if s ?& array[
+    'generated_at','overall_state','critical_attention_count',
+    'warning_attention_count','systems','jobs','attention'
+  ] is not true then
+    raise exception 'summary missing required top-level keys: %', s;
+  end if;
+
+  if txt like '%secret_config%'
+     or txt like '%client_id%'
+     or txt like '%merchant_id%'
+     or txt like '%phone_number_id%'
+     or txt like '%business_account_id%'
+     or txt like '%expo_push_token%'
+     or txt like '%customer_name%'
+     or txt like '%customer_phone%'
+     or txt like '%address_snapshot%'
+     or txt like '%return_message%'
+     or txt like '%"command"%'
+     or txt like '%"username"%'
+     or txt like '%raw%' then
+    raise exception 'unsafe field leaked in summary: %', s;
+  end if;
+
+  if exists (
+    select 1 from jsonb_array_elements(jobs) j
+    where not (j ?& array['job_name','subsystem','active','state','expected_schedule'])
+  ) then
+    raise exception 'job projection missing safe required fields: %', jobs;
+  end if;
+
+  if not exists (select 1 from jsonb_array_elements(systems) x where x->>'id'='payment') then
+    raise exception 'payment card missing';
+  end if;
+  if not exists (select 1 from jsonb_array_elements(systems) x where x->>'id'='order_integrity') then
+    raise exception 'order integrity card missing';
+  end if;
+
+  raise notice 'SAFE SHAPE / NO PII OK';
+end $$;
+
+-- ---- ENABLED DOES NOT IMPLY HEALTHY ----------------------------------------
+do $$
+declare payment_state text; email_state text; otp_state text;
+begin
+  select x->>'state' into payment_state
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+
+  select x->>'state' into email_state
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='email';
+
+  select x->>'state' into otp_state
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+
+  if payment_state = 'healthy' then
+    raise exception 'payment must never be healthy without provider telemetry';
+  end if;
+  if email_state = 'healthy' then
+    raise exception 'email must never be healthy from enabled/configured alone';
+  end if;
+  if otp_state = 'healthy' then
+    raise exception 'OTP must never be healthy from enabled/configured alone';
+  end if;
+
+  raise notice 'TRUTHFUL NOT_MONITORED SEMANTICS OK';
+end $$;
+
+-- ---- READ-ONLY GUARANTEE ----------------------------------------------------
+do $$
+declare
+  orders_before bigint; orders_after bigint;
+  payments_before bigint; payments_after bigint;
+  deletion_before bigint; deletion_after bigint;
+  devices_before bigint; devices_after bigint;
+  logs_before bigint; logs_after bigint;
+begin
+  select count(*) into orders_before from public.orders;
+  select count(*) into payments_before from public.payment_records;
+  select count(*) into deletion_before from public.account_deletion_requests;
+  select count(*) into devices_before from public.push_devices;
+  select count(*) into logs_before from public.notification_log;
+
+  perform public.operations_health_summary();
+  perform public.operations_health_summary();
+
+  select count(*) into orders_after from public.orders;
+  select count(*) into payments_after from public.payment_records;
+  select count(*) into deletion_after from public.account_deletion_requests;
+  select count(*) into devices_after from public.push_devices;
+  select count(*) into logs_after from public.notification_log;
+
+  if (orders_before,payments_before,deletion_before,devices_before,logs_before)
+     is distinct from
+     (orders_after,payments_after,deletion_after,devices_after,logs_after) then
+    raise exception 'summary changed operational row counts';
+  end if;
+
+  raise notice 'READ-ONLY GUARANTEE OK';
+end $$;
+
+do $$ begin raise notice 'ALL OPERATIONS HEALTH CENTER CASES PASSED'; end $$;
+rollback;
