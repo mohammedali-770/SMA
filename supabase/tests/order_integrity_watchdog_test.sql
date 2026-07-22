@@ -263,6 +263,40 @@ begin
   raise notice 'EXCLUSION ROBUSTNESS OK';
 end $$;
 
+-- ---- GROUPED-RULE EXCLUSIONS: R5 honors excluded_order_ids BEFORE grouping ----
+do $$
+declare v_exc uuid; v_clean uuid; v_run bigint;
+begin
+  perform pg_temp.oiw_reset();
+  perform set_config('test.is_admin','true', true);
+  -- An EXCLUDED (authorized test) order shares a paid reference with a clean order.
+  v_exc   := pg_temp.oiw_order('W-EXC-DUP','synced','paid','pickup','received','REFX',null,null,null,10);
+  v_clean := pg_temp.oiw_order('W-CLEAN-DUP','synced','paid','pickup','received','REFY',null,null,null,10);
+  perform pg_temp.oiw_pay(v_exc,'paid',10,'W-EXC-PR','SHARED-TXN');
+  perform pg_temp.oiw_pay(v_clean,'paid',10,'W-CLEAN-PR','SHARED-TXN');   -- same reference_transaction
+  update public.order_integrity_config
+     set value = jsonb_build_array(jsonb_build_object('order_id', v_exc, 'until', (now()+interval '1h')::text, 'reason','authorized test'))
+   where key = 'excluded_order_ids';
+  v_run := public.order_integrity_watchdog();
+  if (select status from public.order_integrity_runs where id=v_run) <> 'success' then
+    raise exception 'GRP-EXC: run not success'; end if;
+  -- Excluded order removed before grouping -> only 1 distinct order -> NO R5 incident.
+  if exists (select 1 from public.order_integrity_incidents where rule_code='DUPLICATE_PROVIDER_REFERENCE') then
+    raise exception 'GRP-EXC FAILED: R5 fired despite the sharing order being excluded'; end if;
+
+  -- Sanity: WITHOUT the exclusion, the same shared reference DOES open R5.
+  perform pg_temp.oiw_reset();
+  update public.order_integrity_config set value='[]'::jsonb where key='excluded_order_ids';
+  v_exc   := pg_temp.oiw_order('W-D1','synced','paid','pickup','received','REFA',null,null,null,10);
+  v_clean := pg_temp.oiw_order('W-D2','synced','paid','pickup','received','REFB',null,null,null,10);
+  perform pg_temp.oiw_pay(v_exc,'paid',10,'W-D1-PR','SHARED2');
+  perform pg_temp.oiw_pay(v_clean,'paid',10,'W-D2-PR','SHARED2');
+  perform public.order_integrity_watchdog();
+  if (select count(*) from public.order_integrity_incidents where rule_code='DUPLICATE_PROVIDER_REFERENCE') <> 1 then
+    raise exception 'GRP-EXC FAILED: R5 did not fire without the exclusion'; end if;
+  raise notice 'GROUPED-RULE EXCLUSIONS OK';
+end $$;
+
 -- ---- LIFECYCLE: dedup, alert-after-2, cooldown, 2-clean resolution, recovery -
 do $$
 declare v_id uuid; v_run bigint; v_inc uuid;

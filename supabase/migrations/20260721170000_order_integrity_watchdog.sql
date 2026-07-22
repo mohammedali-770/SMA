@@ -395,6 +395,8 @@ begin
         and coalesce(pr.confirmed_at, pr.updated_at) < now() - interval '3 minutes'
         and not exists (select 1 from public.orders o
                          where o.id = pr.order_id and o.payment_status = 'paid')
+        -- honor per-order exclusions (keeps genuinely order-less captures)
+        and (pr.order_id is null or pr.order_id <> all (v_excluded))
       on conflict do nothing;
     end if;
 
@@ -429,6 +431,11 @@ begin
                count(distinct pr.order_id) as n_orders
         from public.payment_records pr
         where pr.status = 'paid' and coalesce(pr.reference_transaction, pr.provider_ref) is not null
+          -- Honor per-order exclusions BEFORE grouping: an excluded (authorized
+          -- test) order must not contribute to the distinct-order count, or it
+          -- could push a clean production order's shared reference over the
+          -- threshold and open a false DUPLICATE_PROVIDER_REFERENCE incident.
+          and (pr.order_id is null or pr.order_id <> all (v_excluded))
         group by pr.provider, md5(pr.provider||':'||coalesce(pr.reference_transaction, pr.provider_ref))
         having count(distinct pr.order_id) > 1
       ) g
