@@ -120,6 +120,19 @@ export interface BreadcrumbLike {
   data?: Record<string, unknown>;
 }
 
+/**
+ * Breadcrumb drop policy (applied BEFORE sanitization):
+ *  - 'touch' crumbs are dropped in every environment. Sentry.wrap installs a
+ *    touch-event boundary whose crumbs carry component paths and accessibility
+ *    labels/text of whatever the customer tapped (order cards, products…) —
+ *    user-interaction breadcrumbs are OFF by policy.
+ *  - 'console' crumbs are dropped outside development (dev noise).
+ */
+export function shouldDropBreadcrumb(category: string | undefined, env: string): boolean {
+  if (category === 'touch') return true;
+  return category === 'console' && env !== 'development';
+}
+
 export function sanitizeBreadcrumb<T>(crumb: T): T {
   const out: BreadcrumbLike = { ...(crumb as BreadcrumbLike) };
   if (typeof out.message === 'string') out.message = sanitizeText(out.message);

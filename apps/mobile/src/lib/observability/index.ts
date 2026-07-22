@@ -27,7 +27,9 @@ import {
   SENTRY_DSN, type SentryEnvironment,
 } from './config';
 import { classifyError, errorMessage, formatComponentStack } from './classify';
-import { sanitizeBreadcrumb, sanitizeEvent, sanitizeObject, sanitizeText } from './sanitize';
+import {
+  sanitizeBreadcrumb, sanitizeEvent, sanitizeObject, sanitizeText, shouldDropBreadcrumb,
+} from './sanitize';
 
 export { SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT } from './config';
 export { isExpectedError } from './classify';
@@ -108,7 +110,8 @@ export function initObservability(): boolean {
     replaysSessionSampleRate: 0,
     replaysOnErrorSampleRate: 0,
     enableCaptureFailedRequests: false, // no request/response capture
-    enableUserInteractionTracing: false, // no tap breadcrumbs with labels
+    enableUserInteractionTracing: false, // no user-interaction SPANS; the
+    // touch BREADCRUMBS Sentry.wrap emits are dropped in beforeBreadcrumb
     integrations(defaults) {
       return [
         // Expo Router instrumentation: navigation spans + breadcrumbs with
@@ -130,8 +133,9 @@ export function initObservability(): boolean {
       return sanitizeEvent(event);
     },
     beforeBreadcrumb(crumb) {
-      // Console noise is useful locally but never shipped from release builds.
-      if (crumb.category === 'console' && resolvedEnv !== 'development') return null;
+      // Drops 'touch' crumbs (component paths + labels of tapped UI) in every
+      // environment and 'console' noise outside development — see sanitize.ts.
+      if (shouldDropBreadcrumb(crumb.category, resolvedEnv)) return null;
       return sanitizeBreadcrumb(crumb);
     },
   });
@@ -140,7 +144,10 @@ export function initObservability(): boolean {
   return enabled;
 }
 
-/** Root-component wrapper (touch-event + profiler instrumentation). */
+/**
+ * Root-component wrapper (profiler + touch-event boundary). The boundary's
+ * 'touch' breadcrumbs never leave the device — beforeBreadcrumb drops them.
+ */
 export function wrapRoot<P extends Record<string, unknown>>(
   component: React.ComponentType<P>,
 ): React.ComponentType<P> {

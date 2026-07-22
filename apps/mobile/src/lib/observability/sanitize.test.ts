@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isSensitiveKey, REDACTED, sanitizeBreadcrumb, sanitizeEvent, sanitizeObject,
-  sanitizeText, sanitizeUrl,
+  sanitizeText, sanitizeUrl, shouldDropBreadcrumb,
 } from './sanitize';
 
 describe('isSensitiveKey', () => {
@@ -169,6 +169,26 @@ describe('sanitizeEvent', () => {
     expect((out.extra as Record<string, unknown>).access_token).toBe(REDACTED);
     expect((out.extra as Record<string, unknown>).safe).toBe('yes');
     expect(out.transaction).toBe('/receipt/[id]');
+  });
+});
+
+describe('shouldDropBreadcrumb', () => {
+  it('drops touch crumbs in every environment (interaction breadcrumbs are off)', () => {
+    for (const env of ['development', 'preview', 'production']) {
+      expect(shouldDropBreadcrumb('touch', env), env).toBe(true);
+    }
+  });
+
+  it('drops console crumbs outside development only', () => {
+    expect(shouldDropBreadcrumb('console', 'production')).toBe(true);
+    expect(shouldDropBreadcrumb('console', 'preview')).toBe(true);
+    expect(shouldDropBreadcrumb('console', 'development')).toBe(false);
+  });
+
+  it('keeps operational crumbs everywhere', () => {
+    for (const category of ['http', 'navigation', 'checkout', undefined]) {
+      expect(shouldDropBreadcrumb(category, 'production'), String(category)).toBe(false);
+    }
   });
 });
 
