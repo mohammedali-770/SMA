@@ -491,15 +491,22 @@ begin
     v_email_state := 'unavailable';
   end;
 
-  -- OTP: prefer an enabled channel, then WhatsApp over SMS. Configuration only;
-  -- no OTP or provider test message is sent.
+  -- OTP: the WhatsApp integration row ONLY. Configuration only; no OTP or
+  -- provider test message is sent.
   --
-  -- "configured" mirrors the runtime WhatsApp OTP resolver (_shared/whatsappSend.ts
-  -- resolveWhatsAppConfig), which fails closed unless phone_number_id (public),
-  -- access_token (secret) and an OTP template name are present. The resolver uses
-  -- a non-trimming str(), so presence (not whitespace-trim) is the correct mirror.
-  -- A template for at least one language makes the send path succeed for that
-  -- language; with none, OTP cannot send in any language -> not_configured.
+  -- The runtime OTP send path reads exactly the 'whatsapp' row —
+  -- resolveWhatsAppConfig / getOtpPepper call getProviderConfig(admin, 'whatsapp')
+  -- (_shared/whatsappSend.ts:71,62), a single .eq('provider_type','whatsapp')
+  -- .maybeSingle() lookup. The separate 'sms' integration slot is never consulted
+  -- for WhatsApp OTP, so it must not influence this card's exists/enabled/provider/
+  -- configured state. provider_type is UNIQUE, so this selects one deterministic row.
+  --
+  -- "configured" mirrors resolveWhatsAppConfig, which fails closed unless
+  -- phone_number_id (public), access_token (secret) and an OTP template name are
+  -- present. The resolver uses a non-trimming str(), so presence (not
+  -- whitespace-trim) is the correct mirror. A template for at least one language
+  -- makes the send path succeed for that language; with none, OTP cannot send in
+  -- any language -> not_configured.
   begin
     select
       true,
@@ -513,10 +520,7 @@ begin
     into v_otp_exists, v_otp_enabled, v_otp_configured,
       v_otp_provider, v_otp_updated_at
     from public.integration_settings
-    where provider_type in ('whatsapp','sms')
-    order by enabled desc,
-      case when provider_type = 'whatsapp' then 0 else 1 end,
-      updated_at desc
+    where provider_type = 'whatsapp'
     limit 1;
 
     v_otp_exists := coalesce(v_otp_exists, false);

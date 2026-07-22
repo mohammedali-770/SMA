@@ -230,7 +230,10 @@ end $$;
 -- not_monitored), and a correctly enabled Expo push (which carries no DB secret)
 -- must never be mislabelled not_configured.
 do $$
-declare st text;
+declare
+  st text;
+  prov text;
+  txt text;
 begin
   -- Tap: enabled, provider 'tap', merchant set, but only the WRONG-mode key is
   -- stored (mode=test, only live key) => resolveTapConfig fails => not_configured.
@@ -411,6 +414,95 @@ begin
   where x->>'id'='email';
   if st <> 'not_configured' then
     raise exception 'SMTP without from_email must be not_configured, got %', st;
+  end if;
+
+  -- OTP CARD READS THE WHATSAPP ROW ONLY (never the separate SMS slot).
+  -- The runtime OTP path calls getProviderConfig(admin,'whatsapp'); an enabled SMS
+  -- row — even one carrying WhatsApp-shaped keys — must not influence the card.
+  -- Give the SMS slot a fully "ready" WhatsApp-shaped config for every case so any
+  -- leakage would flip the assertion.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'sms-provider',
+         public_config = '{"phone_number_id":"sms_pnid","otp_template_name_en":"sms_tpl"}'::jsonb,
+         secret_config = '{"access_token":"sms_tok"}'::jsonb
+   where provider_type = 'sms';
+
+  -- Case 1: enabled complete SMS + enabled complete WhatsApp => use WhatsApp,
+  -- configured, and the reported provider is the WhatsApp row's.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'whatsapp',
+         public_config = '{"phone_number_id":"wa_pnid","otp_template_name_ar":"wa_ar"}'::jsonb,
+         secret_config = '{"access_token":"wa_tok"}'::jsonb
+   where provider_type = 'whatsapp';
+  select x->>'state', x->'details'->>'provider' into st, prov
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st in ('not_configured','disabled') then
+    raise exception 'enabled+configured WhatsApp OTP must be configured, got %', st;
+  end if;
+  if prov is distinct from 'whatsapp' then
+    raise exception 'OTP provider must come from the WhatsApp row, got %', prov;
+  end if;
+
+  -- Case 2: enabled complete SMS + enabled INCOMPLETE WhatsApp (no phone_number_id/
+  -- template) => SMS must not mask it; OTP stays not_configured per the WhatsApp row.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'whatsapp',
+         public_config = '{}'::jsonb,
+         secret_config = '{"access_token":"wa_tok"}'::jsonb
+   where provider_type = 'whatsapp';
+  select x->>'state', x->'details'->>'provider' into st, prov
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st <> 'not_configured' then
+    raise exception 'incomplete WhatsApp OTP must be not_configured despite enabled SMS, got %', st;
+  end if;
+  if prov is distinct from 'whatsapp' then
+    raise exception 'OTP must read WhatsApp even when incomplete, got provider %', prov;
+  end if;
+
+  -- Case 3: enabled complete SMS + DISABLED complete WhatsApp => OTP disabled from
+  -- the WhatsApp row; the enabled SMS slot must not make OTP look enabled.
+  update public.integration_settings
+     set enabled = false,
+         provider_name = 'whatsapp',
+         public_config = '{"phone_number_id":"wa_pnid","otp_template_name_ar":"wa_ar"}'::jsonb,
+         secret_config = '{"access_token":"wa_tok"}'::jsonb
+   where provider_type = 'whatsapp';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st <> 'disabled' then
+    raise exception 'disabled WhatsApp OTP must read disabled despite enabled SMS, got %', st;
+  end if;
+
+  -- Safe shape while WhatsApp carries real-looking secret/config: the summary must
+  -- expose no access_token/phone_number_id key or their values.
+  update public.integration_settings
+     set enabled = true,
+         public_config = '{"phone_number_id":"wa_secret_pnid","otp_template_name_ar":"wa_ar"}'::jsonb,
+         secret_config = '{"access_token":"wa_secret_tok"}'::jsonb
+   where provider_type = 'whatsapp';
+  txt := lower(public.operations_health_summary()::text);
+  if txt like '%"access_token"%' or txt like '%wa_secret_tok%'
+     or txt like '%"phone_number_id"%' or txt like '%wa_secret_pnid%' then
+    raise exception 'OTP card leaked a secret/PII field';
+  end if;
+
+  -- Case 4: enabled complete SMS + NO WhatsApp row => OTP reflects the MISSING
+  -- WhatsApp config (not_configured), never the SMS slot.
+  delete from public.integration_settings where provider_type = 'whatsapp';
+  select x->>'state', x->'details'->>'provider' into st, prov
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st <> 'not_configured' then
+    raise exception 'missing WhatsApp row must yield not_configured OTP, got %', st;
+  end if;
+  if prov is not null then
+    raise exception 'OTP provider must be null with no WhatsApp row, got %', prov;
   end if;
 
   raise notice 'CONFIGURED MIRRORS RUNTIME READINESS OK';
