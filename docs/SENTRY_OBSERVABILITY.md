@@ -26,11 +26,12 @@
   Expo Router navigation spans with **templated** paths (`/product/[id]`,
   never raw ids), conservative startup/screen tracing.
 - Off by policy: session replay (0/0), screenshots, view hierarchy,
-  profiling (0), user-interaction tracing AND touch breadcrumbs (the
-  `Sentry.wrap` touch boundary's `touch` crumbs are dropped in
-  `beforeBreadcrumb` in every environment — they carry component paths and
-  labels of tapped UI), failed-request capture, `sendDefaultPii`. Enabling
-  any of these needs explicit owner approval.
+  profiling (0), user-interaction tracing AND interaction breadcrumbs (the
+  `Sentry.wrap` touch boundary's `touch` crumbs and every `ui.*` crumb —
+  including `ui.multiClick` rage taps — are dropped in `beforeBreadcrumb`
+  in every environment; they carry component paths and labels of tapped
+  UI), failed-request capture, `sendDefaultPii`. Enabling any of these
+  needs explicit owner approval.
 - **Web/admin**: not initialized in v1 (`Platform.OS === 'web'` returns
   early). The Expo web export and the Vite admin app are a tracked
   follow-up — see the issue referenced in the activation PR.

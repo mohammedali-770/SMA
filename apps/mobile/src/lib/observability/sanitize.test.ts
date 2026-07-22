@@ -212,9 +212,11 @@ describe('sanitizeSpan / transaction spans', () => {
 });
 
 describe('shouldDropBreadcrumb', () => {
-  it('drops touch crumbs in every environment (interaction breadcrumbs are off)', () => {
+  it('drops touch and ui.* crumbs in every environment (interaction breadcrumbs are off)', () => {
     for (const env of ['development', 'preview', 'production']) {
-      expect(shouldDropBreadcrumb('touch', env), env).toBe(true);
+      for (const category of ['touch', 'ui.multiClick', 'ui.click', 'ui.lifecycle']) {
+        expect(shouldDropBreadcrumb(category, env), `${category}/${env}`).toBe(true);
+      }
     }
   });
 
