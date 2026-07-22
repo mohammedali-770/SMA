@@ -15,16 +15,18 @@ export type OperationsHealthState =
   | 'not_monitored'
   | 'unavailable';
 
+export type OperationsHealthSystemId =
+  | 'lazywait'
+  | 'order_integrity'
+  | 'account_deletion'
+  | 'payment'
+  | 'push'
+  | 'email'
+  | 'otp'
+  | 'database_jobs';
+
 export interface OperationsHealthSystem {
-  id:
-    | 'lazywait'
-    | 'order_integrity'
-    | 'account_deletion'
-    | 'payment'
-    | 'push'
-    | 'email'
-    | 'otp'
-    | 'database_jobs';
+  id: OperationsHealthSystemId;
   critical: boolean;
   state: OperationsHealthState;
   source: string;
@@ -70,9 +72,69 @@ export interface OperationsHealthSummary {
   attention: OperationsHealthAttention[];
 }
 
-function unwrap<T>(result: { data: T | null; error: { message: string } | null }): T {
-  if (result.error) throw new Error(result.error.message);
-  return result.data as T;
+const SYSTEMS: Array<{ id: OperationsHealthSystemId; critical: boolean }> = [
+  { id: 'lazywait', critical: true },
+  { id: 'order_integrity', critical: true },
+  { id: 'account_deletion', critical: true },
+  { id: 'payment', critical: false },
+  { id: 'push', critical: false },
+  { id: 'email', critical: false },
+  { id: 'otp', critical: false },
+  { id: 'database_jobs', critical: true },
+];
+
+const JOBS: Array<{ job_name: string; subsystem: string; expected_schedule: string }> = [
+  { job_name: 'account-deletion-processor', subsystem: 'account_deletion', expected_schedule: '* * * * *' },
+  { job_name: 'lazywait-sync', subsystem: 'lazywait', expected_schedule: '* * * * *' },
+  { job_name: 'order-integrity-watchdog', subsystem: 'order_integrity', expected_schedule: '*/2 * * * *' },
+];
+
+/**
+ * Safe client-side fallback for network/auth/transient RPC failures.
+ * It never reports healthy and never copies the raw error into the UI.
+ */
+export function unavailableOperationsHealthSummary(
+  generatedAt = new Date().toISOString(),
+): OperationsHealthSummary {
+  return {
+    generated_at: generatedAt,
+    overall_state: 'degraded',
+    critical_attention_count: 0,
+    warning_attention_count: 1,
+    systems_unavailable_count: SYSTEMS.length,
+    systems_disabled_count: 0,
+    systems_not_configured_count: 0,
+    systems_not_monitored_count: 0,
+    critical_systems: ['lazywait', 'order_integrity', 'account_deletion', 'database_jobs'],
+    systems: SYSTEMS.map(({ id, critical }) => ({
+      id,
+      critical,
+      state: 'unavailable',
+      source: 'operations_health_summary',
+      details: { safe_error_code: 'client_fetch_failed' },
+    })),
+    jobs: JOBS.map(({ job_name, subsystem, expected_schedule }) => ({
+      job_name,
+      subsystem,
+      critical: true,
+      job_id: null,
+      schedule: null,
+      expected_schedule,
+      active: false,
+      state: 'unavailable',
+      latest_status: null,
+      latest_run_at: null,
+      latest_completed_at: null,
+      latest_success_at: null,
+      latest_success_age_seconds: null,
+    })),
+    attention: [{
+      code: 'OPERATIONS_HEALTH_SOURCE_UNAVAILABLE',
+      subsystem: 'operations_health',
+      severity: 'warning',
+      count: 1,
+    }],
+  };
 }
 
 export const operationsHealth = {
@@ -82,6 +144,8 @@ export const operationsHealth = {
   },
 
   async summary(): Promise<OperationsHealthSummary> {
-    return unwrap<OperationsHealthSummary>(await supabase.rpc('operations_health_summary'));
+    const { data, error } = await supabase.rpc('operations_health_summary');
+    if (error || !data) return unavailableOperationsHealthSummary();
+    return data as OperationsHealthSummary;
   },
 };
