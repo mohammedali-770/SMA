@@ -489,12 +489,21 @@ begin
 
   -- OTP: prefer an enabled channel, then WhatsApp over SMS. Configuration only;
   -- no OTP or provider test message is sent.
+  --
+  -- "configured" mirrors the runtime WhatsApp OTP resolver (_shared/whatsappSend.ts
+  -- resolveWhatsAppConfig), which fails closed unless phone_number_id (public),
+  -- access_token (secret) and an OTP template name are present. The resolver uses
+  -- a non-trimming str(), so presence (not whitespace-trim) is the correct mirror.
+  -- A template for at least one language makes the send path succeed for that
+  -- language; with none, OTP cannot send in any language -> not_configured.
   begin
     select
       true,
       enabled,
-      (provider_name is not null
-        and secret_config is not null and secret_config <> '{}'::jsonb),
+      (nullif(public_config->>'phone_number_id','') is not null
+        and nullif(secret_config->>'access_token','') is not null
+        and (nullif(public_config->>'otp_template_name_ar','') is not null
+             or nullif(public_config->>'otp_template_name_en','') is not null)),
       provider_name,
       updated_at
     into v_otp_exists, v_otp_enabled, v_otp_configured,

@@ -347,6 +347,35 @@ begin
     raise exception 'non-expo push provider must be not_configured, got %', st;
   end if;
 
+  -- OTP (WhatsApp): a token alone is not enough. resolveWhatsAppConfig needs
+  -- phone_number_id (public), access_token (secret) and an OTP template name.
+  -- Missing phone_number_id + template => not_configured despite a saved token.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'whatsapp',
+         public_config = '{}'::jsonb,
+         secret_config = '{"access_token":"tok_abc"}'::jsonb
+   where provider_type = 'whatsapp';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st <> 'not_configured' then
+    raise exception 'incomplete WhatsApp OTP setup must be not_configured, got %', st;
+  end if;
+
+  -- phone_number_id + access_token + one template => configured (not the
+  -- unconfigured/disabled states; normally not_monitored with no send probe).
+  update public.integration_settings
+     set public_config = '{"phone_number_id":"pnid_1","otp_template_name_en":"otp_en"}'::jsonb,
+         secret_config = '{"access_token":"tok_abc"}'::jsonb
+   where provider_type = 'whatsapp';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='otp';
+  if st in ('not_configured','disabled') then
+    raise exception 'fully configured WhatsApp OTP must not be %; expected configured', st;
+  end if;
+
   raise notice 'CONFIGURED MIRRORS RUNTIME READINESS OK';
 end $$;
 
