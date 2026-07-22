@@ -283,6 +283,31 @@ begin
     raise exception 'non-tap payment provider must be not_configured, got %', st;
   end if;
 
+  -- Whitespace-only merchant_id => not_configured (resolveTapConfig trims it).
+  update public.integration_settings
+     set provider_name = 'tap',
+         public_config = '{"mode":"test","currency":"SAR","merchant_id":"   "}'::jsonb,
+         secret_config = '{"test_secret_key":"sk_test_ok"}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st <> 'not_configured' then
+    raise exception 'whitespace-only merchant_id must be not_configured, got %', st;
+  end if;
+
+  -- Whitespace-only selected-mode key => not_configured (resolver trims the key).
+  update public.integration_settings
+     set public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
+         secret_config = '{"test_secret_key":"  \t "}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st <> 'not_configured' then
+    raise exception 'whitespace-only Tap key must be not_configured, got %', st;
+  end if;
+
   -- Push: enabled + provider 'expo' + EMPTY secret_config must be treated as
   -- configured (Expo credentials live outside integration_settings.secret_config).
   update public.integration_settings
@@ -296,6 +321,18 @@ begin
   where x->>'id'='push';
   if st in ('not_configured','disabled') then
     raise exception 'enabled Expo push with no DB secret must be configured, got %', st;
+  end if;
+
+  -- Case-sensitive provider gate: 'Expo' (capitalized) is unsupported at runtime
+  -- (push-dispatch compares exactly to 'expo'), so it must read not_configured.
+  update public.integration_settings
+     set public_config = '{"provider":"Expo"}'::jsonb
+   where provider_type = 'push';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='push';
+  if st <> 'not_configured' then
+    raise exception 'case-mismatched push provider (Expo) must be not_configured, got %', st;
   end if;
 
   -- Push provider not 'expo' => not_configured.

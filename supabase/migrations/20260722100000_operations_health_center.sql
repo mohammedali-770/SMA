@@ -310,18 +310,21 @@ begin
   begin
     -- "configured" mirrors the runtime resolver (_shared/tap.ts resolveTapConfig):
     -- provider must be 'tap', the key for the SELECTED mode must be present, and
-    -- merchant_id must be set. The mode-specific key is only tested for presence;
-    -- its value is never selected into a returned column.
+    -- merchant_id must be set. The resolver trims merchant_id and the key before
+    -- the emptiness gate, so a whitespace-only value is NOT ready — trim here too.
+    -- The mode-specific key is only tested for presence; its value is never
+    -- selected into a returned column.
     select
       true,
       enabled,
       (lower(coalesce(provider_name,'')) = 'tap'
-        and nullif(public_config->>'merchant_id','') is not null
+        and nullif(btrim(public_config->>'merchant_id', E' \t\n\r\f\v'),'') is not null
         and nullif(
-              secret_config->>(
-                case when lower(coalesce(public_config->>'mode','test')) = 'live'
-                     then 'live_secret_key' else 'test_secret_key' end
-              ), '') is not null),
+              btrim(
+                secret_config->>(
+                  case when lower(coalesce(public_config->>'mode','test')) = 'live'
+                       then 'live_secret_key' else 'test_secret_key' end
+                ), E' \t\n\r\f\v'),'') is not null),
       provider_name,
       nullif(public_config->>'mode',''),
       nullif(public_config->>'currency',''),
@@ -394,14 +397,16 @@ begin
   -- Push: configuration, device counts and safe send-ledger aggregates. No send
   -- or test-message endpoint is invoked.
   begin
-    -- "configured" mirrors the runtime push-dispatch gate: an enabled row whose
-    -- provider (public_config.provider, else provider_name) is 'expo'. Expo push
-    -- carries no integration_settings.secret_config (EAS credentials live outside
-    -- the DB), so a DB secret is deliberately NOT required here.
+    -- "configured" mirrors the runtime push-dispatch gate exactly:
+    --   provider = String(public_config.provider ?? provider_name ?? '')
+    --   and that provider must equal 'expo' (case-sensitive; an empty-string
+    --   provider does NOT fall through to provider_name, matching JS `??`).
+    -- Expo push carries no integration_settings.secret_config (EAS credentials
+    -- live outside the DB), so a DB secret is deliberately NOT required here.
     select
       true,
       enabled,
-      (lower(coalesce(nullif(public_config->>'provider',''), provider_name, '')) = 'expo'),
+      (coalesce(public_config->>'provider', provider_name, '') = 'expo'),
       provider_name,
       updated_at
     into v_push_exists, v_push_enabled, v_push_configured,
