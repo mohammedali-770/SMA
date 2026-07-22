@@ -39,7 +39,7 @@ export interface OperationsHealthJob {
   schedule: string | null;
   expected_schedule: string;
   active: boolean;
-  state: 'healthy' | 'degraded' | 'failing';
+  state: 'healthy' | 'degraded' | 'failing' | 'unavailable';
   latest_status: string | null;
   latest_run_at: string | null;
   latest_completed_at: string | null;
@@ -63,6 +63,7 @@ export interface OperationsHealthSummary {
   systems_unavailable_count: number;
   systems_disabled_count: number;
   systems_not_configured_count: number;
+  systems_not_monitored_count: number;
   critical_systems: string[];
   systems: OperationsHealthSystem[];
   jobs: OperationsHealthJob[];
