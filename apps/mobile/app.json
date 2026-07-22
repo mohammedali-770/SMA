@@ -32,6 +32,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "first-taste-trading-company",
+          "project": "react-native",
+          "url": "https://sentry.io/"
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",

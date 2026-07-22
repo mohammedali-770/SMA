@@ -12,10 +12,17 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { ObservabilityErrorBoundary } from '../components/ObservabilityErrorBoundary';
 import { NotificationTapBridge } from '../features/notifications/NotificationTapBridge';
 import { I18nProvider } from '../i18n/I18nProvider';
+import { initObservability, wrapRoot } from '../lib/observability';
 import { AppStoreProvider, useAuth } from '../store';
 import { colors } from '../theme';
+
+// Crash reporting initializes ONCE, before any screen renders. Disabled in
+// tests and (by default) in development; native + JS + promise-rejection
+// capture in preview/production builds. See src/lib/observability.
+initObservability();
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -28,9 +35,12 @@ function SplashGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export default function RootLayout() {
+function RootLayout() {
   return (
     <SafeAreaProvider>
+      {/* Above I18nProvider on purpose: a crash inside localization/state
+          bootstrap still renders the (static, bilingual) fallback. */}
+      <ObservabilityErrorBoundary>
       <I18nProvider>
         <AppStoreProvider>
           <SplashGate>
@@ -59,6 +69,10 @@ export default function RootLayout() {
           </SplashGate>
         </AppStoreProvider>
       </I18nProvider>
+      </ObservabilityErrorBoundary>
     </SafeAreaProvider>
   );
 }
+
+// Sentry.wrap: touch-event + startup profiler instrumentation around the root.
+export default wrapRoot(RootLayout);
