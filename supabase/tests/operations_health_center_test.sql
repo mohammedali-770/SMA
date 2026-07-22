@@ -224,6 +224,95 @@ begin
   raise notice 'TRUTHFUL OPTIONAL-INTEGRATION STATES OK';
 end $$;
 
+-- ---- CONFIGURED MIRRORS RUNTIME READINESS (payment/push) --------------------
+-- The "configured" boolean must track the real runtime gates, not a looser
+-- proxy: a broken local Tap setup must read not_configured (never the softer
+-- not_monitored), and a correctly enabled Expo push (which carries no DB secret)
+-- must never be mislabelled not_configured.
+do $$
+declare st text;
+begin
+  -- Tap: enabled, provider 'tap', merchant set, but only the WRONG-mode key is
+  -- stored (mode=test, only live key) => resolveTapConfig fails => not_configured.
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'tap',
+         public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
+         secret_config = '{"live_secret_key":"sk_live_only"}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st <> 'not_configured' then
+    raise exception 'Tap with only the wrong-mode key must be not_configured, got %', st;
+  end if;
+
+  -- Add the correct selected-mode key => fully configured => not the unconfigured
+  -- or disabled states (no external probe exists, so normally not_monitored).
+  update public.integration_settings
+     set secret_config = '{"test_secret_key":"sk_test_ok","live_secret_key":"sk_live_only"}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st in ('not_configured','disabled') then
+    raise exception 'fully configured Tap must not be %; expected a configured state', st;
+  end if;
+
+  -- Missing merchant_id => not_configured even with a valid selected-mode key.
+  update public.integration_settings
+     set public_config = '{"mode":"test","currency":"SAR"}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st <> 'not_configured' then
+    raise exception 'Tap missing merchant_id must be not_configured, got %', st;
+  end if;
+
+  -- Provider not 'tap' => not_configured.
+  update public.integration_settings
+     set provider_name = 'geidea',
+         public_config = '{"mode":"test","currency":"SAR","merchant_id":"m_123"}'::jsonb,
+         secret_config = '{"test_secret_key":"sk_test_ok"}'::jsonb
+   where provider_type = 'payment';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='payment';
+  if st <> 'not_configured' then
+    raise exception 'non-tap payment provider must be not_configured, got %', st;
+  end if;
+
+  -- Push: enabled + provider 'expo' + EMPTY secret_config must be treated as
+  -- configured (Expo credentials live outside integration_settings.secret_config).
+  update public.integration_settings
+     set enabled = true,
+         provider_name = null,
+         public_config = '{"provider":"expo"}'::jsonb,
+         secret_config = '{}'::jsonb
+   where provider_type = 'push';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='push';
+  if st in ('not_configured','disabled') then
+    raise exception 'enabled Expo push with no DB secret must be configured, got %', st;
+  end if;
+
+  -- Push provider not 'expo' => not_configured.
+  update public.integration_settings
+     set provider_name = 'other',
+         public_config = '{"provider":"other"}'::jsonb
+   where provider_type = 'push';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='push';
+  if st <> 'not_configured' then
+    raise exception 'non-expo push provider must be not_configured, got %', st;
+  end if;
+
+  raise notice 'CONFIGURED MIRRORS RUNTIME READINESS OK';
+end $$;
+
 -- ---- MISSING OPTIONAL CONFIG DOES NOT CRASH THE PAGE ------------------------
 do $$
 declare
