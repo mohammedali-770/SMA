@@ -87,10 +87,16 @@ begin
     raise exception 'activation blocked: operations_digest_generate() is missing or its security contract changed';
   end if;
 
-  -- The v1 outbox dormancy constraint must still be in force: internal
+  -- The v1 outbox dormancy CHECK must still be in force ON THE OUTBOX TABLE
+  -- (a same-named constraint elsewhere must not satisfy this): internal
   -- activation is only safe while external delivery is structurally impossible.
-  if not exists (select 1 from pg_constraint where conname = 'operations_alert_outbox_v1_dormancy') then
-    raise exception 'activation blocked: outbox dormancy constraint operations_alert_outbox_v1_dormancy is missing';
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'operations_alert_outbox_v1_dormancy'
+      and conrelid = 'public.operations_alert_outbox'::regclass
+      and contype = 'c'
+  ) then
+    raise exception 'activation blocked: outbox dormancy constraint operations_alert_outbox_v1_dormancy is missing from public.operations_alert_outbox';
   end if;
 
   select * into v_s from public.operations_alert_settings where id;
@@ -114,13 +120,18 @@ begin
     raise exception 'activation blocked: evaluator history exists but baseline_completed_at is null — complete the baseline first';
   end if;
 
-  -- Foreign-job guards: never adopt or replace a job we do not own.
+  -- Foreign-job guards: never adopt or replace a job we do not own. Ownership
+  -- means the command is EXACTLY our canonical bare internal call — a job that
+  -- merely mentions the function name inside a wrapper/HTTP command is foreign
+  -- and aborts the migration (fail closed) instead of being replaced.
   select command into v_cmd from cron.job where jobname = 'operations-alerts-evaluator' limit 1;
-  if v_cmd is not null and v_cmd not ilike '%operations_alerts_evaluate%' then
+  if v_cmd is not null
+     and btrim(v_cmd) is distinct from 'select public.operations_alerts_evaluate();' then
     raise exception 'activation blocked: a foreign cron job named "operations-alerts-evaluator" exists; verify/remove it first';
   end if;
   select command into v_cmd from cron.job where jobname = 'operations-digest-generator' limit 1;
-  if v_cmd is not null and v_cmd not ilike '%operations_digest_generate%' then
+  if v_cmd is not null
+     and btrim(v_cmd) is distinct from 'select public.operations_digest_generate();' then
     raise exception 'activation blocked: a foreign cron job named "operations-digest-generator" exists; verify/remove it first';
   end if;
 end $$;
