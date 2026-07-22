@@ -455,14 +455,18 @@ begin
 
   -- Email/SMTP: configuration status only. Host/from-address presence is checked
   -- without returning either value, and no email is sent.
+  --
+  -- "configured" mirrors the runtime SMTP readiness (email-test-config): it needs
+  -- host and from_email (both trimmed there), and SMTP auth is OPTIONAL
+  -- (auth = username ? {...} : undefined), so a password/secret is NOT required.
+  -- Requiring provider_name or a non-empty secret_config here would over-report
+  -- not_configured for a valid no-auth SMTP relay.
   begin
     select
       true,
       enabled,
-      (provider_name is not null
-        and secret_config is not null and secret_config <> '{}'::jsonb
-        and nullif(public_config->>'host','') is not null
-        and nullif(public_config->>'from_email','') is not null),
+      (nullif(btrim(public_config->>'host', E' \t\n\r\f\v'),'') is not null
+        and nullif(btrim(public_config->>'from_email', E' \t\n\r\f\v'),'') is not null),
       provider_name,
       updated_at
     into v_email_exists, v_email_enabled, v_email_configured,

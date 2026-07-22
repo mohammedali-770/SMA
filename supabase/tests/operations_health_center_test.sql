@@ -376,6 +376,43 @@ begin
     raise exception 'fully configured WhatsApp OTP must not be %; expected configured', st;
   end if;
 
+  -- Email/SMTP: host + from_email with EMPTY secret_config must be configured
+  -- (email-test-config makes SMTP auth optional, so no password is required).
+  update public.integration_settings
+     set enabled = true,
+         provider_name = 'smtp',
+         public_config = '{"host":"smtp.example.invalid","from_email":"noreply@example.invalid"}'::jsonb,
+         secret_config = '{}'::jsonb
+   where provider_type = 'email';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='email';
+  if st in ('not_configured','disabled') then
+    raise exception 'no-auth SMTP with host + from_email must be configured, got %', st;
+  end if;
+
+  -- Whitespace-only host => not_configured (runtime trims host).
+  update public.integration_settings
+     set public_config = '{"host":"   ","from_email":"noreply@example.invalid"}'::jsonb
+   where provider_type = 'email';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='email';
+  if st <> 'not_configured' then
+    raise exception 'whitespace-only SMTP host must be not_configured, got %', st;
+  end if;
+
+  -- Missing from_email => not_configured.
+  update public.integration_settings
+     set public_config = '{"host":"smtp.example.invalid"}'::jsonb
+   where provider_type = 'email';
+  select x->>'state' into st
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='email';
+  if st <> 'not_configured' then
+    raise exception 'SMTP without from_email must be not_configured, got %', st;
+  end if;
+
   raise notice 'CONFIGURED MIRRORS RUNTIME READINESS OK';
 end $$;
 
