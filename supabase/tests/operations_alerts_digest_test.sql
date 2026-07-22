@@ -13,6 +13,17 @@ select set_config('test.is_admin', 'true', true);
 select set_config('test.is_staff', '', true);
 select set_config('test.auth_uid', '', true);
 
+-- The activation migration (20260723120000) enables the internal engines at
+-- chain-apply time. This suite tests the ENGINE lifecycle from its dormant
+-- starting point, so restore the pre-activation row state for the duration of
+-- this (rolled-back) transaction. Column DEFAULTS staying dormant is asserted
+-- separately in the contract block below.
+update public.operations_alert_settings
+   set alert_evaluation_enabled = false,
+       digest_generation_enabled = false,
+       baseline_completed_at = null
+ where id;
+
 -- ---- fixtures helpers -------------------------------------------------------
 create function pg_temp.oad_job_clear(p_name text) returns void language sql as $$
   delete from cron.job_run_details
@@ -113,9 +124,20 @@ begin
   if (select count(*) from public.operations_alert_settings) <> 1 then
     raise exception 'settings singleton not seeded';
   end if;
-  if (select external_dispatch_enabled or alert_evaluation_enabled or digest_generation_enabled
-      from public.operations_alert_settings) then
-    raise exception 'settings must default to fully dormant';
+  -- Column DEFAULTS must stay dormant (a fresh row can never start enabled),
+  -- and external dispatch must be off even after the internal activation
+  -- migration (which is forbidden from touching it).
+  if exists (
+    select 1 from pg_attribute a
+    join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+    where a.attrelid = 'public.operations_alert_settings'::regclass
+      and a.attname in ('alert_evaluation_enabled','digest_generation_enabled','external_dispatch_enabled')
+      and pg_get_expr(d.adbin, d.adrelid) is distinct from 'false'
+  ) then
+    raise exception 'engine/dispatch column defaults must be dormant (false)';
+  end if;
+  if (select external_dispatch_enabled from public.operations_alert_settings) then
+    raise exception 'external dispatch must never be enabled';
   end if;
 
   raise notice 'OBJECT / SECURITY CONTRACT OK';

@@ -2,18 +2,25 @@
 
 ## Status
 
-**Repository-only.** The migration
+**Deployed and internally active (pre-launch).** The engine migration
 `supabase/migrations/20260723090000_smart_operations_alerts_digest.sql`
-is committed to the repository but **has not been applied to Production**.
-No cron job exists for it, no dispatcher exists, and all engine switches
-default to **off**. Applying it to Production, scheduling it, or enabling
-any switch each require separate explicit owner approval and follow the
-owner-approved workflow in `docs/MIGRATIONS.md`.
+is applied to Production (live version `20260722143014`), the one-time
+owner-approved baseline completed on 2026-07-22 (all-clear, platform
+healthy), and the activation migration
+`supabase/migrations/20260723120000_activate_operations_alerts_digest_cron.sql`
+enables the two **internal** automations and schedules them (see
+"Internal automation" below). **External delivery remains disabled and
+structurally impossible**: no dispatcher exists, the outbox dormancy
+constraint is in force, and the settings RPC hard-rejects enabling
+external dispatch. Ledger reconciliation of `docs/MIGRATIONS.md` is owned
+by Issue #76.
 
 Deliverables:
 
-- Migration: `supabase/migrations/20260723090000_smart_operations_alerts_digest.sql`
-- SQL tests: `supabase/tests/operations_alerts_digest_test.sql`
+- Engine migration: `supabase/migrations/20260723090000_smart_operations_alerts_digest.sql`
+- Activation migration: `supabase/migrations/20260723120000_activate_operations_alerts_digest_cron.sql`
+- SQL tests: `supabase/tests/operations_alerts_digest_test.sql`,
+  `supabase/tests/operations_alerts_activation_test.sql`
 - Client API: `src/lib/operationsAlertsApi.ts`, `src/lib/operationsAlertsCapability.ts`
 - Admin UI: `src/components/admin/OperationsAlertsPanel.tsx` (tab in `AdminDashboard`)
 - Frontend tests: `src/lib/operationsAlertsCapability.test.ts`,
@@ -225,37 +232,123 @@ enabled flag or a healthy state.
 | `recovery_notifications_enabled` | `true` |
 | `optional_system_alerts_enabled` | `false` |
 
-Applying the migration therefore changes **no runtime behavior**: nothing
-runs, nothing alerts, nothing is sent.
+Applying the **engine migration** (`20260723090000`) alone therefore
+changes **no runtime behavior**: nothing runs, nothing alerts, nothing is
+sent. It is the separate **activation migration** (`20260723120000`, next
+section) that enables the two internal engines and schedules the recurring
+jobs — external dispatch stays disabled either way.
 
-## Future activation plan (each step needs separate owner approval)
+## Internal automation (active) — operations runbook
 
-1. **Apply the migration to Production** via the owner-approved
-   `apply_migration` workflow in `docs/MIGRATIONS.md`.
-2. **Schedule the evaluator**: pg_cron job `operations-alerts-evaluator`
-   calling `select public.operations_alerts_evaluate();` every 5–10 minutes,
-   and `operations-digest-generator` calling
-   `select public.operations_digest_generate();` hourly (the function itself
-   no-ops until the configured local digest time has passed and generates at
-   most one digest per day/language). Both jobs are delivered by a future
-   migration — none is created in v1.
-3. **Enable switches**: `alert_evaluation_enabled`, then
-   `digest_generation_enabled`, via the admin settings RPC. The first enabled
-   run performs the baseline (no storm).
-4. **External delivery (future version)**: a reviewed dispatcher (Edge
-   Function or job) plus a migration that drops/replaces the
-   `operations_alert_outbox_v1_dormancy` constraint and lifts the
-   settings-RPC hard-reject. Until all three ship together, external
-   delivery remains structurally impossible.
+Delivered by `20260723120000_activate_operations_alerts_digest_cron.sql`:
+
+| Job | Schedule | Command |
+| --- | --- | --- |
+| `operations-alerts-evaluator` | `*/5 * * * *` (every 5 minutes) | `select public.operations_alerts_evaluate();` |
+| `operations-digest-generator` | `0 * * * *` (hourly) | `select public.operations_digest_generate();` |
+
+**Why the digest cron is hourly, not daily:** the function — not the
+scheduler — is the source of truth for digest timing. Every hourly tick
+before 08:00 Asia/Riyadh records a safe `skipped` run
+(`before_digest_time`); the first tick at/after 08:00 generates the
+previous full local day once per language; later ticks that day are
+idempotently skipped (`generated: []`). If the database or job runner is
+down at 08:00, the next hourly tick recovers the digest instead of losing
+the day. Overlap is prevented by advisory locks in both engines.
+
+**Internal-only guarantees (unchanged by activation):** external dispatch
+disabled (settings hard-reject + `operations_alert_outbox_v1_dormancy`
+constraint), no dispatcher exists, no provider credentials, no Push /
+Email / WhatsApp / SMS / OTP messages, no automatic remediation. The
+system only observes, evaluates, records, and renders internally.
+
+**Verifying job health**
+
+```sql
+select jobname, schedule, active from cron.job
+ where jobname in ('operations-alerts-evaluator','operations-digest-generator');
+select kind, status, skip_reason, safe_error_code, started_at, counts
+  from public.operations_alert_runs order by id desc limit 20;
+```
+
+Or in the Admin Dashboard: Operations Alerts → header "Last evaluation" and
+Settings → last run details; the Operations Health tab's Scheduled Jobs
+card covers the three pre-existing crons.
+
+**Expected skipped runs (safe, routine)**
+- `before_digest_time` — hourly digest tick before 08:00 local. Normal.
+- digest `generated: []` after the day's digest exists. Normal.
+- `overlap_skipped` — a tick fired while the previous one still ran. Safe
+  by design; frequent occurrences suggest load worth investigating.
+
+**A run needs attention when** `status = 'failed'` (carries a fixed
+`safe_error_code`, never a raw message). Repeated failures → use the safe
+disable below and investigate; a single transient failure self-heals on
+the next tick.
+
+**Known limitation (tracked follow-up):** the Operations Health
+scheduled-jobs card allowlists only the three pre-existing crons; the two
+automation jobs above are not yet part of that health source. Extending it
+needs per-cadence staleness windows (the current 6-minute stale-success
+rule fits 1–2-minute jobs and would falsely mark the hourly digest job
+failing between ticks), so it ships as its own reviewed change. Until
+then, monitor the automation itself through the `operations_alert_runs`
+ledger queries above and the Admin panel's last-run data — and note that
+an evaluator that is itself down can never self-report internally; that
+gap is inherent to v1's internal-only design and is what a future
+external-delivery version addresses.
+
+**Safe disable / rollback (non-destructive, reviewed)**
+
+```sql
+select cron.unschedule('operations-alerts-evaluator');
+select cron.unschedule('operations-digest-generator');
+update public.operations_alert_settings
+   set alert_evaluation_enabled = false,
+       digest_generation_enabled = false
+ where id;
+```
+
+Keeps baseline, alert history, digest history, the three unrelated crons,
+and disabled external dispatch untouched. Never reset
+`baseline_completed_at`, never delete history rows, never edit
+migration-history tables.
+
+**Launch-day verification checklist**
+1. `cron.job` shows exactly 5 jobs (3 pre-existing + the 2 above), active.
+2. Latest evaluator runs are `success` (or safe skips), cadence ≈ 5 min.
+3. Yesterday's digest exists in both languages after 08:00 Riyadh.
+4. Operations Alerts inbox shows a truthful state (empty when healthy).
+5. `operations_alert_outbox` contains no external-channel rows outside
+   `blocked`/`cancelled` (constraint makes anything else impossible).
+6. `external_dispatch_enabled` is still `false`.
+7. Operations Health tab unchanged and healthy.
+
+## External delivery (still a future version)
+
+A reviewed dispatcher (Edge Function or job) plus a migration that
+drops/replaces the `operations_alert_outbox_v1_dormancy` constraint and
+lifts the settings-RPC hard-reject. Until all three ship together —
+each requiring separate explicit owner approval — external delivery
+remains structurally impossible.
 
 ## Rollback plan
 
-The feature is additive and dormant, so rollback is a follow-up migration
-(never an edit of an applied one) that:
+The feature is additive, so rollback is a follow-up migration (never an
+edit of an applied one). **In an activated environment the automation must
+be stopped FIRST** — otherwise the two cron jobs keep firing every 5
+minutes/hourly against dropped functions, producing recurring pg_cron
+failures:
 
-1. drops the six `operations_alert*`/`operations_digest*` tables and the
+1. unschedule the automation and disable the engine flags (the "Safe
+   disable / rollback" block in the runbook above:
+   `cron.unschedule('operations-alerts-evaluator')`,
+   `cron.unschedule('operations-digest-generator')`, then set
+   `alert_evaluation_enabled = false` and
+   `digest_generation_enabled = false`);
+2. drops the six `operations_alert*`/`operations_digest*` tables and the
    alert/digest functions;
-2. restores `operations_health_summary()` to its original self-contained
+3. restores `operations_health_summary()` to its original self-contained
    body from `20260722100000_operations_health_center.sql` and drops
    `operations_health_snapshot_internal()`.
 
