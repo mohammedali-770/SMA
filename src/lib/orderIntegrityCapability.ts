@@ -21,18 +21,24 @@ export function classifyWatchdogProbe(error: unknown): WatchdogCapability {
   const e = error as { code?: unknown; message?: unknown };
   const code = typeof e.code === 'string' ? e.code.toUpperCase() : '';
   const msg = typeof e.message === 'string' ? e.message.toLowerCase() : '';
-  // PostgREST "Could not find the function … in the schema cache" → definitive absent.
+  // PostgREST "Could not find the function public.order_integrity_admin_summary …
+  // in the schema cache" (PGRST202) is raised only when the PROBED RPC itself is
+  // missing → definitive absent.
   if (code === 'PGRST202') return 'absent';
-  // Postgres undefined_function (42883) or a message that names our RPC.
+  // Message-fallback: treat as absent ONLY when the error names the probed function
+  // (order_integrity_admin_summary) specifically. A missing *dependent* object —
+  // e.g. `relation "order_integrity_incidents" does not exist` after a partial
+  // migration/schema drift — means the function EXISTS but failed; that must stay
+  // 'unknown' so the real error surfaces in-panel rather than silently hiding the tab.
   if (
     (code === '42883' ||
       msg.includes('could not find the function') ||
       msg.includes('does not exist')) &&
-    msg.includes('order_integrity')
+    msg.includes('order_integrity_admin_summary')
   ) {
     return 'absent';
   }
-  // Network / auth / 5xx / anything else: do NOT treat as migration-absent.
+  // Network / auth / 5xx / dependent-object / anything else: NOT migration-absent.
   return 'unknown';
 }
 

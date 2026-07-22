@@ -58,7 +58,9 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [fSeverity, setFSeverity] = useState<string>('');
-  const [fStatus, setFStatus] = useState<string>('open');
+  // Default to unresolved (open+acknowledged+suppressed) so the list matches the
+  // health counts — acknowledging/suppressing a defect must not hide it from view.
+  const [fStatus, setFStatus] = useState<string>('unresolved');
   const [fRule, setFRule] = useState<string>('');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<Record<string, unknown> | null>(null);
@@ -172,7 +174,8 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
           <option value="">All severities</option><option value="critical">Critical</option><option value="warning">Warning</option>
         </select>
         <select value={fStatus} onChange={(e) => setFStatus(e.target.value)} className="text-[10px] font-bold rounded-lg border border-slate-200 px-2 py-1 bg-white/60">
-          <option value="">All statuses</option><option value="open">Open</option><option value="acknowledged">Acknowledged</option>
+          <option value="unresolved">Unresolved (active)</option><option value="">All statuses</option>
+          <option value="open">Open</option><option value="acknowledged">Acknowledged</option>
           <option value="suppressed">Suppressed</option><option value="resolved">Resolved</option>
         </select>
         <select value={fRule} onChange={(e) => setFRule(e.target.value)} className="text-[10px] font-bold rounded-lg border border-slate-200 px-2 py-1 bg-white/60 max-w-[220px]">

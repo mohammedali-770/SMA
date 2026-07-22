@@ -49,6 +49,20 @@ describe('classifyWatchdogProbe', () => {
       message: 'relation "some_other_table" does not exist',
     })).toBe('unknown');
   });
+
+  it('a missing DEPENDENT order_integrity object (function exists, but a table is gone) → unknown', () => {
+    // Partial migration / schema drift: order_integrity_admin_summary ran but a
+    // dependent table is missing. The function EXISTS → the error must surface
+    // in-panel, NOT hide the tab as "migration absent".
+    expect(classifyWatchdogProbe({
+      code: '42P01',
+      message: 'relation "order_integrity_incidents" does not exist',
+    })).toBe('unknown');
+    expect(classifyWatchdogProbe({
+      code: '42883',
+      message: 'function public.order_integrity_list_incidents(text) does not exist',
+    })).toBe('unknown');
+  });
 });
 
 describe('watchdogTabVisible (tab gating)', () => {

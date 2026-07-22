@@ -485,6 +485,60 @@ begin
   raise notice 'NOTE REDACTION OK';
 end $$;
 
+-- ---- LIST 'unresolved' filter matches the health counts ----------------------
+do $$
+declare v jsonb; v_n int;
+begin
+  perform pg_temp.oiw_reset();
+  perform set_config('test.is_admin','true', true);
+  insert into public.order_integrity_incidents (fingerprint, rule_code, severity, entity_type, status) values
+    ('U:o','PAID_ORDER_NOT_SYNCED','critical','order','open'),
+    ('U:a','PAID_ORDER_NOT_SYNCED','critical','order','acknowledged'),
+    ('U:s','OVERDUE_SYNC_RETRY','warning','order','suppressed'),
+    ('U:r','PAID_ORDER_DEAD_LETTER','critical','order','resolved');
+  -- 'unresolved' = open+acknowledged+suppressed (never resolved).
+  v := public.order_integrity_list_incidents('unresolved');
+  select count(*) into v_n from jsonb_array_elements(v);
+  if v_n <> 3 then raise exception 'LIST unresolved: expected 3 got %', v_n; end if;
+  if exists (select 1 from jsonb_array_elements(v) e where e->>'status'='resolved') then
+    raise exception 'LIST unresolved: a resolved incident leaked in'; end if;
+  -- an explicit status still exact-matches
+  v := public.order_integrity_list_incidents('open');
+  select count(*) into v_n from jsonb_array_elements(v);
+  if v_n <> 1 then raise exception 'LIST open: expected 1 got %', v_n; end if;
+  -- null returns everything
+  v := public.order_integrity_list_incidents();
+  select count(*) into v_n from jsonb_array_elements(v);
+  if v_n <> 4 then raise exception 'LIST all: expected 4 got %', v_n; end if;
+  raise notice 'LIST UNRESOLVED FILTER OK';
+end $$;
+
+-- ---- ALERT PAYLOAD: admin ack_note is stripped from the outbox ----------------
+-- The leak path: a WARNING acknowledged WITH a note, then the condition clears so
+-- the incident is NOT re-detected (safe_details keeps ack_note), yet it crosses the
+-- 15-min threshold and an 'opened' alert is generated. ack_note must not reach it.
+do $$
+declare v_id uuid; v_inc uuid; v_payload jsonb;
+begin
+  perform pg_temp.oiw_reset();
+  v_id := pg_temp.oiw_order('W-ALERT-PII','pending','pending','pickup','received',null, null, now()-interval '11m'); -- R10 warning
+  perform public.order_integrity_watchdog();
+  select id into v_inc from public.order_integrity_incidents where rule_code='OVERDUE_SYNC_RETRY';
+  perform set_config('test.is_admin','true', true);
+  perform public.order_integrity_acknowledge_incident(v_inc, 'ACK_PII_NOTE_JohnDoe');
+  if not ((select safe_details from public.order_integrity_incidents where id=v_inc) ? 'ack_note') then
+    raise exception 'ALERT-PII setup: ack_note not stored'; end if;
+  update public.orders set lazywait_sync_state='synced', lazywait_ref='REFDONE' where id=v_id;  -- clear condition
+  update public.order_integrity_incidents set first_detected_at = now()-interval '16m' where id=v_inc;
+  perform public.order_integrity_watchdog();                    -- not re-detected; warning becomes alert-eligible
+  select payload_safe into v_payload from public.order_integrity_alert_outbox
+    where incident_id=v_inc and alert_type='opened';
+  if v_payload is null then raise exception 'ALERT-PII FAILED: no opened alert created (setup)'; end if;
+  if (v_payload->'safe_details') ? 'ack_note' or (v_payload::text ilike '%ACK_PII_NOTE%') then
+    raise exception 'ALERT-PII FAILED: admin ack_note leaked into alert payload_safe -> %', v_payload; end if;
+  raise notice 'ALERT PAYLOAD PII OK';
+end $$;
+
 -- ---- WARNING alert eligibility (persist >= 15 minutes) -----------------------
 do $$
 declare v_id uuid; v_inc uuid;

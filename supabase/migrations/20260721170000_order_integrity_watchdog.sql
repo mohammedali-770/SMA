@@ -605,7 +605,10 @@ begin
     select i.id, 'opened', i.severity,
            jsonb_build_object('rule_code', i.rule_code, 'fingerprint', i.fingerprint,
              'severity', i.severity, 'first_detected_at', i.first_detected_at,
-             'occurrence_count', i.occurrence_count, 'safe_details', i.safe_details)
+             -- strip admin-entered free text (ack_note): it is potential PII and is
+             -- already redacted from non-admin staff, so it must never enter the
+             -- (future-dispatchable) alert outbox.
+             'occurrence_count', i.occurrence_count, 'safe_details', (i.safe_details - 'ack_note'))
       from public.order_integrity_incidents i
      where i.status in ('open','acknowledged')
        and (i.suppression_until is null or i.suppression_until <= now())
@@ -836,11 +839,16 @@ begin
            case when v_admin then i.safe_details else i.safe_details - 'ack_note' end as safe_details
       from public.order_integrity_incidents i
       left join public.orders o on o.id = i.order_id
-     where (p_status    is null or i.status    = p_status)
+       -- p_status='unresolved' matches every non-resolved status (open+acknowledged
+       -- +suppressed) so the panel default lines up with the health counts; any
+       -- other value is an exact status match.
+     where (p_status    is null
+            or (p_status = 'unresolved' and i.status <> 'resolved')
+            or (p_status <> 'unresolved' and i.status = p_status))
        and (p_severity  is null or i.severity  = p_severity)
        and (p_rule_code is null or i.rule_code = p_rule_code)
        and (p_branch_id is null or i.branch_id = p_branch_id)
-     order by (i.status='open') desc, (i.severity='critical') desc, i.last_detected_at desc
+     order by (i.status<>'resolved') desc, (i.severity='critical') desc, i.last_detected_at desc
      limit greatest(1, least(coalesce(p_limit, 100), 500))
   ) t;
   return v;
