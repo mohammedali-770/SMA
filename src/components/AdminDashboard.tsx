@@ -6,13 +6,15 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale, HeartPulse
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale, HeartPulse, BellRing
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { orderIntegrity } from '../lib/api';
 import { operationsHealth } from '../lib/operationsHealthApi';
+import { operationsAlerts } from '../lib/operationsAlertsApi';
 import { WatchdogCapability, watchdogTabVisible } from '../lib/orderIntegrityCapability';
 import { OperationsHealthCapability, operationsHealthTabVisible } from '../lib/operationsHealthCapability';
+import { OperationsAlertsCapability, operationsAlertsTabVisible } from '../lib/operationsAlertsCapability';
 import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
@@ -26,9 +28,10 @@ import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
 import { MenuManagementPanel } from './admin/MenuManagementPanel';
 import { OrderIntegrityPanel } from './admin/OrderIntegrityPanel';
 import { OperationsHealthPanel } from './admin/OperationsHealthPanel';
+import { OperationsAlertsPanel } from './admin/OperationsAlertsPanel';
 
 
-type AdminTab = 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'health' | 'integrity' | 'settings' | 'legal';
+type AdminTab = 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'health' | 'alerts' | 'integrity' | 'settings' | 'legal';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -73,14 +76,29 @@ export const AdminDashboard: React.FC = () => {
   }, []);
   const healthVisible = operationsHealthTabVisible(healthCap);
 
+  // Operations Alerts follows the same fail-visible capability pattern: the tab
+  // hides only when the probe confirms its RPC is missing (pre-migration deploy).
+  const [alertsCap, setAlertsCap] = useState<OperationsAlertsCapability | 'loading'>('loading');
+  useEffect(() => {
+    let alive = true;
+    operationsAlerts.probeAvailability()
+      .then((cap) => { if (alive) setAlertsCap(cap); })
+      .catch(() => { if (alive) setAlertsCap('unknown'); });
+    return () => { alive = false; };
+  }, []);
+  const alertsVisible = operationsAlertsTabVisible(alertsCap);
+
   useEffect(() => {
     if (activeTab === 'health' && !healthVisible && healthCap !== 'loading') {
+      setActiveTab('stats');
+    }
+    if (activeTab === 'alerts' && !alertsVisible && alertsCap !== 'loading') {
       setActiveTab('stats');
     }
     if (activeTab === 'integrity' && !watchdogVisible && watchdogCap !== 'loading') {
       setActiveTab('stats');
     }
-  }, [activeTab, healthVisible, healthCap, watchdogVisible, watchdogCap]);
+  }, [activeTab, healthVisible, healthCap, alertsVisible, alertsCap, watchdogVisible, watchdogCap]);
 
   // Active-order count drives the sidebar "Live Orders" badge.
   const activeOrdersCount = orders
@@ -260,6 +278,16 @@ export const AdminDashboard: React.FC = () => {
             </button>
           )}
 
+          {alertsVisible && (
+            <button
+              onClick={() => setActiveTab('alerts')}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'alerts' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            >
+              <BellRing className="w-4 h-4" />
+              <span>{isRTL ? 'التنبيهات والملخص' : 'Operations Alerts'}</span>
+            </button>
+          )}
+
           {watchdogVisible && (
             <button
               onClick={() => setActiveTab('integrity')}
@@ -315,6 +343,12 @@ export const AdminDashboard: React.FC = () => {
               Mounted only when the capability probe does not confirm a missing RPC. */}
           {activeTab === 'health' && healthVisible && (
             <OperationsHealthPanel lang={adminLang} onNavigate={(tab) => setActiveTab(tab)} />
+          )}
+
+          {/* TAB: OPERATIONS ALERTS + DAILY DIGEST (read-only inbox/digest; admin-only
+              dormant settings). External delivery is disabled in this version. */}
+          {activeTab === 'alerts' && alertsVisible && (
+            <OperationsAlertsPanel lang={adminLang} isAdmin={canTriage} />
           )}
 
           {/* TAB: ORDER INTEGRITY WATCHDOG (observe-only monitoring; read + ack/suppress).
