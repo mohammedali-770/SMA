@@ -58,9 +58,18 @@ const VALUE_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
   [/-?\d{1,3}\.\d{4,}\s*,\s*-?\d{1,3}\.\d{4,}/g, '[redacted-coords]'],
 ];
 
-/** Scrub sensitive patterns out of arbitrary text. */
+/** URL-like tokens (any scheme) appearing inside free text. */
+const URL_IN_TEXT = /\b[a-z][a-z0-9+.-]*:\/\/[^\s'"<>]+/gi;
+
+/**
+ * Scrub sensitive patterns out of arbitrary text. Every URL-like token also
+ * loses its query string and fragment FIRST — span descriptions, breadcrumb
+ * messages and error texts all carry URLs (e.g. Supabase REST calls with
+ * `?id=eq.<order id>`), and the query-string policy is "dropped entirely",
+ * not pattern-scrubbed.
+ */
 export function sanitizeText(input: string): string {
-  let out = input;
+  let out = input.replace(URL_IN_TEXT, (u) => u.split(/[?#]/)[0]);
   for (const [re, replacement] of VALUE_PATTERNS) out = out.replace(re, replacement);
   return out;
 }
@@ -156,6 +165,11 @@ export function sanitizeBreadcrumb<T>(crumb: T): T {
  * and transactions). Removes cookies/bodies/IP, redacts headers, keeps only a
  * pseudonymous user id, scrubs all text surfaces.
  */
+export interface SpanLike {
+  description?: unknown;
+  data?: Record<string, unknown>;
+}
+
 export interface EventLike {
   message?: unknown;
   request?: {
@@ -169,6 +183,25 @@ export interface EventLike {
   tags?: Record<string, unknown>;
   transaction?: string;
   exception?: { values?: Array<{ value?: string }> };
+  spans?: SpanLike[];
+}
+
+/**
+ * Sanitize a transaction span: fetch/XHR auto-instrumentation records the full
+ * request URL in the description and data, so descriptions are text-scrubbed
+ * (which strips URL query/fragment) and data loses its query/fragment keys
+ * outright before deep sanitization.
+ */
+export function sanitizeSpan<T>(span: T): T {
+  const s = span as SpanLike;
+  if (typeof s.description === 'string') s.description = sanitizeText(s.description);
+  if (s.data && typeof s.data === 'object') {
+    delete s.data['http.query'];
+    delete s.data['http.fragment'];
+    delete s.data.query_string;
+    s.data = sanitizeObject(s.data);
+  }
+  return span;
 }
 
 export function sanitizeEvent<T>(input: T): T {
@@ -199,6 +232,7 @@ export function sanitizeEvent<T>(input: T): T {
     }
   }
   if (event.breadcrumbs) event.breadcrumbs = event.breadcrumbs.map(sanitizeBreadcrumb);
+  if (Array.isArray(event.spans)) event.spans = event.spans.map(sanitizeSpan);
   if (event.extra) event.extra = sanitizeObject(event.extra);
   if (event.contexts) event.contexts = sanitizeObject(event.contexts);
   if (event.tags) event.tags = sanitizeObject(event.tags) as Record<string, unknown>;

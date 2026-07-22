@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isSensitiveKey, REDACTED, sanitizeBreadcrumb, sanitizeEvent, sanitizeObject,
-  sanitizeText, sanitizeUrl, shouldDropBreadcrumb,
+  sanitizeSpan, sanitizeText, sanitizeUrl, shouldDropBreadcrumb,
 } from './sanitize';
 
 describe('isSensitiveKey', () => {
@@ -61,6 +61,13 @@ describe('sanitizeText', () => {
 
   it('redacts high-precision coordinate pairs', () => {
     expect(sanitizeText('at 24.71355, 46.67529')).toBe('at [redacted-coords]');
+  });
+
+  it('strips query strings and fragments from URLs embedded in text', () => {
+    expect(sanitizeText('GET https://x.supabase.co/rest/v1/orders?id=eq.12345 failed'))
+      .toBe('GET https://x.supabase.co/rest/v1/orders failed');
+    expect(sanitizeText('opened spicymeal://auth#access_token=opaque123'))
+      .toBe('opened spicymeal://auth');
   });
 
   it('leaves safe operational text alone', () => {
@@ -169,6 +176,38 @@ describe('sanitizeEvent', () => {
     expect((out.extra as Record<string, unknown>).access_token).toBe(REDACTED);
     expect((out.extra as Record<string, unknown>).safe).toBe('yes');
     expect(out.transaction).toBe('/receipt/[id]');
+  });
+});
+
+describe('sanitizeSpan / transaction spans', () => {
+  it('strips URL queries from span descriptions and data; drops query keys', () => {
+    const out = sanitizeSpan({
+      description: 'GET https://x.supabase.co/rest/v1/orders?id=eq.12345&select=*',
+      data: {
+        'http.query': 'id=eq.12345',
+        'http.fragment': 'x',
+        query_string: 'id=eq.12345',
+        url: 'https://x.supabase.co/rest/v1/orders?id=eq.12345',
+        'http.response.status_code': 200,
+      },
+    });
+    expect(out.description).toBe('GET https://x.supabase.co/rest/v1/orders');
+    expect(out.data).toEqual({
+      url: 'https://x.supabase.co/rest/v1/orders',
+      'http.response.status_code': 200,
+    });
+  });
+
+  it('sanitizeEvent walks transaction spans', () => {
+    const out = sanitizeEvent({
+      transaction: '/orders/[id]',
+      spans: [
+        { description: 'POST https://api.tap.company/v2/charges?apikey=sk_x' },
+        { description: 'plain span' },
+      ],
+    });
+    expect(out.spans?.[0].description).toBe('POST https://api.tap.company/v2/charges');
+    expect(out.spans?.[1].description).toBe('plain span');
   });
 });
 
