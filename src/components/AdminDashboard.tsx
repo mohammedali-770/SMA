@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
   Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { orderIntegrity } from '../lib/api';
+import { WatchdogCapability, watchdogTabVisible } from '../lib/orderIntegrityCapability';
+import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
@@ -19,6 +22,7 @@ import { StatsPanel } from './admin/StatsPanel';
 import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
 import { MenuManagementPanel } from './admin/MenuManagementPanel';
+import { OrderIntegrityPanel } from './admin/OrderIntegrityPanel';
 
 
 export const AdminDashboard: React.FC = () => {
@@ -29,11 +33,27 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'settings' | 'legal'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'integrity' | 'settings' | 'legal'>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
+  const canTriage = canTriageRole(currentUser.role);
+
+  // Capability-gate the Order Integrity tab: it must stay hidden until the
+  // watchdog migration/RPCs exist (the web app may deploy before the Production
+  // migration is applied). Only a CONFIRMED missing function hides it; network/
+  // auth errors keep it visible so they surface in the panel. Re-probes on mount,
+  // so a post-migration refresh reveals the tab automatically (no hard-coded flag).
+  const [watchdogCap, setWatchdogCap] = useState<WatchdogCapability | 'loading'>('loading');
+  useEffect(() => {
+    let alive = true;
+    orderIntegrity.probeAvailability()
+      .then((cap) => { if (alive) setWatchdogCap(cap); })
+      .catch(() => { if (alive) setWatchdogCap('unknown'); });
+    return () => { alive = false; };
+  }, []);
+  const watchdogVisible = watchdogTabVisible(watchdogCap);
 
   // Active-order count drives the sidebar "Live Orders" badge.
   const activeOrdersCount = orders
@@ -203,6 +223,16 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'الربط والتكاملات' : 'Integrations'}</span>
           </button>
 
+          {watchdogVisible && (
+            <button
+              onClick={() => setActiveTab('integrity')}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrity' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span>{isRTL ? 'سلامة الطلبات' : 'Order Integrity'}</span>
+            </button>
+          )}
+
           <button
             onClick={() => setActiveTab('settings')}
             className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
@@ -243,6 +273,11 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}
+
+          {/* TAB: ORDER INTEGRITY WATCHDOG (observe-only monitoring; read + ack/suppress).
+              Only mounted when the capability probe confirms the RPCs exist, and
+              triage controls only for admins (accountants are read-only). */}
+          {activeTab === 'integrity' && watchdogVisible && <OrderIntegrityPanel canTriage={canTriage} />}
 
           {/* TAB 7: SYSTEM SETTINGS (brand, payment methods, maps, loyalty) */}
           {activeTab === 'settings' && <SettingsPanel />}
