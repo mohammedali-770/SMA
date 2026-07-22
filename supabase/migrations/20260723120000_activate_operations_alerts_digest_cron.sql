@@ -102,7 +102,13 @@ begin
     raise exception 'activation blocked: external_dispatch_enabled is true; internal activation refuses to run until it is false';
   end if;
 
-  select count(*) into v_runs from public.operations_alert_runs;
+  -- Only meaningful evaluator history blocks activation: successful evaluator
+  -- runs (which always persist the baseline marker — success with a null
+  -- marker means inconsistent state) or existing alert rows. Skipped/failed
+  -- probe runs and digest-kind ledger rows (the digest generator records its
+  -- ledger row even while disabled) are harmless and must not block.
+  select count(*) into v_runs from public.operations_alert_runs
+   where kind = 'evaluate' and status = 'success';
   select count(*) into v_state from public.operations_alert_state;
   if v_s.baseline_completed_at is null and (v_runs > 0 or v_state > 0) then
     raise exception 'activation blocked: evaluator history exists but baseline_completed_at is null — complete the baseline first';
