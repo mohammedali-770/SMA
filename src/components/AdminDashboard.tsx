@@ -6,11 +6,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3, Layers, ClipboardList, Store,
-  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale
+  Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale, HeartPulse
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { orderIntegrity } from '../lib/api';
+import { operationsHealth } from '../lib/operationsHealthApi';
 import { WatchdogCapability, watchdogTabVisible } from '../lib/orderIntegrityCapability';
+import { OperationsHealthCapability, operationsHealthTabVisible } from '../lib/operationsHealthCapability';
 import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
@@ -23,7 +25,10 @@ import { BranchPoliciesPanel } from './admin/BranchPoliciesPanel';
 import { LiveOrdersPanel } from './admin/LiveOrdersPanel';
 import { MenuManagementPanel } from './admin/MenuManagementPanel';
 import { OrderIntegrityPanel } from './admin/OrderIntegrityPanel';
+import { OperationsHealthPanel } from './admin/OperationsHealthPanel';
 
+
+type AdminTab = 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'health' | 'integrity' | 'settings' | 'legal';
 
 export const AdminDashboard: React.FC = () => {
   const {
@@ -33,7 +38,7 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'integrity' | 'settings' | 'legal'>('stats');
+  const [activeTab, setActiveTab] = useState<AdminTab>('stats');
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -54,6 +59,28 @@ export const AdminDashboard: React.FC = () => {
     return () => { alive = false; };
   }, []);
   const watchdogVisible = watchdogTabVisible(watchdogCap);
+
+  // The UI can deploy before the Operations Health Center migration is applied.
+  // Hide the tab only for a confirmed missing RPC. Network/auth/dependency errors
+  // stay visible so operators receive a truthful, fail-visible error state.
+  const [healthCap, setHealthCap] = useState<OperationsHealthCapability | 'loading'>('loading');
+  useEffect(() => {
+    let alive = true;
+    operationsHealth.probeAvailability()
+      .then((cap) => { if (alive) setHealthCap(cap); })
+      .catch(() => { if (alive) setHealthCap('unknown'); });
+    return () => { alive = false; };
+  }, []);
+  const healthVisible = operationsHealthTabVisible(healthCap);
+
+  useEffect(() => {
+    if (activeTab === 'health' && !healthVisible && healthCap !== 'loading') {
+      setActiveTab('stats');
+    }
+    if (activeTab === 'integrity' && !watchdogVisible && watchdogCap !== 'loading') {
+      setActiveTab('stats');
+    }
+  }, [activeTab, healthVisible, healthCap, watchdogVisible, watchdogCap]);
 
   // Active-order count drives the sidebar "Live Orders" badge.
   const activeOrdersCount = orders
@@ -223,6 +250,16 @@ export const AdminDashboard: React.FC = () => {
             <span>{isRTL ? 'الربط والتكاملات' : 'Integrations'}</span>
           </button>
 
+          {healthVisible && (
+            <button
+              onClick={() => setActiveTab('health')}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'health' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            >
+              <HeartPulse className="w-4 h-4" />
+              <span>{isRTL ? 'صحة العمليات' : 'Operations Health'}</span>
+            </button>
+          )}
+
           {watchdogVisible && (
             <button
               onClick={() => setActiveTab('integrity')}
@@ -273,6 +310,12 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}
+
+          {/* TAB: OPERATIONS HEALTH CENTER (staff read-only observability).
+              Mounted only when the capability probe does not confirm a missing RPC. */}
+          {activeTab === 'health' && healthVisible && (
+            <OperationsHealthPanel lang={adminLang} onNavigate={(tab) => setActiveTab(tab)} />
+          )}
 
           {/* TAB: ORDER INTEGRITY WATCHDOG (observe-only monitoring; read + ack/suppress).
               Only mounted when the capability probe confirms the RPCs exist, and
