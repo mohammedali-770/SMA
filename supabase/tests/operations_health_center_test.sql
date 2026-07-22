@@ -633,6 +633,19 @@ begin
   select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor') into st_job;
   if st_job <> 'healthy' then raise exception 'case4 newer terminal success must clear an older failure, got %', st_job; end if;
 
+  -- Case 4b: FIRST completed run FAILED before any success ever => failing, and
+  -- the database_jobs aggregate surfaces it (terminal failure beats no-success).
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'failed', now() - interval '60 seconds', now() - interval '50 seconds');
+  s := public.operations_health_summary();
+  select (select j->>'state' from jsonb_array_elements(s->'jobs') j where j->>'job_name'='account-deletion-processor'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='database_jobs')
+    into st_job, st_db;
+  if st_job <> 'failing' then raise exception 'case4b first-run terminal failure must be failing, got %', st_job; end if;
+  if st_db <> 'failing' then raise exception 'case4b database_jobs must surface first-run terminal failure, got %', st_db; end if;
+
   -- Case 5: latest running, NO success ever => conservative non-healthy (degraded).
   update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
   delete from cron.job_run_details where jobid = adp;

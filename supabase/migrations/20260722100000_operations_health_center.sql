@@ -195,13 +195,18 @@ begin
         ls.end_time as latest_success_at,
         case
           when j.jobid is null or not coalesce(j.active, false) then 'failing'
-          when ls.end_time is null then 'degraded'
-          when now() - ls.end_time > interval '6 minutes' then 'failing'
-          -- Only a recent TERMINAL non-success (e.g. `failed`) fails the job. A
-          -- newer terminal success clears an older terminal failure because lt is
-          -- the most recently completed run.
+          -- A recent TERMINAL non-success (e.g. `failed`) is a real failure and is
+          -- checked BEFORE the no-success fallback, so a first completed run that
+          -- fails (before any success ever exists) reads `failing`, not `degraded`.
+          -- A newer terminal success clears an older terminal failure because lt is
+          -- the most recently completed run; a `running` row has no end_time and is
+          -- excluded from lt, so it never fails the job.
           when lt.status is not null and lt.status <> 'succeeded'
                and lt.end_time >= now() - interval '6 minutes' then 'failing'
+          -- No completed successful run yet (and no recent terminal failure above):
+          -- conservative first-run / retained-history-gap state.
+          when ls.end_time is null then 'degraded'
+          when now() - ls.end_time > interval '6 minutes' then 'failing'
           when j.schedule is distinct from e.expected_schedule then 'degraded'
           else 'healthy'
         end as state
