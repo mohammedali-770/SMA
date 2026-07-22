@@ -319,12 +319,21 @@ remains structurally impossible.
 
 ## Rollback plan
 
-The feature is additive and dormant, so rollback is a follow-up migration
-(never an edit of an applied one) that:
+The feature is additive, so rollback is a follow-up migration (never an
+edit of an applied one). **In an activated environment the automation must
+be stopped FIRST** — otherwise the two cron jobs keep firing every 5
+minutes/hourly against dropped functions, producing recurring pg_cron
+failures:
 
-1. drops the six `operations_alert*`/`operations_digest*` tables and the
+1. unschedule the automation and disable the engine flags (the "Safe
+   disable / rollback" block in the runbook above:
+   `cron.unschedule('operations-alerts-evaluator')`,
+   `cron.unschedule('operations-digest-generator')`, then set
+   `alert_evaluation_enabled = false` and
+   `digest_generation_enabled = false`);
+2. drops the six `operations_alert*`/`operations_digest*` tables and the
    alert/digest functions;
-2. restores `operations_health_summary()` to its original self-contained
+3. restores `operations_health_summary()` to its original self-contained
    body from `20260722100000_operations_health_center.sql` and drops
    `operations_health_snapshot_internal()`.
 
