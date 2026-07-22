@@ -1,16 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildSentryRelease, isSentryEnabled, isTestRunner, resolveSentryEnvironment,
-  SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT, sentrySampleRates,
+  buildSentryRelease, DEFAULT_SENTRY_DSN, isSentryEnabled, isTestRunner,
+  resolveSentryEnvironment, SENTRY_DSN, SENTRY_ORG, SENTRY_PROJECT, sentrySampleRates,
 } from './config';
 
 describe('Sentry identity', () => {
   it('matches the owner-provided org/project/DSN exactly', () => {
     expect(SENTRY_ORG).toBe('first-taste-trading-company');
     expect(SENTRY_PROJECT).toBe('react-native');
-    expect(SENTRY_DSN).toBe(
+    expect(DEFAULT_SENTRY_DSN).toBe(
       'https://fcdc98794ff4488c9e1bc7ac4efed315@o4511778933243904.ingest.de.sentry.io/4511778937765968',
     );
+  });
+
+  it('the effective DSN honors the rotation override, else the default', () => {
+    expect(SENTRY_DSN).toBe(process.env.EXPO_PUBLIC_SENTRY_DSN ?? DEFAULT_SENTRY_DSN);
   });
 
   it('the DSN is the public ingestion identifier, not a secret token shape', () => {

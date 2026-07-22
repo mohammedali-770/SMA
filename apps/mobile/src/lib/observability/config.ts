@@ -11,10 +11,12 @@
 export const SENTRY_ORG = 'first-taste-trading-company';
 export const SENTRY_PROJECT = 'react-native';
 
-/** Owner-provided public DSN (env override supported for future rotation). */
-export const SENTRY_DSN =
-  process.env.EXPO_PUBLIC_SENTRY_DSN
-  ?? 'https://fcdc98794ff4488c9e1bc7ac4efed315@o4511778933243904.ingest.de.sentry.io/4511778937765968';
+/** Owner-provided public DSN (the baked-in fallback). */
+export const DEFAULT_SENTRY_DSN =
+  'https://fcdc98794ff4488c9e1bc7ac4efed315@o4511778933243904.ingest.de.sentry.io/4511778937765968';
+
+/** Effective DSN (env override supported for future rotation). */
+export const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN ?? DEFAULT_SENTRY_DSN;
 
 export type SentryEnvironment = 'development' | 'preview' | 'production';
 
