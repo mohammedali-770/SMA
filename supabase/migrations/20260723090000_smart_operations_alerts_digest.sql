@@ -852,6 +852,13 @@ create table if not exists public.operations_alert_settings (
   recovery_notifications_enabled boolean not null default true,
   optional_system_alerts_enabled boolean not null default false,
   system_rule_overrides          jsonb   not null default '{}'::jsonb,
+  -- Set by the evaluator after its FIRST successful enabled run, even when
+  -- that run observed zero conditions. Baseline mode is decided by this
+  -- marker, not by whether alert rows exist: an all-clear first run must
+  -- still complete the baseline, otherwise a later first incident would be
+  -- silently suppressed as "baseline". Engine-internal (not patchable via
+  -- the settings RPC).
+  baseline_completed_at          timestamptz,
   created_at                     timestamptz not null default now(),
   updated_at                     timestamptz not null default now(),
   updated_by                     uuid references public.profiles(id) on delete set null
@@ -1626,7 +1633,10 @@ begin
       and x.fingerprint ~ '^[a-z0-9_:-]{3,200}$'
       and x.severity in ('warning', 'critical');
 
-    v_baseline := not exists (select 1 from public.operations_alert_state);
+    -- Baseline mode is decided by the durable settings marker, NOT by whether
+    -- alert rows exist: a healthy (zero-condition) first run leaves the state
+    -- table empty, and the first real incident afterwards must open normally.
+    v_baseline := v_settings.baseline_completed_at is null;
 
     -- Open / update pass -----------------------------------------------------
     for c in select * from _oa_conds loop
@@ -1785,6 +1795,15 @@ begin
       end if;
       n_recovered := n_recovered + 1;
     end loop;
+
+    -- Persist baseline completion on ANY successful enabled run — including an
+    -- all-clear run that inserted no rows. (Rolls back with the inner block on
+    -- failure, so a failed first run correctly retries as baseline.)
+    if v_baseline then
+      update public.operations_alert_settings
+         set baseline_completed_at = now()
+       where id;
+    end if;
 
     v_counts := jsonb_build_object(
       'baseline', v_baseline,
@@ -2142,6 +2161,7 @@ declare
   v_run_id bigint;
   v_settings public.operations_alert_settings%rowtype;
   v_as_of timestamptz := coalesce(p_as_of, now());
+  v_local_now timestamp;
   v_digest_date date;
   v_period_start timestamptz;
   v_period_end timestamptz;
@@ -2183,7 +2203,8 @@ begin
   begin
     -- Local-calendar boundary math, fail-closed on an invalid timezone.
     begin
-      v_digest_date := (v_as_of at time zone v_settings.timezone)::date - 1;
+      v_local_now := v_as_of at time zone v_settings.timezone;
+      v_digest_date := v_local_now::date - 1;
       v_period_start := v_digest_date::timestamp at time zone v_settings.timezone;
       v_period_end := (v_digest_date + 1)::timestamp at time zone v_settings.timezone;
     exception when others then
@@ -2192,6 +2213,17 @@ begin
        where id = v_run_id;
       return jsonb_build_object('status', 'failed', 'safe_error_code', 'invalid_timezone');
     end;
+
+    -- Honor the configured local send time: the future activation cron is
+    -- hourly, so a firing earlier in the local day than digest_local_time
+    -- must wait — otherwise the day's digest would be permanently generated
+    -- (and, once delivery exists, sent) hours early.
+    if v_local_now::time < v_settings.digest_local_time then
+      update public.operations_alert_runs
+         set status = 'skipped', skip_reason = 'before_digest_time', finished_at = now()
+       where id = v_run_id;
+      return jsonb_build_object('status', 'skipped', 'reason', 'before_digest_time');
+    end if;
 
     foreach v_lang in array array['en', 'ar'] loop
       if exists (

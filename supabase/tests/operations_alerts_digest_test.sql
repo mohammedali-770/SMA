@@ -296,11 +296,42 @@ do $$
 declare
   v_res jsonb;
 begin
+  if (select baseline_completed_at from public.operations_alert_settings) is not null then
+    raise exception 'baseline marker must start null';
+  end if;
+
+  -- Baseline mode must be decided by the durable settings marker, NOT by an
+  -- empty state table: simulate an all-clear first run having already
+  -- completed the baseline, and verify the next incident opens NORMALLY
+  -- (notified, with outbox rows) even though no alert rows exist yet.
+  update public.operations_alert_settings set baseline_completed_at = now() where id;
+  v_res := public.operations_alerts_evaluate();
+  if v_res ->> 'status' <> 'ok' or (v_res ->> 'baseline')::boolean then
+    raise exception 'post-baseline-marker run must not be baseline, got %', v_res;
+  end if;
+  if (v_res ->> 'opened')::integer = 0
+     or exists (select 1 from public.operations_alert_events
+                where event_type <> 'opened' or notification_suppressed) then
+    raise exception 'post-baseline first incident must open with notifications';
+  end if;
+  if not exists (select 1 from public.operations_alert_outbox) then
+    raise exception 'post-baseline first incident must record outbox intents';
+  end if;
+
+  -- Rewind the simulation so the real baseline path below starts clean.
+  delete from public.operations_alert_outbox;
+  delete from public.operations_alert_events;
+  delete from public.operations_alert_state;
+  update public.operations_alert_settings set baseline_completed_at = null where id;
+
   -- Fresh harness: the three allowlisted jobs have no completed runs yet, so
   -- alertable conditions definitely exist before the first evaluation.
   v_res := public.operations_alerts_evaluate();
   if v_res ->> 'status' <> 'ok' or not (v_res ->> 'baseline')::boolean then
     raise exception 'first evaluation must be a baseline run, got %', v_res;
+  end if;
+  if (select baseline_completed_at from public.operations_alert_settings) is null then
+    raise exception 'successful baseline run must persist baseline_completed_at';
   end if;
   if (select count(*) from public.operations_alert_state) = 0 then
     raise exception 'baseline observed no conditions (expected job no-success conditions)';
@@ -680,8 +711,20 @@ begin
     raise exception 'boundary(a): wrong UTC period % .. %', d.period_start_utc, d.period_end_utc;
   end if;
 
+  -- 21:00:01Z = 00:00:01 local on 2026-03-11: past local midnight but BEFORE
+  -- the configured 08:00 digest time -> must wait, not generate early.
   v_res := public.operations_digest_generate('2026-03-10 21:00:01+00');
-  if (v_res ->> 'digest_date')::date <> date '2026-03-10' then
+  if v_res ->> 'status' <> 'skipped' or v_res ->> 'reason' <> 'before_digest_time' then
+    raise exception 'boundary(b): pre-digest-time run must skip, got %', v_res;
+  end if;
+  if exists (select 1 from public.operations_digest_runs where digest_date = date '2026-03-10') then
+    raise exception 'boundary(b): pre-digest-time run must not store a digest';
+  end if;
+
+  -- 05:00:01Z = 08:00:01 local on 2026-03-11: at/after the configured time,
+  -- the previous full local day (2026-03-10) is generated.
+  v_res := public.operations_digest_generate('2026-03-11 05:00:01+00');
+  if v_res ->> 'status' <> 'ok' or (v_res ->> 'digest_date')::date <> date '2026-03-10' then
     raise exception 'boundary(b): expected digest_date 2026-03-10, got %', v_res;
   end if;
 
@@ -711,8 +754,9 @@ begin
   end if;
 
   -- current local day: counts must match the event/state tables exactly
+  -- 09:00 local next day: past the 08:00 digest-time gate.
   v_as_of := (((now() at time zone 'Asia/Riyadh')::date + 1)::timestamp
-              at time zone 'Asia/Riyadh') + interval '1 hour';
+              at time zone 'Asia/Riyadh') + interval '9 hours';
   v_res := public.operations_digest_generate(v_as_of);
   if v_res ->> 'status' <> 'ok' or jsonb_array_length(v_res -> 'generated') <> 2 then
     raise exception 'today-digest generation failed: %', v_res;

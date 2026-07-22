@@ -109,7 +109,11 @@ identities.
 
 - **Baseline no-storm** — the very first evaluation of a live system records
   existing problems as `baseline_observed` (suppressed, no outbox rows)
-  instead of storming a burst of "new" alerts.
+  instead of storming a burst of "new" alerts. Baseline completion is
+  persisted in `operations_alert_settings.baseline_completed_at` on the
+  first successful enabled run — **even an all-clear run** — so a system
+  that is healthy at activation and degrades later gets a real, notified
+  alert (never a silently suppressed "baseline" observation).
 - **Open** — a new condition inserts an `open` row (generation 1 for a new
   fingerprint), an `opened` event, and dormant outbox intents (EN + AR).
 - **Dedup** — a persisting condition bumps `occurrence_count` and
@@ -138,6 +142,11 @@ identities.
   **previous full local day**, converted to exact UTC period bounds.
 - One digest per `(scope='daily', digest_date, language)`; generation is
   idempotent (`ON CONFLICT DO NOTHING`).
+- `operations_digest_generate()` honors `digest_local_time`: a run earlier
+  in the local day than the configured time records a `skipped`
+  (`before_digest_time`) ledger row and stores nothing, so the documented
+  hourly activation cron cannot generate (or, once delivery exists, send)
+  the day's digest early.
 - Content: overall state, opened/recovered/unresolved counts by severity,
   top recurring conditions, and explicit no-incident lines
   ("No incidents in this period." / "لا توجد حوادث خلال هذه الفترة.") —
