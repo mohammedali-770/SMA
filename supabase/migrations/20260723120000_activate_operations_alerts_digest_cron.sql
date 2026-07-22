@@ -66,25 +66,43 @@ declare
   v_runs bigint;
   v_state bigint;
   v_cmd text;
+  v_proc regprocedure;
 begin
-  -- Required engine functions must exist with the reviewed security contract
-  -- (SECURITY DEFINER + pinned search_path). A changed contract means the live
-  -- engine differs from the reviewed one — refuse to activate it.
-  if not exists (
-    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'operations_alerts_evaluate'
-      and p.prosecdef
-      and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=public')
-  ) then
-    raise exception 'activation blocked: operations_alerts_evaluate() is missing or its security contract changed';
+  -- The EXACT callables the cron commands invoke must exist with the reviewed
+  -- security contract (SECURITY DEFINER + pinned search_path). Signature-level
+  -- resolution matters: cron.schedule stores only command text, so a renamed /
+  -- re-signatured function would otherwise activate jobs that fail every tick
+  -- instead of fail-closing here.
+  --
+  -- Evaluator: the cron runs `select public.operations_alerts_evaluate();`
+  -- -> the zero-argument signature must resolve.
+  v_proc := to_regprocedure('public.operations_alerts_evaluate()');
+  if v_proc is null then
+    raise exception 'activation blocked: public.operations_alerts_evaluate() (zero-argument signature) does not resolve';
   end if;
   if not exists (
-    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname = 'operations_digest_generate'
+    select 1 from pg_proc p
+    where p.oid = v_proc::oid
       and p.prosecdef
       and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=public')
   ) then
-    raise exception 'activation blocked: operations_digest_generate() is missing or its security contract changed';
+    raise exception 'activation blocked: operations_alerts_evaluate() security contract changed';
+  end if;
+  -- Digest generator: the cron runs `select public.operations_digest_generate();`
+  -- -> the reviewed (timestamptz) signature must resolve AND its parameter must
+  -- carry a default so the bare zero-argument call is valid.
+  v_proc := to_regprocedure('public.operations_digest_generate(timestamptz)');
+  if v_proc is null then
+    raise exception 'activation blocked: public.operations_digest_generate(timestamptz) does not resolve';
+  end if;
+  if not exists (
+    select 1 from pg_proc p
+    where p.oid = v_proc::oid
+      and p.pronargdefaults >= 1
+      and p.prosecdef
+      and exists (select 1 from unnest(p.proconfig) c where c = 'search_path=public')
+  ) then
+    raise exception 'activation blocked: operations_digest_generate() lost its bare-call default or its security contract changed';
   end if;
 
   -- The v1 outbox dormancy CHECK must still be in force ON THE OUTBOX TABLE
