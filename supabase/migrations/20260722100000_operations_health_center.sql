@@ -318,12 +318,17 @@ begin
     v_ad_state := case
       when v_database_jobs_state = 'unavailable' then 'unavailable'
       when not v_ad_active then 'failing'
-      when v_ad_latest_success_at is null
-        or now() - v_ad_latest_success_at > interval '6 minutes' then 'failing'
-      -- Only a recent TERMINAL non-success fails the card. An in-flight `running`
-      -- row (latest_status='running', no terminal outcome yet) never fails it.
+      -- A recent TERMINAL non-success is a real failure and takes precedence. An
+      -- in-flight `running` row has no terminal outcome and never fails here.
       when v_ad_latest_terminal_status is not null and v_ad_latest_terminal_status <> 'succeeded'
         and v_ad_latest_terminal_at >= now() - interval '6 minutes' then 'failing'
+      -- No completed successful run yet (fresh deploy / retained-history gap).
+      -- Kept SEPARATE from the stale-success case and, consistent with the
+      -- scheduled-job snapshot's no-success rule, is `degraded` — not `failing` —
+      -- so the platform does not report failing before any terminal failure.
+      when v_ad_latest_success_at is null then 'degraded'
+      -- A successful run exists but is stale beyond the freshness threshold.
+      when now() - v_ad_latest_success_at > interval '6 minutes' then 'failing'
       when v_ad_manual_review > 0 then 'degraded'
       when v_ad_due_count > 0
         and v_ad_oldest_due < now() - interval '10 minutes' then 'degraded'

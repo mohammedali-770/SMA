@@ -10,6 +10,7 @@ import {
   OperationsHealthState,
   OperationsHealthSummary,
   OperationsHealthSystem,
+  pushFailureMetrics,
 } from '../../lib/operationsHealthApi';
 
 type AdminLang = 'en' | 'ar';
@@ -205,11 +206,16 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   }
 
   if (system.id === 'push') {
+    // Two distinct units, shown separately (never summed): actual failed device
+    // deliveries and failed send-lifecycle events. Falls back to the legacy
+    // `failed_sends_24h` alias for deliveries; missing event field reads 0. The
+    // card's state stays backend-authoritative.
+    const { failedDeliveries, failedSendEvents } = pushFailureMetrics(d);
     return (
       <>
         <Metric label={isAr ? 'أجهزة فعالة' : 'Active devices'} value={numberValue(d, 'active_devices')} />
-        <Metric label={isAr ? 'ترويجي اختياري' : 'Promo opt-in'} value={numberValue(d, 'promotions_opt_in')} />
-        <Metric label={isAr ? 'إخفاقات 24س' : 'Failures 24h'} value={numberValue(d, 'failed_sends_24h')} />
+        <Metric label={isAr ? 'إخفاقات التسليم 24س' : 'Failed deliveries 24h'} value={failedDeliveries} />
+        <Metric label={isAr ? 'إخفاقات الإرسال 24س' : 'Failed send events 24h'} value={failedSendEvents} />
       </>
     );
   }

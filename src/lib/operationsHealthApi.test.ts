@@ -1,5 +1,43 @@
 import { describe, expect, it } from 'vitest';
-import { unavailableOperationsHealthSummary } from './operationsHealthApi';
+import { pushFailureMetrics, unavailableOperationsHealthSummary } from './operationsHealthApi';
+
+describe('pushFailureMetrics', () => {
+  it('reads both distinct units when present', () => {
+    expect(pushFailureMetrics({ failed_deliveries_24h: 2, failed_send_events_24h: 1, failed_sends_24h: 2 }))
+      .toEqual({ failedDeliveries: 2, failedSendEvents: 1 });
+  });
+
+  it('surfaces a zero-delivery lifecycle failure (0 deliveries, 1 event)', () => {
+    expect(pushFailureMetrics({ failed_deliveries_24h: 0, failed_send_events_24h: 1 }))
+      .toEqual({ failedDeliveries: 0, failedSendEvents: 1 });
+  });
+
+  it('falls back to the failed_sends_24h alias when the new field is absent', () => {
+    expect(pushFailureMetrics({ failed_sends_24h: 3 }))
+      .toEqual({ failedDeliveries: 3, failedSendEvents: 0 });
+  });
+
+  it('treats a missing details bag safely as zeros', () => {
+    expect(pushFailureMetrics(undefined)).toEqual({ failedDeliveries: 0, failedSendEvents: 0 });
+    expect(pushFailureMetrics(null)).toEqual({ failedDeliveries: 0, failedSendEvents: 0 });
+    expect(pushFailureMetrics({})).toEqual({ failedDeliveries: 0, failedSendEvents: 0 });
+  });
+
+  it('clamps negative, null, non-finite and malformed values to zero', () => {
+    expect(pushFailureMetrics({ failed_deliveries_24h: -5, failed_send_events_24h: -1 }))
+      .toEqual({ failedDeliveries: 0, failedSendEvents: 0 });
+    expect(pushFailureMetrics({ failed_deliveries_24h: Number.NaN, failed_send_events_24h: Infinity }))
+      .toEqual({ failedDeliveries: 0, failedSendEvents: 0 });
+    // Non-number delivery field is treated as absent -> falls back to the alias.
+    expect(pushFailureMetrics({ failed_deliveries_24h: '2' as unknown as number, failed_sends_24h: 4 }))
+      .toEqual({ failedDeliveries: 4, failedSendEvents: 0 });
+  });
+
+  it('floors fractional counts', () => {
+    expect(pushFailureMetrics({ failed_deliveries_24h: 2.9, failed_send_events_24h: 1.2 }))
+      .toEqual({ failedDeliveries: 2, failedSendEvents: 1 });
+  });
+});
 
 describe('unavailableOperationsHealthSummary', () => {
   it('never reports a client fetch failure as healthy', () => {

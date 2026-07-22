@@ -72,6 +72,44 @@ export interface OperationsHealthSummary {
   attention: OperationsHealthAttention[];
 }
 
+/**
+ * Safe optional shape of the push card's `details`. All fields are optional so
+ * an older backend response (which only carried `failed_sends_24h`) still reads
+ * without error. The wire type stays `Record<string, unknown>`; this documents
+ * the fields the panel consumes.
+ */
+export interface OperationsHealthPushDetails {
+  /** Actual failed device deliveries in the last 24h (sum of the `failed` counter). */
+  failed_deliveries_24h?: number;
+  /** Failed send lifecycle events in the last 24h (rows with send_status='failed'). */
+  failed_send_events_24h?: number;
+  /** Backward-compatible alias for actual failed deliveries. */
+  failed_sends_24h?: number;
+}
+
+/** A finite, non-negative integer read from an untyped details bag, else 0. */
+function safeCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+/**
+ * Normalize the two push failure metrics from a details bag. Delivery failures
+ * prefer `failed_deliveries_24h` and fall back to the legacy `failed_sends_24h`
+ * alias; send-event failures default to 0 when the field is absent. Negative,
+ * non-finite and malformed values are clamped to 0. The backend remains the
+ * authority for the card's state — this only shapes what the UI displays.
+ */
+export function pushFailureMetrics(
+  details: Record<string, unknown> | null | undefined,
+): { failedDeliveries: number; failedSendEvents: number } {
+  const d = details ?? {};
+  const hasDeliveries = typeof d.failed_deliveries_24h === 'number' && Number.isFinite(d.failed_deliveries_24h);
+  return {
+    failedDeliveries: hasDeliveries ? safeCount(d.failed_deliveries_24h) : safeCount(d.failed_sends_24h),
+    failedSendEvents: safeCount(d.failed_send_events_24h),
+  };
+}
+
 const SYSTEMS: Array<{ id: OperationsHealthSystemId; critical: boolean }> = [
   { id: 'lazywait', critical: true },
   { id: 'order_integrity', critical: true },

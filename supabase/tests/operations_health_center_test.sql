@@ -689,6 +689,102 @@ begin
   raise notice 'CRON RUNNING-VS-TERMINAL SEMANTICS OK';
 end $$;
 
+-- ---- ACCOUNT DELETION: FIRST-RUN IS DEGRADED, NOT FAILING -------------------
+-- The account-deletion card must map "active but no completed success yet" to
+-- degraded (consistent with the scheduled-job snapshot), never failing, so the
+-- overall critical platform state does not read failing before any terminal
+-- failure or stale success exists. null-success and stale-success are separate
+-- branches with a recent terminal failure taking precedence over both.
+do $$
+declare
+  adp bigint;
+  s jsonb;
+  st_ad text; st_db text; ov text; txt text;
+begin
+  select jobid into adp from cron.job where jobname = 'account-deletion-processor';
+  -- Keep the two other critical jobs healthy so database_jobs reflects the ADP job.
+  delete from cron.job_run_details
+   where jobid in (select jobid from cron.job where jobname in ('lazywait-sync','order-integrity-watchdog'));
+  insert into cron.job_run_details (jobid, status, start_time, end_time)
+  select jobid, 'succeeded', now() - interval '60 seconds', now() - interval '50 seconds'
+  from cron.job where jobname in ('lazywait-sync','order-integrity-watchdog');
+
+  -- Case 1: active, no completed success ever, no terminal failure => degraded.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  s := public.operations_health_summary();
+  select (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='account_deletion'),
+         (select x->>'state' from jsonb_array_elements(s->'systems') x where x->>'id'='database_jobs')
+    into st_ad, st_db;
+  if st_ad <> 'degraded' then raise exception 'case1 first-run account deletion must be degraded, got %', st_ad; end if;
+  if st_db <> 'degraded' then raise exception 'case1 first-run database_jobs must be degraded, got %', st_db; end if;
+  -- The account-deletion contribution (degraded) must not force overall failing.
+  ov := public.operations_health_overall_state('healthy','healthy', st_ad, st_db);
+  if ov = 'failing' then raise exception 'case1 first-run must not make overall state failing, got %', ov; end if;
+
+  -- Case 2: active, no success, current row running => still degraded.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'running', now() - interval '10 seconds', null);
+  select x->>'state' into st_ad
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x where x->>'id'='account_deletion';
+  if st_ad <> 'degraded' then raise exception 'case2 running first-run account deletion must be degraded, got %', st_ad; end if;
+
+  -- Case 3: active, recent terminal failure, no success => failing (precedence).
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'failed', now() - interval '60 seconds', now() - interval '50 seconds');
+  select x->>'state' into st_ad
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x where x->>'id'='account_deletion';
+  if st_ad <> 'failing' then raise exception 'case3 recent terminal failure (no success) must be failing, got %', st_ad; end if;
+
+  -- Case 4: active, stale successful run (> 6 min) => failing.
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '10 minutes', now() - interval '9 minutes');
+  select x->>'state' into st_ad
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x where x->>'id'='account_deletion';
+  if st_ad <> 'failing' then raise exception 'case4 stale success must be failing, got %', st_ad; end if;
+
+  -- Case 5: active, fresh success => existing expected state (idle with empty queue).
+  update cron.job set active = true, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '60 seconds', now() - interval '50 seconds');
+  select x->>'state' into st_ad
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x where x->>'id'='account_deletion';
+  if st_ad in ('failing','degraded','unavailable') then
+    raise exception 'case5 fresh success must preserve healthy/idle, got %', st_ad;
+  end if;
+
+  -- Case 6: inactive processor => failing.
+  update cron.job set active = false, schedule = '* * * * *' where jobname = 'account-deletion-processor';
+  delete from cron.job_run_details where jobid = adp;
+  insert into cron.job_run_details (jobid, status, start_time, end_time) values
+    (adp, 'succeeded', now() - interval '60 seconds', now() - interval '50 seconds');
+  select x->>'state' into st_ad
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x where x->>'id'='account_deletion';
+  if st_ad <> 'failing' then raise exception 'case6 inactive processor must be failing, got %', st_ad; end if;
+
+  -- Case 7: no queue identifiers / request payloads / PII leak in the AD card.
+  -- Scope the check to the account_deletion card's own details (the embedded
+  -- authoritative lazywait/order_integrity summaries have their own safe fields).
+  update cron.job set active = true where jobname = 'account-deletion-processor';
+  select lower((x->'details')::text) into txt
+  from jsonb_array_elements(public.operations_health_summary()->'systems') x
+  where x->>'id'='account_deletion';
+  if txt like '%user_id%' or txt like '%requested_by%' or txt like '%reason%'
+     or txt like '%email%' or txt like '%phone%' or txt like '%payload%'
+     or txt like '%address%' or txt like '%auth_uid%' then
+    raise exception 'account deletion card leaked a queue identifier / payload / PII field';
+  end if;
+
+  raise notice 'ACCOUNT DELETION FIRST-RUN DEGRADED OK';
+end $$;
+
 -- ---- PUSH: ACTUAL FAILED DELIVERIES vs FAILED LIFECYCLE EVENTS --------------
 -- notification_log records PARTIAL sends as send_status='sent' with failed>0 and
 -- test/broadcast rows as send_status='processing' with failed>0, so counting only
