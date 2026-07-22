@@ -10,19 +10,27 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **48** (all applied)
+- Repository migration files: **49** (48 applied; the newest,
+  `20260722100000_operations_health_center`, is **repository-only and UNAPPLIED**
+  — PR #75, not yet merged and not applied to Production — see §16)
 - Live `schema_migrations` rows: **49**
 - Latest live version: **`20260722053151`**
   (`order_integrity_watchdog`; repository version `20260721170000`)
-- **Every repository migration is now applied.** The Order Integrity Watchdog
+- **Every repository migration is applied EXCEPT the newest.** The read-only
+  Operations Health Center migration `20260722100000_operations_health_center`
+  (PR #75) is repository-only and UNAPPLIED — it is not yet merged, and no
+  Production application is approved; its capability gate keeps the admin tab
+  hidden while the RPC is absent (§16). The Order Integrity Watchdog
   migration `20260721170000_order_integrity_watchdog` (PR #73, squash-merged
   `411c7c9`) was applied to Production on **2026-07-22** (owner-approved) via the
   `apply_migration` workflow → live **`20260722053151`** (class B — same content,
   generated apply-time version). Full pre-live gate + apply + verification record
   is in **§15**. Its observe-only cron `order-integrity-watchdog` (`*/2`) is active
   and healthy; the alert outbox stays **unsent** (no dispatcher). The one-row
-  repo/live difference (48 vs 49) is the single pre-existing live-only F-class
-  historical row documented in §5. The four owner-approved 2026-07 applications
+  difference between the **48 applied** repository migrations and the **49 live**
+  rows is the single pre-existing live-only F-class historical row documented in
+  §5 (the 49th repository file, the repository-only ops-health migration, has no
+  live row because it is UNAPPLIED). The four owner-approved 2026-07 applications
   (all class B — same content, generated apply-time versions):
   - `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`**
     (owner-approved; PR #69)
@@ -126,7 +134,7 @@ fields byte-identical before/after, fingerprint-verified).
 | B. `SAME_CONTENT_DIFFERENT_VERSION` | **31** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
 | H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
 
@@ -144,6 +152,12 @@ notes.
 > true totals to **45 repository / 45 live** (see §1 and §13). The Lazywait sync scheduler is
 > class **B** (`SAME_CONTENT_DIFFERENT_VERSION`): repository `20260720120000`
 > vs. the apply-time live version `20260720075244`, same reviewed content.
+>
+> **Current class-E row.** The single `REPOSITORY_ONLY_UNAPPLIED` (E) row above is
+> the read-only Operations Health Center migration
+> `20260722100000_operations_health_center` (PR #75) — present in the repository,
+> not merged, and not applied to Production. It is documented in §16 and, being
+> unapplied, contributes no live `schema_migrations` row.
 
 Fingerprints: `skel` = MD5 (first 12 hex) of the SQL after removing `--`
 comments, all whitespace and semicolons, lowercased — computed with identical
@@ -562,3 +576,94 @@ separate future deliverables, each requiring its own explicit owner approval.
 that `order_integrity_admin_summary` is live and granted to `authenticated`
 (it stayed hidden while the RPC was absent); triage controls render for admins
 only, accountants/staff are read-only, and customers have no access.
+
+## 16. Pending migration: Operations Health Center (repository-only, UNAPPLIED)
+
+**Read-only observability. NOT merged, NOT applied to Production.** This entry
+records the migration that ships with PR #75; it exists in the repository only and
+has **no** live `schema_migrations` row. No Production application is approved.
+
+- **Repository file:** `supabase/migrations/20260722100000_operations_health_center.sql`
+- **Repository content SHA-256:**
+  `0b231cdc2a0735d4368129a59e891cafdb71ed1c54dcff52a21869c21e5444f3` (26 578 bytes).
+- **PR:** #75 (`feature/operations-health-center`) — open, awaiting review/merge.
+- **Live version:** none (UNAPPLIED). On a future owner-approved application this
+  will be class **B** (same content; apply-time generated version differs from the
+  repository filename version `20260722100000`), applied **only** via MCP
+  `apply_migration` with the exact merged file content — never `db push` or
+  `migration repair`.
+
+**Ledger order.** Filename version `20260722100000` sorts strictly **after** every
+currently applied migration, including its two runtime dependencies
+`20260721150000_lazywait_sync_health_summary` (live `20260721113811`) and
+`20260721170000_order_integrity_watchdog` (live `20260722053151`). A clean rebuild
+from the repository applies it last, after both source functions exist.
+
+**Purpose.** Adds a staff-gated, read-only Operations Health Center aggregate for
+the Admin Dashboard. It composes the existing authoritative
+`lazywait_sync_health_summary()` and `order_integrity_health_summary()` outputs
+with safe database/cron aggregates for account deletion, payments, push, email and
+OTP, so staff can see what needs attention without touching secrets, provider
+payloads or customer data.
+
+**Objects created (additive; no tables/cron/triggers).** Two functions only:
+- `public.operations_health_overall_state(text,text,text,text)` — IMMUTABLE SQL,
+  `search_path=public`; EXECUTE revoked from PUBLIC/anon/authenticated, granted to
+  `service_role` only (not client-callable). Deterministic precedence
+  `configuration_error > failing > degraded (degraded|unavailable) > healthy` over
+  the four critical monitored subsystems.
+- `public.operations_health_summary()` — `SECURITY DEFINER`, STABLE,
+  `search_path=public`; `is_staff()` gate raising `42501` for non-staff; EXECUTE
+  revoked from PUBLIC/anon, granted to `authenticated`. Each subsystem is wrapped
+  in its own `BEGIN/EXCEPTION` so one unavailable source degrades only its own card
+  and returns a `safe_error_code` (SQLSTATE) instead of crashing the page. It reads
+  `secret_config` only to derive a boolean and never returns it; it returns no PII,
+  secrets, raw provider payloads, tokens or cron commands.
+
+**Dependencies (must exist at apply time).** `is_staff()`;
+`lazywait_sync_health_summary()` and `order_integrity_health_summary()` (invoked
+dynamically, so a missing source fails only its card); tables `integration_settings`,
+`account_deletion_requests`, `payment_records`, `push_devices`, `notification_log`,
+`order_integrity_incidents`; `cron.job` and `cron.job_run_details`. All are present
+in Production today.
+
+**Validation performed (repository / throwaway PG16 harness, not Production).**
+Full migration chain applies clean from an empty database with the ops-health
+migration last; idempotent re-apply is clean; the SQL suite
+`supabase/tests/operations_health_center_test.sql` passes all cases (object/security
+contract, overall-state matrix, staff gate, safe-shape/no-PII, truthful
+optional-integration states, missing-optional-config isolation, read-only
+guarantee). Frontend gates pass: `tsc --noEmit`, vitest, `vite build`, mobile web
+build, mobile `tsc`.
+
+**Production requirements (for a FUTURE, separately owner-approved application).**
+Follow the §9 workflow: owner-approved merge first (separate from apply approval);
+pre-live gate recording the current latest live version, confirming both source
+health functions and all dependency tables exist and that no `operations_health_*`
+function/name collision exists; apply via MCP `apply_migration` with the exact
+merged content; post-apply verification that both functions exist with the expected
+SECURITY DEFINER/IMMUTABLE properties, pinned `search_path`, and grants
+(anon/public denied; `authenticated` allowed on the summary; the state helper
+service-role-only), and that `operations_health_summary()` returns only the safe
+documented keys.
+
+**Rollback.** The feature is isolated and read-only. Before any application,
+rollback is simply closing/reverting the PR — the capability gate keeps the admin
+tab hidden while the RPC is absent. After a hypothetical application, disable the UI
+wiring first, then drop the two functions in a separate owner-approved migration
+(`drop function if exists public.operations_health_summary();` and
+`drop function if exists public.operations_health_overall_state(text,text,text,text);`).
+Dropping them cannot affect orders, payments, customer data, integrations, provider
+state or cron because the migration creates no tables, triggers or jobs. Full detail
+in `docs/OPERATIONS_HEALTH_CENTER_ROLLBACK.md`.
+
+**Known limitations.** Observability only — no action can create/cancel/resend an
+order, initialize/confirm/refund a payment, change Lazywait/POS state, enable an
+integration, rotate/expose a secret, send Push/Email/SMS/WhatsApp/OTP, change a cron
+schedule, or acknowledge/suppress/resolve an incident. There is **no external
+provider availability probe** in v1, so optional integrations (payment, push, email,
+OTP) are reported from database/configuration evidence only and are never marked
+`healthy` from `enabled/configured` alone — their normal state is `not_monitored`.
+The scheduled-jobs card observes exactly three allowlisted application jobs. Applying
+this migration and any provider probe are separate future deliverables, each
+requiring its own explicit owner approval.

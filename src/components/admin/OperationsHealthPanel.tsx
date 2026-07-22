@@ -233,15 +233,11 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   );
 }
 
-function SystemCard({
-  system,
-  lang,
-  onNavigate,
-}: {
+const SystemCard: React.FC<{
   system: OperationsHealthSystem;
   lang: AdminLang;
   onNavigate?: (tab: TargetTab) => void;
-}) {
+}> = ({ system, lang, onNavigate }) => {
   const isAr = lang === 'ar';
   const text = SYSTEM_TEXT[system.id];
   const target: TargetTab | null =
@@ -294,7 +290,7 @@ function SystemCard({
       </div>
     </section>
   );
-}
+};
 
 function JobsTable({ jobs, lang }: { jobs: OperationsHealthJob[]; lang: AdminLang }) {
   const isAr = lang === 'ar';
@@ -332,7 +328,7 @@ function JobsTable({ jobs, lang }: { jobs: OperationsHealthJob[]; lang: AdminLan
   );
 }
 
-function AttentionRow({ item, lang }: { item: OperationsHealthAttention; lang: AdminLang }) {
+const AttentionRow: React.FC<{ item: OperationsHealthAttention; lang: AdminLang }> = ({ item, lang }) => {
   const isAr = lang === 'ar';
   const fallback = `${item.subsystem}: ${item.code.replaceAll('_', ' ')}`;
   const text = ATTENTION_TEXT[item.code]?.[lang] ?? fallback;
@@ -351,7 +347,7 @@ function AttentionRow({ item, lang }: { item: OperationsHealthAttention; lang: A
       </div>
     </div>
   );
-}
+};
 
 export const OperationsHealthPanel: React.FC<{
   lang: AdminLang;
