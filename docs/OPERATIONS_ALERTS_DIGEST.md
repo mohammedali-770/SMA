@@ -283,6 +283,18 @@ card covers the three pre-existing crons.
 disable below and investigate; a single transient failure self-heals on
 the next tick.
 
+**Known limitation (tracked follow-up):** the Operations Health
+scheduled-jobs card allowlists only the three pre-existing crons; the two
+automation jobs above are not yet part of that health source. Extending it
+needs per-cadence staleness windows (the current 6-minute stale-success
+rule fits 1–2-minute jobs and would falsely mark the hourly digest job
+failing between ticks), so it ships as its own reviewed change. Until
+then, monitor the automation itself through the `operations_alert_runs`
+ledger queries above and the Admin panel's last-run data — and note that
+an evaluator that is itself down can never self-report internally; that
+gap is inherent to v1's internal-only design and is what a future
+external-delivery version addresses.
+
 **Safe disable / rollback (non-destructive, reviewed)**
 
 ```sql
