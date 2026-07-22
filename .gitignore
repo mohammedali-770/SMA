@@ -7,3 +7,9 @@ coverage/
 .env*
 !.env.example
 *.tsbuildinfo
+
+# Sentry: local CLI auth must never be committed (auth token lives ONLY in
+# EAS/CI encrypted secrets); bundle source maps are build artifacts.
+.sentryclirc
+*.js.map
+*.bundle.map
