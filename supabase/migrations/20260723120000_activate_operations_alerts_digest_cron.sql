@@ -65,7 +65,6 @@ declare
   v_s public.operations_alert_settings%rowtype;
   v_runs bigint;
   v_state bigint;
-  v_cmd text;
   v_proc regprocedure;
 begin
   -- The EXACT callables the cron commands invoke must exist with the reviewed
@@ -138,19 +137,23 @@ begin
     raise exception 'activation blocked: evaluator history exists but baseline_completed_at is null — complete the baseline first';
   end if;
 
-  -- Foreign-job guards: never adopt or replace a job we do not own. Ownership
-  -- means the command is EXACTLY our canonical bare internal call — a job that
-  -- merely mentions the function name inside a wrapper/HTTP command is foreign
-  -- and aborts the migration (fail closed) instead of being replaced.
-  select command into v_cmd from cron.job where jobname = 'operations-alerts-evaluator' limit 1;
-  if v_cmd is not null
-     and btrim(v_cmd) is distinct from 'select public.operations_alerts_evaluate();' then
-    raise exception 'activation blocked: a foreign cron job named "operations-alerts-evaluator" exists; verify/remove it first';
+  -- Foreign/duplicate-job guards: never adopt, replace, or coexist with a job
+  -- we do not own. pg_cron permits same-named jobs across owners, so EVERY
+  -- visible row under a reserved name must carry exactly the canonical bare
+  -- internal call, and at most ONE such row may exist — any other command
+  -- (including wrappers that merely mention the function) or any ambiguity
+  -- aborts the migration fail-closed instead of being unscheduled/replaced.
+  if exists (select 1 from cron.job
+             where jobname = 'operations-alerts-evaluator'
+               and btrim(command) is distinct from 'select public.operations_alerts_evaluate();')
+     or (select count(*) from cron.job where jobname = 'operations-alerts-evaluator') > 1 then
+    raise exception 'activation blocked: a foreign or duplicate cron job named "operations-alerts-evaluator" exists; verify/remove it first';
   end if;
-  select command into v_cmd from cron.job where jobname = 'operations-digest-generator' limit 1;
-  if v_cmd is not null
-     and btrim(v_cmd) is distinct from 'select public.operations_digest_generate();' then
-    raise exception 'activation blocked: a foreign cron job named "operations-digest-generator" exists; verify/remove it first';
+  if exists (select 1 from cron.job
+             where jobname = 'operations-digest-generator'
+               and btrim(command) is distinct from 'select public.operations_digest_generate();')
+     or (select count(*) from cron.job where jobname = 'operations-digest-generator') > 1 then
+    raise exception 'activation blocked: a foreign or duplicate cron job named "operations-digest-generator" exists; verify/remove it first';
   end if;
 end $$;
 
@@ -194,3 +197,24 @@ select cron.schedule(
   '0 * * * *',
   'select public.operations_digest_generate();'
 );
+
+-- ---- 3. Post-schedule self-verification -------------------------------------
+-- The whole migration is one transaction: if the end state is not EXACTLY one
+-- canonical job per reserved name, raise and roll everything back.
+do $$
+begin
+  if (select count(*) from cron.job where jobname = 'operations-alerts-evaluator') <> 1
+     or (select count(*) from cron.job
+         where jobname = 'operations-alerts-evaluator'
+           and schedule = '*/5 * * * *'
+           and btrim(command) = 'select public.operations_alerts_evaluate();') <> 1 then
+    raise exception 'activation verification failed: operations-alerts-evaluator is not in the canonical single-job state';
+  end if;
+  if (select count(*) from cron.job where jobname = 'operations-digest-generator') <> 1
+     or (select count(*) from cron.job
+         where jobname = 'operations-digest-generator'
+           and schedule = '0 * * * *'
+           and btrim(command) = 'select public.operations_digest_generate();') <> 1 then
+    raise exception 'activation verification failed: operations-digest-generator is not in the canonical single-job state';
+  end if;
+end $$;
