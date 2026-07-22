@@ -157,6 +157,14 @@ alert-eligible until the suppression expires.
   an inner savepoint block; on **any** error the run is marked `failed` with a
   **SQLSTATE-only** safe code and the inner changes roll back — so a failed scan
   **never resolves an incident** and is always visible, never a silent success.
+- **Required config validated fail-closed.** Before scanning, all three seeded
+  keys are strictly checked: `rule_enabled` must be a JSON object,
+  `abandoned_awaiting_payment_since` a non-null valid timestamp, and
+  `excluded_order_ids` a JSON array (each key is a PRIMARY KEY, so exactly one
+  row can exist). Any missing, null or malformed required key raises into the
+  handler → a durable `failed` run tagged `watchdog configuration invalid`
+  (→ `configuration_error` health), with **no** incident resolution and **no**
+  silent fallback to scanning without the cutoff/exclusions.
 - The scanner is `SECURITY DEFINER`, `search_path=public`, **service-role
   execute only** (revoked from `anon`/`authenticated`).
 
@@ -167,14 +175,26 @@ alert-eligible until the suppression expires.
 `order_integrity_health_summary()` (service-role) returns a 15-key safe object.
 `overall_state` cascade (first match wins; watchdog runs every 2 min):
 
-- `configuration_error` — the latest run failed for a non-benign reason
-  (`safe_error_code <> 'overlap_skipped'`).
+- `configuration_error` — the latest **decisive** run failed for a non-benign
+  reason. A *decisive* run is a `success` or a `failed` run whose
+  `safe_error_code <> 'overlap_skipped'`; `running` and `overlap_skipped` runs
+  are **ignored** for state selection, so a benign newer run can never mask a
+  real config failure. A later successful decisive run clears it.
 - `failing` — cron missing/inactive; OR no successful run in 6 min (or none
-  ever); OR ≥ 1 **open** critical incident.
-- `degraded` — ≥ 1 **open** warning incident; OR the latest successful run is
-  older than 4 min.
-- `healthy` — cron active, a success within 4 min, zero open critical and zero
-  open warning incidents.
+  ever); OR ≥ 1 **unresolved** critical incident.
+- `degraded` — ≥ 1 **unresolved** warning incident; OR the latest successful run
+  is older than 4 min.
+- `healthy` — cron active, a success within 4 min, zero unresolved critical and
+  zero unresolved warning incidents.
+
+**Unresolved-active counting (Acknowledge ≠ Fixed).** `open_critical_count` /
+`open_warning_count` count every **non-resolved** incident of that severity —
+`open` + `acknowledged` + `suppressed`. Acknowledging means "seen", and suppress
+controls only alert noise; **neither removes an unresolved integrity defect from
+health** (a critical stays `failing`, a warning stays `degraded`). Only
+`status='resolved'` drops an incident from the active counts and from
+`oldest_open_critical_at`. `acknowledged_count` / `suppressed_count` remain
+separate informational fields.
 
 Staff-gated RPCs power the admin panel: `order_integrity_admin_summary` (health),
 `order_integrity_list_incidents` (safe list + `order_number`),
@@ -183,6 +203,23 @@ alert rows). Admin-only triage RPCs: `order_integrity_acknowledge_incident`,
 `order_integrity_suppress_incident`. The **Order Integrity** admin tab renders
 these with **no** Retry / Refund / Resend / Mark-Paid / Auto-Fix action — read +
 acknowledge + suppress only.
+
+**Capability-gated tab (safe before Production migration).** The web app can be
+deployed before the migration is applied. The dashboard probes
+`order_integrity_admin_summary` on mount and shows the tab only when the RPCs
+exist; a **confirmed** missing function (PostgREST `PGRST202`) is the *only*
+signal that hides it (`src/lib/orderIntegrityCapability.ts`). Network / auth /
+transient errors are treated as `unknown` and keep the tab visible so the error
+surfaces in the panel rather than being mistaken for "migration absent". There is
+no permanent hard-coded flag — once the migration is applied, the next refresh
+reveals the tab automatically, and `OrderIntegrityPanel` is never mounted while
+the capability is absent.
+
+**Admin-only triage controls in the UI.** Accountants may read the panel (the
+read RPCs are `is_staff()` gated) but the Acknowledge/Suppress controls render
+**only for `role = 'admin'`** (`src/lib/orderIntegrityTriage.ts`), so the UI never
+offers an action that would return 42501 — defense-in-depth in front of the
+unchanged admin-only RPC authorization.
 
 **Note-field redaction:** the two admin-entered free-text fields (`ack_note` inside
 `safe_details`, and `suppression_reason`) are triage metadata an admin could

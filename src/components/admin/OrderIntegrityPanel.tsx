@@ -3,6 +3,7 @@ import { RefreshCw, ShieldAlert, AlertTriangle, CheckCircle2, Clock, EyeOff, Che
 import {
   orderIntegrity, OrderIntegrityHealth, OrderIntegrityIncident,
 } from '../../lib/api';
+import { showAcknowledge, showSuppress } from '../../lib/orderIntegrityTriage';
 
 /**
  * Order Integrity Watchdog — admin monitoring (READ + acknowledge/suppress only).
@@ -43,7 +44,13 @@ const ageLabel = (iso: string | null): string => {
   return `${Math.floor(s / 86400)}d`;
 };
 
-export const OrderIntegrityPanel: React.FC = () => {
+/**
+ * @param canTriage  Only admins may acknowledge/suppress (the RPCs are is_admin()
+ *   gated and return 42501 otherwise). Accountants get read-only access, so the
+ *   triage controls are not rendered for them — the UI never offers an action the
+ *   caller cannot perform.
+ */
+export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTriage = false }) => {
   const [health, setHealth] = useState<OrderIntegrityHealth | null>(null);
   const [incidents, setIncidents] = useState<OrderIntegrityIncident[]>([]);
   const [loading, setLoading] = useState(true);
@@ -202,13 +209,13 @@ export const OrderIntegrityPanel: React.FC = () => {
                       <button onClick={() => toggleTimeline(i.id)} className="text-[9px] font-black text-slate-500 inline-flex items-center gap-0.5 mr-2">
                         <ChevronDown className={`w-3 h-3 transition-transform ${expanded === i.id ? 'rotate-180' : ''}`} /> Timeline
                       </button>
-                      {i.status === 'open' && (
+                      {showAcknowledge(canTriage, i.status) && (
                         <button onClick={() => acknowledge(i.id)} disabled={busy === i.id}
                           className="text-[9px] font-black text-blue-600 disabled:opacity-50 mr-2 inline-flex items-center gap-0.5">
                           {busy === i.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />} Ack
                         </button>
                       )}
-                      {(i.status === 'open' || i.status === 'acknowledged') && (
+                      {showSuppress(canTriage, i.status) && (
                         <button onClick={() => { setSuppressFor(suppressFor === i.id ? null : i.id); setSupReason(''); }}
                           className="text-[9px] font-black text-slate-600 inline-flex items-center gap-0.5">
                           <EyeOff className="w-3 h-3" /> Suppress

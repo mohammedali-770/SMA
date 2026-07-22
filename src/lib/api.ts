@@ -10,6 +10,7 @@
  */
 import { supabase } from './supabase';
 import { BANNER_BUCKET, bannerStoragePath } from './banners';
+import { classifyWatchdogProbe, WatchdogCapability } from './orderIntegrityCapability';
 
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
@@ -855,6 +856,15 @@ export interface OrderIntegrityIncident {
 }
 
 export const orderIntegrity = {
+  /**
+   * Capability probe used to gate the admin tab before the migration is applied.
+   * 'available' = RPC works; 'absent' = confirmed missing function (migration not
+   * applied yet); 'unknown' = transient/auth/other error (do NOT treat as absent).
+   */
+  probeAvailability: async (): Promise<WatchdogCapability> => {
+    const { error } = await supabase.rpc('order_integrity_admin_summary');
+    return classifyWatchdogProbe(error);
+  },
   /** Safe aggregate health for the panel (is_staff gated). */
   summary: async (): Promise<OrderIntegrityHealth> =>
     ok<OrderIntegrityHealth>(await supabase.rpc('order_integrity_admin_summary')),

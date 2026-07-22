@@ -240,8 +240,11 @@ declare
   c_lock_key   constant bigint := 748291035;   -- fixed advisory key for this watchdog
   v_run_id     bigint;
   v_start      timestamptz := clock_timestamp();
+  v_stage      text := 'init';                  -- which phase failed (for a safe error message)
   v_rules      jsonb;
   v_since      timestamptz;
+  v_since_raw  jsonb;
+  v_excl_raw   jsonb;
   v_excluded   uuid[];
   v_evaluated  integer := 0;
   v_detected   integer := 0;
@@ -265,26 +268,60 @@ begin
   end if;
 
   begin
-    -- Load config (fail-closed: missing config table/keys raise into the handler).
+    -- Load + STRICTLY validate ALL required config keys (fail-CLOSED). Each key
+    -- is PRIMARY KEY so at most one row can exist; a missing, null or wrong-typed
+    -- value raises into the handler, marking the run failed with a safe config
+    -- error — the scanner NEVER silently proceeds without the cutoff/exclusions.
+    v_stage := 'config';
+
+    -- rule_enabled: present + JSON object.
     select value into v_rules from public.order_integrity_config where key = 'rule_enabled';
     if v_rules is null then
-      raise exception 'missing config key rule_enabled' using errcode = 'P0001';
+      raise exception 'config key rule_enabled is missing' using errcode = 'P0001';
     end if;
-    select (value #>> '{}')::timestamptz into v_since
-      from public.order_integrity_config where key = 'abandoned_awaiting_payment_since';
+    if jsonb_typeof(v_rules) <> 'object' then
+      raise exception 'config key rule_enabled must be a JSON object' using errcode = 'P0001';
+    end if;
+
+    -- abandoned_awaiting_payment_since: present + non-null valid timestamp.
+    select value into v_since_raw from public.order_integrity_config
+      where key = 'abandoned_awaiting_payment_since';
+    if v_since_raw is null then
+      raise exception 'config key abandoned_awaiting_payment_since is missing' using errcode = 'P0001';
+    end if;
+    if jsonb_typeof(v_since_raw) = 'null' then
+      raise exception 'config key abandoned_awaiting_payment_since is null' using errcode = 'P0001';
+    end if;
+    begin
+      v_since := (v_since_raw #>> '{}')::timestamptz;
+    exception when others then
+      raise exception 'config key abandoned_awaiting_payment_since is not a valid timestamp' using errcode = 'P0001';
+    end;
+    if v_since is null then
+      raise exception 'config key abandoned_awaiting_payment_since is null' using errcode = 'P0001';
+    end if;
+
+    -- excluded_order_ids: present + JSON array.
+    select value into v_excl_raw from public.order_integrity_config where key = 'excluded_order_ids';
+    if v_excl_raw is null then
+      raise exception 'config key excluded_order_ids is missing' using errcode = 'P0001';
+    end if;
+    if jsonb_typeof(v_excl_raw) <> 'array' then
+      raise exception 'config key excluded_order_ids must be a JSON array' using errcode = 'P0001';
+    end if;
     -- FAIL-CLOSED, never fail-OPEN: a malformed entry (missing/blank order_id)
     -- must NOT inject a NULL into v_excluded — `o.id <> all('{null}')` evaluates
     -- to NULL, which would silently suppress EVERY detection for EVERY rule. Skip
     -- entries without a usable order_id and strip any NULL defensively.
     select coalesce(array_remove(array_agg((e->>'order_id')::uuid), null), '{}')
       into v_excluded
-      from public.order_integrity_config c
-      cross join lateral jsonb_array_elements(c.value) e
-     where c.key = 'excluded_order_ids'
-       and nullif(e->>'order_id', '') is not null
+      from jsonb_array_elements(v_excl_raw) e
+     where nullif(e->>'order_id', '') is not null
        and (e->>'until') is not null
        and (e->>'until')::timestamptz > now();
     v_excluded := coalesce(v_excluded, '{}');
+
+    v_stage := 'scan';
 
     -- Detections for this run. `if not exists` + truncate so repeated calls in a
     -- single session/transaction (e.g. tests) are safe; `on commit drop` clears
@@ -604,13 +641,18 @@ begin
     return v_run_id;
 
   exception when others then
-    -- Fail-closed: mark the run failed with a SQLSTATE-only safe code. The inner
-    -- block's changes (incident upserts/resolutions) roll back to the implicit
-    -- savepoint, so NO incident is resolved on a failed run.
+    -- Fail-closed: mark the run failed with a SQLSTATE-only safe code and a
+    -- stage-scoped (never PII-bearing) message. The inner block's changes
+    -- (incident upserts/resolutions) roll back to the implicit savepoint, so NO
+    -- incident is resolved on a failed run. A config-stage failure surfaces as a
+    -- configuration error (safe_error_code = SQLSTATE, never 'overlap_skipped'),
+    -- which the health summary classifies as configuration_error.
     update public.order_integrity_runs
        set status='failed', completed_at=now(),
            safe_error_code = sqlstate,
-           safe_error_message = left('watchdog rule evaluation failed', 200),
+           safe_error_message = left(
+             case when v_stage = 'config' then 'watchdog configuration invalid'
+                  else 'watchdog rule evaluation failed' end, 200),
            duration_ms = floor(extract(epoch from (clock_timestamp() - v_start)) * 1000)::int
      where id = v_run_id;
     return v_run_id;
@@ -627,15 +669,26 @@ comment on function public.order_integrity_watchdog() is
 -- Deterministic thresholds (watchdog runs every 2 minutes):
 --   SUCCESS_STALE_DEGRADE = 4 minutes   SUCCESS_STALE_FAIL = 6 minutes
 -- Cascade (first match wins): configuration_error > failing > degraded > healthy.
---   configuration_error : the LATEST run failed for a non-benign reason
---                         (safe_error_code <> 'overlap_skipped').
+--   configuration_error : the latest DECISIVE run failed for a non-benign reason.
+--                         A "decisive" run is a success OR a failure whose
+--                         safe_error_code <> 'overlap_skipped'. `running` and
+--                         `overlap_skipped` runs are IGNORED for state selection,
+--                         so a benign newer run can NEVER hide a real config
+--                         failure; a later successful decisive run clears it.
 --   failing             : cron missing/inactive; OR no successful run in 6 min
---                         (or none ever); OR one or more OPEN critical incidents.
---   degraded            : one or more OPEN warning incidents; OR the latest
+--                         (or none ever); OR one or more UNRESOLVED CRITICAL
+--                         incidents.
+--   degraded            : one or more UNRESOLVED WARNING incidents; OR the latest
 --                         successful run is older than 4 minutes.
---   healthy             : cron active, a successful run within 4 minutes, zero
---                         OPEN critical and zero OPEN warning incidents.
--- "open" = status='open' (acknowledged / suppressed / resolved are excluded).
+--   healthy             : cron active, a success within 4 min, zero unresolved
+--                         critical and zero unresolved warning incidents.
+-- IMPORTANT — incident counting semantics: open_critical_count / open_warning_count
+-- count every UNRESOLVED (status <> 'resolved') incident of that severity, i.e.
+-- open + acknowledged + suppressed. Acknowledge means "seen", not "fixed"; suppress
+-- controls alert noise only. Neither can make an unresolved integrity defect
+-- disappear from health — ONLY status='resolved' removes an incident from the
+-- active counts and from oldest_open_critical_at. acknowledged_count and
+-- suppressed_count remain separate informational fields.
 create or replace function public.order_integrity_health_summary()
 returns jsonb
 language plpgsql
@@ -647,7 +700,8 @@ declare
   v_cron_active   boolean := false;
   v_latest_at     timestamptz;
   v_latest_status text;
-  v_latest_code   text;
+  v_dec_status    text;
+  v_dec_code      text;
   v_success_at    timestamptz;
   v_open_crit     integer := 0;
   v_open_warn     integer := 0;
@@ -668,21 +722,30 @@ begin
     v_cron_active := false;
   end;
 
-  select started_at, status, safe_error_code into v_latest_at, v_latest_status, v_latest_code
+  -- Literal latest run (for the visible latest_run_at / age fields).
+  select started_at, status into v_latest_at, v_latest_status
     from public.order_integrity_runs order by started_at desc, id desc limit 1;
+  -- Latest DECISIVE run (for state selection): success OR non-benign failure.
+  -- running / overlap_skipped are skipped so they cannot mask a config failure.
+  select status, safe_error_code into v_dec_status, v_dec_code
+    from public.order_integrity_runs
+   where status = 'success'
+      or (status = 'failed' and coalesce(safe_error_code, '') <> 'overlap_skipped')
+   order by started_at desc, id desc limit 1;
   select completed_at into v_success_at
     from public.order_integrity_runs where status='success'
     order by completed_at desc nulls last, id desc limit 1;
 
+  -- UNRESOLVED (open + acknowledged + suppressed) active incidents by severity.
   select count(*) filter (where severity='critical'),
          count(*) filter (where severity='warning')
     into v_open_crit, v_open_warn
-    from public.order_integrity_incidents where status='open';
+    from public.order_integrity_incidents where status <> 'resolved';
   select count(*) into v_ack  from public.order_integrity_incidents where status='acknowledged';
   select count(*) into v_supp from public.order_integrity_incidents
     where status='suppressed' and (suppression_until is null or suppression_until > now());
   select min(first_detected_at) into v_oldest_crit
-    from public.order_integrity_incidents where status='open' and severity='critical';
+    from public.order_integrity_incidents where status <> 'resolved' and severity='critical';
   select count(*) into v_opened_24h from public.order_integrity_incidents
     where created_at >= now() - interval '24 hours';
   select count(*) into v_resolved_24h from public.order_integrity_incidents
@@ -698,7 +761,7 @@ begin
   v_success_recent := v_success_at is not null and now() - v_success_at <= interval '4 minutes';
 
   v_state := case
-    when v_latest_status = 'failed' and coalesce(v_latest_code,'') <> 'overlap_skipped'
+    when v_dec_status = 'failed'      -- latest decisive run is a non-benign failure
       then 'configuration_error'
     when (not v_cron_active)
       or v_success_at is null
@@ -733,7 +796,7 @@ revoke all on function public.order_integrity_health_summary() from public, anon
 grant execute on function public.order_integrity_health_summary() to service_role;
 
 comment on function public.order_integrity_health_summary() is
-  'Service-role-only aggregate health for the order integrity watchdog: overall_state (healthy/degraded/failing/configuration_error; success stale >4m degrade / >6m fail; runs every 2m), cron active, latest/last-successful run + age, open critical/warning counts, acknowledged/suppressed counts, oldest open critical, latest incident (safe), and 24h opened/resolved counts. No PII, no secrets.';
+  'Service-role-only aggregate health for the order integrity watchdog. overall_state (healthy/degraded/failing/configuration_error) is driven by the latest DECISIVE run (success or non-overlap failure; running/overlap_skipped cannot mask a config failure) and by UNRESOLVED incidents: open_critical_count/open_warning_count count every non-resolved (open+acknowledged+suppressed) incident of that severity, so acknowledging or suppressing an incident never removes it from health — only resolution does. acknowledged_count/suppressed_count are informational. Also returns cron active, latest/last-successful run + age, oldest unresolved critical, latest incident (safe), and 24h opened/resolved counts. No PII, no secrets.';
 
 -- ---- 7. Admin RPCs (is_admin/is_staff gated; safe projections) --------------
 -- Admin overview (mirror of the health summary for the dashboard). is_staff read.

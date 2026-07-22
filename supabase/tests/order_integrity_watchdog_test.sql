@@ -61,6 +61,27 @@ begin
   set local session_replication_role = origin;
 end $$;
 
+-- Assert the given run is a durable CONFIG failure and the incident survived it.
+create function pg_temp.oiw_expect_cfg_fail(p_run bigint, p_inc uuid, p_label text)
+returns void language plpgsql as $$
+declare v_status text; v_code text; v_msg text; v_incstatus text; v_clean int;
+begin
+  select status, safe_error_code, safe_error_message into v_status, v_code, v_msg
+    from public.order_integrity_runs where id = p_run;
+  if v_status <> 'failed' then
+    raise exception 'CFG[%]: run not failed (got %)', p_label, v_status; end if;
+  if coalesce(v_code,'') = 'overlap_skipped' then
+    raise exception 'CFG[%]: benign overlap code, not a real config failure', p_label; end if;
+  if v_msg <> 'watchdog configuration invalid' then
+    raise exception 'CFG[%]: wrong/leaky safe message: %', p_label, v_msg; end if;
+  select status, consecutive_clean_count into v_incstatus, v_clean
+    from public.order_integrity_incidents where id = p_inc;
+  if v_incstatus = 'resolved' then
+    raise exception 'CFG[%]: incident was resolved on a failed config run', p_label; end if;
+  if v_clean <> 0 then
+    raise exception 'CFG[%]: clean counter advanced on a failed config run', p_label; end if;
+end $$;
+
 -- ---- OVERLAP: a concurrent backend holding the lock -> overlap_skipped -------
 -- Placed FIRST so this session does not yet hold the (re-entrant) advisory lock.
 do $$
@@ -322,6 +343,56 @@ begin
   raise notice 'FAILED-SCAN OK';
 end $$;
 
+-- ---- CONFIG VALIDATION: every required key fails CLOSED ----------------------
+do $$
+declare v_inc uuid; v_run bigint; v_re jsonb; v_ab jsonb; v_ex jsonb;
+begin
+  perform pg_temp.oiw_reset();
+  perform pg_temp.oiw_order('W-CFG','dead_letter','paid','pickup','received',null, now()-interval '6m');  -- R7 TP
+  perform public.order_integrity_watchdog();                 -- opens an incident
+  select id into v_inc from public.order_integrity_incidents where rule_code='PAID_ORDER_DEAD_LETTER';
+  if v_inc is null then raise exception 'CFG setup: no incident'; end if;
+
+  select value into v_re from public.order_integrity_config where key='rule_enabled';
+  select value into v_ab from public.order_integrity_config where key='abandoned_awaiting_payment_since';
+  select value into v_ex from public.order_integrity_config where key='excluded_order_ids';
+
+  -- rule_enabled: missing, then wrong type (array).
+  delete from public.order_integrity_config where key='rule_enabled';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'rule_enabled missing');
+  insert into public.order_integrity_config(key,value) values ('rule_enabled', v_re);
+  update public.order_integrity_config set value='[]'::jsonb where key='rule_enabled';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'rule_enabled not object');
+  update public.order_integrity_config set value=v_re where key='rule_enabled';
+
+  -- abandoned_awaiting_payment_since: missing, null, malformed.
+  delete from public.order_integrity_config where key='abandoned_awaiting_payment_since';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'abandoned missing');
+  insert into public.order_integrity_config(key,value) values ('abandoned_awaiting_payment_since', v_ab);
+  update public.order_integrity_config set value='null'::jsonb where key='abandoned_awaiting_payment_since';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'abandoned null');
+  update public.order_integrity_config set value='"not-a-timestamp"'::jsonb where key='abandoned_awaiting_payment_since';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'abandoned malformed');
+  update public.order_integrity_config set value=v_ab where key='abandoned_awaiting_payment_since';
+
+  -- excluded_order_ids: missing, then wrong type (object).
+  delete from public.order_integrity_config where key='excluded_order_ids';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'excluded missing');
+  insert into public.order_integrity_config(key,value) values ('excluded_order_ids', v_ex);
+  update public.order_integrity_config set value='{}'::jsonb where key='excluded_order_ids';
+  perform pg_temp.oiw_expect_cfg_fail(public.order_integrity_watchdog(), v_inc, 'excluded not array');
+  update public.order_integrity_config set value=v_ex where key='excluded_order_ids';
+
+  -- After restoring valid config, a normal scan succeeds again (re-detects, still open).
+  v_run := public.order_integrity_watchdog();
+  if (select status from public.order_integrity_runs where id=v_run) <> 'success' then
+    raise exception 'CFG FAILED: valid config did not restore a successful scan'; end if;
+  if (select status from public.order_integrity_incidents where id=v_inc) = 'resolved' then
+    raise exception 'CFG FAILED: incident resolved unexpectedly'; end if;
+
+  raise notice 'CONFIG VALIDATION OK';
+end $$;
+
 -- ---- ACKNOWLEDGE + SUPPRESS (+ expiry) + auth --------------------------------
 do $$
 declare v_id uuid; v_inc uuid;
@@ -530,6 +601,79 @@ begin
     values (now()-interval '20s', now()-interval '20s', 'failed', 'overlap_skipped');
   s := public.order_integrity_health_summary();
   if s->>'overall_state' <> 'healthy' then raise exception 'HEALTH(overlap benign) -> %', s->>'overall_state'; end if;
+
+  -- Finding 3: acknowledging/suppressing an UNRESOLVED incident must NOT hide it.
+  -- critical: acknowledged -> still failing; suppressed -> still failing; resolved -> recovers.
+  delete from public.order_integrity_incidents;
+  delete from public.order_integrity_runs;
+  insert into public.order_integrity_runs (started_at, completed_at, status)
+    values (now()-interval '1m', now()-interval '1m', 'success');
+  insert into public.order_integrity_incidents (fingerprint, rule_code, severity, entity_type, status)
+    values ('PAID_ORDER_NOT_SYNCED:h3','PAID_ORDER_NOT_SYNCED','critical','order','acknowledged');
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'failing' or (s->>'open_critical_count')::int <> 1
+     or (s->>'acknowledged_count')::int <> 1 then
+    raise exception 'HEALTH(ack critical still failing) -> % crit=% ack=%',
+      s->>'overall_state', s->>'open_critical_count', s->>'acknowledged_count'; end if;
+  update public.order_integrity_incidents set status='suppressed', suppression_until=now()+interval '1h'
+    where fingerprint='PAID_ORDER_NOT_SYNCED:h3';
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'failing' or (s->>'open_critical_count')::int <> 1
+     or (s->>'oldest_open_critical_at') is null then
+    raise exception 'HEALTH(suppress critical still failing) -> % crit=% oldest=%',
+      s->>'overall_state', s->>'open_critical_count', s->>'oldest_open_critical_at'; end if;
+  update public.order_integrity_incidents set status='resolved', resolved_at=now()
+    where fingerprint='PAID_ORDER_NOT_SYNCED:h3';
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' = 'failing' or (s->>'open_critical_count')::int <> 0
+     or (s->>'oldest_open_critical_at') is not null then
+    raise exception 'HEALTH(resolve critical recovers) -> % crit=%', s->>'overall_state', s->>'open_critical_count'; end if;
+
+  -- warning: acknowledged -> degraded; suppressed -> degraded; resolved -> recovers.
+  delete from public.order_integrity_incidents;
+  insert into public.order_integrity_incidents (fingerprint, rule_code, severity, entity_type, status)
+    values ('OVERDUE_SYNC_RETRY:h4','OVERDUE_SYNC_RETRY','warning','order','acknowledged');
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'degraded' or (s->>'open_warning_count')::int <> 1 then
+    raise exception 'HEALTH(ack warning degraded) -> %', s->>'overall_state'; end if;
+  update public.order_integrity_incidents set status='suppressed', suppression_until=now()+interval '1h'
+    where fingerprint='OVERDUE_SYNC_RETRY:h4';
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'degraded' or (s->>'open_warning_count')::int <> 1 then
+    raise exception 'HEALTH(suppress warning degraded) -> %', s->>'overall_state'; end if;
+  update public.order_integrity_incidents set status='resolved', resolved_at=now()
+    where fingerprint='OVERDUE_SYNC_RETRY:h4';
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'healthy' then
+    raise exception 'HEALTH(resolve warning recovers) -> %', s->>'overall_state'; end if;
+
+  -- Finding 5: benign newer runs cannot mask a config failure; a later success clears it.
+  delete from public.order_integrity_incidents;
+  delete from public.order_integrity_runs;
+  insert into public.order_integrity_runs (started_at, completed_at, status, safe_error_code)
+    values (now()-interval '3m', now()-interval '3m', 'success', null);
+  insert into public.order_integrity_runs (started_at, completed_at, status, safe_error_code)
+    values (now()-interval '2m', now()-interval '2m', 'failed', 'P0001');            -- decisive config failure
+  insert into public.order_integrity_runs (started_at, completed_at, status, safe_error_code)
+    values (now()-interval '30s', now()-interval '30s', 'failed', 'overlap_skipped'); -- benign, newer
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'configuration_error' then
+    raise exception 'HEALTH(config not masked by newer overlap_skipped) -> %', s->>'overall_state'; end if;
+  insert into public.order_integrity_runs (started_at, status) values (now()-interval '10s', 'running');
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' <> 'configuration_error' then
+    raise exception 'HEALTH(config not masked by newer running) -> %', s->>'overall_state'; end if;
+  insert into public.order_integrity_runs (started_at, completed_at, status, safe_error_code)
+    values (now()-interval '5s', now()-interval '5s', 'success', null);              -- later decisive success
+  s := public.order_integrity_health_summary();
+  if s->>'overall_state' = 'configuration_error' then
+    raise exception 'HEALTH(later success clears config_error) -> %', s->>'overall_state'; end if;
+
+  -- reset to a clean healthy baseline for the final cron-inactive case
+  delete from public.order_integrity_incidents;
+  delete from public.order_integrity_runs;
+  insert into public.order_integrity_runs (started_at, completed_at, status)
+    values (now()-interval '1m', now()-interval '1m', 'success');
 
   -- failing: cron inactive
   update cron.job set active=false where jobname='order-integrity-watchdog';
