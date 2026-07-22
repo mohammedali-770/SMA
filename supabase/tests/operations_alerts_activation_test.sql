@@ -38,17 +38,25 @@ begin
     raise exception 'activation must not change reminder cooldowns';
   end if;
 
-  -- Applying the chain (including activation) must not have RUN either engine:
-  -- every suite rolls back, so at suite start the ledgers reflect chain-apply
-  -- state only.
-  if (select count(*) from public.operations_alert_runs) <> 0 then
-    raise exception 'migration application must not invoke the evaluator/digest engines';
-  end if;
-  if (select count(*) from public.operations_alert_state)
-     + (select count(*) from public.operations_alert_events)
-     + (select count(*) from public.operations_digest_runs)
-     + (select count(*) from public.operations_alert_outbox) <> 0 then
-    raise exception 'migration application must not create alert/digest/outbox rows';
+  -- Applying the chain (including activation) must not have RUN either engine.
+  -- Live pg_cron may legitimately have executed the newly scheduled jobs by
+  -- the time this suite runs, so the empty-ledger assertion applies only when
+  -- the scheduler shows no execution of the new jobs (always true in the
+  -- harness, whose cron stub never executes commands).
+  if not exists (
+    select 1 from cron.job_run_details d
+    join cron.job j on j.jobid = d.jobid
+    where j.jobname in ('operations-alerts-evaluator', 'operations-digest-generator')
+  ) then
+    if (select count(*) from public.operations_alert_runs) <> 0 then
+      raise exception 'migration application must not invoke the evaluator/digest engines';
+    end if;
+    if (select count(*) from public.operations_alert_state)
+       + (select count(*) from public.operations_alert_events)
+       + (select count(*) from public.operations_digest_runs)
+       + (select count(*) from public.operations_alert_outbox) <> 0 then
+      raise exception 'migration application must not create alert/digest/outbox rows';
+    end if;
   end if;
 
   raise notice 'ACTIVATION END STATE OK';

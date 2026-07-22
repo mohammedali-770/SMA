@@ -232,8 +232,11 @@ enabled flag or a healthy state.
 | `recovery_notifications_enabled` | `true` |
 | `optional_system_alerts_enabled` | `false` |
 
-Applying the migration therefore changes **no runtime behavior**: nothing
-runs, nothing alerts, nothing is sent.
+Applying the **engine migration** (`20260723090000`) alone therefore
+changes **no runtime behavior**: nothing runs, nothing alerts, nothing is
+sent. It is the separate **activation migration** (`20260723120000`, next
+section) that enables the two internal engines and schedules the recurring
+jobs — external dispatch stays disabled either way.
 
 ## Internal automation (active) — operations runbook
 
