@@ -52,13 +52,60 @@ mkrepo "$REPO_PROT" main
 mkrepo "$REPO_FEAT" feature/guard-test
 
 # --- parser isolation -------------------------------------------------------
+# The base PATH must contain ONLY the external commands the guard genuinely
+# invokes. An earlier version used "/usr/bin:/bin:<git dir>", which is not
+# isolation at all: on most Linux/macOS systems /usr/bin ships python3 (and
+# often jq), so
+#   * the no-parser scenarios could still reach a real parser, meaning they
+#     were not testing "no working parser"; and
+#   * worse, the node-only scenario would silently be served by /usr/bin's
+#     python3 — the guard consults python3 before node — so the node branch
+#     was never actually exercised and the suite passed for the wrong reason.
+#
+# Every entry below is an explicit shim that execs one absolute path, so the
+# ambient environment cannot leak a parser into any scenario.
 NODE_ABS="$(command -v node || true)"
 PY_ABS="$(command -v python3 || true)"
-BASE_PATH="/usr/bin:/bin:$(dirname "$(command -v git)")"
+BASH_ABS="$(command -v bash || true)"
+[ -n "$BASH_ABS" ] || { echo "cannot locate bash"; exit 1; }
 
+link_real() {
+  cat > "$1/$2" <<EOF
+#!/bin/sh
+exec "$3" "\$@"
+EOF
+  chmod +x "$1/$2"
+}
+
+# Commands the guard actually runs. Names such as awk/sort/find/uniq appear in
+# the guard only as literal strings inside its allowlist and deny regexes;
+# they are never invoked, so they are deliberately absent here.
+REQUIRED_TOOLS='git grep sed tr cat'
+
+BASE_BIN="$TMP/base-bin"
+mkdir -p "$BASE_BIN"
+MISSING=''
+for t in $REQUIRED_TOOLS; do
+  abs="$(command -v "$t" || true)"
+  if [ -z "$abs" ]; then
+    MISSING="$MISSING $t"
+  else
+    link_real "$BASE_BIN" "$t" "$abs"
+  fi
+done
+if [ -n "$MISSING" ]; then
+  printf 'cannot build an isolated PATH; missing required command(s):%s\n' "$MISSING"
+  exit 1
+fi
+BASE_PATH="$BASE_BIN"
+
+# Isolation is a hard precondition, not a warning: if a parser is reachable
+# from the base PATH then the no-parser and single-parser scenarios below are
+# meaningless, so refuse to report misleading passes.
 for t in jq python3 node; do
   if PATH="$BASE_PATH" command -v "$t" >/dev/null 2>&1; then
-    printf 'WARNING: %s is reachable from the base PATH; isolation is inexact for that scenario\n' "$t"
+    printf 'ISOLATION FAILURE: %s is reachable from the isolated base PATH\n' "$t"
+    exit 1
   fi
 done
 
@@ -101,37 +148,66 @@ EOF
   chmod +x "$1/python3"
 }
 
-link_real() {
-  cat > "$1/$2" <<EOF
-#!/bin/sh
-exec "$3" "\$@"
-EOF
-  chmod +x "$1/$2"
+# --- assertions -------------------------------------------------------------
+# The guard is launched through an ABSOLUTE bash path. The scenario PATH is
+# what the guard itself sees, and it must not have to contain the interpreter
+# used to start it — otherwise an isolated PATH makes `bash "$HOOK"` fail with
+# 127, the guard never runs, and its empty output is indistinguishable from an
+# ALLOW. That is a silent false pass, so the exit status is checked too.
+HOOK_OUT=''
+HOOK_RC=0
+HOOK_ERR_FILE="$TMP/hook-stderr"
+
+run_hook() {
+  HOOK_OUT="$(printf '%s' "$1" | CLAUDE_PROJECT_DIR="$2" PATH="$3" "$BASH_ABS" "$HOOK" 2>"$HOOK_ERR_FILE")"
+  HOOK_RC=$?
 }
 
-# --- assertions -------------------------------------------------------------
-run_hook() {
-  printf '%s' "$1" | CLAUDE_PROJECT_DIR="$2" PATH="$3" bash "$HOOK" 2>/dev/null
+launch_failed() {
+  [ "$HOOK_RC" -ne 0 ] && {
+    FAIL=$((FAIL + 1))
+    printf '  FAIL %s -> guard exited %d (did it run?): %s\n' \
+      "$1" "$HOOK_RC" "$(tr '\n' ' ' < "$HOOK_ERR_FILE")"
+    return 0
+  }
+  return 1
 }
 
 assert_allow() {
-  local out
-  out="$(run_hook "$2" "$3" "$4")"
-  if [ -z "$out" ]; then
+  run_hook "$2" "$3" "$4"
+  launch_failed "$1" && return
+  if [ -z "$HOOK_OUT" ]; then
     PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"
   else
-    FAIL=$((FAIL + 1)); printf '  FAIL %s -> expected ALLOW, got: %s\n' "$1" "$out"
+    FAIL=$((FAIL + 1)); printf '  FAIL %s -> expected ALLOW, got: %s\n' "$1" "$HOOK_OUT"
   fi
 }
 
 assert_deny() {
-  local out
-  out="$(run_hook "$2" "$3" "$4")"
-  if printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
-    && printf '%s' "$out" | grep -Eq "$5"; then
+  run_hook "$2" "$3" "$4"
+  launch_failed "$1" && return
+  if printf '%s' "$HOOK_OUT" | grep -q '"permissionDecision":"deny"' \
+    && printf '%s' "$HOOK_OUT" | grep -Eq "$5"; then
     PASS=$((PASS + 1)); printf '  ok   %s\n' "$1"
   else
-    FAIL=$((FAIL + 1)); printf '  FAIL %s -> expected DENY matching /%s/, got: %s\n' "$1" "$5" "$out"
+    FAIL=$((FAIL + 1)); printf '  FAIL %s -> expected DENY matching /%s/, got: %s\n' "$1" "$5" "$HOOK_OUT"
+  fi
+}
+
+# Asserts a scenario's PATH really lacks the named commands. Without this the
+# no-parser assertions could pass for the wrong reason (or silently test a
+# different parser than the one they name).
+assert_unreachable() {
+  local label="$1" p="$2"
+  shift 2
+  local t bad=''
+  for t in "$@"; do
+    PATH="$p" command -v "$t" >/dev/null 2>&1 && bad="$bad $t"
+  done
+  if [ -z "$bad" ]; then
+    PASS=$((PASS + 1)); printf '  ok   %s\n' "$label"
+  else
+    FAIL=$((FAIL + 1)); printf '  FAIL %s -> unexpectedly reachable:%s\n' "$label" "$bad"
   fi
 }
 
@@ -188,11 +264,19 @@ if [ -n "$NODE_ABS" ]; then
   assert_deny  "empty input fails closed"                       ""         "$REPO_FEAT" "$BIN_NODE:$BASE_PATH" 'empty PreToolUse input'
 fi
 
-# No parser at all must fail closed rather than fall through to allow.
+# No parser at all must fail closed rather than fall through to allow. Each
+# scenario proves its own precondition first, so a leaked ambient parser shows
+# up as an explicit isolation failure instead of a misleading pass.
+assert_unreachable "no-parser scenario really exposes no parser" "$BIN_NONE:$BASE_PATH" jq python3 node
 assert_deny "no working parser fails closed" "$P_WRITE" "$REPO_FEAT" "$BIN_NONE:$BASE_PATH" 'no working JSON parser'
-# ...and a broken python3 with NO node behind it is still "no working parser".
-make_broken_python3 "$BIN_NONE"
-assert_deny "broken python3 alone fails closed" "$P_WRITE" "$REPO_FEAT" "$BIN_NONE:$BASE_PATH" 'no working JSON parser'
+
+# A broken python3 with NO jq and NO node behind it is still "no working
+# parser": the guard must not fall through to allow merely because a parser
+# NAME resolved. Kept in its own directory so the scenario above stays clean.
+BIN_STUBONLY="$TMP/bin-stub-only"; mkdir -p "$BIN_STUBONLY"
+make_broken_python3 "$BIN_STUBONLY"
+assert_unreachable "broken-stub scenario exposes no jq and no node" "$BIN_STUBONLY:$BASE_PATH" jq node
+assert_deny "broken python3 alone fails closed" "$P_WRITE" "$REPO_FEAT" "$BIN_STUBONLY:$BASE_PATH" 'no working JSON parser'
 
 # --- summary ----------------------------------------------------------------
 printf -- '----\n%d passed, %d failed\n' "$PASS" "$FAIL"
