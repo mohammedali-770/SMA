@@ -3,7 +3,7 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from './Button';
-import { colors, font, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 
 export function LoadingView({ label }: { label?: string }) {
   return (
@@ -60,6 +60,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emoji: { fontSize: 44, marginBottom: spacing.sm },
-  title: { fontSize: font.lg, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  muted: { fontSize: font.md, color: colors.muted, textAlign: 'center' },
+  title: { ...typography.heading, color: colors.text, textAlign: 'center' },
+  muted: { ...typography.body, color: colors.muted, textAlign: 'center' },
 });

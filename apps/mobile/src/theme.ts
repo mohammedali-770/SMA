@@ -65,4 +65,49 @@ export const shadow = {
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
+  // Subtle lift for pressable tiles / sticky bars. Same hue family as `card`.
+  sm: {
+    shadowColor: '#2a2350',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+  // Raised sheets, popovers, floating CTAs.
+  lg: {
+    shadowColor: '#2a2350',
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
 };
+
+/**
+ * Typography scale - pairs each size with a line-height and weight so text has
+ * consistent vertical rhythm instead of every screen re-deriving it. Weights
+ * are `as const` to satisfy React Native's `fontWeight` union. The raw `font`
+ * size scale above is kept for existing call sites.
+ */
+export const typography = {
+  display: { fontSize: 26, lineHeight: 32, fontWeight: '800' },
+  title:   { fontSize: 20, lineHeight: 26, fontWeight: '800' },
+  heading: { fontSize: 17, lineHeight: 23, fontWeight: '700' },
+  body:    { fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  label:   { fontSize: 13, lineHeight: 18, fontWeight: '600' },
+  caption: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  button:  { fontSize: 17, lineHeight: 22, fontWeight: '700' },
+} as const;
+
+/**
+ * Motion tokens. Durations sit in the 150-320ms band (perceptible but snappy);
+ * screens should gate any non-trivial animation behind the device's
+ * reduce-motion setting (AccessibilityInfo.isReduceMotionEnabled).
+ */
+export const motion = {
+  duration: { fast: 150, base: 220, slow: 320 },
+  // Pressed-state feedback: a small opacity + scale dip reads as tactile
+  // without moving layout. Consumed by shared pressables.
+  pressedOpacity: 0.9,
+  pressedScale: 0.97,
+} as const;

@@ -2,7 +2,7 @@
 import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
-import { colors, font, radius, spacing } from '../theme';
+import { colors, motion, radius, spacing, typography } from '../theme';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   bordered: { borderWidth: 1.5 },
-  pressed: { opacity: 0.85 },
+  pressed: { opacity: motion.pressedOpacity, transform: [{ scale: motion.pressedScale }] },
   row: { flexDirection: 'row', alignItems: 'center' },
-  label: { fontSize: font.lg, fontWeight: '700' },
+  label: { ...typography.button },
 });
