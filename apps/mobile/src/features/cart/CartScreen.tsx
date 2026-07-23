@@ -12,17 +12,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Header } from '../../components/Header';
 import { BagIcon, DishIcon } from '../../components/Icons';
+import { Price } from '../../components/Price';
 import { QtyStepper } from '../../components/QtyStepper';
 import { EmptyView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useOrderContext } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
-import { formatSAR } from '../../utils/format';
 import type { CartItem } from '../../types/models';
 
 export function CartScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, rtlRow } = useI18n();
+  const { t, pick, rtlRow } = useI18n();
   const cart = useCart();
   const orderCtx = useOrderContext();
 
@@ -52,7 +52,7 @@ export function CartScreen() {
               item={it}
               name={pick(it.product.nameEn, it.product.nameAr)}
               modifierSummary={modifierSummary(it, pick)}
-              lineTotal={formatSAR(it.unitPrice * it.quantity, lang)}
+              lineAmount={it.unitPrice * it.quantity}
               removeLabel={t('remove')}
               onInc={() => cart.incrementLine(it.cartItemId)}
               onDec={() => cart.decrementLine(it.cartItemId)}
@@ -65,7 +65,7 @@ export function CartScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
         <View style={[styles.subtotalRow, rtlRow]}>
           <Text style={styles.subtotalLabel}>{t('subtotal')}</Text>
-          <Text style={styles.subtotalValue}>{formatSAR(cart.subtotal, lang)}</Text>
+          <Price amount={cart.subtotal} size={font.lg} color={colors.purple} weight="800" />
         </View>
         {orderCtx.valid ? (
           <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button">
@@ -88,10 +88,10 @@ function modifierSummary(it: CartItem, pick: (en: string, ar: string) => string)
   return mods.map((m) => pick(m.nameEn, m.nameAr)).join(' · ');
 }
 
-function CartLine({
-  item, name, modifierSummary: summary, lineTotal, removeLabel, onInc, onDec, onRemove,
+export function CartLine({
+  item, name, modifierSummary: summary, lineAmount, removeLabel, onInc, onDec, onRemove,
 }: {
-  item: CartItem; name: string; modifierSummary: string; lineTotal: string;
+  item: CartItem; name: string; modifierSummary: string; lineAmount: number;
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
   const { rtlText, rtlRow } = useI18n();
@@ -120,7 +120,7 @@ function CartLine({
       <View style={styles.lineBody}>
         <View style={[styles.lineTop, rtlRow]}>
           <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
-          <Text style={styles.lineTotal}>{lineTotal}</Text>
+          <Price amount={lineAmount} size={font.md} color={colors.purple} weight="800" />
         </View>
         {summary ? <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>{summary}</Text> : null}
         <View style={[styles.lineBottom, rtlRow]}>

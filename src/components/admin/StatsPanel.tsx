@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
-import { formatSAR } from '../../utils/calculations';
+import { Price } from '../Price';
 
 export const StatsPanel: React.FC = () => {
   const { orders, branches, adminLang } = useApp();
@@ -26,7 +26,7 @@ export const StatsPanel: React.FC = () => {
                 {/* Metric Gross revenue */}
                 <div className="glass-card p-4 rounded-2xl">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_revenue}</span>
-                  <p className="text-xl font-black text-primary mt-1">{formatSAR(totalRevenue, adminLang)}</p>
+                  <p className="text-xl font-black text-primary mt-1"><Price amount={totalRevenue} /></p>
                   <p className="text-[9px] text-green-600 font-bold mt-1">↑ 12.5% {isRTL ? 'منذ الأمس' : 'vs yesterday'}</p>
                 </div>
 
@@ -40,7 +40,7 @@ export const StatsPanel: React.FC = () => {
                 {/* Metric ticket value */}
                 <div className="glass-card p-4 rounded-2xl">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_ticket}</span>
-                  <p className="text-xl font-black text-slate-800 mt-1">{formatSAR(averageTicketValue, adminLang)}</p>
+                  <p className="text-xl font-black text-slate-800 mt-1"><Price amount={averageTicketValue} /></p>
                   <p className="text-[9px] text-gray-400 mt-1">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'VAT-inclusive average ticket'}</p>
                 </div>
 

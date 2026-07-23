@@ -16,6 +16,7 @@ import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycle
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
+import { Price } from '../../components/Price';
 import type { Order, OrderStatus } from '../../types/models';
 
 const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | 'status_ready' | 'status_out_for_delivery' | 'status_delivered' | 'status_cancelled'> = {
@@ -87,7 +88,7 @@ export function OrdersScreen() {
         <PosLifecycleChip order={item} />
         <View style={[styles.cardBottom, rtlRow]}>
           <Text style={[styles.itemsCount, rtlText]}>{meta}</Text>
-          <Text style={styles.total}>{totalLabel}</Text>
+          <Price amount={item.total} size={font.lg} color={colors.purple} weight="800" />
         </View>
         <View style={styles.receiptRow}>
           <Text style={[styles.viewReceipt, rtlText]}>{t('viewReceipt')} {isRTL ? '‹' : '›'}</Text>

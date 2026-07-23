@@ -31,6 +31,7 @@ import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
+import { Price } from '../../components/Price';
 import type { OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
@@ -559,13 +560,13 @@ export function CheckoutScreen() {
 
           {/* Totals preview */}
           <View style={styles.totals}>
-            <Row label={t('subtotal')} value={formatSAR(cart.subtotal, lang)} />
-            {orderType === 'delivery' ? <Row label={t('deliveryFee')} value={formatSAR(deliveryFee, lang)} /> : null}
-            {couponDiscount > 0 ? <Row label={t('discount')} value={`−${formatSAR(couponDiscount, lang)}`} accent /> : null}
-            {loyaltyDiscountEst > 0 ? <Row label={t('loyaltyDiscount')} value={`−${formatSAR(loyaltyDiscountEst, lang)}`} accent /> : null}
+            <Row label={t('subtotal')} amount={cart.subtotal} />
+            {orderType === 'delivery' ? <Row label={t('deliveryFee')} amount={deliveryFee} /> : null}
+            {couponDiscount > 0 ? <Row label={t('discount')} amount={couponDiscount} negative accent /> : null}
+            {loyaltyDiscountEst > 0 ? <Row label={t('loyaltyDiscount')} amount={loyaltyDiscountEst} negative accent /> : null}
             <Row label={t('vat')} value="" muted />
             <View style={styles.totalDivider} />
-            <Row label={t('total')} value={formatSAR(totalEst, lang)} big />
+            <Row label={t('total')} amount={totalEst} big />
             <Text style={[styles.serverNote, rtlText]}>{`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}</Text>
           </View>
         </ScrollView>
@@ -661,12 +662,16 @@ function SegmentBtn({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-function Row({ label, value, big, accent, muted }: { label: string; value: string; big?: boolean; accent?: boolean; muted?: boolean }) {
+function Row({ label, value, amount, negative, big, accent, muted }: { label: string; value?: string; amount?: number; negative?: boolean; big?: boolean; accent?: boolean; muted?: boolean }) {
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
       <Text style={[styles.rowLabel, big && styles.rowLabelBig, muted && styles.rowMuted]}>{label}</Text>
-      <Text style={[styles.rowValue, big && styles.rowValueBig, accent && { color: colors.success }]}>{value}</Text>
+      {amount != null ? (
+        <Price amount={amount} prefix={negative ? '−' : undefined} size={big ? font.lg : font.md} color={accent ? colors.success : big ? colors.purple : colors.text} weight={big ? '800' : '700'} />
+      ) : (
+        <Text style={[styles.rowValue, big && styles.rowValueBig, accent && { color: colors.success }]}>{value}</Text>
+      )}
     </View>
   );
 }

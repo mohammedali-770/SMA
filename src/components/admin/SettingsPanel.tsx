@@ -3,6 +3,7 @@ import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, LifeBuoy
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import { formatSAR } from '../../utils/calculations';
+import { Price } from '../Price';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
 import { admin, catalog } from '../../lib/api';
@@ -644,7 +645,7 @@ export const SettingsPanel: React.FC = () => {
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
                             <span className="text-[8.5px] font-bold text-gray-400 uppercase block">{isRTL ? 'إجمالي قيمة خصومات النقاط' : 'Deducted Points Discount Value'}</span>
                             <p className="text-sm font-black text-primary mt-1">
-                              {formatSAR(profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1), adminLang)}
+                              <Price amount={profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1)} />
                             </p>
                             <span className="text-[8px] text-slate-400 block mt-0.5">{isRTL ? 'مستقطعة من قيمة الفواتير المكتملة' : 'Calculated at active conversions'}</span>
                           </div>
