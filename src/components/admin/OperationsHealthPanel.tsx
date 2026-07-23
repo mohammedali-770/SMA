@@ -88,8 +88,8 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
   database_jobs: {
     en: 'Database & Scheduled Jobs',
     ar: 'قاعدة البيانات والمهام المجدولة',
-    descEn: 'Allowlisted critical pg_cron jobs and recent execution evidence.',
-    descAr: 'المهام الحرجة المسموحة وسجل تشغيلها الأخير.',
+    descEn: 'Allowlisted pg_cron jobs (critical + internal automation) with per-cadence staleness windows.',
+    descAr: 'مهام pg_cron المسموحة (الحرجة والأتمتة الداخلية) بنوافذ تقادم حسب وتيرة كل مهمة.',
   },
 };
 
@@ -105,6 +105,14 @@ const ATTENTION_TEXT: Record<string, { en: string; ar: string }> = {
   PUSH_SEND_FAILURES_24H: {
     en: 'Push send failures were recorded in the last 24 hours.',
     ar: 'تم تسجيل إخفاقات في إرسال الإشعارات خلال آخر 24 ساعة.',
+  },
+  OPERATIONS_AUTOMATION_JOBS_FAILING: {
+    en: 'An internal automation job (alerts evaluator / daily digest) has stopped running on schedule.',
+    ar: 'توقفت إحدى مهام الأتمتة الداخلية (مقيّم التنبيهات / الملخص اليومي) عن العمل في موعدها.',
+  },
+  OPERATIONS_AUTOMATION_JOBS_DEGRADED: {
+    en: 'An internal automation job (alerts evaluator / daily digest) needs attention.',
+    ar: 'تحتاج إحدى مهام الأتمتة الداخلية (مقيّم التنبيهات / الملخص اليومي) إلى المتابعة.',
   },
 };
 

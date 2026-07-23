@@ -273,7 +273,9 @@ select kind, status, skip_reason, safe_error_code, started_at, counts
 
 Or in the Admin Dashboard: Operations Alerts → header "Last evaluation" and
 Settings → last run details; the Operations Health tab's Scheduled Jobs
-card covers the three pre-existing crons.
+card now covers all five crons — the three critical application crons plus
+these two automation crons, the latter with per-cadence staleness windows
+(see the delivered follow-up below).
 
 **Expected skipped runs (safe, routine)**
 - `before_digest_time` — hourly digest tick before 08:00 local. Normal.
@@ -286,17 +288,28 @@ card covers the three pre-existing crons.
 disable below and investigate; a single transient failure self-heals on
 the next tick.
 
-**Known limitation (tracked follow-up):** the Operations Health
-scheduled-jobs card allowlists only the three pre-existing crons; the two
-automation jobs above are not yet part of that health source. Extending it
-needs per-cadence staleness windows (the current 6-minute stale-success
-rule fits 1–2-minute jobs and would falsely mark the hourly digest job
-failing between ticks), so it ships as its own reviewed change. Until
-then, monitor the automation itself through the `operations_alert_runs`
-ledger queries above and the Admin panel's last-run data — and note that
-an evaluator that is itself down can never self-report internally; that
-gap is inherent to v1's internal-only design and is what a future
-external-delivery version addresses.
+**Automation job health monitoring (DELIVERED — migration
+`20260723140000_operations_automation_cron_health`, Issue #79).** The
+Operations Health scheduled-jobs card now also observes these two
+automation crons, each with a **per-cadence staleness window** (evaluator
+`*/5` → 15 min; hourly digest → 130 min) so a healthy-but-idle job between
+ticks is never mislabelled failing — the flaw a single flat 6-minute rule
+would have caused. They are monitored as **non-critical** jobs: the
+platform-critical `database_jobs` rollup (which feeds the overall
+Operations Health state via `operations_health_overall_state`) is computed
+from the three critical application crons ONLY, so a stuck internal
+automation cron surfaces as a **warning** attention item
+(`OPERATIONS_AUTOMATION_JOBS_*`) plus a truthful `automation_state` and job
+row, without ever flipping the platform to failing. The alert evaluator
+likewise now derives a per-job condition
+(`database_jobs:job_health:<jobname>`) for them at **warning** severity
+(per-job alert severity follows the job's `critical` flag; the three
+critical crons stay critical). The `operations_alert_runs` ledger queries
+above remain the way to see the evaluator/digest INTERNAL outcomes (skips,
+safe error codes). Note that an evaluator that is itself down can never
+self-report internally — that gap is inherent to v1's internal-only design
+and is what a future external-delivery version addresses; the digest cron's
+health, however, IS observed by the (separate) evaluator and by this card.
 
 **Safe disable / rollback (non-destructive, reviewed)**
 

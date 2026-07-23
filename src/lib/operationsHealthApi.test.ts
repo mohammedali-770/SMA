@@ -48,8 +48,23 @@ describe('unavailableOperationsHealthSummary', () => {
     expect(summary.systems_unavailable_count).toBe(8);
     expect(summary.systems).toHaveLength(8);
     expect(summary.systems.every((system) => system.state === 'unavailable')).toBe(true);
-    expect(summary.jobs).toHaveLength(3);
+    // 3 critical application crons + 2 non-critical internal automation crons.
+    expect(summary.jobs).toHaveLength(5);
     expect(summary.jobs.every((job) => job.state === 'unavailable')).toBe(true);
+  });
+
+  it('includes the internal automation crons as non-critical jobs', () => {
+    const summary = unavailableOperationsHealthSummary('2026-07-22T00:00:00.000Z');
+    const byName = Object.fromEntries(summary.jobs.map((job) => [job.job_name, job]));
+
+    expect(byName['operations-alerts-evaluator']?.critical).toBe(false);
+    expect(byName['operations-alerts-evaluator']?.expected_schedule).toBe('*/5 * * * *');
+    expect(byName['operations-digest-generator']?.critical).toBe(false);
+    expect(byName['operations-digest-generator']?.expected_schedule).toBe('0 * * * *');
+    // The three pre-existing application crons stay critical.
+    expect(byName['account-deletion-processor']?.critical).toBe(true);
+    expect(byName['lazywait-sync']?.critical).toBe(true);
+    expect(byName['order-integrity-watchdog']?.critical).toBe(true);
   });
 
   it('uses a fixed safe error code and contains no raw provider or customer data', () => {
