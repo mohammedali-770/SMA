@@ -1,0 +1,27 @@
+{
+  "deno.enable": false,
+  "deno.enablePaths": ["supabase/functions"],
+  "deno.lint": true,
+
+  "tailwindCSS.experimental.configFile": {
+    "src/index.css": "src/**"
+  },
+  "tailwindCSS.files.exclude": [
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/apps/mobile/**"
+  ],
+
+  "vitest.rootConfig": "./vitest.config.ts",
+
+  "eslint.enable": false,
+
+  "cSpell.words": [
+    "geidea",
+    "lazywait",
+    "riyal",
+    "spicymeal",
+    "supabase"
+  ]
+}

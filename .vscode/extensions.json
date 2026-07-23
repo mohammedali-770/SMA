@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "denoland.vscode-deno",
+    "bradlc.vscode-tailwindcss",
+    "expo.vscode-expo-tools",
+    "vitest.explorer",
+    "ms-ossdata.vscode-pgsql",
+    "usernamehw.errorlens",
+    "yoavbls.pretty-ts-errors",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+    "dbaeumer.vscode-eslint",
+    "ms-vscode.powershell",
+    "nhoizey.gremlins",
+    "esbenp.prettier-vscode",
+    "EditorConfig.EditorConfig",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
