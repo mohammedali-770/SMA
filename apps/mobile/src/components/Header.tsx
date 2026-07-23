@@ -4,7 +4,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, font, spacing } from '../theme';
+import { colors, spacing, typography } from '../theme';
 import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
@@ -65,5 +65,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bgAlt,
   },
   chevron: { fontSize: 28, fontWeight: '800', color: colors.purple, lineHeight: 30 },
-  title: { flex: 1, textAlign: 'center', fontSize: font.lg, fontWeight: '800', color: colors.text },
+  title: { flex: 1, textAlign: 'center', ...typography.heading, fontWeight: '800', color: colors.text },
 });
