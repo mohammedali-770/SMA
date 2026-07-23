@@ -31,17 +31,20 @@ import { initWebObservability } from '../../../apps/mobile/src/lib/observability
  * under vitest and in dev without VITE_SENTRY_DEV=1). Never throws.
  */
 export function initAdminObservability(): boolean {
-  const env = import.meta.env;
+  // Every value is read as a DIRECT `import.meta.env.X` member expression —
+  // never through an alias — because vite.config.ts injects the two
+  // VITE_VERCEL_* values via `define`, and static replacement of the literal
+  // expression is the only behavior Vite guarantees across versions.
   return initWebObservability({
     surface: 'admin-web',
-    dsn: env.VITE_SENTRY_DSN as string | undefined,
-    explicitEnv: env.VITE_SENTRY_ENV as string | undefined,
-    // Exposed by Vercel when "automatically expose system environment
-    // variables" is enabled; hostname heuristics cover it otherwise.
-    vercelEnv: env.VITE_VERCEL_ENV as string | undefined,
-    commitSha: env.VITE_VERCEL_GIT_COMMIT_SHA as string | undefined,
-    isDevBuild: Boolean(env.DEV),
-    devOptIn: env.VITE_SENTRY_DEV === '1',
-    testRunnerEnv: { MODE: env.MODE as string | undefined },
+    dsn: import.meta.env.VITE_SENTRY_DSN as string | undefined,
+    explicitEnv: import.meta.env.VITE_SENTRY_ENV as string | undefined,
+    // Injected at build time from Vercel's system env (see vite.config.ts);
+    // empty when absent — hostname heuristics cover that case.
+    vercelEnv: import.meta.env.VITE_VERCEL_ENV as string | undefined,
+    commitSha: import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA as string | undefined,
+    isDevBuild: Boolean(import.meta.env.DEV),
+    devOptIn: import.meta.env.VITE_SENTRY_DEV === '1',
+    testRunnerEnv: { MODE: import.meta.env.MODE as string | undefined },
   });
 }
