@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build && npm --prefix apps/mobile ci --no-audit --no-fund && npm --prefix apps/mobile run build:web",
+    "build": "npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@mapbox/mapbox-gl-draw": "^1.5.1",
+    "@sentry/react": "^10.67.0",
     "@supabase/supabase-js": "^2.110.0",
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
@@ -24,10 +25,13 @@
     "react-dom": "^19.0.1"
   },
   "devDependencies": {
+    "@sentry/vite-plugin": "^5.4.0",
     "@testing-library/react": "^16.3.2",
     "@types/google.maps": "^3.65.2",
     "@types/mapbox__mapbox-gl-draw": "^1.4.9",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
