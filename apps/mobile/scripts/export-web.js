@@ -25,7 +25,19 @@ const env = {
     ? { EXPO_PUBLIC_WEB_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA } : {}),
 };
 
+// `npx` is `npx.cmd` on Windows. Node >= 22 refuses to spawn a .cmd/.bat
+// without a shell (EINVAL, CVE-2024-27980 hardening) and the bare `npx`
+// name is otherwise unresolved (ENOENT), so on Windows the export must run
+// through the shell. Linux CI/Vercel keep the original no-shell spawn. The
+// argument list is fixed and contains no shell metacharacters, so enabling
+// the shell here is safe (DEP0190).
 const r = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--clear', '--output-dir', '../../dist/app'], {
-  env, stdio: 'inherit', cwd: __dirname + '/..',
+  env, stdio: 'inherit', cwd: __dirname + '/..', shell: process.platform === 'win32',
 });
+
+// Surface a spawn failure (e.g. binary not found) instead of exiting 1
+// silently, which previously masked the Windows failure above.
+if (r.error) {
+  console.error('[export-web] failed to run expo export:', r.error.message);
+}
 process.exit(r.status ?? 1);
