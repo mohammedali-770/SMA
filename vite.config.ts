@@ -29,6 +29,19 @@ export default defineConfig(() => {
           })]
         : []),
     ],
+    // Vercel's system values are plain VERCEL_* env vars; Vite only exposes
+    // VITE_*-prefixed vars to the client. Alias the two PUBLIC build-metadata
+    // values (environment name + deploy commit sha) at build time so Sentry
+    // tags preview/production and the release correctly — mirrors what
+    // apps/mobile/scripts/export-web.js does for the Expo web export. Empty
+    // string = absent; the runtime treats it as unset and falls back to
+    // hostname heuristics. No secret is exposed here.
+    define: {
+      'import.meta.env.VITE_VERCEL_ENV':
+        JSON.stringify(process.env.VERCEL_ENV ?? ''),
+      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA':
+        JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ''),
+    },
     build: {
       // 'hidden' emits maps without sourceMappingURL comments; combined with
       // filesToDeleteAfterUpload above, no map is ever publicly reachable.
