@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build && npm --prefix apps/mobile ci --no-audit --no-fund && npm --prefix apps/mobile run build:web",
+    "build": "npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
