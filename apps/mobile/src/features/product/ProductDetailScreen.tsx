@@ -16,12 +16,13 @@ import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
-import { computeUnitPrice, formatSAR } from '../../utils/format';
+import { computeUnitPrice } from '../../utils/format';
+import { Price } from '../../components/Price';
 import type { Modifier, ModifierGroup } from '../../types/models';
 
 export function ProductDetailScreen({ productId }: { productId: string }) {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const { t, pick, rtlText, rtlRow } = useI18n();
   const { loading, getProduct, groupsForProduct } = useCatalog();
   const cart = useCart();
 
@@ -93,7 +94,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             <Text style={[styles.desc, rtlText]}>{pick(product.descriptionEn, product.descriptionAr)}</Text>
           ) : null}
           <View style={[styles.metaRow, rtlRow]}>
-            <Text style={styles.price}>{formatSAR(product.price, lang)}</Text>
+            <Price amount={product.price} size={font.xl} color={colors.purple} weight="800" />
             {product.calories ? <Text style={styles.kcal}>{product.calories} {t('kcal')}</Text> : null}
           </View>
 
@@ -134,7 +135,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                           {checked ? <Text style={styles.checkMark}>✓</Text> : null}
                         </View>
                         <Text style={[styles.modName, rtlText]}>{pick(m.nameEn, m.nameAr)}</Text>
-                        {m.price > 0 ? <Text style={styles.modPrice}>+ {formatSAR(m.price, lang)}</Text> : null}
+                        {m.price > 0 ? <Price amount={m.price} prefix="+" size={font.sm} color={colors.purple} weight="800" /> : null}
                       </Pressable>
                     );
                   })}
@@ -159,7 +160,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
           accessibilityState={{ disabled: !canAdd }}
         >
           <Text style={styles.addBtnText}>{t('addForPrice')}</Text>
-          <Text style={styles.addBtnPrice}>{formatSAR(total, lang)}</Text>
+          <Price amount={total} size={font.lg} color={colors.white} weight="800" />
         </Pressable>
       </View>
     </View>

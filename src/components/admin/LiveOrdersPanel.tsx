@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Eye, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { useApp, canTransitionOrder } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
-import { getVATBreakdown, formatSAR } from '../../utils/calculations';
+import { getVATBreakdown } from '../../utils/calculations';
+import { Price } from '../Price';
 import { ADMIN_LOCALES } from './adminLocales';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { orderDisplayNumber } from '../../lib/mappers';
@@ -179,7 +180,7 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="font-bold text-secondary text-[11px]">{formatSAR(it.total, adminLang)}</span>
+                <span className="font-bold text-secondary text-[11px]"><Price amount={it.total} /></span>
                 <button
                   onClick={() => onView(it.id)}
                   className="bg-primary/5 hover:bg-primary hover:text-white border border-primary/10 text-primary py-1 px-2.5 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
@@ -350,7 +351,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           {isRTL ? order.branchNameAr : order.branchNameEn}
                         </td>
                         <td className="px-4 py-3.5 font-bold text-secondary">
-                          {formatSAR(order.total, adminLang)}
+                          <Price amount={order.total} />
                           <span className="mt-1 block text-[9px] font-bold text-gray-500 normal-case">{methodLabelText(order)}</span>
                           {(() => {
                             const badge = paymentBadge(order);
@@ -505,7 +506,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      <span className="font-black text-secondary">{formatSAR(item.price * item.quantity, adminLang)}</span>
+                      <span className="font-black text-secondary"><Price amount={item.price * item.quantity} /></span>
                     </div>
                   ))}
                 </div>
@@ -515,36 +516,36 @@ export const LiveOrdersPanel: React.FC = () => {
               <div className="pt-2 border-t border-gray-100 space-y-1">
                 <div className="flex justify-between text-gray-500">
                   <span>Subtotal:</span>
-                  <span>{formatSAR(activeReceiptOrder.subtotal, adminLang)}</span>
+                  <span><Price amount={activeReceiptOrder.subtotal} /></span>
                 </div>
                 {activeReceiptOrder.deliveryFee > 0 && (
                   <div className="flex justify-between text-gray-500">
                     <span>Delivery Fee:</span>
-                    <span>+{formatSAR(activeReceiptOrder.deliveryFee, adminLang)}</span>
+                    <span><Price amount={activeReceiptOrder.deliveryFee} prefix="+" /></span>
                   </div>
                 )}
                 {(activeReceiptOrder.discountAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-emerald-600">
                     <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}:</span>
-                    <span>-{formatSAR(activeReceiptOrder.discountAmount ?? 0, adminLang)}</span>
+                    <span><Price amount={activeReceiptOrder.discountAmount ?? 0} prefix="−" /></span>
                   </div>
                 )}
                 {(activeReceiptOrder.loyaltyDiscountAmount ?? 0) > 0 && (
                   <div className="flex justify-between text-purple-600">
                     <span>{isRTL ? 'خصم نقاط الولاء' : 'Loyalty Discount'}:</span>
-                    <span>-{formatSAR(activeReceiptOrder.loyaltyDiscountAmount ?? 0, adminLang)}</span>
+                    <span><Price amount={activeReceiptOrder.loyaltyDiscountAmount ?? 0} prefix="−" /></span>
                   </div>
                 )}
                 <div className="flex justify-between font-black text-gray-900 text-sm pt-1 border-t border-gray-50">
                   <span>Grand Total (VAT Inclusive):</span>
-                  <span>{formatSAR(activeReceiptOrder.total, adminLang)}</span>
+                  <span><Price amount={activeReceiptOrder.total} /></span>
                 </div>
               </div>
 
               {/* Mandatory VAT details stamp */}
               <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-400 flex justify-between">
                 <span>{brandSettings?.vatPercentage || 15}% Saudi VAT component:</span>
-                <span className="font-semibold">{formatSAR(getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount, adminLang)}</span>
+                <span className="font-semibold"><Price amount={getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount} /></span>
               </div>
 
               {/* Payment — actual chosen method + derived status (method-aware) */}

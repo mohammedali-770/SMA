@@ -18,11 +18,12 @@ import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycle
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
-import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
+import { formatRiyadhDateTime } from '../../utils/format';
+import { Price } from '../../components/Price';
 import type { Order } from '../../types/models';
 
 export function ReceiptScreen({ orderId }: { orderId: string }) {
-  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const { t, pick, rtlText, rtlRow } = useI18n();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -147,17 +148,17 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={styles.itemPrice}>{formatSAR(it.price * it.quantity, lang)}</Text>
+                  <Price amount={it.price * it.quantity} size={font.md} color={colors.text} weight="700" />
                 </View>
               ))}
               <View style={styles.divider} />
-              <Row label={t('subtotal')} value={formatSAR(order.subtotal, lang)} />
-              {order.deliveryFee > 0 ? <Row label={t('deliveryFee')} value={formatSAR(order.deliveryFee, lang)} /> : null}
-              {order.discountAmount > 0 ? <Row label={t('discount')} value={`−${formatSAR(order.discountAmount, lang)}`} /> : null}
-              {order.loyaltyDiscountAmount > 0 ? <Row label={t('loyaltyDiscount')} value={`−${formatSAR(order.loyaltyDiscountAmount, lang)}`} /> : null}
-              <Row label={t('vat')} value={formatSAR(order.vatAmount, lang)} muted />
+              <Row label={t('subtotal')} amount={order.subtotal} />
+              {order.deliveryFee > 0 ? <Row label={t('deliveryFee')} amount={order.deliveryFee} /> : null}
+              {order.discountAmount > 0 ? <Row label={t('discount')} amount={order.discountAmount} negative /> : null}
+              {order.loyaltyDiscountAmount > 0 ? <Row label={t('loyaltyDiscount')} amount={order.loyaltyDiscountAmount} negative /> : null}
+              <Row label={t('vat')} amount={order.vatAmount} muted />
               <View style={styles.divider} />
-              <Row label={t('total')} value={formatSAR(order.total, lang)} strong big />
+              <Row label={t('total')} amount={order.total} strong big />
               {order.loyaltyPointsEarned > 0 ? (
                 <View style={[styles.earnedRow, rtlRow]}>
                   <AwardIcon size={18} color={colors.warning} />
@@ -232,14 +233,18 @@ const banner = StyleSheet.create({
   body: { fontSize: font.sm, color: colors.text, fontWeight: '600', marginTop: 2, lineHeight: 20 },
 });
 
-function Row({ label, value, secondary, strong, big, muted }: { label: string; value: string; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
+function Row({ label, value, amount, negative, secondary, strong, big, muted }: { label: string; value?: string; amount?: number; negative?: boolean; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
   const { isRTL, rtlRow } = useI18n();
   return (
     // Mirrored in Arabic: label on the right, value column on the left.
     <View style={[styles.row, rtlRow]}>
       <Text style={[styles.rowLabel, muted && styles.muted]}>{label}</Text>
       <View style={[styles.rowValueCol, isRTL && styles.rowValueColRTL]}>
-        <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
+        {amount != null ? (
+          <Price amount={amount} prefix={negative ? '−' : undefined} size={big ? font.lg : font.md} color={big ? colors.purple : colors.text} weight={strong || big ? '800' : '700'} />
+        ) : (
+          <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
+        )}
         {secondary ? <Text style={styles.rowSecondary}>{secondary}</Text> : null}
       </View>
     </View>

@@ -27,6 +27,7 @@ import { BannerCarousel } from './BannerCarousel';
 import { buildMenuSections, buildSearchIndex, menuItemKey, type MenuSection, type MenuSectionItem } from './menuSections';
 import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
+import { Price } from '../../components/Price';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { shouldForceSelection } from '../order/orderContext';
@@ -300,7 +301,7 @@ export function HomeMenuScreen() {
               <Text style={styles.cartCountText}>{cart.count}</Text>
             </View>
             <Text style={[styles.cartBtnText, rtlText]}>{t('myCart')}</Text>
-            <Text style={styles.cartBtnPrice}>{formatSAR(cart.subtotal, lang)}</Text>
+            <Price amount={cart.subtotal} size={font.md} color={colors.white} weight="800" />
           </Pressable>
         </View>
       ) : null}
@@ -366,11 +367,10 @@ export const ProductCard = React.memo(function ProductCard({
 }: {
   product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
 }) {
-  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const { t, pick, rtlText, rtlRow } = useI18n();
   const [imgFailed, setImgFailed] = useState(false);
   const name = pick(product.nameEn, product.nameAr);
   const description = pick(product.descriptionEn, product.descriptionAr);
-  const priceLabel = formatSAR(product.price, lang);
   const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
   const actionLabel = hasModifiers ? t('customizeAdd') : t('addToCart');
   const showImage = !!product.imageUrl && !imgFailed;
@@ -400,7 +400,7 @@ export const ProductCard = React.memo(function ProductCard({
         {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
         <View style={[styles.cardBottom, rtlRow]}>
           <View>
-            <Text style={styles.cardPrice}>{priceLabel}</Text>
+            <Price amount={product.price} size={font.md} color={colors.purple} weight="800" />
             {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
           </View>
           <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
