@@ -667,3 +667,65 @@ OTP) are reported from database/configuration evidence only and are never marked
 The scheduled-jobs card observes exactly three allowlisted application jobs. Applying
 this migration and any provider probe are separate future deliverables, each
 requiring its own explicit owner approval.
+
+## 17. Pending migration: Operations automation cron health (repository-only, UNAPPLIED)
+
+**Read-only observability. NOT merged, NOT applied to Production.** Records the
+migration that ships with the Issue #79 follow-up branch
+`feature/operations-automation-cron-health`; it exists in the repository only and
+has **no** live `schema_migrations` row. No Production application is approved.
+
+- **Repository file:** `supabase/migrations/20260723140000_operations_automation_cron_health.sql`
+- **PR:** Issue #79 follow-up (open, awaiting review/merge).
+- **Live version:** none (UNAPPLIED). On a future owner-approved application this
+  will be class **B** (same content; apply-time generated version differs from the
+  repository filename version `20260723140000`), applied **only** via MCP
+  `apply_migration` with the exact merged file content — never `db push` or
+  `migration repair`.
+
+**Ledger note.** The Operations Health Center (§16), the Smart Operations Alerts &
+Daily Digest engine, and its activation migration are all present in the repository
+and (per `PROJECT_STATUS.md` / `docs/OPERATIONS_ALERTS_DIGEST.md`) live in
+Production, but are not yet itemized in §4/§5 above — that reconciliation is owned
+by **Issue #76**. This §17 entry does not attempt that reconciliation; it only
+records the new repository-only migration so the ledger stays informed.
+
+**Purpose.** Extends the Operations Health scheduled-jobs card to also monitor the
+two INTERNAL automation crons delivered by the alerts/digest engine —
+`operations-alerts-evaluator` (`*/5`) and `operations-digest-generator` (hourly) —
+with per-cadence staleness windows (evaluator 15 min; hourly digest 130 min) so a
+healthy-but-idle sparse job is never mislabelled failing. They are monitored as
+NON-CRITICAL jobs, so the platform-critical `database_jobs` rollup (and therefore
+overall Operations Health state) is unchanged; a stuck automation cron surfaces as
+a WARNING attention item and a truthful `automation_state`.
+
+**Objects changed (additive; no tables/cron/triggers/grants).** Two
+`create or replace function` statements only, both idempotent and preserving the
+exact prior security contract (SECURITY DEFINER / STABLE / `search_path=public`;
+grants unchanged):
+- `public.operations_health_snapshot_internal()` — the single authoritative health
+  core: 5-job allowlist, per-cadence windows, critical-only overall rollup, new
+  `automation_state` + `OPERATIONS_AUTOMATION_JOBS_*` warning attention.
+- `public.operations_alerts_derive(jsonb, jsonb)` — per-job alert severity now
+  follows the job's `critical` flag (the three critical crons stay critical; the
+  two automation crons become warning). No other derivation changes.
+
+**Dependencies (must exist at apply time).** The alerts/digest engine migration
+(`operations_health_snapshot_internal`, `operations_alerts_derive`,
+`operations_alerts_safe_bool`, `operations_alerts_sanitize_evidence`) and the
+activation migration that schedules the two automation crons — all present in
+Production today.
+
+**Validation performed (repository / throwaway PG16 harness, not Production).**
+`supabase/tests/operations_automation_cron_health_test.sql` (allowlist shape,
+per-cadence boundaries, non-critical isolation of overall state, degraded/no-success
+automation, critical-cron regression, derive severity-by-critical-flag, safe
+projection) plus the updated `operations_health_center_test.sql` (5-job shape) and
+`operations_alerts_digest_test.sql` (automation crons pinned healthy) suites.
+Frontend gates: `tsc --noEmit`, vitest, `vite build`, mobile web build, mobile `tsc`.
+
+**Rollback.** The feature is isolated and read-only. Before any application,
+rollback is closing/reverting the PR. After a hypothetical application, re-apply the
+prior definitions of the two functions from
+`20260723090000_smart_operations_alerts_digest.sql` in a separate owner-approved
+follow-up migration (never an edit of an applied file).

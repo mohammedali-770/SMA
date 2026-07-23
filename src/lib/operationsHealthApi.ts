@@ -121,10 +121,13 @@ const SYSTEMS: Array<{ id: OperationsHealthSystemId; critical: boolean }> = [
   { id: 'database_jobs', critical: true },
 ];
 
-const JOBS: Array<{ job_name: string; subsystem: string; expected_schedule: string }> = [
-  { job_name: 'account-deletion-processor', subsystem: 'account_deletion', expected_schedule: '* * * * *' },
-  { job_name: 'lazywait-sync', subsystem: 'lazywait', expected_schedule: '* * * * *' },
-  { job_name: 'order-integrity-watchdog', subsystem: 'order_integrity', expected_schedule: '*/2 * * * *' },
+const JOBS: Array<{ job_name: string; subsystem: string; expected_schedule: string; critical: boolean }> = [
+  { job_name: 'account-deletion-processor', subsystem: 'account_deletion', expected_schedule: '* * * * *', critical: true },
+  { job_name: 'lazywait-sync', subsystem: 'lazywait', expected_schedule: '* * * * *', critical: true },
+  { job_name: 'order-integrity-watchdog', subsystem: 'order_integrity', expected_schedule: '*/2 * * * *', critical: true },
+  // Non-critical internal automation crons (Operations Alerts + Daily Digest).
+  { job_name: 'operations-alerts-evaluator', subsystem: 'operations_alerts', expected_schedule: '*/5 * * * *', critical: false },
+  { job_name: 'operations-digest-generator', subsystem: 'operations_digest', expected_schedule: '0 * * * *', critical: false },
 ];
 
 /**
@@ -151,10 +154,10 @@ export function unavailableOperationsHealthSummary(
       source: 'operations_health_summary',
       details: { safe_error_code: 'client_fetch_failed' },
     })),
-    jobs: JOBS.map(({ job_name, subsystem, expected_schedule }) => ({
+    jobs: JOBS.map(({ job_name, subsystem, expected_schedule, critical }) => ({
       job_name,
       subsystem,
-      critical: true,
+      critical,
       job_id: null,
       schedule: null,
       expected_schedule,

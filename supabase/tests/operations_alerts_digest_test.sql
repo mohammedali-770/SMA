@@ -52,6 +52,16 @@ language sql as $$
   where fingerprint = p_fp and event_type = p_type;
 $$;
 
+-- Migration 20260723140000 added the two INTERNAL automation crons
+-- (operations-alerts-evaluator, operations-digest-generator) to the monitored
+-- job allowlist. Give them a fresh successful run so they read healthy for the
+-- whole suite and never contribute alert conditions that would perturb the
+-- deterministic per-fixture assertions below. Their own monitoring — per-cadence
+-- staleness windows and warning-severity per-job alerts — is covered by
+-- supabase/tests/operations_automation_cron_health_test.sql.
+select pg_temp.oad_job_ok('operations-alerts-evaluator');
+select pg_temp.oad_job_ok('operations-digest-generator');
+
 -- ---- A. OBJECT / SECURITY CONTRACT -----------------------------------------
 do $$
 declare

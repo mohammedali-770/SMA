@@ -105,8 +105,11 @@ begin
   if jsonb_typeof(systems) <> 'array' or jsonb_array_length(systems) <> 8 then
     raise exception 'expected 8 subsystem cards, got %', systems;
   end if;
-  if jsonb_typeof(jobs) <> 'array' or jsonb_array_length(jobs) <> 3 then
-    raise exception 'expected 3 allowlisted jobs, got %', jobs;
+  -- 3 critical application crons + 2 non-critical internal automation crons
+  -- (operations-alerts-evaluator, operations-digest-generator) added by
+  -- migration 20260723140000_operations_automation_cron_health.
+  if jsonb_typeof(jobs) <> 'array' or jsonb_array_length(jobs) <> 5 then
+    raise exception 'expected 5 allowlisted jobs, got %', jobs;
   end if;
   if s ?& array[
     'generated_at','overall_state','critical_attention_count',
