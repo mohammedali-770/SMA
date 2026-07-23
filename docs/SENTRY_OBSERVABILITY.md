@@ -32,9 +32,10 @@
   in every environment; they carry component paths and labels of tapped
   UI), failed-request capture, `sendDefaultPii`. Enabling any of these
   needs explicit owner approval.
-- **Web/admin**: not initialized in v1 (`Platform.OS === 'web'` returns
-  early). The Expo web export and the Vite admin app are a tracked
-  follow-up — see the issue referenced in the activation PR.
+- **Web/admin**: covered separately — the Expo web export (`/app`) and the
+  Vite admin console initialize the browser SDK via a platform-resolved
+  `index.web.ts` and `src/lib/observability` respectively; native builds are
+  unaffected. See `SENTRY_WEB_OBSERVABILITY.md`.
 
 ## Environments
 

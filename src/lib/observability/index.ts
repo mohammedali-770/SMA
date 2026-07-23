@@ -1,0 +1,47 @@
+/**
+ * Observability wiring for the ADMIN/STAFF console (root Vite app,
+ * surface tag 'admin-web').
+ *
+ * The implementation lives in the shared browser core
+ * (apps/mobile/src/lib/observability/webCore.ts) together with the
+ * framework-free, unit-tested sanitization/classification/route modules —
+ * one privacy pipeline for every web surface. This module only feeds it the
+ * Vite-specific environment inputs and re-exports the safe API.
+ *
+ * ADMIN PRIVACY CONTRACT (stricter than the customer app): never pass table
+ * contents, customer/order/payment records, account-deletion requests, alert
+ * or digest payloads, health snapshots, credentials, staff identities, or
+ * search/filter values. Only safe operational metadata — panel name,
+ * operation, safe error code, HTTP status, latency, counts. Everything is
+ * deep-sanitized anyway, but the contract is codes + names, not payloads.
+ * No admin user identity is attached at all in v1.
+ */
+export {
+  captureWebException, captureWebMessage, addSafeWebBreadcrumb,
+  setSafeWebContext, withWebErrorMonitoring, captureWebRenderError,
+  isWebObservabilityInitialized, webObservabilityEnvironment,
+  type SafeWebCaptureContext, type WebObservabilitySubsystem,
+} from '../../../apps/mobile/src/lib/observability/webCore';
+
+import { initWebObservability } from '../../../apps/mobile/src/lib/observability/webCore';
+
+/**
+ * Initialize browser Sentry exactly once for the admin console. Call before
+ * the React root renders. Returns whether the SDK is enabled (always false
+ * under vitest and in dev without VITE_SENTRY_DEV=1). Never throws.
+ */
+export function initAdminObservability(): boolean {
+  const env = import.meta.env;
+  return initWebObservability({
+    surface: 'admin-web',
+    dsn: env.VITE_SENTRY_DSN as string | undefined,
+    explicitEnv: env.VITE_SENTRY_ENV as string | undefined,
+    // Exposed by Vercel when "automatically expose system environment
+    // variables" is enabled; hostname heuristics cover it otherwise.
+    vercelEnv: env.VITE_VERCEL_ENV as string | undefined,
+    commitSha: env.VITE_VERCEL_GIT_COMMIT_SHA as string | undefined,
+    isDevBuild: Boolean(env.DEV),
+    devOptIn: env.VITE_SENTRY_DEV === '1',
+    testRunnerEnv: { MODE: env.MODE as string | undefined },
+  });
+}

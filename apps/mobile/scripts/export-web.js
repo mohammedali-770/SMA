@@ -14,6 +14,15 @@ const env = {
     ?? 'https://wxfmmnihidsdyemasstf.supabase.co',
   EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
     ?? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4Zm1tbmloaWRzZHllbWFzc3RmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NzM3MzIsImV4cCI6MjA5OTA0OTczMn0.F4xEfsAXqvGfXvcaEqzdrbWi5RoTJBVYo4OophZYeKo',
+  // Sentry (web) build metadata — PUBLIC values only. Vercel provides
+  // VERCEL_ENV ('production' | 'preview') and the deploy commit sha at build
+  // time; mapping them into EXPO_PUBLIC_* lets Metro inline them so the /app
+  // bundle tags its environment/release correctly. Absent locally → the
+  // runtime falls back to hostname heuristics (see observability/webConfig).
+  // The SENTRY_AUTH_TOKEN secret is NOT read or forwarded here.
+  ...(process.env.VERCEL_ENV ? { EXPO_PUBLIC_VERCEL_ENV: process.env.VERCEL_ENV } : {}),
+  ...(process.env.VERCEL_GIT_COMMIT_SHA
+    ? { EXPO_PUBLIC_WEB_COMMIT_SHA: process.env.VERCEL_GIT_COMMIT_SHA } : {}),
 };
 
 const r = spawnSync('npx', ['expo', 'export', '--platform', 'web', '--clear', '--output-dir', '../../dist/app'], {
