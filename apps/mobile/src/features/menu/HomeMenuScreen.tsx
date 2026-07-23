@@ -31,7 +31,7 @@ import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { shouldForceSelection } from '../order/orderContext';
 import { useCart, useCatalog, useOrderContext } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
+import { colors, font, motion, radius, shadow, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { Product } from '../../types/models';
 
@@ -361,7 +361,7 @@ function SectionFooter() {
  * handler) so cart taps and searches don't re-render every card; language
  * changes still propagate because useI18n reads context (which bypasses memo).
  */
-const ProductCard = React.memo(function ProductCard({
+export const ProductCard = React.memo(function ProductCard({
   product, hasModifiers, onAdd,
 }: {
   product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
@@ -403,7 +403,7 @@ const ProductCard = React.memo(function ProductCard({
             <Text style={styles.cardPrice}>{priceLabel}</Text>
             {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
           </View>
-          <Pressable style={styles.addBtn} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
+          <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
             <Text style={styles.addBtnText}>{actionLabel}</Text>
           </Pressable>
         </View>
@@ -485,15 +485,16 @@ const styles = StyleSheet.create({
   cardImg: { width: 104, alignSelf: 'stretch', minHeight: 116, backgroundColor: colors.bgAlt },
   cardImgEmpty: { alignItems: 'center', justifyContent: 'center' },
   cardBody: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
-  cardName: { fontSize: font.md, fontWeight: '800', color: colors.text },
-  cardDesc: { fontSize: font.sm, color: colors.muted, marginTop: 2 },
-  cardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.sm },
+  cardName: { fontSize: font.md, lineHeight: 20, fontWeight: '800', color: colors.text },
+  cardDesc: { fontSize: font.sm, lineHeight: 18, color: colors.muted, marginTop: 2 },
+  cardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.md },
   cardPrice: { fontSize: font.md, fontWeight: '800', color: colors.purple },
   cardKcal: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
   addBtn: {
     backgroundColor: colors.red, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
     borderRadius: radius.pill, minHeight: 36, justifyContent: 'center',
   },
+  addBtnPressed: { opacity: motion.pressedOpacity, transform: [{ scale: motion.pressedScale }] },
   addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
 
   cartBar: {
