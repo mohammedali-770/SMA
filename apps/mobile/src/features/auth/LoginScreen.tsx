@@ -22,22 +22,27 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { legalTitle } from '../../lib/legal';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
+import { showsUnavailableCard, type WhatsAppLoginAvailability } from './loginAvailability';
 import { PhoneOtpLogin } from './PhoneOtpLogin';
 
 export function LoginScreen() {
   const { t, pick, lang, isRTL, rtlText } = useI18n();
-  // null = still asking. Login is WhatsApp-only, so a `false` here means the
-  // door is genuinely shut (WhatsApp not configured/enabled) and we say so
-  // rather than offering a path that no longer exists.
-  const [waEnabled, setWaEnabled] = useState<boolean | null>(null);
+  // null = still asking. Then a TRI-STATE: only a CONFIRMED 'disabled' hides the
+  // form. An unreadable flag ('unknown' — network / RPC / RLS error) must never
+  // render the unavailable card, because WhatsApp is the only way in and a
+  // transient read failure would lock customers out of a working app. On
+  // 'unknown' we show the form and let the send hook, which fails closed, be
+  // the authority.
+  const [availability, setAvailability] = useState<WhatsAppLoginAvailability | null>(null);
 
   useEffect(() => {
     let alive = true;
-    auth.whatsappLoginEnabled()
-      .then((enabled) => { if (alive) setWaEnabled(enabled); })
-      // A failed flag read must never lock customers out: show the form and let
-      // the server stay the authority on whether a code can be sent.
-      .catch(() => { if (alive) setWaEnabled(true); });
+    auth.whatsappLoginAvailability()
+      .then((a) => { if (alive) setAvailability(a); })
+      // whatsappLoginAvailability() already resolves 'unknown' instead of
+      // rejecting; this is belt-and-braces so no future change can strand the
+      // screen on the loading state.
+      .catch(() => { if (alive) setAvailability('unknown'); });
     return () => { alive = false; };
   }, []);
 
@@ -55,15 +60,15 @@ export function LoginScreen() {
             <Text style={[styles.sub, rtlText]}>{t('authSub')}</Text>
           </View>
 
-          {waEnabled === null ? (
+          {availability === null ? (
             <LoadingView />
-          ) : waEnabled ? (
-            <PhoneOtpLogin />
-          ) : (
+          ) : showsUnavailableCard(availability) ? (
             <View style={styles.unavailable}>
               <Text style={[styles.unavailableTitle, rtlText]}>{t('whatsappLoginNotAvailable')}</Text>
               <Text style={[styles.unavailableSub, rtlText]}>{t('whatsappLoginNotAvailableSub')}</Text>
             </View>
+          ) : (
+            <PhoneOtpLogin />
           )}
 
           {/* Legal links — open the relevant documents (no forced acceptance). */}

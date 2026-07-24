@@ -28,6 +28,7 @@ import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput'
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
+import { requestLoginCode } from './loginAvailability';
 
 type Phase = 'phone' | 'code';
 
@@ -47,19 +48,21 @@ export function PhoneOtpLogin() {
     const normalized = toSaudiE164(national);
     if (!normalized) { setError(t('invalidSaudiPhone')); return; }
     setBusy(true);
-    try {
-      await auth.signInWithPhone(normalized);
+    // The server is the authority on whether a code can be sent: the login
+    // screen may render this form on an unreadable feature flag, but only a
+    // successful send advances to the code step. A rejection — including the
+    // hook's "WhatsApp login is temporarily unavailable" when login is really
+    // off, or a rate limit — surfaces here and leaves us on the phone step.
+    const outcome = await requestLoginCode((p) => auth.signInWithPhone(p), normalized);
+    if (outcome.status === 'sent') {
       setE164(normalized);
       setPhase('code');
       setNotice(t('weSentLoginCode'));
       startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      // Surface a safe message; Supabase returns an error when the hook can't
-      // deliver (e.g. WhatsApp login disabled) or when rate-limited.
-      setError(err instanceof Error && err.message ? err.message : t('loginCodeSendFailed'));
-    } finally {
-      setBusy(false);
+    } else {
+      setError(outcome.message ?? t('loginCodeSendFailed'));
     }
+    setBusy(false);
   };
 
   const verify = async () => {

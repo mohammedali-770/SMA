@@ -94,7 +94,9 @@ Key guarantees:
 
 **Mobile app (`apps/mobile/`)**
 - `src/services/api.ts` — `auth.signInWithPhone`, `auth.verifyPhone`,
-  `auth.whatsappLoginEnabled`. Email/password `signIn`/`signUp` **removed**.
+  `auth.whatsappLoginAvailability`. Email/password `signIn`/`signUp` **removed**.
+- `src/features/auth/loginAvailability.ts` (+ test) — **NEW.** The tri-state
+  readiness contract and the send-outcome helper (see §6.1).
 - `src/lib/phone.ts` (+ `phone.test.ts`) — Saudi-only normalizer:
   `toSaudiE164` / `toSaudiNational` / `isSaudiMobile` /
   `sanitizeSaudiNationalInput` / `formatSaudiE164` (mirrors the server).
@@ -167,6 +169,33 @@ Hook are enabled in the dashboard. Until then the `whatsapp_login_enabled()` fla
 returns false and the app shows "WhatsApp login isn't available right now" —
 **there is no email fallback any more, so customers cannot log in until this is
 switched on.** Treat the flag as a launch gate, not a preference.
+
+### 6.1 The flag is a hint; the hook is the gate (tri-state)
+
+`auth.whatsappLoginAvailability()` returns **three** values, never a boolean:
+
+| Value | Meaning | Login screen renders |
+| --- | --- | --- |
+| `enabled` | flag read, genuinely ON | phone form |
+| `disabled` | flag read, genuinely OFF | "unavailable" card |
+| `unknown` | flag **could not be read** (network / RPC / RLS error, or a non-boolean payload) | phone form |
+
+Only a **confirmed** `disabled` hides the form. This matters because WhatsApp is
+the only way in: if an unreadable flag were collapsed into "off", a single
+transient status-RPC blip would show every customer the unavailable card even
+though login works perfectly. `readLoginFlag` therefore never rejects and never
+maps a failure to `disabled`.
+
+Rendering the form on `unknown` is safe because the client was never the
+authority. `auth-send-sms-whatsapp` fails closed and returns 503 "WhatsApp login
+is temporarily unavailable" when `whatsapp_login_enabled !== true`, so
+`signInWithOtp` rejects and `requestLoginCode` reports `failed` — the customer
+sees the server's reason and is never advanced to the code step. Worst case on a
+flag-read failure is one honest error message instead of a total lockout.
+
+Covered by `src/features/auth/loginAvailability.test.ts` (18 tests: flag ON, flag
+OFF, RPC/RLS/network read failure, and server rejection while login is really
+off).
 
 > Stronger option: instead of storing `send_sms_hook_secret` in `secret_config`,
 > set it as the Edge Function env var `SEND_SMS_HOOK_SECRET` (and the OTP pepper as

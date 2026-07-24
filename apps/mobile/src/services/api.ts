@@ -13,6 +13,7 @@
  * writes, coupon management, integration_settings, and any service-role /
  * payment / SMS / Lazywait call. Those stay server-side behind Edge Functions.
  */
+import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
@@ -65,15 +66,15 @@ export const auth = {
     return ok(await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   },
   // Anon-safe feature flag (boolean only, no secrets) telling the pre-login UI
-  // whether WhatsApp login is fully configured + enabled. Falls back to false.
-  async whatsappLoginEnabled(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase.rpc('whatsapp_login_enabled');
-      if (error) return false;
-      return data === true;
-    } catch {
-      return false;
-    }
+  // whether WhatsApp login is fully configured + enabled.
+  //
+  // TRI-STATE on purpose. A failed read ('unknown') must NOT be reported as
+  // 'disabled': WhatsApp is the only login path, so treating a transient RPC /
+  // RLS / network error as "off" would lock every customer out of an app that
+  // works. See features/auth/loginAvailability.ts — the caller shows the form on
+  // 'unknown' and lets the Send SMS hook (which fails closed) be the authority.
+  async whatsappLoginAvailability(): Promise<WhatsAppLoginAvailability> {
+    return readLoginFlag(async () => supabase.rpc('whatsapp_login_enabled'));
   },
 };
 
