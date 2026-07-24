@@ -18,6 +18,7 @@ import { CrosshairIcon } from './Icons';
 import {
   FIX_FRESH_MS, LOCATE_TIMEOUT_MS, classifyLocateFailure, isFixFresh, isUsableFix,
   locateFailureMessage, roundCoord, shouldStartLocate,
+  LOCATE_BTN_BOTTOM, LOCATE_BTN_RIGHT, LOCATE_BTN_SIZE, MAP_HEIGHT,
   type CachedFix, type LocateLang, type LocateState,
 } from './locationControl';
 
@@ -194,12 +195,13 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
 
 const styles = StyleSheet.create({
   mapWrap: {
-    height: 240, borderRadius: radius.md, overflow: 'hidden',
+    height: MAP_HEIGHT, borderRadius: radius.md, overflow: 'hidden',
     borderWidth: 1, borderColor: colors.border, position: 'relative',
   },
   locateBtn: {
-    position: 'absolute', right: spacing.sm, bottom: 28,
-    width: 44, height: 44, borderRadius: 22,
+    // Geometry is asserted in locationControl.test.ts.
+    position: 'absolute', right: LOCATE_BTN_RIGHT, bottom: LOCATE_BTN_BOTTOM,
+    width: LOCATE_BTN_SIZE, height: LOCATE_BTN_SIZE, borderRadius: LOCATE_BTN_SIZE / 2,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.white,
     borderWidth: 1, borderColor: colors.border,

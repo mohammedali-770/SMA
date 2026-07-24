@@ -126,3 +126,56 @@ export type LocateLang = keyof typeof locateErrorCopy;
 export function locateFailureMessage(failure: LocateFailure, lang: LocateLang): string {
   return locateErrorCopy[lang][failure];
 }
+
+// ---------------------------------------------------------------------------
+// Layout of the in-map control.
+//
+// These are exported (rather than inlined in the StyleSheet) so the geometry
+// invariants can be asserted in unit tests. They are NOT a substitute for
+// looking at the screen — overlap against live Google chrome still needs a
+// human — but they do pin the parts that are decidable: minimum touch target,
+// clearance above the attribution strip, and the fact that the control and the
+// zoom cluster are anchored to different edges.
+// ---------------------------------------------------------------------------
+
+/** Height of the map viewport in the picker. */
+export const MAP_HEIGHT = 240;
+
+/** Diameter of the locate control. */
+export const LOCATE_BTN_SIZE = 44;
+
+/** Platform minimum touch target (iOS HIG 44pt; Android Material 48dp with hitSlop). */
+export const MIN_TOUCH_TARGET = 44;
+
+/**
+ * Height reserved at the bottom of the map for the provider attribution
+ * ("Google", "Map data ©2026", the keyboard-shortcuts link). The control sits
+ * above this so it can never cover legally required attribution.
+ */
+export const ATTRIBUTION_STRIP = 24;
+
+/** Distance from the map's bottom edge to the control's bottom edge. */
+export const LOCATE_BTN_BOTTOM = 28;
+
+/** Distance from the map's right edge to the control's right edge. */
+export const LOCATE_BTN_RIGHT = 8;
+
+/**
+ * Google's zoom cluster is pinned to RIGHT_CENTER while the locate control is
+ * bottom-right, so the two share an edge but never a row. This is the same
+ * stacking Google Maps uses on mobile.
+ */
+export const ZOOM_CONTROL_POSITION = 'RIGHT_CENTER' as const;
+
+/** Top edge of the control, measured from the top of the map. */
+export function locateBtnTop(): number {
+  return MAP_HEIGHT - LOCATE_BTN_BOTTOM - LOCATE_BTN_SIZE;
+}
+
+/**
+ * True when the control clears the attribution strip entirely — i.e. its bottom
+ * edge sits above the reserved band.
+ */
+export function clearsAttribution(): boolean {
+  return LOCATE_BTN_BOTTOM >= ATTRIBUTION_STRIP;
+}

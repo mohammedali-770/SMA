@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ATTRIBUTION_STRIP,
   FIX_FRESH_MS,
+  LOCATE_BTN_BOTTOM,
+  LOCATE_BTN_RIGHT,
+  LOCATE_BTN_SIZE,
+  MAP_HEIGHT,
+  MIN_TOUCH_TARGET,
+  ZOOM_CONTROL_POSITION,
+  clearsAttribution,
+  locateBtnTop,
   classifyLocateFailure,
   isFixFresh,
   isUsableFix,
@@ -148,5 +157,37 @@ describe('locateFailureMessage', () => {
         expect(m).not.toContain('referer');
       }
     }
+  });
+});
+
+describe('in-map control geometry (the decidable half of visual validation)', () => {
+  it('meets the minimum touch target without a hitSlop crutch', () => {
+    expect(LOCATE_BTN_SIZE).toBeGreaterThanOrEqual(MIN_TOUCH_TARGET);
+  });
+
+  it('clears the provider attribution strip, which is legally required', () => {
+    expect(clearsAttribution()).toBe(true);
+    expect(LOCATE_BTN_BOTTOM).toBeGreaterThanOrEqual(ATTRIBUTION_STRIP);
+  });
+
+  it('sits fully inside the map viewport', () => {
+    const top = locateBtnTop();
+    expect(top).toBeGreaterThan(0);
+    expect(top + LOCATE_BTN_SIZE).toBeLessThanOrEqual(MAP_HEIGHT);
+    expect(LOCATE_BTN_RIGHT).toBeGreaterThanOrEqual(0);
+  });
+
+  it('is anchored bottom-right, in the lower half, away from the centred pin', () => {
+    // The marker is drawn at the map centre; a bottom-anchored control in the
+    // lower half cannot sit on top of it.
+    expect(locateBtnTop()).toBeGreaterThan(MAP_HEIGHT / 2);
+  });
+
+  it('does not share a row with the zoom cluster', () => {
+    // Zoom is pinned to RIGHT_CENTER, the control to bottom-right: same edge,
+    // different band. Overlap against live Google chrome still needs a human.
+    expect(ZOOM_CONTROL_POSITION).toBe('RIGHT_CENTER');
+    const zoomCentreBand = MAP_HEIGHT / 2;
+    expect(locateBtnTop()).toBeGreaterThan(zoomCentreBand);
   });
 });
