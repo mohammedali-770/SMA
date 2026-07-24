@@ -159,12 +159,21 @@ export interface Order {
   couponCode?: string;
   notes?: string;
   createdAt: string;
-  lazywaitOrderNumber?: string; // POS number once synced; primary display ref
-  // POS confirmation lifecycle inputs (customer-facing status derivation).
+  /** Branch (POS) order number once accepted — the ONLY number ever shown. */
+  lazywaitOrderNumber?: string;
+  // Confirmation state-machine inputs (see features/orders/orderConfirmation.ts).
   lazywaitSyncState?: string;
   lazywaitRef?: string; // POS order reference; REQUIRED to show "confirmed"
+  /** Distinguishes "no POS channel for this order" from a real send failure. */
+  syncBlockedReason?: string;
   firstPosSyncFailureAt?: string;
   syncNextAttemptAt?: string;
+  /** May-have-been-sent phase marker; blocks any resend when set. */
+  posCreateAttemptedAt?: string;
+  /** SERVER-counted manual resends. Never rendered — see CUSTOMER_RESEND_LIMIT. */
+  posCustomerRetryCount?: number;
+  /** 'none' | 'pending' | 'processing' | 'refunded' | 'failed'. */
+  refundState?: string;
   address?: SavedAddress;
   items: OrderItem[];
 }

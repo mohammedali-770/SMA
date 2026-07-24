@@ -220,24 +220,36 @@ export function mapOrder(o: DbOrderWithItems): Order {
     lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
     lazywaitSyncState: o.lazywait_sync_state ?? undefined,
     lazywaitRef: o.lazywait_ref ?? undefined,
+    syncBlockedReason: o.sync_blocked_reason ?? undefined,
     firstPosSyncFailureAt: o.first_pos_sync_failure_at ?? undefined,
     syncNextAttemptAt: o.sync_next_attempt_at ?? undefined,
+    posCreateAttemptedAt: o.pos_create_attempted_at ?? undefined,
+    posCustomerRetryCount: o.pos_customer_retry_count ?? 0,
+    refundState: o.refund_state ?? 'none',
     address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
   };
 }
 
 /**
- * The order number to show the customer so it matches the Lazywait POS ticket.
- * Once synced, the POS number (e.g. "#1") is primary and the internal SM-… number
- * is a secondary reference; before sync / for delivery / when POS is off, the
- * SM-… number is shown alone. SM-… stays the canonical id.
+ * The order number to show the customer.
+ *
+ * ONLY the branch's own (Lazywait) order number is ever customer-visible. The
+ * internal SM-… number is an internal database reference and must not appear in
+ * any screen, receipt, notification or client-facing payload (Issue #94) — it
+ * previously leaked as the primary value before sync and as a labelled
+ * "Order ref" afterwards, which showed customers an identifier for an order the
+ * restaurant had not accepted.
+ *
+ * Returns null while the branch has not issued a number yet; callers render the
+ * confirmation state instead of a number in that case. `orderNumber` remains the
+ * canonical internal id for support/admin use — it is simply never displayed.
  */
 export function orderDisplayNumber(
-  o: { orderNumber: string; lazywaitOrderNumber?: string | null },
-): { primary: string; secondary: string | null } {
+  o: { lazywaitOrderNumber?: string | null },
+): string | null {
   const pos = (o.lazywaitOrderNumber ?? '').trim();
-  return pos ? { primary: pos, secondary: o.orderNumber } : { primary: o.orderNumber, secondary: null };
+  return pos.length > 0 ? pos : null;
 }
 
 // --- Settings (single app_settings row feeds brand + loyalty) --------------

@@ -1,20 +1,33 @@
 /**
- * Order confirmation / receipt. Loads the just-placed order (RLS scopes it to
- * the owner) and shows the server-authoritative amounts. Payment stays pending
- * — no payment is faked (payment integration is a later, server-side track).
+ * Order status / receipt screen.
+ *
+ * THE RULE (Issue #94): this screen renders from ONE server-derived state —
+ * `deriveCustomerOrderState` — and nothing else. There is no unconditional
+ * success hero: the check mark and "Order confirmed" appear only in states whose
+ * presentation says `success`, which for a POS-integrated order means the branch
+ * actually accepted it and returned a usable reference. The previous version
+ * rendered a green "Order placed!" hero above a banner that could simultaneously
+ * read "Not confirmed"; that contradiction is now structurally impossible because
+ * both the hero and the message come from the same state.
+ *
+ * The internal SM-… order number is never displayed — only the branch's own order
+ * number, and only once the branch has issued one.
  */
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
-import { AlertIcon, AwardIcon, CheckCircleIcon } from '../../components/Icons';
+import { AlertIcon, AwardIcon, CheckCircleIcon, ClockIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
 import { ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
-import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycleTone } from './posLifecycle';
+import {
+  confirmationPresentation, orderConfirmationState,
+  type ConfirmationTone, type CustomerOrderState,
+} from './orderConfirmation';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
@@ -27,6 +40,9 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Resend is a server action; these only drive the button's local affordance.
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   // Mirror for the focus/poll callbacks (stable identities, no stale closures).
   const orderRef = useRef<Order | null>(null);
 
@@ -65,6 +81,33 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     return () => clearInterval(id);
   }, [refreshSilently]));
 
+  /**
+   * Customer "Resend order". The server owns ownership, the proven-not-sent
+   * safety check and the attempt budget; this handler only debounces the button
+   * and re-reads the authoritative row afterwards.
+   *
+   * `resending` gates re-entry so a double tap cannot fire two requests — and
+   * even if one slipped through, the RPC locks the order row and the second call
+   * observes an already-requeued order, so it can never double the counter or
+   * open a second send.
+   */
+  const resend = useCallback(async () => {
+    if (resending) return;
+    setResending(true);
+    setResendError(null);
+    try {
+      await orders.requestResend(orderId);
+    } catch {
+      // A transport failure says nothing about the order's real state; surface a
+      // neutral retry hint and let the refresh below show the truth.
+      setResendError(t('oc_resend_failed'));
+    } finally {
+      // Always re-read: the RPC's own outcome is advisory, the row is the truth.
+      await refreshSilently();
+      setResending(false);
+    }
+  }, [orderId, refreshSilently, resending, t]);
+
   return (
     <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.bg}>
       {loading ? (
@@ -77,13 +120,16 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
       ) : (
         <View style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ padding: spacing.lg }} showsVerticalScrollIndicator={false}>
-            <View style={styles.hero}>
-              <CheckCircleIcon size={56} color={colors.success} />
-              <Text style={styles.title}>{t('orderPlaced')}</Text>
-              <Text style={styles.sub}>{t('orderPlacedSub')}</Text>
-            </View>
-
-            <PosLifecycleBanner order={order} />
+            {/*
+              ONE state drives the icon, the title and the message together, so a
+              success hero can never sit above a "not confirmed" message again.
+            */}
+            <ConfirmationHero
+              order={order}
+              onResend={resend}
+              resending={resending}
+              resendError={resendError}
+            />
 
             {(() => {
               const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
@@ -107,14 +153,17 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               return (
                 <>
                   <View style={[styles.card, shadow.card]}>
-                    {(() => { const d = orderDisplayNumber(order); return (
-                      <Row
-                        label={t('orderNumber')}
-                        value={d.primary}
-                        secondary={d.secondary ? `${t('orderRef')}: ${d.secondary}` : undefined}
-                        strong
-                      />
-                    ); })()}
+                    {/*
+                      ONLY the branch's own order number is ever shown, and only
+                      once the branch has issued one. The internal SM-… number is
+                      never rendered — it identifies a database row, not an order
+                      the restaurant has accepted.
+                    */}
+                    <Row
+                      label={t('oc_branch_order_number')}
+                      value={orderDisplayNumber(order) ?? t('oc_number_pending')}
+                      strong={orderDisplayNumber(order) != null}
+                    />
                     <Row label={t('paymentMethodTitle')} value={methodText} />
                     <Row label={t('paymentStatus')} value={statusText} />
                     <Row label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />
@@ -180,57 +229,101 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   );
 }
 
-/**
- * Customer-facing POS confirmation banner. Renders ONLY when the order has a
- * derivable POS lifecycle (pickup, post-payment). Copy is the approved AR/EN
- * message; the derivation guarantees "confirmed" is shown only after Lazywait
- * returned a real order reference. Polite live-region so status changes picked
- * up by the silent refresh are announced.
- */
-const POS_TONE: Record<PosLifecycleTone, { bg: string; fg: string }> = {
+const TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
   info: { bg: colors.purpleBg, fg: colors.purple },
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.bgAlt, fg: colors.warning },
   danger: { bg: colors.dangerBg, fg: colors.danger },
 };
 
-function PosLifecycleBanner({ order }: { order: Order }) {
-  const { t, rtlText, rtlRow } = useI18n();
-  const lc = deriveCustomerPosLifecycle({
-    orderType: order.orderType,
-    syncState: order.lazywaitSyncState,
-    ref: order.lazywaitRef,
-    firstFailureAt: order.firstPosSyncFailureAt,
-    nextAttemptAt: order.syncNextAttemptAt,
-  });
-  if (!lc) return null;
-  const p = posLifecyclePresentation(lc);
-  const tone = POS_TONE[p.tone];
+/** Only `success` states get a check mark; everything else is honest about waiting. */
+function StateIcon({ state, color }: { state: CustomerOrderState; color: string }) {
+  const p = confirmationPresentation(state);
+  if (p.success) return <CheckCircleIcon size={56} color={color} />;
+  if (p.tone === 'danger') return <AlertIcon size={56} color={color} />;
+  return <ClockIcon size={56} color={color} />;
+}
+
+/**
+ * THE receipt hero. Icon, title and message all come from one derived state, so
+ * the screen cannot contradict itself. The Retry action is rendered only when the
+ * state's presentation says `canResend` — which the state machine grants only for
+ * orders proven never to have reached the branch, never for ambiguous ones (a
+ * resend there could duplicate the restaurant's ticket).
+ *
+ * A polite live-region announces transitions picked up by the silent refresh.
+ */
+function ConfirmationHero({
+  order, onResend, resending, resendError,
+}: {
+  order: Order;
+  onResend: () => void;
+  resending: boolean;
+  resendError: string | null;
+}) {
+  const { t, rtlText } = useI18n();
+  const state = orderConfirmationState(order);
+  const p = confirmationPresentation(state);
+  const tone = TONE[p.tone];
+
   return (
     <View
-      style={[banner.box, rtlRow, { backgroundColor: tone.bg, borderColor: tone.fg }]}
-      accessibilityLiveRegion="polite"
+      style={hero.wrap}
       accessible
-      accessibilityLabel={`${t(p.labelKey)}. ${t(p.bodyKey)}`}
+      accessibilityLiveRegion="polite"
+      accessibilityLabel={`${t(p.titleKey)}. ${t(p.bodyKey)}`}
     >
-      <View style={[banner.dot, { backgroundColor: tone.fg }]} />
-      <View style={{ flex: 1 }}>
-        <Text style={[banner.title, rtlText, { color: tone.fg }]}>{t(p.labelKey)}</Text>
-        <Text style={[banner.body, rtlText]}>{t(p.bodyKey)}</Text>
-      </View>
+      <StateIcon state={state} color={tone.fg} />
+      <Text style={[hero.title, { color: tone.fg }]}>{t(p.titleKey)}</Text>
+      <Text style={[hero.body, rtlText]}>{t(p.bodyKey)}</Text>
+
+      {p.canResend ? (
+        <View style={hero.action}>
+          <Button
+            label={resending ? t('oc_resending') : t('oc_resend')}
+            onPress={onResend}
+            // Button's own loading state disables the press and shows the spinner:
+            // the server is idempotent regardless, but a dimmed control is the
+            // honest signal that work is already in flight.
+            loading={resending}
+          />
+          {resendError ? (
+            <Text style={[hero.error, rtlText]} accessibilityLiveRegion="polite">{resendError}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/*
+        Refund progress is stated separately and never optimistically: 'Refunded'
+        appears only once the provider has confirmed it (refund_state='refunded').
+      */}
+      {order.refundState && order.refundState !== 'none' ? (
+        <View style={[hero.refund, { borderColor: tone.fg }]}>
+          <Text style={[hero.refundLabel, rtlText]}>{t('oc_refund_status')}</Text>
+          <Text style={[hero.refundValue, rtlText, { color: tone.fg }]}>
+            {order.refundState === 'refunded' ? t('oc_refunded')
+              : order.refundState === 'failed' ? t('oc_refund_failed')
+              : t('oc_refund_pending')}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-const banner = StyleSheet.create({
-  box: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm,
+const hero = StyleSheet.create({
+  wrap: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
+  title: { fontSize: font.xxl, fontWeight: '800', textAlign: 'center' },
+  body: { fontSize: font.md, color: colors.muted, textAlign: 'center', lineHeight: 22 },
+  action: { alignSelf: 'stretch', marginTop: spacing.md },
+  error: { fontSize: font.sm, color: colors.danger, fontWeight: '700', textAlign: 'center', marginTop: spacing.sm },
+  refund: {
+    alignSelf: 'stretch', marginTop: spacing.md, padding: spacing.md,
     borderWidth: 1, borderRadius: radius.md, borderCurve: 'continuous',
-    padding: spacing.md, marginTop: spacing.md,
+    backgroundColor: colors.bgAlt, gap: 2,
   },
-  dot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },
-  title: { fontSize: font.md, fontWeight: '800' },
-  body: { fontSize: font.sm, color: colors.text, fontWeight: '600', marginTop: 2, lineHeight: 20 },
+  refundLabel: { fontSize: font.sm, color: colors.muted, fontWeight: '600' },
+  refundValue: { fontSize: font.md, fontWeight: '800' },
 });
 
 function Row({ label, value, amount, negative, secondary, strong, big, muted }: { label: string; value?: string; amount?: number; negative?: boolean; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
@@ -252,9 +345,6 @@ function Row({ label, value, amount, negative, secondary, strong, big, muted }: 
 }
 
 const styles = StyleSheet.create({
-  hero: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
-  title: { fontSize: font.xxl, fontWeight: '800', color: colors.purple, textAlign: 'center' },
-  sub: { fontSize: font.md, color: colors.muted, textAlign: 'center' },
   card: {
     backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.md,

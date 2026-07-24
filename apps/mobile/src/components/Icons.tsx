@@ -126,6 +126,32 @@ export function CheckCircleIcon({ size = 48, color = '#1f9d55' }: IconProps) {
   );
 }
 
+/**
+ * Clock: ring with two hands — used for in-progress / awaiting states, where a
+ * check mark would wrongly read as "done" and an alert would over-alarm.
+ */
+export function ClockIcon({ size = 48, color = '#8a6d1f' }: IconProps) {
+  const stroke = Math.max(2, Math.round(size / 14));
+  const hourH = Math.round(size * 0.2);
+  const minuteW = Math.round(size * 0.24);
+  return (
+    <View style={{
+      width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: color,
+      alignItems: 'center', justifyContent: 'center',
+    }} pointerEvents="none">
+      {/* Hands pinned to the centre so they read as a clock at any size. */}
+      <View style={{
+        position: 'absolute', width: stroke, height: hourH, borderRadius: stroke / 2,
+        backgroundColor: color, top: size / 2 - hourH, left: size / 2 - stroke,
+      }} />
+      <View style={{
+        position: 'absolute', width: minuteW, height: stroke, borderRadius: stroke / 2,
+        backgroundColor: color, top: size / 2 - stroke, left: size / 2 - stroke,
+      }} />
+    </View>
+  );
+}
+
 /** Medal: ring + core + ribbon legs — used for the loyalty balance. */
 export function AwardIcon({ size = 24, color = '#422e87' }: IconProps) {
   const stroke = Math.max(2, Math.round(size / 12));

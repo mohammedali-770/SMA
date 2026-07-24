@@ -225,6 +225,18 @@ export const orders = {
       .select(ORDER_WITH_ITEMS_SELECT)
       .eq('id', id)
       .single()),
+  /**
+   * Customer "Resend order" for a paid/cash order that provably never reached the
+   * branch. The SERVER owns every rule: ownership, the proven-not-sent safety
+   * check (a resend can never duplicate a POS ticket) and the attempt budget.
+   *
+   * The response deliberately carries NO reason and NO counter — only an opaque
+   * outcome plus the freshly derived state, so the attempt limit is never
+   * disclosed to the client. The UI renders from `state` alone.
+   */
+  requestResend: async (id: string) =>
+    ok<{ outcome: 'accepted' | 'unavailable'; state: string }>(
+      await supabase.rpc('request_customer_pos_resend', { p_order_id: id })),
 };
 
 /** A temporary, pre-payment checkout session (NOT an order). */

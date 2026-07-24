@@ -729,3 +729,95 @@ rollback is closing/reverting the PR. After a hypothetical application, re-apply
 prior definitions of the two functions from
 `20260723090000_smart_operations_alerts_digest.sql` in a separate owner-approved
 follow-up migration (never an edit of an applied file).
+
+---
+
+## 18. Pending migration: Order confirmation state machine + automatic refunds (repository-only, UNAPPLIED)
+
+**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+
+- Repository migration: `20260724120000_order_confirmation_state_machine.sql`
+- Issue: **#94** (customer-visible "Order placed" + "Not confirmed" contradiction;
+  internal `SM-…` order number exposed to customers)
+- Owner approval on record: an explicit, scoped unfreeze of the payment /
+  payment-verification / webhook / checkout-session / Lazywait-submission /
+  retry / order-state / idempotency / automatic-refund areas for this issue,
+  granted in-conversation on 2026-07-24, notwithstanding the CLAUDE.md §6 freeze.
+  The approval covers **repository work only** — it did not authorize a
+  Production apply, a function deployment, or any live payment operation.
+
+### What it adds (all additive; no applied migration is edited)
+
+| Object | Kind | Purpose |
+|---|---|---|
+| `orders.pos_customer_retry_count` / `…_last_at` | columns | SERVER-counted manual resends |
+| `orders.refund_state` + `refund_required_at` / `refund_completed_at` / `refund_failure_code` | columns | refund lifecycle, guarded by an explicit transition trigger |
+| `order_refunds` | table | append-only refund attempt ledger; RLS staff-read-only |
+| `pos_confirmation_channel_active()` | function | does this order have a branch-confirmation step at all? |
+| `customer_order_state()` | function | THE authority mapping columns → one customer-visible state |
+| `customer_pos_resend_eligibility()` | function | pure proven-not-sent + budget predicate |
+| `request_customer_pos_resend()` | RPC (authenticated) | owner-scoped, row-locked, server-counted resend |
+| `order_refund_due()` + 2 triggers | predicate + triggers | automatic, path-independent refund enrollment |
+| `enforce_refund_state_transition()` | trigger | rejects invalid/out-of-order refund transitions |
+| `claim_order_refund()` / `finalize_order_refund()` | RPCs (service_role) | token-fenced, idempotent refund worker |
+| `list_failed_order_refunds()` | RPC (admin) | manual-review feed; fingerprinted charge refs only |
+
+`payment_status` is an enum of only `('pending','paid')` and is **not** extended —
+the refund lifecycle lives in a separate `refund_state` column, avoiding an
+`ALTER TYPE … ADD VALUE` in the migration path.
+
+### Safety properties encoded in the migration
+
+- **Never refund an order Lazywait accepted.** `order_refund_due()` requires a
+  paid order with NO stored POS reference, NO may-have-been-sent phase marker, in
+  a proven-not-sent terminal state (`dead_letter`/`blocked`), with the manual
+  budget spent. Ambiguous orders (`confirmation_required`, or any stored ref
+  marker) are excluded and continue to the existing human-verification feed.
+- **Never refund twice.** A deterministic per-order idempotency key plus a partial
+  unique index allowing at most one `pending|processing|succeeded` refund per order.
+- **Never resend into a duplicate POS ticket.** Lazywait Create Order has no
+  idempotency key, so the customer resend fires only from proven-not-sent state.
+- **No false-success resends.** `request_customer_pos_resend()` extends
+  `pos_sync_deadline_at` in the same locked statement that re-queues the row, so
+  the deadline-bounded claim RPCs actually pick it up.
+- **The retry budget is never disclosed.** The RPC returns only
+  `{ outcome, state }` — no reason code, no counter, no limit.
+
+### Delivery-channel note (forward compatibility)
+
+Delivery orders are held at `blocked` / `delivery_schema_unconfirmed` because the
+Lazywait delivery Create Order schema is unconfirmed. Gating them on Lazywait
+acceptance would mark every delivery order permanently unconfirmed and refund all
+of them. Participation is therefore decided by `pos_confirmation_channel_active()`,
+expressed in terms of the SYNC STATE rather than the order type: when Lazywait
+publishes the delivery API and `set_lazywait_initial_sync` begins enqueuing
+delivery to `pending` like pickup, delivery becomes gate-active automatically with
+no change to this migration.
+
+### Validation performed (repository only — NOT Production)
+
+- `tsc --noEmit` (root), `npm test` (vitest, 747 tests), mobile `tsc --noEmit`.
+- New unit suites: `apps/mobile/src/features/orders/orderConfirmation.test.ts`
+  and `supabase/functions/_shared/tapRefund.test.ts`.
+- **`supabase/tests/order_confirmation_state_machine_test.sql` has NOT been
+  executed** — no Docker/Postgres was available in the authoring environment. It
+  must be run against a throwaway PG16 with the full migration chain applied
+  before this migration is considered validated:
+  ```bash
+  psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+    -f supabase/tests/order_confirmation_state_machine_test.sql
+  ```
+
+### Rollback
+
+The feature is additive and isolated. Before any application, rollback is closing
+or reverting the PR. After a hypothetical application, drop the new triggers,
+functions and `order_refunds` table in a separate owner-approved follow-up
+migration (never an edit of an applied file); the added `orders` columns are
+nullable/defaulted and may be left in place.
+
+### Ledger reconciliation
+
+The §1 production-status counts in this document are **stale** and are owned by
+issue **#76**; this section deliberately does not restate or amend them. It records
+only the facts about this new repository-only migration.

@@ -12,7 +12,7 @@ import { EmptyView, ErrorView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
-import { deriveCustomerPosLifecycle, posLifecyclePresentation, type PosLifecycleTone } from './posLifecycle';
+import { confirmationPresentation, orderConfirmationState, type ConfirmationTone } from './orderConfirmation';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
@@ -64,7 +64,11 @@ export function OrdersScreen() {
   useFocusEffect(useCallback(() => { void load('focus'); }, [load]));
 
   function renderOrder({ item }: { item: Order }) {
-    const d = orderDisplayNumber(item);
+    // Only the branch's number is customer-visible; until the branch issues one
+    // the card leads with the confirmation state instead of an internal id.
+    const branchNo = orderDisplayNumber(item);
+    const confirmation = confirmationPresentation(orderConfirmationState(item));
+    const heading = branchNo ?? t(confirmation.titleKey);
     const statusLabel = t(STATUS_KEY[item.status]);
     const itemCount = item.items.reduce((n, it) => n + it.quantity, 0);
     const meta = `${itemCount} ${t('items')} · ${item.orderType === 'delivery' ? t('delivery') : t('pickup')}`;
@@ -75,17 +79,16 @@ export function OrdersScreen() {
         onPress={() => router.push(`/receipt/${item.id}`)}
         accessibilityRole="button"
         // Composed only from values already displayed on the card.
-        accessibilityLabel={`${d.primary} · ${statusLabel} · ${totalLabel}`}
+        accessibilityLabel={`${heading} · ${statusLabel} · ${totalLabel}`}
       >
         <View style={[styles.cardTop, rtlRow]}>
           <View style={{ flexShrink: 1 }}>
-            <Text style={[styles.orderNo, rtlText]}>{d.primary}</Text>
-            {d.secondary ? <Text style={[styles.orderRef, rtlText]} numberOfLines={1}>{d.secondary}</Text> : null}
+            <Text style={[styles.orderNo, rtlText]} numberOfLines={1}>{heading}</Text>
           </View>
           <StatusBadge label={statusLabel} status={item.status} />
         </View>
         <Text style={[styles.date, rtlText]}>{formatRiyadhDateTime(item.createdAt)}</Text>
-        <PosLifecycleChip order={item} />
+        <ConfirmationChip order={item} />
         <View style={[styles.cardBottom, rtlRow]}>
           <Text style={[styles.itemsCount, rtlText]}>{meta}</Text>
           <Price amount={item.total} size={font.lg} color={colors.purple} weight="800" />
@@ -154,34 +157,33 @@ const skeleton = StyleSheet.create({
   badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: colors.bgAlt },
 });
 
-/**
- * Compact POS confirmation chip on the order card. Renders only when a POS
- * lifecycle is derivable (pickup, post-payment). "Confirmed" appears only after
- * Lazywait returned a real order reference (guaranteed by the derivation).
- */
-const CHIP_TONE: Record<PosLifecycleTone, { bg: string; fg: string }> = {
+const CHIP_TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
   info: { bg: colors.purpleBg, fg: colors.purple },
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.bgAlt, fg: colors.warning },
   danger: { bg: colors.dangerBg, fg: colors.red },
 };
 
-function PosLifecycleChip({ order }: { order: Order }) {
+/**
+ * The same derived state as the receipt, shown compactly. My Orders must not
+ * collapse the confirmation states into a generic "placed" chip — a card whose
+ * order never reached the branch reads "Order not sent yet" or "Order not
+ * placed", never a success.
+ *
+ * The chip is suppressed only for `accepted_no_pos_channel`, where the heading
+ * and the order status already tell the whole story and a second line would just
+ * repeat it.
+ */
+function ConfirmationChip({ order }: { order: Order }) {
   const { t } = useI18n();
-  const lc = deriveCustomerPosLifecycle({
-    orderType: order.orderType,
-    syncState: order.lazywaitSyncState,
-    ref: order.lazywaitRef,
-    firstFailureAt: order.firstPosSyncFailureAt,
-    nextAttemptAt: order.syncNextAttemptAt,
-  });
-  if (!lc) return null;
-  const p = posLifecyclePresentation(lc);
+  const state = orderConfirmationState(order);
+  if (state === 'accepted_no_pos_channel') return null;
+  const p = confirmationPresentation(state);
   const tone = CHIP_TONE[p.tone];
   return (
     <View style={[styles.posChip, { backgroundColor: tone.bg }]}>
       <View style={[styles.posDot, { backgroundColor: tone.fg }]} />
-      <Text style={[styles.posChipText, { color: tone.fg }]} numberOfLines={1}>{t(p.labelKey)}</Text>
+      <Text style={[styles.posChipText, { color: tone.fg }]} numberOfLines={1}>{t(p.titleKey)}</Text>
     </View>
   );
 }
