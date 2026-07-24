@@ -796,17 +796,42 @@ no change to this migration.
 
 ### Validation performed (repository only — NOT Production)
 
-- `tsc --noEmit` (root), `npm test` (vitest, 747 tests), mobile `tsc --noEmit`.
-- New unit suites: `apps/mobile/src/features/orders/orderConfirmation.test.ts`
-  and `supabase/functions/_shared/tapRefund.test.ts`.
-- **`supabase/tests/order_confirmation_state_machine_test.sql` has NOT been
-  executed** — no Docker/Postgres was available in the authoring environment. It
-  must be run against a throwaway PG16 with the full migration chain applied
-  before this migration is considered validated:
-  ```bash
-  psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
-    -f supabase/tests/order_confirmation_state_machine_test.sql
-  ```
+**Executed 2026-07-24 against a disposable local PostgreSQL 16.9 + PostGIS 3.6.2
+cluster (127.0.0.1:5433, loopback-only, destroyed afterwards).** `pg_cron` and
+`pg_net` were installed as inert SHIMS: schedules are recorded but never run, and
+`net.http_post`/`http_get` perform no network I/O — so no payment, Lazywait,
+email, push, SMS or OTP call was possible during validation. The refund worker
+was never scheduled or invoked.
+
+| Check | Result |
+|---|---|
+| Full 53-migration chain from an EMPTY database | **53 / 53 applied**, 0 errors, 0 warnings |
+| Notices across the whole chain | 110, **all** routine `… does not exist, skipping` / `… already exists, skipping` |
+| SQL suites (`supabase/tests/*.sql`) | **17 / 17 passed** |
+| `order_confirmation_state_machine_test.sql` | PASS — `DERIVATION OK; ELIGIBILITY OK; RESEND OK; ENROLLMENT OK; WORKER OK; SECURITY OK` |
+| Apply onto a production-schema stand-in (52 prior migrations + representative data) | applied clean |
+| Retroactive refunds against existing orders | **0** — no historical order is enrolled |
+| Idempotent re-apply (3× on a populated database) | clean; no duplicated triggers/objects |
+| Mid-migration failure INSIDE a transaction | fully rolled back — 0 columns, 0 tables, 0 functions left |
+| Mid-migration failure in autocommit | leaves partial state; a re-run of the corrected file converges (verified) |
+| Frontend gates | `tsc --noEmit` (root + mobile), vitest 747, `vite build`, mobile web build |
+
+Pre-existing rows derive correct customer states after the migration
+(`confirmed_by_branch`, `sending_to_branch`, `branch_failed_retry_available`,
+`verifying_with_branch`, `accepted_no_pos_channel`, `payment_pending`), and a
+paid, dead-lettered, proven-not-sent historical order is offered its three manual
+resends rather than being refunded on sight.
+
+**APPLY INSIDE A TRANSACTION.** The migration file is not self-wrapped in
+`begin/commit`. Applied transactionally (as the `apply_migration` workflow does),
+a mid-way failure rolls back completely. Applied statement-by-statement in
+autocommit, a mid-way failure leaves partial objects; recovery is simply to
+re-run the corrected file, which is idempotent and converges.
+
+```bash
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/order_confirmation_state_machine_test.sql
+```
 
 ### Rollback
 

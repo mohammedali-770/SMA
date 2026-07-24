@@ -178,11 +178,14 @@ No test sends a real payment, refund, Lazywait order, OTP, message or email. The
 SQL suite is transactional (`begin; … rollback;`) and uses `session_replication_role
 = replica` for fixture inserts only.
 
+Validated 2026-07-24 on a disposable PostgreSQL 16.9 + PostGIS 3.6.2 cluster:
+full 53-migration chain applied from empty (0 errors, 0 warnings) and **17/17 SQL
+suites passed**, including this feature's suite. `pg_cron`/`pg_net` were inert
+shims, so no scheduled job ran and no outbound HTTP was possible. See
+`docs/MIGRATIONS.md` §18 for the complete result table.
+
 ## 10. Known gaps
 
-- **The SQL suite has not been executed.** No Docker or Postgres was available in
-  the authoring environment. It must pass against a throwaway PG16 before this
-  migration is considered validated.
 - **No Lazywait reconciliation API.** Issue #94 asks that a timeout/unknown
   response be reconciled with Lazywait before another create request. Lazywait
   exposes no order-lookup endpoint we have confirmed, so "reconcile" currently

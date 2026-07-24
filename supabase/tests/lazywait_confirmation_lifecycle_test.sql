@@ -235,8 +235,19 @@ begin
   --         correction can still create the legitimate confirmation.
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
-  if (select count(*) from public.notification_log where order_id=v_corr and kind='pos_sync') <> 0 then
-    raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking row'; end if;
+  -- The invariant is that the 'pos_confirmed' DEDUP SLOT stays free, so the
+  -- unusable->usable correction below can still enqueue the real confirmation.
+  -- Scoped to status='pos_confirmed' deliberately: the LATER synced-ref guard
+  -- (20260721130000, live 20260721084330) coerces this request to
+  -- 'confirmation_required' and legitimately enqueues ONE
+  -- 'pos_confirmation_required' event. Counting every kind='pos_sync' row
+  -- predates that guard and flagged correct behaviour as a failure.
+  if (select count(*) from public.notification_log
+       where order_id=v_corr and kind='pos_sync' and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking pos_confirmed row'; end if;
+  if (select count(*) from public.notification_log
+       where order_id=v_corr and kind='pos_sync' and status='pos_confirmation_required') <> 1 then
+    raise exception 'CASE 7 FAILED: synced-ref guard did not enqueue pos_confirmation_required'; end if;
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-FIXED'),'success','push',null,null,null,'pos_confirmed');
   if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed' and send_status='pending') <> 1 then
