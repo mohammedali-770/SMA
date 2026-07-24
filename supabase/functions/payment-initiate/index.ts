@@ -1,4 +1,4 @@
-﻿import { corsHeaders, json } from '../_shared/cors.ts';
+import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import { createSessionSignature, formatAmount, geideaApiBase, geideaHppBase } from '../_shared/geidea.ts';
@@ -8,13 +8,13 @@ import {
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
- * payment-initiate â€” the authenticated customer starts paying for an order they
+ * payment-initiate — the authenticated customer starts paying for an order they
  * already created (place_order left it payment_status='pending').
  *
  * verify_jwt = true: only a signed-in user reaches this. We read the order
  * through the USER's client so RLS proves ownership and hands us the server-
  * trusted total; the provider secret is read server-side and never returned. The
- * active provider is selected by integration_settings('payment').provider_name â€”
+ * active provider is selected by integration_settings('payment').provider_name —
  * 'tap' (Tap Hosted Checkout) or the pre-existing 'geidea' scaffold.
  */
 const TAP_CHARGES = 'https://api.tap.company/v2/charges';
@@ -35,7 +35,7 @@ Deno.serve(async (req: Request) => {
 
   const supaUser = userClient(authHeader);
 
-  // New flow: pay for a CHECKOUT SESSION (no order exists yet â€” it is created
+  // New flow: pay for a CHECKOUT SESSION (no order exists yet — it is created
   // only after this charge is verified). Tap-only. RLS scopes the session read to
   // its owner.
   if (sessionId) {
@@ -45,11 +45,14 @@ Deno.serve(async (req: Request) => {
     return await initiateTapForSession(admin0, supaUser, sessionId, cfg0!, lang);
   }
 
-  // Legacy flow: pay for an already-created order. Read it AS THE USER â€” RLS
+  // Legacy flow: pay for an already-created order. Read it AS THE USER — RLS
   // returns it only if they own it, and its `total` is the server-computed amount.
   const { data: order, error: orderErr } = await supaUser
     .from('orders')
-    .select('id, total, payment_status, payment_method, order_number, order_type, customer_name, customer_phone')
+    // order_number is deliberately NOT selected: nothing in this function may
+    // forward the internal SM-… id to Tap. reference.order comes from the
+    // attempt's own opaque ORD-… value (migration 20260724180000).
+    .select('id, total, payment_status, payment_method, order_type, customer_name, customer_phone')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) return json({ error: orderErr.message }, 400);
@@ -84,14 +87,14 @@ async function initiateTap(
   const tap = resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
   if (!tap.ok) {
     // Fail closed. 'disabled' is a global state (safe to reveal); a missing key is
-    // treated the same to the client â€” online payment simply isn't offered.
+    // treated the same to the client — online payment simply isn't offered.
     if (tap.reason === 'disabled') return json({ status: 'disabled' }, 200);
     return json({ error: 'Online payment is not available' }, 400);
   }
 
   // Atomic open-or-reuse of THE single active attempt for this order (DB-level
   // double-charge guard). A reused attempt that already has a checkout URL is
-  // returned as-is â€” no second Tap charge is ever created.
+  // returned as-is — no second Tap charge is ever created.
   const { data: rows, error: beginErr } = await admin.rpc('tap_begin_payment_attempt', {
     p_order_id: order.id, p_mode: tap.mode, p_expiry_minutes: tap.expiryMinutes,
   });
@@ -102,7 +105,7 @@ async function initiateTap(
   const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
   // tap_begin_payment_attempt returns the payment_records id as `attempt_id`
   // (NOT `id`). Guard it explicitly: a missing id here previously slipped through
-  // as `.eq('id', undefined)` â†’ Postgres "invalid input syntax for type uuid" â†’
+  // as `.eq('id', undefined)` → Postgres "invalid input syntax for type uuid" →
   // the charge was created at Tap but never persisted, surfacing as the generic
   // "Could not start the payment" while leaving the record stuck 'initiated'.
   if (!attempt || !attempt.attempt_id) {
@@ -136,7 +139,7 @@ async function initiateTap(
     // verification. The binding stays on referenceOrder below, UNCHANGED.
     description: 'Spicy Meal order',
     referenceTransaction: String(attempt.reference_transaction ?? ''),
-    referenceOrder: String(attempt.reference_order ?? order.order_number ?? ''),
+    referenceOrder: String(attempt.reference_order ?? ''),
     idempotent: String(attempt.reference_transaction ?? ''),
     sourceId: tap.sourceId,
     merchantId: tap.merchantId,
@@ -166,7 +169,7 @@ async function initiateTap(
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15_000),
       });
-      break; // got an HTTP response (ok or not) â€” stop retrying
+      break; // got an HTTP response (ok or not) — stop retrying
     } catch (e) {
       console.error(`Tap charge request error (attempt ${attemptNo}/2)`, e instanceof Error ? e.message : 'error');
       if (attemptNo < 2) await new Promise((r) => setTimeout(r, 600));
@@ -175,7 +178,7 @@ async function initiateTap(
 
   if (!resp) {
     // Still couldn't reach Tap after the retry. Annotate the attempt so the
-    // failure is visible instead of a bare 'initiated' record â€” but KEEP the
+    // failure is visible instead of a bare 'initiated' record — but KEEP the
     // status 'initiated' so tap_begin_payment_attempt reuses this same attempt
     // (and its idempotent reference) on the next "Try Again", preserving the
     // double-charge guard.
@@ -231,7 +234,7 @@ async function initiateTap(
       expiryMinutes: tap.expiryMinutes,
     }, 200);
   }
-  // CAPTURED-at-create (rare for hosted 3DS) or any other state â†’ let the app run
+  // CAPTURED-at-create (rare for hosted 3DS) or any other state → let the app run
   // the server verify path, which retrieves + confirms authoritatively.
   return json({
     provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
@@ -240,8 +243,8 @@ async function initiateTap(
 }
 
 // ---------------------------------------------------------------------------
-// Tap Hosted Checkout for a CHECKOUT SESSION. The order does NOT exist yet â€” it
-// is created only after this charge is verified (webhook / payment-verify â†’
+// Tap Hosted Checkout for a CHECKOUT SESSION. The order does NOT exist yet — it
+// is created only after this charge is verified (webhook / payment-verify →
 // finalize_checkout_session). Mirrors initiateTap but keyed on the session.
 // ---------------------------------------------------------------------------
 async function initiateTapForSession(
@@ -251,7 +254,7 @@ async function initiateTapForSession(
   cfg: ProviderConfig,
   lang: 'ar' | 'en',
 ): Promise<Response> {
-  // Read the session AS THE USER â€” RLS returns it only if they own it; its
+  // Read the session AS THE USER — RLS returns it only if they own it; its
   // `total` is the server-computed amount we charge (never a client value).
   const { data: session, error: sErr } = await supaUser
     .from('checkout_sessions')
@@ -384,7 +387,7 @@ async function initiateTapForSession(
 }
 
 // ---------------------------------------------------------------------------
-// Geidea (pre-existing scaffold â€” retained, dormant; selected only when
+// Geidea (pre-existing scaffold — retained, dormant; selected only when
 // provider_name='geidea'). Unchanged behavior.
 // ---------------------------------------------------------------------------
 async function initiateGeidea(

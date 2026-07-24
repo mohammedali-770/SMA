@@ -218,3 +218,79 @@ describe('sanitizeTapResponse', () => {
     expect(s.live_mode).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Issue #94 follow-up: no SM-… value may leave this system on ANY Tap field.
+//
+// Migration 20260724130000 neutralised `charge.description`; 20260724180000
+// makes `payment_records.reference_order` an opaque 'ORD-…' (the checkout-session
+// path has always used 'CS-…'). These tests assert the whole outbound payload,
+// not just the one field that was fixed first — a value-shape scan catches any
+// future field that starts concatenating the number in.
+// ---------------------------------------------------------------------------
+
+/** The generated shape of the internal id: SM-<4-digit year>-<6+ digits>. */
+const SM_SHAPE = /SM-\d{4}-\d{4,}/;
+
+/** Every string anywhere in a nested value. */
+function deepStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === 'string') { out.push(value); return out; }
+  if (Array.isArray(value)) { for (const v of value) deepStrings(v, out); return out; }
+  if (value && typeof value === 'object') {
+    for (const v of Object.values(value as Record<string, unknown>)) deepStrings(v, out);
+  }
+  return out;
+}
+
+describe('Tap payload carries no internal order identifier', () => {
+  const opaque = {
+    amount: 45.5, currency: 'SAR', description: 'Spicy Meal order',
+    referenceTransaction: 'sm_7a1c9e2b', referenceOrder: 'ORD-4f2a9c7b1d3e',
+    idempotent: 'sm_7a1c9e2b', sourceId: 'src_card', merchantId: 'm_1',
+    expiryMinutes: 30, langCode: 'en' as const,
+    postUrl: 'https://example.test/webhook', redirectUrl: 'https://example.test/return',
+    customer: { firstName: 'Sara', lastName: 'A', phone: '512345678', email: null },
+    descriptor: 'SPICYMEAL',
+  };
+
+  it('emits no SM-… anywhere in the built charge payload', () => {
+    const b = buildTapChargePayload(opaque);
+    const strings = deepStrings(b);
+    expect(strings.length).toBeGreaterThan(0);
+    for (const s of strings) expect(s).not.toMatch(SM_SHAPE);
+  });
+
+  it('keeps the description a constant with no identifier interpolated', () => {
+    const b = buildTapChargePayload(opaque);
+    expect(b.description).toBe('Spicy Meal order');
+  });
+
+  it('carries the opaque reference through unchanged as the binding value', () => {
+    // The binding must still be PRESENT — neutralising the identifier must not
+    // silently drop the field verification compares.
+    const ref = buildTapChargePayload(opaque).reference as Record<string, unknown>;
+    expect(ref.order).toBe('ORD-4f2a9c7b1d3e');
+    expect(ref.transaction).toBe('sm_7a1c9e2b');
+  });
+
+  it('accepts the checkout-session CS-… shape equally', () => {
+    const b = buildTapChargePayload({ ...opaque, referenceOrder: 'CS-9b8a7c6d5e4f' });
+    expect((b.reference as Record<string, unknown>).order).toBe('CS-9b8a7c6d5e4f');
+    for (const s of deepStrings(b)) expect(s).not.toMatch(SM_SHAPE);
+  });
+
+  it('leaves the webhook hashstring contract untouched by the change', () => {
+    // description and reference.order are NOT hash fields, so neutralising them
+    // cannot alter webhook signature verification.
+    expect(chargeHashFields).not.toContain('description');
+    expect(chargeHashFields).not.toContain('reference.order');
+  });
+
+  it('SM_SHAPE actually matches a real internal number (guards the guard)', () => {
+    // A scanner that matches nothing would make every assertion above vacuous.
+    expect('SM-2026-000032').toMatch(SM_SHAPE);
+    expect('Spicy Meal order SM-2026-000032').toMatch(SM_SHAPE);
+    expect('ORD-4f2a9c7b1d3e').not.toMatch(SM_SHAPE);
+    expect('CS-9b8a7c6d5e4f').not.toMatch(SM_SHAPE);
+  });
+});
