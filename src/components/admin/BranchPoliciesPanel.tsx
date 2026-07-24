@@ -1,5 +1,5 @@
 import React, { useState, Suspense } from 'react';
-import { AlertTriangle, Map as MapIcon, Pencil, MapPin } from 'lucide-react';
+import { AlertTriangle, Map as MapIcon, Pencil, MapPin, Trash2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import type { GeoJSONGeometry } from '../../lib/geo';
@@ -11,7 +11,7 @@ const BranchEditModal = React.lazy(() => import('./BranchEditModal').then(m => (
 
 export const BranchPoliciesPanel: React.FC = () => {
   const {
-    branches, products, updateBranchSettings, isProductAvailableInBranch, toggleProductAvailability,
+    branches, products, updateBranchSettings, deleteBranch, isProductAvailableInBranch, toggleProductAvailability,
     currentUser, adminLang, deliveryZones, saveBranchDeliveryZone, clearBranchDeliveryZone,
   } = useApp();
   const isAccountant = currentUser.role === 'accountant';
@@ -19,6 +19,7 @@ export const BranchPoliciesPanel: React.FC = () => {
   const isRTL = adminLang === 'ar';
   const [zoneBranchId, setZoneBranchId] = useState<string | null>(null);
   const [editBranchId, setEditBranchId] = useState<string | null>(null);
+  const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
 
   const zoneForBranch = (branchId: string) => deliveryZones.find(z => z.branchId === branchId && z.isActive);
   const zoneBranch = branches.find(b => b.id === zoneBranchId) ?? null;
@@ -29,6 +30,26 @@ export const BranchPoliciesPanel: React.FC = () => {
   };
   const handleSaveBranch = async (patch: Partial<Branch>) => {
     if (editBranchId) await updateBranchSettings(editBranchId, patch);
+  };
+
+  const handleDeleteBranch = async (branch: Branch) => {
+    if (isAccountant || deletingBranchId) return;
+    const branchName = isRTL ? branch.nameAr : branch.nameEn;
+    const message = isRTL
+      ? `هل أنت متأكد من حذف فرع «${branchName}» نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
+      : `Permanently delete “${branchName}”? This action cannot be undone.`;
+    if (!window.confirm(message)) return;
+
+    setDeletingBranchId(branch.id);
+    try {
+      await deleteBranch(branch.id);
+      if (editBranchId === branch.id) setEditBranchId(null);
+      if (zoneBranchId === branch.id) setZoneBranchId(null);
+    } catch {
+      // AppContext surfaces the server/RLS error in the dashboard write banner.
+    } finally {
+      setDeletingBranchId(null);
+    }
   };
 
   return (
@@ -63,6 +84,20 @@ export const BranchPoliciesPanel: React.FC = () => {
                           <Pencil className="w-2.5 h-2.5" />
                           {isAccountant ? (isRTL ? 'عرض' : 'View') : (isRTL ? 'تعديل' : 'Edit')}
                         </button>
+                        {!isAccountant && (
+                          <button
+                            type="button"
+                            onClick={() => { void handleDeleteBranch(branch); }}
+                            disabled={deletingBranchId !== null}
+                            aria-label={isRTL ? `حذف فرع ${branch.nameAr}` : `Delete branch ${branch.nameEn}`}
+                            className="flex items-center gap-1 text-[9px] font-black uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" />
+                            {deletingBranchId === branch.id
+                              ? (isRTL ? 'جاري الحذف…' : 'Deleting…')
+                              : (isRTL ? 'حذف' : 'Delete')}
+                          </button>
+                        )}
                       </div>
                     </div>
 
