@@ -127,7 +127,14 @@ async function initiateTap(
     amount: total,
     currency: tap.currency,
     descriptor: tap.descriptor,
-    description: `Spicy Meal order ${order.order_number}`,
+    // CUSTOMER-SAFE. Tap documents `description` only as "an arbitrary string
+    // which you can attach to a Charge request with more details" and does NOT
+    // state that it stays internal, so it must be assumed visible on the hosted
+    // payment page / receipt. It is NOT one of the bound fields
+    // validateAndConfirmTapCharge compares, and NOT part of the webhook
+    // hashstring (chargeHashFields), so neutralizing it cannot weaken
+    // verification. The binding stays on referenceOrder below, UNCHANGED.
+    description: 'Spicy Meal order',
     referenceTransaction: String(attempt.reference_transaction ?? ''),
     referenceOrder: String(attempt.reference_order ?? order.order_number ?? ''),
     idempotent: String(attempt.reference_transaction ?? ''),

@@ -223,19 +223,100 @@ suites passed**, including this feature's suite. `pg_cron`/`pg_net` were inert
 shims, so no scheduled job ran and no outbound HTTP was possible. See
 `docs/MIGRATIONS.md` §18 for the complete result table.
 
-## 10. Known gaps
+## 10a. Loyalty reasons (closed)
 
-- **`loyalty_transactions.reason` still embeds the internal order number.**
-  `place_order` writes `'Earned on order ' || order_number` into a column that is
-  customer-readable (`grant select … to authenticated` plus RLS
-  `profile_id = auth.uid()`), so a customer can read their own `SM-…` id straight
-  from PostgREST. This is **pre-existing** and outside this PR's surface — fixing
-  it means either redefining `place_order` (the pricing authority) in a new
-  migration, or column-scoping the grant, which would also hide `reason` from
-  staff since both are the `authenticated` role. Tracked for a separate change.
-- **Tap's hosted checkout page shows the order number** in the charge
-  description (see §4). Server→provider by design; changing the bound
-  `reference.order` would weaken payment verification.
+`place_order` and `insert_order_from_snapshot` wrote `'Earned on order ' ||
+order_number` into `loyalty_transactions.reason`. That table is customer-readable
+(`grant select … to authenticated` + RLS `profile_id = auth.uid()`), so a customer
+could read their own `SM-…` id straight from PostgREST — the mobile app never
+queries the table, so this was pure auto-exposure that a code-path search missed.
+
+Migration `20260724130000` closes it **at the destination column**, not in the
+pricing functions:
+
+- `text_has_internal_order_number(text)` matches the generated VALUE SHAPE
+  (`SM-<4 digits>-<6+ digits>`), so it catches any writer that concatenates the
+  number into free text.
+- `loyalty_safe_reason()` returns neutral wording for order-linked rows
+  (**"Points earned from an order"** / **"Points redeemed on an order"**) and
+  *redacts* the identifier from any other free text, preserving the rest of an
+  operator's note.
+- A BEFORE INSERT OR UPDATE trigger applies it, so the fix is writer-independent.
+- A `NOT VALID` CHECK constraint is the backstop for future writes.
+
+**Why not redefine `place_order`:** it is a ~200-line pricing authority that owns
+subtotal, modifiers, delivery fee, coupon, VAT, loyalty, award timing and
+idempotency. Re-emitting it verbatim to change two string literals is a large,
+transcription-error-prone diff across pricing-sensitive code for a text-only fix.
+The trigger touches none of that logic. `loyalty_reason_no_order_number_test.sql`
+runs a real `place_order` and asserts the award happens **exactly once**, amounts
+and balances are unchanged, and nothing leaks.
+
+Staff keep full traceability through `loyalty_transactions.order_id` (a UUID FK).
+No grant or RLS policy was revoked.
+
+### Historical rows — NOT rewritten
+
+This migration deliberately does **not** touch existing rows, and the constraint
+is `NOT VALID` so history is neither validated nor rejected. Rewriting them is a
+Production **data** change requiring separate, explicit owner approval. The
+proposed statement, to be run only under that approval:
+
+```sql
+-- Preview first:
+select count(*) from public.loyalty_transactions
+ where public.text_has_internal_order_number(reason);
+
+-- Remediation (owner-approved only):
+update public.loyalty_transactions
+   set reason = public.loyalty_safe_reason(type::text, order_id, reason)
+ where public.text_has_internal_order_number(reason);
+
+-- Verify, then optionally promote the guarantee to cover all rows:
+alter table public.loyalty_transactions
+  validate constraint loyalty_transactions_reason_no_order_number;
+```
+
+## 10b. Tap `description` (closed)
+
+Tap documents `description` only as *"an arbitrary string which you can attach to
+a Charge request with more details, if needed"* and **never states that it stays
+internal**, so it cannot be shown to be non-customer-visible and must be assumed
+to appear on the hosted page or a receipt.
+
+It is now the constant `'Spicy Meal order'`. This is safe because `description`
+is **not** one of the bound fields `validateAndConfirmTapCharge` compares (id,
+amount, currency, `reference.order`, `reference.transaction`, `live_mode`,
+merchant) and **not** part of the webhook hashstring (`chargeHashFields`). The
+verification binding stays on `reference.order`, unchanged. `tap.test.ts` pins
+both halves: the description carries no `SM-…`, and `reference.order` still
+carries the exact attempt reference.
+
+## 11. Known gaps
+
+- **The raw `public.orders` table surface still carries `order_number` (and
+  `pos_create_attempt_token`) to the owning customer.** One root cause —
+  `grant select on public.orders to authenticated` is TABLE-WIDE (`20260707120500`
+  :107) and RLS filters ROWS, not columns — with three reachable expressions:
+
+  | Surface | Reachable how |
+  |---|---|
+  | PostgREST table read | `GET /rest/v1/orders?select=order_number` returns the customer's own `SM-…` |
+  | `place_order` RPC | `returns public.orders`, granted to `authenticated`, so a direct call returns the whole row (the app no longer calls it — it uses `order-intake` — but the grant stands) |
+  | Realtime | `supabase_realtime` includes `public.orders` (`20260707121100`), so a subscriber receives full row payloads. Added for the STAFF console; **the customer app does not subscribe**, so this is latent, not active |
+
+  Verified empirically on the disposable cluster: as role `authenticated` with
+  `auth.uid()` set to the owner, `select order_number from orders` returns
+  `SM-2026-000999` and `pos_create_attempt_token` returns its value.
+
+  This PR closes the app, the models and every endpoint response, but **cannot**
+  close the raw table without column-level grants — and **staff share the
+  `authenticated` role** and read orders with `select('*')` (`src/lib/api.ts:553,
+  567`), so column grants would break the dashboard. Closing it properly means
+  moving staff order reads behind a `SECURITY DEFINER` admin RPC (or giving staff
+  a distinct Postgres role), then column-scoping the customer grant and dropping
+  `orders` from the realtime publication in favour of a staff-only channel. That
+  is an architectural change and needs its own reviewed PR.
 - **No Lazywait reconciliation API.** Issue #94 asks that a timeout/unknown
   response be reconciled with Lazywait before another create request. Lazywait
   exposes no order-lookup endpoint we have confirmed, so "reconcile" currently

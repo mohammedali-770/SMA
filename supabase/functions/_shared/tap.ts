@@ -128,7 +128,10 @@ export interface BuildChargeParams {
   amount: number;                 // server order total
   currency: string;               // 'SAR'
   descriptor?: string;            // statement_descriptor (optional)
-  description: string;            // "Spicy Meal order <order_number>"
+  // Customer-safe text only — assume Tap may render this on the hosted page or
+  // a receipt. NEVER embed the internal SM-… order number here (Issue #94); the
+  // verification binding lives in referenceOrder, not this field.
+  description: string;
   referenceTransaction: string;   // our unique attempt reference
   referenceOrder: string;         // local order number
   idempotent: string;             // Tap idempotency string (dedup)

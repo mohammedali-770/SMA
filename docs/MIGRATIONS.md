@@ -862,3 +862,69 @@ nullable/defaulted and may be left in place.
 The §1 production-status counts in this document are **stale** and are owned by
 issue **#76**; this section deliberately does not restate or amend them. It records
 only the facts about this new repository-only migration.
+
+---
+
+## 19. Pending migration: loyalty reason without the internal order number (repository-only, UNAPPLIED)
+
+**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+
+- Repository migration: `20260724130000_loyalty_reason_no_order_number.sql`
+- Issue: **#94** (internal `SM-…` identifier must not reach a customer surface)
+- Companion to §18; both are unapplied and both must be applied inside a transaction.
+
+### What it closes
+
+`place_order` (latest definition `20260710120100`) and
+`insert_order_from_snapshot` (latest `20260712170000`) write
+`'Earned on order ' || orders.order_number` into
+`public.loyalty_transactions.reason`. That table is customer-readable
+(`grant select … to authenticated` from `20260707120900`, RLS
+`profile_id = auth.uid() or is_staff()`), so any signed-in customer could read
+their own `SM-…` id via `GET /rest/v1/loyalty_transactions?select=reason`. The
+mobile app never queries the table — the exposure was PostgREST auto-exposure.
+
+### What it adds (additive; no applied migration is edited)
+
+| Object | Kind | Purpose |
+|---|---|---|
+| `text_has_internal_order_number(text)` | function | matches the generated VALUE SHAPE `SM-<4>-<6+>` |
+| `loyalty_safe_reason(type, order_id, reason)` | function | neutral text for order-linked rows; redaction for free text |
+| `set_loyalty_safe_reason()` + trigger | trigger | normalizes on INSERT **and** UPDATE, writer-independently |
+| `loyalty_transactions_reason_no_order_number` | CHECK (**NOT VALID**) | forward-only backstop; history neither validated nor rejected |
+
+**`place_order` is NOT redefined.** It is a ~200-line pricing authority; the fix
+lives on the destination column so no pricing, award-timing or idempotency logic
+is touched. Loyalty amounts, balances and `order_id` linkage are unchanged.
+
+### Historical rows
+
+**Deliberately not rewritten.** Verified on the production stand-in: after
+applying both migrations, a pre-existing row containing `SM-…` is still present
+and unmodified. Remediation is a separate, explicitly owner-approved Production
+data action — the exact statements are in
+`docs/ORDER_CONFIRMATION_FLOW.md` §10a.
+
+### Validation performed (repository only — NOT Production)
+
+Same disposable PostgreSQL 16.9 + PostGIS 3.6.2 harness as §18 (pg_cron/pg_net
+inert shims; no scheduled job ran; no outbound HTTP possible).
+
+| Check | Result |
+|---|---|
+| Full **54**-migration chain from an EMPTY database | **54 / 54 applied**, 0 errors, 0 warnings |
+| SQL suites | **19 / 19 passed** |
+| `loyalty_reason_no_order_number_test.sql` | PASS — PREDICATE · NORMALIZE · PLACE_ORDER AWARD · REDACT · CUSTOMER PROJECTION · ACCESS/CONSTRAINT · CUSTOMER SCAN · SECURITY CONTRACT |
+| Real `place_order` run | loyalty awarded **exactly once**; idempotency key honoured; totals and points unchanged |
+| End-to-end customer session (role `authenticated`, RLS on) | loyalty reason = "Points earned from an order"; `payment_records`, `integration_sync_logs`, `order_refunds` all **0 rows visible** |
+| Apply onto production stand-in + 3× idempotent re-apply | clean |
+| Historical `SM-…` loyalty row after apply | **still present, unmodified** |
+| Mid-migration failure inside a transaction | fully rolled back (0 functions, 0 triggers, 0 constraints) |
+| Mid-migration failure in autocommit | partial, then converges on re-run |
+| SECURITY DEFINER / `search_path` contract | `place_order` + `insert_order_from_snapshot` unchanged |
+
+### Rollback
+
+Additive and isolated. Before application, rollback is closing/reverting the PR.
+After a hypothetical application: drop the trigger, the constraint and the three
+functions in a separate owner-approved follow-up migration.

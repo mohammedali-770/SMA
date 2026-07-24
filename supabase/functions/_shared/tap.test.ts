@@ -40,12 +40,34 @@ describe('normalizeSaudiPhone', () => {
 
 describe('buildTapChargePayload', () => {
   const base = {
-    amount: 45.5, currency: 'SAR', description: 'Spicy Meal order SM-1',
-    referenceTransaction: 'txn_abc', referenceOrder: 'SM-1', idempotent: 'txn_abc',
+    amount: 45.5, currency: 'SAR', description: 'Spicy Meal order',
+    referenceTransaction: 'txn_abc', referenceOrder: 'SM-2026-000001', idempotent: 'txn_abc',
     sourceId: 'src_all', merchantId: 'mid_1', expiryMinutes: 30, langCode: 'en' as const,
     postUrl: 'https://x/functions/v1/payment-webhook', redirectUrl: 'https://x/functions/v1/payment-return?order=o1',
     customer: { firstName: 'Sara', lastName: 'A', email: 'sara@example.com', phone: { country_code: '966', number: '501234567' } },
   };
+  /**
+   * Issue #94: `description` must be assumed customer-visible (Tap documents it
+   * only as "an arbitrary string … with more details" and never states that it
+   * stays internal), so it must never carry the internal SM-… order number.
+   * The VERIFICATION binding lives in reference.order and is unaffected — the
+   * assertions below pin both halves of that split.
+   */
+  it('never puts the internal order number in the customer-visible description', () => {
+    const b = buildTapChargePayload(base);
+    expect(b.description).toBe('Spicy Meal order');
+    expect(String(b.description)).not.toMatch(/SM-\d{4}-\d{4,}/);
+  });
+
+  it('keeps reference.order as the verification binding', () => {
+    const b = buildTapChargePayload(base);
+    // The bound field validateAndConfirmTapCharge compares must still carry the
+    // exact stored attempt reference — neutralizing the description must not
+    // weaken it.
+    expect((b.reference as Record<string, unknown>).order).toBe('SM-2026-000001');
+    expect((b.reference as Record<string, unknown>).transaction).toBe('txn_abc');
+  });
+
   it('sets the mandatory security fields and src_all', () => {
     const b = buildTapChargePayload(base);
     expect(b.customer_initiated).toBe(true);
@@ -53,7 +75,7 @@ describe('buildTapChargePayload', () => {
     expect(b.save_card).toBe(false);
     expect((b.source as any).id).toBe('src_all');
     expect(b.idempotent).toBe('txn_abc');
-    expect((b.reference as any)).toEqual({ transaction: 'txn_abc', order: 'SM-1' });
+    expect((b.reference as any)).toEqual({ transaction: 'txn_abc', order: 'SM-2026-000001' });
     expect(b.amount).toBe(45.5);
     expect((b.post as any).url).toContain('payment-webhook');
     expect((b.redirect as any).url).toContain('payment-return');
