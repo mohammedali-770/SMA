@@ -177,7 +177,9 @@ const CHIP_TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
 function ConfirmationChip({ order }: { order: Order }) {
   const { t } = useI18n();
   const state = orderConfirmationState(order);
-  if (state === 'accepted_no_pos_channel') return null;
+  // The card heading already renders this state's title when there is no branch
+  // number, so a chip would only repeat it.
+  if (state === 'accepted_no_pos_channel' || state === 'accepted_no_pos_channel_unpaid') return null;
   const p = confirmationPresentation(state);
   const tone = CHIP_TONE[p.tone];
   return (

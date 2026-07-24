@@ -807,20 +807,36 @@ was never scheduled or invoked.
 |---|---|
 | Full 53-migration chain from an EMPTY database | **53 / 53 applied**, 0 errors, 0 warnings |
 | Notices across the whole chain | 110, **all** routine `… does not exist, skipping` / `… already exists, skipping` |
-| SQL suites (`supabase/tests/*.sql`) | **17 / 17 passed** |
+| SQL suites (`supabase/tests/*.sql`) | **18 / 18 passed** |
+| SQL ↔ TypeScript state parity | **0 mismatches over 3,456 input combinations** |
 | `order_confirmation_state_machine_test.sql` | PASS — `DERIVATION OK; ELIGIBILITY OK; RESEND OK; ENROLLMENT OK; WORKER OK; SECURITY OK` |
 | Apply onto a production-schema stand-in (52 prior migrations + representative data) | applied clean |
 | Retroactive refunds against existing orders | **0** — no historical order is enrolled |
 | Idempotent re-apply (3× on a populated database) | clean; no duplicated triggers/objects |
 | Mid-migration failure INSIDE a transaction | fully rolled back — 0 columns, 0 tables, 0 functions left |
 | Mid-migration failure in autocommit | leaves partial state; a re-run of the corrected file converges (verified) |
-| Frontend gates | `tsc --noEmit` (root + mobile), vitest 747, `vite build`, mobile web build |
+| Frontend gates | `tsc --noEmit` (root + mobile), vitest **764**, `vite build`, mobile web build |
 
 Pre-existing rows derive correct customer states after the migration
 (`confirmed_by_branch`, `sending_to_branch`, `branch_failed_retry_available`,
 `verifying_with_branch`, `accepted_no_pos_channel`, `payment_pending`), and a
 paid, dead-lettered, proven-not-sent historical order is offered its three manual
 resends rather than being refunded on sight.
+
+### The refund worker is NOT scheduled
+
+- **No cron job is scheduled by this migration.** It creates no `cron.schedule`
+  entry, and `supabase/functions/payment-refund` is not wired to any scheduler.
+- **It was not invoked during validation.** `pg_cron`/`pg_net` were inert shims;
+  no scheduled command ran and no outbound HTTP was possible.
+- **Merging this PR, or applying the migration alone, cannot start refund
+  processing.** Enrollment only marks `orders.refund_state = 'pending'` and opens
+  an `order_refunds` ledger row; nothing drains that queue until the worker is
+  deliberately run.
+- **Scheduling it is a SEPARATE production action requiring explicit owner
+  approval**, alongside deploying `payment-refund` and configuring its required
+  `refund_trigger_secret`. Without that secret the function returns `503` and
+  processes nothing.
 
 **APPLY INSIDE A TRANSACTION.** The migration file is not self-wrapped in
 `begin/commit`. Applied transactionally (as the `apply_migration` workflow does),

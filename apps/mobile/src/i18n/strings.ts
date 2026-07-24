@@ -286,8 +286,12 @@ export const STRINGS = {
     // three-attempt resend budget is never mentioned.
     oc_payment_pending: 'Payment not completed',
     oc_payment_pending_body: 'We have not received your payment yet. Your order has not been sent to the branch.',
-    oc_accepted: 'Order received',
-    oc_accepted_body: 'Thank you. We have your order and the branch will prepare it.',
+    // No-POS-channel states (delivery today). Neutral by design: payment
+    // settlement may be stated, branch acceptance may NOT be implied, and no
+    // success check is rendered — the branch has confirmed nothing.
+    oc_payment_received: 'Payment received',
+    oc_received: 'Order received',
+    oc_no_pos_channel_body: 'Your order is being processed through the delivery channel.',
     oc_sending: 'Sending to the branch…',
     oc_sending_body: 'We are sending your order to the branch. This usually takes a few moments — please stay on this screen.',
     oc_confirmed: 'Order confirmed',
@@ -580,8 +584,9 @@ export const STRINGS = {
     // تأكيده أو استُرد المبلغ قبل أن يتحقق ذلك فعلاً، ولا يُذكر عدد المحاولات.
     oc_payment_pending: 'لم يكتمل الدفع',
     oc_payment_pending_body: 'لم نستلم عملية الدفع بعد، ولم يتم إرسال طلبك إلى الفرع.',
-    oc_accepted: 'تم استلام الطلب',
-    oc_accepted_body: 'شكراً لك. استلمنا طلبك وسيقوم الفرع بتحضيره.',
+    oc_payment_received: 'تم استلام الدفع',
+    oc_received: 'تم استلام الطلب',
+    oc_no_pos_channel_body: 'طلبك قيد المعالجة عبر قناة التوصيل.',
     oc_sending: 'جارٍ الإرسال إلى الفرع…',
     oc_sending_body: 'جارٍ إرسال طلبك إلى الفرع. عادةً ما يستغرق ذلك لحظات — فضلاً ابقَ في هذه الشاشة.',
     oc_confirmed: 'تم تأكيد الطلب',

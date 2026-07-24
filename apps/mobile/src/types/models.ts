@@ -117,7 +117,6 @@ export interface SavedAddress {
 
 export interface OrderItemModifier {
   id: string;
-  modifierId: string;
   nameEn: string;
   nameAr: string;
   price: number;
@@ -125,7 +124,8 @@ export interface OrderItemModifier {
 
 export interface OrderItem {
   id: string;
-  productId: string;
+  // productId / modifierId are NOT fetched for a customer order (they are catalog
+  // joins the receipt never uses) — see lib/orderSelect.ts.
   nameEn: string;
   nameAr: string;
   price: number; // unit price incl. selected modifiers
@@ -133,12 +133,14 @@ export interface OrderItem {
   selectedModifiers: OrderItemModifier[];
 }
 
+/**
+ * The CUSTOMER view of an order. Deliberately narrower than the table: the
+ * internal `SM-…` order number, customer-identity copies, coupon/notes,
+ * address snapshot and every operational column are neither fetched nor
+ * representable here (Issue #94). See lib/orderSelect.ts.
+ */
 export interface Order {
   id: string;
-  orderNumber: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
   branchId: string;
   branchNameEn: string;
   branchNameAr: string;
@@ -151,13 +153,8 @@ export interface Order {
   vatAmount: number;
   total: number;
   loyaltyPointsEarned: number;
-  loyaltyPointsRedeemed: number;
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // 'online' | 'cash' (admin-configured availability)
-  paymentProvider?: string; // gateway label once an online payment is verified (server-set)
-  paidAt?: string; // ISO time an online payment was verified; null for unpaid/cash
-  couponCode?: string;
-  notes?: string;
   createdAt: string;
   /** Branch (POS) order number once accepted — the ONLY number ever shown. */
   lazywaitOrderNumber?: string;
@@ -166,7 +163,6 @@ export interface Order {
   lazywaitRef?: string; // POS order reference; REQUIRED to show "confirmed"
   /** Distinguishes "no POS channel for this order" from a real send failure. */
   syncBlockedReason?: string;
-  firstPosSyncFailureAt?: string;
   syncNextAttemptAt?: string;
   /** May-have-been-sent phase marker; blocks any resend when set. */
   posCreateAttemptedAt?: string;
@@ -174,7 +170,6 @@ export interface Order {
   posCustomerRetryCount?: number;
   /** 'none' | 'pending' | 'processing' | 'refunded' | 'failed'. */
   refundState?: string;
-  address?: SavedAddress;
   items: OrderItem[];
 }
 

@@ -21,8 +21,16 @@
 export type CustomerOrderState =
   /** Online payment not yet verified. No order-like language may be shown. */
   | 'payment_pending'
-  /** Settled, and this channel has no branch-confirmation step (see below). */
+  /**
+   * PAID, and this channel has no branch-confirmation step (see below). Payment
+   * success may be stated; branch acceptance may NOT — no success check.
+   */
   | 'accepted_no_pos_channel'
+  /**
+   * UNPAID (cash), and this channel has no branch-confirmation step. Same as
+   * above but without any payment claim — cash-on-delivery lands here.
+   */
+  | 'accepted_no_pos_channel_unpaid'
   /** A send is in flight, or an automatic retry is still queued. */
   | 'sending_to_branch'
   /** The branch accepted it. The ONLY state that may show a success hero. */
@@ -125,8 +133,12 @@ export function deriveCustomerOrderState(o: OrderConfirmationInput): CustomerOrd
   // (2) Online payment not yet verified.
   if (o.paymentMethod === 'online' && !paid) return 'payment_pending';
 
-  // (3) No branch-confirmation step for this channel.
-  if (!posConfirmationChannelActive(o.syncState, o.blockedReason)) return 'accepted_no_pos_channel';
+  // (3) No branch-confirmation step for this channel. Split by payment so the
+  //     copy can state payment success without ever implying branch acceptance;
+  //     a cash-on-delivery order lands here and must claim no payment.
+  if (!posConfirmationChannelActive(o.syncState, o.blockedReason)) {
+    return paid ? 'accepted_no_pos_channel' : 'accepted_no_pos_channel_unpaid';
+  }
 
   // (4) The branch accepted it — the only state that may claim confirmation.
   if (o.syncState === 'synced' && hasUsablePosRef(o.ref)) return 'confirmed_by_branch';
@@ -162,11 +174,11 @@ export type ConfirmationTone = 'info' | 'success' | 'warning' | 'danger';
  * the strings table — a state whose copy was never written cannot ship.
  */
 export type ConfirmationTitleKey =
-  | 'oc_payment_pending' | 'oc_accepted' | 'oc_sending'
+  | 'oc_payment_pending' | 'oc_payment_received' | 'oc_received' | 'oc_sending'
   | 'oc_confirmed' | 'oc_verifying' | 'oc_not_sent' | 'oc_failed';
 
 export type ConfirmationBodyKey =
-  | 'oc_payment_pending_body' | 'oc_accepted_body' | 'oc_sending_body'
+  | 'oc_payment_pending_body' | 'oc_no_pos_channel_body' | 'oc_sending_body'
   | 'oc_confirmed_body' | 'oc_verifying_body'
   | 'oc_not_sent_paid_body' | 'oc_not_sent_unpaid_body'
   | 'oc_failed_refund_pending_body' | 'oc_failed_refunded_body'
@@ -191,9 +203,17 @@ const PRESENTATION: Record<CustomerOrderState, ConfirmationPresentation> = {
     titleKey: 'oc_payment_pending', bodyKey: 'oc_payment_pending_body',
     tone: 'info', success: false, canResend: false, showBranchNumber: false,
   },
+  // NEUTRAL, not success. Payment settlement is stated; branch acceptance is
+  // NOT claimed and no green check is rendered — `confirmed_by_branch` remains
+  // the only POS-related state that may show one.
   accepted_no_pos_channel: {
-    titleKey: 'oc_accepted', bodyKey: 'oc_accepted_body',
-    tone: 'success', success: true, canResend: false, showBranchNumber: false,
+    titleKey: 'oc_payment_received', bodyKey: 'oc_no_pos_channel_body',
+    tone: 'info', success: false, canResend: false, showBranchNumber: false,
+  },
+  // Same, minus any payment claim (cash on delivery).
+  accepted_no_pos_channel_unpaid: {
+    titleKey: 'oc_received', bodyKey: 'oc_no_pos_channel_body',
+    tone: 'info', success: false, canResend: false, showBranchNumber: false,
   },
   sending_to_branch: {
     titleKey: 'oc_sending', bodyKey: 'oc_sending_body',

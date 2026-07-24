@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Typed data-access layer over Supabase for the CUSTOMER mobile app.
  *
  * This mirrors the customer-relevant slice of the web app's src/lib/api.ts and
@@ -14,10 +14,11 @@
  * payment / SMS / Lazywait call. Those stay server-side behind Edge Functions.
  */
 import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
+import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
   DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
 
@@ -50,7 +51,7 @@ export const auth = {
     if (error) throw new Error(error.message);
   },
   // verifyOtp with type 'sms' returns a REAL authenticated session (persisted by
-  // the existing supabase-js session handling). This — not whatsapp-verify-otp —
+  // the existing supabase-js session handling). This â€” not whatsapp-verify-otp â€”
   // is what logs a customer in.
   async verifyPhone(phone: string, token: string) {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
@@ -71,7 +72,7 @@ export const auth = {
   // TRI-STATE on purpose. A failed read ('unknown') must NOT be reported as
   // 'disabled': WhatsApp is the only login path, so treating a transient RPC /
   // RLS / network error as "off" would lock every customer out of an app that
-  // works. See features/auth/loginAvailability.ts — the caller shows the form on
+  // works. See features/auth/loginAvailability.ts â€” the caller shows the form on
   // 'unknown' and lets the Send SMS hook (which fails closed) be the authority.
   async whatsappLoginAvailability(): Promise<WhatsAppLoginAvailability> {
     return readLoginFlag(async () => supabase.rpc('whatsapp_login_enabled'));
@@ -100,7 +101,7 @@ export const catalog = {
     ok<DbBranchAvailability[]>(await supabase.from('branch_product_availability').select('*')),
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
-  /** Active delivery zones (safe columns only — never `updated_by`). */
+  /** Active delivery zones (safe columns only â€” never `updated_by`). */
   deliveryZones: async () =>
     ok<DbBranchDeliveryZone[]>(await supabase
       .from('branch_delivery_zones')
@@ -131,11 +132,11 @@ export interface PlaceOrderInput {
   loyaltyPoints?: number;
   /** Retry-safe key: a repeated submit with the same key returns the same order. */
   idempotencyKey?: string | null;
-  /** 'online' | 'cash' — availability is admin-controlled; place_order re-validates. */
+  /** 'online' | 'cash' â€” availability is admin-controlled; place_order re-validates. */
   paymentMethod?: 'online' | 'cash' | null;
 }
 // ---------------------------------------------------------------------------
-// Legal / policy documents — RLS returns only ACTIVE rows to anon/customers.
+// Legal / policy documents â€” RLS returns only ACTIVE rows to anon/customers.
 // ---------------------------------------------------------------------------
 export const legal = {
   list: async () => ok<DbLegalDocument[]>(await supabase
@@ -152,8 +153,11 @@ export const legal = {
   },
 };
 
-/** Order + nested lines/modifiers — the one nested order shape the app reads. */
-const ORDER_WITH_ITEMS_SELECT = '*, order_items(*, order_item_modifiers(*))';
+/** Order + nested lines/modifiers â€” the one nested order shape the app reads. */
+// Explicit customer-safe column list â€” NEVER `*`. The internal SM-â€¦ order number
+// and operational columns (including the POS fencing token) must not reach a
+// customer device. See lib/orderSelect.ts and its contract test.
+const ORDER_WITH_ITEMS_SELECT = CUSTOMER_ORDER_SELECT;
 
 export const orders = {
   /** Server-authoritative order creation (place_order RPC). */
@@ -174,11 +178,11 @@ export const orders = {
    * Create the order AND synchronously sync it to Lazywait POS via the
    * `order-intake` Edge Function, so the receipt can show the POS order number
    * (e.g. "#5"). The server bounds the wait (~10s) and, if the POS is slow/down,
-   * returns the order WITHOUT a POS number — the order is still placed and the
-   * background worker finishes the sync, so the app just falls back to the SM-…
+   * returns the order WITHOUT a POS number â€” the order is still placed and the
+   * background worker finishes the sync, so the app just falls back to the SM-â€¦
    * number. place_order stays the authoritative order creation inside it.
    */
-  async placeAndSync(input: PlaceOrderInput): Promise<DbOrder> {
+  async placeAndSync(input: PlaceOrderInput): Promise<DbCustomerOrderWithItems> {
     const { data, error } = await supabase.functions.invoke('order-intake', {
       body: {
         branchId: input.branchId,
@@ -193,14 +197,14 @@ export const orders = {
       },
     });
     if (error) throw new Error(error.message);
-    const res = (data ?? {}) as { order?: DbOrder; error?: string };
+    const res = (data ?? {}) as { order?: DbCustomerOrderWithItems; error?: string };
     if (res.error) throw new Error(res.error);
     if (!res.order) throw new Error('Order was not created.');
     return res.order;
   },
   /**
    * RLS returns only the signed-in customer's own orders, newest first, capped
-   * to a recent page (`limit`) — My Orders is a recent-history view and must
+   * to a recent page (`limit`) â€” My Orders is a recent-history view and must
    * not re-download the customer's entire nested history on every tab focus.
    *
    * An unpaid ONLINE order is a checkout-in-progress, not a real order, and must
@@ -208,11 +212,11 @@ export const orders = {
    * exactly those rows (payment_method = 'online' AND payment_status <> 'paid').
    * Cash orders and paid online orders always show; a null payment_method
    * (legacy rows) is treated as not-online and shown. RLS is intentionally NOT
-   * tightened — payment-verify, the retry flow, and the receipt screen still
+   * tightened â€” payment-verify, the retry flow, and the receipt screen still
    * read the pending order by id.
    */
   listWithItems: async (limit = 20) =>
-    ok<DbOrderWithItems[]>(await supabase
+    ok<DbCustomerOrderWithItems[]>(await supabase
       .from('orders')
       .select(ORDER_WITH_ITEMS_SELECT)
       .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
@@ -220,7 +224,7 @@ export const orders = {
       .limit(limit)),
   /** A single order with its lines (RLS still scopes it to the owner). */
   byId: async (id: string) =>
-    ok<DbOrderWithItems>(await supabase
+    ok<DbCustomerOrderWithItems>(await supabase
       .from('orders')
       .select(ORDER_WITH_ITEMS_SELECT)
       .eq('id', id)
@@ -230,7 +234,7 @@ export const orders = {
    * branch. The SERVER owns every rule: ownership, the proven-not-sent safety
    * check (a resend can never duplicate a POS ticket) and the attempt budget.
    *
-   * The response deliberately carries NO reason and NO counter — only an opaque
+   * The response deliberately carries NO reason and NO counter â€” only an opaque
    * outcome plus the freshly derived state, so the attempt limit is never
    * disclosed to the client. The UI renders from `state` alone.
    */
@@ -251,7 +255,7 @@ export interface DbCheckoutSession {
 export const checkout = {
   /**
    * Online only: validate + price the cart server-side and open a temporary
-   * checkout session. NO order is created here — the order is created only after
+   * checkout session. NO order is created here â€” the order is created only after
    * the payment is verified. Retry-safe via the cart idempotency key.
    */
   begin: async (input: PlaceOrderInput): Promise<DbCheckoutSession> =>
@@ -268,7 +272,7 @@ export const checkout = {
 };
 
 // ---------------------------------------------------------------------------
-// Tap Payments (online checkout). The app NEVER trusts the redirect result — it
+// Tap Payments (online checkout). The app NEVER trusts the redirect result â€” it
 // opens the Tap hosted checkout URL, then calls payment-verify, which retrieves
 // the charge server-side and confirms only on CAPTURED. No secret key ever
 // reaches the app; amounts/status are always server-authoritative.
@@ -280,11 +284,12 @@ export interface PaymentInitiateResult {
   chargeId?: string;
   checkoutUrl?: string | null;
   needsVerify?: boolean;
-  orderNumber?: string;
   checkoutSessionId?: string;
   orderId?: string | null;    // set when status === 'already_paid' (session flow)
 }
-export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string | null; orderId?: string | null; }
+// No `orderNumber`: the internal SM-â€¦ id is never returned to a customer client
+// (Issue #94). The app navigates by orderId and renders the branch's number only.
+export interface PaymentVerifyResult { status: string; messageKey?: string; orderId?: string | null; }
 async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {
@@ -310,7 +315,7 @@ export const payments = {
 };
 
 // ---------------------------------------------------------------------------
-// Coupons (validation RPC only — codes are never client-readable)
+// Coupons (validation RPC only â€” codes are never client-readable)
 // ---------------------------------------------------------------------------
 export const coupons = {
   async validate(code: string, subtotal: number) {
@@ -407,7 +412,7 @@ export const pushDevices = {
       p_promos: input.promosEnabled,
     }));
   },
-  // NOTE: there is intentionally NO direct update() — RLS exposes no client
+  // NOTE: there is intentionally NO direct update() â€” RLS exposes no client
   // write path. Preference changes re-register through the RPC (which owns
   // the token-format guard and ownership rules); turning everything off goes
   // through deactivateToken.
@@ -420,7 +425,7 @@ export const pushDevices = {
 
 // ---------------------------------------------------------------------------
 // Account deletion (customer self-service). The mobile app NEVER performs the
-// destructive deletion — it only re-verifies identity and enqueues a request via
+// destructive deletion â€” it only re-verifies identity and enqueues a request via
 // the `account-delete-request` Edge Function (JWT identity is the source of
 // truth). Reading the request state is RLS-scoped to the caller's own row.
 // ---------------------------------------------------------------------------

@@ -17,6 +17,15 @@ import {
 const future = () => new Date(Date.now() + 60_000).toISOString();
 const past = () => new Date(Date.now() - 60_000).toISOString();
 
+/** Every state, so the presentation invariants below are exhaustive. */
+const ALL_STATES: CustomerOrderState[] = [
+  'payment_pending', 'accepted_no_pos_channel', 'accepted_no_pos_channel_unpaid',
+  'sending_to_branch', 'confirmed_by_branch', 'verifying_with_branch',
+  'branch_failed_retry_available', 'unpaid_branch_failed_retry_available',
+  'final_failure_refund_pending', 'final_failure_refunded',
+  'final_failure_refund_failed', 'unpaid_final_failure',
+];
+
 /** A paid, pickup, POS-integrated order in the given sync state. */
 function paid(over: Partial<OrderConfirmationInput> = {}): OrderConfirmationInput {
   return {
@@ -66,40 +75,38 @@ describe('posConfirmationChannelActive', () => {
 });
 
 describe('deriveCustomerOrderState — the core contradiction is impossible', () => {
-  it('never reports success while the branch has not confirmed', () => {
-    // Every state that is not an explicit success must not render a check mark.
-    const unconfirmed: CustomerOrderState[] = [
-      'payment_pending', 'sending_to_branch', 'verifying_with_branch',
-      'branch_failed_retry_available', 'unpaid_branch_failed_retry_available',
-      'final_failure_refund_pending', 'final_failure_refunded',
-      'final_failure_refund_failed', 'unpaid_final_failure',
-    ];
-    for (const s of unconfirmed) {
-      expect(confirmationPresentation(s).success, s).toBe(false);
+  it('shows the success check for confirmed_by_branch and NOTHING else', () => {
+    // The hard product rule: a green check may appear only when the branch has
+    // actually accepted the order. Every other state — including the no-POS-channel
+    // states, which merely acknowledge payment — must render neutral.
+    for (const s of ALL_STATES) {
+      expect(confirmationPresentation(s).success, s).toBe(s === 'confirmed_by_branch');
     }
-    expect(confirmationPresentation('confirmed_by_branch').success).toBe(true);
-    expect(confirmationPresentation('accepted_no_pos_channel').success).toBe(true);
+  });
+
+  it('renders the no-POS-channel states neutrally and claims no branch acceptance', () => {
+    for (const s of ['accepted_no_pos_channel', 'accepted_no_pos_channel_unpaid'] as CustomerOrderState[]) {
+      const p = confirmationPresentation(s);
+      expect(p.success, s).toBe(false);
+      expect(p.tone, s).toBe('info');          // neutral/informational, not success
+      expect(p.canResend, s).toBe(false);
+      expect(p.showBranchNumber, s).toBe(false);
+      expect(p.bodyKey, s).toBe('oc_no_pos_channel_body');
+    }
+    // Payment success may be stated ONLY when payment actually happened.
+    expect(confirmationPresentation('accepted_no_pos_channel').titleKey).toBe('oc_payment_received');
+    expect(confirmationPresentation('accepted_no_pos_channel_unpaid').titleKey).toBe('oc_received');
   });
 
   it('only shows a branch order number in the confirmed state', () => {
-    const ALL: CustomerOrderState[] = [
-      'payment_pending', 'accepted_no_pos_channel', 'sending_to_branch',
-      'confirmed_by_branch', 'verifying_with_branch', 'branch_failed_retry_available',
-      'unpaid_branch_failed_retry_available', 'final_failure_refund_pending',
-      'final_failure_refunded', 'final_failure_refund_failed', 'unpaid_final_failure',
-    ];
+    const ALL: CustomerOrderState[] = ALL_STATES;
     for (const s of ALL) {
       expect(confirmationPresentation(s).showBranchNumber, s).toBe(s === 'confirmed_by_branch');
     }
   });
 
   it('offers the resend only from proven-not-sent states', () => {
-    const ALL: CustomerOrderState[] = [
-      'payment_pending', 'accepted_no_pos_channel', 'sending_to_branch',
-      'confirmed_by_branch', 'verifying_with_branch', 'branch_failed_retry_available',
-      'unpaid_branch_failed_retry_available', 'final_failure_refund_pending',
-      'final_failure_refunded', 'final_failure_refund_failed', 'unpaid_final_failure',
-    ];
+    const ALL: CustomerOrderState[] = ALL_STATES;
     const resendable = new Set<CustomerOrderState>([
       'branch_failed_retry_available', 'unpaid_branch_failed_retry_available',
     ]);
@@ -241,7 +248,26 @@ describe('deriveCustomerOrderState — channels without a branch step', () => {
     const state = deriveCustomerOrderState(delivery);
     expect(state).toBe('accepted_no_pos_channel');
     expect(confirmationPresentation(state).canResend).toBe(false);
-    expect(confirmationPresentation(state).success).toBe(true);
+    // Neutral, NOT a success check — the branch has confirmed nothing.
+    expect(confirmationPresentation(state).success).toBe(false);
+  });
+
+  it('makes no payment claim for a CASH order with no POS channel', () => {
+    // Cash on delivery lands here too; saying "Payment received" would be false.
+    const cashDelivery = cash({
+      orderType: 'delivery', syncState: 'blocked',
+      blockedReason: 'delivery_schema_unconfirmed',
+    });
+    const state = deriveCustomerOrderState(cashDelivery);
+    expect(state).toBe('accepted_no_pos_channel_unpaid');
+    expect(confirmationPresentation(state).titleKey).toBe('oc_received');
+  });
+
+  it('treats a pre-integration skipped row as unpaid-safe too', () => {
+    expect(deriveCustomerOrderState(cash({ syncState: 'skipped' })))
+      .toBe('accepted_no_pos_channel_unpaid');
+    expect(deriveCustomerOrderState(paid({ syncState: 'skipped' })))
+      .toBe('accepted_no_pos_channel');
   });
 
   it('still gates an unpaid online delivery order behind payment', () => {

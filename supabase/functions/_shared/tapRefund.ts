@@ -126,3 +126,32 @@ export function refundRequestIsValid(req: Partial<RefundRequest>): boolean {
   return typeof req.chargeId === 'string' && req.chargeId.trim().length > 0
     && Number.isFinite(Number(req.amount)) && Number(req.amount) > 0;
 }
+
+export type RefundLogDecision =
+  | { record: true; logStatus: 'success' | 'failed' | 'skipped' }
+  | { record: false; reason: 'lost_lease' };
+
+/**
+ * Decide whether this run may persist an outcome record for a refund.
+ *
+ * `finalize_order_refund` is token-fenced and returns FALSE when the caller no
+ * longer owns the lease — which happens when the refund was released and
+ * re-claimed by another run while this one's provider call was in flight. In
+ * that case NOTHING was written by this run, so recording an outcome here would
+ * persist a refund result that was never applied, defeating the fence and
+ * misleading anyone reading integration_sync_logs.
+ *
+ * Strict on purpose: only an explicit boolean `true` counts as ownership. A
+ * null/undefined/error result from the RPC is treated as a lost lease, because
+ * an unconfirmed finalize must never be reported as a completed outcome.
+ */
+export function decideRefundLogging(
+  finalized: unknown,
+  outcome: RefundOutcome,
+): RefundLogDecision {
+  if (finalized !== true) return { record: false, reason: 'lost_lease' };
+  return {
+    record: true,
+    logStatus: outcome === 'succeeded' ? 'success' : outcome === 'failed' ? 'failed' : 'skipped',
+  };
+}

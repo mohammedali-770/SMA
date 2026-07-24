@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  buildRefundBody, classifyRefundResponse, refundRequestIsValid, safeMessage,
+  buildRefundBody, classifyRefundResponse, decideRefundLogging,
+  refundRequestIsValid, safeMessage,
 } from './tapRefund.ts';
 
 /**
@@ -112,6 +113,32 @@ describe('buildRefundBody', () => {
     expect(body.amount).toBe(45.5);
     expect(body.currency).toBe('SAR');
     expect(body.reference).toEqual({ merchant: 'refund_abc' });
+  });
+});
+
+describe('decideRefundLogging — a lost lease must not be recorded', () => {
+  it('records the outcome only when finalize confirmed ownership', () => {
+    expect(decideRefundLogging(true, 'succeeded')).toEqual({ record: true, logStatus: 'success' });
+    expect(decideRefundLogging(true, 'failed')).toEqual({ record: true, logStatus: 'failed' });
+    expect(decideRefundLogging(true, 'pending')).toEqual({ record: true, logStatus: 'skipped' });
+  });
+
+  it('suppresses the record when the lease was lost', () => {
+    // finalize_order_refund returned false: another run re-claimed the refund
+    // while our provider call was in flight, so THIS run wrote nothing and must
+    // not persist an outcome that was never applied.
+    expect(decideRefundLogging(false, 'succeeded')).toEqual({ record: false, reason: 'lost_lease' });
+    expect(decideRefundLogging(false, 'failed')).toEqual({ record: false, reason: 'lost_lease' });
+    expect(decideRefundLogging(false, 'pending')).toEqual({ record: false, reason: 'lost_lease' });
+  });
+
+  it('treats an unconfirmed finalize as a lost lease', () => {
+    // Anything that is not an explicit `true` — RPC error, null, undefined, or a
+    // truthy non-boolean — must never be read as "we own this and it completed".
+    for (const v of [null, undefined, 0, 1, '', 'true', {}, []]) {
+      expect(decideRefundLogging(v, 'succeeded'), JSON.stringify(v))
+        .toEqual({ record: false, reason: 'lost_lease' });
+    }
   });
 });
 

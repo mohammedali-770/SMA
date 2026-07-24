@@ -37,11 +37,14 @@ Deno.serve(async (req: Request) => {
   if (sessionId) return await verifySession(supaUser, admin, sessionId);
 
   // Legacy order flow (unchanged): verify an already-created order.
+  // NOTE: order_number (the internal SM-… id) is deliberately neither selected
+  // nor returned. The app opens the receipt by orderId and renders only the
+  // branch's own number once Lazywait issues one (Issue #94).
   const { data: order, error: orderErr } = await supaUser
-    .from('orders').select('id, payment_status, order_number').eq('id', orderId).maybeSingle();
+    .from('orders').select('id, payment_status').eq('id', orderId).maybeSingle();
   if (orderErr) return json({ error: orderErr.message }, 400);
   if (!order) return json({ error: 'Order not found' }, 404);
-  if (order.payment_status === 'paid') return json({ status: 'paid', orderNumber: order.order_number }, 200);
+  if (order.payment_status === 'paid') return json({ status: 'paid', orderId }, 200);
 
   const cfg = await getProviderConfig(admin, 'payment');
   if (!cfg || (cfg.providerName ?? '').toLowerCase() !== 'tap') {
@@ -65,7 +68,7 @@ Deno.serve(async (req: Request) => {
   const result = await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId);
   const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
   const { messageKey } = mapTapStatus(retrieved.charge.status);
-  return json({ status: outcome, messageKey, orderNumber: order.order_number }, 200);
+  return json({ status: outcome, messageKey, orderId }, 200);
 });
 
 /**
@@ -79,8 +82,7 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
   if (sErr) return json({ error: sErr.message }, 400);
   if (!session) return json({ error: 'Checkout session not found' }, 404);
   if (session.order_id) {
-    const { data: paid } = await supaUser.from('orders').select('order_number').eq('id', session.order_id).maybeSingle();
-    return json({ status: 'paid', orderId: session.order_id, orderNumber: paid?.order_number ?? null }, 200);
+    return json({ status: 'paid', orderId: session.order_id }, 200);
   }
 
   const cfg = await getProviderConfig(admin, 'payment');
@@ -108,10 +110,5 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
     const { data: s2 } = await supaUser.from('checkout_sessions').select('order_id').eq('id', sessionId).maybeSingle();
     outOrderId = String(s2?.order_id ?? '');
   }
-  let orderNumber: string | null = null;
-  if (outOrderId) {
-    const { data: o2 } = await supaUser.from('orders').select('order_number').eq('id', outOrderId).maybeSingle();
-    orderNumber = (o2?.order_number as string | undefined) ?? null;
-  }
-  return json({ status: outcome, messageKey, orderId: outOrderId || null, orderNumber }, 200);
+  return json({ status: outcome, messageKey, orderId: outOrderId || null }, 200);
 }

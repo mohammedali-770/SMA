@@ -3,7 +3,7 @@ import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { resolveTapConfig, timingSafeEqual } from '../_shared/tap.ts';
 import {
-  buildRefundBody, classifyRefundResponse, refundRequestIsValid,
+  buildRefundBody, classifyRefundResponse, decideRefundLogging, refundRequestIsValid,
 } from '../_shared/tapRefund.ts';
 
 /**
@@ -92,6 +92,9 @@ Deno.serve(async (req: Request) => {
     // No captured charge reference recorded → nothing can be refunded through the
     // provider. This is a definitive operational failure needing a human, not a
     // retry loop, so it is finalized as failed and surfaces in the admin feed.
+    // (This and the key-unavailable path below finalize IMMEDIATELY after the
+    // claim with no external call in between, so there is no window in which the
+    // lease could have been lost — unlike the provider path further down.)
     if (!refundRequestIsValid(request)) {
       await admin.rpc('finalize_order_refund', {
         p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'failed',
@@ -144,7 +147,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const verdict = classifyRefundResponse(ok, httpStatus, body);
-    await admin.rpc('finalize_order_refund', {
+    const { data: finalized } = await admin.rpc('finalize_order_refund', {
       p_refund_id: row.refund_id,
       p_claim_token: claimToken,
       p_status: verdict.outcome === 'succeeded' ? 'succeeded'
@@ -154,11 +157,23 @@ Deno.serve(async (req: Request) => {
       p_error_safe: verdict.errorSafe,
     });
 
+    // Token-fenced: a non-`true` result means this run no longer owns the lease
+    // and wrote NOTHING, so it must not persist an outcome record (see
+    // decideRefundLogging). A warning is enough — a misleading durable record is
+    // not acceptable.
+    const decision = decideRefundLogging(finalized, verdict.outcome);
+    if (!decision.record) {
+      console.warn('refund lease lost; outcome not recorded', JSON.stringify({
+        refund: String(row.refund_id).slice(0, 36), outcome: verdict.outcome,
+      }));
+      processed.push({ refund: row.refund_id, outcome: 'lost_lease' });
+      continue;
+    }
+
     // Operational trail only — no provider payload, no card data, no full charge id.
     await admin.from('integration_sync_logs').insert({
       provider: 'tap', order_id: row.order_id, direction: 'push',
-      status: verdict.outcome === 'succeeded' ? 'success'
-            : verdict.outcome === 'failed' ? 'failed' : 'skipped',
+      status: decision.logStatus,
       request: { action: 'refund', attempt: row.attempt_count },
       error: verdict.failureCode,
     }).then(() => {}, () => {});

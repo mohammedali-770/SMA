@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
   const order = placed as Record<string, unknown> | null;
   const orderId = order?.id ? String(order.id) : null;
-  if (!orderId) return json({ order: placed });
+  if (!orderId) return json({ error: 'Order was not created.' }, 400);
 
   // Best-effort synchronous POS sync for pickup orders (delivery is 'blocked' at
   // insert). Fully guarded — a POS/network problem never fails the order.
@@ -92,8 +92,23 @@ Deno.serve(async (req: Request) => {
     }
   } catch { /* notification is best-effort only */ }
 
-  // Return the fresh RLS-scoped order row so the client sees the POS number if it
-  // arrived in time; otherwise it carries the SM-… number and syncs in the tail.
-  const { data: fresh } = await supa.from('orders').select('*').eq('id', orderId).maybeSingle();
-  return json({ order: fresh ?? placed });
+  // Return ONLY the customer-safe projection of the fresh RLS-scoped row, so the
+  // client sees the branch (POS) number if it arrived in time. The internal SM-…
+  // number and every operational column (including the POS fencing token) are
+  // never sent to a customer device — Issue #94. The column list mirrors
+  // apps/mobile/src/lib/orderSelect.ts.
+  const { data: fresh } = await supa
+    .from('orders')
+    .select(
+      'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, '
+      + 'subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, '
+      + 'loyalty_points_earned, payment_status, payment_method, lazywait_order_number, '
+      + 'lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, '
+      + 'pos_create_attempted_at, pos_customer_retry_count, refund_state, '
+      + 'order_items(id, name_en, name_ar, unit_price, quantity, '
+      + 'order_item_modifiers(id, name_en, name_ar, price))',
+    )
+    .eq('id', orderId)
+    .maybeSingle();
+  return json({ order: fresh });
 });

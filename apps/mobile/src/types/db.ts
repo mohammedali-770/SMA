@@ -155,6 +155,46 @@ export interface DbOrderItemModifier {
 export type DbOrderWithItems = DbOrder & {
   order_items: (DbOrderItem & { order_item_modifiers: DbOrderItemModifier[] })[];
 };
+
+/**
+ * The CUSTOMER projection of an order — exactly the columns lib/orderSelect.ts
+ * requests. Deliberately a SEPARATE type rather than `Partial<DbOrder>`: the
+ * internal SM-… order number and every operational column are not merely
+ * optional here, they are absent, so code that tries to read one fails to
+ * compile instead of silently shipping `undefined` (Issue #94).
+ */
+export interface DbCustomerOrder {
+  id: string;
+  status: OrderStatus;
+  order_type: OrderType;
+  created_at: string;
+  branch_id: string;
+  branch_name_en: string | null;
+  branch_name_ar: string | null;
+  subtotal: number;
+  delivery_fee: number;
+  discount_amount: number;
+  loyalty_discount_amount: number;
+  vat_amount: number;
+  total: number;
+  loyalty_points_earned: number;
+  payment_status: 'pending' | 'paid';
+  payment_method: string | null;
+  lazywait_order_number?: string | null;
+  lazywait_sync_state?: string | null;
+  lazywait_ref?: string | null;
+  sync_blocked_reason?: string | null;
+  sync_next_attempt_at?: string | null;
+  pos_create_attempted_at?: string | null;
+  pos_customer_retry_count?: number | null;
+  refund_state?: string | null;
+}
+
+export type DbCustomerOrderWithItems = DbCustomerOrder & {
+  order_items: (Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'> & {
+    order_item_modifiers: Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>[];
+  })[];
+};
 export interface DbLoyaltyTransaction {
   id: string; profile_id: string; order_id: string | null;
   type: 'earn' | 'redeem' | 'adjustment'; points: number;

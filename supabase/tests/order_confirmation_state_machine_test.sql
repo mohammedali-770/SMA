@@ -123,12 +123,19 @@ begin
     pg_temp.st('online','paid','dead_letter',null,null,null,null,3,'failed'),
     'final_failure_refund_failed', 'refund failed');
 
-  -- (C) A channel with no branch step is settled, never unconfirmed.
+  -- (C) A channel with no branch step is settled, never unconfirmed. Split by
+  --     payment so the copy can state payment success without implying branch
+  --     acceptance; a cash-on-delivery order must make NO payment claim.
   perform pg_temp.expect_state(
     pg_temp.st('online','paid','blocked',null,'delivery_schema_unconfirmed',null,null,9,'none','delivery'),
-    'accepted_no_pos_channel', 'delivery is not gated on Lazywait');
+    'accepted_no_pos_channel', 'PAID delivery is not gated on Lazywait');
+  perform pg_temp.expect_state(
+    pg_temp.st('cash','pending','blocked',null,'delivery_schema_unconfirmed',null,null,0,'none','delivery'),
+    'accepted_no_pos_channel_unpaid', 'CASH delivery makes no payment claim');
   perform pg_temp.expect_state(pg_temp.st('cash','pending','skipped',null),
-    'accepted_no_pos_channel', 'pre-integration row');
+    'accepted_no_pos_channel_unpaid', 'pre-integration unpaid row');
+  perform pg_temp.expect_state(pg_temp.st('online','paid','skipped',null),
+    'accepted_no_pos_channel', 'pre-integration paid row');
   -- ...but a 'blocked' order whose reason is a REAL POS rejection stays gated.
   perform pg_temp.expect_state(pg_temp.st('online','paid','blocked',null,'invalid_license'),
     'branch_failed_retry_available', 'blocked by a real POS rejection');

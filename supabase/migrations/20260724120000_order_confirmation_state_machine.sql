@@ -203,7 +203,8 @@ grant execute on function public.pos_confirmation_channel_active(text, text) to 
 --
 -- Returned states — payment and branch acceptance are never collapsed together:
 --   payment_pending                  online, not yet verified paid
---   accepted_no_pos_channel          settled; this channel has no branch step
+--   accepted_no_pos_channel          PAID; this channel has no branch step
+--   accepted_no_pos_channel_unpaid   unpaid (cash); this channel has no branch step
 --   sending_to_branch                paid/cash; a send is in flight or auto-queued
 --   confirmed_by_branch              Lazywait accepted; show the Lazywait number
 --   verifying_with_branch            ambiguous outcome; human verification, NO resend
@@ -244,8 +245,13 @@ as $$
       then 'payment_pending'
 
     -- (3) No branch-confirmation step exists for this channel (Design constraint 2).
+    --     Split by payment so the copy can state payment success WITHOUT ever
+    --     implying branch acceptance: a cash-on-delivery order lands here too and
+    --     must not be told "payment received".
     when not public.pos_confirmation_channel_active(p_sync_state, p_blocked_reason)
-      then 'accepted_no_pos_channel'
+      then case when p_payment_status = 'paid'
+                then 'accepted_no_pos_channel'
+                else 'accepted_no_pos_channel_unpaid' end
 
     -- (4) The branch accepted it — the ONLY state that may claim confirmation, and
     --     only with a USABLE reference (the canonical helper, JS .trim() parity).
@@ -584,6 +590,18 @@ create trigger enforce_orders_refund_transition
 -- LOCKED so concurrent workers never claim the same refund, and the order row is
 -- advanced to 'processing' in the same transaction — the ledger and the customer-
 -- visible state can never diverge.
+--
+-- LIVENESS: candidates are scanned first (unlocked, oldest-first, bounded) and
+-- then locked and RE-VALIDATED one at a time. The earlier `… for update skip
+-- locked limit 1` form returned ZERO rows whenever its single candidate failed
+-- the post-lock re-check (a concurrent worker having just committed a claim),
+-- so a run could idle while other refunds waited. Validating each candidate
+-- under its own lock lets the scan advance to the next one instead.
+--
+-- The unlocked pre-scan is only a candidate LIST — every candidate is re-checked
+-- for `status = 'pending'` while holding its row lock, so ordering, locking,
+-- SKIP LOCKED non-blocking, lease/token fencing and single-claim safety are all
+-- preserved. The bound stops one call from scanning an unbounded backlog.
 create or replace function public.claim_order_refund(p_claim_token text)
 returns table (
   refund_id       uuid,
@@ -599,18 +617,34 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare v_row public.order_refunds;
+declare
+  v_row   public.order_refunds;
+  v_id    uuid;
+  v_found boolean := false;
 begin
   if p_claim_token is null or p_claim_token = '' then
     raise exception 'claim token required' using errcode = '22004';
   end if;
 
-  select * into v_row from public.order_refunds
-   where status = 'pending'
-   order by created_at
-   for update skip locked
-   limit 1;
-  if not found then
+  -- Oldest-first candidate scan (unlocked, bounded), then lock + re-validate each
+  -- in turn. A candidate that is locked by another worker is SKIPped; one that is
+  -- no longer 'pending' fails the re-check; either way the scan continues.
+  for v_id in
+    select id from public.order_refunds
+     where status = 'pending'
+     order by created_at
+     limit 50
+  loop
+    select * into v_row from public.order_refunds
+     where id = v_id and status = 'pending'
+     for update skip locked;
+    if found then
+      v_found := true;
+      exit;
+    end if;
+  end loop;
+
+  if not v_found then
     return;
   end if;
 

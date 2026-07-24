@@ -1,11 +1,12 @@
-/**
+﻿/**
  * Translation between the snake_case Supabase rows (api.ts / types/db.ts) and
  * the camelCase domain models the screens consume (types/models.ts). Mirrors
  * the customer slice of the web app's src/lib/mappers.ts.
  */
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrderItem, DbOrderItemModifier, DbOrderWithItems,
+  DbCustomerOrderWithItems, DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup,
+  DbOrderItem, DbOrderItemModifier,
   DbProduct, DbProductModifierGroup, DbProfile,
 } from '../types/db';
 import type {
@@ -173,14 +174,19 @@ function mapAddressSnapshot(snap: Record<string, unknown>): SavedAddress {
 }
 
 // --- Orders ----------------------------------------------------------------
-function mapOrderItemModifier(m: DbOrderItemModifier): OrderItemModifier {
-  return { id: m.id, modifierId: m.modifier_id ?? '', nameEn: m.name_en, nameAr: m.name_ar, price: Number(m.price) };
+// The parameter types are the CUSTOMER projections (see lib/orderSelect.ts):
+// order_id / product_id / modifier_id / line_total are not fetched, so they are
+// not readable here either.
+type CustomerOrderItemModifier = Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>;
+type CustomerOrderItem = Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'>;
+
+function mapOrderItemModifier(m: CustomerOrderItemModifier): OrderItemModifier {
+  return { id: m.id, nameEn: m.name_en, nameAr: m.name_ar, price: Number(m.price) };
 }
 
-function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModifier[] }): OrderItem {
+function mapOrderItem(i: CustomerOrderItem & { order_item_modifiers?: CustomerOrderItemModifier[] }): OrderItem {
   return {
     id: i.id,
-    productId: i.product_id ?? '',
     nameEn: i.name_en,
     nameAr: i.name_ar,
     // unit_price already includes the selected modifiers (place_order sums them).
@@ -190,13 +196,12 @@ function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModif
   };
 }
 
-export function mapOrder(o: DbOrderWithItems): Order {
+export function mapOrder(o: DbCustomerOrderWithItems): Order {
   return {
+    // NOTE: order_number (the internal SM-â€¦ id), customer_* copies, coupon/notes,
+    // address_snapshot and every operational column are deliberately NOT mapped â€”
+    // they are no longer fetched either (see lib/orderSelect.ts). Issue #94.
     id: o.id,
-    orderNumber: o.order_number,
-    customerId: o.customer_id ?? '',
-    customerName: o.customer_name ?? '',
-    customerPhone: o.customer_phone ?? '',
     branchId: o.branch_id,
     branchNameEn: o.branch_name_en ?? '',
     branchNameAr: o.branch_name_ar ?? '',
@@ -209,24 +214,17 @@ export function mapOrder(o: DbOrderWithItems): Order {
     vatAmount: Number(o.vat_amount),
     total: Number(o.total),
     loyaltyPointsEarned: o.loyalty_points_earned ?? 0,
-    loyaltyPointsRedeemed: o.loyalty_points_redeemed ?? 0,
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
-    paymentProvider: o.payment_provider ?? undefined,
-    paidAt: o.paid_at ?? undefined,
-    couponCode: o.coupon_code ?? undefined,
-    notes: o.notes ?? undefined,
     createdAt: o.created_at,
     lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
     lazywaitSyncState: o.lazywait_sync_state ?? undefined,
     lazywaitRef: o.lazywait_ref ?? undefined,
     syncBlockedReason: o.sync_blocked_reason ?? undefined,
-    firstPosSyncFailureAt: o.first_pos_sync_failure_at ?? undefined,
     syncNextAttemptAt: o.sync_next_attempt_at ?? undefined,
     posCreateAttemptedAt: o.pos_create_attempted_at ?? undefined,
     posCustomerRetryCount: o.pos_customer_retry_count ?? 0,
     refundState: o.refund_state ?? 'none',
-    address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
   };
 }
@@ -235,15 +233,15 @@ export function mapOrder(o: DbOrderWithItems): Order {
  * The order number to show the customer.
  *
  * ONLY the branch's own (Lazywait) order number is ever customer-visible. The
- * internal SM-… number is an internal database reference and must not appear in
- * any screen, receipt, notification or client-facing payload (Issue #94) — it
+ * internal SM-â€¦ number is an internal database reference and must not appear in
+ * any screen, receipt, notification or client-facing payload (Issue #94) â€” it
  * previously leaked as the primary value before sync and as a labelled
  * "Order ref" afterwards, which showed customers an identifier for an order the
  * restaurant had not accepted.
  *
  * Returns null while the branch has not issued a number yet; callers render the
  * confirmation state instead of a number in that case. `orderNumber` remains the
- * canonical internal id for support/admin use — it is simply never displayed.
+ * canonical internal id for support/admin use â€” it is simply never displayed.
  */
 export function orderDisplayNumber(
   o: { lazywaitOrderNumber?: string | null },

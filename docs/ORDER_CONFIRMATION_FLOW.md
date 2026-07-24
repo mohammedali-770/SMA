@@ -38,7 +38,8 @@ contract. Change one, change the other in the same commit.
 | State | Meaning | Success hero? | Resend? | Branch number? |
 |---|---|---|---|---|
 | `payment_pending` | Online payment not verified | no | no | no |
-| `accepted_no_pos_channel` | Settled; this channel has no branch step | yes | no | no |
+| `accepted_no_pos_channel` | PAID; this channel has no branch step | **no** | no | no |
+| `accepted_no_pos_channel_unpaid` | Unpaid (cash); no branch step | **no** | no | no |
 | `sending_to_branch` | Send in flight, or an automatic retry is queued | no | no | no |
 | `confirmed_by_branch` | Lazywait accepted it | **yes** | no | **yes** |
 | `verifying_with_branch` | Ambiguous — a ticket may exist | no | **no** | no |
@@ -54,13 +55,51 @@ contract. Change one, change the other in the same commit.
 reference is an inconsistent DB state and is presented as `verifying_with_branch`
 — never as confirmed.
 
+**`confirmed_by_branch` is the ONLY state that renders the green success check.**
+The two no-POS-channel states are deliberately neutral (informational tone, clock
+icon): they acknowledge that we have the order and, when true, that payment
+settled — but they never imply the branch accepted or is preparing it, because no
+branch has seen it. A unit test asserts this over every state.
+
+Customer copy for the no-POS-channel states:
+
+| | English | Arabic |
+|---|---|---|
+| `accepted_no_pos_channel` (paid) | **Payment received** / Your order is being processed through the delivery channel. | **تم استلام الدفع** / طلبك قيد المعالجة عبر قناة التوصيل. |
+| `accepted_no_pos_channel_unpaid` (cash) | **Order received** / Your order is being processed through the delivery channel. | **تم استلام الطلب** / طلبك قيد المعالجة عبر قناة التوصيل. |
+
+The split exists because cash-on-delivery orders also land here; telling an unpaid
+customer "Payment received" would be false.
+
 ## 4. Order numbers
 
 Only the branch's own order number is ever customer-visible.
 `orderDisplayNumber()` returns `null` until Lazywait issues one, and the UI then
 shows the confirmation state instead of a number. The internal `SM-…` number
-remains the canonical id for support and the admin dashboard — it is simply never
-rendered to a customer, in any screen, receipt, notification or client payload.
+remains the canonical id for support and the admin dashboard.
+
+It is removed from the customer surface at **three** layers, so a UI change alone
+cannot resurface it:
+
+1. **Not fetched.** `apps/mobile/src/lib/orderSelect.ts` defines an explicit
+   customer column list; `select('*')` is gone. That also stops shipping
+   operational columns — notably `pos_create_attempt_token`, the Create-Order
+   fencing token, which the wildcard select had been sending to every device.
+2. **Not representable.** `DbCustomerOrder` and the `Order` model no longer
+   declare `order_number` (or the customer-identity copies, coupon, notes,
+   address snapshot), so reading one fails to compile.
+3. **Not returned by any customer endpoint.** `payment-verify`, `payment-initiate`
+   and `order-intake` return `orderId` and a customer-safe projection only.
+
+`orderSelect.test.ts` asserts the select contains no internal column and that a
+deliberately hostile full row still maps to an object carrying none of them.
+
+**Knowingly retained:** `payment-initiate` still uses `order_number` as the Tap
+charge *description* and as the `reference.order` merchant reference
+(`supabase/functions/payment-initiate/index.ts`). Those go server→provider for
+reconciliation, and `reference.order` is a bound field that `payment-verify`
+validates, so changing it would weaken payment verification. The description is
+visible on Tap's hosted page; see §10.
 
 ## 5. Customer resend — proven-not-sent only
 
@@ -186,6 +225,17 @@ shims, so no scheduled job ran and no outbound HTTP was possible. See
 
 ## 10. Known gaps
 
+- **`loyalty_transactions.reason` still embeds the internal order number.**
+  `place_order` writes `'Earned on order ' || order_number` into a column that is
+  customer-readable (`grant select … to authenticated` plus RLS
+  `profile_id = auth.uid()`), so a customer can read their own `SM-…` id straight
+  from PostgREST. This is **pre-existing** and outside this PR's surface — fixing
+  it means either redefining `place_order` (the pricing authority) in a new
+  migration, or column-scoping the grant, which would also hide `reason` from
+  staff since both are the `authenticated` role. Tracked for a separate change.
+- **Tap's hosted checkout page shows the order number** in the charge
+  description (see §4). Server→provider by design; changing the bound
+  `reference.order` would weaken payment verification.
 - **No Lazywait reconciliation API.** Issue #94 asks that a timeout/unknown
   response be reconciled with Lazywait before another create request. Lazywait
   exposes no order-lookup endpoint we have confirmed, so "reconcile" currently
