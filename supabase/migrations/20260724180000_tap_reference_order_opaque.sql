@@ -11,13 +11,37 @@
 -- always used an opaque `'CS-' || <session uuid fragment>` for the same field, so
 -- an opaque reference is already proven against the live Tap contract.
 --
+-- SCOPE OF THE VALUE: PER-ORDER, NOT PER-ATTEMPT
+-- `reference_order` is derived from the ORDER id, so every attempt opened for
+-- the same order receives the SAME value. That is deliberate and matches both
+-- the previous behaviour (orders.order_number was equally per-order) and the
+-- session path ('CS-' is per checkout session). The PER-ATTEMPT component is
+-- `reference_transaction` = 'sm_' || a fresh gen_random_uuid() — 122 bits, new
+-- on every attempt.
+--
+-- Do not describe reference_order as per-attempt: after an attempt expires, a
+-- second attempt for the same order is opened with an identical reference_order
+-- and a different reference_transaction.
+--
 -- VERIFICATION STRENGTH IS UNCHANGED
 -- `validateAndConfirmTapCharge` (supabase/functions/_shared/tapVerify.ts) binds
--- with `String(reference.order) === String(attempt.reference_order)` — an exact
--- comparison against the value THIS system stored when it opened the charge. The
--- binding's strength comes from the value being immutable, unguessable and
--- per-attempt, not from its content. An opaque per-order reference is therefore
--- exactly as strong, and strictly less guessable than a sequential SM-… number.
+-- on BOTH references plus charge id, amount, currency, live_mode and merchant:
+--   reference.order       === attempt.reference_order        (per-order)
+--   reference.transaction === attempt.reference_transaction  (per-attempt)
+-- Each is an exact comparison against the value THIS system stored when it
+-- opened the charge, so the PAIR identifies one attempt uniquely. Strength comes
+-- from the stored value being immutable and unguessable, not from its content —
+-- and an opaque reference is strictly less guessable than a sequential SM-…
+-- number, so this is a small improvement rather than a regression.
+--
+-- ENTROPY / TRUNCATION
+-- 12 hex characters = 48 bits, the same width the session path has used against
+-- the live Tap contract. Distinct orders yield distinct references until the
+-- birthday bound (~2^24 ≈ 16.7M orders for a 50% chance of one collision).
+-- A collision would affect reconciliation readability only, never verification:
+-- reference_transaction still differs, and charge id + amount + mode + merchant
+-- are all compared independently. Widen both this and 'CS-' together if the
+-- order volume ever approaches that bound.
 --
 -- The other bound fields (charge id, amount, currency, reference.transaction,
 -- live_mode, merchant id) are untouched, as is the webhook hashstring — the
@@ -36,10 +60,13 @@
 create or replace function public.tap_begin_payment_attempt(
   p_order_id       uuid,
   p_mode           text,
-  p_expiry_minutes integer
+  p_expiry_minutes integer default 30
 )
 returns table (
-  id                    uuid,
+  -- MUST stay `attempt_id`: CREATE OR REPLACE cannot change a function's return
+  -- type, and payment-initiate reads `attempt.attempt_id`. Renaming it breaks
+  -- both the migration chain and every payment initiation.
+  attempt_id            uuid,
   reference_transaction text,
   reference_order       text,
   provider_ref          text,
@@ -86,8 +113,9 @@ begin
     end if;
   end if;
 
+  -- PER-ATTEMPT: a fresh 122-bit value on every attempt.
   v_ref := 'sm_' || replace(gen_random_uuid()::text, '-', '');
-  -- Opaque, order-derived and stable for this order: same shape as the session
+  -- PER-ORDER: stable for this order across attempts, same shape as the session
   -- path's 'CS-…'. Deliberately NOT orders.order_number.
   v_ref_ord := 'ORD-' || substr(replace(p_order_id::text, '-', ''), 1, 12);
   begin

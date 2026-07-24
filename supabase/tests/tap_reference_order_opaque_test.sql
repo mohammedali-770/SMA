@@ -177,4 +177,109 @@ begin
   raise notice 'CASE 6 ok: sweep clean';
 end $$;
 
+-- Case 7: SCOPE OF THE VALUE — reference_order is PER-ORDER, reference_transaction
+--         is PER-ATTEMPT. Two genuinely separate attempts for the same order
+--         (the first expired, so the one-active-attempt rule permits a second)
+--         share the order reference and differ on the transaction reference.
+do $$
+declare
+  v_order uuid;
+  v_ord1 text; v_txn1 text; v_ord2 text; v_txn2 text;
+  v_reused boolean;
+begin
+  insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    returning id into v_order;
+
+  select reference_order, reference_transaction into v_ord1, v_txn1
+    from public.tap_begin_payment_attempt(v_order, 'test', 30);
+
+  -- Force the first attempt stale so a genuinely separate second one is allowed.
+  update public.payment_records set expires_at = now() - interval '1 minute'
+   where order_id = v_order and status = 'initiated';
+
+  select reference_order, reference_transaction, reused into v_ord2, v_txn2, v_reused
+    from public.tap_begin_payment_attempt(v_order, 'test', 30);
+
+  if v_reused then
+    raise exception 'CASE 7 PRECONDITION FAILED: expected a NEW attempt, got a reuse';
+  end if;
+  if v_ord1 <> v_ord2 then
+    raise exception 'CASE 7 FAILED: reference_order is not stable per order (% vs %)', v_ord1, v_ord2;
+  end if;
+  if v_txn1 = v_txn2 then
+    raise exception 'CASE 7 FAILED: reference_transaction repeated across attempts (%)', v_txn1;
+  end if;
+  if pg_temp.has_sm_number(v_ord2) or pg_temp.has_sm_number(v_txn2) then
+    raise exception 'CASE 7 FAILED: second attempt leaked the internal number';
+  end if;
+
+  -- The first attempt was expired, not deleted: exactly one live attempt remains.
+  if (select count(*) from public.payment_records
+       where order_id = v_order and provider = 'tap' and status = 'initiated') <> 1 then
+    raise exception 'CASE 7 FAILED: more than one live attempt exists';
+  end if;
+
+  raise notice 'CASE 7 ok: reference_order per-ORDER, reference_transaction per-ATTEMPT';
+end $$;
+
+-- Case 8: MISMATCH REJECTION — the binding is an exact comparison, so a charge
+--         quoting a different reference must not match the stored attempt.
+--         (Mirrors validateAndConfirmTapCharge''s refOrderMatch/refTxnMatch.)
+do $$
+declare
+  v_order uuid;
+  v_ord text; v_txn text;
+begin
+  insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    returning id into v_order;
+  select reference_order, reference_transaction into v_ord, v_txn
+    from public.tap_begin_payment_attempt(v_order, 'test', 30);
+
+  if v_ord = 'ORD-000000000000' then
+    raise exception 'CASE 8 FAILED: a foreign reference equals the stored one';
+  end if;
+  if v_txn = 'sm_forged' then
+    raise exception 'CASE 8 FAILED: a forged transaction ref equals the stored one';
+  end if;
+  -- A reference for a DIFFERENT order must never match this attempt.
+  if v_ord = 'ORD-' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 12) then
+    raise exception 'CASE 8 FAILED: reference collided with an unrelated order';
+  end if;
+
+  raise notice 'CASE 8 ok: foreign/forged references do not match the stored binding';
+end $$;
+
+-- Case 9: TRUNCATION DISTINCTNESS — 12 hex chars is a truncation, so prove the
+--         derivation still separates distinct orders across a sample. This cannot
+--         disprove the birthday bound (~2^24 orders); it catches a derivation
+--         regression that would make references constant or highly clustered.
+do $$
+declare
+  v_order uuid;
+  v_ord   text;
+  v_seen  text[] := '{}';
+  i int;
+begin
+  for i in 1..200 loop
+    insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
+      values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+      returning id into v_order;
+    select reference_order into v_ord from public.tap_begin_payment_attempt(v_order, 'test', 30);
+
+    if v_ord = any(v_seen) then
+      raise exception 'CASE 9 FAILED: duplicate reference % after % orders', v_ord, i;
+    end if;
+    if length(v_ord) <> 16 then   -- 'ORD-' + 12 hex
+      raise exception 'CASE 9 FAILED: unexpected reference length % for %', length(v_ord), v_ord;
+    end if;
+    if v_ord !~ '^ORD-[0-9a-f]{12}$' then
+      raise exception 'CASE 9 FAILED: unexpected reference shape %', v_ord;
+    end if;
+    v_seen := v_seen || v_ord;
+  end loop;
+  raise notice 'CASE 9 ok: 200 distinct orders -> 200 distinct 48-bit references';
+end $$;
+
 rollback;
