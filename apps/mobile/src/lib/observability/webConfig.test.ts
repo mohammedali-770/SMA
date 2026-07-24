@@ -45,6 +45,11 @@ describe('resolveWebEnvironment', () => {
 
   it('defaults: dev build → development; release host → production (strictest rules)', () => {
     expect(resolveWebEnvironment({ isDevBuild: true })).toBe('development');
+    // Deliberately a *.vercel.app host: this is the counterpart to the '-git-'
+    // preview case above and the only cover for "vercel.app WITHOUT -git- is
+    // production". Not a reference to the deployment, which is
+    // app.spicymeal.com.sa — do not "update" it to the real domain; the next
+    // line already covers a custom domain.
     expect(resolveWebEnvironment({ hostname: 'sma.vercel.app', isDevBuild: false })).toBe('production');
     expect(resolveWebEnvironment({ hostname: 'www.spicymeal.example', isDevBuild: false })).toBe('production');
     expect(resolveWebEnvironment({ explicitEnv: 'staging?', isDevBuild: false })).toBe('production');

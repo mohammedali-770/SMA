@@ -21,8 +21,13 @@ supported in the code as an alternative but is not configured.
 | Variable | Value | Why |
 | --- | --- | --- |
 | `EXPO_PUBLIC_MAP_PROVIDER` | `google` | Without it the code defaults to `mapbox` and looks for a token that does not exist. |
-| `EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` | `AIza…` | The Maps JavaScript API browser key. |
-| `EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL` | `https://sma.vercel.app/app/` | The `WebView` base URL. **Required.** |
+| `EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` | *(the existing dashboard key)* | Same value as the dashboard's `VITE_GOOGLE_MAPS_API_KEY`. The names differ because Vite only inlines `VITE_*` and Metro only inlines `EXPO_PUBLIC_*`. |
+| `EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL` | `https://app.spicymeal.com.sa/` | The `WebView` base URL. **Required.** |
+
+The key is **not new**. The dashboard already uses a working Google Maps browser
+key, set in the Vercel project as `VITE_GOOGLE_MAPS_API_KEY` and read at
+[`src/lib/map.ts`](../src/lib/map.ts). The mobile app reuses that same value
+under its own variable name. Do not mint a second key, and do not commit either.
 
 ### Why the base URL is not optional
 
@@ -37,19 +42,46 @@ fetched from it — it only establishes the origin.
 
 ## Google Cloud setup
 
-1. **APIs & Services → Library** — enable **Maps JavaScript API**.
-2. **Credentials** — create (or reuse) an API key.
-3. On that key set **Application restrictions → HTTP referrers (web sites)** and
-   add:
-   - `https://sma.vercel.app/*` — covers the WebView base URL and the web build
-   - any custom domain later pointed at the same deployment
-4. Set **API restrictions → Restrict key → Maps JavaScript API** so the key
-   cannot be reused against other billable APIs.
-5. Confirm a **billing account** is attached to the project. Maps JS returns
+Applies to the **existing** dashboard key — reuse it, don't create one.
+
+1. **Credentials** — open the key already used by the dashboard.
+2. Under **Application restrictions → HTTP referrers (web sites)**, confirm the
+   list covers `https://app.spicymeal.com.sa/*`. The dashboard and the customer
+   web export are one Vercel deployment on that domain (dashboard at `/`, Expo
+   web at `/app/*`, see [`vercel.json`](../vercel.json)), so a single
+   `https://app.spicymeal.com.sa/*` entry covers the dashboard, the web map and
+   the mobile WebView. If it is already there, **no change is needed**.
+3. Under **API restrictions**, the key must allow **both**:
+   - **Maps JavaScript API** — the maps themselves
+   - **Places API (New)** — the address search box
+     ([`MapSearchBox.tsx`](../src/components/MapSearchBox.tsx) posts this same
+     key to `places.googleapis.com/v1/places:searchText`)
+
+   Restricting to Maps JavaScript API alone **breaks the dashboard's delivery
+   zone and branch address search**.
+4. Confirm a **billing account** is attached. Maps JS returns
    `BillingNotEnabledMapError` — again, a grey map — without one.
 
-The browser key is public by design (it ships in the JS bundle). The referrer
-restriction, not secrecy, is what protects it. Never put it in `eas.json`.
+### What the referrer restriction does and does not protect
+
+The browser key is public by design: it ships in the web JS bundle and, once
+this lands, in the app binary. On the web the referrer restriction is a genuine
+control because the browser sets `Referer` and the page cannot forge it.
+
+**In a WebView it is not.** The app supplies its own `baseUrl`, so anyone who
+unpacks the binary has both the key and the ability to send any referrer they
+like. Reusing the dashboard key therefore moves it from "readable only by
+someone who can reach the deployment" to "extractable from a shipped app". This
+is accepted for the current WebView implementation; the practical mitigations
+are a **quota cap** on the key, or a second key on the same referrer so mobile
+traffic cannot exhaust the dashboard's quota.
+
+If the picker is ever moved to the native Google Maps SDKs, that build needs
+separate Android- and iOS-restricted keys — application restrictions there are
+by package name + SHA-1 / bundle id, which a referrer-restricted key cannot
+satisfy.
+
+Never put the key in `eas.json` or any committed file.
 
 ## Setting the variables for EAS builds
 
@@ -63,9 +95,9 @@ Run from `apps/mobile/`, once per environment:
 eas env:create --environment production \
   --name EXPO_PUBLIC_MAP_PROVIDER --value google --visibility plaintext
 eas env:create --environment production \
-  --name EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY --value 'AIza…' --visibility sensitive
+  --name EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY --value '<existing dashboard key>' --visibility sensitive
 eas env:create --environment production \
-  --name EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL --value 'https://sma.vercel.app/app/' --visibility plaintext
+  --name EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL --value 'https://app.spicymeal.com.sa/' --visibility plaintext
 ```
 
 Repeat with `--environment preview` and `--environment development`.
