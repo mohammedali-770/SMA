@@ -97,6 +97,7 @@ interface AppContextType {
   toggleProductAvailability: (productId: string, branchId: string) => void;
   isProductAvailableInBranch: (productId: string, branchId: string) => boolean;
   updateBranchSettings: (id: string, updates: Partial<Branch>) => void;
+  deleteBranch: (id: string) => Promise<void>;
   bulkUploadMenu: (categories: Category[], products: Product[]) => Promise<{ success: boolean; count: number }>;
 
   // Delivery zones (per-branch coverage polygons). Reads are public (active
@@ -871,6 +872,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   };
 
+  const deleteBranch = async (id: string): Promise<void> => {
+    try {
+      await adminApi.deleteBranch(id);
+      setSelectedBranch(prev => {
+        if (prev?.id !== id) return prev;
+        return branches.find(b => b.id !== id && b.isActive)
+          ?? branches.find(b => b.id !== id)
+          ?? null;
+      });
+      await refreshCatalog();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setWriteError(message);
+      throw e;
+    }
+  };
+
   // ---- Admin: delivery-zone save / clear (server RPCs re-check is_admin()) ---
   const saveBranchDeliveryZone = useCallback(async (branchId: string, geojson: unknown, name?: string | null): Promise<void> => {
     await adminApi.setBranchDeliveryZone({ branchId, geojson, name: name ?? null });
@@ -1038,6 +1056,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleProductAvailability,
       isProductAvailableInBranch,
       updateBranchSettings,
+      deleteBranch,
       bulkUploadMenu,
 
       deliveryZones,
