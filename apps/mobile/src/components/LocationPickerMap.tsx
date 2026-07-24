@@ -16,6 +16,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { mapConfig } from '../lib/map';
+import { captureMessage } from '../lib/observability';
 import { colors, font, radius, spacing } from '../theme';
 
 interface LocationPickerMapProps {
@@ -29,11 +30,20 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
   // Google Maps JS API in the WebView. Arabic street names are shaped natively.
   // The key must be referrer-restricted; the WebView is loaded with a baseUrl
   // from an allowed domain so requests carry that referrer.
+  //
+  // `gm_authFailure` is Google's documented hook for a rejected key — it is what
+  // fires on RefererNotAllowedMapError (baseUrl missing or not in the key's
+  // referrer allowlist) and InvalidKeyMapError. Without it the API silently
+  // renders a blank grey canvas, which is indistinguishable from a network
+  // stall, so the reason is posted back to RN and reported instead.
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>html,body,#map{margin:0;padding:0;height:100%;width:100%}</style>
 </head><body><div id="map"></div><script>
   var map, marker;
+  function fail(reason){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapError:reason})); }
+  window.gm_authFailure = function(){ fail('google_auth_failure'); };
+  window.onerror = function(m){ fail('script_error: ' + String(m).slice(0,120)); };
   function post(){ if (marker && window.ReactNativeWebView) { var p = marker.getPosition(); window.ReactNativeWebView.postMessage(JSON.stringify({lat:p.lat(),lng:p.lng()})); } }
   window.__init = function(){
     map = new google.maps.Map(document.getElementById('map'), {
@@ -43,10 +53,11 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
     marker = new google.maps.Marker({ position: {lat:${lat}, lng:${lng}}, map: map, draggable: true });
     marker.addListener('dragend', post);
     map.addListener('click', function(e){ marker.setPosition(e.latLng); post(); });
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapReady:true}));
   };
   window.recenter = function(la, ln){ if (map && marker) { map.panTo({lat:la, lng:ln}); marker.setPosition({lat:la, lng:ln}); post(); } };
 </script>
-<script async src="https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=__init"></script>
+<script async src="https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async&callback=__init" onerror="fail('google_script_load_failed')"></script>
 </body></html>`;
 }
 
@@ -62,6 +73,10 @@ function buildHtml(token: string, style: string, lat: number, lng: number): stri
   var map = new mapboxgl.Map({ container:'map', style:${JSON.stringify(style)}, center:[${lng},${lat}], zoom:14 });
   var marker = new mapboxgl.Marker({ color:'#7c3aed', draggable:true }).setLngLat([${lng},${lat}]).addTo(map);
   function post(){ var p = marker.getLngLat(); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({lat:p.lat,lng:p.lng})); }
+  function fail(reason){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapError:reason})); }
+  // A rejected/URL-restricted token surfaces here as a 401 rather than throwing.
+  map.on('error', function(e){ fail('mapbox_error: ' + String((e && e.error && e.error.message) || 'unknown').slice(0,120)); });
+  map.on('load', function(){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapReady:true})); });
   marker.on('dragend', post);
   map.on('click', function(e){ marker.setLngLat(e.lngLat); post(); });
   window.recenter = function(la, ln){ map.flyTo({center:[ln,la]}); marker.setLngLat([ln,la]); post(); };
@@ -71,13 +86,39 @@ function buildHtml(token: string, style: string, lat: number, lng: number): stri
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, onChange, labels }) => {
   const webRef = useRef<WebView | null>(null);
   const [locating, setLocating] = useState(false);
+  const [failed, setFailed] = useState(false);
+  // Report the first failure only; a broken key otherwise fires on every
+  // re-render and would flood Sentry from a screen the user sits on.
+  const reportedRef = useRef(false);
+  // Set once the map has actually drawn. Errors after that point are transient
+  // (a dropped tile, an unrelated script error) and must NOT tear down a map
+  // the customer is already using — only a failure to come up at all is fatal.
+  const readyRef = useRef(false);
+
+  const reportFailure = (reason: string) => {
+    if (readyRef.current) return;
+    setFailed(true);
+    if (reportedRef.current) return;
+    reportedRef.current = true;
+    captureMessage(`map load failed: ${reason}`, {
+      subsystem: 'app',
+      op: 'map_load',
+      code: 'MAP_LOAD_FAILED',
+      level: 'error',
+      tags: { map_provider: mapConfig.provider, has_base_url: Boolean(mapConfig.webviewBaseUrl) },
+    });
+  };
+
   // Build the HTML once from the initial coords; further updates go through
   // injectJavaScript so the WebView is not reloaded on every pin move.
   const htmlRef = useRef(mapConfig.provider === 'google'
     ? buildGoogleHtml(mapConfig.googleKey, lat, lng)
     : buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng));
 
-  if (!mapConfig.isConfigured) {
+  // Unconfigured (no key) and load-failure (bad key / no network) both degrade
+  // to the same hint — the caller's manual coordinate entry keeps working
+  // either way. The two are distinguished in Sentry, not on screen.
+  if (!mapConfig.isConfigured || failed) {
     return (
       <View style={styles.fallback}>
         <Text style={styles.fallbackText}>{labels.setupRequired}</Text>
@@ -112,14 +153,28 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
             ? { html: htmlRef.current, baseUrl: mapConfig.webviewBaseUrl }
             : { html: htmlRef.current }}
           style={styles.web}
+          // Google Maps JS and Mapbox GL both persist state to localStorage;
+          // set explicitly so the map does not depend on the platform default.
+          domStorageEnabled
+          javaScriptEnabled
           onMessage={(e) => {
             try {
               const d = JSON.parse(e.nativeEvent.data);
+              if (d?.__mapReady === true) {
+                readyRef.current = true;
+                return;
+              }
+              if (typeof d?.__mapError === 'string') {
+                reportFailure(d.__mapError);
+                return;
+              }
               if (typeof d?.lat === 'number' && typeof d?.lng === 'number') {
                 onChange(Number(d.lat.toFixed(6)), Number(d.lng.toFixed(6)));
               }
             } catch { /* ignore */ }
           }}
+          onError={(e) => reportFailure(`webview: ${e.nativeEvent.description ?? 'unknown'}`)}
+          onHttpError={(e) => reportFailure(`http_${e.nativeEvent.statusCode}`)}
         />
       </View>
       <View style={styles.row}>
