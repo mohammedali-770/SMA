@@ -18,8 +18,61 @@ const enc = new TextEncoder();
 // ---------------------------------------------------------------------------
 export type NormalizedPhone = { ok: true; e164: string } | { ok: false };
 
+/** Zero-width and bidi control marks that RTL keyboards wrap around numbers. */
+function isInvisibleMark(c: number): boolean {
+  return (c >= 0x200b && c <= 0x200f) || (c >= 0x202a && c <= 0x202e)
+    || (c >= 0x2066 && c <= 0x2069) || c === 0xfeff;
+}
+
+/**
+ * Fold Arabic-Indic digits to ASCII and drop invisible marks. Arabic keyboards
+ * emit U+0660–0669, Persian ones U+06F0–06F9, and both survive a copy/paste out
+ * of WhatsApp — a number typed in Arabic must normalize like any other.
+ */
+function toAsciiDigits(input: string): string {
+  let out = '';
+  for (const ch of input) {
+    const c = ch.charCodeAt(0);
+    if (c >= 0x0660 && c <= 0x0669) out += String(c - 0x0660);
+    else if (c >= 0x06f0 && c <= 0x06f9) out += String(c - 0x06f0);
+    else if (!isInvisibleMark(c)) out += ch;
+  }
+  return out;
+}
+
+/**
+ * KSA-only normalization — the rule for every customer-facing WhatsApp flow.
+ * Login is WhatsApp-only and Saudi-only, so the login hook and the phone
+ * verification functions accept Saudi mobiles ONLY: every accepted form
+ * (`05…`, `5…`, `966…`, `00966…`, `+966…`, spaced/dashed, Arabic-Indic digits,
+ * trunk `0` left in after the country code) collapses to `+9665XXXXXXXX`, and
+ * anything else — foreign numbers included — is rejected.
+ *
+ * Mirrors the app's `apps/mobile/src/lib/phone.ts`; keep the two in sync.
+ */
+export function normalizeSaudiPhoneE164(input: string | null | undefined): NormalizedPhone {
+  if (!input) return { ok: false };
+  const raw = toAsciiDigits(String(input)).trim();
+  // Fail closed on anything that isn't clearly phone punctuation.
+  if (!raw || !/^[\d+\s().-]+$/.test(raw)) return { ok: false };
+  let d = raw.replace(/[^\d+]/g, '');
+  // '+' is a leading sign, never an interior character.
+  if (d.lastIndexOf('+') > 0) return { ok: false };
+  if (d.startsWith('+')) d = d.slice(1);
+  else if (d.startsWith('00')) d = d.slice(2);  // IDD prefix
+  if (d.startsWith('966')) d = d.slice(3);      // country code
+  if (d.startsWith('0')) d = d.slice(1);        // national trunk prefix
+  // Every KSA mobile is 5 + 8 digits. Deliberately NOT narrowed to today's
+  // operator prefixes — CITC keeps allocating new 5X ranges.
+  return /^5\d{8}$/.test(d) ? { ok: true, e164: '+966' + d } : { ok: false };
+}
+
 /** Normalize to E.164. Saudi mobiles become +9665XXXXXXXX; other inputs must
- *  already be valid E.164. Anything that isn't a clean phone is rejected. */
+ *  already be valid E.164. Anything that isn't a clean phone is rejected.
+ *
+ *  Country-agnostic on purpose — kept for the admin diagnostics send and for
+ *  re-verifying a phone already stored on a profile. Customer login and phone
+ *  verification use `normalizeSaudiPhoneE164` instead. */
 export function normalizePhoneE164(input: string | null | undefined): NormalizedPhone {
   if (!input) return { ok: false };
   const raw = String(input).trim();

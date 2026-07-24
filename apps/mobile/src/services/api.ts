@@ -13,6 +13,7 @@
  * writes, coupon management, integration_settings, and any service-role /
  * payment / SMS / Lazywait call. Those stay server-side behind Edge Functions.
  */
+import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
@@ -36,11 +37,11 @@ export const auth = {
   onChange(cb: (userId: string | null) => void) {
     return supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.id ?? null));
   },
-  async signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
-  },
-  // --- Customer WhatsApp login (Supabase Phone Auth is the login authority) ---
+  // --- Customer WhatsApp login: the app's ONLY login path ---------------------
+  // There is deliberately no email/password sign-in or sign-up here. Customers
+  // authenticate with a Saudi mobile (+9665XXXXXXXX) over WhatsApp; staff use
+  // the web dashboard. Normalize with `lib/phone.toSaudiE164` before calling.
+  //
   // signInWithOtp asks Supabase Auth to GENERATE the login OTP; Supabase then
   // calls our `auth-send-sms-whatsapp` Send SMS Hook to deliver it over WhatsApp.
   // No code is generated here and no custom OTP table is involved in login.
@@ -56,12 +57,6 @@ export const auth = {
     if (error) throw new Error(error.message);
     return data.session;
   },
-  async signUp(email: string, password: string, fullName: string, phone?: string) {
-    const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { full_name: fullName, phone } },
-    });
-    if (error) throw new Error(error.message);
-  },
   async signOut() {
     await supabase.auth.signOut();
   },
@@ -71,15 +66,15 @@ export const auth = {
     return ok(await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle());
   },
   // Anon-safe feature flag (boolean only, no secrets) telling the pre-login UI
-  // whether WhatsApp login is fully configured + enabled. Falls back to false.
-  async whatsappLoginEnabled(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase.rpc('whatsapp_login_enabled');
-      if (error) return false;
-      return data === true;
-    } catch {
-      return false;
-    }
+  // whether WhatsApp login is fully configured + enabled.
+  //
+  // TRI-STATE on purpose. A failed read ('unknown') must NOT be reported as
+  // 'disabled': WhatsApp is the only login path, so treating a transient RPC /
+  // RLS / network error as "off" would lock every customer out of an app that
+  // works. See features/auth/loginAvailability.ts — the caller shows the form on
+  // 'unknown' and lets the Send SMS hook (which fails closed) be the authority.
+  async whatsappLoginAvailability(): Promise<WhatsAppLoginAvailability> {
+    return readLoginFlag(async () => supabase.rpc('whatsapp_login_enabled'));
   },
 };
 

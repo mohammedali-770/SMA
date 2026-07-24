@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizePhoneE164, generateOtp, hashOtp, randomSalt,
+  normalizePhoneE164, normalizeSaudiPhoneE164, generateOtp, hashOtp, randomSalt,
   buildOtpTemplateMessage, sanitizeProviderResponse,
 } from './whatsapp';
 
@@ -25,6 +25,50 @@ describe('normalizePhoneE164', () => {
   it('rejects malformed Saudi numbers (wrong national prefix/length)', () => {
     expect(normalizePhoneE164('+966412345678').ok).toBe(false); // not a mobile (must start 5)
     expect(normalizePhoneE164('+96651234').ok).toBe(false);      // too short
+  });
+});
+
+// The customer-facing rule: WhatsApp login and phone verification are KSA-only.
+// Must stay behaviourally identical to apps/mobile/src/lib/phone.ts.
+describe('normalizeSaudiPhoneE164', () => {
+  const CANONICAL = '+966512345678';
+
+  it('accepts every Saudi input pattern', () => {
+    for (const form of [
+      '0512345678', '512345678', '966512345678', '+966512345678', '00966512345678',
+      '+966 51 234 5678', '+966-51-234-5678', '(051) 234-5678', '051 234 5678',
+      '+96605 1234 5678', '9660512345678', '00966 051 234 5678', ' 0512345678 ',
+      '٠٥١٢٣٤٥٦٧٨',  // Arabic-Indic digits
+      '۰۵۱۲۳۴۵۶۷۸',  // Persian digits
+      '\u200F0512345678\u200E',  // bidi-wrapped
+    ]) {
+      expect(normalizeSaudiPhoneE164(form)).toEqual({ ok: true, e164: CANONICAL });
+    }
+  });
+
+  it('accepts every 5X operator range', () => {
+    for (let x = 0; x <= 9; x++) {
+      expect(normalizeSaudiPhoneE164(`05${x}1234567`)).toEqual({ ok: true, e164: `+9665${x}1234567` });
+    }
+  });
+
+  it('rejects non-Saudi numbers', () => {
+    expect(normalizeSaudiPhoneE164('+14155552671').ok).toBe(false);   // US
+    expect(normalizeSaudiPhoneE164('+971501234567').ok).toBe(false);  // UAE
+    expect(normalizeSaudiPhoneE164('+996512345678').ok).toBe(false);  // +996, not +966
+    expect(normalizeSaudiPhoneE164('0044123456789').ok).toBe(false);  // UK via IDD
+  });
+
+  it('rejects Saudi landlines, wrong lengths, junk and injection attempts', () => {
+    expect(normalizeSaudiPhoneE164('+966112345678').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('+966412345678').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('05123456').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('051234567890').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164(null).ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('not-a-phone').ok).toBe(false);
+    expect(normalizeSaudiPhoneE164("+966512345678'; drop table").ok).toBe(false);
+    expect(normalizeSaudiPhoneE164('966+512345678').ok).toBe(false);
   });
 });
 

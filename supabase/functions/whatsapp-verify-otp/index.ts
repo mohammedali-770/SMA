@@ -4,7 +4,7 @@
 // Always returns a generic failure message. Never logs the OTP.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
-import { normalizePhoneE164, hashOtp, timingSafeEqual } from '../_shared/whatsapp.ts';
+import { normalizeSaudiPhoneE164, hashOtp, timingSafeEqual } from '../_shared/whatsapp.ts';
 import { getOtpPepper } from '../_shared/whatsappSend.ts';
 
 const GENERIC_FAIL = 'Invalid or expired verification code.';
@@ -17,7 +17,8 @@ Deno.serve(async (req: Request) => {
   let payload: { phone?: string; code?: string; purpose?: string };
   try { payload = await req.json(); } catch { return json({ verified: false, message: GENERIC_FAIL }, 200); }
 
-  const norm = normalizePhoneE164(payload.phone);
+  // Must normalize exactly like whatsapp-send-otp, or the challenge lookup misses.
+  const norm = normalizeSaudiPhoneE164(payload.phone);
   const code = String(payload.code ?? '').trim();
   const purpose = VALID_PURPOSES.has(String(payload.purpose)) ? String(payload.purpose) : 'phone_verification';
   if (!norm.ok || !/^\d{6}$/.test(code)) return json({ verified: false, message: GENERIC_FAIL }, 200);

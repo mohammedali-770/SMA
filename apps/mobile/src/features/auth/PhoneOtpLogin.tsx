@@ -1,11 +1,17 @@
 /**
- * Customer login via WhatsApp — powered by **Supabase Phone Auth**.
+ * Customer login via WhatsApp — powered by **Supabase Phone Auth**. This is the
+ * app's ONLY login path, and it is Saudi-only.
  *
  *   signInWithPhone → supabase.auth.signInWithOtp({ phone })   (Supabase makes OTP)
  *     → Supabase Auth calls the `auth-send-sms-whatsapp` Send SMS Hook
  *     → the code arrives on the customer's WhatsApp
  *   verifyPhone → supabase.auth.verifyOtp({ phone, token, type:'sms' })
  *     → returns a REAL session; AuthProvider.onChange routes the app in.
+ *
+ * The field holds the 9-digit national part; `+966` is fixed by the UI and the
+ * canonical `+9665XXXXXXXX` is derived once, here, so signInWithOtp, verifyOtp
+ * and the hook all agree on the same string. The hook re-checks Saudi-ness
+ * server-side — this screen is convenience, not the enforcement point.
  *
  * This screen never generates a code, never calls the custom whatsapp-verify-otp
  * function, and never fakes a session — Supabase Auth is the login authority.
@@ -15,20 +21,22 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
 import { useI18n } from '../../i18n/I18nProvider';
-import { toE164 } from '../../lib/phone';
+import { formatSaudiE164, isSaudiMobile, toSaudiE164 } from '../../lib/phone';
 import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
+import { requestLoginCode } from './loginAvailability';
 
 type Phase = 'phone' | 'code';
 
 export function PhoneOtpLogin() {
-  const { t } = useI18n();
+  const { t, rtlText } = useI18n();
   const [phase, setPhase] = useState<Phase>('phone');
-  const [phone, setPhone] = useState('');
-  const [e164, setE164] = useState('');   // the canonical number sent to Supabase
+  const [national, setNational] = useState('');  // 9-digit national part (5XXXXXXXX)
+  const [e164, setE164] = useState('');          // the canonical number sent to Supabase
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,22 +45,24 @@ export function PhoneOtpLogin() {
 
   const sendCode = async () => {
     setError(null); setNotice(null);
-    const normalized = toE164(phone);
-    if (!normalized) { setError(t('invalidPhone')); return; }
+    const normalized = toSaudiE164(national);
+    if (!normalized) { setError(t('invalidSaudiPhone')); return; }
     setBusy(true);
-    try {
-      await auth.signInWithPhone(normalized);
+    // The server is the authority on whether a code can be sent: the login
+    // screen may render this form on an unreadable feature flag, but only a
+    // successful send advances to the code step. A rejection — including the
+    // hook's "WhatsApp login is temporarily unavailable" when login is really
+    // off, or a rate limit — surfaces here and leaves us on the phone step.
+    const outcome = await requestLoginCode((p) => auth.signInWithPhone(p), normalized);
+    if (outcome.status === 'sent') {
       setE164(normalized);
       setPhase('code');
       setNotice(t('weSentLoginCode'));
       startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
-    } catch (err) {
-      // Surface a safe message; Supabase returns an error when the hook can't
-      // deliver (e.g. WhatsApp login disabled) or when rate-limited.
-      setError(err instanceof Error && err.message ? err.message : t('loginCodeSendFailed'));
-    } finally {
-      setBusy(false);
+    } else {
+      setError(outcome.message ?? t('loginCodeSendFailed'));
     }
+    setBusy(false);
   };
 
   const verify = async () => {
@@ -81,29 +91,24 @@ export function PhoneOtpLogin() {
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <Text style={styles.title}>{t('loginPhoneTitle')}</Text>
-      <Text style={styles.sub}>{t('loginPhoneSub')}</Text>
+      <Text style={[styles.title, rtlText]}>{t('loginPhoneTitle')}</Text>
+      <Text style={[styles.sub, rtlText]}>{t('loginPhoneSub')}</Text>
 
-      <View style={styles.field}>
-        <Text style={styles.fieldLabel}>{t('phoneNumberLabel')}</Text>
-        <TextInput
-          value={phone}
-          onChangeText={setPhone}
-          editable={phase === 'phone'}
-          keyboardType="phone-pad"
-          placeholder="05XXXXXXXX"
-          placeholderTextColor={colors.muted}
-          autoComplete="tel"
-          style={[styles.input, phase !== 'phone' && styles.inputMuted]}
-        />
-      </View>
+      <SaudiPhoneInput
+        value={national}
+        onChangeText={setNational}
+        editable={phase === 'phone'}
+        showHint={phase === 'phone'}
+        style={styles.field}
+      />
 
       {phase === 'phone' ? (
-        <Button label={t('sendLoginCode')} onPress={sendCode} loading={busy} />
+        <Button label={t('sendLoginCode')} onPress={sendCode} loading={busy} disabled={!isSaudiMobile(national)} />
       ) : (
         <>
+          <Text style={styles.sentTo}>{formatSaudiE164(e164)}</Text>
           <View style={styles.field}>
-            <Text style={styles.fieldLabel}>{t('enterLoginCode')}</Text>
+            <Text style={[styles.fieldLabel, rtlText]}>{t('enterLoginCode')}</Text>
             <TextInput
               value={code}
               onChangeText={(v) => setCode(sanitizeOtpDigits(v, 8))}
@@ -127,8 +132,8 @@ export function PhoneOtpLogin() {
         </>
       )}
 
-      {notice ? <Text style={styles.notice}>{notice}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {notice ? <Text style={[styles.notice, rtlText]}>{notice}</Text> : null}
+      {error ? <Text style={[styles.error, rtlText]}>{error}</Text> : null}
     </View>
   );
 }
@@ -138,12 +143,16 @@ const styles = StyleSheet.create({
   sub: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
   field: { marginBottom: spacing.md },
   fieldLabel: { fontSize: font.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  // The number the code went to — always LTR so it reads correctly in Arabic.
+  sentTo: {
+    fontSize: font.md, fontWeight: '800', color: colors.purple,
+    textAlign: 'center', writingDirection: 'ltr', marginBottom: spacing.sm,
+  },
   input: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md,
     color: colors.text, backgroundColor: colors.bgAlt,
   },
-  inputMuted: { backgroundColor: colors.bg, color: colors.muted },
   codeInput: { letterSpacing: 6, textAlign: 'center', fontWeight: '800' },
   notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
   error: { color: colors.red, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },

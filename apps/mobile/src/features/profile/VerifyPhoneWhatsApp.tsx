@@ -2,16 +2,22 @@
  * WhatsApp phone verification (Profile screen).
  *
  * Verifies phone OWNERSHIP for the signed-in customer — it does NOT log the user
- * in or change the session (auth stays email/password). The OTP is generated,
- * rate-limited, and checked entirely server-side; this UI only collects the phone
- * + code and reflects the result. When WhatsApp is not configured/enabled the
- * server returns `disabled` and we show a graceful not-available state.
+ * in or change the session. The OTP is generated, rate-limited, and checked
+ * entirely server-side; this UI only collects the phone + code and reflects the
+ * result. When WhatsApp is not configured/enabled the server returns `disabled`
+ * and we show a graceful not-available state.
+ *
+ * Saudi-only, exactly like login: the number is collected as a `+966` national
+ * part and normalized once with `toSaudiE164` before either call, so send and
+ * verify key off the same canonical string the server derives.
  */
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '../../components/Button';
+import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
 import { useI18n } from '../../i18n/I18nProvider';
+import { sanitizeSaudiNationalInput, toSaudiE164 } from '../../lib/phone';
 import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
@@ -25,7 +31,9 @@ export function VerifyPhoneWhatsApp() {
   const { profile, refreshProfile } = useAuth();
 
   const [phase, setPhase] = useState<Phase>(profile?.phoneVerified ? 'verified' : 'phone');
-  const [phone, setPhone] = useState(profile?.phoneNumber ?? '');
+  // Stored profile phones arrive in any shape (+966…, 05…); keep only the
+  // national part so the field and the `+966` prefix never double up.
+  const [national, setNational] = useState(() => sanitizeSaudiNationalInput(profile?.phoneNumber ?? ''));
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,12 +41,14 @@ export function VerifyPhoneWhatsApp() {
   const [notAvailable, setNotAvailable] = useState(false);
   const { cooldown, startCooldown } = useOtpCooldown();
 
+  const e164 = toSaudiE164(national);
+
   const sendCode = async () => {
     setError(null); setNotice(null);
-    if (phone.trim().length < 8) { setError(t('enterPhoneNumber')); return; }
+    if (!e164) { setError(t('invalidSaudiPhone')); return; }
     setBusy(true);
     try {
-      const res = await whatsappOtp.send(phone.trim(), lang);
+      const res = await whatsappOtp.send(e164, lang);
       if (res.status === 'disabled') { setNotAvailable(true); return; }
       setPhase('code');
       setNotice(t('weSentWhatsappCode'));
@@ -52,10 +62,10 @@ export function VerifyPhoneWhatsApp() {
 
   const verify = async () => {
     setError(null);
-    if (!/^\d{6}$/.test(code.trim())) { setError(t('invalidOrExpiredCode')); return; }
+    if (!e164 || !/^\d{6}$/.test(code.trim())) { setError(t('invalidOrExpiredCode')); return; }
     setBusy(true);
     try {
-      const res = await whatsappOtp.verify(phone.trim(), code.trim());
+      const res = await whatsappOtp.verify(e164, code.trim());
       if (res.verified) {
         setPhase('verified');
         setNotice(t('phoneVerifiedSuccess'));
@@ -89,19 +99,17 @@ export function VerifyPhoneWhatsApp() {
       ) : (
         <>
           {/* Digits stay LTR in both languages so numbers read correctly. */}
-          <TextInput
-            value={phone}
-            onChangeText={setPhone}
+          <SaudiPhoneInput
+            value={national}
+            onChangeText={setNational}
             editable={phase === 'phone'}
-            keyboardType="phone-pad"
-            placeholder="+9665XXXXXXXX"
-            placeholderTextColor={colors.muted}
-            style={[styles.input, phase !== 'phone' && styles.inputMuted]}
-            accessibilityLabel={t('phone')}
+            showHint={phase === 'phone'}
+            label={t('phone')}
+            style={styles.phoneField}
           />
 
           {phase === 'phone' ? (
-            <Button label={t('sendCodeWhatsapp')} onPress={sendCode} loading={busy} />
+            <Button label={t('sendCodeWhatsapp')} onPress={sendCode} loading={busy} disabled={!e164} />
           ) : (
             <>
               <TextInput
@@ -148,7 +156,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md,
     color: colors.text, backgroundColor: colors.white, marginBottom: spacing.sm,
   },
-  inputMuted: { backgroundColor: colors.bg, color: colors.muted },
+  phoneField: { marginBottom: spacing.sm },
   codeInput: { letterSpacing: 6, textAlign: 'center', fontWeight: '800' },
   notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
   error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.sm },

@@ -1,9 +1,33 @@
 # WhatsApp customer login — Supabase Phone Auth + Send SMS Hook + Meta Cloud API
 
-Customers log in with a WhatsApp one-time code. **Supabase Auth (GoTrue) is the
-sole login authority** — it generates the OTP and issues the session. WhatsApp is
-only the *delivery channel* for the code Supabase generated. Admin/staff login is
-unchanged (email + password). Everything ships **disabled by default**.
+Customers log in with a WhatsApp one-time code — **this is the only customer
+login path, and it accepts Saudi mobile numbers only.** **Supabase Auth (GoTrue)
+is the sole login authority**: it generates the OTP and issues the session.
+WhatsApp is only the *delivery channel* for the code Supabase generated.
+Admin/staff login is unchanged (email + password, web console). Everything ships
+**disabled by default**.
+
+## 0. The two customer-facing rules
+
+1. **WhatsApp only.** The customer app has no email/password sign-in or sign-up.
+   `auth.signIn` / `auth.signUp` no longer exist in `apps/mobile/src/services/api.ts`.
+   If WhatsApp login is not enabled, the login screen says so instead of offering
+   another way in.
+2. **Saudi (+966) only.** Every number resolves to `+9665XXXXXXXX` or is
+   rejected. Enforced in three places:
+   - `apps/mobile/src/lib/phone.ts` — client normalizer + the `+966` field UI.
+   - `_shared/whatsapp.ts` `normalizeSaudiPhoneE164` — used by
+     `auth-send-sms-whatsapp` (login) and `whatsapp-send-otp` /
+     `whatsapp-verify-otp` (phone verification). **This is the enforcement
+     point** — a client can be bypassed; the hook cannot.
+   - The hook still fails closed on anything that isn't a KSA mobile.
+
+   Every Saudi input pattern is accepted and folded to the same canonical
+   string: `05XXXXXXXX`, `5XXXXXXXX`, `9665…`, `009665…`, `+9665…`, the country
+   code with the trunk `0` left in (`+96605…`), spaces / dashes / parentheses,
+   and Arabic-Indic digits (`٠٥…` / `۰۵…`). All `5X` operator ranges are allowed
+   — no operator-prefix allow-list, because CITC keeps allocating new ones.
+   Saudi landlines, foreign numbers and wrong lengths are rejected.
 
 ---
 
@@ -70,12 +94,21 @@ Key guarantees:
 
 **Mobile app (`apps/mobile/`)**
 - `src/services/api.ts` — `auth.signInWithPhone`, `auth.verifyPhone`,
-  `auth.whatsappLoginEnabled`.
-- `src/lib/phone.ts` — `toE164()` client normalizer (mirrors the server).
-- `src/features/auth/PhoneOtpLogin.tsx` — **NEW.** WhatsApp login screen.
-- `src/features/auth/LoginScreen.tsx` — WhatsApp primary + email fallback.
-- `src/features/profile/VerifyPhoneWhatsApp.tsx` — relabeled (not login).
-- `src/i18n/strings.ts` — login + relabel strings (en/ar).
+  `auth.whatsappLoginAvailability`. Email/password `signIn`/`signUp` **removed**.
+- `src/features/auth/loginAvailability.ts` (+ test) — **NEW.** The tri-state
+  readiness contract and the send-outcome helper (see §6.1).
+- `src/lib/phone.ts` (+ `phone.test.ts`) — Saudi-only normalizer:
+  `toSaudiE164` / `toSaudiNational` / `isSaudiMobile` /
+  `sanitizeSaudiNationalInput` / `formatSaudiE164` (mirrors the server).
+- `src/components/SaudiPhoneInput.tsx` — **NEW.** Fixed `+966` prefix + the
+  9-digit national part; absorbs any pasted Saudi form. Shared by login and
+  profile verification.
+- `src/features/auth/PhoneOtpLogin.tsx` — WhatsApp login screen (Saudi field).
+- `src/features/auth/LoginScreen.tsx` — WhatsApp only; shows an "unavailable"
+  card when the feature flag is off (no email path to fall back to).
+- `src/features/profile/VerifyPhoneWhatsApp.tsx` — same Saudi field.
+- `src/i18n/strings.ts` — WhatsApp/Saudi login strings (en/ar); the email-auth
+  strings are gone.
 
 **Web admin (`src/`)**
 - `components/admin/IntegrationCard.tsx` — WhatsApp spec gains the login toggle
@@ -132,8 +165,37 @@ Admin Dashboard → Integrations → **WhatsApp OTP (Meta Cloud API)** card:
 Login only activates when **all** of: provider enabled + `whatsapp_login_enabled` +
 `phone_number_id` + `access_token` + **`send_sms_hook_secret`** + the template for
 the configured `otp_default_language` are present, AND Phone Auth + the Send SMS
-Hook are enabled in the dashboard. Until then the mobile app shows email login (the
-`whatsapp_login_enabled()` flag returns false).
+Hook are enabled in the dashboard. Until then the `whatsapp_login_enabled()` flag
+returns false and the app shows "WhatsApp login isn't available right now" —
+**there is no email fallback any more, so customers cannot log in until this is
+switched on.** Treat the flag as a launch gate, not a preference.
+
+### 6.1 The flag is a hint; the hook is the gate (tri-state)
+
+`auth.whatsappLoginAvailability()` returns **three** values, never a boolean:
+
+| Value | Meaning | Login screen renders |
+| --- | --- | --- |
+| `enabled` | flag read, genuinely ON | phone form |
+| `disabled` | flag read, genuinely OFF | "unavailable" card |
+| `unknown` | flag **could not be read** (network / RPC / RLS error, or a non-boolean payload) | phone form |
+
+Only a **confirmed** `disabled` hides the form. This matters because WhatsApp is
+the only way in: if an unreadable flag were collapsed into "off", a single
+transient status-RPC blip would show every customer the unavailable card even
+though login works perfectly. `readLoginFlag` therefore never rejects and never
+maps a failure to `disabled`.
+
+Rendering the form on `unknown` is safe because the client was never the
+authority. `auth-send-sms-whatsapp` fails closed and returns 503 "WhatsApp login
+is temporarily unavailable" when `whatsapp_login_enabled !== true`, so
+`signInWithOtp` rejects and `requestLoginCode` reports `failed` — the customer
+sees the server's reason and is never advanced to the code step. Worst case on a
+flag-read failure is one honest error message instead of a total lockout.
+
+Covered by `src/features/auth/loginAvailability.test.ts` (18 tests: flag ON, flag
+OFF, RPC/RLS/network read failure, and server rejection while login is really
+off).
 
 > Stronger option: instead of storing `send_sms_hook_secret` in `secret_config`,
 > set it as the Edge Function env var `SEND_SMS_HOOK_SECRET` (and the OTP pepper as
@@ -141,10 +203,11 @@ Hook are enabled in the dashboard. Until then the mobile app shows email login (
 >
 > **Caveat:** the pre-login readiness flag `whatsapp_login_enabled()` runs in SQL
 > and **cannot see Edge Function env vars**. If you use the env-var path and leave
-> `secret_config.send_sms_hook_secret` empty, the flag stays `false` and the app
-> keeps showing email login (safe — the hook still works if a client calls it). To
-> surface WhatsApp login as the default in that setup, also store the hook secret
-> in `secret_config` (the app never reads it — the flag only checks presence).
+> `secret_config.send_sms_hook_secret` empty, the flag stays `false` — and since
+> WhatsApp is now the only login path, the app shows the "unavailable" card even
+> though the hook itself would work. In that setup you **must** also store the
+> hook secret in `secret_config` (the app never reads it — the flag only checks
+> presence).
 
 ---
 
@@ -176,6 +239,13 @@ Kept, **secondary, still disabled**. `whatsapp-send-otp` / `whatsapp-verify-otp`
 relabeled "Verify phone number — this does not sign you in"). They never issue a
 session and are not part of login. `otp_challenges` is logs/secondary only.
 
+Both now use `normalizeSaudiPhoneE164`, so profile verification follows the same
+Saudi-only rule as login. `whatsapp-test-config` (admin diagnostics send) and
+`account-delete-request` (re-verifies a phone already stored on the profile)
+deliberately keep the country-agnostic `normalizePhoneE164`: the admin test send
+must be able to target any number, and account deletion must never be blocked by
+the shape of the phone already on the profile.
+
 ---
 
 ## 10. Tests & checks run
@@ -194,21 +264,22 @@ session and are not part of login. `otp_challenges` is logs/secondary only.
 
 ## 11. Remaining risks / notes
 
-- **Account linking:** a customer who previously used email/password gets a
-  *separate* auth user when they log in by phone (different `auth.uid()`), so a
-  second profile. We do **not** auto-merge (unsafe). Migration plan below.
-- The Send SMS Hook fails closed: if WhatsApp is misconfigured, `signInWithOtp`
-  errors and the app shows a send-failure message (login can't silently succeed).
-- Meta template approval can take time; keep email fallback until it's approved.
+- **No legacy accounts to migrate.** Confirmed by the owner: there are no
+  existing customer accounts to preserve. Any test/unused accounts left over are
+  not required, so no email→phone linking or profile reconciliation is needed.
+  Nothing is auto-merged and nothing is deleted by this change.
+- **No fallback:** if WhatsApp login is off or misconfigured, customers cannot
+  log in at all. The Send SMS Hook fails closed by design, so verify the whole
+  chain (§12) before flipping the flag.
+- **Saudi mobiles only, by design.** There is no country picker; a non-Saudi
+  number cannot be used to sign up or log in.
+- Meta template approval can take time — do not flip `whatsapp_login_enabled`
+  ON until the templates are approved and tested end-to-end.
 
-### Email → phone migration plan (manual, safe)
-1. Keep email login enabled during transition (already the fallback).
-2. To link an existing email account to a phone, do it **server-side** for a
-   *signed-in* user via GoTrue admin `updateUserById({ phone })` (or the
-   `phone_change` flow) — this keeps one `auth.uid()` and one profile. Never merge
-   by writing `profiles` directly.
-3. If two profiles already exist for one person, reconcile with an admin tool that
-   re-points orders/addresses to the surviving `auth.uid()` — out of scope here.
+### If a future account ever does need linking
+Do it **server-side** for a *signed-in* user via GoTrue admin
+`updateUserById({ phone })` (or the `phone_change` flow) — that keeps one
+`auth.uid()` and one profile. Never merge by writing `profiles` directly.
 
 ---
 
@@ -224,6 +295,9 @@ session and are not part of login. `otp_challenges` is logs/secondary only.
 5. Admin Dashboard → WhatsApp card → fill public + secret fields (incl. the hook
    secret), set `whatsapp_login_enabled` ON, set the card **enabled** ON.
 6. Verify: admin panel "WhatsApp customer login" shows **Login enabled = Yes** and
-   **Send SMS Hook secret = Yes**; the mobile login screen now defaults to
-   "Login with WhatsApp".
-7. Test end-to-end with a real number, then announce to customers.
+   **Send SMS Hook secret = Yes**; the login screen shows the `+966` field
+   instead of the "unavailable" card.
+7. Test end-to-end with a real Saudi number, then announce to customers.
+
+Because there is no email fallback, steps 1–6 are a hard prerequisite for
+customers being able to log in at all — not an enhancement.

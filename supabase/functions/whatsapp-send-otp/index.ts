@@ -4,7 +4,7 @@
 // unconfigured/off state (safe to reveal); otherwise a generic success.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
-import { normalizePhoneE164 } from '../_shared/whatsapp.ts';
+import { normalizeSaudiPhoneE164 } from '../_shared/whatsapp.ts';
 import { sendOtpViaWhatsApp, type Language } from '../_shared/whatsappSend.ts';
 
 const GENERIC = 'If this phone number is valid, a verification code will be sent.';
@@ -22,7 +22,8 @@ Deno.serve(async (req: Request) => {
   let payload: { phone?: string; purpose?: string; language?: string };
   try { payload = await req.json(); } catch { return json({ status: 'ok', message: GENERIC }, 200); }
 
-  const norm = normalizePhoneE164(payload.phone);
+  // Saudi-only, like login: customer phones are KSA mobiles (+9665XXXXXXXX).
+  const norm = normalizeSaudiPhoneE164(payload.phone);
   const purpose = VALID_PURPOSES.has(String(payload.purpose)) ? String(payload.purpose) : 'phone_verification';
   const language: Language = payload.language === 'ar' ? 'ar' : 'en';
 
