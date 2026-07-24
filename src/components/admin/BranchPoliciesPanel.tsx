@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import type { Branch } from '../../types';
+import { branchDeletionConfirmation } from './branchDeletion';
 
 // Lazy so mapbox-gl loads only when an admin opens the zone editor.
 const DeliveryZoneModal = React.lazy(() => import('./DeliveryZoneModal').then(m => ({ default: m.DeliveryZoneModal })));
@@ -34,11 +35,7 @@ export const BranchPoliciesPanel: React.FC = () => {
 
   const handleDeleteBranch = async (branch: Branch) => {
     if (isAccountant || deletingBranchId) return;
-    const branchName = isRTL ? branch.nameAr : branch.nameEn;
-    const message = isRTL
-      ? `هل أنت متأكد من حذف فرع «${branchName}» نهائياً؟ لا يمكن التراجع عن هذا الإجراء.`
-      : `Permanently delete “${branchName}”? This action cannot be undone.`;
-    if (!window.confirm(message)) return;
+    if (!window.confirm(branchDeletionConfirmation(branch, isRTL))) return;
 
     setDeletingBranchId(branch.id);
     try {
