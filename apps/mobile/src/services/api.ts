@@ -36,11 +36,11 @@ export const auth = {
   onChange(cb: (userId: string | null) => void) {
     return supabase.auth.onAuthStateChange((_e, session) => cb(session?.user?.id ?? null));
   },
-  async signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
-  },
-  // --- Customer WhatsApp login (Supabase Phone Auth is the login authority) ---
+  // --- Customer WhatsApp login: the app's ONLY login path ---------------------
+  // There is deliberately no email/password sign-in or sign-up here. Customers
+  // authenticate with a Saudi mobile (+9665XXXXXXXX) over WhatsApp; staff use
+  // the web dashboard. Normalize with `lib/phone.toSaudiE164` before calling.
+  //
   // signInWithOtp asks Supabase Auth to GENERATE the login OTP; Supabase then
   // calls our `auth-send-sms-whatsapp` Send SMS Hook to deliver it over WhatsApp.
   // No code is generated here and no custom OTP table is involved in login.
@@ -55,12 +55,6 @@ export const auth = {
     const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: 'sms' });
     if (error) throw new Error(error.message);
     return data.session;
-  },
-  async signUp(email: string, password: string, fullName: string, phone?: string) {
-    const { error } = await supabase.auth.signUp({
-      email, password, options: { data: { full_name: fullName, phone } },
-    });
-    if (error) throw new Error(error.message);
   },
   async signOut() {
     await supabase.auth.signOut();

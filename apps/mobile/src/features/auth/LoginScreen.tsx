@@ -1,23 +1,20 @@
 /**
  * Customer authentication for the Spicy Meal app.
  *
- * Primary path: **Login with WhatsApp** — Supabase Phone Auth (signInWithOtp /
- * verifyOtp) with the OTP delivered over WhatsApp by the Send SMS hook. This is
- * the real login: verifyOtp returns a genuine session.
- *
- * Fallback path: email + password (existing customers, or whenever WhatsApp
- * login isn't configured/enabled — `auth.whatsappLoginEnabled()` returns false).
+ * **WhatsApp is the only way in.** Supabase Phone Auth (signInWithOtp /
+ * verifyOtp) with the OTP delivered over WhatsApp by the Send SMS hook —
+ * verifyOtp returns a genuine session. There is no email/password path here:
+ * customers are Saudi and log in with a `+966` mobile, nothing else.
  *
  * Admin/staff do NOT log in here (they use the web dashboard's email/password);
- * whichever path a customer uses, the profile is created with role 'customer'.
+ * a customer signing in this way gets a profile with role 'customer'.
  */
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 
-import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
 import { Screen } from '../../components/Screen';
 import { LoadingView } from '../../components/StateViews';
@@ -27,23 +24,20 @@ import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
 import { PhoneOtpLogin } from './PhoneOtpLogin';
 
-type Method = 'whatsapp' | 'email';
-type Mode = 'signin' | 'signup';
-
 export function LoginScreen() {
   const { t, pick, lang, isRTL, rtlText } = useI18n();
-  const [method, setMethod] = useState<Method | null>(null);
-  const [waEnabled, setWaEnabled] = useState(false);
+  // null = still asking. Login is WhatsApp-only, so a `false` here means the
+  // door is genuinely shut (WhatsApp not configured/enabled) and we say so
+  // rather than offering a path that no longer exists.
+  const [waEnabled, setWaEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
     let alive = true;
-    auth.whatsappLoginEnabled().then((enabled) => {
-      if (!alive) return;
-      setWaEnabled(enabled);
-      setMethod((m) => m ?? (enabled ? 'whatsapp' : 'email'));
-    }).catch(() => {
-      if (alive) setMethod((m) => m ?? 'email');
-    });
+    auth.whatsappLoginEnabled()
+      .then((enabled) => { if (alive) setWaEnabled(enabled); })
+      // A failed flag read must never lock customers out: show the form and let
+      // the server stay the authority on whether a code can be sent.
+      .catch(() => { if (alive) setWaEnabled(true); });
     return () => { alive = false; };
   }, []);
 
@@ -61,17 +55,15 @@ export function LoginScreen() {
             <Text style={[styles.sub, rtlText]}>{t('authSub')}</Text>
           </View>
 
-          {method === null ? (
+          {waEnabled === null ? (
             <LoadingView />
-          ) : method === 'whatsapp' ? (
-            <>
-              <PhoneOtpLogin />
-              <Pressable onPress={() => setMethod('email')} style={styles.switch}>
-                <Text style={styles.switchText}>{t('useEmailInstead')}</Text>
-              </Pressable>
-            </>
+          ) : waEnabled ? (
+            <PhoneOtpLogin />
           ) : (
-            <EmailAuth showWhatsAppSwitch={waEnabled} onUseWhatsApp={() => setMethod('whatsapp')} />
+            <View style={styles.unavailable}>
+              <Text style={[styles.unavailableTitle, rtlText]}>{t('whatsappLoginNotAvailable')}</Text>
+              <Text style={[styles.unavailableSub, rtlText]}>{t('whatsappLoginNotAvailableSub')}</Text>
+            </View>
           )}
 
           {/* Legal links — open the relevant documents (no forced acceptance). */}
@@ -92,149 +84,18 @@ export function LoginScreen() {
   );
 }
 
-/** Email + password sign-in / sign-up (the fallback path). */
-function EmailAuth({ showWhatsAppSwitch, onUseWhatsApp }: { showWhatsAppSwitch: boolean; onUseWhatsApp: () => void }) {
-  const { t, rtlText } = useI18n();
-  const [mode, setMode] = useState<Mode>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const submit = async () => {
-    setError(null);
-    setNotice(null);
-    if (!email.trim() || !password) {
-      setError(t('fillRequiredFields'));
-      return;
-    }
-    setBusy(true);
-    try {
-      if (mode === 'signin') {
-        await auth.signIn(email.trim(), password);
-        router.replace('/(tabs)');
-      } else {
-        if (!fullName.trim()) {
-          setError(t('fillRequiredFields'));
-          setBusy(false);
-          return;
-        }
-        await auth.signUp(email.trim(), password, fullName.trim(), phone.trim() || undefined);
-        const session = await auth.getSession();
-        if (session) {
-          router.replace('/(tabs)');
-        } else {
-          setNotice(t('signUpCheckEmail'));
-          setMode('signin');
-        }
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('somethingWentWrong'));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <>
-      <Text style={[styles.title, rtlText]}>{mode === 'signin' ? t('signInTitle') : t('signUpTitle')}</Text>
-
-      {mode === 'signup' && (
-        <Field label={t('fullName')} value={fullName} onChangeText={setFullName} placeholder={t('namePlaceholder')} />
-      )}
-
-      <Field
-        label={t('email')}
-        value={email}
-        onChangeText={setEmail}
-        placeholder={t('emailPlaceholder')}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-      />
-      <Field
-        label={t('password')}
-        value={password}
-        onChangeText={setPassword}
-        placeholder={t('passwordPlaceholder')}
-        secureTextEntry
-        autoCapitalize="none"
-      />
-      {mode === 'signup' && (
-        <Field
-          label={t('phoneOptional')}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder={t('phonePlaceholder')}
-          keyboardType="phone-pad"
-        />
-      )}
-
-      {notice ? <Text style={[styles.notice, rtlText]}>{notice}</Text> : null}
-      {error ? <Text style={[styles.error, rtlText]}>{error}</Text> : null}
-
-      <Button
-        label={mode === 'signin' ? t('signInBtn') : t('signUpBtn')}
-        onPress={submit}
-        loading={busy}
-        style={{ marginTop: spacing.md }}
-      />
-
-      <Pressable accessibilityRole="button" onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} style={styles.switch}>
-        <Text style={styles.switchText}>{mode === 'signin' ? t('haveNoAccount') : t('haveAccount')}</Text>
-      </Pressable>
-
-      {showWhatsAppSwitch && (
-        <Pressable accessibilityRole="button" onPress={onUseWhatsApp} style={styles.switchAlt}>
-          <Text style={styles.switchText}>{t('useWhatsappInstead')}</Text>
-        </Pressable>
-      )}
-    </>
-  );
-}
-
-function Field(props: React.ComponentProps<typeof TextInput> & { label: string }) {
-  const { label, style, ...rest } = props;
-  const { rtlText } = useI18n();
-  return (
-    <View style={styles.field}>
-      <Text style={[styles.fieldLabel, rtlText]}>{label}</Text>
-      <TextInput
-        placeholderTextColor={colors.muted}
-        style={[styles.input, rtlText, style]}
-        {...rest}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   scroll: { padding: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
   hero: { alignItems: 'flex-start', marginBottom: spacing.lg, gap: spacing.xs },
   heroRTL: { alignItems: 'flex-end' },
   welcome: { fontSize: font.xxl, fontWeight: '800', color: colors.purple, marginTop: spacing.md },
   sub: { fontSize: font.md, color: colors.muted },
-  title: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginVertical: spacing.sm },
-  field: { marginBottom: spacing.md },
-  fieldLabel: { fontSize: font.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  input: {
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: font.md,
-    color: colors.text,
-    backgroundColor: colors.bgAlt,
+  unavailable: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg,
+    backgroundColor: colors.bgAlt, padding: spacing.lg, gap: spacing.xs,
   },
-  error: { color: colors.red, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
-  notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
-  switch: { marginTop: spacing.xl, alignItems: 'center' },
-  switchAlt: { marginTop: spacing.md, alignItems: 'center' },
-  switchText: { color: colors.purple, fontSize: font.md, fontWeight: '700' },
+  unavailableTitle: { fontSize: font.md, fontWeight: '800', color: colors.text },
+  unavailableSub: { fontSize: font.sm, color: colors.muted, lineHeight: 20 },
   policy: { marginTop: spacing.xl, textAlign: 'center', color: colors.muted, fontSize: font.sm, lineHeight: 20 },
   policyLink: { color: colors.purple, fontWeight: '800' },
 });

@@ -17,7 +17,7 @@
 //   failure → 200 `{ "error": { "http_code": <n>, "message": "..." } }`
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
-import { normalizePhoneE164 } from '../_shared/whatsapp.ts';
+import { normalizeSaudiPhoneE164 } from '../_shared/whatsapp.ts';
 import { resolveWhatsAppConfig, deliverOtpTemplate, type Language } from '../_shared/whatsappSend.ts';
 import { verifyStandardWebhook, parseSendSmsHookPayload } from '../_shared/authHook.ts';
 
@@ -62,8 +62,11 @@ Deno.serve(async (req: Request) => {
   // 3) Parse the official payload → { phone, otp } (the OTP is Supabase's).
   const parsed = parseSendSmsHookPayload(raw);
   if (!parsed.ok) return hookError(400, 'Invalid hook payload');
-  const norm = normalizePhoneE164(parsed.data.phone);
-  if (!norm.ok) return hookError(400, 'Invalid phone number');
+  // Saudi-only: login is restricted to KSA mobiles (+9665XXXXXXXX). This is the
+  // authoritative check — the app validates too, but a client can be bypassed,
+  // so a non-Saudi number never gets a code delivered.
+  const norm = normalizeSaudiPhoneE164(parsed.data.phone);
+  if (!norm.ok) return hookError(400, 'Enter a Saudi mobile number (+9665XXXXXXXX)');
 
   // 4) Login must be explicitly enabled by the admin (separate from the
   //    provider master switch and from the phone-verification feature).
