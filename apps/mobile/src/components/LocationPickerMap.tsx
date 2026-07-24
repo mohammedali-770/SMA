@@ -4,26 +4,50 @@
  * Renders a real interactive map (Google Maps JS or Mapbox, provider-switched
  * in lib/map.ts) + draggable pin inside a WebView — which
  * runs in Expo Go today with no native map module or EAS build. The pin position
- * is posted back to React Native via `postMessage`. `expo-location` optionally
- * centers on the user; if permission is denied the map still works by manual
- * pan/drag (never blocks). Coordinates are validated server-side by place_order.
+ * is posted back to React Native via `postMessage`. Coordinates are validated
+ * server-side by place_order.
+ *
+ * The current-location control is a compact circular button overlaid on the map
+ * beneath the zoom cluster, in the position Google Maps itself uses. It was
+ * previously a full-width button *below* the map that awaited a fresh
+ * high-accuracy fix on every press with no busy state, so a cold GPS looked like
+ * a dead button and customers queued more fixes by tapping again. Now:
+ *   - a last-known fix moves the pin immediately (perceived speed), then a
+ *     fresh reading refines it;
+ *   - the control shows its own spinner and ignores presses while working;
+ *   - every failure degrades to one short line — dragging the pin always still
+ *     works, so no failure here blocks the order.
+ * Logic testable without a renderer lives in ./locationControl.
  *
  * Isolated behind this component so a later swap to a native map
  * (@rnmapbox/maps on an EAS dev build) is a localized change.
  */
-import React, { useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { mapConfig } from '../lib/map';
 import { captureMessage } from '../lib/observability';
 import { colors, font, radius, spacing } from '../theme';
+import { CrosshairIcon } from './Icons';
+import {
+  FIX_FRESH_MS, LOCATE_TIMEOUT_MS, classifyLocateFailure, isFixFresh, isUsableFix,
+  locateFailureMessage, roundCoord, shouldStartLocate,
+  type CachedFix, type LocateLang, type LocateState,
+} from './locationControl';
 
 interface LocationPickerMapProps {
   lat: number;
   lng: number;
   onChange: (lat: number, lng: number) => void;
-  labels: { moveHint: string; useMyLocation: string; setupRequired: string };
+  /** Language for the control's own error line (the map has no i18n context). */
+  lang: LocateLang;
+  labels: { locateHint: string; useMyLocation: string; setupRequired: string };
+  /**
+   * Reverse-geocoded street/district for the picked point, when the platform can
+   * resolve one. Callers use it to prefill the location description.
+   */
+  onAddressResolved?: (text: string) => void;
 }
 
 function buildGoogleHtml(key: string, lat: number, lng: number): string {
@@ -36,6 +60,9 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
   // referrer allowlist) and InvalidKeyMapError. Without it the API silently
   // renders a blank grey canvas, which is indistinguishable from a network
   // stall, so the reason is posted back to RN and reported instead.
+  //
+  // Zoom sits at RIGHT_CENTER so the app's locate control can occupy the
+  // bottom-right corner without overlapping it — the stacking Google Maps uses.
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <style>html,body,#map{margin:0;padding:0;height:100%;width:100%}</style>
@@ -48,7 +75,8 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
   window.__init = function(){
     map = new google.maps.Map(document.getElementById('map'), {
       center: {lat:${lat}, lng:${lng}}, zoom: 14,
-      clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false, disableDefaultUI: true, zoomControl: true
+      clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false, disableDefaultUI: true,
+      zoomControl: true, zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER }
     });
     marker = new google.maps.Marker({ position: {lat:${lat}, lng:${lng}}, map: map, draggable: true });
     marker.addListener('dragend', post);
@@ -83,9 +111,12 @@ function buildHtml(token: string, style: string, lat: number, lng: number): stri
 </script></body></html>`;
 }
 
-export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, onChange, labels }) => {
+export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
+  lat, lng, onChange, lang, labels, onAddressResolved,
+}) => {
   const webRef = useRef<WebView | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [locateState, setLocateState] = useState<LocateState>('idle');
+  const [locateError, setLocateError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   // Report the first failure only; a broken key otherwise fires on every
   // re-render and would flood Sentry from a screen the user sits on.
@@ -94,6 +125,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
   // (a dropped tile, an unrelated script error) and must NOT tear down a map
   // the customer is already using — only a failure to come up at all is fatal.
   const readyRef = useRef(false);
+  const lastFixRef = useRef<CachedFix | null>(null);
 
   const reportFailure = (reason: string) => {
     if (readyRef.current) return;
@@ -115,6 +147,71 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
     ? buildGoogleHtml(mapConfig.googleKey, lat, lng)
     : buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng));
 
+  /** Move camera + pin, publish the coordinates, and try to name the place. */
+  const applyFix = useCallback((la: number, ln: number, reverseGeocode: boolean) => {
+    const rLa = roundCoord(la);
+    const rLn = roundCoord(ln);
+    webRef.current?.injectJavaScript(`window.recenter(${rLa}, ${rLn}); true;`);
+    onChange(rLa, rLn);
+    if (!reverseGeocode || !onAddressResolved) return;
+    // Best-effort only: a missing street name must never fail the locate action.
+    Location.reverseGeocodeAsync({ latitude: rLa, longitude: rLn })
+      .then((places) => {
+        const p = places?.[0];
+        if (!p) return;
+        const text = [p.name, p.street, p.district, p.city].filter(Boolean).join(', ');
+        if (text) onAddressResolved(text);
+      })
+      .catch(() => { /* no reverse geocoder on this platform / offline */ });
+  }, [onChange, onAddressResolved]);
+
+  const useMyLocation = useCallback(async () => {
+    if (!shouldStartLocate(locateState)) return; // repeated-tap guard
+    setLocateState('locating');
+    setLocateError(null);
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocateError(locateFailureMessage('permission_denied', lang));
+        setLocateState('error');
+        return;
+      }
+
+      // Show a recent fix straight away so the pin moves on the first frame,
+      // then refine with a live reading. `lastFixRef` survives re-presses within
+      // the screen, so a second tap feels instant.
+      const cached = lastFixRef.current;
+      if (cached && isFixFresh(cached, Date.now())) {
+        applyFix(cached.lat, cached.lng, false);
+      } else {
+        const known = await Location.getLastKnownPositionAsync({ maxAge: FIX_FRESH_MS });
+        if (known && isUsableFix(known.coords.latitude, known.coords.longitude)) {
+          applyFix(known.coords.latitude, known.coords.longitude, false);
+        }
+      }
+
+      // Most accurate practical reading, bounded so a cold GPS cannot hang the
+      // control indefinitely.
+      const fresh = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Location request timed out')), LOCATE_TIMEOUT_MS)),
+      ]);
+      const { latitude, longitude } = fresh.coords;
+      if (!isUsableFix(latitude, longitude)) {
+        setLocateError(locateFailureMessage('unavailable', lang));
+        setLocateState('error');
+        return;
+      }
+      lastFixRef.current = { lat: latitude, lng: longitude, at: Date.now() };
+      applyFix(latitude, longitude, true);
+      setLocateState('idle');
+    } catch (e) {
+      setLocateError(locateFailureMessage(classifyLocateFailure(e), lang));
+      setLocateState('error');
+    }
+  }, [locateState, lang, applyFix]);
+
   // Unconfigured (no key) and load-failure (bad key / no network) both degrade
   // to the same hint — the caller's manual coordinate entry keeps working
   // either way. The two are distinguished in Sentry, not on screen.
@@ -126,22 +223,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
     );
   }
 
-  const useMyLocation = async () => {
-    setLocating(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return; // denied → manual selection still works
-      const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const la = Number(pos.coords.latitude.toFixed(6));
-      const ln = Number(pos.coords.longitude.toFixed(6));
-      webRef.current?.injectJavaScript(`window.recenter(${la}, ${ln}); true;`);
-      onChange(la, ln);
-    } catch {
-      // ignore; user can still place the pin manually
-    } finally {
-      setLocating(false);
-    }
-  };
+  const locating = locateState === 'locating';
 
   return (
     <View>
@@ -176,24 +258,53 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
           onError={(e) => reportFailure(`webview: ${e.nativeEvent.description ?? 'unknown'}`)}
           onHttpError={(e) => reportFailure(`http_${e.nativeEvent.statusCode}`)}
         />
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.hint}>{labels.moveHint}</Text>
-        <Pressable onPress={useMyLocation} disabled={locating} style={styles.locBtn}>
-          <Text style={styles.locBtnText}>{locating ? '…' : labels.useMyLocation}</Text>
+
+        {/* In-map current-location control. Bottom-right, clear of the zoom
+            cluster (RIGHT_CENTER) and of the map attribution strip. */}
+        <Pressable
+          onPress={useMyLocation}
+          accessibilityRole="button"
+          accessibilityLabel={labels.useMyLocation}
+          accessibilityState={{ busy: locating, disabled: locating }}
+          accessibilityHint={labels.locateHint}
+          hitSlop={8}
+          style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
+        >
+          {locating
+            ? <ActivityIndicator size="small" color={colors.purple} />
+            : <CrosshairIcon size={22} color={colors.purple} />}
         </Pressable>
       </View>
+
+      {/* Quiet hint — the loud message on these screens is the description
+          field's own validation, which must not have to compete with this. */}
+      <Text style={styles.hint}>{labels.locateHint}</Text>
+      {locateError ? <Text style={styles.locateError}>{locateError}</Text> : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  mapWrap: { height: 240, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
+  mapWrap: {
+    height: 240, borderRadius: radius.md, overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.border, position: 'relative',
+  },
   web: { flex: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs, gap: spacing.sm },
-  hint: { flex: 1, fontSize: font.sm, color: colors.muted },
-  locBtn: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.purple },
-  locBtnText: { color: colors.white, fontSize: font.sm, fontWeight: '800' },
+  // 44x44 keeps the control at the platform minimum touch target while staying
+  // small enough not to cover the map or the pin.
+  locateBtn: {
+    position: 'absolute', right: spacing.sm, bottom: 28,
+    width: 44, height: 44, borderRadius: 22,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1, borderColor: colors.border,
+    // Matches the elevation Google's own map controls carry.
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 }, elevation: 3,
+  },
+  locateBtnPressed: { backgroundColor: colors.purpleBg },
+  hint: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
+  locateError: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.xs },
   fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
   fallbackText: { fontSize: font.sm, color: colors.muted, fontWeight: '700', textAlign: 'center' },
 });

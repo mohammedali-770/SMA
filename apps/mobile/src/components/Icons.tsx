@@ -210,3 +210,27 @@ export function DishIcon({ size = 40, color = '#c9c4d6' }: IconProps) {
     </View>
   );
 }
+
+/**
+ * Crosshair / "my location": a ring with a filled centre and four tick marks,
+ * matching the affordance Google Maps uses for its own locate control so the
+ * in-map button reads as a map control rather than app chrome.
+ */
+export function CrosshairIcon({ size = 20, color = '#422e87' }: IconProps) {
+  const stroke = Math.max(1.5, Math.round(size / 10));
+  const ring = Math.round(size * 0.62);
+  const dot = Math.max(3, Math.round(size * 0.2));
+  const tick = Math.max(2, Math.round(size * 0.14));
+  const tickStyle = { position: 'absolute' as const, backgroundColor: color, borderRadius: stroke };
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+      <View style={{ width: ring, height: ring, borderRadius: ring / 2, borderWidth: stroke, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color }} />
+      </View>
+      <View style={[tickStyle, { top: 0, width: stroke, height: tick }]} />
+      <View style={[tickStyle, { bottom: 0, width: stroke, height: tick }]} />
+      <View style={[tickStyle, { left: 0, height: stroke, width: tick }]} />
+      <View style={[tickStyle, { right: 0, height: stroke, width: tick }]} />
+    </View>
+  );
+}
