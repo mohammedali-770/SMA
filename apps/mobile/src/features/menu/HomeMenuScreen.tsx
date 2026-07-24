@@ -205,7 +205,8 @@ export function HomeMenuScreen() {
         // menu doesn't shift when data lands. No animation loops.
         <MenuSkeleton />
       ) : error ? (
-        <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} icon={<AlertIcon />} />
+        <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} icon={<AlertIcon />}
+          fallbackTitle={pick("The menu didn't load", 'تعذّر تحميل القائمة')} />
       ) : !orderCtx.valid ? (
         // No valid context yet — the gate effect is redirecting to /select.
         <LoadingView label={t('loading')} />

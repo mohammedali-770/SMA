@@ -29,7 +29,7 @@ const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | '
 };
 
 export function OrdersScreen() {
-  const { t, lang, isRTL, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
   const [list, setList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -108,7 +108,8 @@ export function OrdersScreen() {
         // (stale-while-revalidate keeps the real list on screen afterwards).
         <OrdersSkeleton />
       ) : error ? (
-        <ErrorView message={error} onRetry={() => load('focus')} retryLabel={t('retry')} icon={<AlertIcon />} />
+        <ErrorView message={error} onRetry={() => load('focus')} retryLabel={t('retry')} icon={<AlertIcon />}
+          fallbackTitle={pick("Your orders didn't load", 'تعذّر تحميل طلباتك')} />
       ) : list.length === 0 ? (
         <EmptyView icon={<ReceiptIcon size={44} color={colors.disabled} />} title={t('noOrders')} subtitle={t('noOrdersSub')} />
       ) : (

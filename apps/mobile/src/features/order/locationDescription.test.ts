@@ -5,6 +5,7 @@ import {
   checkDescription,
   descriptionCopy,
   descriptionMessage,
+  echoesAddress,
   isDescriptionValid,
   normalizeDescription,
 } from './locationDescription';
@@ -82,14 +83,24 @@ describe('descriptionCopy', () => {
     }
   });
 
-  it('uses the one agreed meaning in both languages', () => {
-    expect(descriptionCopy.en.label).toBe('Location description / nearest landmark');
-    expect(descriptionCopy.ar.label).toBe('وصف الموقع / أقرب معلم');
+  it('asks for delivery guidance, not for the address again', () => {
+    // The label must name what the customer has to add. "Location description"
+    // alone invited people to retype the street the map already knows.
+    expect(descriptionCopy.en.label).toBe('Delivery guidance (building, entrance, apartment or landmark)');
+    expect(descriptionCopy.ar.label).toBe('إرشادات التوصيل (المبنى أو المدخل أو الشقة أو أقرب معلم)');
+    for (const w of ['building', 'entrance', 'apartment', 'landmark']) {
+      expect(descriptionCopy.en.label.toLowerCase()).toContain(w);
+    }
+  });
+
+  it('keeps the resolved address labelled as separate context', () => {
+    expect(descriptionCopy.en.addressPrefix).toBe('Selected location');
+    expect(descriptionCopy.ar.addressPrefix).toBe('الموقع المحدد');
   });
 
   it('has a message for every problem case in both languages', () => {
     for (const lang of ['en', 'ar'] as const) {
-      for (const problem of ['empty', 'too_short', 'too_long'] as const) {
+      for (const problem of ['empty', 'too_short', 'too_long', 'echoes_address'] as const) {
         const msg = descriptionMessage(problem, lang);
         expect(msg).toBeTruthy();
         expect((msg as string).length).toBeGreaterThan(0);
@@ -105,9 +116,89 @@ describe('descriptionCopy', () => {
   it('keeps inline messages short enough not to dominate the form', () => {
     // Information hierarchy: the inline hint states the fix, it is not a lecture.
     for (const lang of ['en', 'ar'] as const) {
-      for (const problem of ['empty', 'too_short', 'too_long'] as const) {
+      for (const problem of ['empty', 'too_short', 'too_long', 'echoes_address'] as const) {
         expect((descriptionMessage(problem, lang) as string).length).toBeLessThanOrEqual(80);
       }
     }
+  });
+});
+
+
+describe('address vs delivery guidance — a pin must not satisfy the rule for you', () => {
+  // The picker reverse-geocodes the pin. An earlier revision prefilled the
+  // description field with that text, which let the map satisfy the mandatory
+  // guidance requirement without the customer typing anything.
+  const RESOLVED = 'King Fahd Road, Al Olaya, Riyadh';
+
+  it('rejects the reverse-geocoded address pasted back verbatim', () => {
+    const r = checkDescription(RESOLVED, RESOLVED);
+    expect(r.valid).toBe(false);
+    expect(r.problem).toBe('echoes_address');
+  });
+
+  it('rejects a trivial reformatting of the same address', () => {
+    // Punctuation, case and spacing differences are not new information.
+    expect(checkDescription('king fahd road  al olaya, riyadh.', RESOLVED).problem).toBe('echoes_address');
+    expect(checkDescription('King Fahd Road - Al Olaya - Riyadh', RESOLVED).problem).toBe('echoes_address');
+  });
+
+  it('rejects the address plus one filler word', () => {
+    expect(checkDescription('King Fahd Road Al Olaya Riyadh near', RESOLVED).problem).toBe('echoes_address');
+  });
+
+  it('accepts genuine delivery guidance that also mentions the street', () => {
+    const r = checkDescription('King Fahd Road, blue building second entrance flat 12', RESOLVED);
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepts guidance that shares no words with the address', () => {
+    expect(checkDescription('blue gate beside the pharmacy', RESOLVED).valid).toBe(true);
+  });
+
+  it('accepts Arabic guidance against an Arabic resolved address', () => {
+    const ar = 'طريق الملك فهد، العليا، الرياض';
+    expect(checkDescription(ar, ar).problem).toBe('echoes_address');
+    expect(checkDescription('المبنى الأزرق المدخل الثاني شقة ١٢', ar).valid).toBe(true);
+  });
+
+  it('ignores Arabic diacritics and tatweel when comparing', () => {
+    const ar = 'طريق الملك فهد';
+    // Same words, decorated — still an echo, not guidance.
+    expect(echoesAddress('طريـــق الملك فهد', ar)).toBe(true);
+  });
+
+  it('still applies the length rules before the echo rule', () => {
+    expect(checkDescription('', RESOLVED).problem).toBe('empty');
+    expect(checkDescription('   ', RESOLVED).problem).toBe('empty');
+    expect(checkDescription('abc', RESOLVED).problem).toBe('too_short');
+  });
+
+  it('skips the echo rule when no address has been resolved', () => {
+    // Reverse geocoding is best-effort; when it fails the customer is not
+    // punished for text that merely looks address-like.
+    expect(checkDescription('King Fahd Road, Al Olaya, Riyadh', null).valid).toBe(true);
+    expect(checkDescription('King Fahd Road, Al Olaya, Riyadh').valid).toBe(true);
+    expect(echoesAddress('anything', null)).toBe(false);
+    expect(echoesAddress('anything', '')).toBe(false);
+  });
+
+  it('gates confirmation of a NEWLY SELECTED PIN on real guidance', () => {
+    // Simulates: customer drops a pin, the map resolves an address, and the
+    // description field still holds only that address.
+    const newPinAddress = 'Prince Sultan Street, Al Khobar';
+    expect(isDescriptionValid(newPinAddress, newPinAddress)).toBe(false);
+    expect(normalizeDescription(newPinAddress, newPinAddress)).toBeNull();
+    // Only after the customer adds real guidance does confirmation unlock.
+    expect(isDescriptionValid('Prince Sultan Street, white tower entrance C', newPinAddress)).toBe(true);
+  });
+
+  it('has an echo message in both languages that asks for the missing detail', () => {
+    for (const lang of ['en', 'ar'] as const) {
+      const msg = descriptionMessage('echoes_address', lang);
+      expect(msg).toBeTruthy();
+      expect((msg as string).length).toBeLessThanOrEqual(80);
+    }
+    expect(descriptionCopy.en.echoes_address.toLowerCase()).toContain('entrance');
+    expect(descriptionCopy.ar.echoes_address).toContain('المدخل');
   });
 });

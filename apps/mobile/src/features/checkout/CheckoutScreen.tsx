@@ -76,6 +76,9 @@ export function CheckoutScreen() {
   // order-type gate so the customer never retypes it (section 2).
   const [addrDesc, setAddrDesc] = useState<string>(orderCtx.context?.deliveryDescription ?? '');
   const [descTouched, setDescTouched] = useState(false);
+  // Reverse-geocoded address for the current pin. Context only — never the
+  // delivery guidance, and never written into the description field.
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   // Set while a quantity change is settling; blocks submission so the server is
   // never handed a cart the customer has not seen priced.
   const [recalcLine, setRecalcLine] = useState<string | null>(null);
@@ -208,7 +211,7 @@ export function CheckoutScreen() {
 
   // Delivery needs a landmark; pickup does not.
   const requiresDescription = orderType === 'delivery';
-  const descCheck = checkDescription(addrDesc);
+  const descCheck = checkDescription(addrDesc, resolvedAddress);
   const descError = descTouched && requiresDescription
     ? descriptionMessage(descCheck.problem, lang)
     : null;
@@ -332,7 +335,7 @@ export function CheckoutScreen() {
         // Mandatory landmark, re-checked here and not only on the button: the
         // address row is written from this path, and it previously stored no
         // description at all.
-        const desc = checkDescription(addrDesc);
+        const desc = checkDescription(addrDesc, resolvedAddress);
         if (!desc.valid) {
           setDescTouched(true);
           throw new Error(descriptionMessage(desc.problem, lang) ?? descriptionCopy[lang].empty);
@@ -577,7 +580,7 @@ export function CheckoutScreen() {
                 lng={pickedLng ?? selectedBranch?.longitude ?? 46.6753}
                 lang={lang}
                 onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
-                onAddressResolved={(text) => setAddrDesc((cur) => (cur.trim() ? cur : text))}
+                onAddressResolved={setResolvedAddress}
                 labels={{
                   locateHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
                   useMyLocation: pick('Use my location', 'استخدم موقعي'),
@@ -588,6 +591,13 @@ export function CheckoutScreen() {
               {/* Mandatory location description — the same field, label and
                   rule as the address gate (see order/locationDescription). */}
               <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
+                {/* The pin's own address, read-only, so the customer can check
+                    the map is right without it counting as delivery guidance. */}
+                {resolvedAddress ? (
+                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
+                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
+                  </Text>
+                ) : null}
                 <Text style={[styles.fieldLabel, rtlText]}>{descriptionCopy[lang].label}</Text>
                 <TextInput
                   value={addrDesc}
@@ -956,6 +966,7 @@ const styles = StyleSheet.create({
   // Mandatory-field affordances (location description).
   fieldLabel: { fontSize: font.sm, fontWeight: '800', color: colors.text, marginTop: spacing.md },
   inputError: { borderColor: colors.danger },
+  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
   fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
 
   // Editable cart lines.

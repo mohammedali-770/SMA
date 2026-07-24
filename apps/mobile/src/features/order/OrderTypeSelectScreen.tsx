@@ -58,6 +58,9 @@ export function OrderTypeSelectScreen() {
   // Validation is only shown once the customer has tried to confirm (or has
   // left the field), so an untouched form is not pre-painted with an error.
   const [descTouched, setDescTouched] = useState(false);
+  // Reverse-geocoded address for the current pin. Context only — never the
+  // delivery guidance, and never written into the description field.
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
@@ -149,7 +152,7 @@ export function OrderTypeSelectScreen() {
     // coordinates alone. Reveal the message and scroll it into view rather than
     // failing silently on a disabled button.
     setDescTouched(true);
-    const desc = checkDescription(landmark);
+    const desc = checkDescription(landmark, resolvedAddress);
     if (!desc.valid) {
       scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true });
       return;
@@ -190,7 +193,7 @@ export function OrderTypeSelectScreen() {
   const mapLng = pickedLng ?? mapConfig.defaultCenter.lng;
 
   // Inline description validation, revealed only after a confirm attempt or blur.
-  const descCheck = checkDescription(landmark);
+  const descCheck = checkDescription(landmark, resolvedAddress);
   const descError = descTouched ? descriptionMessage(descCheck.problem, lang) : null;
 
   return (
@@ -282,13 +285,21 @@ export function OrderTypeSelectScreen() {
                 lng={mapLng}
                 lang={lang}
                 onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setResolveError(null); }}
-                // Reverse geocode only prefills an EMPTY field — it must never
-                // overwrite what the customer typed.
-                onAddressResolved={(text) => setLandmark((cur) => (cur.trim() ? cur : text))}
+                // The reverse-geocoded address is CONTEXT, never the delivery
+                // guidance: prefilling the field with it would let the map
+                // satisfy the mandatory-guidance rule on the customer's behalf.
+                onAddressResolved={setResolvedAddress}
                 labels={{ locateHint: t('otMapMoveHint'), useMyLocation: t('otUseMyLocation'), setupRequired: t('otMapSetup') }}
               />
 
               <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
+                {/* The pin's own address, read-only. Shown so the customer can
+                    confirm the map is right without it counting as guidance. */}
+                {resolvedAddress ? (
+                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
+                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
+                  </Text>
+                ) : null}
                 <Text style={[styles.label, rtlText, { marginTop: spacing.md }]}>
                   {descriptionCopy[lang].label}
                 </Text>
@@ -408,6 +419,7 @@ const styles = StyleSheet.create({
 
   input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, minHeight: 64, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white, marginTop: spacing.xs },
   inputError: { borderColor: colors.danger },
+  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
   fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
   notice: { backgroundColor: '#fdeaec', padding: spacing.lg, borderRadius: radius.md },
   noticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
