@@ -649,6 +649,7 @@ export const admin = {
   updateCategory: (id: string, patch: Partial<DbCategory>) => wrapUpdate('categories', id, patch),
   deleteCategory: (id: string) => wrapDelete('categories', id),
   updateBranch: (id: string, patch: Partial<DbBranch>) => wrapUpdate('branches', id, patch),
+  deleteBranch: (id: string) => wrapDelete('branches', id),
   async setAvailability(branchId: string, productId: string, isAvailable: boolean) {
     const { error } = await supabase.from('branch_product_availability')
       .upsert({ branch_id: branchId, product_id: productId, is_available: isAvailable });
