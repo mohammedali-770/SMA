@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "environment": "development",
       "env": {
         "EXPO_PUBLIC_SUPABASE_URL": "https://wxfmmnihidsdyemasstf.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4Zm1tbmloaWRzZHllbWFzc3RmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NzM3MzIsImV4cCI6MjA5OTA0OTczMn0.F4xEfsAXqvGfXvcaEqzdrbWi5RoTJBVYo4OophZYeKo",
@@ -16,6 +17,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -28,6 +30,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "ios": {
         "simulator": false
       },
