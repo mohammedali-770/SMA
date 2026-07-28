@@ -70,20 +70,25 @@
 - **Historical version identifiers and several migration boundaries differ**
   between the repository and production. This is a *history* divergence, not a
   *schema* divergence. The full mapping is in §5.
-- **Post–Stage-4 applications.** Since the 2026-07-14 audit (§3, §10) six
-  further migrations were applied to production, taking the live count from 39
-  to 45 and the repository count from 38 to 44 (the 45th repository file,
-  `20260721120000_lazywait_confirmation_lifecycle`, is UNAPPLIED — see the note
-  above — so it raised only the repository count, not the live count):
+- **Post–Stage-4 applications.** Since the 2026-07-14 audit (§3, §10) further
+  migrations were applied to Production; the current authoritative totals are the
+  **52 repository / 52 live** stated at the top of this section, with the exact
+  class-by-class algebra in §4 and §5. The applications included:
   - **Lazywait POS sync scheduler** — repository `20260720120000` → live
     `20260720075244`; owner-approved and applied via `apply_migration` on
-    **2026-07-20**, verified (§13). It is fully itemized in §5 (row 39) and §13.
+    **2026-07-20**, verified (§13). Itemized in §5 (row 39) and §13.
+  - **Lazywait confirmation lifecycle** (`20260721120000` → live
+    `20260721082325`), **synced-ref guard**, **sync health summary**, **Order
+    Integrity Watchdog**, **Operations Health Center**, **Smart Operations Alerts
+    & Daily Digest**, and its **cron activation** — all owner-approved, applied
+    2026-07-20…22, each class **B**, itemized in §5 (rows 40–46) and §14–§16.
   - **Five account-deletion migrations** — live versions `20260715120000`,
     `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`
-    (repository files of the same names). These are applied and live but are
-    **not yet itemized/classified in §4/§5** — a known documentation gap to be
-    reconciled in a **separate** documentation PR (they are intentionally not
-    detailed here so this PR stays scoped to the Lazywait scheduler activation).
+    (repository files of the same names). Applied and live, but **not yet
+    itemized/classified in §4/§5** — a known documentation gap to be reconciled in
+    a **separate** documentation PR.
+  The sole merged-but-UNAPPLIED repository file is
+  `20260723140000_operations_automation_cron_health` (§17).
 
 ## 2. Non-negotiable safety rules
 
@@ -148,7 +153,7 @@ fields byte-identical before/after, fingerprint-verified).
 | primary classification | count |
 |---|---|
 | A. `EXACT_MATCH` (version + name + content) | **3** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **31** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **38** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
 | E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
@@ -161,24 +166,31 @@ both "live-only" and "superseded-by-consolidation"); **each ledger entry below
 carries exactly one primary classification**, with overlaps explained in its
 notes.
 
-> **Scope of these counts.** The table above itemizes the **39 repository /
-> 40 live** rows detailed in §5 (through the Lazywait sync scheduler, row 39).
-> The five account-deletion migrations now live in production (§1) are **not
-> yet itemized** here; adding them, plus the one repository-only, UNAPPLIED
-> `20260721120000_lazywait_confirmation_lifecycle` (no live row yet), brings the
-> true totals to **45 repository / 45 live** (see §1 and §13). The Lazywait sync scheduler is
-> class **B** (`SAME_CONTENT_DIFFERENT_VERSION`): repository `20260720120000`
-> vs. the apply-time live version `20260720075244`, same reviewed content.
+> **Scope of these counts.** The table above itemizes the **47 repository / 47
+> live** rows detailed in §5 (rows 1–47, through
+> `20260723140000_operations_automation_cron_health`). Its per-class algebra is
+> internally consistent: repository side 3 A + 38 B + 3 C + 2 H + 1 E = **47
+> files**; live side 3 A + 38 B + 3 C + 3 F = **47 rows** (E is repository-only,
+> F is live-only, and the 2 H repository files are superseded consolidations of
+> live-only history). The **five account-deletion migrations** now live in
+> Production (§1) are applied and live but **not yet itemized** here; adding them
+> to both sides brings the true totals to the **52 repository / 52 live**
+> authoritative production totals carried at the top of §1. The Lazywait sync
+> scheduler (§5 row 39) is class **B** (`SAME_CONTENT_DIFFERENT_VERSION`):
+> repository `20260720120000` vs. the apply-time live version `20260720075244`,
+> same reviewed content; `20260721120000_lazywait_confirmation_lifecycle` (§5 row
+> 40) is likewise **applied**, class B, live `20260721082325` — it is **not**
+> unapplied.
 >
 > **Current class-E row.** The single `REPOSITORY_ONLY_UNAPPLIED` (E) row is now
 > the operations-automation cron-health migration
-> `20260723140000_operations_automation_cron_health` — present in the repository,
-> not yet applied to Production (§17), and therefore contributing no live
-> `schema_migrations` row. The read-only **Operations Health Center**
-> `20260722100000_operations_health_center` (PR #75) is **no longer class E**: it
-> was applied to Production on 2026-07-22 → live `20260722113923` as **class B**
-> (same reviewed content, generated apply-time version), alongside the Smart
-> Operations Alerts & Daily Digest engine
+> `20260723140000_operations_automation_cron_health` (§5 row 47) — **merged to the
+> default branch** (commit `06c9bb0`) but not yet applied to Production (§17), and
+> therefore contributing no live `schema_migrations` row. The read-only
+> **Operations Health Center** `20260722100000_operations_health_center` (PR #75)
+> is **no longer class E**: it was applied to Production on 2026-07-22 → live
+> `20260722113923` as **class B** (same reviewed content, generated apply-time
+> version), alongside the Smart Operations Alerts & Daily Digest engine
 > (`20260723090000_smart_operations_alerts_digest` → `20260722143014`) and its
 > activation (`20260723120000_activate_operations_alerts_digest_cron` →
 > `20260722165557`). §1 carries the current authoritative production totals
@@ -686,14 +698,31 @@ only the safe documented keys; the owner's manual Admin-UI smoke test passed. **
 provider calls, messages, cron-schedule changes, Edge Function deploys, payment
 operations, or Production data changes occurred** during the application.
 
-**Rollback.** The feature is isolated and read-only. As it is now applied, rollback
-means disabling the UI wiring first, then dropping the two functions in a separate
-owner-approved migration
+**Rollback.** The feature is isolated and read-only, but rollback is **no longer a
+plain function drop**. The later Smart Operations Alerts & Daily Digest engine
+(`20260723090000_smart_operations_alerts_digest`, applied 2026-07-22) redefined
+`operations_health_snapshot_internal()` to call
+`operations_health_overall_state(text,text,text,text)` (see that migration's line
+`v_overall_state := public.operations_health_overall_state(…)`), and the two
+internal automation crons `operations-alerts-evaluator` (`*/5`) and
+`operations-digest-generator` (hourly) consume that snapshot. Dropping the Health
+Center functions in isolation would therefore **break the snapshot and make the
+five-minute evaluator record failures**, not merely remove the Health Center card.
+A safe rollback must proceed **in dependency order** within owner-approved
+migration(s): (1) unschedule/disable the two automation crons (and any alerts/digest
+consumers) so nothing reads the snapshot mid-change; (2) restore or replace
+`operations_health_snapshot_internal()` / `operations_alerts_derive()` so they no
+longer reference `operations_health_overall_state()`, **or** remove those dependents
+in the same step; (3) disable the Health Center UI wiring; (4) only then drop the two
+Health Center functions
 (`drop function if exists public.operations_health_summary();` and
 `drop function if exists public.operations_health_overall_state(text,text,text,text);`).
-Dropping them cannot affect orders, payments, customer data, integrations, provider
-state or cron because the migration creates no tables, triggers or jobs. Full detail
-in `docs/OPERATIONS_HEALTH_CENTER_ROLLBACK.md`.
+At its original 2026-07-22 apply time — before the alerts/digest engine existed — the
+drop was dependency-free; that is no longer true. Dropping the functions still cannot
+affect orders, payments, customer data, integrations or provider state (the migration
+creates no tables, triggers or jobs), but it **will** break the alerts/digest
+automation crons unless they are handled first. Full detail in
+`docs/OPERATIONS_HEALTH_CENTER_ROLLBACK.md`.
 
 **Known limitations.** Observability only — no action can create/cancel/resend an
 order, initialize/confirm/refund a payment, change Lazywait/POS state, enable an
@@ -706,15 +735,17 @@ The scheduled-jobs card observes exactly three allowlisted application jobs. App
 this migration and any provider probe are separate future deliverables, each
 requiring its own explicit owner approval.
 
-## 17. Pending migration: Operations automation cron health (repository-only, UNAPPLIED)
+## 17. Merged migration: Operations automation cron health (merged to default, UNAPPLIED to Production)
 
-**Read-only observability. NOT merged, NOT applied to Production.** Records the
-migration that ships with the Issue #79 follow-up branch
-`feature/operations-automation-cron-health`; it exists in the repository only and
-has **no** live `schema_migrations` row. No Production application is approved.
+**Read-only observability. MERGED to the default branch, NOT applied to
+Production.** Records the migration merged via the Issue #79 follow-up (commit
+`06c9bb0`, PR #85); it is present in the repository but has **no** live
+`schema_migrations` row. No Production application is approved — merge approval is
+not apply approval (§2 rule 8).
 
 - **Repository file:** `supabase/migrations/20260723140000_operations_automation_cron_health.sql`
-- **PR:** Issue #79 follow-up (open, awaiting review/merge).
+- **PR:** Issue #79 follow-up — **merged** to `claude/project-build-ie4b56` (commit
+  `06c9bb0`, PR #85); awaiting a separate owner-approved Production apply.
 - **Live version:** none (UNAPPLIED). On a future owner-approved application this
   will be class **B** (same content; apply-time generated version differs from the
   repository filename version `20260723140000`), applied **only** via MCP
