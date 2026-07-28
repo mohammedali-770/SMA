@@ -322,6 +322,14 @@ export interface LazywaitResponse<T = unknown> {
   code: string | null;    // provider error code (e.g. LICENSE_EXPIRED)
   retryAfterMs: number | null;
   error: string | null;
+  /**
+   * Raw response body text, always captured (null on a network/timeout failure).
+   * Additive: existing callers ignore it. It lets the typed lazywaitApi client
+   * recognise non-JSON success bodies (the product/category DELETE returns a
+   * plain-text `ok`) as a first-class typed success instead of relying on the
+   * `data:{raw}` fallback.
+   */
+  text?: string | null;
 }
 
 /**
@@ -345,7 +353,7 @@ export function parseRetryAfterMs(
 export async function lazywaitFetch<T = unknown>(
   cfg: LazywaitConfig,
   opts: {
-    method: 'GET' | 'POST' | 'PUT';
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE';
     path: string;                       // e.g. /pos/orders/create
     query?: Record<string, string | undefined>;
     body?: unknown;
@@ -371,7 +379,12 @@ export async function lazywaitFetch<T = unknown>(
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: opts.method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
+      // GET never carries a body; DELETE only when one is explicitly supplied
+      // (the path/query-addressed deletes send none). POST/PUT are unchanged —
+      // always at least `{}` — so existing behaviour is preserved exactly.
+      body: opts.method === 'GET' || (opts.method === 'DELETE' && opts.body === undefined)
+        ? undefined
+        : JSON.stringify(opts.body ?? {}),
       signal: controller.signal,
     });
     const text = await res.text();
@@ -388,11 +401,12 @@ export async function lazywaitFetch<T = unknown>(
       retryAfterMs,
       error: res.ok ? null : (data && typeof data === 'object' && 'message' in (data as Record<string, unknown>)
         ? String((data as Record<string, unknown>).message) : `HTTP ${res.status}`),
+      text,
     };
   } catch (e) {
     const aborted = e instanceof Error && e.name === 'AbortError';
     return { ok: false, status: 0, data: null, code: null, retryAfterMs: null,
-      error: aborted ? 'timeout' : (e instanceof Error ? e.message : 'network_error') };
+      error: aborted ? 'timeout' : (e instanceof Error ? e.message : 'network_error'), text: null };
   } finally {
     clearTimeout(timer);
   }
