@@ -132,15 +132,25 @@ end $$;
 -- Phase 2 — RLS enforcement (real role switching)
 -- ============================================================================
 
--- ---- anon: only the active, in-window, codeless campaign is visible ---------
+-- ---- anon: only ACTIVE, in-window, CODELESS campaigns are visible -----------
+-- Caps, min-order, branch scope and usage limits do NOT affect visibility (they
+-- are enforced at compute time by the RPC), so 9 of the 13 fixtures are public:
+-- 01 + 06..0d. Hidden: 02 inactive, 03 future, 04 expired, 05 coded.
 set local role anon;
 do $$
 declare n int;
 begin
   select count(*) into n from public.campaigns;
-  if n <> 1 then raise exception 'RLS(anon): expected 1 visible campaign, got %', n; end if;
+  if n <> 9 then raise exception 'RLS(anon): expected 9 visible (codeless/active/in-window) campaigns, got %', n; end if;
   if not exists (select 1 from public.campaigns where id = '00000000-0000-0000-0000-00000d000001') then
     raise exception 'RLS(anon): the auto-apply campaign is not visible'; end if;
+  -- coded / inactive / future / expired must stay hidden.
+  if exists (select 1 from public.campaigns where id in (
+        '00000000-0000-0000-0000-00000d000002',        -- inactive
+        '00000000-0000-0000-0000-00000d000003',        -- future
+        '00000000-0000-0000-0000-00000d000004',        -- expired
+        '00000000-0000-0000-0000-00000d000005')) then  -- coded
+    raise exception 'RLS(anon): a hidden campaign (inactive/future/expired/coded) leaked into SELECT'; end if;
   raise notice 'PHASE 2 anon RLS OK';
 end $$;
 reset role;
@@ -151,9 +161,9 @@ set local role authenticated;
 do $$
 declare n int; blocked boolean;
 begin
-  -- Only the codeless, active, in-window campaign; coded/inactive/future hidden.
+  -- Only codeless, active, in-window campaigns (9 of 13); coded/inactive/future/expired hidden.
   select count(*) into n from public.campaigns;
-  if n <> 1 then raise exception 'RLS(cust): expected 1 visible campaign, got %', n; end if;
+  if n <> 9 then raise exception 'RLS(cust): expected 9 visible campaigns, got %', n; end if;
   if exists (select 1 from public.campaigns where code = 'SAVE20') then
     raise exception 'RLS(cust): a SECRET coded campaign leaked into SELECT'; end if;
 
