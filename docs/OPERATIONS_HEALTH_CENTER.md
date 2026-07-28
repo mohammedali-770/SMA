@@ -148,14 +148,16 @@ Customers have no access.
 
 ## Change control
 
-The migration is repository-only until all of the following are complete:
+This migration was **merged and applied to Production on 2026-07-22** (PR #75,
+squash `91c11b7`; live version `20260722113923`, class B — see `docs/MIGRATIONS.md`
+§16). All change-control gates were satisfied before application:
 
-1. tests and builds pass;
-2. Codex review is clean;
-3. the PR is merged into `claude/project-build-ie4b56` with explicit owner
+1. tests and builds passed;
+2. Codex review was clean;
+3. the PR was merged into `claude/project-build-ie4b56` with explicit owner
    approval;
-4. a separate explicit owner approval authorizes the Production application;
-5. application uses the documented `apply_migration` workflow in
+4. a separate explicit owner approval authorized the Production application;
+5. application used the documented `apply_migration` workflow in
    `docs/MIGRATIONS.md`.
 
 Never use `supabase db push`, migration repair, or untracked Production SQL for
