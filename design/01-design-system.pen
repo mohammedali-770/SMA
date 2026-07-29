@@ -440,13 +440,13 @@
                       "width": "fill_container",
                       "descendants": {
                         "NEjxy": {
-                          "fill": "#1f9d55"
+                          "fill": "#197f45"
                         },
                         "Iqg0Y": {
                           "content": "success"
                         },
                         "YmMQR": {
-                          "content": "#1f9d55"
+                          "content": "#197f45"
                         }
                       }
                     },
@@ -476,13 +476,13 @@
                       "width": "fill_container",
                       "descendants": {
                         "NEjxy": {
-                          "fill": "#c47f17"
+                          "fill": "#9b6412"
                         },
                         "Iqg0Y": {
                           "content": "warning"
                         },
                         "YmMQR": {
-                          "content": "#c47f17"
+                          "content": "#9b6412"
                         }
                       }
                     },
@@ -512,13 +512,13 @@
                       "width": "fill_container",
                       "descendants": {
                         "NEjxy": {
-                          "fill": "#e02d3d"
+                          "fill": "#ce2938"
                         },
                         "Iqg0Y": {
                           "content": "danger"
                         },
                         "YmMQR": {
-                          "content": "#e02d3d"
+                          "content": "#ce2938"
                         }
                       }
                     },
@@ -3961,13 +3961,13 @@
                           "height": 14,
                           "icon": "check_circle",
                           "library": "Material Symbols Rounded",
-                          "fill": "#1f9d55"
+                          "fill": "#197f45"
                         },
                         {
                           "type": "text",
                           "id": "xHK8s",
                           "name": "Label AR",
-                          "fill": "#1f9d55",
+                          "fill": "#197f45",
                           "content": "مكتمل",
                           "fontFamily": "Cairo",
                           "fontSize": 13,
@@ -3977,7 +3977,7 @@
                           "type": "text",
                           "id": "Xky8g",
                           "name": "Label EN",
-                          "fill": "#1f9d55",
+                          "fill": "#197f45",
                           "content": "Completed",
                           "fontFamily": "Inter",
                           "fontSize": 12,
@@ -4006,13 +4006,13 @@
                           "height": 14,
                           "icon": "cancel",
                           "library": "Material Symbols Rounded",
-                          "fill": "#e02d3d"
+                          "fill": "#ce2938"
                         },
                         {
                           "type": "text",
                           "id": "FehV3",
                           "name": "Label AR",
-                          "fill": "#e02d3d",
+                          "fill": "#ce2938",
                           "content": "ملغي",
                           "fontFamily": "Cairo",
                           "fontSize": 13,
@@ -4022,7 +4022,7 @@
                           "type": "text",
                           "id": "VGXiC",
                           "name": "Label EN",
-                          "fill": "#e02d3d",
+                          "fill": "#ce2938",
                           "content": "Cancelled",
                           "fontFamily": "Inter",
                           "fontSize": 12,
@@ -4051,13 +4051,13 @@
                           "height": 14,
                           "icon": "warning",
                           "library": "Material Symbols Rounded",
-                          "fill": "#c47f17"
+                          "fill": "#9b6412"
                         },
                         {
                           "type": "text",
                           "id": "tN5Xv",
                           "name": "Label AR",
-                          "fill": "#c47f17",
+                          "fill": "#9b6412",
                           "content": "تحذير",
                           "fontFamily": "Cairo",
                           "fontSize": 13,
@@ -4067,7 +4067,7 @@
                           "type": "text",
                           "id": "oqxAl",
                           "name": "Label EN",
-                          "fill": "#c47f17",
+                          "fill": "#9b6412",
                           "content": "Warning",
                           "fontFamily": "Inter",
                           "fontSize": 12,
@@ -4104,13 +4104,13 @@
                           "height": 16,
                           "icon": "check_circle",
                           "library": "Material Symbols Rounded",
-                          "fill": "#1f9d55"
+                          "fill": "#197f45"
                         },
                         {
                           "type": "text",
                           "id": "VVdyi",
                           "name": "AR",
-                          "fill": "#1f9d55",
+                          "fill": "#197f45",
                           "content": "مفتوح",
                           "fontFamily": "Cairo",
                           "fontSize": 14,
@@ -4120,7 +4120,7 @@
                           "type": "text",
                           "id": "DSybB",
                           "name": "EN",
-                          "fill": "#1f9d55",
+                          "fill": "#197f45",
                           "content": "Open",
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -4149,13 +4149,13 @@
                           "height": 16,
                           "icon": "cancel",
                           "library": "Material Symbols Rounded",
-                          "fill": "#e02d3d"
+                          "fill": "#ce2938"
                         },
                         {
                           "type": "text",
                           "id": "ZgEhR",
                           "name": "AR",
-                          "fill": "#e02d3d",
+                          "fill": "#ce2938",
                           "content": "مغلق",
                           "fontFamily": "Cairo",
                           "fontSize": 14,
@@ -4165,7 +4165,7 @@
                           "type": "text",
                           "id": "PfQAs",
                           "name": "EN",
-                          "fill": "#e02d3d",
+                          "fill": "#ce2938",
                           "content": "Closed",
                           "fontFamily": "Inter",
                           "fontSize": 13,
@@ -4650,7 +4650,7 @@
                           "height": 18,
                           "icon": "check_circle",
                           "library": "Material Symbols Rounded",
-                          "fill": "#1f9d55"
+                          "fill": "#197f45"
                         },
                         {
                           "type": "frame",
@@ -4664,7 +4664,7 @@
                               "type": "text",
                               "id": "X4rLKf",
                               "name": "AR",
-                              "fill": "#1f9d55",
+                              "fill": "#197f45",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "تم إرسال الطلب بنجاح",
@@ -4676,7 +4676,7 @@
                               "type": "text",
                               "id": "a3oZSg",
                               "name": "EN",
-                              "fill": "#1f9d55",
+                              "fill": "#197f45",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "Order submitted successfully.",
@@ -4712,7 +4712,7 @@
                           "height": 18,
                           "icon": "warning",
                           "library": "Material Symbols Rounded",
-                          "fill": "#c47f17"
+                          "fill": "#9b6412"
                         },
                         {
                           "type": "frame",
@@ -4726,7 +4726,7 @@
                               "type": "text",
                               "id": "BDtMl",
                               "name": "AR",
-                              "fill": "#c47f17",
+                              "fill": "#9b6412",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "المطعم يغلق خلال 30 دقيقة",
@@ -4738,7 +4738,7 @@
                               "type": "text",
                               "id": "tJKei",
                               "name": "EN",
-                              "fill": "#c47f17",
+                              "fill": "#9b6412",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "Restaurant closes in 30 minutes.",
@@ -4774,7 +4774,7 @@
                           "height": 18,
                           "icon": "error",
                           "library": "Material Symbols Rounded",
-                          "fill": "#e02d3d"
+                          "fill": "#ce2938"
                         },
                         {
                           "type": "frame",
@@ -4788,7 +4788,7 @@
                               "type": "text",
                               "id": "YSF34",
                               "name": "AR",
-                              "fill": "#e02d3d",
+                              "fill": "#ce2938",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "فشل في تحميل القائمة",
@@ -4800,7 +4800,7 @@
                               "type": "text",
                               "id": "lv9T9",
                               "name": "EN",
-                              "fill": "#e02d3d",
+                              "fill": "#ce2938",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
                               "content": "Failed to load menu.",
@@ -6948,7 +6948,7 @@
       "type": "color",
       "value": [
         {
-          "value": "#1f9d55",
+          "value": "#197f45",
           "theme": {
             "mode": "light"
           }
@@ -6982,7 +6982,7 @@
       "type": "color",
       "value": [
         {
-          "value": "#c47f17",
+          "value": "#9b6412",
           "theme": {
             "mode": "light"
           }
@@ -7016,7 +7016,7 @@
       "type": "color",
       "value": [
         {
-          "value": "#e02d3d",
+          "value": "#ce2938",
           "theme": {
             "mode": "light"
           }
