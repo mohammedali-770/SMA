@@ -106,8 +106,16 @@ def artboard_bands(img: Image.Image, axis: str = "x", pad: int = 24):
     return out or None
 
 
+MAX_HEIGHT = 2200
+
+
 def emit(img: Image.Image, path: str, width: int, quality: int) -> None:
     height = int(img.height * width / img.width)
+    # A single phone artboard scaled to the full slice width comes out absurdly
+    # tall; cap the long edge so tall bands stay viewable.
+    if height > MAX_HEIGHT:
+        width = int(width * MAX_HEIGHT / height)
+        height = MAX_HEIGHT
     img.resize((width, height), Image.LANCZOS).save(
         path, "JPEG", quality=quality, optimize=True
     )
