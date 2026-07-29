@@ -537,10 +537,33 @@ export interface PosConfirmationRequired {
   items: PosConfirmationRequiredItem[];
 }
 
+// The columns a CUSTOMER holds SELECT privilege on for `public.orders` after
+// migration 20260724200000. Mirrors the column grant EXACTLY. `select('*')` is
+// no longer valid for a customer — it would request columns they cannot read and
+// PostgREST would return a privilege error. The internal `SM-…` order number and
+// every operational column are absent.
+// Typed `string` (not a string literal) on purpose: supabase-js infers the row
+// TYPE from a literal select, which would then be a narrow subset that no longer
+// satisfies DbOrderWithItems. The subset is CORRECT at runtime (mapOrder reads
+// the internal fields as undefined, which the web customer path never renders —
+// it redirects to /app), so we keep the shared DbOrderWithItems shape and let
+// the string stay loose. The DB grant is the real enforcement point.
+const CUSTOMER_ORDER_COLUMNS =
+  'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, loyalty_points_earned, payment_status, payment_method, lazywait_order_number, lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, pos_create_attempted_at, pos_customer_retry_count, refund_state';
+const CUSTOMER_ORDER_WITH_ITEMS_SELECT: string =
+  `${CUSTOMER_ORDER_COLUMNS}, order_items(*, order_item_modifiers(*))`;
+
 export const orders = {
-  /** Server-authoritative order creation (recomputes all amounts + coupon + VAT + loyalty). */
+  /**
+   * Server-authoritative order creation. Calls `place_customer_order`, a thin
+   * wrapper over the UNCHANGED `place_order`: identical pricing, coupon, VAT,
+   * loyalty, transactionality and idempotency, but it returns an explicit
+   * customer-safe projection (no order_number, no pos_create_attempt_token, no
+   * internals) instead of the whole `public.orders` row. `place_order` itself is
+   * no longer granted to `authenticated` (20260724200000).
+   */
   async place(input: PlaceOrderInput): Promise<DbOrder> {
-    return ok<DbOrder>(await supabase.rpc('place_order', {
+    return ok<DbOrder>(await supabase.rpc('place_customer_order', {
       p_branch_id: input.branchId,
       p_order_type: input.orderType,
       p_items: input.items,
@@ -552,35 +575,66 @@ export const orders = {
       p_payment_method: input.paymentMethod ?? null,
     }));
   },
-  /** RLS returns own orders for a customer, all orders for staff. */
-  list: async () =>
-    ok<DbOrder[]>(await supabase.from('orders').select('*').order('created_at', { ascending: false })),
   /**
-   * Same as list(), but embeds each order's items + item modifiers in one round
-   * trip (PostgREST resource embedding). RLS is applied to the embedded tables
-   * too, so a customer still only sees their own orders' lines.
-   *
-   * UNBOUNDED by default so the full load (which the reports filter in memory)
-   * sees every order — a cap here would silently drop delivered orders from
-   * revenue/VAT/coupon totals. Pass `limit` ONLY for the admin live poll, which
-   * keeps its frequent refetch bounded and merges its recent window back into the
-   * full in-memory list.
+   * STAFF flat order feed (no line items) — the Lazywait operations panel. Goes
+   * through the SECURITY DEFINER `admin_list_orders` RPC, which enforces
+   * `is_staff()` server-side and returns the staff column set (including
+   * order_number and the POS diagnostics staff need). Staff hold NO direct SELECT
+   * privilege on `public.orders` any more, so this RPC — not a table read — is
+   * the staff contract. It runs with the staff member's own JWT; no service-role
+   * key is involved.
+   */
+  list: async () =>
+    ok<DbOrder[]>(await supabase.rpc('admin_list_orders', { p_limit: null })),
+  /**
+   * CUSTOMER order feed with items. `public.orders` no longer grants table-wide
+   * SELECT to `authenticated`; a customer holds column privileges for exactly the
+   * safe columns above, so `select('*')` would now fail. Embedded item/modifier
+   * relations stay scoped to the owner by RLS. Staff must use
+   * `adminListWithItems()` instead.
    */
   listWithItems: async (limit?: number) => {
     let q = supabase
       .from('orders')
-      .select('*, order_items(*, order_item_modifiers(*))')
+      .select(CUSTOMER_ORDER_WITH_ITEMS_SELECT)
       .order('created_at', { ascending: false });
     if (limit) q = q.limit(limit);
-    return ok<DbOrderWithItems[]>(await q);
+    // The select is a loose `string` (see CUSTOMER_ORDER_COLUMNS), so supabase-js
+    // yields GenericStringError instead of a row type; the runtime rows are the
+    // customer-safe subset, mapped as the shared DbOrderWithItems shape (internal
+    // fields read as undefined and are never rendered on the web customer path).
+    const res = (await q) as unknown as { data: DbOrderWithItems[] | null; error: { message: string } | null };
+    return ok<DbOrderWithItems[]>(res);
   },
+  /**
+   * STAFF order feed with items + modifiers — the dashboard's full load and live
+   * poll. Goes through the SECURITY DEFINER `admin_list_orders_with_items` RPC
+   * (is_staff enforced), returning the staff column set with items embedded. It
+   * never returns pos_create_attempt_token. Uses the staff member's own JWT.
+   *
+   * UNBOUNDED by default so the reports (which filter in memory) see every order;
+   * pass `limit` ONLY for the admin live poll, which keeps its frequent refetch
+   * bounded and merges its recent window back into the full in-memory list.
+   */
+  adminListWithItems: async (limit?: number) =>
+    ok<DbOrderWithItems[]>(
+      await supabase.rpc('admin_list_orders_with_items', { p_limit: limit ?? null }),
+    ),
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>
     ok<DbOrderItemModifier[]>(await supabase.from('order_item_modifiers').select('*').eq('order_item_id', orderItemId)),
-  /** Admin only (RLS enforces). */
+  /**
+   * Admin only — enforced INSIDE the SECURITY DEFINER `admin_set_order_status`
+   * RPC (`is_admin()`), the same predicate the old `orders_admin_update` policy
+   * used, so staff authorization is unchanged. Goes through an RPC because staff
+   * no longer hold any direct privilege on `public.orders` (an `UPDATE … WHERE
+   * id` would otherwise require a grant on the table).
+   */
   async setStatus(orderId: string, status: OrderStatus) {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
+    const { error } = await supabase.rpc('admin_set_order_status', {
+      p_order_id: orderId, p_status: status,
+    });
     if (error) throw new Error(error.message);
     // Fire-and-forget push notification for the customer. Server-side
     // push-dispatch re-verifies the caller is an admin, re-reads the order's

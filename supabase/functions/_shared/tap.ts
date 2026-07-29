@@ -132,8 +132,11 @@ export interface BuildChargeParams {
   // a receipt. NEVER embed the internal SM-… order number here (Issue #94); the
   // verification binding lives in referenceOrder, not this field.
   description: string;
-  referenceTransaction: string;   // our unique attempt reference
-  referenceOrder: string;         // local order number
+  referenceTransaction: string;   // our unique per-attempt reference (sm_<uuid>)
+  // Opaque PER-ORDER reference the verifier binds against: 'ORD-<order uuid
+  // fragment>' for the direct-order path, 'CS-<session uuid fragment>' for the
+  // checkout-session path. NEVER the internal SM-… order number (20260724180000).
+  referenceOrder: string;
   idempotent: string;             // Tap idempotency string (dedup)
   sourceId: string;               // 'src_all'
   merchantId: string;
