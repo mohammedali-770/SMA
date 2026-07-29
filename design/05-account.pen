@@ -1,0 +1,3462 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "oTEIY",
+      "x": 0,
+      "y": 0,
+      "name": "Status Bar",
+      "reusable": true,
+      "width": 390,
+      "height": 54,
+      "fill": "$surface",
+      "padding": [
+        16,
+        20,
+        0,
+        20
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "AkDeu",
+          "name": "Time",
+          "fill": "$ink",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "KfBQx",
+          "name": "Right Icons",
+          "gap": 6,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "UDekg",
+              "name": "Signal",
+              "width": 16,
+              "height": 16,
+              "icon": "signal",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "LgE9o",
+              "name": "Wifi",
+              "width": 16,
+              "height": 16,
+              "icon": "wifi",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "K9G4G6",
+              "name": "Battery",
+              "width": 20,
+              "height": 16,
+              "icon": "battery-full",
+              "library": "lucide",
+              "fill": "$ink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "oRIZd",
+      "x": 0,
+      "y": -132,
+      "name": "Header Bar",
+      "reusable": true,
+      "width": 390,
+      "height": 52,
+      "fill": "$surface",
+      "padding": [
+        0,
+        16
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "zstrt",
+          "name": "Title",
+          "fill": "$ink",
+          "content": "العنوان",
+          "fontFamily": "$font-ar",
+          "fontSize": 20,
+          "fontWeight": "700"
+        },
+        {
+          "type": "frame",
+          "id": "Y7Y3Gd",
+          "name": "Back Button",
+          "gap": 4,
+          "padding": [
+            8,
+            4
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "c8dz9g",
+              "name": "Back Label",
+              "fill": "$primary",
+              "content": "رجوع",
+              "fontFamily": "$font-ar",
+              "fontSize": 15,
+              "fontWeight": "500"
+            },
+            {
+              "type": "icon",
+              "id": "cTEH1",
+              "name": "Back Icon",
+              "width": 20,
+              "height": 20,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$primary"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "IVDsP",
+      "x": 0,
+      "y": -260,
+      "name": "Primary Button",
+      "reusable": true,
+      "width": 358,
+      "height": 48,
+      "fill": "$primary",
+      "cornerRadius": "$radius-md",
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "s5bpc",
+          "name": "Label",
+          "fill": "$on-primary",
+          "content": "تأكيد",
+          "fontFamily": "$font-ar",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "oqDMG",
+      "x": 0,
+      "y": -348,
+      "name": "Destructive Button",
+      "reusable": true,
+      "width": 358,
+      "height": 48,
+      "fill": "$danger",
+      "cornerRadius": "$radius-md",
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "KnMam",
+          "name": "Label",
+          "fill": "$on-primary",
+          "content": "حذف",
+          "fontFamily": "$font-ar",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "RHjis",
+      "x": 0,
+      "y": -460,
+      "name": "Tab Bar",
+      "reusable": true,
+      "width": 390,
+      "height": 72,
+      "fill": "$surface",
+      "stroke": "$border",
+      "strokeWidth": {
+        "top": 1
+      },
+      "strokeAlignment": "inner",
+      "padding": [
+        8,
+        16,
+        12,
+        16
+      ],
+      "justifyContent": "space_around",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "F2fsV",
+          "name": "Tab Home",
+          "fill": "#00000000",
+          "cornerRadius": 16,
+          "layout": "vertical",
+          "gap": 4,
+          "padding": [
+            6,
+            16,
+            4,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "CLuSz",
+              "name": "Tab Home Icon",
+              "width": 22,
+              "height": 22,
+              "icon": "house",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "swIty",
+              "name": "Tab Home Label",
+              "fill": "$muted",
+              "content": "الرئيسية",
+              "fontFamily": "$font-ar",
+              "fontSize": 10,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "P6khX",
+          "name": "Tab Menu",
+          "fill": "#00000000",
+          "cornerRadius": 16,
+          "layout": "vertical",
+          "gap": 4,
+          "padding": [
+            6,
+            16,
+            4,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "lRzjv",
+              "name": "Tab Menu Icon",
+              "width": 22,
+              "height": 22,
+              "icon": "grid-2x2",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "uyT29",
+              "name": "Tab Menu Label",
+              "fill": "$muted",
+              "content": "القائمة",
+              "fontFamily": "$font-ar",
+              "fontSize": 10,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dzEyb",
+          "name": "Tab Profile",
+          "fill": "$primary-light",
+          "cornerRadius": 16,
+          "layout": "vertical",
+          "gap": 4,
+          "padding": [
+            6,
+            16,
+            4,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "tEuUS",
+              "name": "Tab Profile Icon",
+              "width": 22,
+              "height": 22,
+              "icon": "user",
+              "library": "lucide",
+              "fill": "$primary"
+            },
+            {
+              "type": "text",
+              "id": "FCi1A",
+              "name": "Tab Profile Label",
+              "fill": "$primary",
+              "content": "حسابي",
+              "fontFamily": "$font-ar",
+              "fontSize": 10,
+              "fontWeight": "600"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "Te9g7",
+      "x": 0,
+      "y": -552,
+      "name": "List Row",
+      "reusable": true,
+      "width": 358,
+      "height": 52,
+      "padding": [
+        0,
+        16
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "frame",
+          "id": "srmt3",
+          "name": "Left",
+          "gap": 12,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "nq32e",
+              "name": "Icon",
+              "width": 20,
+              "height": 20,
+              "icon": "map-pin",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "LSKTx",
+              "name": "Label",
+              "fill": "$text",
+              "content": "العنوان",
+              "fontFamily": "$font-ar",
+              "fontSize": 15,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "r0sUd",
+          "name": "Right",
+          "gap": 8,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "i3KmJ",
+              "name": "Value",
+              "fill": "$muted",
+              "fontFamily": "$font-ar",
+              "fontSize": 14
+            },
+            {
+              "type": "icon",
+              "id": "qgWeh",
+              "name": "Chevron",
+              "width": 18,
+              "height": 18,
+              "icon": "chevron-left",
+              "library": "lucide",
+              "fill": "$disabled"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "E1IR6n",
+      "x": 0,
+      "y": -616,
+      "name": "Toggle On",
+      "reusable": true,
+      "width": 44,
+      "height": 24,
+      "fill": "$primary",
+      "cornerRadius": 12,
+      "padding": 2,
+      "justifyContent": "end",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "ellipse",
+          "id": "M9307",
+          "name": "Knob",
+          "fill": "$on-primary",
+          "width": 20,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "AvEs2",
+      "x": 0,
+      "y": -660,
+      "name": "Toggle Off",
+      "reusable": true,
+      "width": 44,
+      "height": 24,
+      "fill": "$disabled",
+      "cornerRadius": 12,
+      "padding": 2,
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "ellipse",
+          "id": "n5X2yl",
+          "name": "Knob",
+          "fill": "$on-primary",
+          "width": 20,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "tCgTa",
+      "x": 470,
+      "y": -696,
+      "name": "Screen 1 Label",
+      "fill": "$muted",
+      "content": "1 — Login: Number Entry",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "EeN3Y",
+      "x": 470,
+      "y": -660,
+      "name": "Login Number Entry",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "p2j26J",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "onnto",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 32,
+          "padding": [
+            40,
+            16,
+            24,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "qoLCQ",
+              "name": "Logo Lockup",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "g3E4Xn",
+                  "name": "Logo Icon",
+                  "width": 64,
+                  "height": 64,
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 180,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#422e87",
+                        "position": 0
+                      },
+                      {
+                        "color": "#6b4ec9",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "cornerRadius": 16,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "sQIJI",
+                      "name": "Flame",
+                      "width": 32,
+                      "height": 32,
+                      "icon": "flame",
+                      "library": "lucide",
+                      "fill": "#ffffff"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "CLAhZ",
+                  "name": "Brand Name",
+                  "fill": "$primary",
+                  "content": "سبايسي ميل",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 28,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "u0XGjl",
+                  "name": "Tagline",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": 280,
+                  "content": "اطلب وجباتك الحارة المفضلة في ثوانٍ.",
+                  "textAlign": "center",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KmNKy",
+              "name": "Login Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 16,
+              "padding": 20,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Y55BF7",
+                  "name": "Card Header",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RxNeA",
+                      "name": "WA Icon",
+                      "width": 28,
+                      "height": 28,
+                      "fill": "#25D366",
+                      "cornerRadius": 14,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "G9qxW",
+                          "name": "WA",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "message-circle",
+                          "library": "lucide",
+                          "fill": "#ffffff"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "ybfTY",
+                      "name": "Card Title",
+                      "fill": "$ink",
+                      "content": "تسجيل الدخول عبر واتساب",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "EXy5y",
+                  "name": "Card Desc",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "سنرسل رمز دخول مؤقت إلى رقم واتساب الخاص بك.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                },
+                {
+                  "type": "frame",
+                  "id": "et27p",
+                  "name": "Phone Field",
+                  "width": "fill_container",
+                  "height": 48,
+                  "fill": "$surface",
+                  "cornerRadius": "$radius-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "nvnLO",
+                      "name": "Prefix",
+                      "width": 72,
+                      "height": "fill_container",
+                      "fill": "$bg-alt",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "left": 1
+                      },
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "G3HsG",
+                          "name": "Prefix Text",
+                          "fill": "$ink",
+                          "content": "966+",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "drJST",
+                      "name": "Input Area",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "h7Q9a",
+                          "name": "Phone Number",
+                          "fill": "$disabled",
+                          "content": "5X XXX XXXX",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "cEPPB",
+                  "name": "Helper",
+                  "fill": "$muted",
+                  "content": "أرقام الجوال السعودية فقط (+966).",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 12
+                },
+                {
+                  "id": "i1rwdN",
+                  "type": "ref",
+                  "ref": "IVDsP",
+                  "name": "Submit Button",
+                  "width": "fill_container",
+                  "descendants": {
+                    "s5bpc": {
+                      "content": "إرسال رمز الدخول"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Bf6sB",
+              "name": "Privacy Note",
+              "layout": "vertical",
+              "gap": 4,
+              "padding": [
+                20,
+                16,
+                0,
+                16
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "L2dr3y",
+                  "name": "Privacy Text",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": 280,
+                  "content": "بالمتابعة، أنت توافق على شروط الاستخدام وسياسة الخصوصية.",
+                  "textAlign": "center",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "uliQ6",
+      "x": 940,
+      "y": -696,
+      "name": "Screen 2 Label",
+      "fill": "$muted",
+      "content": "2 — Login: Code Entry",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "YBXph",
+      "x": 940,
+      "y": -660,
+      "name": "Login Code Entry",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "Uqyiz",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "L6XnOo",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            40,
+            16,
+            24,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "O2Hemq",
+              "name": "OTP Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 20,
+              "padding": 24,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "l1yAK",
+                  "name": "WA Circle",
+                  "width": 56,
+                  "height": 56,
+                  "fill": "#25D366",
+                  "cornerRadius": 28,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "m92VH",
+                      "name": "WA Icon",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "message-circle",
+                      "library": "lucide",
+                      "fill": "#ffffff"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "hZuQX",
+                  "name": "OTP Title",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "أرسلنا رمز الدخول إلى واتساب",
+                  "textAlign": "center",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 17,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "F3lxf",
+                  "name": "Phone Display",
+                  "fill": "$primary",
+                  "content": "+966 5X XXX XX89",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "isrOU",
+                  "name": "OTP Boxes",
+                  "gap": 8,
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "nFmzJ",
+                      "name": "Box 1",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "FNvSi",
+                          "name": "Digit 1",
+                          "fill": "$ink",
+                          "content": "٧",
+                          "fontFamily": "Inter",
+                          "fontSize": 22,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "G9TLTT",
+                      "name": "Box 2",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "KlkVI",
+                          "name": "Digit 2",
+                          "fill": "$ink",
+                          "content": "٣",
+                          "fontFamily": "Inter",
+                          "fontSize": 22,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "soEXO",
+                      "name": "Box 3",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "a3g42",
+                          "name": "Digit 3",
+                          "fill": "$ink",
+                          "content": "٩",
+                          "fontFamily": "Inter",
+                          "fontSize": 22,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Q6zlp",
+                      "name": "Box 4",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XFnmL",
+                          "name": "Digit 4",
+                          "fill": "$ink",
+                          "content": "٢",
+                          "fontFamily": "Inter",
+                          "fontSize": 22,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "W5giW",
+                      "name": "Box 5",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$primary",
+                      "strokeWidth": 2,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 1,
+                          "id": "qGINA",
+                          "name": "Cursor",
+                          "fill": "$primary",
+                          "width": 2,
+                          "height": 24
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "L3n8l",
+                      "name": "Box 6",
+                      "width": 44,
+                      "height": 52,
+                      "fill": "$surface",
+                      "cornerRadius": "$radius-md",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "justifyContent": "center",
+                      "alignItems": "center"
+                    }
+                  ]
+                },
+                {
+                  "id": "NqK43",
+                  "type": "ref",
+                  "ref": "IVDsP",
+                  "name": "Verify Button",
+                  "width": "fill_container",
+                  "descendants": {
+                    "s5bpc": {
+                      "content": "تحقّق وتسجيل الدخول"
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "z5jJDN",
+                  "name": "Resend Row",
+                  "layout": "vertical",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Wktp2",
+                      "name": "Resend Timer",
+                      "fill": "$muted",
+                      "content": "إعادة الإرسال خلال 00:24",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "text",
+                      "id": "C9tgB",
+                      "name": "Change Number",
+                      "fill": "$primary",
+                      "content": "تغيير الرقم",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "IQvR4",
+      "x": 1410,
+      "y": -696,
+      "name": "Screen 3 Label",
+      "fill": "$muted",
+      "content": "3 — Profile",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "WRJnJ",
+      "x": 1410,
+      "y": -660,
+      "name": "Profile",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "x7ole",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "uItti",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "ji81j",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "حسابي",
+              "fontFamily": "$font-ar",
+              "fontSize": 20,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "zXGki",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "E9Zhvu",
+              "name": "Identity Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "gap": 14,
+              "padding": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lMwFl",
+                  "name": "Avatar",
+                  "width": 52,
+                  "height": 52,
+                  "fill": "$primary",
+                  "cornerRadius": 26,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "oVwWM",
+                      "name": "Initial",
+                      "fill": "$on-primary",
+                      "content": "م",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 22,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FoqUw",
+                  "name": "Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "J8vcSC",
+                      "name": "Name Row",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "YmL4x",
+                          "name": "Name",
+                          "fill": "$ink",
+                          "content": "محمد العلي",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 17,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "j9Ha5D",
+                          "name": "Verified Chip",
+                          "fill": "$success-bg",
+                          "cornerRadius": "$radius-pill",
+                          "gap": 4,
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "VpnDw",
+                              "name": "Check",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "circle-check",
+                              "library": "lucide",
+                              "fill": "$success"
+                            },
+                            {
+                              "type": "text",
+                              "id": "l6rrCv",
+                              "name": "Verified Label",
+                              "fill": "$success",
+                              "content": "موثّق",
+                              "fontFamily": "$font-ar",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "Gej2U",
+                      "name": "Phone",
+                      "fill": "$muted",
+                      "content": "+966 5X XXX XX89",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "OTM6L",
+              "name": "Loyalty Card",
+              "width": "fill_container",
+              "height": 100,
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 90,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#422e87",
+                    "position": 0
+                  },
+                  {
+                    "color": "#6b4ec9",
+                    "position": 0.6
+                  },
+                  {
+                    "color": "#8b6fe0",
+                    "position": 1
+                  }
+                ]
+              },
+              "cornerRadius": "$radius-lg",
+              "padding": [
+                16,
+                20
+              ],
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "TVuRg",
+                  "name": "Loyalty Left",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "BZcSs",
+                      "name": "Loyalty Title",
+                      "fill": "#ffffffcc",
+                      "content": "نقاط الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "f06SYQ",
+                      "name": "Points",
+                      "fill": "#ffffff",
+                      "content": "240",
+                      "fontFamily": "Inter",
+                      "fontSize": 40,
+                      "fontWeight": "800"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dncVP",
+                  "name": "Loyalty Right",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "PQSeY",
+                      "name": "Star",
+                      "width": 40,
+                      "height": 40,
+                      "icon": "star",
+                      "library": "lucide",
+                      "fill": "#ffffff33"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "XtRWi",
+              "name": "Menu Group 1",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "children": [
+                {
+                  "id": "SR9Em",
+                  "type": "ref",
+                  "ref": "Te9g7",
+                  "name": "عناويني",
+                  "width": "fill_container",
+                  "descendants": {
+                    "nq32e": {
+                      "icon": "map-pin"
+                    },
+                    "LSKTx": {
+                      "content": "عناويني"
+                    },
+                    "i3KmJ": {
+                      "content": "٣"
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "AM65s",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "b7sY8",
+                  "type": "ref",
+                  "ref": "Te9g7",
+                  "name": "الإشعارات",
+                  "width": "fill_container",
+                  "descendants": {
+                    "nq32e": {
+                      "icon": "bell"
+                    },
+                    "LSKTx": {
+                      "content": "الإشعارات"
+                    },
+                    "i3KmJ": {
+                      "content": ""
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "n7X1q9",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "rQN98",
+                  "type": "ref",
+                  "ref": "Te9g7",
+                  "name": "اللغة",
+                  "width": "fill_container",
+                  "descendants": {
+                    "nq32e": {
+                      "icon": "globe"
+                    },
+                    "LSKTx": {
+                      "content": "اللغة"
+                    },
+                    "i3KmJ": {
+                      "content": "العربية"
+                    }
+                  }
+                },
+                {
+                  "type": "rectangle",
+                  "id": "y4QOh",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "id": "GFYb8",
+                  "type": "ref",
+                  "ref": "Te9g7",
+                  "name": "المستندات والدعم",
+                  "width": "fill_container",
+                  "descendants": {
+                    "nq32e": {
+                      "icon": "file-text"
+                    },
+                    "LSKTx": {
+                      "content": "المستندات والدعم"
+                    },
+                    "i3KmJ": {
+                      "content": ""
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "hidvI",
+              "name": "Menu Group 2",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "LDTEJ",
+                  "name": "Delete Row",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "SnX8s",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "dqy0y",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "trash-2",
+                          "library": "lucide",
+                          "fill": "$danger"
+                        },
+                        {
+                          "type": "text",
+                          "id": "daOax",
+                          "name": "Label",
+                          "fill": "$danger",
+                          "content": "حذف الحساب",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "OtJa5",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "GTtVl",
+                  "name": "Logout Row",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "TuCX6",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "XsDSE",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "log-out",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "BL3Fj",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "تسجيل الخروج",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "fuMnn",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "Zym1J",
+          "type": "ref",
+          "ref": "RHjis",
+          "name": "Tab Bar",
+          "width": "fill_container"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "aMwnZ",
+      "x": 1880,
+      "y": -696,
+      "name": "Screen 4 Label",
+      "fill": "$muted",
+      "content": "4 — Addresses",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "e37wF",
+      "x": 1880,
+      "y": -660,
+      "name": "Addresses",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "OWSQD",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "id": "mNwI4",
+          "type": "ref",
+          "ref": "oRIZd",
+          "name": "Header Bar",
+          "width": "fill_container",
+          "descendants": {
+            "zstrt": {
+              "content": "عناويني"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "s5itbW",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            8,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "x6z0Wx",
+              "name": "Address المنزل",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$primary",
+              "strokeWidth": 1.5,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "oMVNd",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "F8oJe",
+                      "name": "Label Row",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "It2cX",
+                          "name": "Pin",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "house",
+                          "library": "lucide",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "E6iKpf",
+                          "name": "Label",
+                          "fill": "$ink",
+                          "content": "المنزل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VpGA6",
+                          "name": "Default Chip",
+                          "fill": "$primary-light",
+                          "cornerRadius": "$radius-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "A0sZf",
+                              "name": "Default Text",
+                              "fill": "$primary",
+                              "content": "افتراضي",
+                              "fontFamily": "$font-ar",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "yLMHY",
+                      "name": "More",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "ellipsis-vertical",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "vH1XH",
+                  "name": "Description",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "بجانب بقالة السلام، حي الورود",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                },
+                {
+                  "type": "frame",
+                  "id": "iZYAe",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "VzX7v",
+                      "name": "Short Addr",
+                      "fill": "$muted",
+                      "content": "RBAA 1234",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "fflo2",
+                      "name": "Range Chip",
+                      "fill": "$success-bg",
+                      "cornerRadius": "$radius-pill",
+                      "gap": 4,
+                      "padding": [
+                        3,
+                        8
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "wawzM",
+                          "name": "Range Icon",
+                          "width": 12,
+                          "height": 12,
+                          "icon": "circle-check",
+                          "library": "lucide",
+                          "fill": "$success"
+                        },
+                        {
+                          "type": "text",
+                          "id": "oy8v5",
+                          "name": "Range Text",
+                          "fill": "$success",
+                          "content": "ضمن النطاق",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "nTyqY",
+              "name": "Address العمل",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "IpmgG",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "xx7cG",
+                      "name": "Label Row",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "GlmDr",
+                          "name": "Pin",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "briefcase",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "foM9Z",
+                          "name": "Label",
+                          "fill": "$ink",
+                          "content": "العمل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "p5jhoA",
+                      "name": "More",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "ellipsis-vertical",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "aOUCR",
+                  "name": "Description",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "شارع الملك فهد، برج المملكة، الطابق ١٢",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                },
+                {
+                  "type": "frame",
+                  "id": "tDLBB",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n9pKz",
+                      "name": "Short Addr",
+                      "fill": "$muted",
+                      "content": "RKAA 5678",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "biCq1",
+                      "name": "Range Chip",
+                      "fill": "$success-bg",
+                      "cornerRadius": "$radius-pill",
+                      "gap": 4,
+                      "padding": [
+                        3,
+                        8
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "lnCXv",
+                          "name": "Range Icon",
+                          "width": 12,
+                          "height": 12,
+                          "icon": "circle-check",
+                          "library": "lucide",
+                          "fill": "$success"
+                        },
+                        {
+                          "type": "text",
+                          "id": "AwUpi",
+                          "name": "Range Text",
+                          "fill": "$success",
+                          "content": "ضمن النطاق",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Fui1Y",
+              "name": "Address بيت أمي",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Hg51e",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "p1kOE",
+                      "name": "Label Row",
+                      "gap": 8,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "xD9UQ",
+                          "name": "Pin",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "house",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "bt1nH",
+                          "name": "Label",
+                          "fill": "$ink",
+                          "content": "بيت أمي",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "rV0EE",
+                      "name": "More",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "ellipsis-vertical",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "MD30T",
+                  "name": "Description",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "حي النسيم، خلف مسجد الرحمن",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                },
+                {
+                  "type": "frame",
+                  "id": "dkstb",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "BFYQu",
+                      "name": "Short Addr",
+                      "fill": "$muted",
+                      "content": "RDAA 9012",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "sJDot",
+                      "name": "Range Chip",
+                      "fill": "$danger-bg",
+                      "cornerRadius": "$radius-pill",
+                      "gap": 4,
+                      "padding": [
+                        3,
+                        8
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "N8WXEg",
+                          "name": "Range Icon",
+                          "width": 12,
+                          "height": 12,
+                          "icon": "circle-x",
+                          "library": "lucide",
+                          "fill": "$danger"
+                        },
+                        {
+                          "type": "text",
+                          "id": "P0eiv",
+                          "name": "Range Text",
+                          "fill": "$danger",
+                          "content": "خارج نطاق التوصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "J9VNz",
+              "name": "Note",
+              "width": "fill_container",
+              "gap": 6,
+              "padding": [
+                8,
+                0
+              ],
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "wobAp",
+                  "name": "Info",
+                  "width": 14,
+                  "height": 14,
+                  "icon": "info",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "q9Wi1t",
+                  "name": "Note Text",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "اضغط على ⋮ لإعادة التسمية أو تعيين كافتراضي أو الحذف.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bocKH",
+          "name": "Sticky Add",
+          "width": "fill_container",
+          "fill": "$surface",
+          "stroke": "$border",
+          "strokeWidth": {
+            "top": 1
+          },
+          "strokeAlignment": "inner",
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "wkfXO",
+              "name": "Add Button",
+              "width": "fill_container",
+              "height": 48,
+              "cornerRadius": "$radius-md",
+              "stroke": "$primary",
+              "strokeWidth": 1.5,
+              "strokeAlignment": "inner",
+              "gap": 8,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "oSoGc",
+                  "name": "Plus",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "plus",
+                  "library": "lucide",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "text",
+                  "id": "VwVkt",
+                  "name": "Add Label",
+                  "fill": "$primary",
+                  "content": "إضافة عنوان جديد",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "WzBCb",
+      "x": 2350,
+      "y": -696,
+      "name": "Screen 5 Label",
+      "fill": "$muted",
+      "content": "5 — Notifications",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "i4ZfXa",
+      "x": 2350,
+      "y": -660,
+      "name": "Notifications",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "wzFTj",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "id": "PYB0g",
+          "type": "ref",
+          "ref": "oRIZd",
+          "name": "Header Bar",
+          "width": "fill_container",
+          "descendants": {
+            "zstrt": {
+              "content": "الإشعارات"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "ElYVk",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            16,
+            24,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "D7gLC",
+              "name": "Heading",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Vjs9f",
+                  "name": "Title",
+                  "fill": "$ink",
+                  "content": "الإشعارات",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "Ut7Cw",
+                  "name": "Subtitle",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "اختر ما يمكننا إشعارك به على هذا الجهاز.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "dEWoN",
+              "name": "Settings Group",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dHcHl",
+                  "name": "Setting تحديثات الطلب",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "padding": 16,
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "jnDRZ",
+                      "name": "Text",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "uwGA9",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "content": "تحديثات الطلب",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Nhsne",
+                          "name": "Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "إشعارات حالة الطلب والتوصيل.",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "id": "g3tsp",
+                      "type": "ref",
+                      "ref": "E1IR6n",
+                      "name": "Toggle"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "j6Czr",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "kd89c",
+                  "name": "Setting العروض والترويجات",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "padding": 16,
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "a6r5I",
+                      "name": "Text",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xk4yx",
+                          "name": "Title",
+                          "fill": "$ink",
+                          "content": "العروض والترويجات",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "LwUdt",
+                          "name": "Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "عروض حصرية وكوبونات خصم.",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "id": "T6sQ1",
+                      "type": "ref",
+                      "ref": "AvEs2",
+                      "name": "Toggle"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "MAfze",
+              "name": "Warning Notice",
+              "width": "fill_container",
+              "fill": "$warning-bg",
+              "cornerRadius": "$radius-md",
+              "stroke": "#c47f1733",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "gap": 10,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "GgPp7",
+                  "name": "Alert Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "triangle-alert",
+                  "library": "lucide",
+                  "fill": "$warning"
+                },
+                {
+                  "type": "frame",
+                  "id": "VbhZk",
+                  "name": "Notice Text",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "X7ENC",
+                      "name": "Notice Title",
+                      "fill": "#8b6914",
+                      "content": "الإشعارات محظورة",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "dbk2r",
+                      "name": "Notice Desc",
+                      "fill": "#8b6914",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "الإشعارات معطّلة في إعدادات الجهاز. افتح الإعدادات > التطبيقات > سبايسي ميل > الإشعارات لتفعيلها.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "oAcVA",
+      "x": 2820,
+      "y": -696,
+      "name": "Screen 6 Label",
+      "fill": "$muted",
+      "content": "6 — Delete Account",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "q4TtT",
+      "x": 2820,
+      "y": -660,
+      "name": "Delete Account",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "SgQS6",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "id": "qYdvR",
+          "type": "ref",
+          "ref": "oRIZd",
+          "name": "Header Bar",
+          "width": "fill_container",
+          "descendants": {
+            "zstrt": {
+              "content": "حذف الحساب"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "YIszo",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "e7smLF",
+              "name": "Head Section",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xHulo",
+                  "name": "Title",
+                  "fill": "$danger",
+                  "content": "حذف حسابك",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "FnVIg",
+                  "name": "Subtitle",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "يرجى قراءة ما سيحدث قبل المتابعة.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KSTjX",
+              "name": "Consequences Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "FnPhZ",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YSVza",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "uZA4X",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "سيتم إزالة الوصول إلى حسابك نهائيًا.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "l4bkJJ",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "tkgX6",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "dlRPJ",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "ستُحذف جميع العناوين المحفوظة.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gL1vb",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "aKbO1",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YceOk",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "سيتم إخفاء هوية ملفك الشخصي.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "S7QNd",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "H3QWH",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "BEoM1",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "ستفقد جميع نقاط الولاء المتراكمة.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "qJg7H",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "W7IlT",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "mN3Gk",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "سيتم إلغاء جميع الجلسات النشطة.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "WiPU2",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "tCaKX",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "e7S3iu",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "ستُزال أجهزة الإشعارات المسجّلة.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Ves1y",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ry7VE",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CEuOg",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "قد تُحتفظ ببعض السجلات وفقًا للمتطلبات القانونية.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "UktGZ",
+                  "name": "Consequence",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "NOUfp",
+                      "name": "Bullet",
+                      "fill": "$danger",
+                      "content": "•",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "o9wsJW",
+                      "name": "Text",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "لن تتمكن من استعادة الحساب بعد الحذف.",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "xscIp",
+                  "name": "More Row",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "jJ7gL",
+                      "name": "More Indicator",
+                      "fill": "$muted",
+                      "content": "… و٤ بنود أخرى",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FaNoA",
+              "name": "Acknowledgement Card",
+              "width": "fill_container",
+              "fill": "$danger-bg",
+              "cornerRadius": "$radius-md",
+              "stroke": "#e02d3d33",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Yhs2P",
+                  "name": "Checkbox",
+                  "width": 22,
+                  "height": 22,
+                  "fill": "$primary",
+                  "cornerRadius": 6,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "lt2gM",
+                      "name": "Check",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "check",
+                      "library": "lucide",
+                      "fill": "$on-primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "ZZq14",
+                  "name": "Ack Text",
+                  "fill": "$text",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "أقرّ بأنني قرأت وفهمت جميع العواقب المترتبة على حذف حسابي، وأوافق على المتابعة.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "XZbne",
+          "name": "Sticky Bar",
+          "width": "fill_container",
+          "fill": "$surface",
+          "stroke": "$border",
+          "strokeWidth": {
+            "top": 1
+          },
+          "strokeAlignment": "inner",
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "id": "OqZzy",
+              "type": "ref",
+              "ref": "oqDMG",
+              "name": "Delete Button",
+              "width": "fill_container",
+              "descendants": {
+                "KnMam": {
+                  "content": "متابعة حذف الحساب"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "hgHs7",
+      "x": 3290,
+      "y": -696,
+      "name": "Screen 7 Label",
+      "fill": "$muted",
+      "content": "7 — Legal & Support",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "GP2Sv",
+      "x": 3290,
+      "y": -660,
+      "name": "Legal Support",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "k2sHC",
+          "type": "ref",
+          "ref": "oTEIY",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "id": "D6HYA2",
+          "type": "ref",
+          "ref": "oRIZd",
+          "name": "Header Bar",
+          "width": "fill_container",
+          "descendants": {
+            "zstrt": {
+              "content": "المستندات والدعم"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "m6ghnc",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            16,
+            24,
+            16
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "y825zo",
+              "name": "Contact Section Label",
+              "fill": "$muted",
+              "content": "تواصل معنا",
+              "fontFamily": "$font-ar",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "ouVaB",
+              "name": "Contact Group",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MVOls",
+                  "name": "Call Row",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "gELhJ",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "XgULd",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "phone",
+                          "library": "lucide",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "g6FS9",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "الاتصال بالدعم",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "mbFMd",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "m2HEF",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "nPv2z",
+                  "name": "WhatsApp Row",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "S4DFu",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "V1WIsd",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "message-circle",
+                          "library": "lucide",
+                          "fill": "#25D366"
+                        },
+                        {
+                          "type": "text",
+                          "id": "KaDA1",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "الدعم عبر واتساب",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "pac1b",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "JuHxG",
+              "name": "Working Hours Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "zTMir",
+                  "name": "Hours Header",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "xKX1s",
+                      "name": "Clock Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "clock-3",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "bKm8U",
+                      "name": "Hours Title",
+                      "fill": "$ink",
+                      "content": "ساعات العمل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "dGfUQ",
+                  "name": "Hours Detail",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "الأحد – الخميس: ٩:٠٠ ص – ١١:٠٠ م\nالجمعة والسبت: ١٠:٠٠ ص – ١٢:٠٠ ص",
+                  "lineHeight": 1.6,
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "WdK6e",
+              "name": "Documents Section Label",
+              "fill": "$muted",
+              "content": "المستندات القانونية",
+              "fontFamily": "$font-ar",
+              "fontSize": 13,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "f4gt4",
+              "name": "Documents Group",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "mqIuQ",
+                  "name": "سياسة الخصوصية",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "sBSIT",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "wClXJ",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "shield",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qDbHc",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "سياسة الخصوصية",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "yR9Ey",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "dxr0m",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "U29nxx",
+                  "name": "الشروط والأحكام",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "XkG6s",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "QqhdH",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "scroll-text",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "FWWpY",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "الشروط والأحكام",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "Fq1R5",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "ceS4q",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "dufc5",
+                  "name": "سياسة الاسترجاع",
+                  "width": "fill_container",
+                  "height": 52,
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RjLCo",
+                      "name": "Left",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "YSa7F",
+                          "name": "Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "rotate-ccw",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "i8JSqS",
+                          "name": "Label",
+                          "fill": "$text",
+                          "content": "سياسة الاسترجاع",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "icon",
+                      "id": "M40XAu",
+                      "name": "Chevron",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chevron-left",
+                      "library": "lucide",
+                      "fill": "$disabled"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Kh1Fr",
+              "name": "Footer Note",
+              "width": "fill_container",
+              "gap": 6,
+              "padding": [
+                4,
+                0
+              ],
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "d2MwQ",
+                  "name": "Info",
+                  "width": 14,
+                  "height": 14,
+                  "icon": "info",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "b7xN2",
+                  "name": "Note Text",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "تظهر قنوات الدعم فقط عندما يقوم المسؤول بتفعيلها في لوحة التحكم.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 11
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-light": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "on-primary": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bg-alt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "overlay": {
+      "type": "color",
+      "value": "#1c163073"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-bg": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-bg": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-bg": {
+      "type": "color",
+      "value": "#fef3cd"
+    },
+    "brand-tint": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "font-ar": {
+      "type": "string",
+      "value": "IBM Plex Sans Arabic"
+    },
+    "font-en": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "radius-sm": {
+      "type": "number",
+      "value": 8
+    },
+    "radius-md": {
+      "type": "number",
+      "value": 12
+    },
+    "radius-lg": {
+      "type": "number",
+      "value": 16
+    },
+    "radius-xl": {
+      "type": "number",
+      "value": 22
+    },
+    "radius-pill": {
+      "type": "number",
+      "value": 999
+    }
+  },
+  "fileToken": "fb911cfc-3524-44a1-ada8-9c9aad27651b"
+}
