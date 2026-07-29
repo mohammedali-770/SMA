@@ -17,6 +17,7 @@ other. Left alone they compound.
 | # | Defect | Batches | Status |
 | --- | --- | --- | --- |
 | C1 | **Numeral system disagrees.** Batch 02 renders Arabic-Indic numerals on Arabic screens (٣٥ ر.س, ٤٨٠ سعرة); batches 03 and 05 render Western (78.00, 240). Pen.dev's own design-system sheet (batch 01) specifies Arabic-Indic in Arabic context, so 03/05 contradict the system they were handed. | 02 vs 03, 05 | **needs owner decision** |
+| C1b | The numeral inconsistency now spans the admin surface too — batch 06's Live Orders and Financial Reports use Western numerals. Whatever C1 resolves to must be applied to both surfaces. | 06 | **needs owner decision** |
 | C2 | **Bottom tab bar labels disagree.** Batch 02 is correct — الرئيسية / طلباتي / حسابي (Home / Orders / Account). Batch 05 renders الرئيسية / القائمة / حسابي, inventing a "Menu" tab. The product has exactly three tabs and no separate Menu tab: home *is* the menu. | 05 | open |
 | C3 | **RTL sentence punctuation.** Full stops land at the start of a wrapped Arabic line instead of the end (e.g. the below-minimum warning, the addresses hint). A bidi/pilcrow handling issue in the text runs. | 03, 05 | open |
 
@@ -32,6 +33,12 @@ other. Left alone they compound.
 | --- | --- | --- |
 | 4.1 | **Prompt instruction leaked into visible copy.** The `accepted_no_pos_channel_unpaid` card ends with the literal words "No payment language." — that was an instruction to the generator, not customer copy. | open |
 | 4.2 | **Unrequested copy implies a branch step.** The `accepted_no_pos_channel` card gained "Awaiting branch assignment." The entire point of that state is that no branch is involved, so nothing may imply a branch step is pending. | open |
+
+## Batch 06 — admin dashboard
+
+| # | Defect | Status |
+| --- | --- | --- |
+| 6.1 | **Orphaned sidebar artboard.** The sheet contains a standalone sidebar with no screen attached — scratch geometry from building the reusable component, shipped in the export. Same class of problem as 1.1. | open |
 
 ## Batch 01 — design system
 
