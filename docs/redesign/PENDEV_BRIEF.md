@@ -28,9 +28,12 @@ copy and behaviour. Design them once, responsively; do not produce a divergent
 
 ### 1.1 What is being redesigned
 
-- The **customer experience** (mobile + web `/app`): 17 routes, listed in
-  `FEATURE_INVENTORY.md` §2.
+- The **customer experience** (mobile + web `/app`): 17 existing routes plus two
+  additions (address management, campaigns), listed in `FEATURE_INVENTORY.md` §2.
 - The **staff console** (site root): 12 tabs, listed in `FEATURE_INVENTORY.md` §3.
+  "The website" means **the admin dashboard only** — no public marketing page is
+  in scope (owner decision §10.5).
+- Both surfaces in **light and dark**, in **Arabic and English** (§10.1).
 
 ### 1.2 What is *not* being redesigned
 
@@ -211,7 +214,7 @@ board. See `FEATURE_INVENTORY.md` §2.11.
 | Area | Status | What the design may do |
 | --- | --- | --- |
 | **Payment / Tap** | **FROZEN** (`CLAUDE.md` §6) | restyle screens only; no change to the flow, the number of steps, the copy semantics, or the verification round-trip |
-| **Push notifications** | **DORMANT** — no credentials, disabled integration row | the notification-preferences UI exists and must be preserved in the design, but must not be promoted (no onboarding prompt, no permission pre-ask) |
+| **Push notifications** | **DORMANT** — no credentials, disabled integration row | the notification-preferences UI is **designed and visible** (owner decision §10.4), but must not be promoted: no onboarding prompt, no permission pre-ask |
 | **Production schema / migrations** | owner-approved workflow only | design must not require a new column, table or RPC; flag anything that would |
 
 If a proposed design needs a backend change, it must be raised as an explicit
@@ -344,13 +347,17 @@ things RN can render:
 
 ### 5.5 Theming
 
-- The design must survive an admin swapping `primary_color` and
-  `secondary_color` at runtime. Define **semantic** roles (primary, on-primary,
-  secondary, surface, surface-alt, border, muted, success, warning, danger, plus
-  their tint backgrounds) and derive components from roles, never from raw hexes.
-- Dark mode does **not** exist today. If you propose it, it is an addition to be
-  approved separately and must cover all 12 confirmation states, all admin
-  panels, and both languages — otherwise leave it out of scope.
+- Design against the **fixed brand palette** `#422e87` / `#e02d3d` (owner
+  decision §10.6). The runtime override still exists in the backend, so keep the
+  system built on **semantic** roles (primary, on-primary, secondary, surface,
+  surface-alt, border, muted, success, warning, danger, plus their tint
+  backgrounds) and derive components from roles, never from raw hexes — but a
+  second palette is no longer a deliverable.
+- **Dark mode is IN SCOPE** (owner decision §10.1). It must cover every customer
+  screen, all 12 confirmation states, all 12 console tabs, and both languages.
+  Build it token-level: redefine the palette tokens, do not invert. Dark grounds
+  must keep body text ≥ 4.5:1 and keep the red/purple accents legible — the red
+  in particular needs lifting on a dark ground.
 
 ---
 
@@ -486,26 +493,23 @@ counts as that approval.
 
 ---
 
-## 10. Known open questions for the owner
+## 10. Owner decisions (resolved 2026-07-29)
 
-Flag these before/while designing; they change the work:
+These were open questions; the owner has answered them. They are now
+requirements, and are reflected in `FEATURE_INVENTORY.md` and `DESIGN_SYSTEM.md`.
 
-1. **Dark mode** — in or out of scope? (currently absent)
-2. **Discounts & campaigns** — a campaigns feature exists in the repository but
-   is **unapplied** (`docs/DISCOUNTS_CAMPAIGNS.md`): percentage / fixed /
-   free-delivery, with codes, windows, caps and per-user limits. Should the
-   redesign include customer-facing campaign UI (a promos strip, auto-applied
-   discount lines) so it is ready when the feature ships?
-3. **Address management in the customer app** — today the app can create/select
-   addresses during the delivery flow, but full address CRUD (rename, delete,
-   set default) is not a dedicated screen. Add one?
-4. **Push notification UI** — preferences exist while the stack is dormant.
-   Keep as-is (design it, ship it inert) or hide until enabled?
-5. **Order tracking granularity** — statuses are `received / preparing / ready /
-   out_for_delivery / delivered / cancelled`. Should the redesign introduce a
-   progress timeline, given the POS confirmation machine already occupies the
-   receipt's primary space?
-6. **Web `/app` vs. a marketing landing page** — the site root is the staff
-   console today. Is a public marketing page part of "the website"?
-7. **Alternate brand palette** — is the admin colour override still a live
-   requirement, or can the design assume the fixed purple/red?
+| # | Question | **Decision** | Consequence |
+| --- | --- | --- | --- |
+| 1 | Dark mode | **IN SCOPE** | Every screen, every state — including all 12 confirmation states and all 12 console tabs — ships in light *and* dark, in both languages. Semantic tokens, not inverted colours. |
+| 2 | Discounts & campaigns | **DESIGN NOW** | Customer-facing campaign UI is part of this work: a promos surface, auto-applied discount lines, coded vs. codeless campaigns, and free-delivery presentation. The backend slice is **unapplied**, so the UI must degrade to nothing when no campaign exists. |
+| 3 | Address management | **ADD A DEDICATED SCREEN** | Full CRUD: list, add, rename/edit label + description, set default, delete with confirmation — reachable from Profile *and* from the delivery flow. |
+| 4 | Push notification UI | **DESIGN IT, DON'T HIDE IT** | The notification-preferences screen is designed and shipped visible while the push stack stays **dormant**. Still no onboarding prompt and no permission pre-ask. |
+| 5 | "The website" | **ADMIN DASHBOARD ONLY** | No public marketing page in scope. The site root stays the staff console; the customer web experience remains `/app`. |
+| 6 | Brand palette | **ASSUME FIXED PURPLE/RED** | Design against `#422e87` / `#e02d3d`. The runtime override still exists in the backend, so keep tokens semantic — but a second palette is no longer a deliverable. |
+
+One question remains open and is **not** blocking:
+
+- **Order tracking granularity** — statuses are `received / preparing / ready /
+  out_for_delivery / delivered / cancelled`. Whether to introduce a progress
+  timeline is deferred, because the POS confirmation machine (§3.5) already owns
+  the receipt's primary space. Default: keep status pills, no timeline.

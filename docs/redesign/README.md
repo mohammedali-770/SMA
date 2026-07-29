@@ -17,6 +17,7 @@ app, also exported to web at `/app`), `src/` (admin/staff console), `supabase/`
 | [`FEATURE_INVENTORY.md`](./FEATURE_INVENTORY.md) | The **parity checklist**: every screen, every state, every control, every admin panel, with a tick-box per item. "Nothing lost" is proven against this file. | Designer + reviewer |
 | [`DESIGN_SYSTEM.md`](./DESIGN_SYSTEM.md) | Current **design tokens and component contracts** (colours, type scale, spacing, radii, shadows, motion, component states). What may change, what may not. | Designer |
 | [`PENDEV_PROMPTS.md`](./PENDEV_PROMPTS.md) | Ready-to-run **`pen` CLI prompts**, one per screen batch, plus the workflow for iterating and exporting. | Whoever drives the tool |
+| [`mockups-v1.html`](./mockups-v1.html) | **First visual pass** — 22 customer screens, the twelve-state board and all twelve admin tabs, in Arabic and English, light and dark. Open it in a browser. | Owner + designer |
 
 ## Read order
 

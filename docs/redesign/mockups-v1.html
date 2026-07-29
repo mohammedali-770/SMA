@@ -1,0 +1,2131 @@
+<title>Spicy Meal — Redesign, screen by screen</title>
+
+<style>
+/* ============================ DECK TOKENS ============================ */
+:root{
+  --ground:#f3f1f8; --ground-2:#e9e5f2; --panel:#ffffff; --panel-2:#faf9fd;
+  --ink:#1b1529; --body:#3b3450; --muted:#6f6889; --line:#ddd7ea;
+  --brand:#422e87; --hot:#c9202f; --gold:#a06d17;
+  --shadow:0 1px 2px rgba(28,22,48,.06), 0 12px 32px -12px rgba(28,22,48,.22);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ground:#120e1c; --ground-2:#1a1428; --panel:#1c1630; --panel-2:#221a3a;
+    --ink:#f0ecfa; --body:#c6bfdd; --muted:#8d85a8; --line:#312a48;
+    --brand:#9b85f0; --hot:#ff6274; --gold:#d9a34a;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 40px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#120e1c; --ground-2:#1a1428; --panel:#1c1630; --panel-2:#221a3a;
+  --ink:#f0ecfa; --body:#c6bfdd; --muted:#8d85a8; --line:#312a48;
+  --brand:#9b85f0; --hot:#ff6274; --gold:#d9a34a;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 40px -14px rgba(0,0,0,.7);
+}
+:root[data-theme="light"]{
+  --ground:#f3f1f8; --ground-2:#e9e5f2; --panel:#ffffff; --panel-2:#faf9fd;
+  --ink:#1b1529; --body:#3b3450; --muted:#6f6889; --line:#ddd7ea;
+  --brand:#422e87; --hot:#c9202f; --gold:#a06d17;
+  --shadow:0 1px 2px rgba(28,22,48,.06), 0 12px 32px -12px rgba(28,22,48,.22);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--body);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:ui-serif,Georgia,"Iowan Old Style","Times New Roman",serif}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+h1,h2,h3{color:var(--ink); text-wrap:balance; margin:0}
+a{color:var(--brand)}
+
+.wrap{max-width:1240px; margin:0 auto; padding:0 24px}
+
+/* ============================ MASTHEAD ============================ */
+.masthead{padding:64px 0 40px; border-bottom:1px solid var(--line)}
+.eyebrow{
+  font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--gold); font-weight:700;
+}
+.masthead h1{
+  font-family:ui-serif,Georgia,serif; font-size:clamp(34px,5.2vw,60px);
+  line-height:1.04; letter-spacing:-.02em; margin:14px 0 18px; font-weight:600;
+}
+.masthead h1 em{font-style:italic; color:var(--brand)}
+.lede{max-width:62ch; font-size:17px}
+.meta{
+  display:flex; flex-wrap:wrap; gap:8px; margin-top:26px;
+}
+.tag{
+  font-size:11.5px; padding:5px 11px; border-radius:999px;
+  border:1px solid var(--line); background:var(--panel); color:var(--muted);
+  font-family:ui-monospace,"SF Mono",Menlo,monospace;
+}
+.tag b{color:var(--ink); font-weight:600}
+
+/* ============================ NAV ============================ */
+.rail{
+  position:sticky; top:0; z-index:50; background:color-mix(in srgb,var(--ground) 88%,transparent);
+  backdrop-filter:saturate(1.4) blur(10px); border-bottom:1px solid var(--line);
+}
+.rail-in{display:flex; gap:4px; overflow-x:auto; padding:10px 24px; max-width:1240px; margin:0 auto}
+.rail a{
+  flex:0 0 auto; font-size:12.5px; padding:6px 12px; border-radius:8px;
+  color:var(--muted); text-decoration:none; font-weight:600; white-space:nowrap;
+}
+.rail a:hover{background:var(--ground-2); color:var(--ink)}
+.rail a:focus-visible{outline:2px solid var(--brand); outline-offset:2px}
+
+/* ============================ SECTIONS ============================ */
+section{padding:72px 0; border-bottom:1px solid var(--line)}
+.shead{display:flex; align-items:baseline; gap:16px; margin-bottom:8px; flex-wrap:wrap}
+.snum{
+  font-family:ui-monospace,monospace; font-size:12px; color:var(--gold);
+  border:1px solid var(--line); border-radius:6px; padding:3px 8px; letter-spacing:.06em;
+}
+.shead h2{font-family:ui-serif,Georgia,serif; font-size:30px; font-weight:600; letter-spacing:-.01em}
+.sintro{max-width:70ch; margin:10px 0 40px; color:var(--muted)}
+.sintro strong{color:var(--ink); font-weight:600}
+
+/* ============================ TOKEN STRIP ============================ */
+.tokens{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+.swatch{
+  border:1px solid var(--line); border-radius:12px; overflow:hidden; background:var(--panel);
+}
+.swatch .chip{height:64px}
+.swatch .lab{padding:10px 12px}
+.swatch .lab b{display:block; color:var(--ink); font-size:12.5px}
+.swatch .lab span{font-family:ui-monospace,monospace; font-size:11px; color:var(--muted)}
+
+.typerow{
+  margin-top:32px; display:grid; gap:0; border:1px solid var(--line);
+  border-radius:14px; overflow:hidden; background:var(--panel);
+}
+.typerow div{
+  display:flex; align-items:baseline; gap:20px; padding:14px 18px;
+  border-bottom:1px solid var(--line); flex-wrap:wrap;
+}
+.typerow div:last-child{border-bottom:0}
+.typerow .k{
+  font-family:ui-monospace,monospace; font-size:11px; color:var(--muted);
+  min-width:150px; letter-spacing:.04em;
+}
+.typerow .v{color:var(--ink)}
+
+/* ============================ SCREEN GRID ============================ */
+.grid{
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(288px,1fr));
+  gap:44px 28px; align-items:start;
+}
+.cell{display:flex; flex-direction:column; gap:12px}
+.cap{padding-inline-start:2px}
+.cap b{display:block; color:var(--ink); font-size:14px; font-weight:650; letter-spacing:-.01em}
+.cap .route{
+  font-family:ui-monospace,monospace; font-size:11px; color:var(--brand);
+  display:inline-block; margin-top:3px;
+}
+.cap p{margin:6px 0 0; font-size:12.5px; color:var(--muted); line-height:1.5}
+.cap .new{
+  display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.1em;
+  color:#fff; background:var(--hot); padding:2px 6px; border-radius:4px;
+  vertical-align:2px; margin-inline-start:6px;
+}
+.cap .drk{
+  display:inline-block; font-size:9.5px; font-weight:800; letter-spacing:.1em;
+  color:var(--ground); background:var(--ink); padding:2px 6px; border-radius:4px;
+  vertical-align:2px; margin-inline-start:6px;
+}
+
+/* ============================ PHONE FRAME ============================ */
+.phone{
+  --p-bg:#f6f5fa; --p-surf:#ffffff; --p-ink:#1c1630; --p-text:#241d3a;
+  --p-mut:#6b6580; --p-line:#ece9f2; --p-purple:#422e87; --p-red:#e02d3d;
+  --p-ok:#1f9d55; --p-okbg:#e7f6ee; --p-dngbg:#fdeaec; --p-purbg:#f1edfb;
+  --p-warn:#c47f17; --p-disabled:#c9c4d6;
+  width:288px; height:604px; border-radius:34px; padding:8px;
+  background:linear-gradient(160deg,#2a2350,#100c22); box-shadow:var(--shadow);
+  flex:0 0 auto;
+}
+.phone.is-dark{
+  --p-bg:#100c1c; --p-surf:#1c1630; --p-ink:#f2eefb; --p-text:#e4dff2;
+  --p-mut:#948caf; --p-line:#2e2745; --p-purple:#9b85f0;
+  --p-red:#ff6274; --p-ok:#3ec37c; --p-okbg:#12301f; --p-dngbg:#331319;
+  --p-purbg:#241c40; --p-warn:#e0a33f; --p-disabled:#4a4363;
+}
+.scr{
+  height:100%; border-radius:27px; overflow:hidden; background:var(--p-bg);
+  color:var(--p-text); display:flex; flex-direction:column;
+  font-size:11.5px; line-height:1.45; position:relative;
+}
+.scr *{box-sizing:border-box}
+.sbar{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:9px 16px 3px; font-size:9.5px; font-weight:700; color:var(--p-ink);
+  flex:0 0 auto; letter-spacing:.02em;
+}
+.sbar .dots{display:flex; gap:3px; align-items:center}
+.sbar i{display:block; width:3px; height:7px; border-radius:1px; background:var(--p-ink); font-style:normal}
+.sbar i:nth-child(1){height:4px} .sbar i:nth-child(2){height:5.5px} .sbar i:nth-child(3){height:7px}
+.sbar u{
+  width:16px; height:8px; border:1px solid var(--p-ink); border-radius:2px;
+  display:inline-block; position:relative; text-decoration:none; opacity:.85;
+}
+.sbar u::after{content:""; position:absolute; inset:1.5px; right:5px; background:var(--p-ink); border-radius:1px}
+.body{flex:1; overflow:hidden; padding:0 12px}
+.body.flush{padding:0}
+.scroll{height:100%; overflow:hidden}
+
+/* phone primitives */
+.pbar{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:6px 4px 10px;
+}
+.ptitle{font-size:14.5px; font-weight:800; color:var(--p-ink); letter-spacing:-.01em}
+.psub{font-size:10.5px; color:var(--p-mut)}
+.card{
+  background:var(--p-surf); border-radius:14px; padding:11px;
+  border:1px solid var(--p-line); margin-bottom:9px;
+}
+.row{display:flex; align-items:center; gap:9px}
+.between{display:flex; align-items:center; justify-content:space-between; gap:8px}
+.btn{
+  background:var(--p-purple); color:#fff; border-radius:12px; padding:10px;
+  text-align:center; font-weight:800; font-size:12px;
+}
+.btn.red{background:var(--p-red)}
+.btn.ghost{background:transparent; color:var(--p-purple); border:1.5px solid var(--p-purple)}
+.btn.off{background:var(--p-disabled); color:#fff}
+.chip{
+  font-size:9.5px; font-weight:800; padding:4px 9px; border-radius:999px;
+  background:var(--p-purbg); color:var(--p-purple); white-space:nowrap;
+}
+.chip.on{background:var(--p-purple); color:#fff}
+.chip.ok{background:var(--p-okbg); color:var(--p-ok)}
+.chip.bad{background:var(--p-dngbg); color:var(--p-red)}
+.chip.warn{background:#fdf3e2; color:var(--p-warn)}
+.is-dark .chip.warn{background:#31240e}
+.pill{
+  font-size:9px; font-weight:800; letter-spacing:.04em; padding:3px 7px;
+  border-radius:6px; background:var(--p-purbg); color:var(--p-purple);
+}
+.img{
+  border-radius:10px; background:
+    radial-gradient(120% 90% at 25% 15%, #ffd9a3 0%, #f4a259 42%, #d1512f 78%, #8f2f22 100%);
+  flex:0 0 auto;
+}
+.img.b{background:radial-gradient(120% 90% at 30% 20%, #ffe6b0, #f0b25e 45%, #c0642a 100%)}
+.img.c{background:radial-gradient(120% 90% at 30% 20%, #ffe9c9, #e9c46a 40%, #b07d2b 100%)}
+.img.d{background:radial-gradient(120% 90% at 35% 25%, #ffd5d5, #e07a5f 45%, #9d3a2a 100%)}
+.name{font-weight:750; color:var(--p-ink); font-size:11.5px}
+.mut{color:var(--p-mut); font-size:10px}
+.price{font-weight:800; color:var(--p-ink); font-size:12px; font-variant-numeric:tabular-nums}
+.rial{
+  font-size:9px; font-weight:700; color:var(--p-mut); vertical-align:1px;
+  margin-inline-start:2px;
+}
+.field{
+  border:1.5px solid var(--p-line); border-radius:11px; padding:9px 11px;
+  background:var(--p-surf); font-size:11px; color:var(--p-mut);
+}
+.field.focus{border-color:var(--p-purple)}
+.tabbar{
+  display:flex; border-top:1px solid var(--p-line); background:var(--p-surf);
+  padding:7px 0 12px; flex:0 0 auto;
+}
+.tabbar div{flex:1; text-align:center; font-size:8.5px; font-weight:700; color:var(--p-mut)}
+.tabbar div.on{color:var(--p-purple)}
+.tabbar span{
+  display:block; width:16px; height:16px; margin:0 auto 3px; border-radius:5px;
+  background:var(--p-mut); opacity:.35;
+}
+.tabbar div.on span{background:var(--p-purple); opacity:1}
+.sticky{
+  position:absolute; left:0; right:0; bottom:0; padding:10px 12px 16px;
+  background:var(--p-surf); border-top:1px solid var(--p-line);
+  box-shadow:0 -6px 18px rgba(42,35,80,.07);
+}
+.divider{height:1px; background:var(--p-line); margin:9px 0}
+.hero-ic{
+  width:44px; height:44px; border-radius:999px; display:flex; align-items:center;
+  justify-content:center; font-size:20px; font-weight:800; color:#fff;
+}
+.note{
+  border-radius:11px; padding:9px 10px; font-size:10px; line-height:1.45;
+  border:1px solid transparent;
+}
+.note.warn{background:#fdf3e2; color:#8a5c10; border-color:#f2dcb4}
+.is-dark .note.warn{background:#2d2210; color:#e8be74; border-color:#4a3717}
+.note.info{background:var(--p-purbg); color:var(--p-purple)}
+.note.bad{background:var(--p-dngbg); color:var(--p-red)}
+.note.ok{background:var(--p-okbg); color:var(--p-ok)}
+.dotrow{display:flex; gap:4px; justify-content:center; margin-top:6px}
+.dotrow i{width:4px; height:4px; border-radius:999px; background:var(--p-line); display:block}
+.dotrow i.on{background:var(--p-purple); width:12px; border-radius:999px}
+.stepper{
+  display:flex; align-items:center; gap:8px; border:1px solid var(--p-line);
+  border-radius:999px; padding:3px 7px; font-weight:800; color:var(--p-ink); font-size:11px;
+}
+.stepper b{color:var(--p-purple); font-size:13px; line-height:1}
+.otp{display:flex; gap:6px; justify-content:center}
+.otp span{
+  width:31px; height:38px; border-radius:9px; border:1.5px solid var(--p-line);
+  display:flex; align-items:center; justify-content:center; font-weight:800;
+  color:var(--p-ink); font-size:15px; background:var(--p-surf);
+}
+.otp span.on{border-color:var(--p-purple)}
+.map{
+  border-radius:12px; position:relative; overflow:hidden;
+  background:
+    linear-gradient(115deg, transparent 47.6%, #cfc9dd 47.6%, #cfc9dd 48.6%, transparent 48.6%),
+    linear-gradient(28deg, transparent 61%, #cfc9dd 61%, #cfc9dd 61.8%, transparent 61.8%),
+    linear-gradient(0deg, transparent 78%, #cfc9dd 78%, #cfc9dd 78.8%, transparent 78.8%),
+    #e6e2ee;
+}
+.is-dark .map{
+  background:
+    linear-gradient(115deg, transparent 47.6%, #3a3355 47.6%, #3a3355 48.6%, transparent 48.6%),
+    linear-gradient(28deg, transparent 61%, #3a3355 61%, #3a3355 61.8%, transparent 61.8%),
+    linear-gradient(0deg, transparent 78%, #3a3355 78%, #3a3355 78.8%, transparent 78.8%),
+    #241d3a;
+}
+.map .zone{
+  position:absolute; inset:16% 14% 26% 12%; border-radius:44% 56% 48% 52%/52% 44% 56% 48%;
+  background:rgba(66,46,135,.14); border:1.5px dashed rgba(66,46,135,.5);
+}
+.map .pin{
+  position:absolute; left:50%; top:46%; width:16px; height:16px; margin:-16px 0 0 -8px;
+  background:var(--p-red); border-radius:999px 999px 999px 2px; transform:rotate(45deg);
+  box-shadow:0 4px 10px rgba(224,45,61,.45);
+}
+.logo{
+  font-weight:900; letter-spacing:-.02em; color:var(--p-purple); font-size:15px;
+}
+.logo em{color:var(--p-red); font-style:normal}
+
+/* ============================ STATE BOARD ============================ */
+.board{display:grid; grid-template-columns:repeat(auto-fill,minmax(232px,1fr)); gap:14px}
+.st{
+  border:1px solid var(--line); border-radius:14px; background:var(--panel);
+  padding:14px; display:flex; flex-direction:column; gap:9px;
+}
+.st .sk{font-family:ui-monospace,monospace; font-size:10px; color:var(--muted); letter-spacing:.02em}
+.st .sh{display:flex; align-items:center; gap:9px}
+.st .si{
+  width:30px; height:30px; border-radius:999px; flex:0 0 auto; display:flex;
+  align-items:center; justify-content:center; font-size:14px; font-weight:800; color:#fff;
+}
+.st .sn{color:var(--ink); font-weight:700; font-size:13.5px; line-height:1.25}
+.st .sa{font-size:11.5px; color:var(--muted); line-height:1.45}
+.st .flags{display:flex; gap:5px; flex-wrap:wrap; margin-top:auto; padding-top:4px}
+.f{
+  font-size:9.5px; font-weight:800; letter-spacing:.04em; padding:3px 7px;
+  border-radius:5px; background:var(--ground-2); color:var(--muted);
+}
+.f.yes{background:#e7f6ee; color:#12683a}
+.f.no{background:#fdeaec; color:#a51828}
+@media (prefers-color-scheme:dark){
+  .f.yes{background:#12301f; color:#4fd18c} .f.no{background:#331319; color:#ff8a98}
+}
+:root[data-theme="dark"] .f.yes{background:#12301f; color:#4fd18c}
+:root[data-theme="dark"] .f.no{background:#331319; color:#ff8a98}
+:root[data-theme="light"] .f.yes{background:#e7f6ee; color:#12683a}
+:root[data-theme="light"] .f.no{background:#fdeaec; color:#a51828}
+
+/* ============================ BROWSER FRAME ============================ */
+.wins{display:flex; flex-direction:column; gap:48px}
+.win{
+  --w-bg:#f4f2f9; --w-surf:#ffffff; --w-ink:#1b1529; --w-txt:#3b3450;
+  --w-mut:#7a7392; --w-line:#e6e1f0; --w-purple:#422e87; --w-red:#e02d3d;
+  --w-ok:#1f9d55; --w-okbg:#e7f6ee; --w-warnbg:#fdf3e2; --w-warn:#a06d17;
+  --w-badbg:#fdeaec; --w-purbg:#f1edfb;
+  border-radius:14px; overflow:hidden; border:1px solid var(--line);
+  box-shadow:var(--shadow); background:var(--w-surf);
+}
+.win.is-dark{
+  --w-bg:#141020; --w-surf:#1d1730; --w-ink:#f1edfb; --w-txt:#cfc8e4;
+  --w-mut:#8f87a9; --w-line:#302943; --w-purple:#9b85f0; --w-red:#ff6274;
+  --w-ok:#3ec37c; --w-okbg:#12301f; --w-warnbg:#2d2210; --w-warn:#e0a33f;
+  --w-badbg:#331319; --w-purbg:#241c40;
+}
+.wtop{
+  display:flex; align-items:center; gap:10px; padding:9px 14px;
+  background:var(--w-bg); border-bottom:1px solid var(--w-line);
+}
+.wtop .dot{width:9px; height:9px; border-radius:999px; background:var(--w-line)}
+.wtop .url{
+  flex:1; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--w-mut);
+  background:var(--w-surf); border:1px solid var(--w-line); border-radius:7px;
+  padding:4px 10px; text-align:center;
+}
+.wbody{display:flex; background:var(--w-bg); min-height:400px; color:var(--w-txt); font-size:12px}
+.wside{
+  width:186px; flex:0 0 auto; background:var(--w-surf); border-right:1px solid var(--w-line);
+  padding:12px 10px; display:flex; flex-direction:column; gap:2px;
+}
+.wside .brand{display:flex; align-items:center; gap:8px; padding:4px 8px 12px}
+.wside .brand b{font-size:13px; color:var(--w-ink); font-weight:900; letter-spacing:-.02em}
+.wnav{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:7px 10px; border-radius:9px; font-size:11px; font-weight:700; color:var(--w-txt);
+}
+.wnav.on{background:var(--w-purple); color:#fff}
+.wnav .b{
+  font-size:9px; font-weight:900; background:var(--w-red); color:#fff;
+  padding:1px 6px; border-radius:999px;
+}
+.wnav.on .b{background:#fff; color:var(--w-purple)}
+.wmain{flex:1; padding:16px 18px; min-width:0; overflow:hidden}
+.whead{display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px}
+.whead h4{margin:0; font-size:15px; color:var(--w-ink); font-weight:800; letter-spacing:-.01em}
+.whead p{margin:3px 0 0; font-size:11px; color:var(--w-mut)}
+.wctl{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+.wbtn{
+  font-size:10.5px; font-weight:800; padding:6px 11px; border-radius:9px;
+  background:var(--w-purple); color:#fff;
+}
+.wbtn.g{background:transparent; color:var(--w-txt); border:1px solid var(--w-line)}
+.live{
+  display:inline-flex; align-items:center; gap:5px; font-size:9.5px; font-weight:900;
+  background:var(--w-okbg); color:var(--w-ok); padding:3px 9px; border-radius:999px;
+}
+.live i{width:5px; height:5px; border-radius:999px; background:var(--w-ok); display:block}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px; margin-bottom:14px}
+.kpi{
+  background:var(--w-surf); border:1px solid var(--w-line); border-radius:11px; padding:11px 12px;
+}
+.kpi .k{font-size:9.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--w-mut); font-weight:800}
+.kpi .v{
+  font-size:19px; font-weight:850; color:var(--w-ink); margin-top:3px;
+  font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+}
+.kpi .d{font-size:10px; color:var(--w-ok); font-weight:700}
+.kpi .d.dn{color:var(--w-red)}
+.wcard{background:var(--w-surf); border:1px solid var(--w-line); border-radius:12px; padding:13px}
+.wgrid2{display:grid; grid-template-columns:1.55fr 1fr; gap:12px}
+.wgrid2b{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+.tbl{width:100%; border-collapse:collapse; font-size:11px}
+.tbl th{
+  text-align:left; font-size:9.5px; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--w-mut); font-weight:800; padding:0 8px 8px; border-bottom:1px solid var(--w-line);
+}
+.tbl td{padding:8px; border-bottom:1px solid var(--w-line); color:var(--w-txt)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl .num{text-align:right; font-variant-numeric:tabular-nums; font-weight:700; color:var(--w-ink)}
+.wtag{
+  display:inline-block; font-size:9px; font-weight:900; letter-spacing:.04em;
+  padding:2.5px 7px; border-radius:5px; background:var(--w-purbg); color:var(--w-purple);
+}
+.wtag.ok{background:var(--w-okbg); color:var(--w-ok)}
+.wtag.bad{background:var(--w-badbg); color:var(--w-red)}
+.wtag.warn{background:var(--w-warnbg); color:var(--w-warn)}
+.bars{display:flex; align-items:flex-end; gap:7px; height:96px; padding-top:8px}
+.bars div{flex:1; border-radius:5px 5px 2px 2px; background:var(--w-purple); opacity:.85}
+.bars div.hi{background:var(--w-red); opacity:1}
+.barx{display:flex; gap:7px; margin-top:6px}
+.barx span{flex:1; text-align:center; font-size:8.5px; color:var(--w-mut)}
+.acct{
+  display:flex; align-items:center; gap:7px; background:var(--w-warnbg); color:var(--w-warn);
+  border:1px solid color-mix(in srgb,var(--w-warn) 30%,transparent);
+  border-radius:9px; padding:7px 11px; font-size:10.5px; font-weight:700; margin-bottom:12px;
+}
+.olist{display:flex; flex-direction:column; gap:9px}
+.ocard{border:1px solid var(--w-line); border-radius:11px; padding:11px; background:var(--w-surf)}
+.sev{width:3px; border-radius:2px; align-self:stretch; background:var(--w-red); flex:0 0 auto}
+.matrix{display:grid; grid-template-columns:1.5fr repeat(4,1fr); gap:1px; background:var(--w-line); border:1px solid var(--w-line); border-radius:9px; overflow:hidden}
+.matrix > div{background:var(--w-surf); padding:7px 9px; font-size:10.5px}
+.matrix .h{font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.05em; color:var(--w-mut)}
+.sw{width:26px; height:15px; border-radius:999px; background:var(--w-purple); position:relative; display:inline-block}
+.sw::after{content:""; position:absolute; top:2px; right:2px; width:11px; height:11px; border-radius:999px; background:#fff}
+.sw.off{background:var(--w-line)}
+.sw.off::after{right:auto; left:2px}
+
+/* ============================ CLOSING ============================ */
+.decisions{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px}
+.dec{border:1px solid var(--line); border-radius:13px; padding:16px; background:var(--panel)}
+.dec .q{font-size:11.5px; color:var(--muted); margin-bottom:7px}
+.dec .a{color:var(--ink); font-weight:750; font-size:14px; letter-spacing:-.01em}
+.dec .c{font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5}
+.callout{
+  border-inline-start:3px solid var(--hot); background:var(--panel); border-radius:0 12px 12px 0;
+  padding:16px 20px; margin-top:28px;
+}
+.callout b{color:var(--ink)}
+footer{padding:40px 0 72px; color:var(--muted); font-size:12.5px}
+
+@media (max-width:760px){
+  .wgrid2,.wgrid2b{grid-template-columns:1fr}
+  .wside{display:none}
+  section{padding:52px 0}
+  .wrap{padding:0 18px}
+  .rail-in{padding:10px 18px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none !important; transition:none !important}}
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="eyebrow">Spicy Meal · سبايسي ميل — design proposal</div>
+    <h1>Every screen, <em>redrawn</em>.</h1>
+    <p class="lede">
+      A first visual pass over the whole product: 22 customer screens, the twelve-state
+      order board, and all twelve tabs of the admin dashboard. Arabic-first and right-to-left
+      throughout, with English shown where mirroring needs proving. Built against the shipped
+      feature inventory — nothing here removes a state that exists today.
+    </p>
+    <div class="meta">
+      <span class="tag"><b>22</b> customer screens</span>
+      <span class="tag"><b>12</b> confirmation states</span>
+      <span class="tag"><b>12</b> admin tabs</span>
+      <span class="tag"><b>AR</b> primary · <b>EN</b> secondary</span>
+      <span class="tag"><b>Light + dark</b></span>
+      <span class="tag">brand <b>#422e87 / #e02d3d</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="rail">
+  <div class="rail-in">
+    <a href="#system">System</a>
+    <a href="#entry">Entry &amp; login</a>
+    <a href="#order">Ordering</a>
+    <a href="#pay">Checkout &amp; payment</a>
+    <a href="#states">The 12 states</a>
+    <a href="#account">Account &amp; support</a>
+    <a href="#dark">Dark mode</a>
+    <a href="#admin">Admin dashboard</a>
+    <a href="#decisions">Decisions</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- ============================ 01 SYSTEM ============================ -->
+<section id="system">
+  <div class="wrap">
+    <div class="shead"><span class="snum">01</span><h2>The material</h2></div>
+    <p class="sintro">
+      Brand purple and hot red are fixed. Everything else is a neutral with a purple bias so
+      the two brand colours never sit on a dead grey. Status colour is always paired with an
+      icon and a label — <strong>never colour alone</strong>. Dark mode redefines the tokens
+      rather than inverting them: the red is lifted so it stays legible on a dark ground.
+    </p>
+    <div class="tokens">
+      <div class="swatch"><div class="chip" style="background:#422e87"></div><div class="lab"><b>Brand primary</b><span>#422e87</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#e02d3d"></div><div class="lab"><b>Brand secondary</b><span>#e02d3d</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#1c1630"></div><div class="lab"><b>Ink</b><span>#1c1630</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#f6f5fa"></div><div class="lab"><b>Ground</b><span>#f6f5fa</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#1f9d55"></div><div class="lab"><b>Success</b><span>#1f9d55</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#c47f17"></div><div class="lab"><b>Warning</b><span>#c47f17</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#100c1c"></div><div class="lab"><b>Dark ground</b><span>#100c1c</span></div></div>
+      <div class="swatch"><div class="chip" style="background:#9b85f0"></div><div class="lab"><b>Purple on dark</b><span>#9b85f0</span></div></div>
+    </div>
+
+    <div class="typerow">
+      <div><span class="k">display / 26·32·800</span><span class="v" style="font-size:22px;font-weight:800;letter-spacing:-.02em">أشبع رغبتك في الطعم الحار!</span></div>
+      <div><span class="k">title / 20·26·800</span><span class="v" style="font-size:18px;font-weight:800">Checkout · إتمام الطلب</span></div>
+      <div><span class="k">heading / 17·23·700</span><span class="v" style="font-size:16px;font-weight:700">Order summary · ملخص الطلب</span></div>
+      <div><span class="k">body / 15·22·500</span><span class="v" style="font-size:14px">Points are redeemed and validated by the server at checkout.</span></div>
+      <div><span class="k">label / 13·18·600</span><span class="v" style="font-size:13px;font-weight:600">الحد الأدنى للتوصيل</span></div>
+      <div><span class="k">numerals / tabular</span><span class="v" style="font-variant-numeric:tabular-nums;font-weight:800">29.00 ر.س · 149.50 SAR</span></div>
+    </div>
+    <p class="sintro" style="margin-top:20px;margin-bottom:0">
+      Arabic sets one step larger in leading than Latin at the same optical size, and every
+      layout is built with 35% more string length than the English draft needs. Numerals,
+      prices and timestamps stay left-to-right inside right-to-left text.
+    </p>
+  </div>
+</section>
+
+<!-- ============================ 02 ENTRY ============================ -->
+<section id="entry">
+  <div class="wrap">
+    <div class="shead"><span class="snum">02</span><h2>Entry &amp; login</h2></div>
+    <p class="sintro">
+      WhatsApp one-time code is the only way in — no email, no password, no social, no guest
+      checkout. When the availability check can't answer, the form still shows: locking every
+      customer out of a working app because a flag failed to load is the worse failure.
+    </p>
+    <div class="grid">
+
+      <!-- Splash -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px">
+            <div style="width:74px;height:74px;border-radius:24px;background:linear-gradient(150deg,#5a3fb0,#422e87);display:flex;align-items:center;justify-content:center;box-shadow:0 12px 30px -10px rgba(66,46,135,.6)">
+              <span style="color:#fff;font-size:30px;font-weight:900">🔥</span>
+            </div>
+            <div style="text-align:center">
+              <div class="logo" style="font-size:20px">سبايسي <em>ميل</em></div>
+              <div class="mut" style="margin-top:5px">حار، مقرمش، طازج ولقيمات ذهبية</div>
+            </div>
+            <div style="width:80px;height:3px;border-radius:9px;background:var(--p-line);overflow:hidden;margin-top:8px">
+              <div style="width:55%;height:100%;background:var(--p-purple);border-radius:9px"></div>
+            </div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Splash &amp; session gate</b><span class="route mono">/</span>
+          <p>Routes to login, to the order-type gate, or straight to the menu. The only screen allowed to show a bare spinner.</p></div>
+      </div>
+
+      <!-- Login phone -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div style="padding:22px 4px 16px;text-align:center">
+              <div class="logo" style="font-size:19px">سبايسي <em>ميل</em></div>
+              <div class="mut" style="margin-top:6px">اطلب وجباتك الحارة المفضلة في ثوانٍ.</div>
+            </div>
+            <div class="card">
+              <div class="name" style="font-size:13px;margin-bottom:3px">تسجيل الدخول عبر واتساب</div>
+              <div class="mut" style="line-height:1.5">أدخل رقم جوالك السعودي وسنرسل رمز الدخول إلى واتساب الخاص بك.</div>
+              <div class="divider"></div>
+              <div class="mut" style="margin-bottom:5px;font-weight:700">رقم الجوال</div>
+              <div class="field focus" style="display:flex;align-items:center;gap:8px;direction:ltr">
+                <span style="font-weight:800;color:var(--p-ink)">+966</span>
+                <span style="width:1px;height:14px;background:var(--p-line)"></span>
+                <span style="color:var(--p-ink);font-weight:700;letter-spacing:.06em">50 123 4567</span>
+              </div>
+              <div class="mut" style="margin-top:6px">أرقام الجوال السعودية فقط (+966).</div>
+              <div class="btn" style="margin-top:11px">إرسال رمز الدخول</div>
+            </div>
+            <div class="note info" style="margin-top:2px">🔒 لن نشارك رقمك. يُستخدم لتسجيل الدخول وتحديثات الطلب فقط.</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Login — number entry</b><span class="route mono">/(auth)/login</span>
+          <p>Saudi-only mask, inline validation, and the unavailable state as an inline notice — never a blocking wall.</p></div>
+      </div>
+
+      <!-- OTP -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">التحقق</span><span></span></div>
+            <div class="card" style="text-align:center">
+              <div style="font-size:26px">💬</div>
+              <div class="name" style="font-size:13px;margin-top:5px">أرسلنا رمز الدخول إلى واتساب</div>
+              <div class="mut" style="direction:ltr;margin-top:3px;font-weight:700">+966 50 123 4567</div>
+              <div class="divider"></div>
+              <div class="otp" dir="ltr">
+                <span>4</span><span>1</span><span>7</span><span class="on">2</span><span></span><span></span>
+              </div>
+              <div class="btn" style="margin-top:12px">تحقّق وتسجيل الدخول</div>
+              <div class="mut" style="margin-top:9px">إعادة الإرسال خلال <b style="color:var(--p-ink)">00:24</b></div>
+              <div style="color:var(--p-purple);font-weight:800;margin-top:8px;font-size:11px">تغيير الرقم</div>
+            </div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Login — code entry</b><span class="route mono">/(auth)/login</span>
+          <p>Six boxes, paste and platform autofill, live-filling focus state, resend cooldown. Invalid and expired codes tint the boxes red.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 03 ORDERING ============================ -->
+<section id="order">
+  <div class="wrap">
+    <div class="shead"><span class="snum">03</span><h2>The ordering loop</h2></div>
+    <p class="sintro">
+      Order type is a <strong>blocking gate</strong> — the menu is not usable until pickup or
+      delivery resolves to a real, open branch. Home and menu stay on one screen, with the
+      branch selector, the promos strip, search and category chips stacking above a virtualised
+      section list.
+    </p>
+    <div class="grid">
+
+      <!-- Order type pickup -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span class="ptitle">اختر نوع الطلب</span></div>
+            <div class="row" style="background:var(--p-purbg);border-radius:12px;padding:3px;margin-bottom:11px">
+              <div class="btn" style="flex:1;padding:8px;font-size:11px">استلام من الفرع</div>
+              <div style="flex:1;text-align:center;font-weight:800;color:var(--p-purple);font-size:11px;padding:8px">توصيل</div>
+            </div>
+            <div class="mut" style="margin-bottom:7px;font-weight:700">الأقرب إليك أولاً</div>
+            <div class="card" style="border-color:var(--p-purple);border-width:1.5px">
+              <div class="between"><span class="name">فرع العليا</span><span class="chip ok">● مفتوح</span></div>
+              <div class="mut" style="margin-top:3px">طريق العليا العام، الرياض</div>
+              <div class="between" style="margin-top:8px">
+                <span class="mut">1.2 كم</span>
+                <span class="mut">الحد الأدنى <b style="color:var(--p-ink)">25.00</b> ر.س</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="name">فرع النخيل</span><span class="chip ok">● مفتوح</span></div>
+              <div class="mut" style="margin-top:3px">شارع الأمير تركي، الرياض</div>
+              <div class="between" style="margin-top:8px"><span class="mut">3.8 كم</span><span class="mut">الحد الأدنى <b style="color:var(--p-ink)">25.00</b> ر.س</span></div>
+            </div>
+            <div class="card" style="opacity:.55">
+              <div class="between"><span class="name">فرع الملقا</span><span class="chip bad">● مغلق</span></div>
+              <div class="mut" style="margin-top:3px">طريق الملك عبدالعزيز</div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn">متابعة</div></div>
+        </div></div>
+        <div class="cap"><b>Order type — pickup</b><span class="route mono">/select</span>
+          <p>Nearest-first when location is granted. Closed branches stay visible but unselectable, so the customer learns the branch exists.</p></div>
+      </div>
+
+      <!-- Order type delivery -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span class="ptitle">اختر عنوان التوصيل</span></div>
+            <div class="row" style="background:var(--p-purbg);border-radius:12px;padding:3px;margin-bottom:11px">
+              <div style="flex:1;text-align:center;font-weight:800;color:var(--p-purple);font-size:11px;padding:8px">استلام من الفرع</div>
+              <div class="btn" style="flex:1;padding:8px;font-size:11px">توصيل</div>
+            </div>
+            <div class="map" style="height:158px">
+              <div class="zone"></div><div class="pin"></div>
+              <div style="position:absolute;inset-inline-start:8px;top:8px" class="chip on">📍 استخدم موقعي</div>
+              <div style="position:absolute;inset-inline:8px;bottom:8px;background:var(--p-surf);border-radius:9px;padding:6px 9px;font-size:9.5px;font-weight:700;color:var(--p-ink);text-align:center">حرّك الدبوس إلى موقعك بالضبط</div>
+            </div>
+            <div class="card" style="margin-top:10px">
+              <div class="mut" style="font-weight:700;margin-bottom:5px">وصف الموقع / معلم قريب <span style="color:var(--p-red)">*</span></div>
+              <div class="field">مثال: بقالة السلام، بجانب المسجد</div>
+            </div>
+            <div class="note ok">✓ ضمن نطاق التوصيل — التوصيل من <b>فرع العليا</b> · 2.4 كم</div>
+          </div>
+          <div class="sticky"><div class="btn">تأكيد الموقع</div></div>
+        </div></div>
+        <div class="cap"><b>Order type — delivery</b><span class="route mono">/select</span>
+          <p>Pin picker, mandatory landmark, zone resolution. Out-of-zone swaps the green notice for a plain explanation and offers pickup instead.</p></div>
+      </div>
+
+      <!-- Home AR -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="between" style="padding:6px 2px 9px">
+              <span class="logo">سبايسي <em>ميل</em></span>
+              <span class="chip">EN</span>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between">
+                <div>
+                  <div class="mut" style="font-size:9px;font-weight:800">التوصيل من</div>
+                  <div class="name">فرع العليا</div>
+                </div>
+                <div class="row" style="gap:6px"><span class="chip ok">● مفتوح</span><span class="chip">تغيير</span></div>
+              </div>
+            </div>
+            <div style="height:62px;border-radius:12px;background:linear-gradient(105deg,#422e87,#6a4bc4 55%,#e02d3d);display:flex;align-items:center;padding:0 13px;color:#fff;margin-bottom:6px">
+              <div>
+                <div style="font-weight:900;font-size:13px">وجبة العائلة</div>
+                <div style="font-size:9.5px;opacity:.9">خصم 20٪ حتى نهاية الأسبوع</div>
+              </div>
+            </div>
+            <div class="dotrow" style="margin-bottom:9px"><i class="on"></i><i></i><i></i></div>
+            <div class="field" style="display:flex;align-items:center;gap:7px;margin-bottom:10px">🔍 <span>ابحث عن برجر، مقبلات…</span></div>
+            <div class="row" style="gap:6px;margin-bottom:10px">
+              <span class="chip on">الكل</span><span class="chip">برجر</span><span class="chip">دجاج</span><span class="chip">مقبلات</span>
+            </div>
+            <div class="name" style="margin-bottom:7px;font-size:12.5px">برجر</div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">فولكانو دجاج مقرمش</div>
+                  <div class="mut">دجاج مقرمش حار جدًا · 710 سعرة</div>
+                  <div class="between" style="margin-top:6px">
+                    <span class="price">29.00<span class="rial">ر.س</span></span>
+                    <span class="chip on">تخصيص وإضافة</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img b" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">دبل تشيز برجر</div>
+                  <div class="mut">قطعتان لحم · 840 سعرة</div>
+                  <div class="between" style="margin-top:6px">
+                    <span class="price">34.00<span class="rial">ر.س</span></span>
+                    <span class="chip on">+ إضافة</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sticky" style="padding-bottom:10px">
+            <div class="btn" style="display:flex;justify-content:space-between;padding:11px 13px">
+              <span>عرض السلة · 3 عناصر</span><span>92.00 ر.س</span>
+            </div>
+          </div>
+          <div class="tabbar">
+            <div class="on"><span></span>الرئيسية</div><div><span></span>طلباتي</div><div><span></span>حسابي</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Home &amp; menu — Arabic</b><span class="route mono">/(tabs)/index</span>
+          <p>Branch bar, promos carousel, search, scroll-spy category chips, virtualised sections, sticky cart bar above the safe area.</p></div>
+      </div>
+
+      <!-- Home EN -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="ltr">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="between" style="padding:6px 2px 9px">
+              <span class="logo">SPICY <em>MEAL</em></span>
+              <span class="chip">ع</span>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between">
+                <div>
+                  <div class="mut" style="font-size:9px;font-weight:800">DELIVERED FROM</div>
+                  <div class="name">Olaya Branch</div>
+                </div>
+                <div class="row" style="gap:6px"><span class="chip ok">● Open</span><span class="chip">Change</span></div>
+              </div>
+            </div>
+            <div style="height:62px;border-radius:12px;background:linear-gradient(255deg,#422e87,#6a4bc4 55%,#e02d3d);display:flex;align-items:center;padding:0 13px;color:#fff;margin-bottom:6px">
+              <div>
+                <div style="font-weight:900;font-size:13px">Family Feast</div>
+                <div style="font-size:9.5px;opacity:.9">20% off through the weekend</div>
+              </div>
+            </div>
+            <div class="dotrow" style="margin-bottom:9px"><i class="on"></i><i></i><i></i></div>
+            <div class="field" style="display:flex;align-items:center;gap:7px;margin-bottom:10px">🔍 <span>Search burgers, sides…</span></div>
+            <div class="row" style="gap:6px;margin-bottom:10px">
+              <span class="chip on">All</span><span class="chip">Burgers</span><span class="chip">Chicken</span><span class="chip">Sides</span>
+            </div>
+            <div class="name" style="margin-bottom:7px;font-size:12.5px">Burgers</div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">Spicy Volcano Chicken</div>
+                  <div class="mut">Hand-breaded, very spicy · 710 kcal</div>
+                  <div class="between" style="margin-top:6px">
+                    <span class="price">29.00<span class="rial">SAR</span></span>
+                    <span class="chip on">Customize &amp; Add</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img b" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">Double Cheese Burger</div>
+                  <div class="mut">Two beef patties · 840 kcal</div>
+                  <div class="between" style="margin-top:6px">
+                    <span class="price">34.00<span class="rial">SAR</span></span>
+                    <span class="chip on">+ Add</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sticky" style="padding-bottom:10px">
+            <div class="btn" style="display:flex;justify-content:space-between;padding:11px 13px">
+              <span>View cart · 3 items</span><span>92.00 SAR</span>
+            </div>
+          </div>
+          <div class="tabbar"><div class="on"><span></span>Home</div><div><span></span>Orders</div><div><span></span>Profile</div></div>
+        </div></div>
+        <div class="cap"><b>Home &amp; menu — English</b><span class="route mono">/(tabs)/index</span>
+          <p>The same screen mirrored: tab order, chevrons, the banner's gradient direction and every icon-to-text gap flip with the direction.</p></div>
+      </div>
+
+      <!-- Product -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body flush">
+            <div class="img" style="height:150px;border-radius:0;position:relative">
+              <span class="chip" style="position:absolute;top:10px;inset-inline-start:10px;background:rgba(255,255,255,.92)">→ رجوع</span>
+            </div>
+            <div style="padding:11px 12px 0">
+              <div class="between"><span class="ptitle" style="font-size:14px">فولكانو دجاج مقرمش</span><span class="price" style="font-size:14px">29.00<span class="rial">ر.س</span></span></div>
+              <div class="mut" style="margin-top:3px">دجاج مقرمش حار جدًا بتتبيلة سبايسي ميل · 710 سعرة</div>
+              <div class="divider"></div>
+              <div class="between" style="margin-bottom:7px">
+                <span class="name">اختر الحجم</span><span class="chip bad">إجباري</span>
+              </div>
+              <div class="card" style="padding:9px;margin-bottom:6px;border-color:var(--p-purple)">
+                <div class="between"><span class="name" style="font-weight:600">عادي</span><span class="row" style="gap:6px"><span class="mut">+0.00</span><span style="color:var(--p-purple);font-weight:900">◉</span></span></div>
+              </div>
+              <div class="card" style="padding:9px;margin-bottom:6px">
+                <div class="between"><span class="name" style="font-weight:600">كبير</span><span class="row" style="gap:6px"><span class="mut">+6.00</span><span style="color:var(--p-line);font-weight:900">◯</span></span></div>
+              </div>
+              <div class="between" style="margin:9px 0 7px">
+                <span class="name">إضافات</span><span class="chip">اختياري · حتى 3</span>
+              </div>
+              <div class="card" style="padding:9px;margin-bottom:6px">
+                <div class="between"><span class="name" style="font-weight:600">جبن إضافي</span><span class="row" style="gap:6px"><span class="mut">+4.00</span><span style="color:var(--p-purple);font-weight:900">☑</span></span></div>
+              </div>
+              <div class="card" style="padding:9px"><div class="between"><span class="name" style="font-weight:600">صوص حار إضافي</span><span class="row" style="gap:6px"><span class="mut">+2.00</span><span style="color:var(--p-line);font-weight:900">☐</span></span></div></div>
+            </div>
+          </div>
+          <div class="sticky">
+            <div class="between" style="margin-bottom:8px">
+              <span class="mut" style="font-weight:700">الكمية</span>
+              <span class="stepper"><b>−</b> 2 <b>+</b></span>
+            </div>
+            <div class="btn" style="display:flex;justify-content:space-between;padding:11px 13px"><span>إضافة للسلة</span><span>66.00 ر.س</span></div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Product detail</b><span class="route mono">/product/[id]</span>
+          <p>Single-select groups as radios, multi-select bounded by max, required badges gating the sticky add bar. Price recomputes live.</p></div>
+      </div>
+
+      <!-- Cart -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">سلتي</span><span class="mut">3 عناصر</span></div>
+            <div class="card">
+              <div class="row" style="align-items:flex-start">
+                <div class="img" style="width:46px;height:46px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="between"><span class="name">فولكانو دجاج مقرمش</span><span class="price">66.00</span></div>
+                  <div class="mut" style="margin-top:2px">كبير · جبن إضافي</div>
+                  <div class="between" style="margin-top:7px">
+                    <span class="stepper"><b>−</b> 2 <b>+</b></span>
+                    <span class="mut" style="color:var(--p-red);font-weight:700">حذف</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row" style="align-items:flex-start">
+                <div class="img c" style="width:46px;height:46px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="between"><span class="name">بطاطس مقلية مقرمشة</span><span class="price">12.00</span></div>
+                  <div class="mut" style="margin-top:2px">وسط</div>
+                  <div class="between" style="margin-top:7px">
+                    <span class="stepper"><b>−</b> 1 <b>+</b></span>
+                    <span class="mut" style="color:var(--p-red);font-weight:700">حذف</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="mut">المجموع الفرعي</span><span class="price">78.00<span class="rial">ر.س</span></span></div>
+              <div class="mut" style="margin-top:5px;line-height:1.45">تُحتسب الرسوم والخصومات النهائية عند إتمام الطلب.</div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn" style="display:flex;justify-content:space-between;padding:11px 13px"><span>إتمام الطلب</span><span>78.00 ر.س</span></div></div>
+        </div></div>
+        <div class="cap"><b>Cart</b><span class="route mono">/cart</span>
+          <p>Modifier summary per line. A decrement at quantity 1 opens a confirm dialog — a fast double-tap can never silently drop a line.</p></div>
+      </div>
+
+      <!-- Offers NEW -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">العروض</span><span></span></div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="height:58px;background:linear-gradient(105deg,#422e87,#e02d3d)"></div>
+              <div style="padding:10px 11px">
+                <div class="between"><span class="name">خصم 20٪ على الوجبات العائلية</span><span class="chip on">20٪</span></div>
+                <div class="mut" style="margin-top:4px">يُطبَّق تلقائيًا · الحد الأدنى 80.00 ر.س</div>
+                <div class="mut" style="margin-top:6px">ينتهي 15 أغسطس · حد أقصى للخصم 30.00 ر.س</div>
+              </div>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden">
+              <div style="height:58px;background:linear-gradient(105deg,#1f9d55,#6a4bc4)"></div>
+              <div style="padding:10px 11px">
+                <div class="between"><span class="name">توصيل مجاني</span><span class="chip ok">مجاني</span></div>
+                <div class="mut" style="margin-top:4px">يُطبَّق تلقائيًا على طلبات التوصيل · فرع العليا</div>
+                <div class="mut" style="margin-top:6px">ينتهي بعد 3 أيام</div>
+              </div>
+            </div>
+            <div class="note info">تُطبَّق العروض تلقائيًا عند إتمام الطلب. رموز الخصم الخاصة تُدخل في خانة رمز الخصم.</div>
+          </div>
+          <div class="tabbar"><div class="on"><span></span>الرئيسية</div><div><span></span>طلباتي</div><div><span></span>حسابي</div></div>
+        </div></div>
+        <div class="cap"><b>Offers &amp; campaigns<span class="new">NEW</span></b><span class="route mono">campaigns</span>
+          <p>Only codeless, auto-applied campaigns are ever listed — coded ones stay secret. With no live campaign the whole surface collapses to nothing.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 04 CHECKOUT ============================ -->
+<section id="pay">
+  <div class="wrap">
+    <div class="shead"><span class="snum">04</span><h2>Checkout &amp; payment</h2></div>
+    <p class="sintro">
+      Every number on the checkout screen is a <strong>preview</strong>; the server recomputes
+      subtotal, fees, coupon, campaign, loyalty and VAT and is the only authority. The footer
+      shows exactly one blocking reason at a time — eight of them exist, from a closed branch
+      to a missing address description.
+    </p>
+    <div class="grid">
+
+      <!-- Checkout -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">إتمام الطلب</span><span></span></div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between"><span class="mut" style="font-weight:700">نوع الطلب</span><span class="chip on">توصيل</span></div>
+              <div class="divider"></div>
+              <div class="between"><span><span class="mut" style="font-weight:700">موقع التوصيل</span><div class="name" style="margin-top:2px">المنزل · بجانب بقالة السلام</div></span><span class="chip">تغيير</span></div>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="mut" style="font-weight:700;margin-bottom:7px">طريقة الدفع</div>
+              <div class="row" style="gap:6px">
+                <div class="btn" style="flex:1;padding:8px;font-size:10.5px">الدفع الإلكتروني</div>
+                <div style="flex:1;text-align:center;padding:8px;font-size:10.5px;font-weight:800;color:var(--p-mut);border:1.5px solid var(--p-line);border-radius:12px">نقداً عند التوصيل</div>
+              </div>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="row" style="gap:6px">
+                <div class="field" style="flex:1">رمز الخصم</div><div class="chip on" style="padding:8px 12px">تطبيق</div>
+              </div>
+              <div class="note ok" style="margin-top:7px">✓ تم تطبيق الخصم!</div>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between"><span><span class="name">استبدال نقاط الولاء</span><div class="mut" style="margin-top:2px">240 نقطة متاحة</div></span><span class="sw" style="background:var(--p-purple);width:30px;height:17px;border-radius:999px;position:relative;display:inline-block"><span style="position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:999px;background:#fff;display:block"></span></span></div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="between" style="margin-bottom:5px"><span class="mut">المجموع الفرعي</span><span class="price">78.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">رسوم التوصيل</span><span class="price">10.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="color:var(--p-ok)">خصم الحملة (20٪)</span><span class="price" style="color:var(--p-ok)">−15.60</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="color:var(--p-ok)">خصم الولاء</span><span class="price" style="color:var(--p-ok)">−5.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="font-size:9.5px">ضريبة القيمة المضافة (١٥٪ شاملة)</span><span class="mut">8.79</span></div>
+              <div class="divider"></div>
+              <div class="between"><span class="name" style="font-size:13px">الإجمالي</span><span class="price" style="font-size:15px">67.40<span class="rial">ر.س</span></span></div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn" style="padding:12px">تأكيد وإرسال الطلب</div></div>
+        </div></div>
+        <div class="cap"><b>Checkout</b><span class="route mono">/checkout</span>
+          <p>Campaign discount is its own line, distinct from coupon and loyalty. The VAT row is informational and never added to the total.</p></div>
+      </div>
+
+      <!-- Checkout blocked -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">إتمام الطلب</span><span></span></div>
+            <div class="note warn" style="margin-bottom:9px">⚠︎ أقل من الحد الأدنى للفرع للتوصيل — أضف <b>7.00 ر.س</b> للمتابعة.</div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between"><span class="mut" style="font-weight:700">نوع الطلب</span><span class="chip on">توصيل</span></div>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="mut" style="font-weight:700;margin-bottom:7px">طريقة الدفع</div>
+              <div class="note bad">الدفع الإلكتروني غير متاح حالياً. يمكنك الدفع نقداً عند التوصيل.</div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="between" style="margin-bottom:5px"><span class="mut">المجموع الفرعي</span><span class="price">18.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">رسوم التوصيل</span><span class="price">10.00</span></div>
+              <div class="divider"></div>
+              <div class="between"><span class="name" style="font-size:13px">الإجمالي</span><span class="price" style="font-size:15px">28.00<span class="rial">ر.س</span></span></div>
+            </div>
+            <div class="note info" style="margin-top:2px">الحد الأدنى للتوصيل من فرع العليا هو <b>25.00 ر.س</b> قبل الرسوم.</div>
+          </div>
+          <div class="sticky">
+            <div class="mut" style="text-align:center;margin-bottom:7px;font-weight:700;color:var(--p-warn)">أقل من الحد الأدنى للتوصيل</div>
+            <div class="btn off" style="padding:12px">تأكيد وإرسال الطلب</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Checkout — blocked</b><span class="route mono">/checkout</span>
+          <p>One blocking reason at a time, stated in the footer and echoed at the top. Shown here: below minimum, with online payment disabled by an admin.</p></div>
+      </div>
+
+      <!-- Payment webview -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span class="ptitle">الدفع الآمن</span><span class="mut">إغلاق ✕</span></div>
+            <div class="note ok" style="margin-bottom:10px">🔒 اتصال مشفّر — تتم معالجة الدفع لدى مزوّد الدفع مباشرة.</div>
+            <div class="card" style="padding:13px">
+              <div class="mut" style="text-align:center;margin-bottom:11px">إجمالي المبلغ</div>
+              <div class="price" style="text-align:center;font-size:22px">67.40<span class="rial" style="font-size:11px">ر.س</span></div>
+              <div class="divider"></div>
+              <div class="mut" style="font-weight:700;margin-bottom:5px">رقم البطاقة</div>
+              <div class="field" style="margin-bottom:8px;direction:ltr">•••• •••• •••• 4242</div>
+              <div class="row" style="gap:7px">
+                <div style="flex:1"><div class="mut" style="font-weight:700;margin-bottom:5px">الانتهاء</div><div class="field" style="direction:ltr">05/29</div></div>
+                <div style="flex:1"><div class="mut" style="font-weight:700;margin-bottom:5px">CVV</div><div class="field" style="direction:ltr">•••</div></div>
+              </div>
+              <div class="btn" style="margin-top:11px">ادفع 67.40 ر.س</div>
+            </div>
+            <div class="mut" style="text-align:center">صفحة الدفع مستضافة لدى المزوّد داخل التطبيق</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Secure payment<span class="drk">FROZEN</span></b><span class="route mono">/payment/checkout</span>
+          <p>Restyle only. The provider's hosted page renders inside the frame; our chrome conveys security without impersonating their brand.</p></div>
+      </div>
+
+      <!-- Verifying -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:13px;padding:0 26px">
+            <div class="hero-ic" style="background:var(--p-purple)">↻</div>
+            <div>
+              <div class="ptitle" style="font-size:15px">جارٍ التحقق من الدفع…</div>
+              <div class="mut" style="margin-top:6px;line-height:1.55">نتحقق من عملية الدفع مع المزوّد. لا تغلق التطبيق.</div>
+            </div>
+            <div style="width:100px;height:3px;border-radius:9px;background:var(--p-line);overflow:hidden">
+              <div style="width:62%;height:100%;background:var(--p-purple)"></div>
+            </div>
+            <div class="note info" style="margin-top:6px;text-align:start">لا نعتمد على نتيجة الصفحة — الخادم هو من يؤكد الدفع.</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Payment return<span class="drk">FROZEN</span></b><span class="route mono">/payment/return</span>
+          <p>Verification is a visible step, never an instant success. Seven outcomes follow: paid, declined, cancelled, expired, pending, unconfirmable, failed.</p></div>
+      </div>
+
+      <!-- Receipt confirmed -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="card" style="text-align:center;padding:16px 12px;margin-top:12px;border-color:var(--p-ok)">
+              <div class="hero-ic" style="background:var(--p-ok);margin:0 auto">✓</div>
+              <div class="ptitle" style="margin-top:9px;font-size:15px">تم تأكيد الطلب</div>
+              <div class="mut" style="margin-top:4px">قام الفرع بتأكيد طلبك.</div>
+              <div class="divider"></div>
+              <div class="mut" style="font-weight:700">رقم الطلب لدى الفرع</div>
+              <div class="price" style="font-size:24px;margin-top:2px">#5</div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="between"><span class="mut">الدفع</span><span class="chip ok">مدفوع</span></div>
+              <div class="between" style="margin-top:7px"><span class="mut">الفرع</span><span class="name">فرع العليا</span></div>
+              <div class="between" style="margin-top:7px"><span class="mut">التاريخ</span><span class="name" style="font-variant-numeric:tabular-nums">2026-07-29 21:14</span></div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="name" style="margin-bottom:8px">ملخص الطلب</div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">2× فولكانو دجاج مقرمش</span><span class="price">66.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">1× بطاطس مقرمشة</span><span class="price">12.00</span></div>
+              <div class="divider"></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">رسوم التوصيل</span><span class="price">10.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="color:var(--p-ok)">الخصومات</span><span class="price" style="color:var(--p-ok)">−20.60</span></div>
+              <div class="between"><span class="name">الإجمالي</span><span class="price" style="font-size:14px">67.40<span class="rial">ر.س</span></span></div>
+            </div>
+          </div>
+          <div class="sticky" style="display:flex;gap:8px">
+            <div class="btn ghost" style="flex:1;padding:10px">طلباتي</div>
+            <div class="btn" style="flex:1;padding:10px">القائمة</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Receipt — confirmed by branch</b><span class="route mono">/receipt/[id]</span>
+          <p>The one state that earns a green check. The number shown is the <em>branch's</em> — the internal SM-… id never reaches a customer device.</p></div>
+      </div>
+
+      <!-- Orders -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span class="ptitle">طلباتي</span></div>
+            <div class="card">
+              <div class="between"><span class="row" style="gap:6px"><span class="chip warn">قيد التحضير</span></span><span class="mut" style="font-variant-numeric:tabular-nums">اليوم 21:14</span></div>
+              <div class="between" style="margin-top:8px"><span class="name">فرع العليا · توصيل</span><span class="price">67.40<span class="rial">ر.س</span></span></div>
+              <div class="mut" style="margin-top:4px">رقم الفرع #5 · 3 عناصر</div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="chip">جارٍ التحقق مع الفرع</span><span class="mut" style="font-variant-numeric:tabular-nums">أمس 19:02</span></div>
+              <div class="between" style="margin-top:8px"><span class="name">فرع النخيل · استلام</span><span class="price">42.00<span class="rial">ر.س</span></span></div>
+              <div class="mut" style="margin-top:4px">رقم الفرع لم يصدر بعد · عنصران</div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="chip ok">تم التوصيل</span><span class="mut" style="font-variant-numeric:tabular-nums">2026-07-24</span></div>
+              <div class="between" style="margin-top:8px"><span class="name">فرع العليا · توصيل</span><span class="price">88.00<span class="rial">ر.س</span></span></div>
+              <div class="mut" style="margin-top:4px">رقم الفرع #22 · 4 عناصر</div>
+            </div>
+            <div class="mut" style="text-align:center;margin-top:6px">اسحب للأسفل للتحديث</div>
+          </div>
+          <div class="tabbar"><div><span></span>الرئيسية</div><div class="on"><span></span>طلباتي</div><div><span></span>حسابي</div></div>
+        </div></div>
+        <div class="cap"><b>My orders</b><span class="route mono">/(tabs)/orders</span>
+          <p>Status pill plus the confirmation tone. Unpaid online orders are hidden — a checkout in progress is not an order yet.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 05 STATE BOARD ============================ -->
+<section id="states">
+  <div class="wrap">
+    <div class="shead"><span class="snum">05</span><h2>The twelve-state board</h2></div>
+    <p class="sintro">
+      Two facts are tracked separately and never merged: whether the customer <strong>paid</strong>,
+      and whether the order actually <strong>reached the restaurant</strong>. Exactly one state
+      renders a success check. Two are deliberately neutral. One is ambiguous and offers no
+      retry, because the branch may already be cooking.
+    </p>
+    <div class="board">
+
+      <div class="st"><span class="sk">payment_pending</span>
+        <div class="sh"><span class="si" style="background:#6b6580">◔</span><span class="sn">لم يكتمل الدفع<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Payment not completed</span></span></div>
+        <p class="sa">Payment not received. The order has not been sent to the branch.</p>
+        <div class="flags"><span class="f no">no check</span><span class="f no">no resend</span><span class="f no">no number</span></div>
+      </div>
+
+      <div class="st"><span class="sk">accepted_no_pos_channel</span>
+        <div class="sh"><span class="si" style="background:#422e87">◷</span><span class="sn">تم استلام الدفع<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Payment received</span></span></div>
+        <p class="sa">Neutral by design. Payment settled, but no branch has seen this order — so nothing may imply acceptance.</p>
+        <div class="flags"><span class="f no">no check</span><span class="f no">no resend</span><span class="f">neutral tone</span></div>
+      </div>
+
+      <div class="st"><span class="sk">accepted_no_pos_channel_unpaid</span>
+        <div class="sh"><span class="si" style="background:#422e87">◷</span><span class="sn">تم استلام الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Order received</span></span></div>
+        <p class="sa">The cash twin of the state above. Saying "payment received" to an unpaid customer would be false — hence two states.</p>
+        <div class="flags"><span class="f no">no check</span><span class="f">cash</span></div>
+      </div>
+
+      <div class="st"><span class="sk">sending_to_branch</span>
+        <div class="sh"><span class="si" style="background:#422e87">↻</span><span class="sn">جارٍ الإرسال إلى الفرع…<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Sending to the branch</span></span></div>
+        <p class="sa">In flight, or an automatic retry is queued. Copy asks the customer to stay on the screen.</p>
+        <div class="flags"><span class="f no">no check</span><span class="f">animated</span></div>
+      </div>
+
+      <div class="st" style="border-color:#1f9d55"><span class="sk">confirmed_by_branch</span>
+        <div class="sh"><span class="si" style="background:#1f9d55">✓</span><span class="sn">تم تأكيد الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Order confirmed</span></span></div>
+        <p class="sa">The branch accepted it and returned a usable reference. The only success treatment in the entire product.</p>
+        <div class="flags"><span class="f yes">success check</span><span class="f yes">branch number</span></div>
+      </div>
+
+      <div class="st"><span class="sk">verifying_with_branch</span>
+        <div class="sh"><span class="si" style="background:#c47f17">?</span><span class="sn">جارٍ التحقق مع الفرع<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Checking with the branch</span></span></div>
+        <p class="sa">Ambiguous — a ticket may already exist. No retry button, and the copy tells the customer not to re-order.</p>
+        <div class="flags"><span class="f no">no resend</span><span class="f">staff follow-up</span></div>
+      </div>
+
+      <div class="st"><span class="sk">branch_failed_retry_available</span>
+        <div class="sh"><span class="si" style="background:#e02d3d">↺</span><span class="sn">لم يُرسل الطلب بعد<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Order not sent yet — paid</span></span></div>
+        <p class="sa">Payment succeeded, provably never sent. Offers a resend — never a duplicate ticket.</p>
+        <div class="flags"><span class="f yes">resend</span><span class="f no">no budget shown</span></div>
+      </div>
+
+      <div class="st"><span class="sk">unpaid_branch_failed_retry_available</span>
+        <div class="sh"><span class="si" style="background:#e02d3d">↺</span><span class="sn">لم يُرسل الطلب بعد<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Order not sent yet — cash</span></span></div>
+        <p class="sa">The cash equivalent. Same resend affordance, no payment language.</p>
+        <div class="flags"><span class="f yes">resend</span><span class="f">cash</span></div>
+      </div>
+
+      <div class="st"><span class="sk">final_failure_refund_pending</span>
+        <div class="sh"><span class="si" style="background:#e02d3d">✕</span><span class="sn">لم يتم إنشاء الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Refund automatic</span></span></div>
+        <p class="sa">Ordering service unavailable. The refund is stated as in progress, not as done.</p>
+        <div class="flags"><span class="f">refund row</span><span class="f no">no resend</span></div>
+      </div>
+
+      <div class="st"><span class="sk">final_failure_refunded</span>
+        <div class="sh"><span class="si" style="background:#6b6580">✕</span><span class="sn">لم يتم إنشاء الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Refunded</span></span></div>
+        <p class="sa">Refund confirmed by the provider — only then does the copy say "refunded".</p>
+        <div class="flags"><span class="f">refund row</span></div>
+      </div>
+
+      <div class="st"><span class="sk">final_failure_refund_failed</span>
+        <div class="sh"><span class="si" style="background:#c47f17">!</span><span class="sn">لم يتم إنشاء الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Refund in progress</span></span></div>
+        <p class="sa">The refund could not complete automatically. Promises contact, not completion.</p>
+        <div class="flags"><span class="f">manual review</span></div>
+      </div>
+
+      <div class="st"><span class="sk">unpaid_final_failure</span>
+        <div class="sh"><span class="si" style="background:#6b6580">✕</span><span class="sn">لم يتم إنشاء الطلب<br><span style="font-weight:500;font-size:11.5px;color:var(--muted)">Not charged</span></span></div>
+        <p class="sa">Cash order that never reached the branch. No refund language at all — nothing was taken.</p>
+        <div class="flags"><span class="f">cash</span><span class="f no">no refund copy</span></div>
+      </div>
+
+    </div>
+    <div class="callout">
+      <b>Why this matters.</b> The screen this replaces rendered an unconditional
+      “Order placed!” hero with a banner underneath that could simultaneously read
+      “Not confirmed”. Both appeared at once, on a real customer's phone. The board above
+      makes that contradiction structurally impossible — hero and message come from one state.
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 06 ACCOUNT ============================ -->
+<section id="account">
+  <div class="wrap">
+    <div class="shead"><span class="snum">06</span><h2>Account, addresses &amp; support</h2></div>
+    <p class="sintro">
+      Address management becomes its own screen. Notification preferences stay visible even
+      though the push stack is dormant — designed, shipped, inert. Account deletion keeps all
+      eleven disclosure bullets and its neutral, legally careful register.
+    </p>
+    <div class="grid">
+
+      <!-- Profile -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span class="ptitle">حسابي</span></div>
+            <div class="card">
+              <div class="row">
+                <div style="width:42px;height:42px;border-radius:999px;background:var(--p-purple);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:17px">م</div>
+                <div style="flex:1">
+                  <div class="name" style="font-size:13px">محمد العلي</div>
+                  <div class="row" style="gap:5px;margin-top:3px;direction:ltr;justify-content:flex-end"><span class="chip ok">موثّق</span><span class="mut">+966 50 123 4567</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="background:linear-gradient(105deg,#422e87,#6a4bc4);border:0">
+              <div class="between">
+                <span style="color:#fff"><span style="font-size:9.5px;opacity:.85;font-weight:800">نقاط الولاء</span><div style="font-weight:900;font-size:19px;margin-top:1px">240</div></span>
+                <span style="font-size:24px">🏅</span>
+              </div>
+            </div>
+            <div class="card" style="padding:0">
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600">عناويني</span><span class="mut">3 ›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600">الإشعارات</span><span class="mut">›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600">اللغة</span><span class="mut">العربية ›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600">المستندات والدعم</span><span class="mut">›</span></div>
+            </div>
+            <div class="card" style="padding:0">
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600;color:var(--p-red)">حذف الحساب</span><span class="mut">›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:10px 11px"><span class="name" style="font-weight:600">تسجيل الخروج</span><span class="mut">›</span></div>
+            </div>
+          </div>
+          <div class="tabbar"><div><span></span>الرئيسية</div><div><span></span>طلباتي</div><div class="on"><span></span>حسابي</div></div>
+        </div></div>
+        <div class="cap"><b>Profile</b><span class="route mono">/(tabs)/profile</span>
+          <p>Identity, verified badge, loyalty balance, and the entry points to addresses, notifications, language, legal and deletion.</p></div>
+      </div>
+
+      <!-- Addresses NEW -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">عناويني</span><span></span></div>
+            <div class="card" style="border-color:var(--p-purple)">
+              <div class="between"><span class="row" style="gap:6px"><span class="name">المنزل</span><span class="chip on">افتراضي</span></span><span class="mut">⋯</span></div>
+              <div class="mut" style="margin-top:4px">بجانب بقالة السلام، حي الورود</div>
+              <div class="row" style="gap:8px;margin-top:8px">
+                <span class="mut" style="font-family:ui-monospace,monospace">RRBB1234</span>
+                <span class="chip ok">ضمن النطاق</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="name">العمل</span><span class="mut">⋯</span></div>
+              <div class="mut" style="margin-top:4px">برج المملكة، الدور 12</div>
+              <div class="row" style="gap:8px;margin-top:8px">
+                <span class="mut" style="font-family:ui-monospace,monospace">RRBA5521</span>
+                <span class="chip ok">ضمن النطاق</span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="between"><span class="name">بيت أمي</span><span class="mut">⋯</span></div>
+              <div class="mut" style="margin-top:4px">الدرعية، بجانب الحديقة</div>
+              <div class="row" style="gap:8px;margin-top:8px">
+                <span class="chip bad">خارج نطاق التوصيل</span>
+              </div>
+            </div>
+            <div class="note info">اضغط ⋯ لإعادة التسمية، أو التعيين كافتراضي، أو الحذف.</div>
+          </div>
+          <div class="sticky"><div class="btn">+ إضافة عنوان جديد</div></div>
+        </div></div>
+        <div class="cap"><b>Addresses<span class="new">NEW</span></b><span class="route mono">/account/addresses</span>
+          <p>Full CRUD: rename, edit pin and landmark, set default, delete with confirmation. Out-of-zone addresses are flagged before checkout, not during it.</p></div>
+      </div>
+
+      <!-- Notifications -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">الإشعارات</span><span></span></div>
+            <div class="mut" style="margin-bottom:10px;line-height:1.5">اختر ما يمكننا إشعارك به على هذا الجهاز.</div>
+            <div class="card">
+              <div class="between">
+                <span style="flex:1"><span class="name">تحديثات الطلب</span><div class="mut" style="margin-top:3px;line-height:1.45">حالة طلباتك (قيد التحضير، جاهز، تم التوصيل…)</div></span>
+                <span style="width:30px;height:17px;border-radius:999px;background:var(--p-purple);position:relative;display:inline-block;flex:0 0 auto"><span style="position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:999px;background:#fff;display:block"></span></span>
+              </div>
+            </div>
+            <div class="card">
+              <div class="between">
+                <span style="flex:1"><span class="name">العروض والترويجات</span><div class="mut" style="margin-top:3px;line-height:1.45">عروض من حين لآخر — فقط إذا اشتركت.</div></span>
+                <span style="width:30px;height:17px;border-radius:999px;background:var(--p-line);position:relative;display:inline-block;flex:0 0 auto"><span style="position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:999px;background:#fff;display:block"></span></span>
+              </div>
+            </div>
+            <div class="note warn">الإشعارات محظورة لهذا التطبيق. فعّلها من إعدادات جهازك ثم حاول مرة أخرى.</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Notifications<span class="drk">DORMANT</span></b><span class="route mono">profile → notifications</span>
+          <p>Order updates on by default, promotions opt-in. Permission is requested only on first enable — no onboarding prompt, no pre-ask.</p></div>
+      </div>
+
+      <!-- Delete account -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">حذف حسابك</span><span></span></div>
+            <div class="mut" style="margin-bottom:9px">يرجى قراءة ما سيحدث قبل المتابعة.</div>
+            <div class="card" style="padding:11px">
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div class="mut" style="line-height:1.45">• سيتم إلغاء وصولك إلى الحساب.</div>
+                <div class="mut" style="line-height:1.45">• سيتم حذف العناوين المحفوظة.</div>
+                <div class="mut" style="line-height:1.45">• سيتم حذف معلومات الملف الشخصي أو إخفاء هويتها.</div>
+                <div class="mut" style="line-height:1.45">• قد تفقد نقاط الولاء وسجل النقاط.</div>
+                <div class="mut" style="line-height:1.45">• سيتم تسجيل خروجك وإلغاء جلساتك.</div>
+                <div class="mut" style="line-height:1.45">• ستتم إزالة تسجيلات أجهزة الإشعارات.</div>
+                <div class="mut" style="line-height:1.45">• قد يتم الاحتفاظ ببعض السجلات المطلوبة نظامًا.</div>
+                <div class="mut" style="opacity:.6;line-height:1.45">• … و4 بنود أخرى</div>
+              </div>
+            </div>
+            <div class="card" style="padding:11px">
+              <div class="row" style="align-items:flex-start;gap:8px">
+                <span style="color:var(--p-purple);font-weight:900;font-size:13px">☑</span>
+                <span class="mut" style="line-height:1.45">أفهم أن حذف الحساب سيؤدي إلى فقدان الوصول إلى بيانات الحساب والعناوين والنقاط، وأن بعض السجلات قد يُحتفظ بها.</span>
+              </div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn red">متابعة حذف الحساب</div></div>
+        </div></div>
+        <div class="cap"><b>Delete account</b><span class="route mono">/account/delete</span>
+          <p>Eleven disclosure bullets, an acknowledgement that gates the button, then identity re-verification and a final irreversible confirm.</p></div>
+      </div>
+
+      <!-- Legal & support -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle">المستندات والدعم</span><span></span></div>
+            <div class="card" style="padding:0">
+              <div class="between" style="padding:11px"><span class="row" style="gap:8px"><span>📞</span><span class="name" style="font-weight:600">الاتصال بالدعم</span></span><span class="mut">›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:11px"><span class="row" style="gap:8px"><span>💬</span><span class="name" style="font-weight:600">الدعم عبر واتساب</span></span><span class="mut">›</span></div>
+            </div>
+            <div class="card" style="padding:11px">
+              <div class="mut" style="font-weight:800;margin-bottom:4px">ساعات العمل</div>
+              <div class="name" style="font-weight:600">يوميًا 10:00 ص — 2:00 ص</div>
+            </div>
+            <div class="mut" style="font-weight:800;margin:11px 2px 7px">المستندات</div>
+            <div class="card" style="padding:0">
+              <div class="between" style="padding:11px"><span class="name" style="font-weight:600">سياسة الخصوصية</span><span class="mut">›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:11px"><span class="name" style="font-weight:600">الشروط والأحكام</span><span class="mut">›</span></div>
+              <div style="height:1px;background:var(--p-line)"></div>
+              <div class="between" style="padding:11px"><span class="name" style="font-weight:600">سياسة الاسترجاع</span><span class="mut">›</span></div>
+            </div>
+            <div class="note info">قنوات الدعم تظهر فقط عندما يفعّلها المشرف — لا تظهر قيم افتراضية أبدًا.</div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Legal &amp; support</b><span class="route mono">/legal</span>
+          <p>Email is absent here because the admin hasn't enabled it — channels never render half-configured, and placeholder values are rejected outright.</p></div>
+      </div>
+
+      <!-- Legal doc -->
+      <div class="cell">
+        <div class="phone"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">→</span><span class="ptitle" style="font-size:13px">سياسة الخصوصية</span><span></span></div>
+            <div class="row" style="gap:6px;margin-bottom:10px"><span class="chip">الإصدار 2.1</span><span class="chip">سارية من 2026-05-01</span></div>
+            <div class="card" style="padding:12px">
+              <div class="name" style="margin-bottom:6px">1. البيانات التي نجمعها</div>
+              <div class="mut" style="line-height:1.6">نجمع رقم الجوال والاسم وعناوين التوصيل وسجل الطلبات لتقديم الخدمة. لا نبيع بياناتك ولا نشاركها لأغراض تسويقية خارجية.</div>
+              <div class="divider"></div>
+              <div class="name" style="margin-bottom:6px">2. كيف نستخدم البيانات</div>
+              <div class="mut" style="line-height:1.6">تُستخدم البيانات لمعالجة الطلبات، وإرسال تحديثات الحالة، ومعالجة المدفوعات والمبالغ المستردة، والامتثال للمتطلبات النظامية في المملكة.</div>
+              <div class="divider"></div>
+              <div class="name" style="margin-bottom:6px">3. الاحتفاظ بالبيانات</div>
+              <div class="mut" style="line-height:1.6">يتم الاحتفاظ بسجلات الطلبات والمحاسبة للمدة التي يفرضها النظام.</div>
+            </div>
+          </div>
+        </div></div>
+        <div class="cap"><b>Legal document</b><span class="route mono">/legal/[type]</span>
+          <p>Version and effective date carried as chips. Content is admin-authored plain text with line breaks preserved — no rich editor exists.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 07 DARK ============================ -->
+<section id="dark">
+  <div class="wrap">
+    <div class="shead"><span class="snum">07</span><h2>Dark mode</h2></div>
+    <p class="sintro">
+      Newly in scope. Not an inversion — the tokens are redefined: the ground goes deep
+      purple-black, the purple lifts to <span class="mono">#9b85f0</span> and the red to
+      <span class="mono">#ff6274</span> so both stay legible. Every screen and every one of the
+      twelve states ships in both themes, in both languages.
+    </p>
+    <div class="grid">
+
+      <div class="cell">
+        <div class="phone is-dark"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="between" style="padding:6px 2px 9px"><span class="logo">سبايسي <em>ميل</em></span><span class="chip">EN</span></div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between">
+                <div><div class="mut" style="font-size:9px;font-weight:800">التوصيل من</div><div class="name">فرع العليا</div></div>
+                <div class="row" style="gap:6px"><span class="chip ok">● مفتوح</span><span class="chip">تغيير</span></div>
+              </div>
+            </div>
+            <div style="height:62px;border-radius:12px;background:linear-gradient(105deg,#4b35a0,#7d5be0 55%,#ff6274);display:flex;align-items:center;padding:0 13px;color:#fff;margin-bottom:6px">
+              <div><div style="font-weight:900;font-size:13px">وجبة العائلة</div><div style="font-size:9.5px;opacity:.9">خصم 20٪ حتى نهاية الأسبوع</div></div>
+            </div>
+            <div class="dotrow" style="margin-bottom:9px"><i class="on"></i><i></i><i></i></div>
+            <div class="field" style="display:flex;align-items:center;gap:7px;margin-bottom:10px">🔍 <span>ابحث عن برجر، مقبلات…</span></div>
+            <div class="row" style="gap:6px;margin-bottom:10px"><span class="chip on">الكل</span><span class="chip">برجر</span><span class="chip">دجاج</span><span class="chip">مقبلات</span></div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">فولكانو دجاج مقرمش</div>
+                  <div class="mut">دجاج مقرمش حار جدًا · 710 سعرة</div>
+                  <div class="between" style="margin-top:6px"><span class="price">29.00<span class="rial">ر.س</span></span><span class="chip on">تخصيص وإضافة</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="card" style="padding:9px">
+              <div class="row">
+                <div class="img b" style="width:56px;height:56px"></div>
+                <div style="flex:1;min-width:0">
+                  <div class="name">دبل تشيز برجر</div>
+                  <div class="mut">قطعتان لحم · 840 سعرة</div>
+                  <div class="between" style="margin-top:6px"><span class="price">34.00<span class="rial">ر.س</span></span><span class="chip on">+ إضافة</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="sticky" style="padding-bottom:10px"><div class="btn" style="display:flex;justify-content:space-between;padding:11px 13px"><span>عرض السلة · 3 عناصر</span><span>92.00 ر.س</span></div></div>
+          <div class="tabbar"><div class="on"><span></span>الرئيسية</div><div><span></span>طلباتي</div><div><span></span>حسابي</div></div>
+        </div></div>
+        <div class="cap"><b>Home &amp; menu — dark<span class="drk">DARK</span></b><span class="route mono">/(tabs)/index</span>
+          <p>Food photography carries the warmth, so the chrome recedes. Card surfaces lift off the ground rather than relying on borders alone.</p></div>
+      </div>
+
+      <div class="cell">
+        <div class="phone is-dark"><div class="scr" dir="rtl">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="card" style="text-align:center;padding:16px 12px;margin-top:12px;border-color:var(--p-ok)">
+              <div class="hero-ic" style="background:var(--p-ok);margin:0 auto;color:#08210f">✓</div>
+              <div class="ptitle" style="margin-top:9px;font-size:15px">تم تأكيد الطلب</div>
+              <div class="mut" style="margin-top:4px">قام الفرع بتأكيد طلبك.</div>
+              <div class="divider"></div>
+              <div class="mut" style="font-weight:700">رقم الطلب لدى الفرع</div>
+              <div class="price" style="font-size:24px;margin-top:2px">#5</div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="between"><span class="mut">الدفع</span><span class="chip ok">مدفوع</span></div>
+              <div class="between" style="margin-top:7px"><span class="mut">الفرع</span><span class="name">فرع العليا</span></div>
+              <div class="between" style="margin-top:7px"><span class="mut">التاريخ</span><span class="name" style="font-variant-numeric:tabular-nums">2026-07-29 21:14</span></div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="name" style="margin-bottom:8px">ملخص الطلب</div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">2× فولكانو دجاج مقرمش</span><span class="price">66.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">1× بطاطس مقرمشة</span><span class="price">12.00</span></div>
+              <div class="divider"></div>
+              <div class="between"><span class="name">الإجمالي</span><span class="price" style="font-size:14px">67.40<span class="rial">ر.س</span></span></div>
+            </div>
+          </div>
+          <div class="sticky" style="display:flex;gap:8px"><div class="btn ghost" style="flex:1;padding:10px">طلباتي</div><div class="btn" style="flex:1;padding:10px">القائمة</div></div>
+        </div></div>
+        <div class="cap"><b>Receipt — dark<span class="drk">DARK</span></b><span class="route mono">/receipt/[id]</span>
+          <p>Success green is darkened to sit on the dark ground while keeping its check icon at full contrast. All twelve states get the same treatment.</p></div>
+      </div>
+
+      <div class="cell">
+        <div class="phone is-dark"><div class="scr" dir="ltr">
+          <div class="sbar"><span>9:41</span><span class="dots"><i></i><i></i><i></i><u></u></span></div>
+          <div class="body">
+            <div class="pbar" style="padding-top:12px"><span style="color:var(--p-purple);font-weight:800">←</span><span class="ptitle">Checkout</span><span></span></div>
+            <div class="card" style="padding:9px 11px">
+              <div class="between"><span class="mut" style="font-weight:700">Order type</span><span class="chip on">Delivery</span></div>
+              <div class="divider"></div>
+              <div class="between"><span><span class="mut" style="font-weight:700">Delivery location</span><div class="name" style="margin-top:2px">Home · near Al Salam grocery</div></span><span class="chip">Change</span></div>
+            </div>
+            <div class="card" style="padding:9px 11px">
+              <div class="mut" style="font-weight:700;margin-bottom:7px">Payment method</div>
+              <div class="row" style="gap:6px">
+                <div class="btn" style="flex:1;padding:8px;font-size:10.5px">Online Payment</div>
+                <div style="flex:1;text-align:center;padding:8px;font-size:10.5px;font-weight:800;color:var(--p-mut);border:1.5px solid var(--p-line);border-radius:12px">Cash on Delivery</div>
+              </div>
+            </div>
+            <div class="card" style="padding:10px 11px">
+              <div class="between" style="margin-bottom:5px"><span class="mut">Subtotal</span><span class="price">78.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut">Delivery fee</span><span class="price">10.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="color:var(--p-ok)">Campaign (20%)</span><span class="price" style="color:var(--p-ok)">−15.60</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="color:var(--p-ok)">Loyalty discount</span><span class="price" style="color:var(--p-ok)">−5.00</span></div>
+              <div class="between" style="margin-bottom:5px"><span class="mut" style="font-size:9.5px">VAT (15%, included)</span><span class="mut">8.79</span></div>
+              <div class="divider"></div>
+              <div class="between"><span class="name" style="font-size:13px">Total</span><span class="price" style="font-size:15px">67.40<span class="rial">SAR</span></span></div>
+            </div>
+          </div>
+          <div class="sticky"><div class="btn" style="padding:12px">Confirm &amp; Order</div></div>
+        </div></div>
+        <div class="cap"><b>Checkout — dark, English<span class="drk">DARK</span></b><span class="route mono">/checkout</span>
+          <p>Four permutations exist for every screen: light and dark × Arabic and English. Discount lines stay green in both themes at adjusted lightness.</p></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 08 ADMIN ============================ -->
+<section id="admin">
+  <div class="wrap">
+    <div class="shead"><span class="snum">08</span><h2>Admin dashboard</h2></div>
+    <p class="sintro">
+      Operated on a shop floor during rush, so it is built to be scanned, not read. Twelve tabs;
+      three of them are capability-gated and appear only once their backend is present. Every
+      panel has an admin view and a read-only <strong>accountant</strong> view.
+    </p>
+
+    <div class="wins">
+
+      <!-- Sales overview -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · لوحة التحكم</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav on"><span>Sales Overview</span></div>
+            <div class="wnav"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav"><span>Branch Management</span></div>
+            <div class="wnav"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="whead">
+              <div><h4>Sales Overview</h4><p>Real-time console connected to live branches</p></div>
+              <div class="wctl"><span class="live"><i></i>LIVE · 21:14:07</span><span class="wbtn g">AR</span><span class="wbtn g">🔔</span></div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><div class="k">Today's sales</div><div class="v">18,420</div><div class="d">▲ 12% vs yesterday</div></div>
+              <div class="kpi"><div class="k">Active orders</div><div class="v">7</div><div class="d">2 awaiting POS</div></div>
+              <div class="kpi"><div class="k">Completed today</div><div class="v">214</div><div class="d">▲ 8%</div></div>
+              <div class="kpi"><div class="k">Avg ticket <span style="font-weight:600;text-transform:none">(VAT incl.)</span></div><div class="v">86.07</div><div class="d dn">▼ 3%</div></div>
+              <div class="kpi"><div class="k">Branches closed</div><div class="v">2</div><div class="d dn">of 16</div></div>
+            </div>
+            <div class="wgrid2">
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:4px"><div><h4 style="font-size:12.5px">Daily branch sales distribution</h4></div><span class="wtag">Last 7 days</span></div>
+                <div class="bars">
+                  <div style="height:52%"></div><div style="height:71%"></div><div style="height:44%"></div>
+                  <div style="height:88%"></div><div class="hi" style="height:100%"></div><div style="height:63%"></div><div style="height:78%"></div>
+                </div>
+                <div class="barx"><span>Sat</span><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span></div>
+              </div>
+              <div class="wcard">
+                <h4 style="font-size:12.5px;margin-bottom:9px">Integration sync</h4>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Lazywait POS</span><span class="wtag ok">● Realtime</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Tap payments</span><span class="wtag ok">● Live</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>WhatsApp OTP</span><span class="wtag ok">● Live</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Push notifications</span><span class="wtag">Dormant</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Awaiting sync</span><span class="wtag warn">2 orders</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live orders -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Live Orders</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav"><span>Sales Overview</span></div>
+            <div class="wnav on"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav"><span>Branch Management</span></div>
+            <div class="wnav"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="whead">
+              <div><h4>Live Orders</h4><p>7 active · Realtime with a 12-second polling fallback</p></div>
+              <div class="wctl">
+                <span class="wbtn g">Search order #, client, phone…</span>
+                <span class="wbtn g">All statuses ▾</span><span class="wbtn">Sound on</span>
+              </div>
+            </div>
+            <div class="olist">
+              <div class="ocard" style="border-color:var(--w-red)">
+                <div style="display:flex;gap:11px">
+                  <div class="sev"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                      <div><b style="color:var(--w-ink);font-size:12.5px">SM-2026-004182</b> <span class="wtag">Olaya · Delivery</span></div>
+                      <div style="display:flex;gap:6px;align-items:center"><span class="wtag bad">PENDING ONLINE PAYMENT</span><span style="color:var(--w-mut);font-size:10.5px">21:12</span></div>
+                    </div>
+                    <div style="color:var(--w-mut);font-size:10.5px;margin-top:4px">Mohammed Al-Ali · +966 50 123 4567 · 3 items</div>
+                    <div style="color:var(--w-txt);font-size:10.5px;margin-top:5px">2× Spicy Volcano Chicken <span style="color:var(--w-mut)">(Large, extra cheese)</span> · 1× Crispy Fries</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:9px;gap:8px;flex-wrap:wrap">
+                      <span style="color:var(--w-mut);font-size:10.5px">Online payment has not been completed. Order is held from POS.</span>
+                      <span style="display:flex;gap:6px"><span class="wbtn g">Re-verify via Tap</span><span class="wbtn">Set status ▾</span></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ocard">
+                <div style="display:flex;gap:11px">
+                  <div class="sev" style="background:var(--w-ok)"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                      <div><b style="color:var(--w-ink);font-size:12.5px">SM-2026-004181</b> <span class="wtag">Nakheel · Pickup</span> <span class="wtag ok">POS #5</span></div>
+                      <div style="display:flex;gap:6px;align-items:center"><span class="wtag ok">PAID</span><span style="color:var(--w-mut);font-size:10.5px">21:04</span></div>
+                    </div>
+                    <div style="color:var(--w-mut);font-size:10.5px;margin-top:4px">Sara Al-Otaibi · +966 55 987 6543 · 2 items · 67.40 SAR</div>
+                    <div style="display:flex;gap:6px;margin-top:9px;flex-wrap:wrap">
+                      <span class="wtag">Received</span><span class="wtag ok">Preparing</span><span class="wtag">Ready</span><span class="wtag">Out for delivery</span><span class="wtag">Delivered</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="ocard">
+                <div style="display:flex;gap:11px">
+                  <div class="sev" style="background:var(--w-warn)"></div>
+                  <div style="flex:1;min-width:0">
+                    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+                      <div><b style="color:var(--w-ink);font-size:12.5px">SM-2026-004179</b> <span class="wtag">Malqa · Delivery</span></div>
+                      <div style="display:flex;gap:6px;align-items:center"><span class="wtag warn">CASH PAYMENT REQUIRED</span><span style="color:var(--w-mut);font-size:10.5px">20:51</span></div>
+                    </div>
+                    <div style="color:var(--w-mut);font-size:10.5px;margin-top:4px">Payment must be collected from the customer · branch is not mapped to POS</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Menu management -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Menu Management</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav"><span>Sales Overview</span></div>
+            <div class="wnav"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav on"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav"><span>Branch Management</span></div>
+            <div class="wnav"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="whead">
+              <div><h4>Menu Management</h4><p>Categories, products, modifier groups and CSV import</p></div>
+              <div class="wctl"><span class="wbtn g">Download CSV template</span><span class="wbtn g">Import CSV</span><span class="wbtn">+ New product</span></div>
+            </div>
+            <div class="wgrid2">
+              <div class="wcard" style="padding:0;overflow:hidden">
+                <table class="tbl">
+                  <tr><th style="padding-left:13px">Product</th><th>Category</th><th>Price</th><th>kcal</th><th style="padding-right:13px">Active</th></tr>
+                  <tr><td style="padding-left:13px"><b style="color:var(--w-ink)">Spicy Volcano Chicken</b><div style="color:var(--w-mut);font-size:10px">فولكانو دجاج مقرمش · 2 modifier groups</div></td><td>Burgers</td><td class="num">29.00</td><td class="num">710</td><td style="padding-right:13px"><span class="sw"></span></td></tr>
+                  <tr><td style="padding-left:13px"><b style="color:var(--w-ink)">Double Cheese Burger</b><div style="color:var(--w-mut);font-size:10px">دبل تشيز برجر · 1 modifier group</div></td><td>Burgers</td><td class="num">34.00</td><td class="num">840</td><td style="padding-right:13px"><span class="sw"></span></td></tr>
+                  <tr><td style="padding-left:13px"><b style="color:var(--w-ink)">Crispy French Fries</b><div style="color:var(--w-mut);font-size:10px">بطاطس مقلية مقرمشة</div></td><td>Sides</td><td class="num">12.00</td><td class="num">310</td><td style="padding-right:13px"><span class="sw"></span></td></tr>
+                  <tr><td style="padding-left:13px"><b style="color:var(--w-ink)">Ice Cold Orange Juice</b><div style="color:var(--w-mut);font-size:10px">عصير برتقال مثلج</div></td><td>Drinks</td><td class="num">10.00</td><td class="num">120</td><td style="padding-right:13px"><span class="sw off"></span></td></tr>
+                </table>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="wcard">
+                  <h4 style="font-size:12.5px;margin-bottom:9px">Categories</h4>
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;justify-content:space-between"><span>Burgers · برجر</span><span class="wtag">8 items</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>Chicken · دجاج</span><span class="wtag">6 items</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>Sides · المقبلات</span><span class="wtag">5 items</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>Drinks · المشروبات</span><span class="wtag">4 items</span></div>
+                  </div>
+                </div>
+                <div class="wcard">
+                  <h4 style="font-size:12.5px;margin-bottom:9px">Modifier groups</h4>
+                  <div style="display:flex;flex-direction:column;gap:7px">
+                    <div style="display:flex;justify-content:space-between"><span>Size · الحجم</span><span class="wtag bad">Required · 1 of 1</span></div>
+                    <div style="display:flex;justify-content:space-between"><span>Extras · إضافات</span><span class="wtag">Optional · up to 3</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Branch management -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Branch Management</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav"><span>Sales Overview</span></div>
+            <div class="wnav"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav on"><span>Branch Management</span></div>
+            <div class="wnav"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="whead">
+              <div><h4>Branch Management</h4><p>16 branches · channels, delivery zones and stock availability</p></div>
+              <div class="wctl"><span class="wbtn">+ Add branch</span></div>
+            </div>
+            <div class="wgrid2">
+              <div class="wcard">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:11px">
+                  <div><b style="color:var(--w-ink);font-size:13px">Olaya Branch · فرع العليا</b><div style="color:var(--w-mut);font-size:10.5px;margin-top:2px">Olaya Main Road, Riyadh · +966 11 123 4567</div></div>
+                  <span class="wtag ok">Mapped to POS</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:11px">
+                  <div><div style="color:var(--w-mut);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em">Delivery fee</div><div style="color:var(--w-ink);font-weight:800">10.00 SAR</div></div>
+                  <div><div style="color:var(--w-mut);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em">Minimum order</div><div style="color:var(--w-ink);font-weight:800">25.00 SAR</div></div>
+                  <div><div style="color:var(--w-mut);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em">Est. delivery</div><div style="color:var(--w-ink);font-weight:800">35 min</div></div>
+                  <div><div style="color:var(--w-mut);font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em">Location</div><div style="color:var(--w-ink);font-weight:800">Set ✓</div></div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Delivery</span><span class="sw"></span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Pickup</span><span class="sw"></span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Delivery temporarily closed</span><span class="sw off"></span></div>
+                </div>
+              </div>
+              <div class="wcard" style="padding:0;overflow:hidden">
+                <div style="padding:11px 13px 0"><h4 style="font-size:12.5px">Delivery area</h4><p style="color:var(--w-mut);font-size:10.5px;margin:2px 0 9px">Drawn polygon · active</p></div>
+                <div style="height:154px;position:relative;background:linear-gradient(115deg,transparent 47.6%,rgba(122,113,150,.35) 47.6%,rgba(122,113,150,.35) 48.4%,transparent 48.4%),linear-gradient(28deg,transparent 61%,rgba(122,113,150,.35) 61%,rgba(122,113,150,.35) 61.7%,transparent 61.7%),var(--w-bg)">
+                  <div style="position:absolute;inset:14% 16% 20% 14%;border-radius:44% 56% 48% 52%/52% 44% 56% 48%;background:rgba(66,46,135,.16);border:1.5px dashed rgba(66,46,135,.55)"></div>
+                  <div style="position:absolute;left:48%;top:44%;width:12px;height:12px;background:var(--w-red);border-radius:999px 999px 999px 2px;transform:rotate(45deg)"></div>
+                </div>
+                <div style="padding:10px 13px;display:flex;gap:6px"><span class="wbtn g">Edit area</span><span class="wbtn g">Clear</span></div>
+              </div>
+            </div>
+            <div style="margin-top:12px">
+              <h4 style="font-size:12.5px;color:var(--w-ink);margin-bottom:8px">Branch × product availability</h4>
+              <div class="matrix">
+                <div class="h">Product</div><div class="h">Olaya</div><div class="h">Nakheel</div><div class="h">Malqa</div><div class="h">Sulaimaniyah</div>
+                <div>Spicy Volcano Chicken</div><div><span class="sw"></span></div><div><span class="sw"></span></div><div><span class="sw off"></span></div><div><span class="sw"></span></div>
+                <div>Double Cheese Burger</div><div><span class="sw"></span></div><div><span class="sw"></span></div><div><span class="sw"></span></div><div><span class="sw"></span></div>
+                <div>Crispy French Fries</div><div><span class="sw"></span></div><div><span class="sw off"></span></div><div><span class="sw"></span></div><div><span class="sw"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reports -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Financial Reports</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav"><span>Sales Overview</span></div>
+            <div class="wnav"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav"><span>Branch Management</span></div>
+            <div class="wnav on"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="acct">🛡 Accountant role — reports and exports are available; write actions are hidden.</div>
+            <div class="whead">
+              <div><h4>Financial Reports</h4><p>Riyadh calendar days · six ledgers · CSV export</p></div>
+              <div class="wctl"><span class="wbtn g">All branches ▾</span><span class="wbtn g">2026-07-01 → 2026-07-29</span><span class="wbtn">Export CSV</span></div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><div class="k">Filtered revenue</div><div class="v">412,880</div><div class="d" style="color:var(--w-mut)">Includes 15% VAT</div></div>
+              <div class="kpi"><div class="k">Completed orders</div><div class="v">4,796</div><div class="d" style="color:var(--w-mut)">In range</div></div>
+              <div class="kpi"><div class="k">Coupon savings</div><div class="v">18,240</div><div class="d" style="color:var(--w-mut)">Deducted from gross</div></div>
+              <div class="kpi"><div class="k">Delivery fees</div><div class="v">29,410</div><div class="d" style="color:var(--w-mut)">Completed deliveries</div></div>
+            </div>
+            <div class="wctl" style="margin-bottom:11px">
+              <span class="wbtn">Sales by day</span><span class="wbtn g">By branch</span><span class="wbtn g">By product</span>
+              <span class="wbtn g">Coupon usage</span><span class="wbtn g">Delivery fees</span><span class="wbtn g">POS audit</span>
+            </div>
+            <div class="wcard" style="padding:0;overflow:hidden">
+              <table class="tbl">
+                <tr><th style="padding-left:13px">Calendar date</th><th class="num">Orders</th><th class="num">Gross sales</th><th class="num">Discounts</th><th class="num" style="padding-right:13px">Net</th></tr>
+                <tr><td style="padding-left:13px">2026-07-29</td><td class="num">214</td><td class="num">18,420.00</td><td class="num">742.00</td><td class="num" style="padding-right:13px">17,678.00</td></tr>
+                <tr><td style="padding-left:13px">2026-07-28</td><td class="num">196</td><td class="num">16,430.50</td><td class="num">610.00</td><td class="num" style="padding-right:13px">15,820.50</td></tr>
+                <tr><td style="padding-left:13px">2026-07-27</td><td class="num">231</td><td class="num">19,980.00</td><td class="num">1,104.00</td><td class="num" style="padding-right:13px">18,876.00</td></tr>
+                <tr><td style="padding-left:13px">2026-07-26</td><td class="num">188</td><td class="num">15,210.00</td><td class="num">488.00</td><td class="num" style="padding-right:13px">14,722.00</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alerts (dark) -->
+      <div class="win is-dark">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Operations Alerts — dark mode</span></div>
+        <div class="wbody">
+          <div class="wside">
+            <div class="brand"><span style="width:22px;height:22px;border-radius:7px;background:var(--w-purple);display:inline-block"></span><b>SPICY MEAL</b></div>
+            <div class="wnav"><span>Sales Overview</span></div>
+            <div class="wnav"><span>Live Orders</span><span class="b">7</span></div>
+            <div class="wnav"><span>Menu Management</span></div>
+            <div class="wnav"><span>Banners</span></div>
+            <div class="wnav"><span>Branch Management</span></div>
+            <div class="wnav"><span>Financial Reports</span></div>
+            <div class="wnav"><span>Integrations</span></div>
+            <div class="wnav"><span>Operations Health</span></div>
+            <div class="wnav on"><span>Operations Alerts</span><span class="b">3</span></div>
+            <div class="wnav"><span>Order Integrity</span></div>
+            <div class="wnav"><span>Settings</span></div>
+            <div class="wnav"><span>Legal Documents</span></div>
+          </div>
+          <div class="wmain">
+            <div class="whead">
+              <div><h4>Operations Alerts &amp; Daily Digest</h4><p>Evaluated every 5 minutes · digest at 08:00 Asia/Riyadh</p></div>
+              <div class="wctl"><span class="wtag">In-dashboard only</span><span class="wbtn g">Settings</span></div>
+            </div>
+            <div class="wgrid2">
+              <div style="display:flex;flex-direction:column;gap:9px">
+                <div class="ocard" style="display:flex;gap:11px">
+                  <div class="sev"></div>
+                  <div style="flex:1">
+                    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="color:var(--w-ink);font-size:12.5px">POS sync failing — Malqa</b><span class="wtag bad">Critical</span></div>
+                    <p style="margin:4px 0 0;color:var(--w-mut);font-size:10.5px">4 orders have exceeded the retry deadline in the last 30 minutes. Branch is unmapped.</p>
+                    <p style="margin:4px 0 0;color:var(--w-mut);font-size:10.5px">فشل مزامنة نقطة البيع — فرع الملقا</p>
+                    <div style="margin-top:8px;display:flex;gap:6px"><span class="wbtn g">Timeline</span><span class="wbtn g">Open Order Integrity</span></div>
+                  </div>
+                </div>
+                <div class="ocard" style="display:flex;gap:11px">
+                  <div class="sev" style="background:var(--w-warn)"></div>
+                  <div style="flex:1">
+                    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="color:var(--w-ink);font-size:12.5px">Delivery enabled without a zone</b><span class="wtag warn">Warning</span></div>
+                    <p style="margin:4px 0 0;color:var(--w-mut);font-size:10.5px">Sulaimaniyah accepts delivery but has no active polygon configured.</p>
+                  </div>
+                </div>
+                <div class="ocard" style="display:flex;gap:11px">
+                  <div class="sev" style="background:var(--w-purple)"></div>
+                  <div style="flex:1">
+                    <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b style="color:var(--w-ink);font-size:12.5px">Online payment disabled 3 h</b><span class="wtag">Info</span></div>
+                    <p style="margin:4px 0 0;color:var(--w-mut);font-size:10.5px">Outage mode is on; cash orders continue and reach the POS as unpaid.</p>
+                  </div>
+                </div>
+              </div>
+              <div class="wcard">
+                <h4 style="font-size:12.5px;margin-bottom:4px">Daily digest — 2026-07-29</h4>
+                <p style="color:var(--w-mut);font-size:10.5px;margin:0 0 10px">Generated 08:00 · AR + EN</p>
+                <div style="display:flex;flex-direction:column;gap:8px;font-size:11px">
+                  <div style="display:flex;justify-content:space-between"><span>Orders completed</span><b style="color:var(--w-ink)">214</b></div>
+                  <div style="display:flex;justify-content:space-between"><span>POS failures</span><b style="color:var(--w-red)">4</b></div>
+                  <div style="display:flex;justify-content:space-between"><span>Refunds issued</span><b style="color:var(--w-ink)">1</b></div>
+                  <div style="display:flex;justify-content:space-between"><span>Branches closed early</span><b style="color:var(--w-ink)">2</b></div>
+                </div>
+                <div style="margin-top:11px;padding-top:10px;border-top:1px solid var(--w-line);color:var(--w-mut);font-size:10px">
+                  External delivery is disabled by design — this digest is read here and nowhere else.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Composite: remaining tabs -->
+      <div class="win">
+        <div class="wtop"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="url">spicymeal.sa · Banners · Integrations · Health · Integrity · Settings · Legal</span></div>
+        <div class="wbody" style="padding:16px 18px">
+          <div class="wmain" style="padding:0">
+            <div class="whead"><div><h4>The remaining six tabs</h4><p>Same shell, same density rules — shown here as panel studies</p></div></div>
+            <div class="wgrid2b">
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Banners</h4><p>Homepage carousel · scheduled</p></div><span class="wbtn">+ New</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;gap:9px;align-items:center">
+                    <span style="width:52px;height:30px;border-radius:6px;background:linear-gradient(105deg,#422e87,#e02d3d);flex:0 0 auto"></span>
+                    <span style="flex:1"><b style="color:var(--w-ink);font-size:11.5px">Family Feast</b><div style="color:var(--w-mut);font-size:10px">01 Jul → 15 Aug · sort 1 · opens product</div></span>
+                    <span class="sw"></span>
+                  </div>
+                  <div style="display:flex;gap:9px;align-items:center">
+                    <span style="width:52px;height:30px;border-radius:6px;background:linear-gradient(105deg,#1f9d55,#6a4bc4);flex:0 0 auto"></span>
+                    <span style="flex:1"><b style="color:var(--w-ink);font-size:11.5px">Free delivery week</b><div style="color:var(--w-mut);font-size:10px">27 Jul → 03 Aug · sort 2</div></span>
+                    <span class="sw"></span>
+                  </div>
+                  <div style="display:flex;gap:9px;align-items:center;opacity:.55">
+                    <span style="width:52px;height:30px;border-radius:6px;background:linear-gradient(105deg,#c47f17,#e02d3d);flex:0 0 auto"></span>
+                    <span style="flex:1"><b style="color:var(--w-ink);font-size:11.5px">Ramadan menu</b><div style="color:var(--w-mut);font-size:10px">Expired 30 Mar · sort 3</div></span>
+                    <span class="sw off"></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Integrations</h4><p>Payments · Messaging · POS &amp; Delivery</p></div><span class="wtag">Admin only</span></div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--w-line)">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Tap Payments</b><div style="color:var(--w-mut);font-size:10px">Live mode · secret stored ✓ · never displayed</div></span>
+                    <span class="wtag ok">Connected</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--w-line)">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">WhatsApp OTP</b><div style="color:var(--w-mut);font-size:10px">Send-SMS hook · test message available</div></span>
+                    <span class="wtag ok">Connected</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--w-line)">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Lazywait POS</b><div style="color:var(--w-mut);font-size:10px">Menu ✓ · Stock ✓ · Orders ✓ · 14 / 16 branches mapped</div></span>
+                    <span class="wtag warn">2 unmapped</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Push notifications</b><div style="color:var(--w-mut);font-size:10px">No credentials configured</div></span>
+                    <span class="wtag">Dormant</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Operations Health</h4><p>Read-only · staff-gated</p></div><span class="live"><i></i>Healthy</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Order intake</span><span class="wtag ok">OK · p95 640 ms</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Payment verification</span><span class="wtag ok">OK</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>POS sync worker</span><span class="wtag warn">Degraded · 4 retrying</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Scheduled jobs</span><span class="wtag ok">2 crons on time</span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Account deletion queue</span><span class="wtag ok">Empty</span></div>
+                </div>
+              </div>
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Order Integrity</h4><p>Observe only — acknowledge or suppress</p></div><span class="wtag bad">2 open</span></div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;gap:9px">
+                    <div class="sev"></div>
+                    <div style="flex:1"><b style="color:var(--w-ink);font-size:11.5px">Paid, never sent to POS</b>
+                      <div style="color:var(--w-mut);font-size:10px">Order 004182 · detected 21:19 · no PII shown</div>
+                      <div style="margin-top:7px;display:flex;gap:6px"><span class="wbtn g">Acknowledge</span><span class="wbtn g">Suppress</span><span class="wbtn g">Timeline</span></div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:9px;padding-top:8px;border-top:1px solid var(--w-line)">
+                    <div class="sev" style="background:var(--w-warn)"></div>
+                    <div style="flex:1"><b style="color:var(--w-ink);font-size:11.5px">Ambiguous POS outcome</b>
+                      <div style="color:var(--w-mut);font-size:10px">Order 004180 · awaiting human verification with the branch</div>
+                    </div>
+                  </div>
+                  <div style="color:var(--w-mut);font-size:10px;padding-top:6px;border-top:1px solid var(--w-line)">No retry, refund, resend or mark-paid control exists on this screen — by design.</div>
+                </div>
+              </div>
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Settings</h4><p>Brand · payment · maps · loyalty · support</p></div><span class="wtag">Admin only</span></div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Prices include VAT (15%)</span><span class="sw"></span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Online payment</span><span class="sw"></span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Cash payment</span><span class="sw"></span></div>
+                  <div style="display:flex;justify-content:space-between;align-items:center"><span>Loyalty program</span><span class="sw"></span></div>
+                  <div style="display:flex;gap:9px;align-items:center;padding-top:8px;border-top:1px solid var(--w-line)">
+                    <span style="width:20px;height:20px;border-radius:6px;background:#422e87;flex:0 0 auto"></span>
+                    <span style="width:20px;height:20px;border-radius:6px;background:#e02d3d;flex:0 0 auto"></span>
+                    <span style="color:var(--w-mut);font-size:10px">Brand colours · #422e87 / #e02d3d</span>
+                  </div>
+                  <div style="background:var(--w-warnbg);color:var(--w-warn);border-radius:8px;padding:7px 9px;font-size:10px;font-weight:700">Disabling both payment methods stops checkout entirely.</div>
+                </div>
+              </div>
+
+              <div class="wcard">
+                <div class="whead" style="margin-bottom:9px"><div><h4 style="font-size:12.5px">Legal Documents</h4><p>Versioned · bilingual · active-only reach the app</p></div><span class="wbtn">+ New type</span></div>
+                <div style="display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--w-line)">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Privacy policy</b><div style="color:var(--w-mut);font-size:10px">v2.1 · effective 2026-05-01 · AR + EN</div></span>
+                    <span class="wtag ok">Active</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--w-line)">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Terms &amp; conditions</b><div style="color:var(--w-mut);font-size:10px">v3.0 · effective 2026-06-15 · requires acceptance</div></span>
+                    <span class="wtag ok">Active</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span><b style="color:var(--w-ink);font-size:11.5px">Refund policy</b><div style="color:var(--w-mut);font-size:10px">v1.0 · draft</div></span>
+                    <span class="wtag">Inactive</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 09 DECISIONS ============================ -->
+<section id="decisions">
+  <div class="wrap">
+    <div class="shead"><span class="snum">09</span><h2>Your six decisions, applied</h2></div>
+    <p class="sintro">
+      These answers are now recorded in the brief and the parity inventory, and every screen
+      above is drawn against them.
+    </p>
+    <div class="decisions">
+      <div class="dec"><div class="q">Dark mode?</div><div class="a">In scope</div>
+        <p class="c">Every screen, all twelve states, all twelve tabs, both languages. Tokens redefined, not inverted.</p></div>
+      <div class="dec"><div class="q">Discounts &amp; campaigns?</div><div class="a">Design now</div>
+        <p class="c">Promos surface, auto-applied discount line, free-delivery treatment. The backend slice is unapplied, so the UI collapses to nothing when no campaign is live.</p></div>
+      <div class="dec"><div class="q">Address management?</div><div class="a">Dedicated screen</div>
+        <p class="c">List, add, edit, set default, delete — reachable from Profile and from the delivery flow. Out-of-zone flagged before checkout.</p></div>
+      <div class="dec"><div class="q">Notification UI?</div><div class="a">Design it, don't hide it</div>
+        <p class="c">Shipped visible while the push stack stays dormant. Still no onboarding prompt and no permission pre-ask.</p></div>
+      <div class="dec"><div class="q">"The website"?</div><div class="a">Admin dashboard only</div>
+        <p class="c">No public marketing page in scope. The customer web experience stays at /app.</p></div>
+      <div class="dec"><div class="q">Brand palette?</div><div class="a">Fixed purple / red</div>
+        <p class="c">Designed against #422e87 and #e02d3d. Tokens stay semantic because the backend override still exists, but a second palette is no longer a deliverable.</p></div>
+    </div>
+
+    <div class="callout">
+      <b>Still open, not blocking:</b> whether order tracking gains a progress timeline.
+      The six status values are unchanged; the receipt's primary space is already owned by the
+      confirmation state machine, so the default is status pills and no timeline.
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    First visual pass · drawn against <span class="mono">docs/redesign/FEATURE_INVENTORY.md</span> ·
+    Spicy Meal — شركة الطعم الأول للتجارة · 29 July 2026.
+    Photography shown as colour fields; production cards use real product shots at a fixed 4:3 crop.
+  </div>
+</footer>

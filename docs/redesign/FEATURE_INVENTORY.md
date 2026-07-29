@@ -33,6 +33,8 @@
 | ☐ 1.14 | Accessibility labels on every icon-only control, both languages | |
 | ☐ 1.15 | No internal `SM-…` order number anywhere on a customer surface | see §2.11 |
 | ☐ 1.16 | No disclosure of retry budgets, attempt counters or block reasons to customers | |
+| ☐ 1.17 | **Dark mode** for every screen and every state, both surfaces, both languages | owner decision; token-level, not inverted |
+| ☐ 1.18 | Fixed brand palette `#422e87` / `#e02d3d`; tokens stay semantic | no second-palette deliverable |
 
 ---
 
@@ -246,6 +248,39 @@
 
 ### 2.17 Development-only routes
 - ☐ `/dev-preview`, `/dev-sentry` — **excluded** from the design (not in production UX).
+
+### 2.18 Address management — **NEW** (owner decision §10.3)
+- ☐ Dedicated screen reachable from **Profile** *and* from the delivery flow.
+- ☐ List of saved addresses: label, description/landmark, national short address,
+  a **Default** chip, and the map thumbnail or coordinates summary.
+- ☐ Add address → map pin picker + label + required description (reuses §2.3).
+- ☐ Edit address (rename label, change description, move pin).
+- ☐ **Set as default** action.
+- ☐ **Delete** with confirmation; guard/behaviour when deleting the address a
+  live order is using, and when deleting the default.
+- ☐ Empty state, loading, error + retry.
+- ☐ Out-of-zone indication on an address that no active branch can serve.
+
+### 2.19 Offers & campaigns — **NEW** (owner decision §10.2)
+> The backend slice (`campaigns`, `campaign_redemptions`,
+> `compute_campaign_discount`) exists in the repository but is **UNAPPLIED**.
+> The UI must therefore collapse to nothing when no campaign is live.
+- ☐ **Home promos surface** listing live, codeless campaigns (auto-applied),
+  which renders **nothing at all** when the list is empty.
+- ☐ Campaign card: bilingual name + description, value presented per type —
+  **percentage**, **fixed amount**, **free delivery** — plus the minimum-order
+  condition and the validity window.
+- ☐ **Coded campaigns are never listed** (they are secret; only validated through
+  the promo-code field at checkout).
+- ☐ Checkout: an **auto-applied campaign discount line**, distinct from the
+  coupon line and the loyalty line.
+- ☐ Free-delivery presentation: the delivery-fee row struck through / zeroed,
+  never a phantom discount on the merchandise subtotal.
+- ☐ Percentage cap reached state (`max_discount_amount` clamp) shown honestly.
+- ☐ Rejection states: below minimum order, wrong branch, outside the window,
+  per-user limit reached, global limit reached.
+- ☐ Campaign + coupon + loyalty **stacking order is a business decision still to
+  be confirmed** — design the totals block so any ordering renders correctly.
 
 ---
 
