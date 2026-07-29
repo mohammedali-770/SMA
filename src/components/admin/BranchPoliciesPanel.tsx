@@ -84,7 +84,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                         </span>
                         <button
                           onClick={() => setEditBranchId(branch.id)}
-                          className="flex items-center gap-1 text-[9px] font-black uppercase text-primary bg-primary/10 border border-primary/20 hover:bg-primary hover:text-white rounded-lg px-2 py-0.5 transition-all"
+                          className="flex items-center gap-1 text-[9px] font-black text-primary bg-primary/10 border border-primary/20 hover:bg-primary hover:text-white rounded-lg px-2 py-0.5 transition-all"
                         >
                           <Pencil className="w-2.5 h-2.5" />
                           {isAccountant ? (isRTL ? 'عرض' : 'View') : (isRTL ? 'تعديل' : 'Edit')}
@@ -95,7 +95,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                             onClick={() => { void handleDeleteBranch(branch); }}
                             disabled={deletingBranchId === branch.id}
                             aria-label={isRTL ? `حذف فرع ${branch.nameAr}` : `Delete branch ${branch.nameEn}`}
-                            className="flex items-center gap-1 text-[9px] font-black uppercase text-red-700 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1 text-[9px] font-black text-red-700 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                             {deletingBranchId === branch.id
@@ -163,14 +163,14 @@ export const BranchPoliciesPanel: React.FC = () => {
                         <button
                           onClick={() => updateBranchSettings(branch.id, { deliveryEnabled: !deliveryEnabled })}
                           disabled={isAccountant}
-                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${deliveryEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
+                          className={`py-1 rounded text-center text-[8.5px] font-black transition-all disabled:opacity-50 ${deliveryEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
                         >
                           {isRTL ? 'التوصيل' : 'Delivery'} {deliveryEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </button>
                         <button
                           onClick={() => updateBranchSettings(branch.id, { pickupEnabled: !pickupEnabled })}
                           disabled={isAccountant}
-                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${pickupEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
+                          className={`py-1 rounded text-center text-[8.5px] font-black transition-all disabled:opacity-50 ${pickupEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
                         >
                           {isRTL ? 'الاستلام' : 'Pickup'} {pickupEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </button>
@@ -179,7 +179,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                       <button
                         onClick={() => updateBranchSettings(branch.id, { deliveryTemporarilyClosed: !deliveryClosed })}
                         disabled={isAccountant}
-                        className={`w-full py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${deliveryClosed ? 'bg-amber-50 text-amber-700' : 'bg-white/40 text-slate-500'}`}
+                        className={`w-full py-1 rounded text-center text-[8.5px] font-black transition-all disabled:opacity-50 ${deliveryClosed ? 'bg-amber-50 text-amber-700' : 'bg-white/40 text-slate-500'}`}
                       >
                         {deliveryClosed ? (isRTL ? 'التوصيل موقوف مؤقتاً' : 'Delivery temporarily closed') : (isRTL ? 'إيقاف التوصيل مؤقتاً' : 'Pause delivery temporarily')}
                       </button>
@@ -195,7 +195,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                         {hasCoords ? (
                           <button
                             onClick={() => setZoneBranchId(branch.id)}
-                            className="w-full py-1.5 rounded-lg text-center text-[9px] font-black uppercase bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-1"
+                            className="w-full py-1.5 rounded-lg text-center text-[9px] font-black bg-primary/10 text-primary border border-primary/20 hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-1"
                           >
                             <MapIcon className="w-3 h-3" />
                             {hasZone
@@ -211,7 +211,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                             {!isAccountant && (
                               <button
                                 onClick={() => setEditBranchId(branch.id)}
-                                className="w-full py-1.5 rounded-lg text-center text-[9px] font-black uppercase bg-amber-500 text-white hover:bg-amber-600 transition-all flex items-center justify-center gap-1"
+                                className="w-full py-1.5 rounded-lg text-center text-[9px] font-black bg-amber-500 text-white hover:bg-amber-600 transition-all flex items-center justify-center gap-1"
                               >
                                 <MapPin className="w-3 h-3" />
                                 {isRTL ? 'تحديد موقع الفرع' : 'Set branch location'}
@@ -232,9 +232,11 @@ export const BranchPoliciesPanel: React.FC = () => {
                       <button
                         onClick={() => updateBranchSettings(branch.id, { isActive: !branch.isActive })}
                         disabled={isAccountant}
-                        className={`w-full py-1.5 rounded text-center text-[9px] font-black uppercase transition-all disabled:opacity-50 ${branch.isActive ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                        className={`w-full py-1.5 rounded text-center text-[9px] font-black transition-all disabled:opacity-50 ${branch.isActive ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                       >
-                        {branch.isActive ? 'Close Branch Maintenance' : 'Open Branch Operational'}
+                        {branch.isActive
+                          ? (isRTL ? 'إغلاق الفرع للصيانة' : 'Close branch for maintenance')
+                          : (isRTL ? 'إعادة تشغيل الفرع' : 'Reopen branch')}
                       </button>
                     </div>
 
@@ -250,9 +252,9 @@ export const BranchPoliciesPanel: React.FC = () => {
                               <button
                                 onClick={() => toggleProductAvailability(p.id, branch.id)}
                                 disabled={isAccountant || !branch.isActive}
-                                className={`text-[8px] font-black px-2 py-0.5 rounded uppercase disabled:opacity-50 ${isAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                                className={`text-[8px] font-black px-2 py-0.5 rounded disabled:opacity-50 ${isAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
                               >
-                                {isAvailable ? 'Available' : 'Sold Out'}
+                                {isAvailable ? (isRTL ? 'متوفر' : 'Available') : (isRTL ? 'نفد' : 'Sold out')}
                               </button>
                             </div>
                           );

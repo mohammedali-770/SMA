@@ -181,7 +181,7 @@ const Toggle: React.FC<{ on: boolean; disabled: boolean; onClick: () => void; la
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`py-1.5 rounded-lg text-center text-[10px] font-black uppercase transition-all disabled:opacity-50 ${on ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
+    className={`py-1.5 rounded-lg text-center text-[10px] font-black transition-all disabled:opacity-50 ${on ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
   >
     {label} {on ? 'ON' : 'OFF'}
   </button>

@@ -153,6 +153,14 @@ body {
   border: 1px solid var(--sm-border);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* What a user typed is body copy, not a label. The console set every field at
+   font-bold — legible for a 15% VAT figure, wrong for a four-paragraph privacy
+   policy, where bold reads as shouting and slows the eye down. Weight is set
+   here rather than on ~200 className strings, and `input` keeps a little more
+   than `textarea` because its values are short and mostly numeric. */
+input, select { font-weight: 600; }
+textarea { font-weight: 400; line-height: 1.65; }
 .glass-input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary), transparent 88%);

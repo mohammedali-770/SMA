@@ -182,23 +182,24 @@ export const MenuManagementPanel: React.FC = () => {
     <>
             <div className="space-y-4 animate-fade-in">
               
-              {/* Sub tabs selectors */}
-              <div className="flex border-b border-gray-200">
+              {/* Sub tabs. Pills, matching Settings and Integrations — Menu was
+                  the last panel still using underline tabs. */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 border-b border-slate-100">
                 <button 
                   onClick={() => setMenuSubTab('products')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${menuSubTab === 'products' ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'}`}
                 >
                   {t.products_tab}
                 </button>
                 <button 
                   onClick={() => setMenuSubTab('categories')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'categories' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
+                  className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${menuSubTab === 'categories' ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'}`}
                 >
                   {t.categories_tab}
                 </button>
                 <button 
                   onClick={() => setMenuSubTab('csv')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all flex items-center gap-1.5 ${menuSubTab === 'csv' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
+                  className={`flex items-center gap-1.5 py-2 px-3.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap border ${menuSubTab === 'csv' ? 'bg-primary/10 text-primary border-primary/20 shadow-xs' : 'bg-white/40 text-slate-600 border-transparent hover:bg-white/80'}`}
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
                   <span>{t.csv_tab}</span>
@@ -247,11 +248,15 @@ export const MenuManagementPanel: React.FC = () => {
                               </td>
                               <td className="px-4 py-2 font-bold text-gray-900">{p.nameEn}</td>
                               <td className="px-4 py-2 font-bold text-gray-900">{p.nameAr}</td>
-                              <td className="px-4 py-2 text-primary font-bold">
-                                {catMatch ? (isRTL ? catMatch.nameAr : catMatch.nameEn) : 'No Category'}
+                              <td className="px-4 py-2">
+                                <span className="inline-block whitespace-nowrap rounded-full bg-[var(--sm-surface-alt)] border border-[var(--sm-border)] px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                                  {catMatch
+                                    ? (isRTL ? catMatch.nameAr : catMatch.nameEn)
+                                    : (isRTL ? 'بدون تصنيف' : 'No category')}
+                                </span>
                               </td>
                               <td className="px-4 py-2 font-bold text-slate-900 tabular-nums"><Price amount={p.price} /></td>
-                              <td className="px-4 py-2 font-semibold text-gray-600">{p.calories} kcal</td>
+                              <td className="px-4 py-2 font-medium text-slate-600 whitespace-nowrap tabular-nums">{p.calories} kcal</td>
                               <td className="px-4 py-2">
                                 <div className="flex gap-1.5">
                                   <button 

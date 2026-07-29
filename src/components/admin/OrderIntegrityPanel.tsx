@@ -147,12 +147,14 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">
           <p className="text-[8.5px] font-bold text-slate-600">Open Critical</p>
-          <p className="text-lg font-bold text-red-700">{health?.open_critical_count ?? 0}</p>
+          {/* A red zero reads as "something is wrong" when nothing is. Colour the
+              figure only when there is actually something open. */}
+          <p className={`text-lg font-black tabular-nums ${(health?.open_critical_count ?? 0) > 0 ? 'text-red-700' : 'text-slate-900'}`}>{health?.open_critical_count ?? 0}</p>
           <p className="text-[8.5px] text-slate-600 font-medium">oldest {ageLabel(health?.oldest_open_critical_at ?? null)}</p>
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">
           <p className="text-[8.5px] font-bold text-slate-600">Open Warning</p>
-          <p className="text-lg font-bold text-amber-700">{health?.open_warning_count ?? 0}</p>
+          <p className={`text-lg font-black tabular-nums ${(health?.open_warning_count ?? 0) > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{health?.open_warning_count ?? 0}</p>
           <p className="text-[8.5px] text-slate-600 font-medium">ack {health?.acknowledged_count ?? 0} · suppressed {health?.suppressed_count ?? 0}</p>
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">

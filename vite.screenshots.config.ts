@@ -22,6 +22,12 @@ export default defineConfig({
         find: /^\.\/context\/AppContext$/,
         replacement: fileURLToPath(new URL('./screenshots/AppContextStub.tsx', import.meta.url)),
       },
+      // Banners and Legal Documents read straight from Supabase rather than
+      // through the context, so without this they render "Loading…" forever.
+      {
+        find: /^(\.\.\/)+lib\/api$/,
+        replacement: fileURLToPath(new URL('./screenshots/apiStub.ts', import.meta.url)),
+      },
     ],
   },
   server: { port: 4180, host: '127.0.0.1' },
