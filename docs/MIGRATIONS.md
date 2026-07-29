@@ -292,7 +292,7 @@ database remains unsafe regardless. Risks:
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (37 junk records even on success);
+- **duplicate or misleading history rows** (44 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
   1:1 onto live rows, so no version-based comparison can treat them correctly.
