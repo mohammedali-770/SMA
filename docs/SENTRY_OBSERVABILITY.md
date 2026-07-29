@@ -162,21 +162,44 @@ must not receive test events.
 
 ## Verifying the source-map gate
 
-The gate is plain config resolution, so it can be checked without a build:
+The gate is plain config resolution, so it can be checked without a build, a
+real token, or any network call. Run both — they cover different things.
+
+**1. The gate logic itself.** Exercises `app.config.js` directly against the real
+`app.json`, so it depends on no CLI flags and no Expo version behaviour:
 
 ```bash
 cd apps/mobile
-
-# No token → the Sentry plugin must be ABSENT
-npx expo config --type public --json | grep -c '@sentry/react-native/expo'   # expect 0
-
-# Token present → the Sentry plugin must be PRESENT (any non-empty value works;
-# this reads the gate only and performs no upload and no network call)
-SENTRY_AUTH_TOKEN=dummy npx expo config --type public --json \
-  | grep -c '@sentry/react-native/expo'                                       # expect 1
+node -e "const c=require('./app.json').expo; const f=require('./app.config.js');
+console.log('no token :', f({config:c}).plugins.length);
+process.env.SENTRY_AUTH_TOKEN='dummy';
+console.log('token    :', f({config:c}).plugins.length);"
+# expect   no token : 4   |   token : 5
 ```
 
-Use a throwaway value — never paste the real token into a shell.
+**2. End-to-end resolution through Expo:**
+
+```bash
+cd apps/mobile
+npx expo config --type prebuild --json \
+  | grep -c '@sentry/react-native/expo'                                        # expect 0
+SENTRY_AUTH_TOKEN=dummy npx expo config --type prebuild --json \
+  | grep -c '@sentry/react-native/expo'                                        # expect 1
+```
+
+Use a throwaway value — **never paste the real token into a shell.**
+
+> ⚠️ **Use `--type prebuild`, not `--type public`.** The public config is the
+> client manifest; `plugins` is build-time configuration and is not reliably
+> present in it. A `--type public` check can therefore print `0` in **both**
+> cases — the "expect 0" assertion passes trivially and the "expect 1"
+> assertion fails even when the gate is working correctly. A check that cannot
+> fail is worse than no check.
+
+Neither command proves that omitting the plugin leaves **native crash capture**
+intact — config resolution cannot show that. The first production EAS build is
+the definitive check: it should complete, and Sentry should still receive events
+from that build.
 
 ## Triage workflow
 
