@@ -4,7 +4,7 @@
 > is a correction to apply in a refinement pass, **not** a reason to regenerate
 > the batch — the underlying screens are sound.
 >
-> Status key: `open` · `fixed` · `needs owner decision`.
+> Status key: `open` · `fixed` · `withdrawn` (raised in error) · `needs owner decision`.
 > Last updated 2026-07-29.
 
 ---
@@ -39,13 +39,14 @@ other. Left alone they compound.
 
 | # | Defect | Status |
 | --- | --- | --- |
-| 6.1 | **Orphaned sidebar artboard.** The sheet contains a standalone sidebar with no screen attached — scratch geometry from building the reusable component, shipped in the export. Same class of problem as 1.1. | open |
+| ~~6.1~~ | ~~Orphaned sidebar artboard.~~ **MISDIAGNOSED — not a defect.** The standalone sidebar (`YgURS`) is the master **component definition**, flagged `reusable: true`, and all three screens are instances referencing it (`wb0nD`, `SUeZF`, `xWYl3`). Same for Nav Item, Nav Item Active and KPI Tile. Deleting any of them would break every screen that points at it. Verified by parsing the `.pen`: 4 definitions, 28 instance refs. A component library on the canvas is good file structure, not scratch. | **withdrawn** |
 
 ## Batch 01 — design system
 
 | # | Defect | Status |
 | --- | --- | --- |
-| 1.1 | **Stray scratch geometry above the sheet** — a leftover quantity stepper, text field, button and colour swatch float outside the main artboard. Cosmetic, but it ships in the export. | open |
+| ~~1.1~~ | ~~Stray scratch geometry above the sheet.~~ **MISDIAGNOSED — same cause as 6.1.** The floating stepper, text field, button and swatch are the sheet's own reusable **component definitions** (`component/Swatch`, `component/Button`, `component/TextField`, `component/QtyStepper`), referenced by 58 instances across the sheet. Not deletable. | **withdrawn** |
+| 1.3 | **Component definitions render in the export.** The real (presentational) issue behind 1.1/6.1: master definitions sit outside the sheet's layout, so exported PNGs show them floating above the content and read as clutter. Fix is placement, not deletion — move them into a labelled "Component library" section at the foot of the sheet. | open |
 | 1.2 | **Dark-mode contrast unverified.** The dark palette looks right but has not been measured. Every dark token pair needs a computed contrast ratio against its ground before sign-off (body text ≥ 4.5:1, UI affordances ≥ 3:1). | open |
 
 ---
