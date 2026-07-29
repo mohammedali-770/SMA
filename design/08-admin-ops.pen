@@ -100,8 +100,8 @@
               "children": [
                 {
                   "type": "frame",
-                  "id": "YKvrr",
-                  "name": "Nav Dashboard",
+                  "id": "y7mSDO",
+                  "name": "Nav Sales Overview",
                   "width": "fill_container",
                   "cornerRadius": 8,
                   "gap": 12,
@@ -113,20 +113,20 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "zqWav",
-                      "name": "Icon Dashboard",
+                      "id": "E9XAlx",
+                      "name": "Icon Sales Overview",
                       "width": 18,
                       "height": 18,
-                      "icon": "layout-dashboard",
+                      "icon": "trending-up",
                       "library": "lucide",
                       "fill": "$sidebar-text"
                     },
                     {
                       "type": "text",
-                      "id": "y81TI",
-                      "name": "Label Dashboard",
+                      "id": "ugcQU",
+                      "name": "Label Sales Overview",
                       "fill": "$sidebar-text",
-                      "content": "Dashboard",
+                      "content": "Sales Overview",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "500"
@@ -135,8 +135,8 @@
                 },
                 {
                   "type": "frame",
-                  "id": "BuwRl",
-                  "name": "Nav Orders",
+                  "id": "J8fhre",
+                  "name": "Nav Live Orders",
                   "width": "fill_container",
                   "cornerRadius": 8,
                   "gap": 12,
@@ -148,8 +148,8 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "F9CSy",
-                      "name": "Icon Orders",
+                      "id": "E8J4W",
+                      "name": "Icon Live Orders",
                       "width": 18,
                       "height": 18,
                       "icon": "shopping-bag",
@@ -158,20 +158,45 @@
                     },
                     {
                       "type": "text",
-                      "id": "H1yI1",
-                      "name": "Label Orders",
+                      "id": "uU4j3",
+                      "name": "Label Live Orders",
                       "fill": "$sidebar-text",
-                      "content": "Orders",
+                      "content": "Live Orders",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "V5Ku4",
+                      "name": "Badge Live Orders",
+                      "fill": "$danger",
+                      "cornerRadius": 10,
+                      "padding": [
+                        2,
+                        7
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "p3nvGL",
+                          "name": "Badge Text Live Orders",
+                          "fill": "#ffffff",
+                          "content": "7",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "700"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "g56Fv",
-                  "name": "Nav Menu",
+                  "id": "mQuSZ",
+                  "name": "Nav Menu Management",
                   "width": "fill_container",
                   "cornerRadius": 8,
                   "gap": 12,
@@ -183,8 +208,8 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "VvL6b",
-                      "name": "Icon Menu",
+                      "id": "O0lyv",
+                      "name": "Icon Menu Management",
                       "width": 18,
                       "height": 18,
                       "icon": "utensils",
@@ -193,10 +218,10 @@
                     },
                     {
                       "type": "text",
-                      "id": "a5I7JV",
-                      "name": "Label Menu",
+                      "id": "syNli",
+                      "name": "Label Menu Management",
                       "fill": "$sidebar-text",
-                      "content": "Menu",
+                      "content": "Menu Management",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "500"
@@ -205,77 +230,7 @@
                 },
                 {
                   "type": "frame",
-                  "id": "AlQrC",
-                  "name": "Nav Branches",
-                  "width": "fill_container",
-                  "cornerRadius": 8,
-                  "gap": 12,
-                  "padding": [
-                    10,
-                    12
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "UsQZo",
-                      "name": "Icon Branches",
-                      "width": 18,
-                      "height": 18,
-                      "icon": "git-branch",
-                      "library": "lucide",
-                      "fill": "$sidebar-text"
-                    },
-                    {
-                      "type": "text",
-                      "id": "DFgm6",
-                      "name": "Label Branches",
-                      "fill": "$sidebar-text",
-                      "content": "Branches",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "oL2sd",
-                  "name": "Nav Customers",
-                  "width": "fill_container",
-                  "cornerRadius": 8,
-                  "gap": 12,
-                  "padding": [
-                    10,
-                    12
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "kEUPR",
-                      "name": "Icon Customers",
-                      "width": 18,
-                      "height": 18,
-                      "icon": "users",
-                      "library": "lucide",
-                      "fill": "$sidebar-text"
-                    },
-                    {
-                      "type": "text",
-                      "id": "Rn9D3",
-                      "name": "Label Customers",
-                      "fill": "$sidebar-text",
-                      "content": "Customers",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "nRAfi",
+                  "id": "h9RbU",
                   "name": "Nav Banners",
                   "width": "fill_container",
                   "fill": "$sidebar-hover",
@@ -289,7 +244,7 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "HCRk7",
+                      "id": "v96GI",
                       "name": "Icon Banners",
                       "width": 18,
                       "height": 18,
@@ -299,7 +254,7 @@
                     },
                     {
                       "type": "text",
-                      "id": "HuHgR",
+                      "id": "XNxTp",
                       "name": "Label Banners",
                       "fill": "$sidebar-active",
                       "content": "Banners",
@@ -311,7 +266,77 @@
                 },
                 {
                   "type": "frame",
-                  "id": "du6R6",
+                  "id": "F05MGt",
+                  "name": "Nav Branch Management",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "NaCoG",
+                      "name": "Icon Branch Management",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "git-branch",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "so5Ln",
+                      "name": "Label Branch Management",
+                      "fill": "$sidebar-text",
+                      "content": "Branch Management",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "evnm5",
+                  "name": "Nav Financial Reports",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "trEbg",
+                      "name": "Icon Financial Reports",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chart-bar",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ojjNw",
+                      "name": "Label Financial Reports",
+                      "fill": "$sidebar-text",
+                      "content": "Financial Reports",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "VWPV1",
                   "name": "Nav Integrations",
                   "width": "fill_container",
                   "cornerRadius": 8,
@@ -324,7 +349,7 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "PToJC",
+                      "id": "rGGTS",
                       "name": "Icon Integrations",
                       "width": 18,
                       "height": 18,
@@ -334,7 +359,7 @@
                     },
                     {
                       "type": "text",
-                      "id": "UcaVJ",
+                      "id": "InX4R",
                       "name": "Label Integrations",
                       "fill": "$sidebar-text",
                       "content": "Integrations",
@@ -346,8 +371,8 @@
                 },
                 {
                   "type": "frame",
-                  "id": "M50E0e",
-                  "name": "Nav Operations",
+                  "id": "A9z81",
+                  "name": "Nav Operations Health",
                   "width": "fill_container",
                   "cornerRadius": 8,
                   "gap": 12,
@@ -359,8 +384,8 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "ht28F",
-                      "name": "Icon Operations",
+                      "id": "xcM6Z",
+                      "name": "Icon Operations Health",
                       "width": 18,
                       "height": 18,
                       "icon": "activity",
@@ -369,10 +394,10 @@
                     },
                     {
                       "type": "text",
-                      "id": "t7gGL",
-                      "name": "Label Operations",
+                      "id": "s370ty",
+                      "name": "Label Operations Health",
                       "fill": "$sidebar-text",
-                      "content": "Operations",
+                      "content": "Operations Health",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "500"
@@ -381,7 +406,67 @@
                 },
                 {
                   "type": "frame",
-                  "id": "Z50MI",
+                  "id": "FGeNZ",
+                  "name": "Nav Operations Alerts",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "H2o3iR",
+                      "name": "Icon Operations Alerts",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "bell-ring",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "pSIXl",
+                      "name": "Label Operations Alerts",
+                      "fill": "$sidebar-text",
+                      "content": "Operations Alerts",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "UoTs0",
+                      "name": "Badge Operations Alerts",
+                      "fill": "$danger",
+                      "cornerRadius": 10,
+                      "padding": [
+                        2,
+                        7
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "RrcmL",
+                          "name": "Badge Text Operations Alerts",
+                          "fill": "#ffffff",
+                          "content": "3",
+                          "fontFamily": "Inter",
+                          "fontSize": 10,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "HEv5X",
                   "name": "Nav Order Integrity",
                   "width": "fill_container",
                   "cornerRadius": 8,
@@ -394,7 +479,7 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "Ht33w",
+                      "id": "uiOVV",
                       "name": "Icon Order Integrity",
                       "width": 18,
                       "height": 18,
@@ -404,7 +489,7 @@
                     },
                     {
                       "type": "text",
-                      "id": "s8Npy4",
+                      "id": "yRLzZ",
                       "name": "Label Order Integrity",
                       "fill": "$sidebar-text",
                       "content": "Order Integrity",
@@ -416,7 +501,7 @@
                 },
                 {
                   "type": "frame",
-                  "id": "D5WWf",
+                  "id": "v5mJDV",
                   "name": "Nav Settings",
                   "width": "fill_container",
                   "cornerRadius": 8,
@@ -429,7 +514,7 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "dLpdR",
+                      "id": "tGkXi",
                       "name": "Icon Settings",
                       "width": 18,
                       "height": 18,
@@ -439,7 +524,7 @@
                     },
                     {
                       "type": "text",
-                      "id": "F6gwC",
+                      "id": "pljbn",
                       "name": "Label Settings",
                       "fill": "$sidebar-text",
                       "content": "Settings",
@@ -451,8 +536,8 @@
                 },
                 {
                   "type": "frame",
-                  "id": "GZ1fG",
-                  "name": "Nav Legal Docs",
+                  "id": "mebSx",
+                  "name": "Nav Legal Documents",
                   "width": "fill_container",
                   "cornerRadius": 8,
                   "gap": 12,
@@ -464,8 +549,8 @@
                   "children": [
                     {
                       "type": "icon",
-                      "id": "R8TdP",
-                      "name": "Icon Legal Docs",
+                      "id": "P9B19C",
+                      "name": "Icon Legal Documents",
                       "width": 18,
                       "height": 18,
                       "icon": "file-text",
@@ -474,45 +559,10 @@
                     },
                     {
                       "type": "text",
-                      "id": "kluBE",
-                      "name": "Label Legal Docs",
+                      "id": "n3YpGY",
+                      "name": "Label Legal Documents",
                       "fill": "$sidebar-text",
-                      "content": "Legal Docs",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "ZNGBz",
-                  "name": "Nav Reports",
-                  "width": "fill_container",
-                  "cornerRadius": 8,
-                  "gap": 12,
-                  "padding": [
-                    10,
-                    12
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "icon",
-                      "id": "THM3x",
-                      "name": "Icon Reports",
-                      "width": 18,
-                      "height": 18,
-                      "icon": "chart-bar",
-                      "library": "lucide",
-                      "fill": "$sidebar-text"
-                    },
-                    {
-                      "type": "text",
-                      "id": "vr7ue",
-                      "name": "Label Reports",
-                      "fill": "$sidebar-text",
-                      "content": "Reports",
+                      "content": "Legal Documents",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "500"
