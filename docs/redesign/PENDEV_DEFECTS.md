@@ -54,7 +54,7 @@ so left alone they compound.
 | --- | --- | --- | --- |
 | ~~1.1~~ | ~~Stray scratch geometry above the sheet.~~ **MISDIAGNOSED — same cause as 6.1.** The floating stepper, field, button and swatch are the sheet's own component definitions, referenced by 116 instances. | **withdrawn** | `verify.py` §6 — 4 definitions, 116 refs, all resolving. |
 | 1.3 | **Component definitions render in the export**, floating outside the sheet layout so PNGs read as cluttered. The real issue behind the 1.1/6.1 misreading — placement, not deletion. | **fixed** | Definitions moved into a labelled *Component library · مكتبة المكونات* section at the foot of the sheet; refs intact. |
-| 1.2 | **Dark-mode contrast unverified.** The dark palette looks right but has not been measured. Every dark token pair needs a computed ratio against its ground (body ≥ 4.5:1, UI affordances ≥ 3:1). | **open** | Deferred — needs a computed contrast pass, not a visual judgement. |
+| 1.2 | **Dark-mode contrast unverified.** | **fixed — passes** | Measured with `design/contrast.py` (WCAG 2.1 relative luminance, tokens read from the `.pen` itself). **Dark mode: all 18 required pairs meet AA**, 8 of them AAA. Full output in `CONTRAST_REPORT.txt`. |
 
 ---
 
@@ -111,9 +111,46 @@ re-order* · *nothing to refund* · *VAT incl* · *awaiting POS* · *Dormant* ·
 *Disabling both payment methods stops checkout* · *ضريبة القيمة المضافة* ·
 *خصم الولاء*.
 
+## Contrast measurement (defect 1.2)
+
+Run `python3 design/contrast.py`; full output in `CONTRAST_REPORT.txt`.
+
+**Dark mode passes.** All 18 required pairs meet AA and 8 reach AAA. Body text
+sits at 16.63:1 on the ground and 14.61:1 on a card; the lifted purple and red
+clear AA against every surface they are used on. The dark palette needed no change.
+
+**Light mode has 5 real AA failures — and they are pre-existing production
+values, not redesign output.** Every failing colour is byte-identical to
+`apps/mobile/src/theme.ts`:
+
+| Pair | Ratio | Need | Minimal fix |
+| --- | --- | --- | --- |
+| success chip text in its tint (`#1f9d55` on `#e7f6ee`) | 3.13:1 | 4.5:1 | `#197f45` → 4.52:1 |
+| warning chip text in its tint (`#c47f17` on `#fef3e0`) | 2.99:1 | 4.5:1 | `#9b6412` → 4.52:1 |
+| error chip text in its tint (`#e02d3d` on `#fdeaec`) | 3.94:1 | 4.5:1 | `#ce2938` → 4.54:1 |
+| success status text on a card (`#1f9d55` on `#ffffff`) | 3.49:1 | 4.5:1 | `#1b8749` → 4.56:1 |
+| warning status text on a card (`#c47f17` on `#ffffff`) | 3.28:1 | 4.5:1 | `#a36913` → 4.58:1 |
+
+Source lines: `theme.ts:20` `success: '#1f9d55'`, `:21` `danger: '#e02d3d'`,
+`:22` `warning: '#c47f17'`, `:25` `successBg: '#e7f6ee'`, `:26` `dangerBg: '#fdeaec'`.
+
+These affect **the shipped app today**: order-status pills, the open/closed badge,
+payment badges and inline notices all use them. Fixing them is a theme change, not
+a design change — and therefore an owner decision, since it alters production.
+
+**Two advisories** (not counted as failures): the card border sits at 1.20:1 light
+and 1.22:1 dark against its own surface. WCAG 1.4.11 covers components required to
+identify the interface, and a card is a container separated by fill and shadow as
+well as its border — so this is a low-vision legibility concern rather than a
+strict AA obligation. Worth strengthening if the owner wants belt-and-braces.
+
+**Disabled controls** are measured but exempt: WCAG 1.4.3 and 1.4.11 both carve
+out inactive components.
+
 ## Remaining open items
 
-- **1.2 — dark-mode contrast** needs measuring against WCAG rather than eyeballing.
+- **Light-mode status colours fail AA** — 5 pairs, detailed below. Inherited from
+  the live app, not introduced by the redesign. Needs an owner decision.
 - **Layer-name hygiene** — `03-payment` retains 4 Arabic-Indic digits inside layer
   names. Never rendered; cosmetic only.
 - **Order-tracking timeline** — still the owner's call (`PENDEV_BRIEF.md` §10);
