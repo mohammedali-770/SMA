@@ -68,7 +68,11 @@ export function OrdersScreen() {
     // the card leads with the confirmation state instead of an internal id.
     const branchNo = orderDisplayNumber(item);
     const confirmation = confirmationPresentation(orderConfirmationState(item));
-    const heading = branchNo ?? t(confirmation.titleKey);
+    // The branch's number is short — often a single digit — so it led the card
+    // as a bare "5" with nothing saying what the 5 was. The receipt labels it
+    // ("Order number: 5"); the card has no room for a label, so it gets the
+    // sign instead, which reads the same in both languages.
+    const heading = branchNo != null ? `#${branchNo}` : t(confirmation.titleKey);
     const statusLabel = t(STATUS_KEY[item.status]);
     const itemCount = item.items.reduce((n, it) => n + it.quantity, 0);
     const meta = `${itemCount} ${t('items')} · ${item.orderType === 'delivery' ? t('delivery') : t('pickup')}`;

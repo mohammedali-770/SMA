@@ -215,7 +215,8 @@ const styles = StyleSheet.create({
   },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
+    // Primary action → brand purple (see the design system's button variants).
+    backgroundColor: colors.purple, borderRadius: radius.lg, borderCurve: 'continuous',
     paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
   },
   addBtnDim: { backgroundColor: colors.disabled },

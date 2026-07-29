@@ -170,7 +170,9 @@ const styles = StyleSheet.create({
   subtotalValue: { fontSize: font.lg, color: colors.purple, fontWeight: '800' },
   checkoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
+    // Purple, not red: the design system gives primary actions the brand purple
+    // and keeps red for destructive ones (Remove, above, is correctly red).
+    backgroundColor: colors.purple, borderRadius: radius.lg, borderCurve: 'continuous',
     paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
   },
   checkoutBtnDisabled: { backgroundColor: colors.muted, justifyContent: 'center' },

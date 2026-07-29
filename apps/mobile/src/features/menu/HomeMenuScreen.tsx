@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BannerCarousel } from './BannerCarousel';
 import { buildMenuSections, buildSearchIndex, menuItemKey, type MenuSection, type MenuSectionItem } from './menuSections';
 import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
+import { LangToggle } from '../../components/LangToggle';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { Price } from '../../components/Price';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
@@ -45,7 +46,7 @@ const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, toggle, isRTL, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
   const {
     loading, error, reload, categories, products, selectedBranch, selectedBranchId,
     isAvailable, branchIsOpen, groupsForProduct,
@@ -145,43 +146,38 @@ export function HomeMenuScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Top bar: logo + language toggle (no phone icon) */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
-        <View style={styles.brandRow}>
+      {/* Top bar: mark + wordmark, and the language toggle on the far edge.
+          The marketing tagline that used to sit under the wordmark is gone —
+          it competed with the branch context immediately below it, which is
+          the line a customer actually needs to read before ordering. */}
+      <View style={[styles.topBar, rtlRow, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={[styles.brandRow, rtlRow]}>
           <Image source={require('../../../assets/icon.png')} style={styles.mark} contentFit="cover" />
-          <View>
-            <Text style={styles.brand}>{pick('Spicy Meal', 'سبايسي ميل')}</Text>
-            <Text style={styles.brandTag} numberOfLines={1}>
-              {pick('Hot, ', 'حار، ')}
-              <Text style={styles.brandTagAccent}>{pick('Crispy', 'مقرمش')}</Text>
-              {pick(', Fresh and Golden Bites', '، طازج ولقيمات ذهبية')}
-            </Text>
-          </View>
+          <Text style={styles.brand}>{pick('Spicy Meal', 'سبايسي ميل')}</Text>
         </View>
-        <Pressable onPress={toggle} hitSlop={8} style={styles.langBtn} accessibilityRole="button">
-          <Text style={styles.langText}>{lang === 'en' ? 'العربية' : 'EN'}</Text>
-        </Pressable>
+        <LangToggle />
       </View>
 
-      {/* Selected order-context card (above the banners + search). Tapping it
-          re-opens the same blocking Pickup/Delivery selection flow. Mirrored in
-          Arabic (accent → info → action), with a purple accent bar on the
-          reading edge so the current context scans instantly. */}
+      {/* Selected order context. Tapping it re-opens the same blocking
+          Pickup/Delivery selection flow.
+
+          It reads as a strip on the page ground rather than a bordered card
+          with an accent bar: the order type is a quiet LABEL above the branch
+          name, because "Delivery from" is context and the branch is the fact.
+          The old layout gave both the same weight and boxed them, which made a
+          persistent, always-true piece of state look like an alert. */}
       {orderCtx.context ? (
         <Pressable style={[styles.branchRow, rtlRow]} onPress={() => router.push('/select')} accessibilityRole="button">
-          <View style={styles.ctxAccent} />
           <View style={{ flex: 1 }}>
+            <Text style={[styles.ctxLabel, rtlText]}>
+              {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
+            </Text>
             <View style={[styles.ctxTopRow, rtlRow]}>
-              <View style={styles.otChip}>
-                <Text style={styles.otChipText}>
-                  {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
-                </Text>
-              </View>
+              <Text style={[styles.branchValue, rtlText]} numberOfLines={1}>
+                {pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}
+              </Text>
               {selectedBranch ? <OpenClosedBadge open={branchOpen} /> : null}
             </View>
-            <Text style={[styles.branchValue, rtlText]} numberOfLines={1}>
-              {pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}
-            </Text>
             {orderCtx.context.orderType === 'delivery' ? (
               <Text style={[styles.branchSub, rtlText]} numberOfLines={1}>
                 {[orderCtx.context.deliveryDescription,
@@ -331,15 +327,15 @@ function MenuSkeleton() {
       </View>
       {[0, 1, 2, 3].map((i) => (
         <View key={i} style={skeleton.card}>
-          <View style={skeleton.img} />
-          <View style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
+          <View style={{ flex: 1, gap: spacing.sm }}>
             <View style={[skeleton.line, { width: '70%' }]} />
             <View style={[skeleton.line, { width: '95%' }]} />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
               <View style={[skeleton.line, { width: 64 }]} />
-              <View style={[skeleton.chip, { width: 76 }]} />
+              <View style={[skeleton.chip, { width: 76, height: 36 }]} />
             </View>
           </View>
+          <View style={skeleton.img} />
         </View>
       ))}
     </View>
@@ -349,8 +345,11 @@ function MenuSkeleton() {
 const skeleton = StyleSheet.create({
   block: { backgroundColor: colors.bgAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   chip: { height: 34, borderRadius: radius.pill, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
-  card: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  img: { width: 104, minHeight: 112, backgroundColor: colors.bgAlt },
+  card: {
+    flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.xl,
+    padding: spacing.md, gap: spacing.md,
+  },
+  img: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.bgAlt },
   line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
 });
 
@@ -376,8 +375,21 @@ export const ProductCard = React.memo(function ProductCard({
   const actionLabel = hasModifiers ? t('customizeAdd') : t('addToCart');
   const showImage = !!product.imageUrl && !imgFailed;
   return (
-    // Mirrored in Arabic: image on the right, text block reading right-to-left.
+    // Mirrored in Arabic: image on the trailing edge, text reading right-to-left.
     <View style={[styles.card, rtlRow, shadow.card]}>
+      <View style={styles.cardBody}>
+        <Text style={[styles.cardName, rtlText]} numberOfLines={2}>{name}</Text>
+        {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
+        <View style={[styles.cardBottom, rtlRow]}>
+          <View>
+            <Price amount={product.price} size={font.lg} color={colors.ink} weight="800" />
+            {kcalLabel ? <Text style={[styles.cardKcal, rtlText]}>{kcalLabel}</Text> : null}
+          </View>
+          <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
+            <Text style={styles.addBtnText}>{actionLabel}</Text>
+          </Pressable>
+        </View>
+      </View>
       {showImage ? (
         <Image
           source={{ uri: product.imageUrl }}
@@ -396,19 +408,6 @@ export const ProductCard = React.memo(function ProductCard({
           <DishIcon size={34} />
         </View>
       )}
-      <View style={styles.cardBody}>
-        <Text style={[styles.cardName, rtlText]} numberOfLines={2}>{name}</Text>
-        {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
-        <View style={[styles.cardBottom, rtlRow]}>
-          <View>
-            <Price amount={product.price} size={font.md} color={colors.purple} weight="800" />
-            {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
-          </View>
-          <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
-            <Text style={styles.addBtnText}>{actionLabel}</Text>
-          </Pressable>
-        </View>
-      </View>
     </View>
   );
 });
@@ -421,34 +420,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  mark: { width: 38, height: 38, borderRadius: radius.sm },
+  mark: { width: 34, height: 34, borderRadius: radius.sm, borderCurve: 'continuous' },
   brand: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
-  brandTag: { fontSize: font.xs, fontWeight: '700', color: colors.text, marginTop: -2 },
-  brandTagAccent: { color: colors.red, fontWeight: '800' },
-  langBtn: {
-    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill,
-    borderWidth: 1.5, borderColor: colors.purple,
-  },
-  langText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
-
+  // A strip on the ground, not a boxed card: this state is always present and
+  // always true, so it should sit quietly under the header rather than announce
+  // itself. The rule beneath separates it from the banners.
   branchRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
+    backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border,
   },
-  ctxAccent: { alignSelf: 'stretch', width: 4, borderRadius: 2, backgroundColor: colors.purple },
-  ctxTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 },
-  otChip: {
-    paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radius.pill,
-    backgroundColor: colors.purpleBg,
-  },
-  otChipText: { fontSize: font.xs, color: colors.purple, fontWeight: '800' },
-  branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
-  branchSub: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
+  ctxLabel: { fontSize: font.xs, color: colors.muted, fontWeight: '600' },
+  ctxTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 },
+  branchValue: { fontSize: font.md, color: colors.ink, fontWeight: '800', flexShrink: 1 },
+  branchSub: { fontSize: font.xs, color: colors.muted, marginTop: 3 },
   changeBtn: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.purple,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
+    borderRadius: radius.pill, backgroundColor: colors.purpleBg,
   },
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
@@ -457,8 +445,8 @@ const styles = StyleSheet.create({
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.lg, marginTop: spacing.md, paddingHorizontal: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
+    marginHorizontal: spacing.lg, marginTop: spacing.lg, paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border,
   },
   searchInput: { flex: 1, paddingVertical: spacing.md, fontSize: font.md, color: colors.text },
@@ -477,26 +465,36 @@ const styles = StyleSheet.create({
   chipText: { color: colors.text, fontWeight: '700', fontSize: font.sm },
   chipTextActive: { color: colors.white, fontWeight: '800' },
 
-  sectionTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.ink, marginBottom: spacing.md },
 
+  // Card defined by shadow rather than a hairline border, with the image inset
+  // instead of bleeding to the edge — the flush block made every row look like
+  // a table cell, and a food photograph reads better as an object on the card
+  // than as one of its walls.
   card: {
-    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
-    borderCurve: 'continuous', overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'stretch', backgroundColor: colors.surface,
+    borderRadius: radius.xl, borderCurve: 'continuous', padding: spacing.md, gap: spacing.md,
   },
-  cardImg: { width: 104, alignSelf: 'stretch', minHeight: 116, backgroundColor: colors.bgAlt },
+  cardImg: {
+    width: 96, alignSelf: 'stretch', minHeight: 96,
+    borderRadius: radius.md, borderCurve: 'continuous', backgroundColor: colors.bgAlt,
+  },
   cardImgEmpty: { alignItems: 'center', justifyContent: 'center' },
-  cardBody: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
-  cardName: { fontSize: font.md, lineHeight: 20, fontWeight: '800', color: colors.text },
-  cardDesc: { fontSize: font.sm, lineHeight: 18, color: colors.muted, marginTop: 2 },
+  cardBody: { flex: 1, justifyContent: 'space-between', minHeight: 96 },
+  cardName: { fontSize: font.md, lineHeight: 21, fontWeight: '800', color: colors.ink },
+  cardDesc: { fontSize: font.sm, lineHeight: 19, color: colors.muted, marginTop: 3 },
   cardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.md },
-  cardPrice: { fontSize: font.md, fontWeight: '800', color: colors.purple },
-  cardKcal: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
+  cardKcal: { fontSize: font.xs, color: colors.muted, marginTop: 3 },
+  // Quiet, not loud. A solid brand-red pill repeated down twenty rows spends the
+  // accent on the least remarkable thing on screen; the price is what a customer
+  // reads, and Add is the small affordance next to it.
   addBtn: {
-    backgroundColor: colors.red, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
-    borderRadius: radius.pill, minHeight: 36, justifyContent: 'center',
+    backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
+    borderRadius: radius.md, borderCurve: 'continuous', minHeight: 36, justifyContent: 'center',
   },
   addBtnPressed: { opacity: motion.pressedOpacity, transform: [{ scale: motion.pressedScale }] },
-  addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
+  addBtnText: { color: colors.ink, fontWeight: '800', fontSize: font.sm },
 
   cartBar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -505,7 +503,7 @@ const styles = StyleSheet.create({
   cartBtn: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
     backgroundColor: colors.purple, borderRadius: radius.lg, borderCurve: 'continuous',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, ...shadow.card,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, ...shadow.lg,
   },
   cartCount: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
   cartCountText: { color: colors.white, fontWeight: '800', fontSize: font.sm },

@@ -26,6 +26,7 @@ import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { Notice } from '../../components/Notice';
+import { LangToggle } from '../../components/LangToggle';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { checkDescription, descriptionCopy, descriptionMessage } from './locationDescription';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -198,7 +199,7 @@ export function OrderTypeSelectScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title={t('otTitle')} showBack={valid} onBack={done} safeTop />
+      <Header title={t('otTitle')} showBack={valid} onBack={done} safeTop right={<LangToggle />} />
 
       {/* Pickup / Delivery — a single segmented control so the two order
           types read as one choice, not two separate buttons. */}
