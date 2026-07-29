@@ -8,3 +8,5 @@ Using the attached design system, design the checkout and payment screens for th
 6. My orders, ARABIC. A list of three order cards, each with a status pill (قيد التحضير amber, جارٍ التحقق مع الفرع neutral, تم التوصيل green), a timestamp, the branch and order type, the total price, and a line showing the branch order number or "لم يصدر بعد". Bottom tab bar with the orders tab active.
 
 Critical rule: the internal database order number must never appear. Only the branch's own POS number is ever shown to a customer, and only once it exists.
+
+IMAGE RULE — REQUIRED FOR THE FILE TO SAVE. Do NOT insert image assets, image fills, or any external/remote image reference anywhere in this design. Every photograph must be drawn as a rounded rectangle filled with a warm appetising linear gradient (for food: #ffd9a3 into #f4a259 into #d1512f; vary the hue slightly between dishes) and, where it helps, a small muted caption. These are photo placeholders, which is standard mockup practice — production builds swap in real product shots at the same crop. Maps are likewise drawn with vector strokes, never an image tile.

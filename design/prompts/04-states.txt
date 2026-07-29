@@ -18,3 +18,5 @@ Each card shows a circular status icon, an Arabic headline, an English sub-headl
 12. unpaid_final_failure — grey cross icon — "لم يتم إنشاء الطلب" / Not charged — cash order, no refund language at all.
 
 Make card 5 visually distinct with a green border so it reads as the single success state. Cards 2 and 3 must look clearly NEUTRAL and never celebratory. Never disclose how many resend attempts remain.
+
+IMAGE RULE — REQUIRED FOR THE FILE TO SAVE. Do NOT insert image assets, image fills, or any external/remote image reference anywhere in this design. Every photograph must be drawn as a rounded rectangle filled with a warm appetising linear gradient (for food: #ffd9a3 into #f4a259 into #d1512f; vary the hue slightly between dishes) and, where it helps, a small muted caption. These are photo placeholders, which is standard mockup practice — production builds swap in real product shots at the same crop. Maps are likewise drawn with vector strokes, never an image tile.
