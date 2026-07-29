@@ -12,13 +12,16 @@
  * verify key off the same canonical string the server derives.
  */
 import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '../../components/Button';
 import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
 import { useI18n } from '../../i18n/I18nProvider';
 import { sanitizeSaudiNationalInput, toSaudiE164 } from '../../lib/phone';
-import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
+import { DEFAULT_OTP_LENGTH } from '../otp/otpAutofill';
+import { OtpCodeInput } from '../otp/OtpCodeInput';
+import { OTP_RESEND_COOLDOWN_SECONDS } from '../otp/otpInput';
+import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
 import { whatsappOtp } from '../../services/api';
@@ -60,12 +63,13 @@ export function VerifyPhoneWhatsApp() {
     } finally { setBusy(false); }
   };
 
-  const verify = async () => {
+  const verify = async (codeArg?: string) => {
     setError(null);
-    if (!e164 || !/^\d{6}$/.test(code.trim())) { setError(t('invalidOrExpiredCode')); return; }
+    const value = (codeArg ?? code).trim();
+    if (!e164 || !/^\d{6}$/.test(value)) { setError(t('invalidOrExpiredCode')); return; }
     setBusy(true);
     try {
-      const res = await whatsappOtp.verify(e164, code.trim());
+      const res = await whatsappOtp.verify(e164, value);
       if (res.verified) {
         setPhase('verified');
         setNotice(t('phoneVerifiedSuccess'));
@@ -77,6 +81,14 @@ export function VerifyPhoneWhatsApp() {
       setError(t('invalidOrExpiredCode'));
     } finally { setBusy(false); }
   };
+
+  // Zero-tap autofill (WebOTP on web; declarative on native). Only listens on the
+  // code step; on read it fills the boxes and hands the code straight to verify.
+  useOtpAutofill({
+    enabled: phase === 'code',
+    length: DEFAULT_OTP_LENGTH,
+    onCode: (c) => { setCode(c); void verify(c); },
+  });
 
   const verified = phase === 'verified' || profile?.phoneVerified;
 
@@ -112,17 +124,15 @@ export function VerifyPhoneWhatsApp() {
             <Button label={t('sendCodeWhatsapp')} onPress={sendCode} loading={busy} disabled={!e164} />
           ) : (
             <>
-              <TextInput
+              <OtpCodeInput
                 value={code}
-                onChangeText={(v) => setCode(sanitizeOtpDigits(v, 6))}
-                keyboardType="number-pad"
-                placeholder={t('enterVerificationCode')}
-                placeholderTextColor={colors.muted}
-                style={[styles.input, styles.codeInput]}
-                maxLength={6}
+                onChange={setCode}
+                length={DEFAULT_OTP_LENGTH}
+                onComplete={(c) => verify(c)}
                 accessibilityLabel={t('enterVerificationCode')}
+                style={styles.codeField}
               />
-              <Button label={t('verifyBtn')} onPress={verify} loading={busy} />
+              <Button label={t('verifyBtn')} onPress={() => verify()} loading={busy} />
               <Button
                 label={cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
                 onPress={sendCode}
@@ -151,13 +161,8 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.successBg },
   badgeText: { fontSize: font.xs, fontWeight: '800', color: colors.success },
   sub: { fontSize: font.sm, color: colors.muted, marginTop: 2, marginBottom: spacing.md },
-  input: {
-    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md,
-    color: colors.text, backgroundColor: colors.white, marginBottom: spacing.sm,
-  },
   phoneField: { marginBottom: spacing.sm },
-  codeInput: { letterSpacing: 6, textAlign: 'center', fontWeight: '800' },
+  codeField: { marginBottom: spacing.sm },
   notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
   error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.sm },
   success: { fontSize: font.md, color: colors.success, fontWeight: '800', paddingVertical: spacing.sm },
