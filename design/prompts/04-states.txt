@@ -1,0 +1,20 @@
+Using the attached design system, design a board of TWELVE order-confirmation states for the Spicy Meal customer app. Lay them out as a 4-by-3 grid of phone-width cards (each about 340 wide), with a title above the board reading "Order confirmation — twelve states" and a short caption under each card.
+
+Two facts are tracked separately and must never be merged: whether the customer PAID, and whether the order actually reached the restaurant's point-of-sale system.
+
+Each card shows a circular status icon, an Arabic headline, an English sub-headline, one line of body copy, and small flag chips indicating whether it has a success check, a resend button and a branch order number.
+
+1. payment_pending — grey clock icon — "لم يكتمل الدفع" / Payment not completed — payment not received, order not sent to the branch. No check, no resend, no number.
+2. accepted_no_pos_channel — purple clock icon, NEUTRAL tone — "تم استلام الدفع" / Payment received — the order is processed through the delivery channel. NO success check: no branch has seen this order.
+3. accepted_no_pos_channel_unpaid — purple clock icon, NEUTRAL — "تم استلام الطلب" / Order received (cash) — same neutral treatment, no payment language.
+4. sending_to_branch — purple spinner icon — "جارٍ الإرسال إلى الفرع…" / Sending to the branch — asks the customer to stay on the screen.
+5. confirmed_by_branch — GREEN circular checkmark, the only success treatment in the whole product — "تم تأكيد الطلب" / Order confirmed — the branch confirmed it. Shows the branch order number #5.
+6. verifying_with_branch — amber question icon — "جارٍ التحقق مع الفرع" / Checking with the branch — ambiguous, a ticket may already exist. NO retry button; copy discourages re-ordering.
+7. branch_failed_retry_available — red retry icon — "لم يُرسل الطلب بعد" / Order not sent yet, paid — payment succeeded but the order was provably never sent. Has a resend button.
+8. unpaid_branch_failed_retry_available — red retry icon — "لم يُرسل الطلب بعد" / Order not sent yet, cash — same, no payment language.
+9. final_failure_refund_pending — red cross icon — "لم يتم إنشاء الطلب" / Refund automatic — the refund is in progress, not complete.
+10. final_failure_refunded — grey cross icon — "لم يتم إنشاء الطلب" / Refunded — refund confirmed by the provider.
+11. final_failure_refund_failed — amber warning icon — "لم يتم إنشاء الطلب" / Refund in progress — could not complete automatically, the team will make contact.
+12. unpaid_final_failure — grey cross icon — "لم يتم إنشاء الطلب" / Not charged — cash order, no refund language at all.
+
+Make card 5 visually distinct with a green border so it reads as the single success state. Cards 2 and 3 must look clearly NEUTRAL and never celebratory. Never disclose how many resend attempts remain.

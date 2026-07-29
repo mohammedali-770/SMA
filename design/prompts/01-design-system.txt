@@ -1,0 +1,10 @@
+Create the design system page for Spicy Meal, a Saudi fast-food ordering app that is Arabic-first (right-to-left) with English (left-to-right) as a secondary language. Lay it out as one wide artboard, clearly sectioned.
+
+1. Semantic colour roles, as labelled swatches with hex values: primary, on-primary, secondary, on-secondary, surface, surface-alt, background, border, text, text-muted, disabled, overlay, success, warning, danger, plus a tint background for each status. Brand primary is deep purple #422e87 and brand secondary is hot red #e02d3d — these are FIXED. Show a LIGHT row and a DARK row: on the dark ground (#100c1c) the purple lifts to #9b85f0 and the red to #ff6274 so both stay legible. Dark mode redefines tokens; it is not an inversion.
+2. A paired type scale for Arabic and Latin — display 26/32/800, title 20/26/800, heading 17/23/700, body 15/22/500, label 13/18/600, caption 12/16/500, button 17/22/700. Show each row twice: once in Arabic, once in English. Arabic needs greater line height and strings run 30-40 percent longer.
+3. Spacing 4/8/12/16/20/28, corner radii 8/12/16/22/pill, and exactly three elevation levels, each shown as a card sample.
+4. Motion tokens 150/220/320 ms, with a pressed state at 0.9 opacity and 0.97 scale.
+5. A core component strip, each component in default, pressed, disabled and loading states: primary button, secondary button, destructive button, text field, quantity stepper, status chip, open/closed badge, list row, card, inline notice (info, success, warning, error), 6-box OTP input, bottom tab bar, and a sticky bottom action bar.
+6. A Saudi Riyal currency treatment: a symbol plus the labels SAR and ر.س, amounts always at two decimals, numerals staying left-to-right inside Arabic text.
+
+Constraints: everything must be renderable by React Native on iOS, Android and web. Status must never be conveyed by colour alone — always pair it with an icon and a text label.

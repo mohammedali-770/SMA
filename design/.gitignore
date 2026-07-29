@@ -1,0 +1,7 @@
+# Transient run artifacts from run-batches.sh — regenerate, never review.
+logs/
+driver.log
+
+# Pipeline smoke test (proves generate + export works; not a deliverable).
+00-smoke.pen
+exports/00-smoke.png
