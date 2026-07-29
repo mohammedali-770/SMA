@@ -1,0 +1,5901 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "v2HZKe",
+      "x": 0,
+      "y": 0,
+      "name": "Status Bar",
+      "reusable": true,
+      "width": 390,
+      "height": 62,
+      "fill": "$white",
+      "padding": [
+        38,
+        24,
+        0,
+        24
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "egELm",
+          "name": "Time",
+          "fill": "$ink",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 15,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "BqvwF",
+          "name": "Right Icons",
+          "gap": 6,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "Up100",
+              "name": "Signal",
+              "width": 16,
+              "height": 16,
+              "icon": "signal",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "UoEGX",
+              "name": "Wifi",
+              "width": 16,
+              "height": 16,
+              "icon": "wifi",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "AMbFo",
+              "name": "Battery",
+              "width": 20,
+              "height": 16,
+              "icon": "battery-full",
+              "library": "lucide",
+              "fill": "$ink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "YUtSZ",
+      "x": 0,
+      "y": -136,
+      "name": "Tab Bar AR",
+      "reusable": true,
+      "width": 390,
+      "height": 88,
+      "fill": "$white",
+      "padding": [
+        0,
+        16,
+        12,
+        16
+      ],
+      "justifyContent": "center",
+      "alignItems": "end",
+      "children": [
+        {
+          "type": "frame",
+          "id": "KODQh",
+          "name": "Tab Inner",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "#f0eef5",
+          "cornerRadius": 28,
+          "padding": 6,
+          "justifyContent": "space_around",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "XSEpg",
+              "name": "Tab حسابي",
+              "width": 80,
+              "height": 44,
+              "fill": "#00000000",
+              "cornerRadius": 22,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "V1tce",
+                  "name": "Icon حسابي",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "user",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "nSD17",
+                  "name": "Label حسابي",
+                  "fill": "$muted",
+                  "content": "حسابي",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "xlIXI",
+              "name": "Tab طلباتي",
+              "width": 80,
+              "height": 44,
+              "fill": "#00000000",
+              "cornerRadius": 22,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "I3X7V",
+                  "name": "Icon طلباتي",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "clipboard-list",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "VtnW1",
+                  "name": "Label طلباتي",
+                  "fill": "$muted",
+                  "content": "طلباتي",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "S2acwZ",
+              "name": "Tab الرئيسية",
+              "width": 80,
+              "height": 44,
+              "fill": "$primary",
+              "cornerRadius": 22,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "ttdft",
+                  "name": "Icon الرئيسية",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "house",
+                  "library": "lucide",
+                  "fill": "$on-primary"
+                },
+                {
+                  "type": "text",
+                  "id": "HAHca",
+                  "name": "Label الرئيسية",
+                  "fill": "$on-primary",
+                  "content": "الرئيسية",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "e8f4mo",
+      "x": 0,
+      "y": -268,
+      "name": "Button Primary",
+      "reusable": true,
+      "width": 358,
+      "height": 52,
+      "fill": "$primary",
+      "cornerRadius": 12,
+      "justifyContent": "center",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "sytB8",
+          "name": "Button Label",
+          "fill": "$on-primary",
+          "content": "متابعة",
+          "fontFamily": "Inter",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "qp1ox",
+      "x": 0,
+      "y": -376,
+      "name": "Badge Open",
+      "reusable": true,
+      "fill": "$success-tint",
+      "cornerRadius": 999,
+      "gap": 4,
+      "padding": [
+        4,
+        10
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "icon",
+          "id": "XXdSq",
+          "name": "Badge Icon",
+          "width": 14,
+          "height": 14,
+          "icon": "circle-check",
+          "library": "lucide",
+          "fill": "$success"
+        },
+        {
+          "type": "text",
+          "id": "PTy8W",
+          "name": "Badge Label",
+          "fill": "$success",
+          "content": "مفتوح",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "gNXWA",
+      "x": 0,
+      "y": -484,
+      "name": "Badge Closed",
+      "reusable": true,
+      "fill": "$danger-tint",
+      "cornerRadius": 999,
+      "gap": 4,
+      "padding": [
+        4,
+        10
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "icon",
+          "id": "pR8lD",
+          "name": "Badge Icon Closed",
+          "width": 14,
+          "height": 14,
+          "icon": "circle-x",
+          "library": "lucide",
+          "fill": "$danger"
+        },
+        {
+          "type": "text",
+          "id": "d5J3L8",
+          "name": "Badge Label Closed",
+          "fill": "$danger",
+          "content": "مغلق",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "H1yXly",
+      "x": 470,
+      "y": -484,
+      "name": "Screen 1 Label",
+      "fill": "$muted",
+      "content": "1 — Order Type · Pickup (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "Y6eGjN",
+      "x": 680,
+      "y": -484,
+      "name": "Screen 1 Pickup",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "Z50PR",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "kV0GX",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "qBIen",
+              "name": "Header Title",
+              "fill": "$ink",
+              "content": "اختر طريقة الطلب",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "ms1CZ",
+          "name": "Order Type Tabs",
+          "width": "fill_container",
+          "height": 48,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "end",
+          "children": [
+            {
+              "type": "frame",
+              "id": "AXLu0",
+              "name": "Tab Pickup",
+              "width": "fill_container",
+              "height": 48,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Z7vZwp",
+                  "name": "Tab Pickup Label",
+                  "fill": "$primary",
+                  "content": "استلام من الفرع",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "g2agX",
+                  "name": "Tab Pickup Indicator",
+                  "fill": "$primary",
+                  "width": "fill_container",
+                  "height": 3
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "y7ayyK",
+              "name": "Tab Delivery",
+              "width": "fill_container",
+              "height": 48,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pFloL",
+                  "name": "Tab Delivery Label",
+                  "fill": "$muted",
+                  "content": "توصيل",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Fy9pU",
+                  "name": "Tab Delivery Line",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "y5T4G3",
+          "name": "Branch List",
+          "width": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "PaUYL",
+              "name": "Branch فرع العليا",
+              "width": "fill_container",
+              "gap": 12,
+              "padding": [
+                16,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "fsegI",
+                  "name": "Icon Wrap",
+                  "width": 40,
+                  "height": 40,
+                  "fill": "$primary-light",
+                  "cornerRadius": 10,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "Q157zQ",
+                      "name": "Branch Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "store",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dpoN6",
+                  "name": "Branch Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "O0TnAM",
+                      "name": "Branch Top",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "eDwNP",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "فرع العليا",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "iNK3i",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "mRT9x",
+                      "name": "Branch Address",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "طريق العليا العام، حي العليا",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "y5DlF",
+                      "name": "Branch Details",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "q2d7N",
+                          "name": "Distance",
+                          "fill": "$muted",
+                          "content": "١٫٢ كم",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "D6NME",
+                          "name": "Fee",
+                          "fill": "$muted",
+                          "content": "توصيل: مجاني",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "xtF7p",
+                          "name": "Min Order",
+                          "fill": "$muted",
+                          "content": "الحد الأدنى: ٥٠ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "puOZq",
+              "name": "Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "MotWW",
+              "name": "Branch فرع النخيل",
+              "width": "fill_container",
+              "gap": 12,
+              "padding": [
+                16,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Wdki9",
+                  "name": "Icon Wrap",
+                  "width": 40,
+                  "height": 40,
+                  "fill": "$primary-light",
+                  "cornerRadius": 10,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "yoV92",
+                      "name": "Branch Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "store",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cXNPx",
+                  "name": "Branch Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "P336eq",
+                      "name": "Branch Top",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "mVbUv",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "فرع النخيل",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "tnGrh",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "VAUcP",
+                      "name": "Branch Address",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "طريق الملك فهد، حي النخيل",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jULZK",
+                      "name": "Branch Details",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "k5oiT",
+                          "name": "Distance",
+                          "fill": "$muted",
+                          "content": "٣٫٨ كم",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "xSodI",
+                          "name": "Fee",
+                          "fill": "$muted",
+                          "content": "توصيل: ٥ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "aEEJI",
+                          "name": "Min Order",
+                          "fill": "$muted",
+                          "content": "الحد الأدنى: ٤٠ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "Fk4ev",
+              "name": "Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "t0DNL",
+              "name": "Branch فرع الملقا",
+              "width": "fill_container",
+              "gap": 12,
+              "padding": [
+                16,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "BHUXd",
+                  "name": "Icon Wrap",
+                  "width": 40,
+                  "height": 40,
+                  "fill": "$primary-light",
+                  "cornerRadius": 10,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "hukmb",
+                      "name": "Branch Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "store",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "u9WCRL",
+                  "name": "Branch Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "G42Do",
+                      "name": "Branch Top",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "nKSHn",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "فرع الملقا",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "WfPLX",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "nCfrX",
+                      "name": "Branch Address",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "شارع أنس بن مالك، حي الملقا",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ACd3M",
+                      "name": "Branch Details",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kOb6M",
+                          "name": "Distance",
+                          "fill": "$muted",
+                          "content": "٦٫٥ كم",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GQb5J",
+                          "name": "Fee",
+                          "fill": "$muted",
+                          "content": "توصيل: ٨ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "AG4jF",
+                          "name": "Min Order",
+                          "fill": "$muted",
+                          "content": "الحد الأدنى: ٤٠ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "D9mKrr",
+              "name": "Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "QGey5",
+              "name": "Branch فرع السويدي",
+              "opacity": 0.45,
+              "width": "fill_container",
+              "gap": 12,
+              "padding": [
+                16,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "lDSC6",
+                  "name": "Icon Wrap",
+                  "width": 40,
+                  "height": 40,
+                  "fill": "$primary-light",
+                  "cornerRadius": 10,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "Lsxq0",
+                      "name": "Branch Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "store",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "YdUio",
+                  "name": "Branch Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "a8RPsH",
+                      "name": "Branch Top",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Ths2V",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "فرع السويدي",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "AI4ZN",
+                          "type": "ref",
+                          "ref": "gNXWA",
+                          "name": "Closed Badge"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "ePVwo",
+                      "name": "Branch Address",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "شارع الأمير سلطان، حي السويدي",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vhTWy",
+                      "name": "Branch Details",
+                      "width": "fill_container",
+                      "gap": 16,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "UMgut",
+                          "name": "Distance",
+                          "fill": "$muted",
+                          "content": "١٢٫١ كم",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "yW5Kn",
+                          "name": "Fee",
+                          "fill": "$muted",
+                          "content": "توصيل: ١٢ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "urTDu",
+                          "name": "Min Order",
+                          "fill": "$muted",
+                          "content": "الحد الأدنى: ٦٠ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "hhIUm",
+          "name": "Selected Branch Note",
+          "width": "fill_container",
+          "fill": "$primary-light",
+          "gap": 8,
+          "padding": [
+            12,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "djmfK",
+              "name": "Check Icon",
+              "width": 18,
+              "height": 18,
+              "icon": "circle-check",
+              "library": "lucide",
+              "fill": "$primary"
+            },
+            {
+              "type": "text",
+              "id": "p4pvxK",
+              "name": "Selected Text",
+              "fill": "$primary",
+              "content": "تم اختيار: فرع العليا",
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "600"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "pCJLp",
+          "name": "Sticky Bottom",
+          "width": "fill_container",
+          "fill": "$white",
+          "layout": "vertical",
+          "padding": [
+            12,
+            16,
+            34,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "j97CUk",
+              "type": "ref",
+              "ref": "e8f4mo",
+              "name": "Continue Button",
+              "width": "fill_container",
+              "descendants": {
+                "sytB8": {
+                  "content": "متابعة"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "ENqDU",
+      "x": 1150,
+      "y": -484,
+      "name": "Screen 2 Label",
+      "fill": "$muted",
+      "content": "2 — Order Type · Delivery (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "VPE06",
+      "x": 1373,
+      "y": -484,
+      "name": "Screen 2 Delivery",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "wlxN9",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "odKNx",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "e6ifsK",
+              "name": "Header Title",
+              "fill": "$ink",
+              "content": "اختر طريقة الطلب",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VxNSk",
+          "name": "Order Type Tabs",
+          "width": "fill_container",
+          "height": 48,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "end",
+          "children": [
+            {
+              "type": "frame",
+              "id": "IXwqb",
+              "name": "Tab Pickup",
+              "width": "fill_container",
+              "height": 48,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "EARgK",
+                  "name": "Tab Pickup Label",
+                  "fill": "$muted",
+                  "content": "استلام من الفرع",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "rectangle",
+                  "id": "Zyehs",
+                  "name": "Tab Pickup Line",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "mh0nx",
+              "name": "Tab Delivery",
+              "width": "fill_container",
+              "height": 48,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "i39xrx",
+                  "name": "Tab Delivery Label",
+                  "fill": "$primary",
+                  "content": "توصيل",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 2,
+                  "id": "WwT3d",
+                  "name": "Tab Delivery Indicator",
+                  "fill": "$primary",
+                  "width": "fill_container",
+                  "height": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "jZjhn",
+          "name": "Map Area",
+          "clip": true,
+          "width": "fill_container",
+          "height": 280,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 0,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#d4e8d0",
+                "position": 0
+              },
+              {
+                "color": "#e8edd5",
+                "position": 0.5
+              },
+              {
+                "color": "#dde4d0",
+                "position": 1
+              }
+            ]
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "rectangle",
+              "id": "U1HlT",
+              "x": 0,
+              "y": 20,
+              "name": "Road H0",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "Ldnpe",
+              "x": 0,
+              "y": 70,
+              "name": "Road H1",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "cqDJC",
+              "x": 0,
+              "y": 120,
+              "name": "Road H2",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "V3WSEa",
+              "x": 0,
+              "y": 170,
+              "name": "Road H3",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "ZD1Xq",
+              "x": 0,
+              "y": 220,
+              "name": "Road H4",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "n44kKy",
+              "x": 0,
+              "y": 270,
+              "name": "Road H5",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 390,
+              "height": 1
+            },
+            {
+              "type": "rectangle",
+              "id": "n6a9yo",
+              "x": 0,
+              "y": 0,
+              "name": "Road V0",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "x0yH8W",
+              "x": 55,
+              "y": 0,
+              "name": "Road V1",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "NCzdf",
+              "x": 110,
+              "y": 0,
+              "name": "Road V2",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "dHAEh",
+              "x": 165,
+              "y": 0,
+              "name": "Road V3",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "PzO5N",
+              "x": 220,
+              "y": 0,
+              "name": "Road V4",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "wdvvr",
+              "x": 275,
+              "y": 0,
+              "name": "Road V5",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "UdpFz",
+              "x": 330,
+              "y": 0,
+              "name": "Road V6",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "kBGCO",
+              "x": 385,
+              "y": 0,
+              "name": "Road V7",
+              "opacity": 0.5,
+              "fill": "#c5cfc0",
+              "width": 1,
+              "height": 280
+            },
+            {
+              "type": "rectangle",
+              "id": "H2gSW",
+              "x": 0,
+              "y": 130,
+              "name": "Main Road H",
+              "fill": "#a8b5a3",
+              "width": 390,
+              "height": 3
+            },
+            {
+              "type": "rectangle",
+              "id": "DOJcc",
+              "x": 195,
+              "y": 0,
+              "name": "Main Road V",
+              "fill": "#a8b5a3",
+              "width": 3,
+              "height": 280
+            },
+            {
+              "type": "frame",
+              "id": "DzrmG",
+              "x": 175,
+              "y": 110,
+              "name": "Pin",
+              "layout": "vertical",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "y7yCz",
+                  "name": "Pin Head",
+                  "width": 36,
+                  "height": 36,
+                  "fill": "$secondary",
+                  "cornerRadius": 18,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "zYIQN",
+                      "name": "Pin Icon",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "map-pin",
+                      "library": "lucide",
+                      "fill": "$on-secondary"
+                    }
+                  ]
+                },
+                {
+                  "type": "path",
+                  "id": "oPoUB",
+                  "name": "Pin Tail",
+                  "geometry": "M6 0l6 8h-12z",
+                  "viewBox": [
+                    0,
+                    0,
+                    12,
+                    8
+                  ],
+                  "fill": "$secondary",
+                  "width": 12,
+                  "height": 8
+                }
+              ]
+            },
+            {
+              "type": "ellipse",
+              "id": "dFmBL",
+              "x": 179,
+              "y": 158,
+              "name": "Pin Shadow",
+              "fill": "#00000022",
+              "width": 28,
+              "height": 8
+            },
+            {
+              "type": "frame",
+              "id": "bdaVp",
+              "x": 16,
+              "y": 240,
+              "name": "Location Chip Wrap",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "gpFWd",
+                  "name": "Use Location Chip",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "gap": 6,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "rd2jC",
+                      "name": "Loc Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "locate",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "owCQE",
+                      "name": "Loc Text",
+                      "fill": "$primary",
+                      "content": "موقعي الحالي",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "aXUFr",
+              "x": 100,
+              "y": 12,
+              "name": "Hint Wrap",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "S2t8P",
+                  "name": "Hint Chip",
+                  "fill": "#1c163088",
+                  "cornerRadius": 8,
+                  "gap": 4,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "N7O181",
+                      "name": "Hint Icon",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "move",
+                      "library": "lucide",
+                      "fill": "$white"
+                    },
+                    {
+                      "type": "text",
+                      "id": "RnZrs",
+                      "name": "Hint Text",
+                      "fill": "$white",
+                      "content": "حرّك الدبوس لتحديد الموقع",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "k7nQVL",
+          "name": "Form Area",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            20,
+            16,
+            12,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "tiPVl",
+              "name": "Location Field Wrap",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xrwY7",
+                  "name": "Field Label",
+                  "fill": "$ink",
+                  "content": "وصف الموقع *",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "X6wUx",
+                  "name": "Field Box",
+                  "width": "fill_container",
+                  "height": 48,
+                  "fill": "$white",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    0,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fvgAH",
+                      "name": "Field Placeholder",
+                      "fill": "$disabled",
+                      "content": "مثال: بقالة السلام، بجانب المسجد",
+                      "fontFamily": "Inter",
+                      "fontSize": 14
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Gk2zf",
+              "name": "Zone Confirmation",
+              "width": "fill_container",
+              "fill": "$success-tint",
+              "cornerRadius": 12,
+              "gap": 10,
+              "padding": [
+                12,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "SN32v",
+                  "name": "Zone Icon",
+                  "width": 20,
+                  "height": 20,
+                  "icon": "circle-check",
+                  "library": "lucide",
+                  "fill": "$success"
+                },
+                {
+                  "type": "frame",
+                  "id": "YcH2r",
+                  "name": "Zone Text",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "OQZ3S",
+                      "name": "Zone Status",
+                      "fill": "$success",
+                      "content": "موقعك ضمن نطاق التوصيل",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "l155G",
+                      "name": "Zone Branch",
+                      "fill": "$muted",
+                      "content": "فرع العليا · ١٫٢ كم",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AMM3c",
+          "name": "Sticky Bottom",
+          "width": "fill_container",
+          "fill": "$white",
+          "layout": "vertical",
+          "padding": [
+            12,
+            16,
+            34,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "w7vg9",
+              "type": "ref",
+              "ref": "e8f4mo",
+              "name": "Confirm Button",
+              "width": "fill_container",
+              "descendants": {
+                "sytB8": {
+                  "content": "تأكيد الموقع"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "OfU7J",
+      "x": 1843,
+      "y": -484,
+      "name": "Screen 3 Label",
+      "fill": "$muted",
+      "content": "3 — Home & Menu (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "GoLDs",
+      "x": 2017,
+      "y": -484,
+      "name": "Screen 3 Home AR",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "LidbN",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "Uyf2f",
+          "name": "Logo Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "g9jghI",
+              "name": "Logo Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "ime4h",
+                  "name": "Logo Mark",
+                  "width": 32,
+                  "height": 32,
+                  "fill": "$primary",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Vpo8i",
+                      "name": "Logo Letter",
+                      "fill": "$on-primary",
+                      "content": "S",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "800"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "wyCBe",
+                  "name": "Logo Text",
+                  "fill": "$ink",
+                  "content": "Spicy Meal",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "L4xzJq",
+              "name": "Lang Toggle",
+              "fill": "$white",
+              "cornerRadius": 999,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "gap": 4,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "V7jKF",
+                  "name": "Globe Icon",
+                  "width": 14,
+                  "height": 14,
+                  "icon": "globe",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "qlkD6",
+                  "name": "Lang Text",
+                  "fill": "$muted",
+                  "content": "EN",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "t4nHe",
+          "name": "Branch Bar",
+          "width": "fill_container",
+          "fill": "$white",
+          "padding": [
+            10,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "PjziE",
+              "name": "Branch Bar Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "b9Anq",
+                  "name": "Delivery Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "truck",
+                  "library": "lucide",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "frame",
+                  "id": "r4IS4K",
+                  "name": "Branch Bar Text",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "egaDU",
+                      "name": "Delivery Label",
+                      "fill": "$muted",
+                      "content": "التوصيل من",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "B3F28x",
+                      "name": "Branch Name Row",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "E944rX",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "فرع العليا",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "ygvyl",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "IWLpS",
+              "name": "Change Chip",
+              "fill": "$primary-light",
+              "cornerRadius": 999,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "oipyk",
+                  "name": "Change Text",
+                  "fill": "$primary",
+                  "content": "تغيير",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "QGPYb",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "wnOxX",
+              "name": "Banner Carousel",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 16,
+                  "id": "MQh8t",
+                  "name": "Banner Image",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 135,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#422e87",
+                        "position": 0
+                      },
+                      {
+                        "color": "#6b4fc7",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#e02d3d",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": "fill_container",
+                  "height": 140
+                },
+                {
+                  "type": "frame",
+                  "id": "g39K8U",
+                  "name": "Dots",
+                  "gap": 6,
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "b0NPtz",
+                      "name": "Dot 0",
+                      "fill": "$primary",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "TqNJp",
+                      "name": "Dot 1",
+                      "fill": "$disabled",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "m3ovl",
+                      "name": "Dot 2",
+                      "fill": "$disabled",
+                      "width": 8,
+                      "height": 8
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "K7WFmU",
+              "name": "Search Field",
+              "width": "fill_container",
+              "height": 44,
+              "fill": "$white",
+              "cornerRadius": 12,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "gap": 8,
+              "padding": [
+                0,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "RGXKB",
+                  "name": "Search Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "LQZtm",
+                  "name": "Search Placeholder",
+                  "fill": "$disabled",
+                  "content": "ابحث عن برجر، مقبلات…",
+                  "fontFamily": "Inter",
+                  "fontSize": 14
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "o83E0p",
+              "name": "Category Row",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "A5Vkc",
+                  "name": "Cat الكل",
+                  "fill": "$primary",
+                  "cornerRadius": 999,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "X9JSU",
+                      "name": "Cat Label",
+                      "fill": "$on-primary",
+                      "content": "الكل",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "CS0jA",
+                  "name": "Cat برجر",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Hv6O4",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "برجر",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "F2DKs1",
+                  "name": "Cat دجاج",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "TR96A",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "دجاج",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "hhUOt",
+                  "name": "Cat مقبلات",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "L6lOi9",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "مقبلات",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "qG810",
+                  "name": "Cat مشروبات",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "EyjrA",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "مشروبات",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "R1ff4Q",
+              "name": "Product List",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "rSyYA",
+                  "name": "Card برجر كلاسيكي",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "MRbYF",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "N21FN",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "برجر كلاسيكي",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z3khc",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "لحم أنغوس مشوي مع جبن شيدر وخضروات طازجة",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "N2qpP",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "V73Eof",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "٤٨٠ سعرة",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "oSQzF",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "٣٥ ر.س",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "L8AaLV",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Wsft3",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "إضافة",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "U8MufE",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffd9a3",
+                            "position": 0
+                          },
+                          {
+                            "color": "#f4a259",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#d1512f",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "isDMT",
+                  "name": "Card برجر سبايسي",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "qJljM",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "fHNXM",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "برجر سبايسي",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "cv7Qs",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "لحم مع صوص حار خاص وهالبينو مقرمش",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "JTeqY",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "phDPX",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "٥٢٠ سعرة",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "vxC1B",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "٤٠ ر.س",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "GqcrJ",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "TOCwU",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "تخصيص وإضافة",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "O2M69c",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffc97a",
+                            "position": 0
+                          },
+                          {
+                            "color": "#e8944a",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#c4421f",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Ap4Pn",
+                  "name": "Card دجاج مقرمش",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "QnQPl",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JHvD7",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "دجاج مقرمش",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "VL6rj",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "قطع دجاج مقرمشة مع صوص العسل والماسترد",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "x5pkn",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zPSI6",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "٣٨٠ سعرة",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "f55jCz",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "٣٠ ر.س",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "DKzgD",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "O8DrA",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "إضافة",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "uHomy",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffe0a8",
+                            "position": 0
+                          },
+                          {
+                            "color": "#f0aa55",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#d45830",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bP0Hd",
+          "name": "Cart Bar",
+          "width": "fill_container",
+          "fill": "$primary",
+          "padding": [
+            10,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "wVUoH",
+              "name": "Cart Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "tCgIU",
+                  "name": "Cart Badge",
+                  "width": 28,
+                  "height": 28,
+                  "fill": "#ffffff33",
+                  "cornerRadius": 14,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "KLD6O",
+                      "name": "Cart Count",
+                      "fill": "$on-primary",
+                      "content": "٢",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "etKPL",
+                  "name": "Cart Label",
+                  "fill": "$on-primary",
+                  "content": "عرض السلة",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "NRmxN",
+              "name": "Cart Total",
+              "fill": "$on-primary",
+              "content": "٧٥ ر.س",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "id": "x3pgyr",
+          "type": "ref",
+          "ref": "YUtSZ",
+          "name": "Tab Bar"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "X2cApJ",
+      "x": 2487,
+      "y": -484,
+      "name": "Screen 4 Label",
+      "fill": "$muted",
+      "content": "4 — Home & Menu (EN · LTR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "vwCPd",
+      "x": 2698,
+      "y": -484,
+      "name": "Screen 4 Home EN",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "X28uM",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "P1C7i",
+          "name": "Logo Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "gUZBl",
+              "name": "Lang Toggle",
+              "fill": "$white",
+              "cornerRadius": 999,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "gap": 4,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "d61CLK",
+                  "name": "Globe Icon",
+                  "width": 14,
+                  "height": 14,
+                  "icon": "globe",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "qUsg9",
+                  "name": "Lang Text",
+                  "fill": "$muted",
+                  "content": "ع",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "oGSlq",
+              "name": "Logo Right",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "c5XYWe",
+                  "name": "Logo Text",
+                  "fill": "$ink",
+                  "content": "Spicy Meal",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "frame",
+                  "id": "VWF8w",
+                  "name": "Logo Mark",
+                  "width": 32,
+                  "height": 32,
+                  "fill": "$primary",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "i6U24V",
+                      "name": "Logo Letter",
+                      "fill": "$on-primary",
+                      "content": "S",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "y7jCs",
+          "name": "Branch Bar",
+          "width": "fill_container",
+          "fill": "$white",
+          "padding": [
+            10,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "zaQvM",
+              "name": "Change Chip",
+              "fill": "$primary-light",
+              "cornerRadius": 999,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "DpIFF",
+                  "name": "Change Text",
+                  "fill": "$primary",
+                  "content": "Change",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "e6n7dI",
+              "name": "Branch Bar Right",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "yjcRh",
+                  "name": "Branch Bar Text",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "b2EOKj",
+                      "name": "Branch Name Row",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "AD2nI",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge",
+                          "descendants": {
+                            "PTy8W": {
+                              "content": "Open"
+                            }
+                          }
+                        },
+                        {
+                          "type": "text",
+                          "id": "bQMsP",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "Olaya Branch",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "bEiIm",
+                      "name": "Delivery Label",
+                      "fill": "$muted",
+                      "content": "Delivery from",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "icon",
+                  "id": "zwCjL",
+                  "name": "Delivery Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "truck",
+                  "library": "lucide",
+                  "fill": "$primary"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "E5Pd0",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "KIurd",
+              "name": "Banner Carousel",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 16,
+                  "id": "sdCwB",
+                  "name": "Banner Image",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 135,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#422e87",
+                        "position": 0
+                      },
+                      {
+                        "color": "#6b4fc7",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#e02d3d",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": "fill_container",
+                  "height": 140
+                },
+                {
+                  "type": "frame",
+                  "id": "uQSEb",
+                  "name": "Dots",
+                  "gap": 6,
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "G3Ucs",
+                      "name": "Dot 0",
+                      "fill": "$primary",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "w3NuC9",
+                      "name": "Dot 1",
+                      "fill": "$disabled",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "qht1A",
+                      "name": "Dot 2",
+                      "fill": "$disabled",
+                      "width": 8,
+                      "height": 8
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "MkR4N",
+              "name": "Search Field",
+              "width": "fill_container",
+              "height": 44,
+              "fill": "$white",
+              "cornerRadius": 12,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "gap": 8,
+              "padding": [
+                0,
+                14
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "zAfvx",
+                  "name": "Search Placeholder",
+                  "fill": "$disabled",
+                  "content": "Search for burgers, sides…",
+                  "fontFamily": "Inter",
+                  "fontSize": 14
+                },
+                {
+                  "type": "icon",
+                  "id": "ujQtz",
+                  "name": "Search Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "search",
+                  "library": "lucide",
+                  "fill": "$muted"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Mm3lB",
+              "name": "Category Row",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "UEzCL",
+                  "name": "Cat All",
+                  "fill": "$primary",
+                  "cornerRadius": 999,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "iUL8r",
+                      "name": "Cat Label",
+                      "fill": "$on-primary",
+                      "content": "All",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "nElsa",
+                  "name": "Cat Burgers",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "N59EZc",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "Burgers",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "rfMDx",
+                  "name": "Cat Chicken",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "D9uS4A",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "Chicken",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "j7y6m",
+                  "name": "Cat Sides",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Z9yh4",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "Sides",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "bAg7X",
+                  "name": "Cat Drinks",
+                  "fill": "$white",
+                  "cornerRadius": 999,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "iulxM",
+                      "name": "Cat Label",
+                      "fill": "$muted",
+                      "content": "Drinks",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "l5LQP",
+              "name": "Product List",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "kgB6G",
+                  "name": "Card Classic Burger",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "Z8TKS",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffd9a3",
+                            "position": 0
+                          },
+                          {
+                            "color": "#f4a259",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#d1512f",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R6jRzr",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zfvEl",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "Classic Burger",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GIDCi",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Grilled Angus beef with cheddar cheese and fresh vegetables",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "dPL9o",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IYkuu",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "480 cal",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MtTAo",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "SAR 35",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "JbBUm",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "fFMKl",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "Add",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "jzF1Z",
+                  "name": "Card Spicy Burger",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "WKfTb",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffc97a",
+                            "position": 0
+                          },
+                          {
+                            "color": "#e8944a",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#c4421f",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    },
+                    {
+                      "type": "frame",
+                      "id": "f92ijc",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "amah5",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "Spicy Burger",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "FbNjV",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Beef patty with special hot sauce and crispy jalapeno",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "bnFot",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "i7zgja",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "520 cal",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "uWKxE",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "SAR 40",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "OjVGg",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "plvDn",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "Customize & Add",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "RDgI9",
+                  "name": "Card Crispy Chicken",
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": 16,
+                  "gap": 12,
+                  "padding": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 12,
+                      "id": "B8FWBz",
+                      "name": "Food Photo",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 150,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#ffe0a8",
+                            "position": 0
+                          },
+                          {
+                            "color": "#f0aa55",
+                            "position": 0.5
+                          },
+                          {
+                            "color": "#d45830",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 100,
+                      "height": 100
+                    },
+                    {
+                      "type": "frame",
+                      "id": "V1Sqpg",
+                      "name": "Card Info",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "LhwkF",
+                          "name": "Product Name",
+                          "fill": "$ink",
+                          "content": "Crispy Chicken",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "iePCf",
+                          "name": "Product Desc",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Crispy chicken strips with honey mustard dipping sauce",
+                          "fontFamily": "Inter",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "rl92x",
+                          "name": "Cal Price Row",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "O2Iie",
+                              "name": "Calories",
+                              "fill": "$muted",
+                              "content": "380 cal",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "O9FF39",
+                              "name": "Price",
+                              "fill": "$primary",
+                              "content": "SAR 30",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "wcrqW",
+                          "name": "Action Btn",
+                          "fill": "$primary-light",
+                          "cornerRadius": 8,
+                          "padding": [
+                            6,
+                            12
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uuZGe",
+                              "name": "Action Text",
+                              "fill": "$primary",
+                              "content": "Add",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "CoEnb",
+          "name": "Cart Bar",
+          "width": "fill_container",
+          "fill": "$primary",
+          "padding": [
+            10,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "l4Pfa",
+              "name": "Cart Total",
+              "fill": "$on-primary",
+              "content": "SAR 75",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "h6rAA9",
+              "name": "Cart Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "R1kS8",
+                  "name": "Cart Label",
+                  "fill": "$on-primary",
+                  "content": "View Cart",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "cO15Q",
+                  "name": "Cart Badge",
+                  "width": 28,
+                  "height": 28,
+                  "fill": "#ffffff33",
+                  "cornerRadius": 14,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sHBKv",
+                      "name": "Cart Count",
+                      "fill": "$on-primary",
+                      "content": "2",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bwzpa",
+          "name": "Tab Bar EN",
+          "width": "fill_container",
+          "height": 88,
+          "fill": "$white",
+          "padding": [
+            0,
+            16,
+            12,
+            16
+          ],
+          "justifyContent": "center",
+          "alignItems": "end",
+          "children": [
+            {
+              "type": "frame",
+              "id": "f0XoT",
+              "name": "Tab Inner",
+              "width": "fill_container",
+              "height": 56,
+              "fill": "#f0eef5",
+              "cornerRadius": 28,
+              "padding": 6,
+              "justifyContent": "space_around",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "HodVa",
+                  "name": "Tab Home",
+                  "width": 80,
+                  "height": 44,
+                  "fill": "$primary",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 2,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "jKN8U",
+                      "name": "Icon",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "house",
+                      "library": "lucide",
+                      "fill": "$on-primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "p51Fja",
+                      "name": "Label",
+                      "fill": "$on-primary",
+                      "content": "Home",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "cJ7Oi",
+                  "name": "Tab Orders",
+                  "width": 80,
+                  "height": 44,
+                  "fill": "#00000000",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 2,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "dU5ly",
+                      "name": "Icon",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "clipboard-list",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ze3lV",
+                      "name": "Label",
+                      "fill": "$muted",
+                      "content": "Orders",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dKq4e",
+                  "name": "Tab Account",
+                  "width": 80,
+                  "height": 44,
+                  "fill": "#00000000",
+                  "cornerRadius": 22,
+                  "layout": "vertical",
+                  "gap": 2,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "G7dpOi",
+                      "name": "Icon",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "user",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "FyXDe",
+                      "name": "Label",
+                      "fill": "$muted",
+                      "content": "Account",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "eXjDu",
+      "x": 3168,
+      "y": -484,
+      "name": "Screen 5 Label",
+      "fill": "$muted",
+      "content": "5 — Product Detail (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "W8pza",
+      "x": 3343,
+      "y": -484,
+      "name": "Screen 5 Product Detail",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "GKtIK",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "ZFZbO",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "YtQXK",
+              "name": "Back Arrow",
+              "width": 24,
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "text",
+              "id": "dDlkk",
+              "name": "Header Title",
+              "fill": "$ink",
+              "content": "تفاصيل المنتج",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "UB7YD",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            }
+          ]
+        },
+        {
+          "type": "rectangle",
+          "id": "V0v7n",
+          "name": "Hero Photo",
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 160,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#ffd9a3",
+                "position": 0
+              },
+              {
+                "color": "#f4a259",
+                "position": 0.4
+              },
+              {
+                "color": "#d1512f",
+                "position": 1
+              }
+            ]
+          },
+          "width": "fill_container",
+          "height": 220
+        },
+        {
+          "type": "frame",
+          "id": "XttRb",
+          "name": "PD Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            20,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "e9PUAW",
+              "name": "Name Price",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "TQTpv",
+                  "name": "Product Name",
+                  "fill": "$ink",
+                  "content": "برجر سبايسي",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "fyjAA",
+                  "name": "Price",
+                  "fill": "$primary",
+                  "content": "٤٠ ر.س",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "GVuQq",
+              "name": "Desc Area",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 6,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Q4bRQK",
+                  "name": "Description",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "لحم أنغوس مشوي مع صوص حار خاص وشرائح هالبينو مقرمشة، يقدم مع خس وطماطم وجبن شيدر مدخن",
+                  "fontFamily": "Inter",
+                  "fontSize": 14
+                },
+                {
+                  "type": "frame",
+                  "id": "u3GM7",
+                  "name": "Cal Row",
+                  "gap": 4,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "urCjj",
+                      "name": "Cal Icon",
+                      "width": 14,
+                      "height": 14,
+                      "icon": "flame",
+                      "library": "lucide",
+                      "fill": "$warning"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JFnLt",
+                      "name": "Cal Text",
+                      "fill": "$muted",
+                      "content": "٥٢٠ سعرة حرارية",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "T7OmZ",
+              "name": "Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "ttBvX",
+              "name": "Mod Group 1",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "M7zKX",
+                  "name": "Mod Group Header",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "oWyOI",
+                      "name": "Group Title",
+                      "fill": "$ink",
+                      "content": "اختر نوع الخبز",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zU5fO",
+                      "name": "Required Badge",
+                      "fill": "$danger-tint",
+                      "cornerRadius": 999,
+                      "padding": [
+                        3,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zYBz8",
+                          "name": "Required Text",
+                          "fill": "$danger",
+                          "content": "إجباري",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "rAa1h",
+                  "name": "Option خبز برجر كلاسيكي",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oA1wh",
+                      "name": "Opt Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "VyHvs",
+                          "name": "Radio",
+                          "fill": "$primary",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$primary",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "ellipse",
+                          "id": "q1way4",
+                          "layoutPosition": "absolute",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Radio Dot",
+                          "innerRadius": 0.55,
+                          "fill": "$white",
+                          "width": 22,
+                          "height": 22
+                        },
+                        {
+                          "type": "text",
+                          "id": "PZS9m",
+                          "name": "Opt Name",
+                          "fill": "$ink",
+                          "content": "خبز برجر كلاسيكي",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "HTknk",
+                  "name": "Option خبز بريوش",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "M2ixj",
+                      "name": "Opt Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "CeCfk",
+                          "name": "Radio",
+                          "fill": "$white",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$border",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "text",
+                          "id": "fT59q",
+                          "name": "Opt Name",
+                          "fill": "$ink",
+                          "content": "خبز بريوش",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "t3AJaM",
+                      "name": "Opt Price",
+                      "fill": "$muted",
+                      "content": "+ ٣ ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gA0o2",
+                  "name": "Option خبز بالسمسم",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KvKQE",
+                      "name": "Opt Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "ellipse",
+                          "id": "ZhBJx",
+                          "name": "Radio",
+                          "fill": "$white",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$border",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "text",
+                          "id": "cuVBj",
+                          "name": "Opt Name",
+                          "fill": "$ink",
+                          "content": "خبز بالسمسم",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "srOEh",
+              "name": "Divider 2",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "n0TLc",
+              "name": "Mod Group 2",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "vtXcb",
+                  "name": "Mod Group Header",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "a2K2v",
+                      "name": "Group Title",
+                      "fill": "$ink",
+                      "content": "إضافات",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "UcBGy",
+                      "name": "Optional Badge",
+                      "fill": "$primary-light",
+                      "cornerRadius": 999,
+                      "padding": [
+                        3,
+                        8
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "aYn7x",
+                          "name": "Optional Text",
+                          "fill": "$primary",
+                          "content": "اختياري · حتى ٣",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "m54vk0",
+                  "name": "Extra جبن إضافي",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "kfAjj",
+                      "name": "Extra Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 6,
+                          "id": "kW1Xa",
+                          "name": "Checkbox",
+                          "fill": "$primary",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$primary",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "icon",
+                          "id": "wH4G7",
+                          "layoutPosition": "absolute",
+                          "x": 4,
+                          "y": 4,
+                          "name": "Check",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "check",
+                          "library": "lucide",
+                          "fill": "$on-primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YM427",
+                          "name": "Extra Name",
+                          "fill": "$ink",
+                          "content": "جبن إضافي",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "NW6wD",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ ٤ ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MpY8X",
+                  "name": "Extra بصل مقرمش",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "BWXn9",
+                      "name": "Extra Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 6,
+                          "id": "y9B0r",
+                          "name": "Checkbox",
+                          "fill": "$primary",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$primary",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "icon",
+                          "id": "j1QYYN",
+                          "layoutPosition": "absolute",
+                          "x": 4,
+                          "y": 4,
+                          "name": "Check",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "check",
+                          "library": "lucide",
+                          "fill": "$on-primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "H5vMMb",
+                          "name": "Extra Name",
+                          "fill": "$ink",
+                          "content": "بصل مقرمش",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "Dz38F",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ ٣ ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "CgQT9",
+                  "name": "Extra صوص باربكيو",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Ki8h4",
+                      "name": "Extra Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 6,
+                          "id": "GLo1Z",
+                          "name": "Checkbox",
+                          "fill": "$white",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$border",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "text",
+                          "id": "cvgIm",
+                          "name": "Extra Name",
+                          "fill": "$ink",
+                          "content": "صوص باربكيو",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "u7hCx",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ ٢ ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "v7iUS",
+                  "name": "Extra مخلل إضافي",
+                  "width": "fill_container",
+                  "padding": [
+                    12,
+                    0
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Qxxdm",
+                      "name": "Extra Left",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 6,
+                          "id": "e2N0h",
+                          "name": "Checkbox",
+                          "fill": "$white",
+                          "width": 22,
+                          "height": 22,
+                          "stroke": "$border",
+                          "strokeWidth": 2
+                        },
+                        {
+                          "type": "text",
+                          "id": "s4d7E2",
+                          "name": "Extra Name",
+                          "fill": "$ink",
+                          "content": "مخلل إضافي",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "tVacG",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "مجاني",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "k7afR",
+          "name": "Sticky Bottom",
+          "width": "fill_container",
+          "fill": "$white",
+          "gap": 12,
+          "padding": [
+            12,
+            16,
+            34,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "JA7h7",
+              "name": "Qty Stepper",
+              "height": 48,
+              "fill": "$bg",
+              "cornerRadius": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "SjJfc",
+                  "name": "Minus Btn",
+                  "width": 48,
+                  "height": 48,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "mmHEQ",
+                      "name": "Minus Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "minus",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "OxA5W",
+                  "name": "Qty Value",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": 36,
+                  "content": "١",
+                  "textAlign": "center",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "gwjd8",
+                  "name": "Plus Btn",
+                  "width": 48,
+                  "height": 48,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "kyMSZ",
+                      "name": "Plus Icon",
+                      "width": 20,
+                      "height": 20,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "$primary"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "pKisG",
+              "name": "Add to Cart Btn",
+              "width": "fill_container",
+              "height": 48,
+              "fill": "$primary",
+              "cornerRadius": 12,
+              "gap": 8,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "iJPCM",
+                  "name": "Add Label",
+                  "fill": "$on-primary",
+                  "content": "أضف للسلة",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "g53UFi",
+                  "name": "Add Total",
+                  "fill": "$on-primary",
+                  "content": "٤٧ ر.س",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "UY0rv",
+      "x": 3813,
+      "y": -484,
+      "name": "Screen 6 Label",
+      "fill": "$muted",
+      "content": "6 — Cart (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "r5yeOo",
+      "x": 3922,
+      "y": -484,
+      "name": "Screen 6 Cart",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "X4Vhs8",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "kJl8y",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "tLYGf",
+              "name": "Back Arrow",
+              "width": 24,
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "text",
+              "id": "p5tumA",
+              "name": "Header Title",
+              "fill": "$ink",
+              "content": "السلة",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "nOBUX",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "lt3zL",
+          "name": "Cart Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "A9PUnd",
+              "name": "Cart Item برجر سبايسي",
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "gap": 12,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 10,
+                  "id": "Bkxf2",
+                  "name": "Thumb",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 150,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#ffc97a",
+                        "position": 0
+                      },
+                      {
+                        "color": "#e8944a",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#c4421f",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": 64,
+                  "height": 64
+                },
+                {
+                  "type": "frame",
+                  "id": "jnyNv",
+                  "name": "Item Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "DbjEp",
+                      "name": "Item Name",
+                      "fill": "$ink",
+                      "content": "برجر سبايسي",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "yYX7s",
+                      "name": "Item Mods",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "خبز بريوش · جبن إضافي · بصل مقرمش",
+                      "fontFamily": "Inter",
+                      "fontSize": 12
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PFbgJ",
+                      "name": "Bottom Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "CHOun",
+                          "name": "Item Price",
+                          "fill": "$primary",
+                          "content": "٤٧ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "yNOwr",
+                          "name": "Qty Controls",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "xpbxR",
+                              "name": "Minus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "UjSHA",
+                                  "name": "Minus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "minus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "s8zGwx",
+                              "name": "Qty",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": 28,
+                              "content": "١",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "s3Uxt",
+                              "name": "Plus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "TqjDd",
+                                  "name": "Plus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zBSG6",
+                      "name": "Remove Row",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "Y7pW2x",
+                          "name": "Trash Icon",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "trash-2",
+                          "library": "lucide",
+                          "fill": "$danger"
+                        },
+                        {
+                          "type": "text",
+                          "id": "YsOVp",
+                          "name": "Remove Text",
+                          "fill": "$danger",
+                          "content": "إزالة",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "MYjjZ",
+              "name": "Cart Item برجر كلاسيكي",
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "gap": 12,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 10,
+                  "id": "FZCST",
+                  "name": "Thumb",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 150,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#ffd9a3",
+                        "position": 0
+                      },
+                      {
+                        "color": "#f4a259",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#d1512f",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": 64,
+                  "height": 64
+                },
+                {
+                  "type": "frame",
+                  "id": "Ehbuw",
+                  "name": "Item Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "HZmmP",
+                      "name": "Item Name",
+                      "fill": "$ink",
+                      "content": "برجر كلاسيكي",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Py4Im",
+                      "name": "Item Mods",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "خبز برجر كلاسيكي",
+                      "fontFamily": "Inter",
+                      "fontSize": 12
+                    },
+                    {
+                      "type": "frame",
+                      "id": "n7CbL",
+                      "name": "Bottom Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "d8UW3",
+                          "name": "Item Price",
+                          "fill": "$primary",
+                          "content": "٣٥ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "tiXcC",
+                          "name": "Qty Controls",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ikSY4",
+                              "name": "Minus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "R7Cl7G",
+                                  "name": "Minus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "minus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "Wby9k",
+                              "name": "Qty",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": 28,
+                              "content": "٢",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "lRuli",
+                              "name": "Plus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "U8GwL",
+                                  "name": "Plus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MrgTp",
+                      "name": "Remove Row",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "A0IsC",
+                          "name": "Trash Icon",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "trash-2",
+                          "library": "lucide",
+                          "fill": "$danger"
+                        },
+                        {
+                          "type": "text",
+                          "id": "GNjvA",
+                          "name": "Remove Text",
+                          "fill": "$danger",
+                          "content": "إزالة",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "u4elh",
+              "name": "Cart Item دجاج مقرمش",
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "gap": 12,
+              "padding": 12,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 10,
+                  "id": "rh7DG",
+                  "name": "Thumb",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 150,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#ffe0a8",
+                        "position": 0
+                      },
+                      {
+                        "color": "#f0aa55",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#d45830",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": 64,
+                  "height": 64
+                },
+                {
+                  "type": "frame",
+                  "id": "m5wmD",
+                  "name": "Item Info",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "svBaR",
+                      "name": "Item Name",
+                      "fill": "$ink",
+                      "content": "دجاج مقرمش",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Aaj5D",
+                      "name": "Item Mods",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "بدون إضافات",
+                      "fontFamily": "Inter",
+                      "fontSize": 12
+                    },
+                    {
+                      "type": "frame",
+                      "id": "eCX6r",
+                      "name": "Bottom Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ZysmL",
+                          "name": "Item Price",
+                          "fill": "$primary",
+                          "content": "٣٠ ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ilbF5",
+                          "name": "Qty Controls",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "nx7eT",
+                              "name": "Minus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "jeRN4",
+                                  "name": "Minus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "minus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "sdlm9",
+                              "name": "Qty",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": 28,
+                              "content": "١",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "DOBCy",
+                              "name": "Plus",
+                              "width": 32,
+                              "height": 32,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "z21Iwu",
+                                  "name": "Plus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "wR0bY",
+                      "name": "Remove Row",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "L5g069",
+                          "name": "Trash Icon",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "trash-2",
+                          "library": "lucide",
+                          "fill": "$danger"
+                        },
+                        {
+                          "type": "text",
+                          "id": "b1WNB",
+                          "name": "Remove Text",
+                          "fill": "$danger",
+                          "content": "إزالة",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cGven",
+              "name": "Subtotal Card",
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "jzwZr",
+                  "name": "Subtotal Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hqjqC",
+                      "name": "Subtotal Label",
+                      "fill": "$ink",
+                      "content": "المجموع الفرعي",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "SBGur",
+                      "name": "Subtotal Value",
+                      "fill": "$ink",
+                      "content": "١٤٧ ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "rectangle",
+                  "id": "l4Ofr1",
+                  "name": "Divider",
+                  "fill": "$border",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "frame",
+                  "id": "J4Lem5",
+                  "name": "Note Row",
+                  "width": "fill_container",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "W1BqWb",
+                      "name": "Info Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "info",
+                      "library": "lucide",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "vGy76",
+                      "name": "Note Text",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "رسوم التوصيل والضريبة تُحسب عند الدفع. الأسعار شاملة ضريبة القيمة المضافة.",
+                      "fontFamily": "Inter",
+                      "fontSize": 12
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "RjEks",
+          "name": "Sticky Bottom",
+          "width": "fill_container",
+          "fill": "$white",
+          "layout": "vertical",
+          "padding": [
+            12,
+            16,
+            34,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "id": "C6OxcO",
+              "type": "ref",
+              "ref": "e8f4mo",
+              "name": "Checkout Button",
+              "width": "fill_container",
+              "descendants": {
+                "sytB8": {
+                  "content": "الدفع · ١٤٧ ر.س"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "r9PLSD",
+      "x": 4392,
+      "y": -484,
+      "name": "Screen 7 Label",
+      "fill": "$muted",
+      "content": "7 — Offers & Campaigns (AR)",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "I42Kv4",
+      "x": 4606,
+      "y": -484,
+      "name": "Screen 7 Offers",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "RHypq",
+          "type": "ref",
+          "ref": "v2HZKe",
+          "name": "Status Bar"
+        },
+        {
+          "type": "frame",
+          "id": "D5m0P",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 52,
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "OrTvF",
+              "name": "Back Arrow",
+              "width": 24,
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
+            },
+            {
+              "type": "text",
+              "id": "BwSWv",
+              "name": "Header Title",
+              "fill": "$ink",
+              "content": "العروض والحملات",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "wyKoS",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "KCC6V",
+          "name": "Offers Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            12,
+            16,
+            16,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "WSqGV",
+              "name": "Offer Card 1",
+              "clip": true,
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "yUhNx",
+                  "name": "Card Band",
+                  "width": "fill_container",
+                  "height": 56,
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 90,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#422e87",
+                        "position": 0
+                      },
+                      {
+                        "color": "#6b4fc7",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "w8JHSh",
+                      "name": "Band Title AR",
+                      "fill": "$on-primary",
+                      "content": "خصم على الطلبات",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kbwMp",
+                      "name": "Discount Chip",
+                      "fill": "#ffffff33",
+                      "cornerRadius": 999,
+                      "padding": [
+                        4,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "GfDqe",
+                          "name": "Discount Value",
+                          "fill": "$on-primary",
+                          "content": "٪٢٠",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "w3Q0QE",
+                  "name": "Card Body",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "JLoKd",
+                      "name": "Title EN",
+                      "fill": "$ink",
+                      "content": "20% Off All Orders",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "R7YsJA",
+                      "name": "Description",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "احصل على خصم ٢٠٪ على جميع الطلبات عند الطلب بقيمة ٨٠ ر.س أو أكثر.",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t5BKQ1",
+                      "name": "Details",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "O8GQlV",
+                          "name": "Min Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "kd6HK",
+                              "name": "Min Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "shopping-bag",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "V4F94m",
+                              "name": "Min Text",
+                              "fill": "$muted",
+                              "content": "الحد الأدنى للطلب: ٨٠ ر.س",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "a0sZE",
+                          "name": "Valid Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "VzpsI",
+                              "name": "Clock Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "clock-3",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Wkoh9",
+                              "name": "Valid Text",
+                              "fill": "$muted",
+                              "content": "صالح حتى ١٥ أغسطس ٢٠٢٦",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "SQfXT",
+              "name": "Offer Card 2",
+              "clip": true,
+              "width": "fill_container",
+              "fill": "$white",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "NzEkk",
+                  "name": "Card Band",
+                  "width": "fill_container",
+                  "height": 56,
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 90,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#1f9d55",
+                        "position": 0
+                      },
+                      {
+                        "color": "#34c86f",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "padding": [
+                    0,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "VzmWe",
+                      "name": "Band Title AR",
+                      "fill": "$on-primary",
+                      "content": "توصيل مجاني",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "nfOYe",
+                      "name": "Free Chip",
+                      "fill": "#ffffff33",
+                      "cornerRadius": 999,
+                      "padding": [
+                        4,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "J0A1nI",
+                          "name": "Free Value",
+                          "fill": "$on-primary",
+                          "content": "مجاني",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Z1aDK",
+                  "name": "Card Body",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "k0fL29",
+                      "name": "Title EN",
+                      "fill": "$ink",
+                      "content": "Free Delivery",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "RJUpg",
+                      "name": "Description",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "استمتع بتوصيل مجاني على جميع الطلبات من فرع العليا.",
+                      "fontFamily": "Inter",
+                      "fontSize": 13
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Arecm",
+                      "name": "Details",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "P4Wk2",
+                          "name": "Min Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "DwPCc",
+                              "name": "Min Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "shopping-bag",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Kd410",
+                              "name": "Min Text",
+                              "fill": "$muted",
+                              "content": "الحد الأدنى للطلب: ٥٠ ر.س",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "HpNdd",
+                          "name": "Valid Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "T7Wdi",
+                              "name": "Clock Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "clock-3",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MpjXN",
+                              "name": "Valid Text",
+                              "fill": "$muted",
+                              "content": "صالح حتى ٣٠ سبتمبر ٢٠٢٦",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "mY7Jd",
+              "name": "Footer Note",
+              "width": "fill_container",
+              "fill": "$primary-light",
+              "cornerRadius": 12,
+              "gap": 8,
+              "padding": [
+                16,
+                14
+              ],
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "ByANU",
+                  "name": "Info Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "info",
+                  "library": "lucide",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "text",
+                  "id": "LSiKF",
+                  "name": "Footer Text",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "العروض تُطبق تلقائياً عند استيفاء الشروط. لإدخال رمز ترويجي، استخدم حقل الرمز في صفحة الدفع.",
+                  "fontFamily": "Inter",
+                  "fontSize": 13
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-light": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "white": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bg-alt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "on-primary": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "on-secondary": {
+      "type": "color",
+      "value": "#ffffff"
+    }
+  },
+  "fileToken": "10554d88-adb0-4b83-a4d7-8060434c8860"
+}
