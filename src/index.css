@@ -1,9 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Cairo:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
+/* ===========================================================================
+   Spicy Meal admin console — Pen.dev design implementation.
+
+   The console previously used a frosted-glass language: translucent panels,
+   gradient buttons, a two-tone radial page wash. The Pen.dev redesign replaces
+   that with a flat, high-clarity surface — solid white panels on a light ground,
+   a solid purple pill for the active nav item, and cards defined by a hairline
+   border plus a soft low shadow rather than blur.
+
+   The `.glass-*` class NAMES are kept deliberately. They are referenced from
+   ~30 components; redefining them here re-skins the entire console in one place
+   instead of rewriting every className string, and keeps the diff reviewable.
+   =========================================================================== */
+
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  /* Cairo carries Arabic; Inter carries Latin. Listing Cairo first in the sans
+     stack lets each script fall to the face designed for it — Inter has no
+     Arabic coverage, so Arabic text resolves to Cairo automatically. */
+  --font-sans: "Inter", "Cairo", ui-sans-serif, system-ui, sans-serif;
+  --font-arabic: "Cairo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Inter", "Cairo", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Brand palette. These back every bg-primary/text-primary/bg-secondary/etc.
@@ -32,126 +50,145 @@
   }
 }
 
-body {
-  background-color: #f3f2f7;
-  background-image: radial-gradient(at 0% 0%, color-mix(in srgb, var(--color-primary), transparent 92%) 0px, transparent 50%), radial-gradient(at 100% 100%, color-mix(in srgb, var(--color-secondary), transparent 92%) 0px, transparent 50%);
-  background-attachment: fixed;
-  font-family: var(--font-sans);
-  color: #1e293b;
+:root {
+  /* Surface scale from the Pen.dev design system, light mode. */
+  --sm-surface: #ffffff;
+  --sm-surface-alt: #faf9fd;
+  --sm-ground: #f6f5fa;
+  --sm-border: #ece9f2;
+  --sm-ink: #1c1630;
+  --sm-muted: #6b6580;
+
+  /* Elevation. One soft, low, wide shadow — the design defines cards by
+     shadow rather than by a heavy border. */
+  --sm-shadow-sm: 0 1px 2px rgba(28, 22, 48, 0.04);
+  --sm-shadow-card: 0 1px 2px rgba(28, 22, 48, 0.04), 0 4px 16px -6px rgba(28, 22, 48, 0.08);
+  --sm-shadow-lg: 0 2px 4px rgba(28, 22, 48, 0.04), 0 16px 40px -12px rgba(28, 22, 48, 0.16);
 }
 
-/* Frosted Glass Utilities */
+body {
+  /* Flat ground. The old two-tone radial wash fought the panels for attention
+     and tinted every "white" card a different shade depending on position. */
+  background-color: var(--sm-ground);
+  background-image: none;
+  font-family: var(--font-sans);
+  color: var(--sm-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Arabic gets its own face and a touch more leading — Cairo sets tighter than
+   Inter at the same size, and Arabic needs the extra vertical room. */
+[dir="rtl"], [dir="rtl"] input, [dir="rtl"] textarea, [dir="rtl"] select, [dir="rtl"] button {
+  font-family: var(--font-arabic);
+  line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------------------
+   Panels and cards
+   --------------------------------------------------------------------------- */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 1px 0 rgba(255, 255, 255, 0.8) inset;
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  box-shadow: var(--sm-shadow-card);
 }
 
 .glass-panel-dark {
-  /* 0.92, not 0.45. Over the light body this panel composites to whatever the
-     alpha gives: at 0.45 the result was a mid-grey (#8c8f9b) on which NOTHING
-     reaches WCAG AA — even pure white measured 3.22:1 against a 4.5:1
-     requirement, so every light-on-dark colour inside was unreadable. At 0.92
-     the ground is genuinely dark (#21293a) and the panel's existing slate-300 /
-     slate-400 text clears AA at 9.80:1 and 5.68:1. The blur still carries the
-     glass effect. Verified by src/lib/a11yContrast.audit.mjs. */
-  background: rgba(15, 23, 42, 0.92);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  /* The database console is the one deliberately dark surface. Solid, not
+     translucent: at 0.45 alpha over the light ground it composited to a mid-grey
+     (#8c8f9b) on which nothing reached WCAG AA — pure white measured 3.22:1.
+     Verified by src/lib/a11yContrast.audit.mjs. */
+  background: #1c2333;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--sm-shadow-lg);
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.05);
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  box-shadow: var(--sm-shadow-sm);
 }
 
+/* ---------------------------------------------------------------------------
+   Controls
+   --------------------------------------------------------------------------- */
 .glass-btn-primary {
-  background: linear-gradient(135deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary), black 25%) 100%);
-  color: white;
-  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--color-primary), transparent 70%);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 .glass-btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--color-primary), transparent 60%);
+  background: color-mix(in srgb, var(--color-primary), black 12%);
 }
 .glass-btn-primary:active {
-  transform: translateY(0);
+  background: color-mix(in srgb, var(--color-primary), black 20%);
 }
 
 .glass-btn-secondary {
-  background: linear-gradient(135deg, var(--color-secondary) 0%, color-mix(in srgb, var(--color-secondary), black 16%) 100%);
-  color: white;
-  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--color-secondary), transparent 70%);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--color-secondary);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background-color 0.15s ease;
 }
 .glass-btn-secondary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px -8px color-mix(in srgb, var(--color-secondary), transparent 60%);
-}
-.glass-btn-secondary:active {
-  transform: translateY(0);
+  background: color-mix(in srgb, var(--color-secondary), black 12%);
 }
 
 .glass-btn-outline {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
   color: #475569;
-  transition: all 0.2s;
+  font-weight: 700;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .glass-btn-outline:hover {
-  background: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  background: var(--sm-surface-alt);
+  border-color: #ddd8e8;
 }
 
 .glass-input {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  transition: all 0.2s;
+  background: var(--sm-surface);
+  border: 1px solid var(--sm-border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .glass-input:focus {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: color-mix(in srgb, var(--color-primary), transparent 60%);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary), transparent 92%);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary), transparent 88%);
+  outline: none;
 }
 
 /* Keyboard-only focus ring. :focus-visible keeps it off mouse clicks while
-   making tab-navigation visible — the app had no visible keyboard-focus state,
-   so keyboard users could not tell which control was active. */
+   making tab-navigation visible. */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 /* Branch edit-modal input. */
 .edit-input {
   width: 100%;
-  border: 1.5px solid rgb(226 232 240);
-  border-radius: 0.5rem;
-  padding: 0.375rem 0.625rem;
+  border: 1px solid var(--sm-border);
+  border-radius: 0.625rem;
+  padding: 0.5rem 0.75rem;
   font-size: 12px;
   font-weight: 700;
-  color: rgb(30 41 59);
-  background: rgba(255, 255, 255, 0.7);
+  color: var(--sm-ink);
+  background: var(--sm-surface);
 }
-.edit-input:focus { border-color: color-mix(in srgb, var(--color-primary), transparent 55%); outline: none; }
-.edit-input:disabled { opacity: 0.55; background: rgb(248 250 252); }
+.edit-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary), transparent 88%);
+  outline: none;
+}
+.edit-input:disabled { opacity: 0.55; background: var(--sm-surface-alt); }
 
-/* Dashboard readability: the admin UI hard-codes many sub-10px arbitrary text
-   sizes that were hard to read. Nudge the smallest ones up to a comfortable
-   floor (≥11px) globally — a small, consistent bump that keeps layouts intact
-   and avoids editing hundreds of className strings. */
+/* Dashboard readability: the console hard-codes many sub-10px arbitrary text
+   sizes. The Pen.dev design sets its smallest label at 12px, so lift the
+   smallest arbitrary sizes to that floor globally rather than editing hundreds
+   of className strings. */
 .text-\[8px\]   { font-size: 11px !important; }
 .text-\[8\.5px\] { font-size: 11px !important; }
 .text-\[9px\]   { font-size: 12px !important; }

@@ -137,7 +137,7 @@ export const AdminDashboard: React.FC = () => {
       )}
 
       {/* Admin Title bar Header */}
-      <div className="bg-white/20 backdrop-blur-md border-b border-slate-200/60 p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div className="bg-white border-b border-[var(--sm-border)] p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-lg font-black text-primary flex items-center gap-2 flex-wrap">
             <BarChart3 className="w-5 h-5 text-secondary" />
@@ -204,10 +204,10 @@ export const AdminDashboard: React.FC = () => {
       <div className="flex-1 flex flex-col md:flex-row">
         
         {/* Responsive Left Sidebar */}
-        <div className="w-full md:w-[220px] bg-white/20 backdrop-blur-md border-b md:border-b-0 md:border-r border-slate-200/60 p-3 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible">
+        <div className="w-full md:w-[220px] bg-white border-b md:border-b-0 md:border-r border-[var(--sm-border)] p-3 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible">
           <button 
             onClick={() => setActiveTab('stats')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'stats' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'stats' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <BarChart3 className="w-4 h-4" />
             <span>{isRTL ? 'الملخص اليومي' : 'Sales Overview'}</span>
@@ -215,7 +215,7 @@ export const AdminDashboard: React.FC = () => {
           
           <button 
             onClick={() => setActiveTab('orders')}
-            className={`w-full text-left flex items-center justify-between text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'orders' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center justify-between text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'orders' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <div className="flex items-center gap-2">
               <ClipboardList className="w-4 h-4" />
@@ -230,7 +230,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button 
             onClick={() => setActiveTab('menu')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'menu' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'menu' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Layers className="w-4 h-4" />
             <span>{isRTL ? 'إدارة المنيو والأسعار' : 'Menu Management'}</span>
@@ -238,7 +238,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('banners')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'banners' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'banners' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Images className="w-4 h-4" />
             <span>{isRTL ? 'بانرات الرئيسية' : 'Banners'}</span>
@@ -246,7 +246,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('branches')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'branches' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'branches' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Store className="w-4 h-4" />
             <span>{isRTL ? 'إدارة الفروع' : 'Branch Management'}</span>
@@ -254,7 +254,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button 
             onClick={() => setActiveTab('reports')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'reports' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'reports' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>{isRTL ? 'التقارير والتحليلات المالية' : 'Financial Reports'}</span>
@@ -262,7 +262,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('integrations')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrations' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrations' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Plug className="w-4 h-4" />
             <span>{isRTL ? 'الربط والتكاملات' : 'Integrations'}</span>
@@ -271,7 +271,7 @@ export const AdminDashboard: React.FC = () => {
           {healthVisible && (
             <button
               onClick={() => setActiveTab('health')}
-              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'health' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'health' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
             >
               <HeartPulse className="w-4 h-4" />
               <span>{isRTL ? 'صحة العمليات' : 'Operations Health'}</span>
@@ -281,7 +281,7 @@ export const AdminDashboard: React.FC = () => {
           {alertsVisible && (
             <button
               onClick={() => setActiveTab('alerts')}
-              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'alerts' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'alerts' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
             >
               <BellRing className="w-4 h-4" />
               <span>{isRTL ? 'التنبيهات والملخص' : 'Operations Alerts'}</span>
@@ -291,7 +291,7 @@ export const AdminDashboard: React.FC = () => {
           {watchdogVisible && (
             <button
               onClick={() => setActiveTab('integrity')}
-              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrity' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+              className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'integrity' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
             >
               <ShieldAlert className="w-4 h-4" />
               <span>{isRTL ? 'سلامة الطلبات' : 'Order Integrity'}</span>
@@ -300,7 +300,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('settings')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'settings' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Settings className="w-4 h-4" />
             <span>{isRTL ? 'الإعدادات' : 'Settings'}</span>
@@ -308,7 +308,7 @@ export const AdminDashboard: React.FC = () => {
 
           <button
             onClick={() => setActiveTab('legal')}
-            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'legal' ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+            className={`w-full text-left flex items-center gap-2 text-xs font-extrabold py-2.5 px-3.5 rounded-xl transition-all whitespace-nowrap ${activeTab === 'legal' ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-[var(--sm-surface-alt)]'}`}
           >
             <Scale className="w-4 h-4" />
             <span>{isRTL ? 'المستندات القانونية' : 'Legal Documents'}</span>
