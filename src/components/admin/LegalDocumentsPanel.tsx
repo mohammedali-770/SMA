@@ -108,7 +108,7 @@ export const LegalDocumentsPanel: React.FC = () => {
       {error && (
         <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center justify-between gap-2">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />{error}</span>
-          <button onClick={() => void load()} className="bg-red-600 text-white text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
+          <button onClick={() => void load()} className="sm-fill-danger text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
         </div>
       )}
 

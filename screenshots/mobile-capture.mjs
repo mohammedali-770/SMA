@@ -16,7 +16,13 @@ import { mkdirSync } from 'node:fs';
 
 const BASE = process.env.PREVIEW_URL ?? 'http://localhost:8085';
 const OUT = 'screenshots/mobile-out';
-const LANGS = process.argv[2] ? [process.argv[2]] : ['en', 'ar'];
+const ARGS = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const LANGS = ARGS.length ? ARGS : ['en', 'ar'];
+// Dark mode follows the device, so the harness just tells Chromium it prefers
+// dark and React Native Web's useColorScheme reports it — the same path a real
+// phone on its evening schedule takes.
+const DARK = process.argv.includes('--dark');
+const SUFFIX = DARK ? '-dark' : '';
 
 mkdirSync(OUT, { recursive: true });
 
@@ -43,14 +49,15 @@ async function tap(page, text, { optional = false } = {}) {
 
 async function shot(page, name) {
   await page.waitForTimeout(500);
-  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
-  console.log(`captured ${name}`);
+  await page.screenshot({ path: `${OUT}/${name}${SUFFIX}.png`, fullPage: true });
+  console.log(`captured ${name}${SUFFIX}`);
 }
 
 for (const lang of LANGS) {
   const page = await browser.newPage({
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
+    colorScheme: DARK ? 'dark' : 'light',
   });
   page.on('pageerror', (e) => problems.push(`[${lang}] pageerror: ${e.message}`));
 

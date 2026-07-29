@@ -238,7 +238,7 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
                             className="w-14 text-[10px] rounded-lg border border-slate-200 px-1 py-1 mx-1" />h
                         </label>
                         <button onClick={() => submitSuppress(i.id)} disabled={busy === i.id}
-                          className="text-[9px] font-black text-white bg-slate-600 rounded-lg px-2 py-1 disabled:opacity-50">Confirm suppress</button>
+                          className="text-[9px] font-black sm-fill-ink rounded-lg px-2 py-1 disabled:opacity-50">Confirm suppress</button>
                       </div>
                     </td></tr>
                   )}

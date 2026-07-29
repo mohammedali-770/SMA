@@ -34,6 +34,8 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { shouldForceSelection } from '../order/orderContext';
 import { useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, motion, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { formatSAR } from '../../utils/format';
 import type { Product } from '../../types/models';
 
@@ -45,6 +47,8 @@ const SECTION_HEADER_OFFSET = 40;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
   const {
@@ -317,6 +321,7 @@ function ItemSeparator() {
  * with reduced-motion preferences.
  */
 function MenuSkeleton() {
+  const skeleton = useSkeleton();
   return (
     <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
       <View style={[skeleton.block, { height: 64 }]} />
@@ -342,7 +347,7 @@ function MenuSkeleton() {
   );
 }
 
-const skeleton = StyleSheet.create({
+const useSkeleton = makeStyles((colors) => ({
   block: { backgroundColor: colors.bgAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
   chip: { height: 34, borderRadius: radius.pill, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
   card: {
@@ -351,7 +356,7 @@ const skeleton = StyleSheet.create({
   },
   img: { width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.bgAlt },
   line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
-});
+}));
 
 function SectionFooter() {
   return <View style={{ height: spacing.xl }} />;
@@ -368,6 +373,8 @@ export const ProductCard = React.memo(function ProductCard({
   product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
 }) {
   const { t, pick, rtlText, rtlRow } = useI18n();
+  const colors = useThemeColors();
+  const styles = useStyles();
   const [imgFailed, setImgFailed] = useState(false);
   const name = pick(product.nameEn, product.nameAr);
   const description = pick(product.descriptionEn, product.descriptionAr);
@@ -412,16 +419,16 @@ export const ProductCard = React.memo(function ProductCard({
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.white,
+    paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.surface,
     borderBottomWidth: 1, borderBottomColor: colors.border,
   },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   mark: { width: 34, height: 34, borderRadius: radius.sm, borderCurve: 'continuous' },
-  brand: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
+  brand: { fontSize: font.xl, fontWeight: '800', color: colors.accent },
   // A strip on the ground, not a boxed card: this state is always present and
   // always true, so it should sit quietly under the header rather than announce
   // itself. The rule beneath separates it from the banners.
@@ -438,7 +445,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
     borderRadius: radius.pill, backgroundColor: colors.purpleBg,
   },
-  change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  change: { color: colors.accent, fontWeight: '800', fontSize: font.sm },
 
   closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
   closedNoticeText: { color: colors.danger, fontWeight: '700', fontSize: font.sm },
@@ -458,7 +465,7 @@ const styles = StyleSheet.create({
   // is purple. Identical padding + border width in both states → no layout
   // jump when the selection moves.
   chip: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.white,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.surface,
     borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
   },
   chipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
@@ -509,4 +516,4 @@ const styles = StyleSheet.create({
   cartCountText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
   cartBtnText: { color: colors.white, fontWeight: '800', fontSize: font.md, flex: 1 },
   cartBtnPrice: { color: colors.white, fontWeight: '800', fontSize: font.md },
-});
+}));

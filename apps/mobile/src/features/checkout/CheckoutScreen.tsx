@@ -35,6 +35,8 @@ import { pointInPolygon } from '../../lib/geo';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, radius, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { formatSAR } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { OrderType, SavedAddress } from '../../types/models';
@@ -44,6 +46,8 @@ import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHand
 import { chooseCheckoutTransport } from './paymentFlow';
 
 export function CheckoutScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const { profile } = useAuth();
@@ -608,7 +612,7 @@ export function CheckoutScreen() {
                   <Text style={[styles.note, rtlText]}>{pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')}</Text>
                 ) : null}
                 {showOnlineOutageNotice ? (
-                  <Text style={[styles.note, rtlText, { color: colors.purple, fontWeight: '700' }]}>
+                  <Text style={[styles.note, rtlText, { color: colors.accent, fontWeight: '700' }]}>
                     {pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')}
                   </Text>
                 ) : null}
@@ -867,7 +871,7 @@ export function CheckoutScreen() {
             <Text style={styles.payTitle}>{t('payTitle')}</Text>
             {payFlow && (payFlow.state === 'opening' || payFlow.state === 'verifying') ? (
               <View style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg }}>
-                <ActivityIndicator size="large" color={colors.purple} />
+                <ActivityIndicator size="large" color={colors.accent} />
                 <Text style={styles.payMsg}>{t(payFlow.state === 'opening' ? 'payOpening' : 'payVerifying')}</Text>
                 {/* Escape hatch if initiate/verify stalls: dismiss keeps the session,
                     so a still-open charge is resolved by recovery on next entry. */}
@@ -918,6 +922,7 @@ export function CheckoutScreen() {
 }
 
 function SegmentBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable style={[styles.segBtn, active && styles.segBtnActive]} onPress={onPress} accessibilityRole="button">
       <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
@@ -926,6 +931,8 @@ function SegmentBtn({ label, active, onPress }: { label: string; active: boolean
 }
 
 function Row({ label, value, amount, negative, big, accent, muted }: { label: string; value?: string; amount?: number; negative?: boolean; big?: boolean; accent?: boolean; muted?: boolean }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
@@ -939,28 +946,28 @@ function Row({ label, value, amount, negative, big, accent, muted }: { label: st
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
   hint: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
   otRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
   otValue: { fontSize: font.md, color: colors.text, fontWeight: '700', marginTop: 2 },
-  otChange: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  otChange: { color: colors.accent, fontWeight: '800', fontSize: font.sm },
   block: { marginTop: spacing.xl },
   note: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
 
   segment: { flexDirection: 'row', gap: spacing.md },
   segBtn: {
-    flex: 1, paddingVertical: spacing.lg, borderRadius: radius.md, backgroundColor: colors.white,
+    flex: 1, paddingVertical: spacing.lg, borderRadius: radius.md, backgroundColor: colors.surface,
     borderWidth: 1.5, borderColor: colors.border, alignItems: 'center',
   },
   segBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
   segText: { fontSize: font.md, fontWeight: '800', color: colors.muted },
-  segTextActive: { color: colors.purple },
+  segTextActive: { color: colors.accent },
 
   addrRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm,
-    backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
+    backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
   },
   addrRowActive: { borderColor: colors.purple },
   radioDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border },
@@ -971,7 +978,7 @@ const styles = StyleSheet.create({
   couponRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
   couponInput: {
     flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md, color: colors.text, backgroundColor: colors.white,
+    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md, color: colors.text, backgroundColor: colors.surface,
   },
   couponBtn: { minWidth: 96 },
   couponMsg: { marginTop: spacing.sm, fontSize: font.sm, fontWeight: '700' },
@@ -979,28 +986,28 @@ const styles = StyleSheet.create({
   toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   switch: { width: 48, height: 28, borderRadius: 14, backgroundColor: colors.border, padding: 3, justifyContent: 'center' },
   switchOn: { backgroundColor: colors.purple },
-  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.white },
+  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.surface },
   knobOn: { alignSelf: 'flex-end' },
   toggleLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
   toggleSub: { fontSize: font.sm, color: colors.muted },
 
   notesInput: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md,
-    minHeight: 76, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white,
+    minHeight: 76, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.surface,
   },
 
-  totals: { marginTop: spacing.xxl, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg },
+  totals: { marginTop: spacing.xxl, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600' },
   rowLabelBig: { fontSize: font.lg, fontWeight: '800' },
   rowMuted: { color: colors.muted, fontSize: font.sm },
   rowValue: { fontSize: font.md, color: colors.text, fontWeight: '700' },
-  rowValueBig: { fontSize: font.lg, fontWeight: '800', color: colors.purple },
+  rowValueBig: { fontSize: font.lg, fontWeight: '800', color: colors.accent },
   totalDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   serverNote: { fontSize: font.xs, color: colors.muted, marginTop: spacing.sm },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface,
     borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
   },
   error: { color: colors.danger, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
@@ -1023,10 +1030,10 @@ const styles = StyleSheet.create({
   lineInfo: { flex: 1, gap: 2 },
   lineName: { fontSize: font.md, fontWeight: '700', color: colors.text },
   lineMods: { fontSize: font.xs, color: colors.muted },
-  policyLink: { color: colors.purple, fontWeight: '800' },
+  policyLink: { color: colors.accent, fontWeight: '800' },
 
   payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.xl },
+  payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.xl },
   payTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: spacing.sm },
   payMsg: { fontSize: font.md, color: colors.text, textAlign: 'center', lineHeight: 20 },
-});
+}));

@@ -31,11 +31,16 @@ import {
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../lib/payment';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import type { Palette } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { formatRiyadhDateTime } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Order } from '../../types/models';
 
 export function ReceiptScreen({ orderId }: { orderId: string }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, pick, rtlText, rtlRow } = useI18n();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -229,12 +234,12 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   );
 }
 
-const TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
-  info: { bg: colors.purpleBg, fg: colors.purple },
+const toneFor = (colors: Palette): Record<ConfirmationTone, { bg: string; fg: string }> => ({
+  info: { bg: colors.purpleBg, fg: colors.accent },
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.bgAlt, fg: colors.warning },
   danger: { bg: colors.dangerBg, fg: colors.danger },
-};
+});
 
 /** Only `success` states get a check mark; everything else is honest about waiting. */
 function StateIcon({ state, color }: { state: CustomerOrderState; color: string }) {
@@ -261,10 +266,11 @@ function ConfirmationHero({
   resending: boolean;
   resendError: string | null;
 }) {
+  const hero = useHero();
   const { t, rtlText } = useI18n();
   const state = orderConfirmationState(order);
   const p = confirmationPresentation(state);
-  const tone = TONE[p.tone];
+  const tone = toneFor(colors)[p.tone];
 
   return (
     <View
@@ -311,7 +317,7 @@ function ConfirmationHero({
   );
 }
 
-const hero = StyleSheet.create({
+const useHero = makeStyles((colors) => ({
   wrap: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
   title: { fontSize: font.xxl, fontWeight: '800', textAlign: 'center' },
   body: { fontSize: font.md, color: colors.muted, textAlign: 'center', lineHeight: 22 },
@@ -324,9 +330,11 @@ const hero = StyleSheet.create({
   },
   refundLabel: { fontSize: font.sm, color: colors.muted, fontWeight: '600' },
   refundValue: { fontSize: font.md, fontWeight: '800' },
-});
+}));
 
 function Row({ label, value, amount, negative, secondary, strong, big, muted }: { label: string; value?: string; amount?: number; negative?: boolean; secondary?: string; strong?: boolean; big?: boolean; muted?: boolean }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { isRTL, rtlRow } = useI18n();
   return (
     // Mirrored in Arabic: label on the right, value column on the left.
@@ -334,7 +342,7 @@ function Row({ label, value, amount, negative, secondary, strong, big, muted }: 
       <Text style={[styles.rowLabel, muted && styles.muted]}>{label}</Text>
       <View style={[styles.rowValueCol, isRTL && styles.rowValueColRTL]}>
         {amount != null ? (
-          <Price amount={amount} prefix={negative ? '−' : undefined} size={big ? font.lg : font.md} color={big ? colors.purple : colors.text} weight={strong || big ? '800' : '700'} />
+          <Price amount={amount} prefix={negative ? '−' : undefined} size={big ? font.lg : font.md} color={big ? colors.accent : colors.text} weight={strong || big ? '800' : '700'} />
         ) : (
           <Text style={[styles.rowValue, strong && styles.strong, big && styles.big]}>{value}</Text>
         )}
@@ -344,9 +352,9 @@ function Row({ label, value, amount, negative, secondary, strong, big, muted }: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.md,
   },
   summaryTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.xl, marginBottom: spacing.xs },
@@ -358,9 +366,9 @@ const styles = StyleSheet.create({
   rowSecondary: { fontSize: font.sm, color: colors.muted, fontWeight: '600', marginTop: 1 },
   muted: { color: colors.muted, fontSize: font.sm },
   strong: { fontWeight: '800' },
-  big: { fontSize: font.lg, color: colors.purple },
+  big: { fontSize: font.lg, color: colors.accent },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, paddingVertical: spacing.sm - 2 },
-  itemQty: { fontSize: font.md, fontWeight: '800', color: colors.purple, minWidth: 28 },
+  itemQty: { fontSize: font.md, fontWeight: '800', color: colors.accent, minWidth: 28 },
   itemName: { fontSize: font.md, fontWeight: '700', color: colors.text },
   itemMods: { fontSize: font.sm, color: colors.muted, marginTop: 1 },
   itemPrice: { fontSize: font.md, fontWeight: '700', color: colors.text },
@@ -373,8 +381,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, borderCurve: 'continuous', padding: spacing.md,
   },
   notPaid: { color: colors.warning, fontWeight: '700', fontSize: font.sm },
-  footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.white },
-});
+  footer: { padding: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+}));
 
 /**
  * Static ghost receipt matching the loaded layout — no animation loops.
@@ -384,6 +392,7 @@ const styles = StyleSheet.create({
  * per-block announcements.
  */
 function ReceiptSkeleton() {
+  const skeleton = useSkeleton();
   const { t } = useI18n();
   return (
     <View
@@ -426,11 +435,11 @@ function ReceiptSkeleton() {
   );
 }
 
-const skeleton = StyleSheet.create({
+const useSkeleton = makeStyles((colors) => ({
   circle: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
   },
   line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
-});
+}));

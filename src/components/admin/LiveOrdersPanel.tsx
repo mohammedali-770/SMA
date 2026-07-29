@@ -198,7 +198,7 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
         <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
         <h3 className="text-sm font-bold text-amber-900">{t.verify_title}</h3>
         {total > 0 && (
-          <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black">{total}</span>
+          <span className="text-[9px] px-2 py-0.5 rounded-full sm-fill-warning font-black">{total}</span>
         )}
       </div>
       <p className="text-[10px] text-amber-700/80 font-medium mb-3">{t.verify_sub}</p>

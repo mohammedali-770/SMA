@@ -29,6 +29,8 @@ import { SUPABASE_URL } from '../../lib/env';
 import { readCheckoutHandoff, settleCheckoutHandoff, type CheckoutHandoffResult } from '../../features/checkout/checkoutHandoff';
 import { decideNavigation, safeHostForLog, type WebviewNavConfig } from '../../features/checkout/webviewPolicy';
 import { colors, font, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -42,6 +44,8 @@ function hostOf(u: string): string {
 }
 
 export default function PaymentCheckoutScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ session?: string }>();
   const insets = useSafeAreaInsets();
   const { t, pick } = useI18n();
@@ -185,7 +189,7 @@ export default function PaymentCheckoutScreen() {
           // Opaque loader only before the first paint; later Tap/3DS transitions
           // render on the page itself so we don't blank an interactive checkout.
           <View style={styles.overlay} pointerEvents="none">
-            <ActivityIndicator size="large" color={colors.purple} />
+            <ActivityIndicator size="large" color={colors.accent} />
             <Text style={styles.loadingMsg}>{t('payScreenLoading')}</Text>
           </View>
         ) : null}
@@ -200,11 +204,11 @@ export default function PaymentCheckoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   body: { flex: 1 },
   web: { flex: 1, backgroundColor: colors.bg },
-  close: { color: colors.purple, fontWeight: '800', fontSize: font.md, paddingVertical: spacing.xs },
+  close: { color: colors.accent, fontWeight: '800', fontSize: font.md, paddingVertical: spacing.xs },
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl,
@@ -214,8 +218,8 @@ const styles = StyleSheet.create({
   errTitle: { color: colors.text, fontSize: font.md, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
   errActions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.md },
   footer: {
-    backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border,
+    backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border,
     paddingHorizontal: spacing.lg, paddingTop: spacing.sm,
   },
   footerText: { color: colors.muted, fontSize: font.xs, textAlign: 'center' },
-});
+}));

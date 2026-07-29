@@ -1,5 +1,19 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><title>Spicy Meal — admin console screenshots</title></head>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Spicy Meal — admin console screenshots</title>
+    <script>
+      /* Mirrors the pre-paint stamp in the real index.html. */
+      (function () {
+        try {
+          var pref = localStorage.getItem('sm-admin-theme') || 'system';
+          var dark = pref === 'dark' || (pref === 'system'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) { /* storage blocked — light is a safe default */ }
+      })();
+    </script>
+  </head>
   <body><div id="root"></div><script type="module" src="/screenshots/main.tsx"></script></body>
 </html>

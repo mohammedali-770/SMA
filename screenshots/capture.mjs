@@ -35,10 +35,25 @@ const TABS = [
 const browser = await chromium.launch({
   executablePath: '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
 });
+// Dark mode is a token-level remap, so the same walk captures it: the harness
+// stamps data-theme on <html> exactly the way the console's own boot script
+// does, and every panel re-resolves from the CSS custom properties.
+const DARK = process.argv.includes('--dark');
+const SUFFIX = DARK ? '-dark' : '';
+
 const page = await browser.newPage({
   viewport: { width: 1440, height: 1000 },
   deviceScaleFactor: 2,
+  colorScheme: DARK ? 'dark' : 'light',
 });
+if (DARK) {
+  // addInitScript runs before the document exists, so only storage is written
+  // here; the console's ThemeToggle reads it on mount and stamps the attribute,
+  // which is the same path a real operator takes.
+  await page.addInitScript(() => {
+    try { localStorage.setItem('sm-admin-theme', 'dark'); } catch { /* ignore */ }
+  });
+}
 
 const problems = [];
 page.on('pageerror', (e) => problems.push(`pageerror: ${e.message}`));
@@ -56,15 +71,15 @@ for (const [label, name] of TABS) {
   // Panels fetch on mount and settle into a loaded or error state; give them a
   // beat rather than racing the first paint.
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: true });
-  console.log(`captured ${name}`);
+  await page.screenshot({ path: `${OUT}/${name}${SUFFIX}.png`, fullPage: true });
+  console.log(`captured ${name}${SUFFIX}`);
 }
 
 // The dark playground is the reason .glass-panel-dark changed, so capture it too.
 await page.goto(`${BASE}?view=db`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
-await page.screenshot({ path: `${OUT}/13-database-playground.png`, fullPage: true });
-console.log('captured 13-database-playground');
+await page.screenshot({ path: `${OUT}/13-database-playground${SUFFIX}.png`, fullPage: true });
+console.log(`captured 13-database-playground${SUFFIX}`);
 
 await browser.close();
 if (problems.length) {

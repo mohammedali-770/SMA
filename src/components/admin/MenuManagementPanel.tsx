@@ -445,7 +445,7 @@ export const MenuManagementPanel: React.FC = () => {
                       <button 
                         onClick={handleCommitCSV}
                         disabled={isAccountant || csvResult.products.length === 0}
-                        className={`w-full text-center text-xs font-black py-2.5 rounded-xl transition-all ${isAccountant || csvResult.products.length === 0 ? 'bg-gray-200 text-gray-600 cursor-not-allowed' : 'bg-secondary text-white hover:bg-secondary/95'}`}
+                        className={`w-full text-center text-xs font-black py-2.5 rounded-xl transition-all ${isAccountant || csvResult.products.length === 0 ? 'sm-fill-muted cursor-not-allowed' : 'bg-secondary text-white hover:bg-secondary/95'}`}
                       >
                         {t.commit_btn}
                       </button>

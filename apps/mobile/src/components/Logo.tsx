@@ -4,11 +4,13 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, font, radius, spacing } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const MARK = require('../../assets/icon.png');
 
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <Image source={MARK} style={compact ? styles.markSm : styles.mark} contentFit="cover" />
@@ -22,10 +24,10 @@ export function Logo({ compact = false }: { compact?: boolean }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   mark: { width: 40, height: 40, borderRadius: radius.sm },
   markSm: { width: 30, height: 30, borderRadius: radius.sm },
-  word: { fontSize: font.xl, fontWeight: '800', color: colors.purple, letterSpacing: 0.2 },
-  tag: { fontSize: font.xs, fontWeight: '600', color: colors.red, marginTop: -2 },
-});
+  word: { fontSize: font.xl, fontWeight: '800', color: colors.accent, letterSpacing: 0.2 },
+  tag: { fontSize: font.xs, fontWeight: '600', color: colors.accentAlt, marginTop: -2 },
+}));

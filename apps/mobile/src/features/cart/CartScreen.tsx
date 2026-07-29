@@ -18,9 +18,13 @@ import { EmptyView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useOrderContext } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import type { CartItem } from '../../types/models';
 
 export function CartScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, rtlRow } = useI18n();
   const cart = useCart();
@@ -65,7 +69,7 @@ export function CartScreen() {
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
         <View style={[styles.subtotalRow, rtlRow]}>
           <Text style={styles.subtotalLabel}>{t('subtotal')}</Text>
-          <Price amount={cart.subtotal} size={font.lg} color={colors.purple} weight="800" />
+          <Price amount={cart.subtotal} size={font.lg} color={colors.accent} weight="800" />
         </View>
         {orderCtx.valid ? (
           <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button">
@@ -94,6 +98,8 @@ export function CartLine({
   item: CartItem; name: string; modifierSummary: string; lineAmount: number;
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { rtlText, rtlRow } = useI18n();
   const [imgFailed, setImgFailed] = useState(false);
   // The full Product travels with every cart line, so the thumbnail reuses the
@@ -120,7 +126,7 @@ export function CartLine({
       <View style={styles.lineBody}>
         <View style={[styles.lineTop, rtlRow]}>
           <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
-          <Price amount={lineAmount} size={font.md} color={colors.purple} weight="800" />
+          <Price amount={lineAmount} size={font.md} color={colors.accent} weight="800" />
         </View>
         {summary ? <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>{summary}</Text> : null}
         <View style={[styles.lineBottom, rtlRow]}>
@@ -140,10 +146,10 @@ export function CartLine({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   line: {
-    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
+    flexDirection: 'row', backgroundColor: colors.surface, borderRadius: radius.lg,
     borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
     padding: spacing.md, gap: spacing.md,
   },
@@ -152,7 +158,7 @@ const styles = StyleSheet.create({
   lineBody: { flex: 1, gap: spacing.xs },
   lineTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
   lineName: { flex: 1, fontSize: font.md, fontWeight: '800', color: colors.text },
-  lineTotal: { fontSize: font.md, fontWeight: '800', color: colors.purple },
+  lineTotal: { fontSize: font.md, fontWeight: '800', color: colors.accent },
   lineMods: { fontSize: font.sm, color: colors.muted },
   lineBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
   removeBtn: {
@@ -162,12 +168,12 @@ const styles = StyleSheet.create({
   remove: { color: colors.danger, fontWeight: '800', fontSize: font.sm },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface,
     borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md,
   },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   subtotalLabel: { fontSize: font.md, color: colors.muted, fontWeight: '700' },
-  subtotalValue: { fontSize: font.lg, color: colors.purple, fontWeight: '800' },
+  subtotalValue: { fontSize: font.lg, color: colors.accent, fontWeight: '800' },
   checkoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     // Purple, not red: the design system gives primary actions the brand purple
@@ -178,4 +184,4 @@ const styles = StyleSheet.create({
   checkoutBtnDisabled: { backgroundColor: colors.muted, justifyContent: 'center' },
   checkoutText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
   checkoutCount: { color: colors.white, fontWeight: '700', fontSize: font.sm, opacity: 0.9 },
-});
+}));

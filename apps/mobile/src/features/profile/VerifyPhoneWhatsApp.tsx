@@ -26,10 +26,12 @@ import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
 import { whatsappOtp } from '../../services/api';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code' | 'verified';
 
 export function VerifyPhoneWhatsApp() {
+  const styles = useStyles();
   const { t, lang, rtlText, rtlRow } = useI18n();
   const { profile, refreshProfile } = useAuth();
 
@@ -151,9 +153,9 @@ export function VerifyPhoneWhatsApp() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
   },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
@@ -167,4 +169,4 @@ const styles = StyleSheet.create({
   error: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.sm },
   success: { fontSize: font.md, color: colors.success, fontWeight: '800', paddingVertical: spacing.sm },
   notAvailable: { fontSize: font.sm, color: colors.muted, fontWeight: '700', paddingVertical: spacing.sm },
-});
+}));

@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
 import { colors, font, radius } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 
 interface Props {
   value: number;
@@ -14,6 +15,7 @@ interface Props {
 }
 
 export function QtyStepper({ value, onIncrement, onDecrement, min = 1, small }: Props) {
+  const styles = useStyles();
   const { t } = useI18n();
   const size = small ? 30 : 38;
   // Keep the compact visuals but guarantee a ≥44pt effective touch target.
@@ -44,7 +46,7 @@ export function QtyStepper({ value, onIncrement, onDecrement, min = 1, small }: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -55,7 +57,7 @@ const styles = StyleSheet.create({
   },
   btn: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },
-  sign: { fontSize: font.xl, fontWeight: '700', color: colors.purple, lineHeight: font.xl + 2 },
+  sign: { fontSize: font.xl, fontWeight: '700', color: colors.accent, lineHeight: font.xl + 2 },
   signDisabled: { color: colors.disabled },
   value: { minWidth: 24, textAlign: 'center', fontSize: font.md, fontWeight: '700', color: colors.text },
-});
+}));

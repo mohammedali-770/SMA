@@ -18,12 +18,14 @@ import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type N
 import { catalog } from '../../services/api';
 import { mapBanner } from '../../lib/mappers';
 import { colors, radius, spacing } from '../../theme';
+import { makeStyles } from '../../theme/makeStyles';
 import type { HomeBanner } from '../../types/models';
 
 const ROTATE_MS = 4000;
 const RATIO = 6 / 16; // height = width * 6/16 (~2.67:1) — short banner.
 
 export function BannerCarousel() {
+  const styles = useStyles();
   const [banners, setBanners] = useState<HomeBanner[]>([]);
   const [failed, setFailed] = useState<Record<string, true>>({});
   const [width, setWidth] = useState(0);
@@ -140,10 +142,10 @@ function BannerImage({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
   frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.bgAlt, width: '100%' },
   dots: { position: 'absolute', bottom: spacing.sm, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
-  dotActive: { backgroundColor: colors.white, width: 16 },
-});
+  dotActive: { backgroundColor: colors.surface, width: 16 },
+}));

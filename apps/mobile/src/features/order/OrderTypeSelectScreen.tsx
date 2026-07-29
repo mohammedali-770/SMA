@@ -36,6 +36,8 @@ import { mapConfig } from '../../lib/map';
 import { distanceKm, type GeoPoint } from '../../lib/geo';
 import { useCart, useCatalog, useOrderContext } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { isBranchOpen, pickupBranches, resolveDeliveryBranch } from './orderContext';
 import { validateCartForBranch } from './cartValidation';
 import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/models';
@@ -43,6 +45,8 @@ import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/mode
 type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
 
 export function OrderTypeSelectScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
@@ -211,7 +215,7 @@ export function OrderTypeSelectScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={colors.purple} /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={colors.accent} /></View>
       ) : error ? (
         <View style={styles.center}>
           <Text style={styles.err}>{error}</Text>
@@ -352,7 +356,7 @@ export function OrderTypeSelectScreen() {
 
       {busy ? (
         <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator size="large" color={colors.purple} />
+          <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.overlayText}>{t('otResolving')}</Text>
         </View>
       ) : null}
@@ -376,6 +380,7 @@ export function OrderTypeSelectScreen() {
 }
 
 function TabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]} accessibilityRole="button" accessibilityState={{ selected: active }}>
       <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
@@ -383,9 +388,9 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
-  tabsBar: { padding: spacing.lg, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabsBar: { padding: spacing.lg, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   tabs: {
     flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.pill,
     padding: 4, gap: 4,
@@ -408,17 +413,17 @@ const styles = StyleSheet.create({
   label: { fontSize: font.sm, fontWeight: '800', color: colors.text },
 
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     padding: spacing.lg, borderWidth: 1.5, borderColor: 'transparent', gap: spacing.xs,
   },
-  cardSelected: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
+  cardSelected: { borderColor: colors.accent, backgroundColor: colors.purpleBg },
   cardDisabled: { opacity: 0.55 },
   cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   name: { fontSize: font.md, fontWeight: '800', color: colors.text, flex: 1, paddingRight: spacing.sm },
   address: { fontSize: font.sm, color: colors.muted },
   meta: { fontSize: font.sm, color: colors.text, fontWeight: '700' },
 
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, minHeight: 64, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white, marginTop: spacing.xs },
+  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, minHeight: 64, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.surface, marginTop: spacing.xs },
   inputError: { borderColor: colors.danger },
   resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
   fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
@@ -430,7 +435,7 @@ const styles = StyleSheet.create({
   overlayText: { color: colors.text, fontWeight: '800', fontSize: font.md },
 
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl },
   sheetTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
   sheetBody: { fontSize: font.md, color: colors.text, marginTop: spacing.sm, lineHeight: 21 },
-});
+}));

@@ -9,6 +9,7 @@ import {
   Volume2, VolumeX, ShieldAlert, FileSpreadsheet, Settings, Languages, Plug, Images, Scale, HeartPulse, BellRing
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { ThemeToggle } from './ThemeToggle';
 import { orderIntegrity } from '../lib/api';
 import { operationsHealth } from '../lib/operationsHealthApi';
 import { operationsAlerts } from '../lib/operationsAlertsApi';
@@ -243,6 +244,8 @@ export const AdminDashboard: React.FC = () => {
           >
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
+
+          <ThemeToggle lang={adminLang} />
         </div>
       </div>
 

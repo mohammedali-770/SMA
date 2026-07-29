@@ -15,9 +15,14 @@ import { VerifyPhoneWhatsApp } from './VerifyPhoneWhatsApp';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useTheme, useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 export function ProfileScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, pick, lang, setLang, rtlText, rtlRow } = useI18n();
+  const { preference, setPreference } = useTheme();
   const { profile, signOut } = useAuth();
 
   const onSignOut = async () => {
@@ -78,6 +83,19 @@ export function ProfileScreen() {
           </View>
         </View>
 
+        {/* Appearance. Three options, not a switch: 'System' is the default and
+            has to stay reachable, so a customer whose phone dims in the evening
+            gets a dark app without configuring anything — and can still pin a
+            scheme if they prefer one. */}
+        <Text style={[styles.sectionTitle, rtlText]}>{t('appearance')}</Text>
+        <View style={[styles.card, shadow.card, styles.langCard]}>
+          <View style={styles.langRow}>
+            <LangBtn label={t('themeSystem')} active={preference === 'system'} onPress={() => setPreference('system')} />
+            <LangBtn label={t('themeLight')} active={preference === 'light'} onPress={() => setPreference('light')} />
+            <LangBtn label={t('themeDark')} active={preference === 'dark'} onPress={() => setPreference('dark')} />
+          </View>
+        </View>
+
         {/* Legal & Support */}
         <Text style={[styles.sectionTitle, rtlText]}>{t('legalSupport')}</Text>
         <Pressable
@@ -120,6 +138,7 @@ export function ProfileScreen() {
 }
 
 function DetailRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.detailRow, rtlRow, !last && styles.detailBorder]}>
@@ -130,6 +149,7 @@ function DetailRow({ label, value, last }: { label: string; value: string; last?
 }
 
 function LangBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable
       style={[styles.langBtn, active && styles.langBtnActive]}
@@ -142,11 +162,11 @@ function LangBtn({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   header: { paddingBottom: spacing.md },
   title: { fontSize: font.xxl, fontWeight: '800', color: colors.text },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
   },
   pressed: { opacity: 0.9 },
@@ -161,8 +181,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.purpleBg, borderColor: colors.purpleBg,
   },
   loyaltyLabelRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  loyaltyLabel: { fontSize: font.md, fontWeight: '800', color: colors.purple },
-  loyaltyValue: { fontSize: font.xxl, fontWeight: '800', color: colors.purple, fontVariant: ['tabular-nums'] },
+  loyaltyLabel: { fontSize: font.md, fontWeight: '800', color: colors.accent },
+  loyaltyValue: { fontSize: font.xxl, fontWeight: '800', color: colors.accent, fontVariant: ['tabular-nums'] },
 
   detailRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md, paddingVertical: spacing.md },
   detailBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -180,7 +200,7 @@ const styles = StyleSheet.create({
 
   legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
   legalText: { fontSize: font.md, color: colors.text, fontWeight: '700', flexShrink: 1 },
-  legalChevron: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
+  legalChevron: { fontSize: font.xl, fontWeight: '800', color: colors.accent },
 
   signOutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
@@ -196,4 +216,4 @@ const styles = StyleSheet.create({
   deleteText: { color: colors.danger, fontWeight: '700', fontSize: font.md, textDecorationLine: 'underline' },
 
   footerNote: { textAlign: 'center', color: colors.muted, fontSize: font.xs, marginTop: spacing.xl },
-});
+}));

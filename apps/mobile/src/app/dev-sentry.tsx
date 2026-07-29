@@ -25,6 +25,7 @@ import {
   captureException, captureMessage, isObservabilityInitialized, observabilityEnvironment,
 } from '../lib/observability';
 import { colors } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 
 export default function DevSentryScreen() {
   // Release builds: hard redirect. The dev-only body below is unreachable.
@@ -33,6 +34,7 @@ export default function DevSentryScreen() {
 }
 
 function DevSentryBody() {
+  const styles = useStyles();
   const [lastAction, setLastAction] = useState<string>('none');
   const [crashNow, setCrashNow] = useState(false);
 
@@ -91,7 +93,7 @@ function DevSentryBody() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
   title: { fontSize: 17, fontWeight: '800', color: colors.ink },
   meta: { fontSize: 12, color: colors.muted },
@@ -99,4 +101,4 @@ const styles = StyleSheet.create({
   danger: { backgroundColor: colors.red },
   buttonText: { color: colors.white, fontWeight: '800' },
   note: { fontSize: 11, color: colors.muted, textAlign: 'center', marginTop: 12 },
-});
+}));

@@ -6,6 +6,7 @@
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthScreen } from './components/AuthScreen';
+import { ThemeProvider } from './components/ThemeProvider';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 // The Admin POS panel and the Supabase console are heavy and secondary to the
@@ -186,8 +187,12 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    // Theme sits OUTSIDE the app provider: the colour scheme has to hold on the
+    // sign-in screen and the loading state too, neither of which has a session.
+    <ThemeProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ThemeProvider>
   );
 }

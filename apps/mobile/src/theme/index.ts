@@ -2,11 +2,29 @@
  * Spicy Meal design tokens. Brand colors are fixed by the brief; app_settings
  * may override primary/secondary at runtime (see store), but these are the
  * safe defaults used before settings load and for static styles.
+ *
+ * Two palettes with identical KEYS, so a screen's StyleSheet is written once and
+ * resolved per theme (see makeStyles). Three keys carry a role split that only
+ * matters in dark mode, and that light mode makes invisible by giving both
+ * members the same value:
+ *
+ *   purple  — a FILL that carries white text.       accent — the same brand
+ *   red     — a FILL that carries white text.       colour used as TEXT or an
+ *   white   — a LABEL on a coloured fill.           icon on a surface.
+ *                                                   surface — a panel.
+ *
+ * One token cannot do both jobs on a dark ground: a purple light enough to read
+ * as text on #1e1a2e cannot carry white text, and vice versa. In light mode
+ * accent === purple and surface === white, so every existing screen renders
+ * byte-identically; only dark mode pulls them apart.
  */
-export const colors = {
+export const lightColors = {
   purple: '#422e87',
   red: '#e02d3d',
   white: '#ffffff',
+  // Same value as `purple`/`red` here on purpose — see the note above.
+  accent: '#422e87',
+  accentAlt: '#e02d3d',
 
   // neutrals
   ink: '#1c1630',
@@ -42,6 +60,60 @@ export const colors = {
   disabled: '#c9c4d6',
   overlay: 'rgba(28,22,48,0.45)',
 };
+
+/**
+ * Dark mode. Values are the design system's DARK MODE row
+ * (design/01-design-system), with the three role splits resolved:
+ *
+ *  - `purple`/`red` are the FILL variants, chosen dark enough that white text on
+ *    them still clears AA. The design system's #9b85f0 is the TEXT variant and
+ *    lands in `accent`, where it belongs.
+ *  - `white` stays real white: it labels those fills. Panels use `surface`.
+ *
+ * Every pairing here is asserted in theme/contrast.test.ts.
+ */
+export const darkColors: Palette = {
+  purple: '#5a44ad',
+  red: '#c22636',
+  white: '#ffffff',
+  accent: '#b3a3f5',
+  accentAlt: '#ff8b99',
+
+  // neutrals
+  ink: '#f0edf6',
+  text: '#e4e0ee',
+  muted: '#a79fbb',
+  border: '#2e2847',
+  surface: '#1e1a2e',
+  bg: '#100c1c',
+  bgAlt: '#252040',
+
+  // Semantic status colours, used for TEXT and icons. On a dark ground these
+  // move the other way from light mode: they get LIGHTER, not darker, and each
+  // value is the smallest lightening that clears 4.5:1 on both its own tint and
+  // a `surface` card.
+  success: '#4ade80',
+  danger: '#ff8b99',
+  warning: '#fbbf24',
+
+  successBg: '#1a2e1f',
+  dangerBg: '#2e1a1e',
+  purpleBg: '#262046',
+
+  disabled: '#4a4460',
+  overlay: 'rgba(16,12,28,0.72)',
+};
+
+/** The shape both palettes share. */
+export type Palette = typeof lightColors;
+
+/**
+ * The light palette, kept as the default export name so the ~40 modules that
+ * import `colors` keep compiling. Anything rendered through makeStyles /
+ * useThemeColors resolves the ACTIVE palette instead; this is the value used by
+ * module-scope constants and by code that runs before a provider exists.
+ */
+export const colors = lightColors;
 
 export const spacing = {
   xs: 4,

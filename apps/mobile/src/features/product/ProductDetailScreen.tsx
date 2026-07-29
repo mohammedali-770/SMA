@@ -16,11 +16,15 @@ import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { computeUnitPrice } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Modifier, ModifierGroup } from '../../types/models';
 
 export function ProductDetailScreen({ productId }: { productId: string }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, rtlText, rtlRow } = useI18n();
   const { loading, getProduct, groupsForProduct } = useCatalog();
@@ -94,7 +98,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             <Text style={[styles.desc, rtlText]}>{pick(product.descriptionEn, product.descriptionAr)}</Text>
           ) : null}
           <View style={[styles.metaRow, rtlRow]}>
-            <Price amount={product.price} size={font.xl} color={colors.purple} weight="800" />
+            <Price amount={product.price} size={font.xl} color={colors.accent} weight="800" />
             {product.calories ? <Text style={styles.kcal}>{product.calories} {t('kcal')}</Text> : null}
           </View>
 
@@ -135,7 +139,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                           {checked ? <Text style={styles.checkMark}>✓</Text> : null}
                         </View>
                         <Text style={[styles.modName, rtlText]}>{pick(m.nameEn, m.nameAr)}</Text>
-                        {m.price > 0 ? <Price amount={m.price} prefix="+" size={font.sm} color={colors.purple} weight="800" /> : null}
+                        {m.price > 0 ? <Price amount={m.price} prefix="+" size={font.sm} color={colors.accent} weight="800" /> : null}
                       </Pressable>
                     );
                   })}
@@ -167,18 +171,18 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg },
   hero: { width: '100%', height: 260, backgroundColor: colors.bgAlt },
   body: { padding: spacing.lg },
   name: { fontSize: font.xxl, fontWeight: '800', color: colors.text, lineHeight: font.xxl + 8 },
   desc: { fontSize: font.md, color: colors.muted, marginTop: spacing.xs, lineHeight: font.md + 7 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.md },
-  price: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
+  price: { fontSize: font.xl, fontWeight: '800', color: colors.accent },
   kcal: { fontSize: font.sm, color: colors.muted },
 
   group: {
-    marginTop: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg,
+    marginTop: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.lg,
     borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border, padding: spacing.md,
   },
   groupUnmet: { borderColor: colors.red },
@@ -191,7 +195,7 @@ const styles = StyleSheet.create({
   groupError: { color: colors.danger, fontSize: font.xs, fontWeight: '700', marginBottom: spacing.xs },
 
   modRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white,
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.surface,
     borderRadius: radius.md, borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
     padding: spacing.md, minHeight: 48,
   },
@@ -204,13 +208,13 @@ const styles = StyleSheet.create({
   checkOn: { backgroundColor: colors.purple, borderColor: colors.purple },
   checkMark: { color: colors.white, fontWeight: '900', fontSize: font.sm },
   modName: { flex: 1, fontSize: font.md, color: colors.text, fontWeight: '600' },
-  modPrice: { fontSize: font.sm, color: colors.purple, fontWeight: '800' },
+  modPrice: { fontSize: font.sm, color: colors.accent, fontWeight: '800' },
 
   qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xl },
   qtyLabel: { fontSize: font.lg, fontWeight: '800', color: colors.text },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.surface,
     borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
   },
   addBtn: {
@@ -222,4 +226,4 @@ const styles = StyleSheet.create({
   addBtnDim: { backgroundColor: colors.disabled },
   addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
   addBtnPrice: { color: colors.white, fontWeight: '800', fontSize: font.lg },
-});
+}));

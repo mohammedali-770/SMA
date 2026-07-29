@@ -734,14 +734,14 @@ export const SettingsPanel: React.FC = () => {
                                       <button
                                         onClick={handleAddPoints}
                                         disabled={pointsLocked || !adjustmentValue}
-                                        className="bg-green-600 hover:bg-green-700 text-white text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
+                                        className="sm-fill-success text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
                                       >
                                         +{isRTL ? 'إضافة' : 'Add'}
                                       </button>
                                       <button
                                         onClick={handleDeductPoints}
                                         disabled={pointsLocked || !adjustmentValue || currentPoints <= 0}
-                                        className="bg-red-500 hover:bg-red-600 text-white text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
+                                        className="sm-fill-danger text-[9px] font-black px-2.5 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-40"
                                       >
                                         -{isRTL ? 'خصم' : 'Deduct'}
                                       </button>

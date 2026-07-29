@@ -16,6 +16,7 @@ import { CartLine } from '../features/cart/CartScreen';
 import { ProductCard } from '../features/menu/HomeMenuScreen';
 import { useI18n } from '../i18n/I18nProvider';
 import { colors, spacing } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
 import type { CartItem, Product } from '../types/models';
 
 const P = (o: Partial<Product>): Product => o as unknown as Product;
@@ -61,6 +62,7 @@ const RIYAL_SAMPLES: { label: string; a: number; s: number; w: TextStyle['fontWe
 ];
 
 export default function DevPreview() {
+  const colors = useThemeColors();
   const { c } = useLocalSearchParams<{ c?: string }>();
   const { pick, t } = useI18n();
   if (!__DEV__) return <Redirect href="/" />;
@@ -72,7 +74,7 @@ export default function DevPreview() {
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <Text style={{ width: 92, fontSize: 12, color: colors.muted }}>{r.label}</Text>
                 <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.text} weight={r.w} />
-                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.purple} weight="800" />
+                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.accent} weight="800" />
               </View>
             ))
           : c === 'cart'

@@ -27,11 +27,15 @@ import {
 import { legal } from '../../services/api';
 import { useCatalog } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import type { DbLegalDocument } from '../../types/db';
 
 const CHANNEL_EMOJI: Record<SupportChannelKind, string> = { phone: '📞', whatsapp: '💬', email: '✉️' };
 
 export function LegalListScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
   const { support } = useCatalog();
   const [docs, setDocs] = useState<DbLegalDocument[] | null>(null);
@@ -126,9 +130,9 @@ export function LegalListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   supportCard: {
-    backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg,
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg,
     gap: spacing.sm, marginBottom: spacing.sm,
   },
   supportTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
@@ -142,9 +146,9 @@ const styles = StyleSheet.create({
 
   row: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface, borderRadius: radius.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg,
   },
   rowText: { flex: 1, fontSize: font.md, fontWeight: '700', color: colors.text },
-  chevron: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
+  chevron: { fontSize: font.xl, fontWeight: '800', color: colors.accent },
   empty: { textAlign: 'center', color: colors.muted, fontSize: font.md, marginTop: spacing.xl },
-});
+}));

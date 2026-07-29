@@ -25,6 +25,8 @@ import {
 } from '../../features/checkout/pendingSessionStore';
 import { useCart } from '../../store';
 import { colors, font, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,6 +37,8 @@ function uuidParam(v: string | string[] | undefined): string {
 }
 
 export default function PaymentReturnRoute() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const params = useLocalSearchParams<{ session?: string; order?: string }>();
   const { pick } = useI18n();
   const cart = useCart();
@@ -71,7 +75,7 @@ export default function PaymentReturnRoute() {
 
   return (
     <View style={styles.root}>
-      <ActivityIndicator size="large" color={colors.purple} />
+      <ActivityIndicator size="large" color={colors.accent} />
       <Text style={styles.msg}>
         {pick('Confirming your payment…', 'جارٍ تأكيد الدفع…')}
       </Text>
@@ -87,8 +91,8 @@ export default function PaymentReturnRoute() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   root: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
   msg: { fontSize: font.md, color: colors.text, fontWeight: '700', textAlign: 'center' },
   fallback: { marginTop: spacing.xl, alignSelf: 'stretch' },
-});
+}));

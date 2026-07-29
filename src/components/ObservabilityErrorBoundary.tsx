@@ -54,7 +54,7 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
         <button
           type="button"
           onClick={this.retry}
-          className="mt-4 bg-slate-800 text-white text-xs font-black py-2.5 px-6 rounded-xl hover:bg-slate-700 transition-colors"
+          className="mt-4 sm-fill-ink text-xs font-black py-2.5 px-6 rounded-xl transition-colors"
         >
           Try again · إعادة المحاولة
         </button>

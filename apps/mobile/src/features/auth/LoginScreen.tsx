@@ -22,10 +22,14 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { legalTitle } from '../../lib/legal';
 import { auth } from '../../services/api';
 import { colors, font, radius, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { showsUnavailableCard, type WhatsAppLoginAvailability } from './loginAvailability';
 import { PhoneOtpLogin } from './PhoneOtpLogin';
 
 export function LoginScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, pick, lang, isRTL, rtlText } = useI18n();
   // null = still asking. Then a TRI-STATE: only a CONFIRMED 'disabled' hides the
   // form. An unreadable flag ('unknown' — network / RPC / RLS error) must never
@@ -89,11 +93,11 @@ export function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   scroll: { padding: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.sm },
   hero: { alignItems: 'flex-start', marginBottom: spacing.lg, gap: spacing.xs },
   heroRTL: { alignItems: 'flex-end' },
-  welcome: { fontSize: font.xxl, fontWeight: '800', color: colors.purple, marginTop: spacing.md },
+  welcome: { fontSize: font.xxl, fontWeight: '800', color: colors.accent, marginTop: spacing.md },
   sub: { fontSize: font.md, color: colors.muted },
   unavailable: {
     borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg,
@@ -102,5 +106,5 @@ const styles = StyleSheet.create({
   unavailableTitle: { fontSize: font.md, fontWeight: '800', color: colors.text },
   unavailableSub: { fontSize: font.sm, color: colors.muted, lineHeight: 20 },
   policy: { marginTop: spacing.xl, textAlign: 'center', color: colors.muted, fontSize: font.sm, lineHeight: 20 },
-  policyLink: { color: colors.purple, fontWeight: '800' },
-});
+  policyLink: { color: colors.accent, fontWeight: '800' },
+}));

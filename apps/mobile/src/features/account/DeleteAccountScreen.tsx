@@ -30,6 +30,8 @@ import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'checking' | 'pending' | 'intro' | 'reverify' | 'unavailable' | 'submitting' | 'success';
 
@@ -40,6 +42,8 @@ const CONSEQUENCE_KEYS = [
 ] as const;
 
 export function DeleteAccountScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, lang, isRTL, rtlText, rtlRow } = useI18n();
   const { signOut } = useAuth();
 
@@ -341,6 +345,7 @@ export function DeleteAccountScreen() {
 }
 
 function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
+  const styles = useStyles();
   const { t, rtlText } = useI18n();
   return (
     <View style={styles.support}>
@@ -355,13 +360,13 @@ function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   subtitle: { fontSize: font.md, color: colors.muted, marginBottom: spacing.md },
   muted: { fontSize: font.sm, color: colors.muted, marginTop: spacing.sm, lineHeight: font.sm + 6 },
   h2: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
   bodyText: { fontSize: font.md, color: colors.text, lineHeight: font.md + 8 },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
   },
   successCard: { borderColor: colors.success, backgroundColor: colors.successBg },
@@ -381,27 +386,27 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
     paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md,
-    color: colors.text, backgroundColor: colors.white, marginTop: spacing.sm,
+    color: colors.text, backgroundColor: colors.surface, marginTop: spacing.sm,
   },
   codeInput: { letterSpacing: 6, textAlign: 'center', fontWeight: '800' },
   switchLink: { paddingVertical: spacing.sm, alignItems: 'center' },
-  switchText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  switchText: { color: colors.accent, fontWeight: '800', fontSize: font.sm },
 
   notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
   error: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
 
   support: { marginTop: spacing.xl, gap: spacing.xs, alignItems: 'center' },
   supportLabel: { fontSize: font.sm, color: colors.muted, fontWeight: '600' },
-  supportLink: { fontSize: font.md, color: colors.purple, fontWeight: '800' },
+  supportLink: { fontSize: font.md, color: colors.accent, fontWeight: '800' },
 
   modalOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
   },
   modalCard: {
-    width: '100%', backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    width: '100%', backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     padding: spacing.xl, gap: spacing.sm,
   },
   modalTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text },
   modalBody: { fontSize: font.md, color: colors.muted, lineHeight: font.md + 7, marginBottom: spacing.md },
-});
+}));

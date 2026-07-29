@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, spacing, typography } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function Header({ title, showBack, onBack, right, left, safeTop }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { isRTL, t, rtlRow } = useI18n();
   const back = () => {
@@ -47,13 +49,13 @@ export function Header({ title, showBack, onBack, right, left, safeTop }: Props)
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -64,6 +66,6 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
     backgroundColor: colors.bgAlt,
   },
-  chevron: { fontSize: 28, fontWeight: '800', color: colors.purple, lineHeight: 30 },
+  chevron: { fontSize: 28, fontWeight: '800', color: colors.accent, lineHeight: 30 },
   title: { flex: 1, textAlign: 'center', ...typography.heading, fontWeight: '800', color: colors.text },
-});
+}));

@@ -31,6 +31,8 @@ import {
 } from 'react-native';
 
 import { colors, font, radius, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { applyBackspace, applyBoxInput, joinBoxes, splitCodeToBoxes } from './otpAutofill';
 
 interface Props {
@@ -56,6 +58,8 @@ export function OtpCodeInput({
   accessibilityLabel,
   style,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const inputs = useRef<Array<TextInput | null>>([]);
   const boxes = useMemo(() => splitCodeToBoxes(value, length), [value, length]);
 
@@ -116,7 +120,7 @@ export function OtpCodeInput({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // Never mirrored: the code always reads left-to-right in both languages.
   row: {
     flexDirection: 'row',
@@ -139,10 +143,10 @@ const styles = StyleSheet.create({
   },
   boxFilled: {
     borderColor: colors.purple,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
   boxMuted: {
     backgroundColor: colors.bg,
     color: colors.muted,
   },
-});
+}));

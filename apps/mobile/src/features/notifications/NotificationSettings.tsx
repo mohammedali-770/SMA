@@ -21,9 +21,13 @@ import {
   deactivateThisDeviceStrict, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
 } from './pushRegistration';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import type { DbPushDevice } from '../../types/db';
 
 export function NotificationSettings() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, lang, rtlText, rtlRow } = useI18n();
   const { userId } = useAuth();
   const [device, setDevice] = useState<DbPushDevice | null>(null);
@@ -122,9 +126,9 @@ export function NotificationSettings() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
   },
   title: { fontSize: font.lg, fontWeight: '800', color: colors.text },
@@ -134,4 +138,4 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
   rowSub: { fontSize: font.xs, color: colors.muted, marginTop: 1 },
   denied: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
-});
+}));

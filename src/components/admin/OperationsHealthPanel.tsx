@@ -266,7 +266,7 @@ const SystemCard: React.FC<{
           <div className="flex items-center gap-1.5">
             <h5 className="text-[11px] font-black text-slate-800">{isAr ? text.ar : text.en}</h5>
             {system.critical && (
-              <span className="text-[7px] font-black uppercase bg-slate-800 text-white px-1.5 py-0.5 rounded-full">
+              <span className="text-[7px] font-black uppercase sm-fill-ink px-1.5 py-0.5 rounded-full">
                 {isAr ? 'حرج' : 'Critical'}
               </span>
             )}

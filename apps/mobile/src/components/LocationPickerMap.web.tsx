@@ -14,6 +14,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { mapConfig } from '../lib/map';
 import { colors, font, radius, spacing } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 import { CrosshairIcon } from './Icons';
 import {
   FIX_FRESH_MS, LOCATE_TIMEOUT_MS, classifyLocateFailure, isFixFresh, isUsableFix,
@@ -55,6 +57,8 @@ function loadGoogleMapsWeb(key: string): Promise<void> {
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   lat, lng, onChange, lang, labels, onAddressResolved,
 }) => {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const hostRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -183,8 +187,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
         >
           {locating
-            ? <ActivityIndicator size="small" color={colors.purple} />
-            : <CrosshairIcon size={22} color={colors.purple} />}
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : <CrosshairIcon size={22} color={colors.accent} />}
         </Pressable>
       </View>
       <Text style={styles.hint}>{labels.locateHint}</Text>
@@ -193,7 +197,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   mapWrap: {
     height: MAP_HEIGHT, borderRadius: radius.md, overflow: 'hidden',
     borderWidth: 1, borderColor: colors.border, position: 'relative',
@@ -203,7 +207,7 @@ const styles = StyleSheet.create({
     position: 'absolute', right: LOCATE_BTN_RIGHT, bottom: LOCATE_BTN_BOTTOM,
     width: LOCATE_BTN_SIZE, height: LOCATE_BTN_SIZE, borderRadius: LOCATE_BTN_SIZE / 2,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderWidth: 1, borderColor: colors.border,
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 }, elevation: 3,
@@ -211,6 +215,6 @@ const styles = StyleSheet.create({
   locateBtnPressed: { backgroundColor: colors.purpleBg },
   hint: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
   locateError: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.xs },
-  fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
+  fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   fallbackText: { fontSize: font.sm, color: colors.muted, fontWeight: '700', textAlign: 'center' },
-});
+}));

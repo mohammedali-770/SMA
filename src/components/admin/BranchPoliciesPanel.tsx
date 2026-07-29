@@ -95,7 +95,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                             onClick={() => { void handleDeleteBranch(branch); }}
                             disabled={deletingBranchId === branch.id}
                             aria-label={isRTL ? `حذف فرع ${branch.nameAr}` : `Delete branch ${branch.nameEn}`}
-                            className="flex items-center gap-1 text-[9px] font-black text-red-700 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1 text-[9px] font-black text-red-700 bg-red-50 border border-red-200 sm-hover-fill-danger rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                             {deletingBranchId === branch.id
@@ -211,7 +211,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                             {!isAccountant && (
                               <button
                                 onClick={() => setEditBranchId(branch.id)}
-                                className="w-full py-1.5 rounded-lg text-center text-[9px] font-black bg-amber-500 text-white hover:bg-amber-600 transition-all flex items-center justify-center gap-1"
+                                className="w-full py-1.5 rounded-lg text-center text-[9px] font-black sm-fill-warning transition-all flex items-center justify-center gap-1"
                               >
                                 <MapPin className="w-3 h-3" />
                                 {isRTL ? 'تحديد موقع الفرع' : 'Set branch location'}

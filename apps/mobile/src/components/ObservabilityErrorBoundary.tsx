@@ -63,6 +63,9 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
   }
 }
 
+// A class component cannot call a hook, and this boundary has to render when
+// the provider tree itself has failed — so it stays on the light palette by
+// design rather than by omission. It is the one screen in the app that does.
 const styles = StyleSheet.create({
   wrap: {
     flex: 1, alignItems: 'center', justifyContent: 'center',

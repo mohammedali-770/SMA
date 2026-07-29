@@ -21,11 +21,15 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Button } from './Button';
 import { presentState } from './stateHierarchy';
 import { colors, font, spacing, typography } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 
 export function LoadingView({ label }: { label?: string }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   return (
     <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label}>
-      <ActivityIndicator size="large" color={colors.purple} />
+      <ActivityIndicator size="large" color={colors.accent} />
       {label ? <Text style={styles.muted}>{label}</Text> : null}
     </View>
   );
@@ -44,6 +48,7 @@ export function ErrorView({
   /** Localized generic heading used when `message` is technical. */
   fallbackTitle?: string;
 }) {
+  const styles = useStyles();
   // Screens pass a localized fallback; the English default only applies to call
   // sites not yet migrated.
   const { heading, detail } = presentState({
@@ -72,6 +77,7 @@ export function EmptyView({
   /** Drawn icon (see components/Icons); falls back to the legacy emoji glyph. */
   icon?: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.center}>
       {icon ?? <Text style={styles.emoji}>{emoji ?? '🛒'}</Text>}
@@ -85,7 +91,7 @@ export function EmptyView({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   center: {
     flex: 1,
     alignItems: 'center',
@@ -101,4 +107,4 @@ const styles = StyleSheet.create({
     fontSize: font.xs, color: colors.muted, textAlign: 'center',
     marginTop: spacing.md, lineHeight: 17,
   },
-});
+}));

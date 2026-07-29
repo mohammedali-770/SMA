@@ -15,6 +15,9 @@ import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
 import { confirmationPresentation, orderConfirmationState, type ConfirmationTone } from './orderConfirmation';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
+import type { Palette } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Order, OrderStatus } from '../../types/models';
@@ -29,6 +32,8 @@ const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | '
 };
 
 export function OrdersScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
   const [list, setList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +100,7 @@ export function OrdersScreen() {
         <ConfirmationChip order={item} />
         <View style={[styles.cardBottom, rtlRow]}>
           <Text style={[styles.itemsCount, rtlText]}>{meta}</Text>
-          <Price amount={item.total} size={font.lg} color={colors.purple} weight="800" />
+          <Price amount={item.total} size={font.lg} color={colors.accent} weight="800" />
         </View>
         <View style={styles.receiptRow}>
           <Text style={[styles.viewReceipt, rtlText]}>{t('viewReceipt')} {isRTL ? '‹' : '›'}</Text>
@@ -124,7 +129,7 @@ export function OrdersScreen() {
           data={list}
           keyExtractor={(o) => o.id}
           contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} tintColor={colors.purple} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load('refresh')} tintColor={colors.accent} />}
           renderItem={renderOrder}
         />
       )}
@@ -134,6 +139,8 @@ export function OrdersScreen() {
 
 /** Static ghost cards matching the loaded layout — no animation loops. */
 function OrdersSkeleton() {
+  const colors = useThemeColors();
+  const skeleton = useSkeleton();
   return (
     <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
       {[0, 1, 2, 3].map((i) => (
@@ -153,21 +160,21 @@ function OrdersSkeleton() {
   );
 }
 
-const skeleton = StyleSheet.create({
+const useSkeleton = makeStyles((colors) => ({
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.sm,
   },
   line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
   badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: colors.bgAlt },
-});
+}));
 
-const CHIP_TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
-  info: { bg: colors.purpleBg, fg: colors.purple },
+const chipTone = (colors: Palette): Record<ConfirmationTone, { bg: string; fg: string }> => ({
+  info: { bg: colors.purpleBg, fg: colors.accent },
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.bgAlt, fg: colors.warning },
   danger: { bg: colors.dangerBg, fg: colors.danger },
-};
+});
 
 /**
  * The same derived state as the receipt, shown compactly. My Orders must not
@@ -180,13 +187,14 @@ const CHIP_TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
  * repeat it.
  */
 function ConfirmationChip({ order }: { order: Order }) {
+  const styles = useStyles();
   const { t } = useI18n();
   const state = orderConfirmationState(order);
   // The card heading already renders this state's title when there is no branch
   // number, so a chip would only repeat it.
   if (state === 'accepted_no_pos_channel' || state === 'accepted_no_pos_channel_unpaid') return null;
   const p = confirmationPresentation(state);
-  const tone = CHIP_TONE[p.tone];
+  const tone = chipTone(colors)[p.tone];
   return (
     <View style={[styles.posChip, { backgroundColor: tone.bg }]}>
       <View style={[styles.posDot, { backgroundColor: tone.fg }]} />
@@ -196,10 +204,12 @@ function ConfirmationChip({ order }: { order: Order }) {
 }
 
 function StatusBadge({ label, status }: { label: string; status: OrderStatus }) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const tone =
     status === 'delivered' ? { bg: colors.successBg, fg: colors.success }
     : status === 'cancelled' ? { bg: colors.dangerBg, fg: colors.danger }
-    : { bg: colors.purpleBg, fg: colors.purple };
+    : { bg: colors.purpleBg, fg: colors.accent };
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }]}>
       <Text style={[styles.badgeText, { color: tone.fg }]}>{label}</Text>
@@ -207,11 +217,11 @@ function StatusBadge({ label, status }: { label: string; status: OrderStatus }) 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   header: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.md },
   title: { fontSize: font.xxl, fontWeight: '800', color: colors.text },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.surface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: colors.border, padding: spacing.lg, gap: spacing.xs,
   },
   cardPressed: { opacity: 0.9 },
@@ -221,9 +231,9 @@ const styles = StyleSheet.create({
   date: { fontSize: font.sm, color: colors.muted },
   cardBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
   itemsCount: { fontSize: font.sm, color: colors.text, fontWeight: '600', flexShrink: 1 },
-  total: { fontSize: font.lg, fontWeight: '800', color: colors.purple },
+  total: { fontSize: font.lg, fontWeight: '800', color: colors.accent },
   receiptRow: { borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.sm },
-  viewReceipt: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
+  viewReceipt: { color: colors.accent, fontWeight: '800', fontSize: font.sm },
   // Badge sizes to its label and may wrap on narrow widths — long Arabic
   // status names shrink the reference column instead of clipping.
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill, maxWidth: '55%' },
@@ -234,4 +244,4 @@ const styles = StyleSheet.create({
   },
   posDot: { width: 7, height: 7, borderRadius: 4 },
   posChipText: { fontSize: font.xs, fontWeight: '800', flexShrink: 1 },
-});
+}));

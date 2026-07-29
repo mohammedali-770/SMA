@@ -60,7 +60,7 @@ export const IntegrationsPanel: React.FC = () => {
       ) : integrationsError ? (
         <div className="p-4 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center justify-between gap-2">
           <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />{integrationsError}</span>
-          <button onClick={() => { void loadIntegrations(); }} className="bg-red-600 text-white text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
+          <button onClick={() => { void loadIntegrations(); }} className="sm-fill-danger text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
         </div>
       ) : integrationsLoading ? (
         <div className="py-8 text-center text-slate-600 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>

@@ -12,8 +12,10 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
 import { colors } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 export default function TabsLayout() {
+  const colors = useThemeColors();
   const { status } = useAuth();
   const { t, pick } = useI18n();
 
@@ -44,9 +46,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.purple,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { borderTopColor: colors.border, backgroundColor: colors.white },
+        tabBarStyle: { borderTopColor: colors.border, backgroundColor: colors.surface },
         tabBarLabelStyle: { fontWeight: '700' },
       }}
     >

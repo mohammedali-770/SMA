@@ -98,7 +98,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
                 <button
                   onClick={() => void handleTest()}
                   disabled={testing || !testTo.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black px-3 rounded-xl flex items-center gap-1 disabled:opacity-40"
+                  className="sm-fill-info text-[11px] font-black px-3 rounded-xl flex items-center gap-1 disabled:opacity-40"
                 >
                   <Send className="w-3 h-3" /> {testing ? '…' : (isRTL ? 'إرسال' : 'Send')}
                 </button>

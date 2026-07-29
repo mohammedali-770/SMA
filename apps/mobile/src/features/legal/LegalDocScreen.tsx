@@ -15,6 +15,8 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { legalTitle } from '../../lib/legal';
 import { legal } from '../../services/api';
 import { colors, font, spacing } from '../../theme';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 import type { DbLegalDocument } from '../../types/db';
 
 type State =
@@ -24,6 +26,8 @@ type State =
   | { kind: 'ok'; doc: DbLegalDocument };
 
 export function LegalDocScreen() {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { type } = useLocalSearchParams<{ type: string }>();
   const { t, pick, lang, isRTL } = useI18n();
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -67,11 +71,11 @@ export function LegalDocScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
   missing: { fontSize: font.md, color: colors.muted, fontWeight: '700', textAlign: 'center' },
   title: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
   body: { fontSize: font.md, color: colors.text, lineHeight: 22 },
   metaWrap: { marginTop: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   meta: { fontSize: font.xs, color: colors.muted, fontWeight: '600' },
-});
+}));

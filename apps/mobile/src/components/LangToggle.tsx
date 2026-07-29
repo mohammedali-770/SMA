@@ -13,8 +13,10 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
 import { colors, font, radius, spacing } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 
 export function LangToggle() {
+  const styles = useStyles();
   const { lang, toggle } = useI18n();
   // The label names the language you would switch TO, so it reads as an action.
   const label = lang === 'en' ? 'العربية' : 'EN';
@@ -31,10 +33,10 @@ export function LangToggle() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   btn: {
     paddingHorizontal: spacing.md, paddingVertical: 7, borderRadius: radius.pill,
     backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border,
   },
   text: { color: colors.text, fontWeight: '700', fontSize: font.sm },
-});
+}));

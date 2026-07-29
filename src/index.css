@@ -66,6 +66,183 @@
   --sm-shadow-lg: 0 2px 4px rgba(28, 22, 48, 0.04), 0 16px 40px -12px rgba(28, 22, 48, 0.16);
 }
 
+/* ===========================================================================
+   Dark mode.
+
+   Tailwind 4 compiles every colour utility to `var(--color-<hue>-<step>)` and
+   declares the palette as custom properties on :root. That means the whole
+   console can be re-themed by redefining those variables — no `dark:` variant
+   on any of the ~1,400 colour classes in src/, and no component edits.
+
+   Two things the naive "invert the ramp" version gets wrong, both handled:
+
+   1. `--color-white` is shared by `bg-white` (a surface, 137 uses) and
+      `text-white` (a label on a coloured fill, 72 uses). Remapping it would
+      turn every button label dark-on-dark, so it stays white and the
+      BACKGROUND utilities are overridden individually instead.
+
+   2. A few mid-ramp steps are solid fills carrying white text (bg-red-600,
+      bg-slate-800, bg-green-600…) while the SAME step is also a text colour on
+      a light tint elsewhere. One variable cannot be both. Those 16 fill sites
+      use the .sm-fill-* classes below, which are defined per theme.
+
+   Palette values are the design system's DARK MODE row (design/01-design-system).
+   =========================================================================== */
+:root[data-theme='dark'] {
+  --sm-surface: #1e1a2e;
+  --sm-surface-alt: #252040;
+  --sm-ground: #100c1c;
+  --sm-border: #2e2847;
+  --sm-ink: #f0edf6;
+  --sm-muted: #9890aa;
+
+  /* Brand defaults lift for a dark ground. An operator's runtime override still
+     wins (it is an inline style on :root) — see --sm-accent-on-dark below for
+     how text keeps its contrast when they pick a dark purple. */
+  --sm-primary: #9b85f0;
+  --sm-secondary: #ff6274;
+
+  /* On a dark ground a soft wide shadow does nothing; separation comes from the
+     surface step instead, so elevation is reduced to a hairline lift. */
+  --sm-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sm-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px -6px rgba(0, 0, 0, 0.5);
+  --sm-shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px -12px rgba(0, 0, 0, 0.7);
+
+  /* Neutrals. The ramp is inverted: low steps become surfaces and borders, high
+     steps become text. slate and gray are kept identical — the console uses
+     both interchangeably for the same jobs. */
+  --color-slate-50:  #232040;
+  --color-slate-100: #272244;
+  --color-slate-200: #2e2847;
+  --color-slate-300: #3b3459;
+  --color-slate-400: #9c94b3;
+  --color-slate-500: #a79fbb;
+  --color-slate-600: #b3abc6;
+  --color-slate-700: #cdc7db;
+  --color-slate-800: #e2dfec;
+  --color-slate-900: #f0edf6;
+  --color-slate-950: #f8f6fc;
+  --color-gray-50:  #232040;
+  --color-gray-100: #272244;
+  --color-gray-200: #2e2847;
+  --color-gray-300: #3b3459;
+  --color-gray-400: #9c94b3;
+  --color-gray-500: #a79fbb;
+  --color-gray-600: #b3abc6;
+  --color-gray-700: #cdc7db;
+  --color-gray-800: #e2dfec;
+  --color-gray-900: #f0edf6;
+
+  /* Success. Low steps are the tint, high steps the text on it. */
+  --color-green-50:  #16261b;
+  --color-green-100: #1a2e1f;
+  --color-green-200: #24422c;
+  --color-green-300: #2f5a3a;
+  --color-green-400: #4ade80;
+  --color-green-500: #4ade80;
+  --color-green-600: #5ce38c;
+  --color-green-700: #6ee79b;
+  --color-green-800: #86efac;
+  --color-emerald-50:  #16261b;
+  --color-emerald-100: #1a2e1f;
+  --color-emerald-200: #24422c;
+  --color-emerald-400: #4ade80;
+  --color-emerald-500: #4ade80;
+  --color-emerald-600: #5ce38c;
+  --color-emerald-700: #6ee79b;
+  --color-emerald-800: #86efac;
+
+  /* Danger. */
+  --color-red-50:  #26161a;
+  --color-red-100: #2e1a1e;
+  --color-red-200: #43242a;
+  --color-red-300: #5c3038;
+  --color-red-400: #ff8b99;
+  --color-red-500: #ff6274;
+  --color-red-600: #ff7a89;
+  --color-red-700: #ff8b99;
+  --color-red-800: #ffa6b1;
+  --color-red-900: #ffc2ca;
+
+  /* Warning. */
+  --color-amber-50:  #26221a;
+  --color-amber-100: #2e2a1a;
+  --color-amber-200: #443c22;
+  --color-amber-500: #fbbf24;
+  --color-amber-600: #fcc73f;
+  --color-amber-700: #fdd460;
+  --color-amber-800: #fee085;
+  --color-amber-900: #feeaa8;
+  --color-yellow-50:  #26221a;
+  --color-yellow-600: #fcc73f;
+  --color-yellow-700: #fdd460;
+  --color-orange-100: #2e2a1a;
+  --color-orange-200: #443c22;
+  --color-orange-700: #fdd460;
+  --color-orange-800: #fee085;
+
+  /* Info. */
+  --color-blue-50:  #17203a;
+  --color-blue-100: #1b2647;
+  --color-blue-200: #26345e;
+  --color-blue-400: #7aa5ff;
+  --color-blue-500: #7aa5ff;
+  --color-blue-600: #8fb4ff;
+  --color-blue-700: #a5c3ff;
+  --color-blue-800: #bcd3ff;
+  --color-sky-50:  #17203a;
+  --color-sky-100: #1b2647;
+  --color-sky-200: #26345e;
+  --color-sky-700: #a5c3ff;
+  --color-sky-800: #bcd3ff;
+
+  /* Brand-adjacent hues used for accents and admin-only chips. */
+  --color-indigo-100: #262046;
+  --color-indigo-700: #b8a7f6;
+  --color-violet-100: #262046;
+  --color-violet-200: #332a5e;
+  --color-violet-800: #c9bcf9;
+  --color-purple-50:  #201a3d;
+  --color-purple-100: #262046;
+  --color-purple-300: #453a80;
+  --color-purple-400: #b3a3f5;
+  --color-purple-600: #a894f3;
+}
+
+/* `bg-white` means "a panel" in this console, not "the colour white". Only the
+   BACKGROUND utilities are redirected; `text-white` and `border-white` keep the
+   real white so labels on coloured fills stay legible. */
+:root[data-theme='dark'] .bg-white { background-color: var(--sm-surface); }
+:root[data-theme='dark'] .bg-white\/10,
+:root[data-theme='dark'] .bg-white\/20,
+:root[data-theme='dark'] .bg-white\/30,
+:root[data-theme='dark'] .bg-white\/40,
+:root[data-theme='dark'] .bg-white\/45,
+:root[data-theme='dark'] .bg-white\/50,
+:root[data-theme='dark'] .bg-white\/60,
+:root[data-theme='dark'] .bg-white\/70,
+:root[data-theme='dark'] .bg-white\/80 { background-color: var(--sm-surface); }
+:root[data-theme='dark'] .hover\:bg-white:hover,
+:root[data-theme='dark'] .hover\:bg-white\/80:hover { background-color: var(--sm-surface-alt); }
+:root[data-theme='dark'] .border-white\/10,
+:root[data-theme='dark'] .border-white\/20,
+:root[data-theme='dark'] .border-white\/60,
+:root[data-theme='dark'] .border-white\/85 { border-color: var(--sm-border); }
+
+/* The brand colour is applied as an INLINE style on :root by the admin colour
+   pickers, so it wins over any stylesheet rule — including this one. That is
+   correct for FILLS (the brand purple carries white text at any lightness) and
+   wrong for TEXT (a dark brand purple on a dark ground is unreadable). Text and
+   borders therefore draw from a lightened derivative that tracks whatever the
+   operator picked, rather than from the raw value. */
+:root[data-theme='dark'] {
+  --sm-accent-text: color-mix(in srgb, var(--color-primary), white 45%);
+  --sm-accent-text-2: color-mix(in srgb, var(--color-secondary), white 35%);
+}
+:root[data-theme='dark'] .text-primary { color: var(--sm-accent-text); }
+:root[data-theme='dark'] .text-secondary { color: var(--sm-accent-text-2); }
+:root[data-theme='dark'] .border-primary { border-color: var(--sm-accent-text); }
+
 body {
   /* Flat ground. The old two-tone radial wash fought the panels for attention
      and tinted every "white" card a different shade depending on position. */
@@ -74,7 +251,9 @@ body {
   font-family: var(--font-sans);
   color: var(--sm-ink);
   -webkit-font-smoothing: antialiased;
+  color-scheme: light;
 }
+:root[data-theme='dark'] body { color-scheme: dark; }
 
 /* Arabic gets its own face and a touch more leading — Cairo sets tighter than
    Inter at the same size, and Arabic needs the extra vertical room. */
@@ -100,6 +279,35 @@ body {
   background: #1c2333;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: var(--sm-shadow-lg);
+
+  /* This panel is dark in BOTH themes, so its contents must not follow the dark
+     theme's ramp inversion — inside here `text-slate-300` is already light text
+     on a dark surface, and flipping it to a dark value would make it invisible.
+     Re-declaring the ramp locally pins it to the light palette; custom
+     properties inherit, so every utility on every descendant follows. This is
+     the whole fix: no component edits, and the panel is theme-independent by
+     construction rather than by a list of exceptions someone has to maintain. */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+  --color-slate-950: #020617;
+  --color-gray-100: #f3f4f6;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-purple-300: #d8b4fe;
+  --color-purple-400: #c084fc;
+  --color-green-400: #4ade80;
+  --color-red-400: #f87171;
+  --color-emerald-400: #34d399;
+  --color-blue-400: #60a5fa;
 }
 
 .glass-card {
@@ -147,6 +355,45 @@ body {
   background: var(--sm-surface-alt);
   border-color: #ddd8e8;
 }
+
+/* ---------------------------------------------------------------------------
+   Semantic solid fills.
+
+   A handful of sites use a mid-ramp step as a SOLID button with white text
+   (bg-red-600, bg-green-600, bg-amber-500, bg-slate-800, bg-blue-600) while the
+   same step is a TEXT colour on a light tint elsewhere. One variable cannot
+   serve both roles across themes, so these get their own classes with a fixed
+   contract: an opaque fill that always carries its stated label colour.
+   --------------------------------------------------------------------------- */
+.sm-fill-danger  { background: #d92d3c; color: #fff; }
+.sm-fill-danger:hover  { background: #bf2432; }
+.sm-fill-success { background: #167a41; color: #fff; }
+.sm-fill-success:hover { background: #126334; }
+.sm-fill-warning { background: #a86a10; color: #fff; }
+.sm-fill-warning:hover { background: #8c580c; }
+.sm-fill-info    { background: #1d5fd0; color: #fff; }
+.sm-fill-info:hover    { background: #1750b0; }
+.sm-fill-ink     { background: #2c2545; color: #fff; }
+.sm-fill-ink:hover     { background: #3a3159; }
+/* Disabled/neutral fill — a label that must read as unavailable, not as a
+   colour. Contrast is deliberately modest; 1.4.3 exempts disabled controls. */
+.sm-fill-muted   { background: var(--sm-surface-alt); color: var(--sm-muted); }
+/* Hover-only variant, for a quiet button that turns solid on hover. Its own
+   class rather than `hover:sm-fill-danger` — Tailwind variants apply to
+   Tailwind utilities, not to arbitrary class names. */
+.sm-hover-fill-danger:hover { background: #d92d3c; color: #fff; border-color: #d92d3c; }
+
+:root[data-theme='dark'] .sm-fill-danger  { background: #e0394a; }
+:root[data-theme='dark'] .sm-fill-danger:hover  { background: #f0505f; }
+:root[data-theme='dark'] .sm-fill-success { background: #1c8f4d; }
+:root[data-theme='dark'] .sm-fill-success:hover { background: #24a75c; }
+:root[data-theme='dark'] .sm-fill-warning { background: #b0730f; }
+:root[data-theme='dark'] .sm-fill-warning:hover { background: #c9861a; }
+:root[data-theme='dark'] .sm-fill-info    { background: #2a6ee0; }
+:root[data-theme='dark'] .sm-fill-info:hover    { background: #3b7ef0; }
+:root[data-theme='dark'] .sm-fill-ink     { background: #3b3459; }
+:root[data-theme='dark'] .sm-fill-ink:hover     { background: #4a4270; }
+:root[data-theme='dark'] .sm-hover-fill-danger:hover { background: #e0394a; border-color: #e0394a; }
 
 .glass-input {
   background: var(--sm-surface);

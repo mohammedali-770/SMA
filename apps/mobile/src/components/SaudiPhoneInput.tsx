@@ -14,6 +14,8 @@ import { StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } fro
 import { useI18n } from '../i18n/I18nProvider';
 import { KSA_DIAL_CODE, sanitizeSaudiNationalInput } from '../lib/phone';
 import { colors, font, radius, spacing } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 
 interface Props {
   /** The national part only (`5XXXXXXXX`) — never the country code. */
@@ -31,6 +33,8 @@ interface Props {
 export function SaudiPhoneInput({
   value, onChangeText, editable = true, autoFocus, label, showHint = true, style,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const { t, rtlText } = useI18n();
   const fieldLabel = label ?? t('phoneNumberLabel');
 
@@ -66,7 +70,7 @@ export function SaudiPhoneInput({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   label: { fontSize: font.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
   row: {
     flexDirection: 'row',
@@ -97,4 +101,4 @@ const styles = StyleSheet.create({
   },
   textMuted: { color: colors.muted },
   hint: { fontSize: font.xs, color: colors.muted, marginTop: spacing.xs },
-});
+}));

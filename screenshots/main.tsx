@@ -6,6 +6,7 @@ import React, { Suspense, lazy } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import '../src/index.css';
+import { ThemeProvider } from '../src/components/ThemeProvider';
 
 const AdminDashboard = lazy(() =>
   import('../src/components/AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
@@ -18,6 +19,9 @@ const view = new URLSearchParams(location.search).get('view') ?? 'admin';
 
 function Harness() {
   return (
+    // Same position as in App: above every screen, so the DatabasePlayground
+    // view is themed too, not only the dashboard.
+    <ThemeProvider>
     <div className="min-h-screen flex flex-col font-sans">
       <header className="sticky top-0 backdrop-blur-md bg-white/30 border-b border-slate-200/60 text-slate-800 py-3 px-6 z-40">
         <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
@@ -37,6 +41,7 @@ function Harness() {
         </Suspense>
       </main>
     </div>
+    </ThemeProvider>
   );
 }
 

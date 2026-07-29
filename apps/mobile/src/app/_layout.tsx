@@ -17,6 +17,7 @@ import { NotificationTapBridge } from '../features/notifications/NotificationTap
 import { I18nProvider } from '../i18n/I18nProvider';
 import { initObservability, wrapRoot } from '../lib/observability';
 import { AppStoreProvider, useAuth } from '../store';
+import { ThemeProvider, useTheme, useThemeColors } from '../theme/ThemeProvider';
 import { colors } from '../theme';
 
 // Crash reporting initializes ONCE, before any screen renders. Disabled in
@@ -35,19 +36,36 @@ function SplashGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/** Status-bar glyphs invert with the theme; a dark bar on a dark ground is blank. */
+function ThemedChrome() {
+  const { resolved } = useTheme();
+  return <StatusBar style={resolved === 'dark' ? 'light' : 'dark'} />;
+}
+
+/** The navigator's own content background, so pushes do not flash light. */
+function ThemedStack({ children }: { children: React.ReactNode }) {
+  const colors = useThemeColors();
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+      {children}
+    </Stack>
+  );
+}
+
 function RootLayout() {
   return (
     <SafeAreaProvider>
       {/* Above I18nProvider on purpose: a crash inside localization/state
           bootstrap still renders the (static, bilingual) fallback. */}
       <ObservabilityErrorBoundary>
+      <ThemeProvider>
       <I18nProvider>
         <AppStoreProvider>
           <SplashGate>
-            <StatusBar style="dark" />
+            <ThemedChrome />
             {/* Push-notification taps → allow-listed internal routes only. */}
             <NotificationTapBridge />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <ThemedStack>
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
@@ -65,10 +83,11 @@ function RootLayout() {
               <Stack.Screen name="legal/[type]" />
               <Stack.Screen name="receipt/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="account/delete" />
-            </Stack>
+            </ThemedStack>
           </SplashGate>
         </AppStoreProvider>
       </I18nProvider>
+      </ThemeProvider>
       </ObservabilityErrorBoundary>
     </SafeAreaProvider>
   );

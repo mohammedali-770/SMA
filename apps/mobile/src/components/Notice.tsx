@@ -24,6 +24,8 @@ import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 import { colors, font, radius, spacing } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 
 export type NoticeTone = 'blocking' | 'warning' | 'info' | 'success';
 
@@ -43,11 +45,13 @@ interface NoticeProps {
 const TONE = {
   blocking: { bg: colors.dangerBg, bar: colors.danger, title: colors.danger },
   warning: { bg: '#fdf3e3', bar: colors.warning, title: colors.warning },
-  info: { bg: colors.purpleBg, bar: colors.purple, title: colors.purple },
+  info: { bg: colors.purpleBg, bar: colors.accent, title: colors.accent },
   success: { bg: colors.successBg, bar: colors.success, title: colors.success },
 } as const;
 
 export function Notice({ title, action, detail, tone = 'blocking', rtlText, style }: NoticeProps) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const c = TONE[tone];
   return (
     <View
@@ -64,7 +68,7 @@ export function Notice({ title, action, detail, tone = 'blocking', rtlText, styl
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: {
     borderRadius: radius.md,
     borderCurve: 'continuous',
@@ -81,7 +85,7 @@ const styles = StyleSheet.create({
   action: { fontSize: font.md, color: colors.text, lineHeight: 21, marginTop: 2 },
   // Step 3 — supporting/legal. Quieter, still legible.
   detail: { marginTop: spacing.xs },
-});
+}));
 
 /**
  * Shared text style for secondary/legal copy rendered outside a Notice (for

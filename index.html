@@ -6,6 +6,20 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Spicy Meal — Saudi Fast-Food Delivery & POS</title>
+    <script>
+      /* Stamp the colour scheme before first paint. Doing this from React would
+         render one frame of the light palette on a dark-mode machine — a white
+         flash on an operations console someone is watching at night. Kept inline
+         and tiny on purpose; the real logic lives in src/lib/theme.ts. */
+      (function () {
+        try {
+          var pref = localStorage.getItem('sm-admin-theme') || 'system';
+          var dark = pref === 'dark' || (pref === 'system'
+            && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) { /* storage blocked — light is a safe default */ }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

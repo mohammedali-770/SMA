@@ -10,6 +10,8 @@ import { StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-na
 import { SaudiRiyalSymbol } from './SaudiRiyalSymbol';
 import { useI18n } from '../i18n/I18nProvider';
 import { colors } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
+import { useThemeColors } from '../theme/ThemeProvider';
 
 interface Props {
   amount: number;
@@ -23,21 +25,27 @@ interface Props {
   style?: StyleProp<TextStyle>;
 }
 
-export function Price({ amount, size = 15, color = colors.text, weight = '800', prefix, style }: Props) {
+export function Price({ amount, size = 15, color, weight = '800', prefix, style }: Props) {
   const { lang } = useI18n();
+  const colors = useThemeColors();
+  const styles = useStyles();
+  // The default has to be resolved here, not in the parameter list: a default
+  // read from the module-scope palette would pin every unstyled Price to the
+  // light ink even in dark mode.
+  const fg = color ?? colors.text;
   const value = amount.toFixed(2);
   const currency = lang === 'ar' ? 'ريال سعودي' : 'Saudi Riyal';
   return (
     <View style={styles.row} accessibilityRole="text" accessibilityLabel={(prefix ? prefix + ' ' : '') + value + ' ' + currency}>
-      {prefix ? <Text style={{ fontSize: size, color, fontWeight: weight }}>{prefix}</Text> : null}
-      <SaudiRiyalSymbol size={Math.round(size * 0.82)} color={color} />
-      <Text style={[{ fontSize: size, color, fontWeight: weight }, style]}>{value}</Text>
+      {prefix ? <Text style={{ fontSize: size, color: fg, fontWeight: weight }}>{prefix}</Text> : null}
+      <SaudiRiyalSymbol size={Math.round(size * 0.82)} color={fg} />
+      <Text style={[{ fontSize: size, color: fg, fontWeight: weight }, style]}>{value}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // `flexDirection: 'row'` (never rtlRow) keeps the symbol on the LEFT in both
   // languages: the app does not force native RTL, so a plain row is not mirrored.
   row: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-});
+}));

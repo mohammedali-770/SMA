@@ -11,26 +11,64 @@
  * through a translucent white panel — the panel only lightens it, so measuring
  * against #f3f2f7 is the conservative case for dark-on-light text.
  *
- * Usage:  node src/lib/a11yContrast.audit.mjs [--all] [--fix]
+ * Usage:  node src/lib/a11yContrast.audit.mjs [--all] [--fix] [--dark]
+ *
+ * --dark measures the SAME class strings against the dark palette. Dark mode is
+ * a token-level remap (see the [data-theme='dark'] block in index.css), so the
+ * markup is identical and only the resolved colours differ — which means the
+ * audit needs a different palette, not a different walk. The dark values are
+ * PARSED OUT OF index.css rather than duplicated here: a second hand-maintained
+ * copy of a 60-entry ramp would drift, and a contrast tool measuring colours
+ * the app does not actually use is worse than no tool.
  *
  * --fix rewrites ONLY the occurrences this audit flags. That distinction
  * matters: the same utility can be correct or broken depending on what it sits
  * on — text-slate-400 is unreadable on the page ground at 2.30:1 but perfectly
  * fine on bg-slate-900. A blanket find-and-replace would wreck the dark panels.
+ * --fix is refused in --dark mode: the two themes share one class string, so
+ * "fixing" a dark failure by changing the utility would move the light failure
+ * somewhere else. Dark failures are fixed by adjusting the ramp in index.css.
  */
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PAGE_GROUND = '#f3f2f7'; // index.css body background-color
+const DARK = process.argv.includes('--dark');
+
+// Light: the page ground (index.css body). Dark: the RAISED surface, not the
+// ground — light text sits on panels, and a panel is the lightest thing that
+// text lands on, so it is the conservative case in this direction (the reverse
+// of light mode, where the ground is the conservative one).
+const PAGE_GROUND = DARK ? '#252040' : '#f3f2f7';
 
 // Files whose ROOT container is dark, so an element with no bg- utility of its
 // own sits on that instead of the page. Getting this wrong is not cosmetic:
 // assuming the light page inside a dark panel makes the fixer darken text that
 // was already correct, turning readable light-on-dark into black-on-dark.
-// #21293a is .glass-panel-dark (rgba(15,23,42,0.92)) composited over the body.
+//
+// #1c2333 is .glass-panel-dark, which is deliberately dark in BOTH themes — and
+// which therefore re-declares the neutral ramp locally back to the LIGHT values
+// (see index.css). `lightPalette: true` mirrors that here, so the dark run
+// measures these files against the colours the browser will actually resolve.
 const DARK_ROOTS = {
-  'src/components/DatabasePlayground.tsx': '#21293a',
+  'src/components/DatabasePlayground.tsx': { ground: '#1c2333', lightPalette: true },
 };
+
+/**
+ * Pull the dark ramp straight out of index.css so the two cannot drift.
+ * Only `--color-*: #hex;` declarations inside the [data-theme='dark'] block are
+ * read; --sm-* tokens and color-mix() values are left to the light defaults.
+ */
+function readDarkPalette() {
+  const css = readFileSync('src/index.css', 'utf8');
+  const start = css.indexOf("[data-theme='dark'] {");
+  if (start < 0) throw new Error('dark theme block not found in src/index.css');
+  const block = css.slice(start, css.indexOf('\n}', start));
+  const out = {};
+  for (const m of block.matchAll(/--color-([a-z]+-\d{2,3})\s*:\s*(#[0-9a-fA-F]{6})/g)) {
+    out[m[1]] = m[2].toLowerCase();
+  }
+  return out;
+}
 
 // Tailwind default palette, only the shades this codebase uses.
 const P = {
@@ -60,6 +98,17 @@ const P = {
   'yellow-600': '#ca8a04', 'yellow-700': '#a16207',
   white: '#ffffff',
 };
+
+/** The light palette, kept intact so panels that pin it can be measured. */
+const LIGHT_P = { ...P };
+
+if (DARK) {
+  // `white` is NOT remapped, matching index.css: bg-white is redirected to the
+  // surface by a utility override, while text-white stays real white so labels
+  // on coloured fills keep working. A step the dark block does not redefine
+  // keeps its light value, which is exactly what the browser does.
+  Object.assign(P, readDarkPalette());
+}
 
 /** Composite `hex` at `alpha` over `ground` — Tailwind's bg-x/NN modifier. */
 function composite(hex, alpha, ground) {
@@ -106,16 +155,22 @@ const CLASS_RE = /class(?:Name)?\s*=\s*(?:"([^"]*)"|\{`([^`]*)`\}|\{[^}]*?["'`](
  * searching one direction would suggest slate-50 for text on a dark panel — a
  * passing ratio, but a far bigger visual change than necessary.
  */
-function suggest(fgName, bg, need) {
+function suggest(fgName, bg, need, pal = P) {
   const hue = fgName.split('-')[0];
-  const ramp = Object.keys(P)
+  const ramp = Object.keys(pal)
     .filter((n) => n.startsWith(`${hue}-`))
     .sort((a, b) => Number(a.split('-')[1]) - Number(b.split('-')[1]));
   const ordered = luminance(bg) > 0.5 ? ramp : [...ramp].reverse();
-  return ordered.find((n) => ratio(P[n], bg) >= need);
+  return ordered.find((n) => ratio(pal[n], bg) >= need);
 }
 
 const FIX = process.argv.includes('--fix');
+if (FIX && DARK) {
+  console.error('--fix is not available with --dark: both themes render the same\n'
+    + 'class strings, so rewriting a utility to satisfy dark would break light.\n'
+    + 'Adjust the ramp in the [data-theme=\'dark\'] block of src/index.css instead.');
+  process.exit(2);
+}
 const findings = [];
 const touched = new Set();
 
@@ -131,27 +186,32 @@ for (const file of walk('src')) {
     while ((m = re.exec(line))) {
       const cls = (m[1] || m[2] || m[3] || '');
       const fgm = cls.match(/\btext-([a-z]+-[0-9]{2,3})\b/);
-      if (!fgm || !P[fgm[1]]) continue;
-      const fg = P[fgm[1]];
+      if (!fgm) continue;
       // Tailwind opacity modifiers matter: bg-emerald-500/10 is a 10% tint over
       // whatever is behind it, not a solid mid-tone green. Treating it as solid
       // resolves the ground far too dark and makes a light-on-light failure look
       // like a dark-on-dark one.
       const bgm = cls.match(/\bbg-([a-z]+-[0-9]{2,3})(?:\/([0-9]{1,3}))?\b/);
-      const rootGround = DARK_ROOTS[file.split('\\').join('/')] ?? PAGE_GROUND;
-      const bgName = bgm && P[bgm[1]] ? (bgm[2] ? `${bgm[1]}/${bgm[2]}` : bgm[1]) : 'page';
+      const root = DARK_ROOTS[file.split('\\').join('/')];
+      const rootGround = root?.ground ?? PAGE_GROUND;
+      // A file whose panel pins the light ramp resolves every utility from it,
+      // in both themes.
+      const pal = DARK && root?.lightPalette ? LIGHT_P : P;
+      if (!pal[fgm[1]]) continue;
+      const fg = pal[fgm[1]];
+      const bgName = bgm && pal[bgm[1]] ? (bgm[2] ? `${bgm[1]}/${bgm[2]}` : bgm[1]) : 'page';
       const bg = bgName === 'page'
         ? rootGround
         : bgm[2]
-          ? composite(P[bgm[1]], Number(bgm[2]) / 100, rootGround)
-          : P[bgm[1]];
+          ? composite(pal[bgm[1]], Number(bgm[2]) / 100, rootGround)
+          : pal[bgm[1]];
       // An element sized like a glyph is an icon: 1.4.11 asks 3:1, not 4.5:1.
       const isIcon = /\bw-\d+(\.\d+)?\b/.test(cls) && /\bh-\d+(\.\d+)?\b/.test(cls);
       const need = isIcon ? 3.0 : 4.5;
       const r = ratio(fg, bg);
       if (r >= need) continue;
 
-      const fix = suggest(fgm[1], bg, need);
+      const fix = suggest(fgm[1], bg, need, pal);
       findings.push({
         file, line: i + 1, fg: fgm[1], bg: bgName, fix,
         ratio: +r.toFixed(2), need, kind: isIcon ? 'icon' : 'text',

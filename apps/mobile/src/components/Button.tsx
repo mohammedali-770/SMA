@@ -3,6 +3,8 @@ import React from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { colors, motion, radius, spacing, typography } from '../theme';
+import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -17,6 +19,8 @@ interface Props {
 }
 
 export function Button({ label, onPress, variant = 'primary', disabled, loading, style, accessibilityLabel }: Props) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const isDisabled = disabled || loading;
   const bg =
     variant === 'primary' ? colors.purple
@@ -24,10 +28,10 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
     : variant === 'secondary' ? colors.white
     : 'transparent';
   const fg =
-    variant === 'secondary' ? colors.purple
-    : variant === 'ghost' ? colors.purple
+    variant === 'secondary' ? colors.accent
+    : variant === 'ghost' ? colors.accent
     : colors.white;
-  const borderColor = variant === 'secondary' ? colors.purple : 'transparent';
+  const borderColor = variant === 'secondary' ? colors.accent : 'transparent';
 
   return (
     <Pressable
@@ -54,7 +58,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   base: {
     minHeight: 52,
     borderRadius: radius.md,
@@ -67,4 +71,4 @@ const styles = StyleSheet.create({
   pressed: { opacity: motion.pressedOpacity, transform: [{ scale: motion.pressedScale }] },
   row: { flexDirection: 'row', alignItems: 'center' },
   label: { ...typography.button },
-});
+}));

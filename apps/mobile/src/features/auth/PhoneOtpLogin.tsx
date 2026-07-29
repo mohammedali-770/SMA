@@ -31,11 +31,13 @@ import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { colors, font, spacing } from '../../theme';
+import { makeStyles } from '../../theme/makeStyles';
 import { requestLoginCode } from './loginAvailability';
 
 type Phase = 'phone' | 'code';
 
 export function PhoneOtpLogin() {
+  const styles = useStyles();
   const { t, rtlText } = useI18n();
   const [phase, setPhase] = useState<Phase>('phone');
   const [national, setNational] = useState('');  // 9-digit national part (5XXXXXXXX)
@@ -148,16 +150,16 @@ export function PhoneOtpLogin() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   title: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
   sub: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
   field: { marginBottom: spacing.md },
   fieldLabel: { fontSize: font.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
   // The number the code went to — always LTR so it reads correctly in Arabic.
   sentTo: {
-    fontSize: font.md, fontWeight: '800', color: colors.purple,
+    fontSize: font.md, fontWeight: '800', color: colors.accent,
     textAlign: 'center', writingDirection: 'ltr', marginBottom: spacing.sm,
   },
   notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
   error: { color: colors.danger, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
-});
+}));

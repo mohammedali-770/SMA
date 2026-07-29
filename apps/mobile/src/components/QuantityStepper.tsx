@@ -14,6 +14,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, font, radius, spacing } from '../theme';
+import { makeStyles } from '../theme/makeStyles';
 
 interface QuantityStepperProps {
   quantity: number;
@@ -29,6 +30,7 @@ interface QuantityStepperProps {
 export function QuantityStepper({
   quantity, onIncrement, onDecrement, busy = false, itemLabel, labels,
 }: QuantityStepperProps) {
+  const styles = useStyles();
   // At 1, minus means "remove this item" — the caller confirms before removing.
   const decrementLabel = `${labels.decrease}, ${itemLabel}`;
   const incrementLabel = `${labels.increase}, ${itemLabel}`;
@@ -68,7 +70,7 @@ export function QuantityStepper({
 
 const BTN = 32;
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // Row direction is intentionally fixed: −  n  + reads the same in Arabic, the
   // way a calculator or a lift panel does, so RTL must not mirror it.
   wrap: {
@@ -78,15 +80,15 @@ const styles = StyleSheet.create({
   btn: {
     width: BTN, height: BTN, borderRadius: BTN / 2,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
-  btnPressed: { backgroundColor: colors.purpleBg, borderColor: colors.purple },
+  btnPressed: { backgroundColor: colors.purpleBg, borderColor: colors.accent },
   btnDisabled: { opacity: 0.45 },
-  minusBar: { width: 12, height: 2, borderRadius: 1, backgroundColor: colors.purple },
-  plusBar: { position: 'absolute', width: 2, height: 12, borderRadius: 1, backgroundColor: colors.purple },
+  minusBar: { width: 12, height: 2, borderRadius: 1, backgroundColor: colors.accent },
+  plusBar: { position: 'absolute', width: 2, height: 12, borderRadius: 1, backgroundColor: colors.accent },
   qty: {
     minWidth: 24, textAlign: 'center',
     fontSize: font.md, fontWeight: '800', color: colors.text,
     fontVariant: ['tabular-nums'],
   },
-});
+}));
