@@ -208,7 +208,7 @@ begin
   raise notice 'CUSTOMER PROJECTION OK';
 end $$;
 
--- ---- F. access + constraint contract ---------------------------------------
+-- ---- F. access contract -----------------------------------------------------
 do $$
 declare n integer;
 begin
@@ -226,22 +226,124 @@ begin
    where schemaname = 'public' and tablename = 'loyalty_transactions';
   if n < 1 then raise exception 'ACCESS FAILED: RLS policy missing'; end if;
 
-  -- The forward guarantee is in place and is NOT VALID (history untouched).
-  select count(*) into n from pg_constraint
-   where conrelid = 'public.loyalty_transactions'::regclass
-     and conname = 'loyalty_transactions_reason_no_order_number';
-  if n <> 1 then raise exception 'CONSTRAINT MISSING'; end if;
-  if (select convalidated from pg_constraint
-       where conrelid = 'public.loyalty_transactions'::regclass
-         and conname = 'loyalty_transactions_reason_no_order_number') then
-    raise exception 'CONSTRAINT must be NOT VALID so historical rows are not rejected';
-  end if;
-
   -- The helpers are not reachable by anon.
   if has_function_privilege('anon', 'public.loyalty_safe_reason(text,uuid,text)', 'execute') then
     raise exception 'ACCESS FAILED: anon may call loyalty_safe_reason'; end if;
 
-  raise notice 'ACCESS/CONSTRAINT OK';
+  raise notice 'ACCESS OK';
+end $$;
+
+-- ---- F2. ENFORCEMENT CONTRACT: the trigger, and deliberately NO table CHECK --
+-- This section replaces an earlier assertion that a NOT VALID CHECK constraint
+-- existed. 20260724190000 DROPPED that constraint on purpose: a table CHECK sees
+-- only the resulting row, so it cannot distinguish "a new bad write" from "an old
+-- row being touched for an unrelated reason", and it therefore REJECTED
+-- legitimate updates to historical rows (PostgreSQL evaluates a NOT VALID
+-- constraint on every later INSERT *and UPDATE*).
+--
+-- The contract asserted here is the one that actually holds: enforcement rests
+-- solely on the BEFORE INSERT OR UPDATE trigger, which is writer-independent and
+-- can tell a genuine reason write from an unrelated update.
+do $$
+declare
+  n integer;
+  v_tg record;
+begin
+  -- (i) NO table CHECK is relied upon to police historical rows.
+  select count(*) into n from pg_constraint
+   where conrelid = 'public.loyalty_transactions'::regclass
+     and contype = 'c'
+     and pg_get_constraintdef(oid) ilike '%order_number%';
+  if n <> 0 then
+    raise exception 'ENFORCEMENT FAILED: a reason CHECK constraint is back (%). '
+                    'It would reject unrelated updates to historical rows.', n;
+  end if;
+
+  -- (ii) The trigger IS the enforcement point, and is bound for INSERT + UPDATE.
+  select t.tgname,
+         (t.tgtype & 1)  <> 0 as is_row,
+         (t.tgtype & 2)  <> 0 as is_before,
+         (t.tgtype & 4)  <> 0 as on_insert,
+         (t.tgtype & 16) <> 0 as on_update
+    into v_tg
+    from pg_trigger t
+   where t.tgrelid = 'public.loyalty_transactions'::regclass
+     and not t.tgisinternal
+     and t.tgname = 'set_loyalty_transactions_safe_reason';
+  if v_tg is null then
+    raise exception 'ENFORCEMENT FAILED: set_loyalty_transactions_safe_reason is missing';
+  end if;
+  if not (v_tg.is_row and v_tg.is_before and v_tg.on_insert and v_tg.on_update) then
+    raise exception 'ENFORCEMENT FAILED: trigger binding wrong (row=% before=% ins=% upd=%)',
+                    v_tg.is_row, v_tg.is_before, v_tg.on_insert, v_tg.on_update;
+  end if;
+
+  raise notice 'ENFORCEMENT OK: trigger-based, no history-hostile CHECK';
+end $$;
+
+-- ---- F3. The behaviour that replaces the constraint, proven end to end -------
+-- A historical row (written before the rule) must survive an unrelated UPDATE:
+-- permitted, not rejected, and NOT silently rewritten — while a genuine reason
+-- write is still sanitized. Points/balances must be untouched throughout.
+do $$
+declare
+  v_p      uuid := gen_random_uuid();
+  v_id     uuid := gen_random_uuid();
+  v_reason text;
+  v_points integer;
+  v_bal    integer;
+begin
+  insert into public.profiles (id) values (v_p) on conflict (id) do nothing;
+
+  -- A pre-rule row, written with the trigger disabled so it is stored verbatim.
+  alter table public.loyalty_transactions disable trigger set_loyalty_transactions_safe_reason;
+  insert into public.loyalty_transactions (id, profile_id, type, points, balance_after, reason)
+    values (v_id, v_p, 'earn', 25, 25, 'Earned on order SM-2026-000501');
+  alter table public.loyalty_transactions enable trigger set_loyalty_transactions_safe_reason;
+
+  if (select reason from public.loyalty_transactions where id = v_id)
+       <> 'Earned on order SM-2026-000501' then
+    raise exception 'F3 PRECONDITION FAILED: historical fixture not stored verbatim';
+  end if;
+
+  -- (a) an unrelated UPDATE is PERMITTED (no CHECK rejects it) ...
+  begin
+    update public.loyalty_transactions set balance_after = 999 where id = v_id;
+  exception when others then
+    raise exception 'F3 FAILED: unrelated update on a historical row was rejected: % / %',
+                    sqlstate, sqlerrm;
+  end;
+
+  -- (b) ... and does NOT rewrite the historical reason.
+  select reason, points, balance_after into v_reason, v_points, v_bal
+    from public.loyalty_transactions where id = v_id;
+  if v_reason <> 'Earned on order SM-2026-000501' then
+    raise exception 'F3 FAILED: historical reason was silently rewritten to %', v_reason;
+  end if;
+  if v_bal <> 999 then raise exception 'F3 FAILED: the unrelated column did not change'; end if;
+  if v_points <> 25 then raise exception 'F3 FAILED: points changed (% <> 25)', v_points; end if;
+
+  -- (c) a GENUINE reason change IS sanitized, even on this historical row.
+  update public.loyalty_transactions
+     set reason = 'Manual correction for order SM-2026-000501' where id = v_id;
+  select reason, points into v_reason, v_points
+    from public.loyalty_transactions where id = v_id;
+  if public.text_has_internal_order_number(v_reason) then
+    raise exception 'F3 FAILED: a genuine reason change kept the internal number (%)', v_reason;
+  end if;
+  if v_points <> 25 then
+    raise exception 'F3 FAILED: sanitizing a reason changed points (% <> 25)', v_points;
+  end if;
+
+  -- (d) a NEW insert carrying the internal number is sanitized on the way in.
+  insert into public.loyalty_transactions (profile_id, type, points, balance_after, reason)
+    values (v_p, 'earn', 5, 1004, 'Earned on order SM-2026-000502')
+    returning reason into v_reason;
+  if public.text_has_internal_order_number(v_reason) then
+    raise exception 'F3 FAILED: a new insert stored the internal number (%)', v_reason;
+  end if;
+
+  raise notice 'F3 OK: history preserved + updatable; genuine writes sanitized; points intact';
 end $$;
 
 -- ---- E2. END-TO-END: what a REAL customer session can read, by VALUE --------

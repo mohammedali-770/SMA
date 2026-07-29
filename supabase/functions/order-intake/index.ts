@@ -33,7 +33,10 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
 
   const supa = userClient(auth);
-  const { data: placed, error } = await supa.rpc('place_order', {
+  // place_order is no longer granted to `authenticated`; the customer path goes
+  // through place_customer_order, a thin wrapper with identical pricing/loyalty/
+  // idempotency that returns a customer-safe projection (migration 20260724200000).
+  const { data: placed, error } = await supa.rpc('place_customer_order', {
     p_branch_id: body.branchId,
     p_order_type: body.orderType,
     p_items: body.items,

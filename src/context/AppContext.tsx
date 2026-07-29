@@ -185,6 +185,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authReady, setAuthReady] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<UserProfile>(GUEST_USER);
+  // Mirror of currentUser for the stable ([]-dep) order fetchers below: they pick
+  // the customer table read or the staff RPC by LIVE role without being recreated
+  // on every profile change. Staff order reads go through the SECURITY DEFINER
+  // admin RPCs (staff hold no direct privilege on public.orders); a customer
+  // reads the column-scoped table. See supabase migration 20260724200000.
+  const currentUserRef = useRef<UserProfile>(GUEST_USER);
+  currentUserRef.current = currentUser;
   const loadedUserRef = useRef<string | null>(null);
   // Stable per-checkout key so a retried submit can't create a duplicate order.
   // Reset whenever the cart materially changes or an order succeeds.
@@ -291,7 +298,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    * must fetch every order, not a capped window.
    */
   const refreshOrders = useCallback(async () => {
-    const rows = await ordersApi.listWithItems();
+    const rows = currentUserRef.current.role === 'customer'
+      ? await ordersApi.listWithItems()
+      : await ordersApi.adminListWithItems();
     setOrders(rows.map(mapOrder));
     setOrdersLastUpdated(Date.now());
   }, []);
@@ -303,7 +312,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    * reports need while still surfacing new/updated recent orders.
    */
   const pollRecentOrders = useCallback(async () => {
-    const rows = await ordersApi.listWithItems(ORDERS_POLL_LIMIT);
+    const rows = currentUserRef.current.role === 'customer'
+      ? await ordersApi.listWithItems(ORDERS_POLL_LIMIT)
+      : await ordersApi.adminListWithItems(ORDERS_POLL_LIMIT);
     const fresh = rows.map(mapOrder);
     setOrders(prev => {
       const byId = new Map<string, Order>(prev.map(o => [o.id, o] as [string, Order]));
@@ -487,9 +498,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // delivers (e.g. table not in the realtime publication).
     slowPoll = setInterval(() => { if (!document.hidden) void doRefresh(); }, 60000);
 
+    // Subscribe to the staff-only signal table, NOT public.orders. orders left
+    // the realtime publication (migration 20260724200000) so a customer
+    // subscriber can no longer receive full order rows; order_change_events
+    // carries only an order id + event kind, and its RLS is staff-only. The
+    // handler ignores the payload and just refetches, so the change is one line.
     const channel = supabase
       .channel(`admin-orders-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => bump())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_change_events' }, () => bump())
       .subscribe((status) => {
         if (disposed) return;
         if (status === 'SUBSCRIBED') {
@@ -745,7 +761,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idempotencyKeyRef.current = null; // success → the next checkout gets a fresh key
       // The RPC returns the order row without its items; refetch (with items) so
       // the receipt renders the full breakdown recomputed by the server.
-      const rows = await ordersApi.listWithItems();
+      const rows = currentUser.role === 'customer'
+        ? await ordersApi.listWithItems()
+        : await ordersApi.adminListWithItems();
       const mapped = rows.map(mapOrder);
       setOrders(mapped);
       const full = mapped.find(o => o.id === created.id);
