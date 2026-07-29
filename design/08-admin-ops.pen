@@ -1,0 +1,2801 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "DI8O1",
+      "x": 0,
+      "y": 0,
+      "name": "The remaining six tabs — panel studies",
+      "clip": true,
+      "width": 1440,
+      "height": 1000,
+      "fill": "$bg",
+      "children": [
+        {
+          "type": "frame",
+          "id": "ofa3j",
+          "name": "Sidebar",
+          "width": 220,
+          "height": "fill_container",
+          "fill": "$sidebar-bg",
+          "layout": "vertical",
+          "padding": [
+            24,
+            0
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "MLrYM",
+              "name": "Logo Row",
+              "height": 48,
+              "gap": 10,
+              "padding": [
+                0,
+                20
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "nogri",
+                  "name": "Logo Mark",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 0,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#ffd9a3",
+                        "position": 0
+                      },
+                      {
+                        "color": "#f4a259",
+                        "position": 0.5
+                      },
+                      {
+                        "color": "#d1512f",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "width": 28,
+                  "height": 28
+                },
+                {
+                  "type": "text",
+                  "id": "YAqVP",
+                  "name": "Logo Text",
+                  "fill": "$sidebar-active",
+                  "content": "Spicy Meal",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "SN7io",
+              "name": "Logo Spacer",
+              "width": "fill_container",
+              "height": 24
+            },
+            {
+              "type": "frame",
+              "id": "VXgGX",
+              "name": "Nav List",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 2,
+              "padding": [
+                0,
+                8
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "YKvrr",
+                  "name": "Nav Dashboard",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "zqWav",
+                      "name": "Icon Dashboard",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "layout-dashboard",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "y81TI",
+                      "name": "Label Dashboard",
+                      "fill": "$sidebar-text",
+                      "content": "Dashboard",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "BuwRl",
+                  "name": "Nav Orders",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "F9CSy",
+                      "name": "Icon Orders",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "shopping-bag",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "H1yI1",
+                      "name": "Label Orders",
+                      "fill": "$sidebar-text",
+                      "content": "Orders",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "g56Fv",
+                  "name": "Nav Menu",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "VvL6b",
+                      "name": "Icon Menu",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "utensils",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "a5I7JV",
+                      "name": "Label Menu",
+                      "fill": "$sidebar-text",
+                      "content": "Menu",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "AlQrC",
+                  "name": "Nav Branches",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "UsQZo",
+                      "name": "Icon Branches",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "git-branch",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "DFgm6",
+                      "name": "Label Branches",
+                      "fill": "$sidebar-text",
+                      "content": "Branches",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oL2sd",
+                  "name": "Nav Customers",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "kEUPR",
+                      "name": "Icon Customers",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "users",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Rn9D3",
+                      "name": "Label Customers",
+                      "fill": "$sidebar-text",
+                      "content": "Customers",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "nRAfi",
+                  "name": "Nav Banners",
+                  "width": "fill_container",
+                  "fill": "$sidebar-hover",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "HCRk7",
+                      "name": "Icon Banners",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "image",
+                      "library": "lucide",
+                      "fill": "$sidebar-active"
+                    },
+                    {
+                      "type": "text",
+                      "id": "HuHgR",
+                      "name": "Label Banners",
+                      "fill": "$sidebar-active",
+                      "content": "Banners",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "du6R6",
+                  "name": "Nav Integrations",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "PToJC",
+                      "name": "Icon Integrations",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "plug",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "UcaVJ",
+                      "name": "Label Integrations",
+                      "fill": "$sidebar-text",
+                      "content": "Integrations",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "M50E0e",
+                  "name": "Nav Operations",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "ht28F",
+                      "name": "Icon Operations",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "activity",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "t7gGL",
+                      "name": "Label Operations",
+                      "fill": "$sidebar-text",
+                      "content": "Operations",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Z50MI",
+                  "name": "Nav Order Integrity",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "Ht33w",
+                      "name": "Icon Order Integrity",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "shield-alert",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "s8Npy4",
+                      "name": "Label Order Integrity",
+                      "fill": "$sidebar-text",
+                      "content": "Order Integrity",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "D5WWf",
+                  "name": "Nav Settings",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "dLpdR",
+                      "name": "Icon Settings",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "settings",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "F6gwC",
+                      "name": "Label Settings",
+                      "fill": "$sidebar-text",
+                      "content": "Settings",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GZ1fG",
+                  "name": "Nav Legal Docs",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "R8TdP",
+                      "name": "Icon Legal Docs",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "file-text",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kluBE",
+                      "name": "Label Legal Docs",
+                      "fill": "$sidebar-text",
+                      "content": "Legal Docs",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ZNGBz",
+                  "name": "Nav Reports",
+                  "width": "fill_container",
+                  "cornerRadius": 8,
+                  "gap": 12,
+                  "padding": [
+                    10,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "THM3x",
+                      "name": "Icon Reports",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "chart-bar",
+                      "library": "lucide",
+                      "fill": "$sidebar-text"
+                    },
+                    {
+                      "type": "text",
+                      "id": "vr7ue",
+                      "name": "Label Reports",
+                      "fill": "$sidebar-text",
+                      "content": "Reports",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "cA4ug",
+          "name": "Main Content",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            28,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "kY35w",
+              "name": "Title Row",
+              "width": "fill_container",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "a1MlYS",
+                  "name": "Page Title",
+                  "fill": "$ink",
+                  "content": "The remaining six tabs — panel studies",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "iKPQl",
+              "name": "Grid Area",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "paYpV",
+                  "name": "Row 1",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "gap": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RSlaZ",
+                      "name": "Panel Banners",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Tp4Pc",
+                          "name": "Banners Header",
+                          "width": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "p8WYbE",
+                              "name": "Banners Header Left",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "GpqVh",
+                                  "name": "Banners Title",
+                                  "fill": "$ink",
+                                  "content": "Banners",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 16,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "QyMuR",
+                                  "name": "Banners Sub",
+                                  "fill": "$muted",
+                                  "content": "Homepage carousel · scheduled",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "AyxHI",
+                              "name": "New Banner Btn",
+                              "fill": "$primary",
+                              "cornerRadius": 8,
+                              "gap": 6,
+                              "padding": [
+                                6,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "GzJ88",
+                                  "name": "Plus Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "#ffffff"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "heqZp",
+                                  "name": "New Btn Label",
+                                  "fill": "#ffffff",
+                                  "content": "New",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "cDxpG",
+                          "name": "Banner List",
+                          "clip": true,
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "zu3zM",
+                              "name": "Banner Row Family Feast",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": 6,
+                                  "id": "X6dUX",
+                                  "name": "Thumb Family Feast",
+                                  "fill": {
+                                    "type": "gradient",
+                                    "gradientType": "linear",
+                                    "enabled": true,
+                                    "rotation": 0,
+                                    "size": {
+                                      "height": 1
+                                    },
+                                    "colors": [
+                                      {
+                                        "color": "#ffd9a3",
+                                        "position": 0
+                                      },
+                                      {
+                                        "color": "#f4a259",
+                                        "position": 0.5
+                                      },
+                                      {
+                                        "color": "#d1512f",
+                                        "position": 1
+                                      }
+                                    ]
+                                  },
+                                  "width": 48,
+                                  "height": 32
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "h0KAV",
+                                  "name": "Info Family Feast",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "YS2NS",
+                                      "name": "Title Family Feast",
+                                      "fill": "$text",
+                                      "content": "Family Feast",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "Mej8p",
+                                      "name": "Detail Family Feast",
+                                      "fill": "$muted",
+                                      "content": "01 Jul → 15 Aug · Opens product · Sort 1",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "SaVZZ",
+                                  "name": "Toggle Family Feast",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "XfARZ",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Knob Family Feast",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "pSVH8",
+                              "name": "Banner Row Free delivery week",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": 6,
+                                  "id": "CLglZ",
+                                  "name": "Thumb Free delivery week",
+                                  "fill": {
+                                    "type": "gradient",
+                                    "gradientType": "linear",
+                                    "enabled": true,
+                                    "rotation": 0,
+                                    "size": {
+                                      "height": 1
+                                    },
+                                    "colors": [
+                                      {
+                                        "color": "#a3d9ff",
+                                        "position": 0
+                                      },
+                                      {
+                                        "color": "#5994f4",
+                                        "position": 0.5
+                                      },
+                                      {
+                                        "color": "#2f51d1",
+                                        "position": 1
+                                      }
+                                    ]
+                                  },
+                                  "width": 48,
+                                  "height": 32
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "S4SRkv",
+                                  "name": "Info Free delivery week",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "Hgai0",
+                                      "name": "Title Free delivery week",
+                                      "fill": "$text",
+                                      "content": "Free delivery week",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "t33g1",
+                                      "name": "Detail Free delivery week",
+                                      "fill": "$muted",
+                                      "content": "27 Jul → 03 Aug · Sort 2",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "pQXg4",
+                                  "name": "Toggle Free delivery week",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "m46dl",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Knob Free delivery week",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "nIk5Q",
+                              "name": "Banner Row Ramadan menu",
+                              "opacity": 0.5,
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": 6,
+                                  "id": "zSZZK",
+                                  "name": "Thumb Ramadan menu",
+                                  "fill": {
+                                    "type": "gradient",
+                                    "gradientType": "linear",
+                                    "enabled": true,
+                                    "rotation": 0,
+                                    "size": {
+                                      "height": 1
+                                    },
+                                    "colors": [
+                                      {
+                                        "color": "#d4c9a3",
+                                        "position": 0
+                                      },
+                                      {
+                                        "color": "#b09a6f",
+                                        "position": 0.5
+                                      },
+                                      {
+                                        "color": "#8a7550",
+                                        "position": 1
+                                      }
+                                    ]
+                                  },
+                                  "width": 48,
+                                  "height": 32
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Zvrt7",
+                                  "name": "Info Ramadan menu",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "b00JJX",
+                                      "name": "Title Ramadan menu",
+                                      "fill": "$text",
+                                      "content": "Ramadan menu",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "Zg1z9",
+                                      "name": "Detail Ramadan menu",
+                                      "fill": "$muted",
+                                      "content": "Expired 30 Mar · Sort 3",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "NQf2R",
+                                  "name": "Toggle Ramadan menu",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$disabled",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "E391e",
+                                      "x": 2,
+                                      "y": 2,
+                                      "name": "Knob Ramadan menu",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JySpf",
+                      "name": "Panel Integrations",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "FtWG1",
+                          "name": "Integrations Header",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "X5xTL",
+                              "name": "Integrations Title",
+                              "fill": "$ink",
+                              "content": "Integrations",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "A5qtmZ",
+                              "name": "Admin Chip",
+                              "fill": "#ecedf0",
+                              "cornerRadius": 12,
+                              "padding": [
+                                3,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "EB4mo",
+                                  "name": "Admin Chip Label",
+                                  "fill": "$muted",
+                                  "content": "Admin only",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "T0OUyE",
+                          "name": "Integration List",
+                          "clip": true,
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "OfM8g",
+                              "name": "Int Row Tap Payments",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "cVB8D",
+                                  "name": "Int Info Tap Payments",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "L42rA",
+                                      "name": "Int Name Tap Payments",
+                                      "fill": "$text",
+                                      "content": "Tap Payments",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "fkbDg",
+                                      "name": "Int Detail Tap Payments",
+                                      "fill": "$muted",
+                                      "textGrowth": "fixed-width",
+                                      "width": "fill_container",
+                                      "content": "Live mode · secret stored, never displayed",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Nw0sc",
+                                  "name": "Status Chip Tap Payments",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "a53oe",
+                                      "name": "Status Label Tap Payments",
+                                      "fill": "$success",
+                                      "content": "Connected",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "IPD1b",
+                              "name": "Int Row WhatsApp OTP",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "e44Wj",
+                                  "name": "Int Info WhatsApp OTP",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "oLiYW",
+                                      "name": "Int Name WhatsApp OTP",
+                                      "fill": "$text",
+                                      "content": "WhatsApp OTP",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "m0Iera",
+                                      "name": "Int Detail WhatsApp OTP",
+                                      "fill": "$muted",
+                                      "textGrowth": "fixed-width",
+                                      "width": "fill_container",
+                                      "content": "Send-SMS hook · test message available",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Vq6F7",
+                                  "name": "Status Chip WhatsApp OTP",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "ZCYzg",
+                                      "name": "Status Label WhatsApp OTP",
+                                      "fill": "$success",
+                                      "content": "Connected",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bwdpH",
+                              "name": "Int Row Lazywait POS",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "Yqyz6",
+                                  "name": "Int Info Lazywait POS",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "S1tOSp",
+                                      "name": "Int Name Lazywait POS",
+                                      "fill": "$text",
+                                      "content": "Lazywait POS",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "a933F",
+                                      "name": "Int Detail Lazywait POS",
+                                      "fill": "$muted",
+                                      "textGrowth": "fixed-width",
+                                      "width": "fill_container",
+                                      "content": "Menu, Stock and Orders sync on · 14 of 16 branches mapped",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "obnKU",
+                                  "name": "Status Chip Lazywait POS",
+                                  "fill": "$warning-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "I8mkxc",
+                                      "name": "Status Label Lazywait POS",
+                                      "fill": "$warning",
+                                      "content": "2 unmapped",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "IyUza",
+                              "name": "Int Row Push notifications",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "neD8k",
+                                  "name": "Int Info Push notifications",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 2,
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "CKc4X",
+                                      "name": "Int Name Push notifications",
+                                      "fill": "$text",
+                                      "content": "Push notifications",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "UHeIM",
+                                      "name": "Int Detail Push notifications",
+                                      "fill": "$muted",
+                                      "textGrowth": "fixed-width",
+                                      "width": "fill_container",
+                                      "content": "No credentials configured",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "U8XaQG",
+                                  "name": "Status Chip Push notifications",
+                                  "fill": "#ecedf0",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "GLKCB",
+                                      "name": "Status Label Push notifications",
+                                      "fill": "$muted",
+                                      "content": "Dormant",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "w54aW",
+                      "name": "Panel Operations Health",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "PXUVr",
+                          "name": "Ops Header",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "inYeG",
+                              "name": "Ops Header Top",
+                              "width": "fill_container",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "rtvzq",
+                                  "name": "Ops Title",
+                                  "fill": "$ink",
+                                  "content": "Operations Health",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 16,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "J5wetn",
+                                  "name": "Healthy Pill",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "gap": 4,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "IHXnI",
+                                      "name": "Health Dot",
+                                      "fill": "$success",
+                                      "width": 6,
+                                      "height": 6
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "TFLrB",
+                                      "name": "Healthy Label",
+                                      "fill": "$success",
+                                      "content": "Healthy",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "c1uRP",
+                              "name": "Ops Sub",
+                              "fill": "$muted",
+                              "content": "Read-only · staff-gated",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "B8uTlN",
+                          "name": "Ops List",
+                          "clip": true,
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "pNxxy",
+                              "name": "Ops Row Order intake",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "mPoud",
+                                  "name": "Ops Name Order intake",
+                                  "fill": "$text",
+                                  "content": "Order intake",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "pmJYB",
+                                  "name": "Ops Chip Order intake",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "j1skG2",
+                                      "name": "Ops Status Order intake",
+                                      "fill": "$success",
+                                      "content": "OK · p95 640 ms",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "hBJsB",
+                              "name": "Ops Row Payment verification",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "G7IowS",
+                                  "name": "Ops Name Payment verification",
+                                  "fill": "$text",
+                                  "content": "Payment verification",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "IRJve",
+                                  "name": "Ops Chip Payment verification",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "UHbEp",
+                                      "name": "Ops Status Payment verification",
+                                      "fill": "$success",
+                                      "content": "OK",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "gm6Fk",
+                              "name": "Ops Row POS sync worker",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "a5pw7o",
+                                  "name": "Ops Name POS sync worker",
+                                  "fill": "$text",
+                                  "content": "POS sync worker",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "y5e43",
+                                  "name": "Ops Chip POS sync worker",
+                                  "fill": "$warning-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "o0QATb",
+                                      "name": "Ops Status POS sync worker",
+                                      "fill": "$warning",
+                                      "content": "Degraded · 4 retrying",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "aQeyS",
+                              "name": "Ops Row Scheduled jobs",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "wEUh8",
+                                  "name": "Ops Name Scheduled jobs",
+                                  "fill": "$text",
+                                  "content": "Scheduled jobs",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "njtDw",
+                                  "name": "Ops Chip Scheduled jobs",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "TMarf",
+                                      "name": "Ops Status Scheduled jobs",
+                                      "fill": "$success",
+                                      "content": "2 crons on time",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "IBoKY",
+                              "name": "Ops Row Account deletion queue",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "JsU4t",
+                                  "name": "Ops Name Account deletion queue",
+                                  "fill": "$text",
+                                  "content": "Account deletion queue",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "TkMeQ",
+                                  "name": "Ops Chip Account deletion queue",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "r7w4g",
+                                      "name": "Ops Status Account deletion queue",
+                                      "fill": "$success",
+                                      "content": "Empty",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "O5gUFC",
+                  "name": "Row 2",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "gap": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "WaYD7",
+                      "name": "Panel Order Integrity",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "wbe41",
+                          "name": "OI Header",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "pPtGv",
+                              "name": "OI Header Top",
+                              "width": "fill_container",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Od96u",
+                                  "name": "OI Title",
+                                  "fill": "$ink",
+                                  "content": "Order Integrity",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 16,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "gGiHj",
+                                  "name": "Open Chip",
+                                  "fill": "$danger-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "abBSt",
+                                      "name": "Open Chip Label",
+                                      "fill": "$danger",
+                                      "content": "2 open",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "xAJxf",
+                              "name": "OI Sub",
+                              "fill": "$muted",
+                              "content": "Observe only — acknowledge or suppress",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Q0XsC",
+                          "name": "Incident List",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 10,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "mmkdq",
+                              "name": "Incident 1",
+                              "clip": true,
+                              "width": "fill_container",
+                              "cornerRadius": 8,
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "id": "s003xJ",
+                                  "name": "Severity Red",
+                                  "fill": "$danger",
+                                  "width": 4,
+                                  "height": 72
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "cHlZT",
+                                  "name": "Inc1 Body",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "padding": [
+                                    12,
+                                    14
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "M1SQIG",
+                                      "name": "Inc1 Title",
+                                      "fill": "$danger",
+                                      "content": "Paid, never sent to POS",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "FxMRE",
+                                      "name": "Inc1 Detail",
+                                      "fill": "$muted",
+                                      "content": "Order #004182 · detected 21:19 · no personal data shown",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "FXffb",
+                                      "name": "Inc1 Actions",
+                                      "gap": 8,
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Tb8xg",
+                                          "name": "Btn Acknowledge",
+                                          "cornerRadius": 6,
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "padding": [
+                                            4,
+                                            10
+                                          ],
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "UrmSo",
+                                              "name": "Btn Label Acknowledge",
+                                              "fill": "$text",
+                                              "content": "Acknowledge",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 11,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "LnVsD",
+                                          "name": "Btn Suppress",
+                                          "cornerRadius": 6,
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "padding": [
+                                            4,
+                                            10
+                                          ],
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "n1630I",
+                                              "name": "Btn Label Suppress",
+                                              "fill": "$text",
+                                              "content": "Suppress",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 11,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "tv6tA",
+                                          "name": "Btn Timeline",
+                                          "cornerRadius": 6,
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "padding": [
+                                            4,
+                                            10
+                                          ],
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "qz3ii",
+                                              "name": "Btn Label Timeline",
+                                              "fill": "$text",
+                                              "content": "Timeline",
+                                              "fontFamily": "Inter",
+                                              "fontSize": 11,
+                                              "fontWeight": "600"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "OoSqu",
+                              "name": "Incident 2",
+                              "clip": true,
+                              "width": "fill_container",
+                              "cornerRadius": 8,
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "id": "TbK9z",
+                                  "name": "Severity Amber",
+                                  "fill": "$warning",
+                                  "width": 4,
+                                  "height": 52
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "DqxI1",
+                                  "name": "Inc2 Body",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 6,
+                                  "padding": [
+                                    12,
+                                    14
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "bN7lC",
+                                      "name": "Inc2 Title",
+                                      "fill": "$warning",
+                                      "content": "Ambiguous POS outcome",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "700"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "iKYvT",
+                                      "name": "Inc2 Detail",
+                                      "fill": "$muted",
+                                      "content": "Order #004180 · awaiting human verification",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "nE7xy",
+                          "name": "OI Footer",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "No retry, refund, resend or mark-paid control exists on this screen — by design.",
+                          "fontFamily": "Inter",
+                          "fontSize": 11,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "hkYVt",
+                      "name": "Panel Settings",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "pKKjd",
+                          "name": "Settings Header",
+                          "width": "fill_container",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "e0YQt4",
+                              "name": "Settings Title",
+                              "fill": "$ink",
+                              "content": "Settings",
+                              "fontFamily": "Inter",
+                              "fontSize": 16,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Cashh",
+                              "name": "Admin Chip 5",
+                              "fill": "#ecedf0",
+                              "cornerRadius": 12,
+                              "padding": [
+                                3,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IrUzP",
+                                  "name": "Admin Chip 5 Label",
+                                  "fill": "$muted",
+                                  "content": "Admin only",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "v9uJjR",
+                          "name": "Settings List",
+                          "clip": true,
+                          "width": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "PsMC3",
+                              "name": "Setting Row Prices include VAT (15%)",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "I2R21",
+                                  "name": "Setting Label Prices include VAT (15%)",
+                                  "fill": "$text",
+                                  "content": "Prices include VAT (15%)",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "ZoKo6",
+                                  "name": "Setting Toggle Prices include VAT (15%)",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "A2Oin",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Setting Knob Prices include VAT (15%)",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "LioEM",
+                              "name": "Setting Row Online payment",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "TGBlZ",
+                                  "name": "Setting Label Online payment",
+                                  "fill": "$text",
+                                  "content": "Online payment",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "jTn1T",
+                                  "name": "Setting Toggle Online payment",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "rMpiV",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Setting Knob Online payment",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "NBmQ3",
+                              "name": "Setting Row Cash payment",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Ugstk",
+                                  "name": "Setting Label Cash payment",
+                                  "fill": "$text",
+                                  "content": "Cash payment",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Z3IvrK",
+                                  "name": "Setting Toggle Cash payment",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "j2htg",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Setting Knob Cash payment",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "o8aVMk",
+                              "name": "Setting Row Loyalty program",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": [
+                                12,
+                                14
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "UW16o",
+                                  "name": "Setting Label Loyalty program",
+                                  "fill": "$text",
+                                  "content": "Loyalty program",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "djkpb",
+                                  "name": "Setting Toggle Loyalty program",
+                                  "width": 36,
+                                  "height": 20,
+                                  "fill": "$success",
+                                  "cornerRadius": 10,
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "ellipse",
+                                      "id": "m0G4q",
+                                      "x": 18,
+                                      "y": 2,
+                                      "name": "Setting Knob Loyalty program",
+                                      "fill": "#ffffff",
+                                      "width": 16,
+                                      "height": 16
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "t3wunZ",
+                          "name": "Brand Colour Row",
+                          "width": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 12,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "rTPjF",
+                              "name": "Swatches",
+                              "gap": 6,
+                              "children": [
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": 6,
+                                  "id": "dOJuH",
+                                  "name": "Swatch Purple",
+                                  "fill": "$primary",
+                                  "width": 24,
+                                  "height": 24
+                                },
+                                {
+                                  "type": "rectangle",
+                                  "cornerRadius": 6,
+                                  "id": "MtZWr",
+                                  "name": "Swatch Red",
+                                  "fill": "$secondary",
+                                  "width": 24,
+                                  "height": 24
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "nJc1H",
+                              "name": "Brand Caption",
+                              "fill": "$muted",
+                              "content": "Brand colours · #422e87 / #e02d3d",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "FDSM3",
+                          "name": "Warning Strip",
+                          "width": "fill_container",
+                          "fill": "$warning-tint",
+                          "cornerRadius": 8,
+                          "gap": 8,
+                          "padding": [
+                            10,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "YdEoW",
+                              "name": "Warning Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "triangle-alert",
+                              "library": "lucide",
+                              "fill": "$warning"
+                            },
+                            {
+                              "type": "text",
+                              "id": "j4wo9O",
+                              "name": "Warning Text",
+                              "fill": "$warning",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Disabling both payment methods stops checkout entirely.",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "r10ViL",
+                      "name": "Panel Legal Documents",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        20,
+                        24
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Rvy4M",
+                          "name": "Legal Header",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "KqSrj",
+                              "name": "Legal Header Top",
+                              "width": "fill_container",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "S0pGf",
+                                  "name": "Legal Title",
+                                  "fill": "$ink",
+                                  "content": "Legal Documents",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 16,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "SFORh",
+                                  "name": "New Type Btn",
+                                  "fill": "$primary",
+                                  "cornerRadius": 8,
+                                  "gap": 6,
+                                  "padding": [
+                                    6,
+                                    14
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "id": "LXnmb",
+                                      "name": "Plus Icon Legal",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "plus",
+                                      "library": "lucide",
+                                      "fill": "#ffffff"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "eiLy1",
+                                      "name": "New Type Label",
+                                      "fill": "#ffffff",
+                                      "content": "New type",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "Yc9mh",
+                              "name": "Legal Sub",
+                              "fill": "$muted",
+                              "content": "Versioned · bilingual · active-only reach the app",
+                              "fontFamily": "Inter",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "OmQjN",
+                          "name": "Legal List",
+                          "clip": true,
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "layout": "vertical",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "omf9X",
+                              "name": "Doc Row Privacy policy",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": 14,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "utAKz",
+                                  "name": "Doc Info Privacy policy",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "C4PmVw",
+                                      "name": "Doc Top Privacy policy",
+                                      "gap": 8,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "xRyOe",
+                                          "name": "Doc Name Privacy policy",
+                                          "fill": "$text",
+                                          "content": "Privacy policy",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 13,
+                                          "fontWeight": "600"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "KeGkz",
+                                          "name": "Doc Version Privacy policy",
+                                          "fill": "$muted",
+                                          "content": "v2.1",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "OVRnC",
+                                      "name": "Doc Detail Privacy policy",
+                                      "fill": "$muted",
+                                      "content": "Effective 2026-05-01 · AR + EN",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "mzcTR",
+                                  "name": "Doc Status Privacy policy",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "EBuhm",
+                                      "name": "Doc Status Label Privacy policy",
+                                      "fill": "$success",
+                                      "content": "Active",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "epcAt",
+                              "name": "Doc Row Terms and conditions",
+                              "width": "fill_container",
+                              "fill": "$bgAlt",
+                              "gap": 12,
+                              "padding": 14,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "C934N3",
+                                  "name": "Doc Info Terms and conditions",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "lTHfc",
+                                      "name": "Doc Top Terms and conditions",
+                                      "gap": 8,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "l1eJo",
+                                          "name": "Doc Name Terms and conditions",
+                                          "fill": "$text",
+                                          "content": "Terms and conditions",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 13,
+                                          "fontWeight": "600"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "swZOu",
+                                          "name": "Doc Version Terms and conditions",
+                                          "fill": "$muted",
+                                          "content": "v3.0",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "N7SHx",
+                                      "name": "Doc Detail Terms and conditions",
+                                      "fill": "$muted",
+                                      "content": "Effective 2026-06-15 · AR + EN · Requires acceptance",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "M2mBC",
+                                  "name": "Doc Status Terms and conditions",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "y5xH0",
+                                      "name": "Doc Status Label Terms and conditions",
+                                      "fill": "$success",
+                                      "content": "Active",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "fRSp1",
+                              "name": "Doc Row Refund policy",
+                              "width": "fill_container",
+                              "fill": "$surface",
+                              "gap": 12,
+                              "padding": 14,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "H7OBo",
+                                  "name": "Doc Info Refund policy",
+                                  "width": "fill_container",
+                                  "layout": "vertical",
+                                  "gap": 3,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "UFV2K",
+                                      "name": "Doc Top Refund policy",
+                                      "gap": 8,
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "CItD2",
+                                          "name": "Doc Name Refund policy",
+                                          "fill": "$text",
+                                          "content": "Refund policy",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 13,
+                                          "fontWeight": "600"
+                                        },
+                                        {
+                                          "type": "text",
+                                          "id": "zIg7e",
+                                          "name": "Doc Version Refund policy",
+                                          "fill": "$muted",
+                                          "content": "v1.0",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 11,
+                                          "fontWeight": "500"
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "bmf2J",
+                                      "name": "Doc Detail Refund policy",
+                                      "fill": "$muted",
+                                      "content": "Draft",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "a56cS2",
+                                  "name": "Doc Status Refund policy",
+                                  "fill": "#ecedf0",
+                                  "cornerRadius": 12,
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "SmN1f",
+                                      "name": "Doc Status Label Refund policy",
+                                      "fill": "$muted",
+                                      "content": "Inactive",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-tint": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "secondary-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bgAlt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-tint": {
+      "type": "color",
+      "value": "#fef3cd"
+    },
+    "overlay": {
+      "type": "color",
+      "value": "#1c163073"
+    },
+    "sidebar-bg": {
+      "type": "color",
+      "value": "#2a2350"
+    },
+    "sidebar-text": {
+      "type": "color",
+      "value": "#c4bdd9"
+    },
+    "sidebar-active": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "sidebar-hover": {
+      "type": "color",
+      "value": "#3d3470"
+    }
+  },
+  "fileToken": "d5c9f706-32eb-4ad9-910b-3405f12329a1"
+}
