@@ -22,6 +22,12 @@ FULL_WIDTH = 1600
 SLICE_WIDTH = 1800
 # Slice a sheet whose height exceeds this multiple of its width.
 TALL_RATIO = 2.2
+# Slice a sheet whose width exceeds this multiple of its height. A row of seven
+# phone screens comes out around 8192x2012 (aspect 4.1); fit to width and every
+# screen is thumbnail-sized, so cut it into legible columns instead.
+WIDE_RATIO = 2.0
+# Aim each wide slice at roughly this aspect so screens stay readable.
+TARGET_SLICE_ASPECT = 1.5
 
 
 def emit(img: Image.Image, path: str, width: int, quality: int) -> None:
@@ -39,12 +45,25 @@ def process(src: str) -> None:
 
     emit(img, os.path.join(OUT_DIR, f"{stem}.jpg"), FULL_WIDTH, 82)
 
+    aspect = img.width / img.height
+
     if img.height / img.width > TALL_RATIO:
         # Overlap the halves slightly so nothing is lost at the seam.
         top = img.crop((0, 0, img.width, int(img.height * 0.52)))
         bottom = img.crop((0, int(img.height * 0.50), img.width, img.height))
         emit(top, os.path.join(OUT_DIR, f"{stem}-a.jpg"), SLICE_WIDTH, 84)
         emit(bottom, os.path.join(OUT_DIR, f"{stem}-b.jpg"), SLICE_WIDTH, 84)
+
+    elif aspect > WIDE_RATIO:
+        n = max(2, round(aspect / TARGET_SLICE_ASPECT))
+        step = img.width / n
+        overlap = int(step * 0.03)  # small overlap so nothing is cut at a seam
+        for i in range(n):
+            left = max(0, int(i * step) - (overlap if i else 0))
+            right = min(img.width, int((i + 1) * step) + (overlap if i < n - 1 else 0))
+            part = img.crop((left, 0, right, img.height))
+            label = chr(ord("a") + i)
+            emit(part, os.path.join(OUT_DIR, f"{stem}-{label}.jpg"), SLICE_WIDTH, 84)
 
 
 def main() -> int:
