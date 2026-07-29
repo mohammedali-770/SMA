@@ -44,40 +44,65 @@ def equal_bands(img: Image.Image, aspect: float):
     ]
 
 
-def artboard_bands(img: Image.Image, pad: int = 24):
-    """Split a wide sheet on the dark gutters between artboards.
+def artboard_bands(img: Image.Image, axis: str = "x", pad: int = 24):
+    """Split a sheet on the dark gutters between artboards.
 
-    pen.dev lays a batch out as artboards on a dark canvas. Cutting into equal
-    columns slices screens mid-content; cutting on the gutters keeps each screen
-    whole. Returns None when the sheet has no usable gutters (e.g. one solid
-    artboard), so the caller can fall back to equal columns.
+    pen.dev lays a batch out as artboards on a dark canvas, either in a row or a
+    column. Cutting into equal parts slices screens mid-content; cutting on the
+    gutters keeps each screen whole. `axis` is "x" for a wide sheet (vertical
+    gutters) or "y" for a tall one (horizontal gutters). Returns None when there
+    are no usable gutters, so the caller can fall back to equal parts.
     """
-    small = img.convert("L").resize((img.width // 8, 64), Image.BILINEAR)
-    w = small.width
-    px = small.load()
-    # A column is "gutter" when every sampled pixel is near-black.
-    gutter = [max(px[x, y] for y in range(small.height)) < 40 for x in range(w)]
+    horizontal = axis == "x"
+    span = img.width if horizontal else img.height
+    cross = img.height if horizontal else img.width
+    rgb = img.convert("RGB")
+    px = rgb.load()
+
+    # The canvas colour is whatever dominates the sheet's outer border. Matching
+    # it exactly is the only reliable test: a DARK-MODE artboard averages out to
+    # the same luminance as empty canvas, so any brightness threshold merges the
+    # two and silently drops the dark screen from the output.
+    border = []
+    for i in range(0, span, max(1, span // 200)):
+        border.append(px[i, 0] if horizontal else px[0, i])
+        border.append(px[i, cross - 1] if horizontal else px[cross - 1, i])
+    canvas = max(set(border), key=border.count)
+
+    def is_canvas(c):
+        return all(abs(a - b) <= 10 for a, b in zip(c, canvas))
+
+    step_cross = max(1, cross // 120)
+    step_span = max(1, span // 1200)
+    gutter_at = {}
+    for i in range(0, span, step_span):
+        gutter_at[i] = all(
+            is_canvas(px[i, j] if horizontal else px[j, i])
+            for j in range(0, cross, step_cross)
+        )
+    keys = sorted(gutter_at)
+    n = len(keys)
+    gutter = [gutter_at[k] for k in keys]
     if not any(gutter) or all(gutter):
         return None
 
     bands, run = [], None
-    for x in range(w):
-        if not gutter[x] and run is None:
-            run = x
-        elif gutter[x] and run is not None:
-            bands.append((run, x))
+    for i in range(n):
+        if not gutter[i] and run is None:
+            run = i
+        elif gutter[i] and run is not None:
+            bands.append((run, i))
             run = None
     if run is not None:
-        bands.append((run, w))
+        bands.append((run, n))
 
-    scale = img.width / w
     out = []
     for a, b in bands:
-        left = max(0, int(a * scale) - pad)
-        right = min(img.width, int(b * scale) + pad)
+        lo = max(0, keys[a] - pad)
+        hi = min(span, (keys[b] if b < n else span) + pad)
         # Ignore slivers — label text and stray scratch geometry.
-        if right - left > img.height * 0.25:
-            out.append((left, right))
+        if hi - lo > cross * 0.25:
+            out.append((lo, hi))
     return out or None
 
 
@@ -98,19 +123,20 @@ def process(src: str) -> None:
 
     aspect = img.width / img.height
 
-    if img.height / img.width > TALL_RATIO:
-        # Overlap the halves slightly so nothing is lost at the seam.
-        top = img.crop((0, 0, img.width, int(img.height * 0.52)))
-        bottom = img.crop((0, int(img.height * 0.50), img.width, img.height))
-        emit(top, os.path.join(OUT_DIR, f"{stem}-a.jpg"), SLICE_WIDTH, 84)
-        emit(bottom, os.path.join(OUT_DIR, f"{stem}-b.jpg"), SLICE_WIDTH, 84)
+    if aspect > WIDE_RATIO:
+        bands = artboard_bands(img, "x") or equal_bands(img, aspect)
+        for i, (lo, hi) in enumerate(bands):
+            part = img.crop((lo, 0, hi, img.height))
+            emit(part, os.path.join(OUT_DIR, f"{stem}-{chr(ord('a') + i)}.jpg"), SLICE_WIDTH, 84)
 
-    elif aspect > WIDE_RATIO:
-        bands = artboard_bands(img) or equal_bands(img, aspect)
-        for i, (left, right) in enumerate(bands):
-            part = img.crop((left, 0, right, img.height))
-            label = chr(ord("a") + i)
-            emit(part, os.path.join(OUT_DIR, f"{stem}-{label}.jpg"), SLICE_WIDTH, 84)
+    elif 1 / aspect > TALL_RATIO or (bands := artboard_bands(img, "y")):
+        # A tall sheet is either stacked artboards (split on their gutters) or
+        # one long sheet (split into overlapping halves).
+        if not bands:
+            bands = [(0, int(img.height * 0.52)), (int(img.height * 0.50), img.height)]
+        for i, (lo, hi) in enumerate(bands):
+            part = img.crop((0, lo, img.width, hi))
+            emit(part, os.path.join(OUT_DIR, f"{stem}-{chr(ord('a') + i)}.jpg"), SLICE_WIDTH, 84)
 
 
 def main() -> int:
