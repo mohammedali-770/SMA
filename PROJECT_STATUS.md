@@ -138,6 +138,7 @@ Notes:
 | `docs/OPERATIONS_ALERTS_DIGEST.md` | Alerts/digest engine, activation state, runbook |
 | `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook |
 | `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
+| `docs/redesign/` | Redesign brief for a design partner (Pen.dev): guidelines, feature-parity inventory, design tokens, prompt playbook |
 | `README.md` / `README_MOBILE.md` | General app documentation |
 
 ## 7. Rules that must never be broken
