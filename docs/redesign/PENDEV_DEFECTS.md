@@ -12,7 +12,8 @@
 >
 > Status key: `fixed` · `open` · `withdrawn` (raised in error) · `needs owner decision`.
 >
-> **Last run: 34 / 34 checks passed** — 2026-07-29, after the refinement pass.
+> **Last run: 34 / 34 verification checks passed, 0 contrast pairs below WCAG AA**
+> — 2026-07-29, after the refinement pass and the contrast corrections.
 
 ---
 
@@ -119,8 +120,9 @@ Run `python3 design/contrast.py`; full output in `CONTRAST_REPORT.txt`.
 sits at 16.63:1 on the ground and 14.61:1 on a card; the lifted purple and red
 clear AA against every surface they are used on. The dark palette needed no change.
 
-**Light mode has 5 real AA failures — and they are pre-existing production
-values, not redesign output.** Every failing colour is byte-identical to
+**Light mode had 5 real AA failures — pre-existing production values, not redesign
+output. All five are now CORRECTED in the design sources** (`design/*.pen`);
+`contrast.py` reports 0 failures across both palettes. Every failing colour is byte-identical to
 `apps/mobile/src/theme.ts`:
 
 | Pair | Ratio | Need | Minimal fix |
@@ -149,8 +151,9 @@ out inactive components.
 
 ## Remaining open items
 
-- **Light-mode status colours fail AA** — 5 pairs, detailed below. Inherited from
-  the live app, not introduced by the redesign. Needs an owner decision.
+- **`apps/mobile/src/theme.ts` still carries the five failing values.** The design
+  sources are corrected; production is not. Changing `theme.ts` alters the live app
+  and remains the owner's decision — see the corrected values above.
 - **Layer-name hygiene** — `03-payment` retains 4 Arabic-Indic digits inside layer
   names. Never rendered; cosmetic only.
 - **Order-tracking timeline** — still the owner's call (`PENDEV_BRIEF.md` §10);

@@ -15,12 +15,12 @@ primary button label                          10.65:1   4.5:1  AAA
 destructive button label                       4.55:1   4.5:1  AA
 link / active nav on the ground                9.82:1   4.5:1  AAA
 link / active nav on a card                   10.65:1   4.5:1  AAA
-success chip text in its tint                  3.13:1   4.5:1  FAIL
-warning chip text in its tint                  2.99:1   4.5:1  FAIL
-error chip text in its tint                    3.94:1   4.5:1  FAIL
-success status text on a card                  3.49:1   4.5:1  FAIL
-warning status text on a card                  3.28:1   4.5:1  FAIL
-error status text on a card                    4.55:1   4.5:1  AA
+success chip text in its tint                  4.52:1   4.5:1  AA
+warning chip text in its tint                  4.52:1   4.5:1  AA
+error chip text in its tint                    4.54:1   4.5:1  AA
+success status text on a card                  5.04:1   4.5:1  AA
+warning status text on a card                  4.97:1   4.5:1  AA
+error status text on a card                    5.25:1   4.5:1  AA
 filled control against a card                 10.65:1   3.0:1  AAA
 accent control against a card                  4.55:1   3.0:1  AAA
 card border against the card                   1.20:1   3.0:1  advisory
@@ -31,22 +31,7 @@ disabled control (WCAG-exempt)                 1.70:1   3.0:1  exempt
   · card border against the card: border #ece9f2 on surface #ffffff = 1.20:1
   · divider against the ground: border #ece9f2 on background #f6f5fa = 1.11:1
 
-5 pair(s) BELOW AA — suggested minimal fixes:
-  · success chip text in its tint
-      success #1f9d55 on success-tint #e7f6ee = 3.13:1
-      -> #197f45  = 4.52:1
-  · warning chip text in its tint
-      warning #c47f17 on warning-tint #fef3e0 = 2.99:1
-      -> #9b6412  = 4.52:1
-  · error chip text in its tint
-      danger #e02d3d on danger-tint #fdeaec = 3.94:1
-      -> #ce2938  = 4.54:1
-  · success status text on a card
-      success #1f9d55 on surface #ffffff = 3.49:1
-      -> #1b8749  = 4.56:1
-  · warning status text on a card
-      warning #c47f17 on surface #ffffff = 3.28:1
-      -> #a36913  = 4.58:1
+All required pairs meet AA.
 
 18 tokens read from design/01-design-system.pen (dark)
 
@@ -83,4 +68,4 @@ disabled control (WCAG-exempt)                 1.84:1   3.0:1  exempt
 All required pairs meet AA.
 
 ==========================================================================
-TOTAL FAILURES BELOW AA: 5
+TOTAL FAILURES BELOW AA: 0
