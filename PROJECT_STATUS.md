@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-07-23 (default-branch head `736a6a0`).
+> Last updated: 2026-07-29 (default-branch head `e36fff1`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -25,7 +25,7 @@ One repository contains three user-facing apps and the backend definition:
   (admin/accountant) get the AdminDashboard.
 - Deployment: Vercel builds the default branch (`npm run build` = mobile
   `npm ci` → `vite build` → Expo web export into `dist/app`). Mobile store
-  builds go through EAS with **remote** versioning.
+  builds go through EAS with **remote** versioning. See `docs/DEPLOY.md`.
 
 ## 2. Repository layout
 
@@ -55,33 +55,61 @@ vitest.config.ts        Root unit-test config (includes framework-free
 
 The default branch **is** production. Everything below is deployed and active:
 
-- **Ordering + checkout + Tap payments** (payment area is FROZEN — §7).
+- **Ordering + checkout + Tap payments.** Customers order and pay today, but
+  **all payment/refund WORK is postponed** — see §5 and
+  `docs/PAYMENT_POSTPONEMENT.md`.
 - **Lazywait POS integration**: `lazywait-sync` worker with deadline-bounded
   retries, `confirmation_required` lifecycle state, reaper, and an admin
   "Orders Requiring Verification" panel.
 - **Order Integrity watchdog** + admin triage panel.
 - **Operations Health Center**: staff RPC `operations_health_summary()`
-  (SECURITY DEFINER, staff-gated with 42501) + admin panel.
+  (SECURITY DEFINER, staff-gated with 42501) + admin panel, now monitoring a
+  5-job allowlist (three critical crons + the two internal automation crons).
 - **Smart Operations Alerts + Daily Digest** (live and ACTIVE):
   evaluator cron `operations-alerts-evaluator` every 5 min, digest cron
   `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
   AR/EN digests, alerts inbox in the admin dashboard. **External dispatch is
   disabled by design** — alerts/digests are internal (in-dashboard) only.
+- **Order confirmation state machine** — one authoritative customer-visible
+  order state, server-counted manual resends, and refund *enrolment*. Refund
+  *processing* is not running (§5).
+- **Discounts & campaigns schema** — tables, RLS and
+  `compute_campaign_discount()` are live, but **inert**: `place_order` does not
+  call the RPC, so no discount can affect an order total yet. Eight open
+  business questions gate the wiring — `docs/DISCOUNTS_CAMPAIGNS.md`.
 - **Sentry crash/error monitoring** (org `first-taste-trading-company`,
   project `react-native`) on all three surfaces:
   - mobile (PR #80): native + JS crashes, sampling prod 0.08;
   - web/admin (PR #83): `admin-web` + `expo-web` surface tags, sampling
-    prod 0.05 — see §5 for the one pending owner action.
-- **Auth**: Supabase auth with WhatsApp OTP flow. **Push notifications are
-  DORMANT** (integration row disabled, no credentials) — do not enable.
+    prod 0.05 — see §5 for the pending owner action.
+- **Auth**: Supabase auth with WhatsApp OTP flow.
 - **Account deletion** flow (store-compliance requirement).
+- **Push notifications are DORMANT.** The `push`/`expo` integration row is
+  `enabled = false` (set 2026-07-29 with owner approval), with zero credentials
+  and zero registered devices. Do not enable it.
 
-Migration state: the repo `supabase/migrations/` chain and the Production
-migration history are reconciled through `docs/MIGRATIONS.md` (the
-authoritative ledger — read it before touching anything database-related).
-Live schema changes go ONLY through the owner-approved MCP `apply_migration`
-workflow; `supabase db push` and `supabase migration repair` are permanently
-forbidden against Production.
+### Active scheduled jobs (pg_cron)
+
+| Job | Schedule | State |
+| --- | --- | --- |
+| `account-deletion-processor` | `* * * * *` | active |
+| `lazywait-sync` | `* * * * *` | active |
+| `order-integrity-watchdog` | `*/2 * * * *` | active |
+| `operations-alerts-evaluator` | `*/5 * * * *` | active |
+| `operations-digest-generator` | `0 * * * *` | active |
+| `payment-refund-worker` | `*/5 * * * *` | **DISABLED** (`active = false`, §5) |
+
+### Migration state
+
+**62** live `schema_migrations` rows; **61** repository migration files;
+**zero unapplied**. Latest live version `20260729112238`. Ten migrations were
+applied on 2026-07-29, eight of them closing a Production incident in which the
+deployed frontend was running eight migrations ahead of the database.
+
+`docs/MIGRATIONS.md` is the authoritative ledger — read it before touching
+anything database-related. Live schema changes go ONLY through the
+owner-approved MCP `apply_migration` workflow; `supabase db push` and
+`supabase migration repair` are permanently forbidden against Production.
 
 ## 4. Working in VS Code — setup & daily commands
 
@@ -105,12 +133,16 @@ npm --prefix apps/mobile start       # Expo dev server (iOS/Android)
 
 # 4) Quality gates (run before every commit — all must pass)
 npm run lint                         # root tsc --noEmit (includes shared web code)
-npm test                             # vitest: 653 tests (root + framework-free mobile)
+npm test                             # vitest (root + framework-free mobile)
 npm --prefix apps/mobile run typecheck
 npm run build                        # full production build (Vite + Expo web export)
 ```
 
 Notes:
+- `npm run build` installs `apps/mobile` deps **first** on purpose: `vite build`
+  transforms `apps/mobile/src`, whose tsconfig extends `expo/tsconfig.base`, so
+  it needs `apps/mobile/node_modules` to already exist. Reordering these breaks
+  the Vercel build.
 - Root vitest deliberately includes `apps/mobile/src/**/*.test.ts` for
   FRAMEWORK-FREE modules only (no RN/Expo imports in those test files).
 - `supabase/tests/*.sql` run against a throwaway local PG harness — never
@@ -120,14 +152,45 @@ Notes:
 
 ## 5. Pending items / owner actions
 
-- **Issue #81 (open)** — create the `SENTRY_AUTH_TOKEN` secret in EAS *and*
-  Vercel so release builds upload source maps. Until then, Sentry ingestion
-  works but stack traces are unsymbolicated. The token is a real secret:
-  never commit it, never put it in `EXPO_PUBLIC_*`/`VITE_*`.
-- **Issue #79 (follow-up)** — optional monitoring of pg_cron job health for
-  the alerts/digest jobs.
-- Store launch checklist lives in `docs/SENTRY_OBSERVABILITY.md`
-  (launch-day verification) and `docs/MIGRATIONS.md` (schema state).
+**Payment & refund work is POSTPONED** (owner decision, 2026-07-29). The
+payment gateway provider has not been selected. Do not modify, deploy, schedule
+or test any payment/refund functionality. The `payment-refund-worker` cron was
+disabled; **nothing was deleted** — all payment code, migrations and Edge
+Functions remain intact. Full record, including the open double-refund design
+question that must be resolved before the worker is ever re-enabled:
+`docs/PAYMENT_POSTPONEMENT.md`.
+
+Open issues:
+
+- **Issue #81 (open, `blocks-production`)** — create the `SENTRY_AUTH_TOKEN`
+  secret in EAS *and* Vercel so release builds upload source maps. Until then
+  production EAS builds fail at the Sentry upload step, and crash reports arrive
+  unsymbolicated. The token is a real secret: never commit it, never put it in
+  `EXPO_PUBLIC_*`/`VITE_*`. Owner action only — no repository change needed.
+- **Issue #102 (open)** — set the Vercel **Production Branch** to
+  `claude/project-build-ie4b56` and trigger a fresh Production redeploy. While it
+  is unset, the default branch only deploys as a Preview and `/` and `/app/`
+  serve byte-identical HTML, so the customer Expo web app is not actually being
+  served in production. Owner action only (Vercel dashboard) — see
+  `docs/DEPLOY.md`.
+
+Needs an owner decision:
+
+- **Discounts & campaigns** — eight business questions in
+  `docs/DISCOUNTS_CAMPAIGNS.md` block wiring campaigns into `place_order`.
+
+Resolved 2026-07-29:
+
+- **Push integration row.** It had drifted to `enabled = true` in Production
+  (with zero credentials and zero devices) while `CLAUDE.md` §7 and this
+  document both described it as disabled. With owner approval it was set back to
+  `enabled = false`, so Production now matches the documented intent. Exactly one
+  row changed; no credentials were added or removed.
+
+Documentation debt:
+
+- The five account-deletion migrations are applied and live but not yet itemized
+  in `docs/MIGRATIONS.md` §4/§5 (tracked in §1 of that document).
 
 ## 6. Authoritative docs (read these before changing the related area)
 
@@ -135,7 +198,11 @@ Notes:
 | --- | --- |
 | `CLAUDE.md` | Change-control rules for ALL agent/automated work (§7 below) |
 | `docs/MIGRATIONS.md` | Migration ledger + the only allowed Production schema workflow |
+| `docs/PAYMENT_POSTPONEMENT.md` | The payment/refund freeze: scope, live state, resume checklist |
+| `docs/DEPLOY.md` | Vercel deployment, Production Branch, env vars, verification |
 | `docs/OPERATIONS_ALERTS_DIGEST.md` | Alerts/digest engine, activation state, runbook |
+| `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle + refund enrolment rules |
+| `docs/DISCOUNTS_CAMPAIGNS.md` | Campaigns schema, what is live, open business questions |
 | `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook |
 | `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
 | `README.md` / `README_MOBILE.md` | General app documentation |
@@ -149,10 +216,11 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
    Every change: fresh branch off the default branch → PR → explicit owner
    approval → merge. A PreToolUse hook additionally blocks agent sessions
    from editing on a protected checkout.
-2. **Payment/Tap area is FROZEN** (payment-verify, payment-webhook,
-   checkout/session functions, Tap settings) — no changes without separate
-   explicit owner approval.
-3. **Push notifications stay disabled** — no credentials, no enabling.
+2. **Payment/Tap area is FROZEN and payment work is POSTPONED** — no changes
+   without separate explicit owner approval, and none at all until a gateway
+   provider is selected (`docs/PAYMENT_POSTPONEMENT.md`).
+3. **Push notifications stay dormant** — row disabled, no credentials, no
+   enabling.
 4. **Production schema**: only the owner-approved `apply_migration` workflow;
    `supabase db push` / `migration repair` are permanently forbidden; never
    edit an already-applied migration file.
@@ -167,25 +235,33 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #112 | Refund worker scheduler + stale-claim reaper; `caller_can_read_order` anon revoke | `e36fff1` |
+| #85 | Operations automation cron health | `06c9bb0` |
+| #84 | `PROJECT_STATUS.md` onboarding document | `e520f0a` |
 | #83 | Sentry error monitoring for web + admin (`admin-web`/`expo-web`) | `736a6a0` |
 | #80 | Sentry crash reporting for the mobile app | `22e5aca` |
 | #78 | Internal activation of alerts/digest (live crons) | `ffa3ba3` |
 | #77 | Smart Operations Alerts + Daily Digest engine | `600b6d4` |
-| #75 | Operations Health Center | (merged, live) |
-| #71 | Health-summary foundation | (merged, live) |
+| #75 | Operations Health Center | `91c11b7` |
+| #73 | Order Integrity Watchdog | `411c7c9` |
+| #71 | Health-summary foundation | `4c3d0bd` |
 
-Production Supabase also carries the corresponding live migration versions —
-`docs/MIGRATIONS.md` maps every repo file to its applied Production version.
+`docs/MIGRATIONS.md` maps every repository migration file to its applied
+Production version.
 
-## 9. Test & quality snapshot (at last merge)
+## 9. Test & quality snapshot
 
-- Root vitest: **653/653 passing** (admin logic, Edge-Function helpers,
-  framework-free mobile logic, observability sanitization/classification).
-- TypeScript: root and mobile programs clean (`--noEmit`), root now with
-  real React 19 types.
-- SQL suites: alerts/digest/activation/watchdog/health suites pass in the
-  local PG harness.
-- `npm audit` (root): 0 vulnerabilities. Mobile tree has one pre-existing
-  upstream Expo advisory (documented in PR #80, not introduced by this repo).
+- Root vitest: **764** tests recorded at the 2026-07-24 validation
+  (`docs/MIGRATIONS.md` §18). The suite was **not** re-run for the 2026-07-29
+  documentation changes — run `npm test` for the current figure before relying
+  on it.
+- TypeScript: root and mobile programs clean (`--noEmit`), root with real
+  React 19 types (`@types/react@^19`, `@types/react-dom@^19`).
+- SQL suites: alerts/digest/activation/watchdog/health/order-confirmation/
+  loyalty-reason suites pass in the local PG harness. They are never run
+  against Production.
+- `npm audit` (root): 0 vulnerabilities at the last check. The mobile tree has
+  one pre-existing upstream Expo advisory (documented in PR #80, not introduced
+  by this repo).
 - Bundles: no source maps shipped, no secrets, dev-only test tooling
   excluded from production output.

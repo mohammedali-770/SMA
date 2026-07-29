@@ -1,14 +1,22 @@
 # Discounts & Promotional Campaigns (#100)
 
-Status: **repository-only, UNAPPLIED.** This is a safe, self-contained slice —
-a migration file, a SQL test, and a small typed client helper. No migration has
-been applied to any database, nothing is deployed, and no owner approval for a
-live change is implied. Applying it to Production goes only through the
-owner-approved `apply_migration` workflow in `docs/MIGRATIONS.md`.
+Status: **schema APPLIED to Production; NOT yet wired into pricing.**
+
+The migration was applied on **2026-07-29** as live version
+**`20260729073932`** (class B — see `docs/MIGRATIONS.md` §5 row 50 and §20).
+The tables, RLS policies and `compute_campaign_discount()` all exist in
+Production.
+
+**No discount can currently affect an order total.** `place_order` does not
+call the RPC and writes no `campaign_redemptions` row, so the feature is inert
+until the integration described in Assumption 1 is built — and that work is
+gated on the eight open questions below, which are business decisions, not
+engineering ones. Nothing else is deployed, and no campaign row exists.
 
 ## What this slice adds
 
 - **`supabase/migrations/20260728120000_discounts_campaigns.sql`**
+  (live `20260729073932`)
   - `public.campaigns` — bilingual name/description; `type` in
     `('percentage','fixed','free_delivery')`; `value`; optional uppercase `code`
     (unique when present); `starts_at`/`ends_at`; `min_order_amount`;
@@ -34,7 +42,12 @@ owner-approved `apply_migration` workflow in `docs/MIGRATIONS.md`.
   and DISPLAY-ONLY pure helpers (`selectLiveCampaigns`, `formatCampaignSummary`).
   No client-side discount math. `tsc --noEmit` clean; 12 unit tests pass.
 
-## Assumptions (please confirm)
+## Open questions — BLOCKING the `place_order` integration (please confirm)
+
+These are business decisions. The `place_order` migration cannot be written
+correctly until they are answered, and writing it on guessed semantics would
+bake wrong pricing into a server-authoritative RPC. Items **1**, **3**, **4**,
+**7** and **8** are the ones that change the code.
 
 1. **Server authority / `place_order` integration is out of scope here.** Like
    `validate_coupon`, `compute_campaign_discount` returns a discount for a
@@ -56,13 +69,13 @@ owner-approved `apply_migration` workflow in `docs/MIGRATIONS.md`.
    subtotal.** The RPC returns `discount_amount = delivery_fee` and
    `free_delivery = true`; the intended effect at order time is to waive the
    delivery fee (so `total = subtotal + delivery_fee - delivery_fee`). It is 0
-   for pickup orders. Confirm whether the order path should model this as a
+   for pickup orders. **Confirm** whether the order path should model this as a
    discount line or by zeroing `delivery_fee`.
 4. **Stacking rules are NOT defined.** Coupons (`validate_coupon`) and campaigns
    are independent today. Whether a campaign may stack with a coupon and/or
    loyalty, and in what order they apply, is a business decision left to the
    `place_order` integration. Default suggestion: apply campaign to the
-   merchandise subtotal, then coupon, then loyalty, then VAT — but confirm.
+   merchandise subtotal, then coupon, then loyalty, then VAT — but **confirm**.
 5. **VAT interaction.** KSA VAT is inclusive and extracted from the payable total
    in `place_order`. A campaign discount reduces the payable total before VAT is
    extracted (same as coupons today). No VAT logic is added here.
@@ -72,10 +85,10 @@ owner-approved `apply_migration` workflow in `docs/MIGRATIONS.md`.
    listed). Confirm this matches the intended "campaign vs. code" UX.
 7. **Percentage vs. fixed caps.** `max_discount_amount` caps `percentage` and
    `fixed` discounts and both are additionally clamped to the subtotal;
-   `free_delivery` is clamped only to the delivery fee. Confirm the cap should
+   `free_delivery` is clamped only to the delivery fee. **Confirm** the cap should
    also apply to `fixed`.
 8. **Branch scoping** uses `on delete cascade` (deleting a branch removes its
-   scoped campaigns). Confirm that is the desired lifecycle vs. `set null`
+   scoped campaigns). **Confirm** that is the desired lifecycle vs. `set null`
    (campaign becomes all-branches) or `restrict`.
 
 ## What a reviewer must check
@@ -84,7 +97,8 @@ owner-approved `apply_migration` workflow in `docs/MIGRATIONS.md`.
   computes or sends a discount amount.
 - RLS: confirm anon/customers cannot see inactive/future/coded campaigns or other
   users' redemptions, and cannot write either table (the SQL test asserts this,
-  but it has not been executed here — no local Postgres).
-- Migration timestamp `20260728120000` is after the latest existing file
-  (`20260723140000`) and the file is idempotent (`create ... if not exists`,
-  `drop policy if exists`, `create or replace function`).
+  but it has not been executed against Production — the suite runs only in a
+  local Postgres harness).
+- No applied migration is ever edited. Any change to this schema is a **new**
+  migration applied through the owner-approved `apply_migration` workflow in
+  `docs/MIGRATIONS.md`.
