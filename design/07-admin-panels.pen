@@ -59,8 +59,8 @@
         },
         {
           "type": "frame",
-          "id": "oIUG5",
-          "name": "Nav Dashboard",
+          "id": "FfPb5",
+          "name": "Nav Sales Overview",
           "width": "fill_container",
           "height": 40,
           "cornerRadius": 8,
@@ -73,20 +73,20 @@
           "children": [
             {
               "type": "icon",
-              "id": "uOguQ",
-              "name": "Icon Dashboard",
+              "id": "dvbO7",
+              "name": "Icon Sales Overview",
               "width": 18,
               "height": 18,
-              "icon": "layout-dashboard",
+              "icon": "trending-up",
               "library": "lucide",
               "fill": "$muted"
             },
             {
               "type": "text",
-              "id": "Q9TXrV",
-              "name": "Label Dashboard",
+              "id": "XVOUf",
+              "name": "Label Sales Overview",
               "fill": "$muted",
-              "content": "Dashboard",
+              "content": "Sales Overview",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
@@ -95,8 +95,8 @@
         },
         {
           "type": "frame",
-          "id": "o6OhLN",
-          "name": "Nav Orders",
+          "id": "kkIPS",
+          "name": "Nav Live Orders",
           "width": "fill_container",
           "height": 40,
           "cornerRadius": 8,
@@ -109,8 +109,8 @@
           "children": [
             {
               "type": "icon",
-              "id": "ALbC2",
-              "name": "Icon Orders",
+              "id": "KuExC",
+              "name": "Icon Live Orders",
               "width": 18,
               "height": 18,
               "icon": "shopping-bag",
@@ -119,20 +119,48 @@
             },
             {
               "type": "text",
-              "id": "qR8YF",
-              "name": "Label Orders",
+              "id": "YqDya",
+              "name": "Label Live Orders",
               "fill": "$muted",
-              "content": "Orders",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Live Orders",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "ztrFW",
+              "name": "Badge Live Orders",
+              "height": 20,
+              "fill": "#EF4444",
+              "cornerRadius": 10,
+              "padding": [
+                0,
+                6
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "F0Npl",
+                  "name": "Count Live Orders",
+                  "fill": "#FFFFFF",
+                  "content": "7",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600"
+                }
+              ]
             }
           ]
         },
         {
           "type": "frame",
-          "id": "UCoG9",
-          "name": "Nav Menu",
+          "id": "z6WyB",
+          "name": "Nav Menu Management",
           "width": "fill_container",
           "height": 40,
           "cornerRadius": 8,
@@ -145,8 +173,8 @@
           "children": [
             {
               "type": "icon",
-              "id": "fbwHe",
-              "name": "Icon Menu",
+              "id": "Df19h",
+              "name": "Icon Menu Management",
               "width": 18,
               "height": 18,
               "icon": "utensils",
@@ -155,10 +183,10 @@
             },
             {
               "type": "text",
-              "id": "mltK5",
-              "name": "Label Menu",
+              "id": "vgRxp",
+              "name": "Label Menu Management",
               "fill": "$muted",
-              "content": "Menu",
+              "content": "Menu Management",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
@@ -167,8 +195,8 @@
         },
         {
           "type": "frame",
-          "id": "LTbFU",
-          "name": "Nav Branches",
+          "id": "F9j220",
+          "name": "Nav Banners",
           "width": "fill_container",
           "height": 40,
           "cornerRadius": 8,
@@ -181,8 +209,44 @@
           "children": [
             {
               "type": "icon",
-              "id": "tPn4n",
-              "name": "Icon Branches",
+              "id": "VoK0Y",
+              "name": "Icon Banners",
+              "width": 18,
+              "height": 18,
+              "icon": "flag",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "QhYId",
+              "name": "Label Banners",
+              "fill": "$muted",
+              "content": "Banners",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "s3KKo",
+          "name": "Nav Branch Management",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "gCy47",
+              "name": "Icon Branch Management",
               "width": 18,
               "height": 18,
               "icon": "map-pin",
@@ -191,10 +255,10 @@
             },
             {
               "type": "text",
-              "id": "SmPrN",
-              "name": "Label Branches",
+              "id": "dRcqS",
+              "name": "Label Branch Management",
               "fill": "$muted",
-              "content": "Branches",
+              "content": "Branch Management",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
@@ -203,8 +267,8 @@
         },
         {
           "type": "frame",
-          "id": "s3mtI",
-          "name": "Nav Customers",
+          "id": "Y1EyQ",
+          "name": "Nav Financial Reports",
           "width": "fill_container",
           "height": 40,
           "cornerRadius": 8,
@@ -217,152 +281,8 @@
           "children": [
             {
               "type": "icon",
-              "id": "OhzTf",
-              "name": "Icon Customers",
-              "width": 18,
-              "height": 18,
-              "icon": "users",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "qaUrX",
-              "name": "Label Customers",
-              "fill": "$muted",
-              "content": "Customers",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "yhcFO",
-          "name": "Nav Payments",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "xX2Y2",
-              "name": "Icon Payments",
-              "width": 18,
-              "height": 18,
-              "icon": "credit-card",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "PqJfI",
-              "name": "Label Payments",
-              "fill": "$muted",
-              "content": "Payments",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "AKrE7",
-          "name": "Nav Promotions",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "XUaTX",
-              "name": "Icon Promotions",
-              "width": 18,
-              "height": 18,
-              "icon": "tag",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "TmKEI",
-              "name": "Label Promotions",
-              "fill": "$muted",
-              "content": "Promotions",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "Hv1Yz",
-          "name": "Nav Delivery",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "ewnJX",
-              "name": "Icon Delivery",
-              "width": 18,
-              "height": 18,
-              "icon": "truck",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "huaKK",
-              "name": "Label Delivery",
-              "fill": "$muted",
-              "content": "Delivery",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "I3Ty1",
-          "name": "Nav Reports",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "C9cPr",
-              "name": "Icon Reports",
+              "id": "YtzCR",
+              "name": "Icon Financial Reports",
               "width": 18,
               "height": 18,
               "icon": "chart-no-axes-column",
@@ -371,10 +291,10 @@
             },
             {
               "type": "text",
-              "id": "HEkoQ",
-              "name": "Label Reports",
+              "id": "DBVWs",
+              "name": "Label Financial Reports",
               "fill": "$muted",
-              "content": "Reports",
+              "content": "Financial Reports",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
@@ -383,79 +303,7 @@
         },
         {
           "type": "frame",
-          "id": "gm2Vh",
-          "name": "Nav Operations",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "WRH3w",
-              "name": "Icon Operations",
-              "width": 18,
-              "height": 18,
-              "icon": "bell",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "a9s5Y",
-              "name": "Label Operations",
-              "fill": "$muted",
-              "content": "Operations",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "EVo6B",
-          "name": "Nav Settings",
-          "width": "fill_container",
-          "height": 40,
-          "cornerRadius": 8,
-          "gap": 10,
-          "padding": [
-            0,
-            12
-          ],
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "iQ656",
-              "name": "Icon Settings",
-              "width": 18,
-              "height": 18,
-              "icon": "settings",
-              "library": "lucide",
-              "fill": "$muted"
-            },
-            {
-              "type": "text",
-              "id": "DDV2s",
-              "name": "Label Settings",
-              "fill": "$muted",
-              "content": "Settings",
-              "fontFamily": "Inter",
-              "fontSize": 14,
-              "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "IPf43",
+          "id": "ClaoB",
           "name": "Nav Integrations",
           "width": "fill_container",
           "height": 40,
@@ -469,7 +317,7 @@
           "children": [
             {
               "type": "icon",
-              "id": "D8kBV",
+              "id": "mQOm9",
               "name": "Icon Integrations",
               "width": 18,
               "height": 18,
@@ -479,10 +327,218 @@
             },
             {
               "type": "text",
-              "id": "xlVqZ",
+              "id": "NStQB",
               "name": "Label Integrations",
               "fill": "$muted",
               "content": "Integrations",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "c4aXr",
+          "name": "Nav Operations Health",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "HDMCb",
+              "name": "Icon Operations Health",
+              "width": 18,
+              "height": 18,
+              "icon": "activity",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "qQS9I",
+              "name": "Label Operations Health",
+              "fill": "$muted",
+              "content": "Operations Health",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "I1qua8",
+          "name": "Nav Operations Alerts",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "H0zRp0",
+              "name": "Icon Operations Alerts",
+              "width": 18,
+              "height": 18,
+              "icon": "bell",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "pOm4y",
+              "name": "Label Operations Alerts",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Operations Alerts",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "bgxDG",
+              "name": "Badge Operations Alerts",
+              "height": 20,
+              "fill": "#EF4444",
+              "cornerRadius": 10,
+              "padding": [
+                0,
+                6
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "aHJr8",
+                  "name": "Count Operations Alerts",
+                  "fill": "#FFFFFF",
+                  "content": "3",
+                  "fontFamily": "Inter",
+                  "fontSize": 11,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Ha7BP",
+          "name": "Nav Order Integrity",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "wkYdj",
+              "name": "Icon Order Integrity",
+              "width": 18,
+              "height": 18,
+              "icon": "shield-check",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "zl75s",
+              "name": "Label Order Integrity",
+              "fill": "$muted",
+              "content": "Order Integrity",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "P1QaG",
+          "name": "Nav Settings",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "wKKCd",
+              "name": "Icon Settings",
+              "width": 18,
+              "height": 18,
+              "icon": "settings",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "OjgSe",
+              "name": "Label Settings",
+              "fill": "$muted",
+              "content": "Settings",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "M0Ehod",
+          "name": "Nav Legal Documents",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "cIgS9",
+              "name": "Icon Legal Documents",
+              "width": 18,
+              "height": 18,
+              "icon": "file-text",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "ZJJmU",
+              "name": "Label Legal Documents",
+              "fill": "$muted",
+              "content": "Legal Documents",
               "fontFamily": "Inter",
               "fontSize": 14,
               "fontWeight": "500"
@@ -570,14 +626,14 @@
           "ref": "T8rOj4",
           "name": "Menu Sidebar",
           "descendants": {
-            "UCoG9": {
+            "z6WyB": {
               "fill": "$primary",
               "cornerRadius": 8
             },
-            "fbwHe": {
+            "Df19h": {
               "fill": "$on-primary"
             },
-            "mltK5": {
+            "vgRxp": {
               "fill": "$on-primary",
               "fontWeight": "600"
             }
@@ -997,7 +1053,8 @@
                                   "fill": "$muted",
                                   "content": "سماش برجر · 3 modifier groups",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             }
@@ -1164,7 +1221,8 @@
                                   "fill": "$muted",
                                   "content": "راب الدجاج المقرمش · 2 modifier groups",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             }
@@ -1331,7 +1389,8 @@
                                   "fill": "$muted",
                                   "content": "بطاطس محملة · 1 modifier groups",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             }
@@ -1498,7 +1557,8 @@
                                   "fill": "$disabled",
                                   "content": "سموذي مانجو",
                                   "fontFamily": "Inter",
-                                  "fontSize": 12
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             }
@@ -1672,7 +1732,8 @@
                                   "fill": "$muted",
                                   "content": "· برجر",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -1742,7 +1803,8 @@
                                   "fill": "$muted",
                                   "content": "· دجاج",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -1812,7 +1874,8 @@
                                   "fill": "$muted",
                                   "content": "· المقبلات",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -1882,7 +1945,8 @@
                                   "fill": "$muted",
                                   "content": "· المشروبات",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -1990,7 +2054,8 @@
                                   "fill": "$muted",
                                   "content": "· الحجم",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -2060,7 +2125,8 @@
                                   "fill": "$muted",
                                   "content": "· إضافات",
                                   "fontFamily": "Inter",
-                                  "fontSize": 13
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
                                 }
                               ]
                             },
@@ -2128,14 +2194,14 @@
           "ref": "T8rOj4",
           "name": "Branch Sidebar",
           "descendants": {
-            "LTbFU": {
+            "s3KKo": {
               "fill": "$primary",
               "cornerRadius": 8
             },
-            "tPn4n": {
+            "gCy47": {
               "fill": "$on-primary"
             },
-            "SmPrN": {
+            "dRcqS": {
               "fill": "$on-primary",
               "fontWeight": "600"
             }
@@ -2302,7 +2368,8 @@
                               "fill": "$muted",
                               "content": "King Fahd Road, Al Olaya, Riyadh · +966 11 234 5678",
                               "fontFamily": "Inter",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -3427,114 +3494,114 @@
             "yQhrB": {
               "fill": "$dark-text"
             },
-            "oIUG5": {
-              "fill": "none"
+            "FfPb5": {
+              "fill": "#00000000"
             },
-            "uOguQ": {
+            "dvbO7": {
               "fill": "$dark-muted"
             },
-            "Q9TXrV": {
+            "XVOUf": {
               "fill": "$dark-muted"
             },
-            "o6OhLN": {
-              "fill": "none"
+            "kkIPS": {
+              "fill": "#00000000"
             },
-            "ALbC2": {
+            "KuExC": {
               "fill": "$dark-muted"
             },
-            "qR8YF": {
+            "YqDya": {
               "fill": "$dark-muted"
             },
-            "UCoG9": {
-              "fill": "none"
+            "z6WyB": {
+              "fill": "#00000000"
             },
-            "fbwHe": {
+            "Df19h": {
               "fill": "$dark-muted"
             },
-            "mltK5": {
+            "vgRxp": {
               "fill": "$dark-muted"
             },
-            "LTbFU": {
-              "fill": "none"
+            "F9j220": {
+              "fill": "#00000000"
             },
-            "tPn4n": {
+            "VoK0Y": {
               "fill": "$dark-muted"
             },
-            "SmPrN": {
+            "QhYId": {
               "fill": "$dark-muted"
             },
-            "s3mtI": {
-              "fill": "none"
+            "s3KKo": {
+              "fill": "#00000000"
             },
-            "OhzTf": {
+            "gCy47": {
               "fill": "$dark-muted"
             },
-            "qaUrX": {
+            "dRcqS": {
               "fill": "$dark-muted"
             },
-            "yhcFO": {
-              "fill": "none"
+            "Y1EyQ": {
+              "fill": "#00000000"
             },
-            "xX2Y2": {
+            "YtzCR": {
               "fill": "$dark-muted"
             },
-            "PqJfI": {
+            "DBVWs": {
               "fill": "$dark-muted"
             },
-            "AKrE7": {
-              "fill": "none"
+            "ClaoB": {
+              "fill": "#00000000"
             },
-            "XUaTX": {
+            "mQOm9": {
               "fill": "$dark-muted"
             },
-            "TmKEI": {
+            "NStQB": {
               "fill": "$dark-muted"
             },
-            "Hv1Yz": {
-              "fill": "none"
+            "c4aXr": {
+              "fill": "#00000000"
             },
-            "ewnJX": {
+            "HDMCb": {
               "fill": "$dark-muted"
             },
-            "huaKK": {
+            "qQS9I": {
               "fill": "$dark-muted"
             },
-            "I3Ty1": {
-              "fill": "none"
-            },
-            "C9cPr": {
-              "fill": "$dark-muted"
-            },
-            "HEkoQ": {
-              "fill": "$dark-muted"
-            },
-            "gm2Vh": {
+            "I1qua8": {
               "fill": "$primary",
               "cornerRadius": 8
             },
-            "WRH3w": {
+            "H0zRp0": {
               "fill": "$on-primary"
             },
-            "a9s5Y": {
+            "pOm4y": {
               "fill": "$on-primary",
               "fontWeight": "600"
             },
-            "EVo6B": {
-              "fill": "none"
+            "Ha7BP": {
+              "fill": "#00000000"
             },
-            "iQ656": {
+            "wkYdj": {
               "fill": "$dark-muted"
             },
-            "DDV2s": {
+            "zl75s": {
               "fill": "$dark-muted"
             },
-            "IPf43": {
-              "fill": "none"
+            "P1QaG": {
+              "fill": "#00000000"
             },
-            "D8kBV": {
+            "wKKCd": {
               "fill": "$dark-muted"
             },
-            "xlVqZ": {
+            "OjgSe": {
+              "fill": "$dark-muted"
+            },
+            "M0Ehod": {
+              "fill": "#00000000"
+            },
+            "cIgS9": {
+              "fill": "$dark-muted"
+            },
+            "ZJJmU": {
               "fill": "$dark-muted"
             }
           }
@@ -3786,7 +3853,8 @@
                               "width": "fill_container",
                               "content": "4 orders exceeded the retry deadline. The branch is unmapped from POS — new orders will not reach the kitchen display.",
                               "fontFamily": "Inter",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             },
                             {
                               "type": "text",
@@ -3797,7 +3865,8 @@
                               "width": "fill_container",
                               "content": "فشل مزامنة نقطة البيع — فرع الملقا",
                               "fontFamily": "Inter",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             },
                             {
                               "type": "frame",
@@ -3949,7 +4018,8 @@
                               "width": "fill_container",
                               "content": "The branch has delivery toggled on but no delivery area polygon is configured. Customers may place orders outside the serviceable range.",
                               "fontFamily": "Inter",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
@@ -4045,7 +4115,8 @@
                               "width": "fill_container",
                               "content": "Cash orders continue and reach POS unpaid. Revenue reconciliation will be incomplete until the payment gateway is re-enabled.",
                               "fontFamily": "Inter",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
@@ -4327,7 +4398,8 @@
                               "width": "fill_container",
                               "content": "External delivery is disabled by design. This digest is read here in the dashboard and nowhere else.",
                               "fontFamily": "Inter",
-                              "fontSize": 12
+                              "fontSize": 12,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
