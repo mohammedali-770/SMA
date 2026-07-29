@@ -11,9 +11,14 @@
 # Re-running is safe: a batch whose .pen output already exists is skipped, so
 # this doubles as the resume path.
 set -uo pipefail
-cd /home/user/SMA
+ROOT=/home/user/SMA
+cd "$ROOT"
 
-OUT=design
+# Every path handed to `pen` MUST be absolute. With a relative -o/-e and an
+# image attachment, the CLI completes the design and then dies at the save step
+# with "IPCError: Both URIs must be absolute!" — losing the entire run's work
+# after the expensive part is already done. Batch 02 was lost this way.
+OUT=$ROOT/design
 LOGS=$OUT/logs
 BRANCH=claude/pen-dev-guidelines-review-6dz4sr
 mkdir -p "$OUT/exports" "$LOGS"
@@ -52,7 +57,7 @@ run_batch() {  # $1=id $2=name  (remaining args -> pen)
     echo "=== $id ($name) started $(date -u +%H:%M:%S)"
     timeout "$PEN_TIMEOUT" pen \
       -o "$OUT/$id-$name.pen" \
-      -C . \
+      -C "$ROOT" \
       "$@" \
       -e "$OUT/exports/$id-$name.png" --export-scale 2 \
       -p "$(cat "$OUT/prompts/$id-$name.txt")"
@@ -63,7 +68,7 @@ run_batch() {  # $1=id $2=name  (remaining args -> pen)
 
 # ---- Batch 01 first: every other batch references its exported sheet --------
 echo "[driver] === batch 01 (design-system) $(date -u +%H:%M:%S)"
-run_batch 01 design-system -f docs/redesign/DESIGN_SYSTEM.md
+run_batch 01 design-system -f "$ROOT/docs/redesign/DESIGN_SYSTEM.md"
 
 SYSREF=()
 if [ -f "$OUT/exports/01-design-system.png" ]; then
@@ -72,7 +77,7 @@ if [ -f "$OUT/exports/01-design-system.png" ]; then
 else
   echo "[driver] WARNING: no system export — falling back to the token doc alone"
 fi
-SYSREF+=(-f docs/redesign/DESIGN_SYSTEM.md)
+SYSREF+=(-f "$ROOT/docs/redesign/DESIGN_SYSTEM.md")
 
 # ---- Batches 02-08, one at a time ------------------------------------------
 while read -r id name; do

@@ -5,3 +5,7 @@ driver.log
 # Pipeline smoke test (proves generate + export works; not a deliverable).
 00-smoke.pen
 exports/00-smoke.png
+
+# Second pipeline probe (absolute-path fix). Not a deliverable.
+00-smoke2.pen
+exports/00-smoke2.png
