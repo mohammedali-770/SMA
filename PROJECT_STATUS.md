@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-07-29 (default-branch head `bff19ff`).
+> Last updated: 2026-07-29 (default-branch head `537d345`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -144,7 +144,9 @@ npm --prefix apps/mobile run typecheck
 npm run build                        # full production build (Vite + Expo web export)
 
 # 5) Expo config sanity (after touching app.json / app.config.js)
-npx --prefix apps/mobile expo config --type public --json > /dev/null
+npx --prefix apps/mobile expo config --type prebuild --json > /dev/null
+#    Full source-map gate check: docs/SENTRY_OBSERVABILITY.md
+#    → "Verifying the source-map gate"
 ```
 
 Notes:
@@ -247,6 +249,7 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #115 | Conditional Sentry source-map gate on mobile (`app.config.js`) | `537d345` |
 | #114 | Production EAS builds no longer fail on the missing Sentry token | `bff19ff` |
 | #113 | Payment postponement + migration ledger reconciliation + doc corrections | `9f0ec87` |
 | #112 | Refund worker scheduler + stale-claim reaper; `caller_can_read_order` anon revoke | `e36fff1` |
@@ -256,7 +259,6 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 | #80 | Sentry crash reporting for the mobile app | `22e5aca` |
 | #78 | Internal activation of alerts/digest (live crons) | `ffa3ba3` |
 | #77 | Smart Operations Alerts + Daily Digest engine | `600b6d4` |
-| #75 | Operations Health Center | `91c11b7` |
 
 `docs/MIGRATIONS.md` maps every repository migration file to its applied
 Production version.
@@ -266,6 +268,11 @@ Production version.
 - Root vitest: **764** tests recorded at the 2026-07-24 validation
   (`docs/MIGRATIONS.md` §18). The suite was **not** re-run for the 2026-07-29
   changes — run `npm test` for the current figure before relying on it.
+- **`apps/mobile/app.config.js` (#115) has not been executed.** It was authored
+  and merged in a session where Bash was unavailable, so no build, test,
+  typecheck or config resolution was run against it. Verify with the two
+  commands in `docs/SENTRY_OBSERVABILITY.md` → "Verifying the source-map gate"
+  before relying on a production build.
 - TypeScript: root and mobile programs clean (`--noEmit`), root with real
   React 19 types (`@types/react@^19`, `@types/react-dom@^19`).
 - SQL suites: alerts/digest/activation/watchdog/health/order-confirmation/
