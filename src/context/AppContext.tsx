@@ -26,6 +26,7 @@ import {
 import {
   PaymentMethod, PaymentMethodSettings, resolveDefaultMethod, availableMethods,
 } from '../lib/payment';
+import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 
 interface AppContextType {
   // Auth / session (Option A: GoTrue = authentication, profiles.role = authorization)
@@ -883,7 +884,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       await refreshCatalog();
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      // A branch that still owns orders / checkout sessions is FK-blocked. Show
+      // the friendly, localized "deactivate instead" guidance instead of the raw
+      // Postgres constraint string; the branch is left in place (never removed
+      // locally on this path). All other errors surface their message as-is.
+      const message = isBranchDependencyError(e)
+        ? branchDeletionBlockedMessage(adminLang === 'ar')
+        : (e instanceof Error ? e.message : String(e));
       setWriteError(message);
       throw e;
     }

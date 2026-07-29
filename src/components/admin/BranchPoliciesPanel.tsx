@@ -4,7 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import type { Branch } from '../../types';
-import { branchDeletionConfirmation } from './branchDeletion';
+import { branchDeletionConfirmation, branchDeletionConfirmed } from './branchDeletion';
 
 // Lazy so mapbox-gl loads only when an admin opens the zone editor.
 const DeliveryZoneModal = React.lazy(() => import('./DeliveryZoneModal').then(m => ({ default: m.DeliveryZoneModal })));
@@ -35,7 +35,12 @@ export const BranchPoliciesPanel: React.FC = () => {
 
   const handleDeleteBranch = async (branch: Branch) => {
     if (isAccountant || deletingBranchId) return;
-    if (!window.confirm(branchDeletionConfirmation(branch, isRTL))) return;
+    // Type-to-confirm: the admin must type the branch name (either language) for
+    // this irreversible, cascade-removing delete. Cancelled/empty/mismatched
+    // input aborts. The friendly FK guard (orders/sessions) lives server-side in
+    // api.deleteBranch + AppContext.
+    const typed = window.prompt(branchDeletionConfirmation(branch, isRTL));
+    if (!branchDeletionConfirmed(branch, typed)) return;
 
     setDeletingBranchId(branch.id);
     try {
@@ -85,7 +90,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => { void handleDeleteBranch(branch); }}
-                            disabled={deletingBranchId !== null}
+                            disabled={deletingBranchId === branch.id}
                             aria-label={isRTL ? `حذف فرع ${branch.nameAr}` : `Delete branch ${branch.nameEn}`}
                             className="flex items-center gap-1 text-[9px] font-black uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >

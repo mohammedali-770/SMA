@@ -11,6 +11,10 @@
 import { supabase } from './supabase';
 import { BANNER_BUCKET, bannerStoragePath } from './banners';
 import { classifyWatchdogProbe, WatchdogCapability } from './orderIntegrityCapability';
+import {
+  BranchDependencyCounts, BranchHasDependenciesError,
+  branchHasBlockingDependencies, isBranchDependencyError,
+} from './branchDeletion';
 
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
@@ -649,7 +653,34 @@ export const admin = {
   updateCategory: (id: string, patch: Partial<DbCategory>) => wrapUpdate('categories', id, patch),
   deleteCategory: (id: string) => wrapDelete('categories', id),
   updateBranch: (id: string, patch: Partial<DbBranch>) => wrapUpdate('branches', id, patch),
-  deleteBranch: (id: string) => wrapDelete('branches', id),
+  /**
+   * Admin-only branch delete with a friendly dependent-data guard.
+   *
+   * The delete CASCADES the branch's delivery zone + product-availability rows,
+   * but `orders.branch_id` (ON DELETE RESTRICT) and `checkout_sessions.branch_id`
+   * (NO ACTION) HARD-BLOCK deleting any branch that owns order history — that FK,
+   * plus the admin-only RLS, is the real guarantee. This wrapper only adds UX:
+   *   1. Advisory pre-check: count orders + checkout sessions and, if any exist,
+   *      block locally with a typed {@link BranchHasDependenciesError} (carrying
+   *      the counts) instead of firing a delete the FK would reject anyway.
+   *   2. Hard backstop: if a delete still trips the FK (an order/session landed
+   *      between the count and the delete, or the pre-count was RLS-limited),
+   *      map the Postgres 23503 violation to the same typed error rather than
+   *      leaking the raw constraint string.
+   * Non-admins are still blocked server-side by RLS (their delete matches 0
+   * rows); this wrapper never weakens that.
+   */
+  async deleteBranch(id: string): Promise<void> {
+    const counts = await countBranchDependencies(id);
+    if (branchHasBlockingDependencies(counts)) {
+      throw new BranchHasDependenciesError(counts);
+    }
+    const { error } = await supabase.from('branches').delete().eq('id', id);
+    if (error) {
+      if (isBranchDependencyError(error)) throw new BranchHasDependenciesError();
+      throw new Error(error.message);
+    }
+  },
   async setAvailability(branchId: string, productId: string, isAvailable: boolean) {
     const { error } = await supabase.from('branch_product_availability')
       .upsert({ branch_id: branchId, product_id: productId, is_available: isAvailable });
@@ -696,6 +727,24 @@ async function wrapUpdate(table: string, id: string, patch: any) {
 }
 async function wrapDelete(table: string, id: string) {
   const { error } = await supabase.from(table).delete().eq('id', id); if (error) throw new Error(error.message);
+}
+
+/**
+ * Count the FK-protected dependents of a branch (orders + checkout sessions) that
+ * block its deletion. Admin/staff RLS lets an admin SELECT every such row, so
+ * this advisory count is accurate for the admin performing the delete. Cascade
+ * tables (delivery zones, product availability) are deliberately not counted —
+ * they are removed with the branch. `head: true` fetches counts only (no rows).
+ */
+async function countBranchDependencies(branchId: string): Promise<BranchDependencyCounts> {
+  const [ordersRes, sessionsRes] = await Promise.all([
+    supabase.from('orders').select('id', { count: 'exact', head: true }).eq('branch_id', branchId),
+    supabase.from('checkout_sessions').select('id', { count: 'exact', head: true }).eq('branch_id', branchId),
+  ]);
+  return {
+    orders: ordersRes.count ?? 0,
+    checkoutSessions: sessionsRes.count ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
