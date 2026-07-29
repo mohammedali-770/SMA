@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-07-29 (default-branch head `e36fff1`).
+> Last updated: 2026-07-29 (default-branch head `bff19ff`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -31,6 +31,10 @@ One repository contains three user-facing apps and the backend definition:
 
 ```
 apps/mobile/            Expo app (customer iOS/Android/web)
+  app.json              Static Expo config (single source of truth)
+  app.config.js         Dynamic layer: drops the Sentry config plugin when
+                        SENTRY_AUTH_TOKEN is absent (see docs/SENTRY_*)
+  eas.json              EAS build profiles (development / preview / production)
   src/app/              expo-router routes (incl. dev-sentry test screen)
   src/lib/observability/  Sentry: mobile (index.ts), web (index.web.ts),
                           shared framework-free sanitize/classify/config,
@@ -83,7 +87,7 @@ The default branch **is** production. Everything below is deployed and active:
   - web/admin (PR #83): `admin-web` + `expo-web` surface tags, sampling
     prod 0.05.
   Ingestion works everywhere; **stack traces are unsymbolicated** until the
-  source-map upload is enabled (§5).
+  `SENTRY_AUTH_TOKEN` secret exists (§5).
 - **Auth**: Supabase auth with WhatsApp OTP flow.
 - **Account deletion** flow (store-compliance requirement).
 - **Push notifications are DORMANT.** The `push`/`expo` integration row is
@@ -138,6 +142,9 @@ npm run lint                         # root tsc --noEmit (includes shared web co
 npm test                             # vitest (root + framework-free mobile)
 npm --prefix apps/mobile run typecheck
 npm run build                        # full production build (Vite + Expo web export)
+
+# 5) Expo config sanity (after touching app.json / app.config.js)
+npx --prefix apps/mobile expo config --type public --json > /dev/null
 ```
 
 Notes:
@@ -165,14 +172,13 @@ question that must be resolved before the worker is ever re-enabled:
 Open issues:
 
 - **Issue #81 (open)** — create the `SENTRY_AUTH_TOKEN` secret in EAS *and*
-  Vercel so release builds upload source maps. Production EAS builds no longer
-  **fail** without it — `SENTRY_DISABLE_AUTO_UPLOAD` is now set on the
-  production profile, matching development and preview — but production stack
-  traces stay **unsymbolicated** until the token exists.
-  **When you create the secret, delete `SENTRY_DISABLE_AUTO_UPLOAD` from the
-  `production` block of `apps/mobile/eas.json` in the same change**, or uploads
-  will silently never happen. The token is a real secret: never commit it,
-  never put it in `EXPO_PUBLIC_*`/`VITE_*`. See `docs/SENTRY_OBSERVABILITY.md`.
+  Vercel so release builds upload source maps. Builds succeed without it on
+  both surfaces; production stack traces are simply **unsymbolicated** until it
+  exists. **No code change is needed** — both gates are conditional
+  (`apps/mobile/app.config.js` for mobile, `vite.config.ts` for web) and start
+  uploading automatically once the token is present. The token is a real
+  secret: never commit it, never put it in `EXPO_PUBLIC_*`/`VITE_*`. See
+  `docs/SENTRY_OBSERVABILITY.md`.
 - **Issue #102 (open)** — set the Vercel **Production Branch** to
   `claude/project-build-ie4b56` and trigger a fresh Production redeploy. While it
   is unset, the default branch only deploys as a Preview and `/` and `/app/`
@@ -209,7 +215,7 @@ Documentation debt:
 | `docs/OPERATIONS_ALERTS_DIGEST.md` | Alerts/digest engine, activation state, runbook |
 | `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle + refund enrolment rules |
 | `docs/DISCOUNTS_CAMPAIGNS.md` | Campaigns schema, what is live, open business questions |
-| `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook + source-map upload state |
+| `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook + the source-map gate |
 | `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
 | `README.md` / `README_MOBILE.md` | General app documentation |
 
@@ -241,6 +247,7 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #114 | Production EAS builds no longer fail on the missing Sentry token | `bff19ff` |
 | #113 | Payment postponement + migration ledger reconciliation + doc corrections | `9f0ec87` |
 | #112 | Refund worker scheduler + stale-claim reaper; `caller_can_read_order` anon revoke | `e36fff1` |
 | #85 | Operations automation cron health | `06c9bb0` |
@@ -250,7 +257,6 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 | #78 | Internal activation of alerts/digest (live crons) | `ffa3ba3` |
 | #77 | Smart Operations Alerts + Daily Digest engine | `600b6d4` |
 | #75 | Operations Health Center | `91c11b7` |
-| #73 | Order Integrity Watchdog | `411c7c9` |
 
 `docs/MIGRATIONS.md` maps every repository migration file to its applied
 Production version.
@@ -259,8 +265,7 @@ Production version.
 
 - Root vitest: **764** tests recorded at the 2026-07-24 validation
   (`docs/MIGRATIONS.md` §18). The suite was **not** re-run for the 2026-07-29
-  documentation changes — run `npm test` for the current figure before relying
-  on it.
+  changes — run `npm test` for the current figure before relying on it.
 - TypeScript: root and mobile programs clean (`--noEmit`), root with real
   React 19 types (`@types/react@^19`, `@types/react-dom@^19`).
 - SQL suites: alerts/digest/activation/watchdog/health/order-confirmation/
