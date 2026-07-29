@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-07-29 (default-branch head `537d345`).
+> Last updated: 2026-07-29 (default-branch head `1a69416`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -249,6 +249,7 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #116 | Corrected the source-map gate verification commands | `1a69416` |
 | #115 | Conditional Sentry source-map gate on mobile (`app.config.js`) | `537d345` |
 | #114 | Production EAS builds no longer fail on the missing Sentry token | `bff19ff` |
 | #113 | Payment postponement + migration ledger reconciliation + doc corrections | `9f0ec87` |
@@ -258,7 +259,6 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 | #83 | Sentry error monitoring for web + admin (`admin-web`/`expo-web`) | `736a6a0` |
 | #80 | Sentry crash reporting for the mobile app | `22e5aca` |
 | #78 | Internal activation of alerts/digest (live crons) | `ffa3ba3` |
-| #77 | Smart Operations Alerts + Daily Digest engine | `600b6d4` |
 
 `docs/MIGRATIONS.md` maps every repository migration file to its applied
 Production version.
@@ -268,11 +268,20 @@ Production version.
 - Root vitest: **764** tests recorded at the 2026-07-24 validation
   (`docs/MIGRATIONS.md` §18). The suite was **not** re-run for the 2026-07-29
   changes — run `npm test` for the current figure before relying on it.
-- **`apps/mobile/app.config.js` (#115) has not been executed.** It was authored
-  and merged in a session where Bash was unavailable, so no build, test,
-  typecheck or config resolution was run against it. Verify with the two
-  commands in `docs/SENTRY_OBSERVABILITY.md` → "Verifying the source-map gate"
-  before relying on a production build.
+- **Sentry source-map gate (`apps/mobile/app.config.js`, #115) — VERIFIED
+  2026-07-29.** Both checks in `docs/SENTRY_OBSERVABILITY.md` →
+  "Verifying the source-map gate" pass: direct evaluation returns **4** plugins
+  without the token and **5** with it, and `expo config --type prebuild` reports
+  the Sentry plugin absent (**0**) then present (**1**). Config resolution
+  succeeds, so the file cannot break a build, and Expo genuinely honours the
+  gate rather than only the function returning the right value.
+  **Still unproven:** that omitting the plugin leaves *native crash capture*
+  intact — config resolution cannot establish that. The reasoning is that the
+  native SDK is autolinked from the `@sentry/react-native` dependency and
+  started by `Sentry.init()`, with Debug IDs from the `getSentryExpoConfig`
+  Metro wrapper, none of which route through the config plugin. The first
+  production EAS build is the definitive check: it should complete, and Sentry
+  should still receive events from that build.
 - TypeScript: root and mobile programs clean (`--noEmit`), root with real
   React 19 types (`@types/react@^19`, `@types/react-dom@^19`).
 - SQL suites: alerts/digest/activation/watchdog/health/order-confirmation/
