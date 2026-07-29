@@ -10,85 +10,86 @@
 
 ## 1. Purpose and production status
 
-- Repository migration files: **52** (51 applied; the newest,
-  `20260723140000_operations_automation_cron_health`, is the sole
-  **repository-only and UNAPPLIED** file — not yet applied to Production — see §17)
-- Live `schema_migrations` rows: **52**
-- Latest live version: **`20260722165557`**
-  (`activate_operations_alerts_digest_cron`; repository version `20260723120000`)
-- **Every repository migration is applied EXCEPT the newest.** The
-  operations-automation cron-health migration
-  `20260723140000_operations_automation_cron_health` is repository-only and
-  UNAPPLIED — no Production application is approved (§17). The three
-  operations-automation migrations that shipped before it were all applied to
-  Production on **2026-07-22** (owner-approved) via the `apply_migration`
-  workflow, each **class B** (same reviewed content, generated apply-time
-  version): the read-only **Operations Health Center**
-  `20260722100000_operations_health_center` (PR #75, squash-merged `91c11b7`) →
-  live **`20260722113923`** (§16); the **Smart Operations Alerts & Daily Digest**
-  engine `20260723090000_smart_operations_alerts_digest` → live
-  **`20260722143014`**; and its activation
-  `20260723120000_activate_operations_alerts_digest_cron` → live
-  **`20260722165557`** (the current latest live version). The Order Integrity
-  Watchdog migration `20260721170000_order_integrity_watchdog` (PR #73,
-  squash-merged `411c7c9`) was applied on **2026-07-22** → live
-  **`20260722053151`** (§15); its observe-only cron `order-integrity-watchdog`
-  (`*/2`) is active and healthy and the alert outbox stays **unsent** (no
-  dispatcher). The activation migration created the internal-automation crons
-  `operations-alerts-evaluator` (`*/5`) and `operations-digest-generator`
-  (hourly) with external dispatch still **disabled**. The relationship between
-  the **52 repository files** and the **52 live rows** remains a *history*
-  divergence, not a *schema* divergence — the full class-by-class mapping is in
-  §5; the sole repository-only/unapplied file is
-  `operations_automation_cron_health` (§17), and the pre-existing live-only
-  F-class history rows carry no repository file. The owner-approved 2026-07
-  applications (all class B — same content, generated apply-time versions):
-  - `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`**
-    (owner-approved; PR #69)
-  - `20260721130000_lazywait_synced_ref_guard` → live **`20260721084330`**
-    (owner-approved; PR #70; version recorded in the migration file header)
-  - `20260721150000_lazywait_sync_health_summary` → live **`20260721113811`**
-    (owner-approved; PR #71; observability-only — see §14)
-  - `20260721170000_order_integrity_watchdog` → live **`20260722053151`**
-    (owner-approved; PR #73; observe-only monitoring — see §15)
-  - `20260722100000_operations_health_center` → live **`20260722113923`**
-    (owner-approved; PR #75; read-only Operations Health Center — see §16)
-  - `20260723090000_smart_operations_alerts_digest` → live **`20260722143014`**
-    (owner-approved; Smart Operations Alerts & Daily Digest engine)
-  - `20260723120000_activate_operations_alerts_digest_cron` → live
-    **`20260722165557`** (owner-approved; activation of the alerts/digest crons)
-- The current production schema is **functionally aligned with the repository
-  through `20260714130000`** — every repository migration, including the
-  trigger-function grant hardening, is applied and verified — based on
-  catalog/object-state verification (tables, columns, functions and exact
-  signatures, SECURITY DEFINER/INVOKER state, pinned `search_path`, grants,
-  RLS policies, triggers, indexes, storage bucket and policies, realtime
-  publication membership). The grant hardening was **applied and verified on
-  2026-07-14** (§10): PUBLIC/anon/authenticated EXECUTE removed from the
-  three trigger-only functions, service_role EXECUTE retained, function and
-  trigger definitions unchanged.
-- **Historical version identifiers and several migration boundaries differ**
-  between the repository and production. This is a *history* divergence, not a
-  *schema* divergence. The full mapping is in §5.
-- **Post–Stage-4 applications.** Since the 2026-07-14 audit (§3, §10) further
-  migrations were applied to Production; the current authoritative totals are the
-  **52 repository / 52 live** stated at the top of this section, with the exact
-  class-by-class algebra in §4 and §5. The applications included:
-  - **Lazywait POS sync scheduler** — repository `20260720120000` → live
-    `20260720075244`; owner-approved and applied via `apply_migration` on
-    **2026-07-20**, verified (§13). Itemized in §5 (row 39) and §13.
-  - **Lazywait confirmation lifecycle** (`20260721120000` → live
-    `20260721082325`), **synced-ref guard**, **sync health summary**, **Order
-    Integrity Watchdog**, **Operations Health Center**, **Smart Operations Alerts
-    & Daily Digest**, and its **cron activation** — all owner-approved, applied
-    2026-07-20…22, each class **B**, itemized in §5 (rows 40–46) and §14–§16.
-  - **Five account-deletion migrations** — live versions `20260715120000`,
-    `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`
-    (repository files of the same names). Applied and live, but **not yet
-    itemized/classified in §4/§5** — a known documentation gap to be reconciled in
-    a **separate** documentation PR.
-  The sole merged-but-UNAPPLIED repository file is
-  `20260723140000_operations_automation_cron_health` (§17).
+**As of 2026-07-29, every repository migration is applied to Production.
+There are no unapplied migration files.**
+
+- Repository migration files (default branch `claude/project-build-ie4b56`,
+  head `e36fff1`): **61**
+- Live `schema_migrations` rows: **62**
+- Unapplied repository files: **0** (class E is now empty — see §4)
+- Latest live version: **`20260729112238`**
+  (`caller_can_read_order_anon_revoke`; repository version `20260729091000`)
+
+The 61 / 62 difference is the long-standing **history** divergence, not a
+*schema* divergence: three live-only F-class history rows carry no repository
+file, and two H-class repository files (`place_order`, `loyalty`) were
+superseded by later consolidated migrations. The full class-by-class algebra is
+in §4 and the row-by-row mapping in §5.
+
+### Ten migrations were applied on 2026-07-29
+
+Eight of them closed a **Production incident**: the deployed frontend was
+calling RPCs that did not exist in the database, because the repository had run
+eight migrations ahead of Production. The visible symptom was a single
+PostgREST `PGRST202` error
+(`Could not find the function public.admin_list_orders_with_items(p_limit) in
+the schema cache`), but the cause was the whole eight-migration gap. Full
+detail — including the per-wave verification and the data-drift evidence — is in
+**§20**.
+
+All ten are class **B** (same reviewed content; `apply_migration` stamps a
+generated apply-time version that differs from the repository filename):
+
+| Repository file | Live version | Applied |
+| --- | --- | --- |
+| `20260724130000_loyalty_reason_no_order_number` | `20260729073748` | Wave A |
+| `20260724190000_loyalty_reason_history_safe` | `20260729073815` | Wave A |
+| `20260728120000_discounts_campaigns` | `20260729073932` | Wave A |
+| `20260723140000_operations_automation_cron_health` | `20260729074316` | Wave A |
+| `20260724120000_order_confirmation_state_machine` | `20260729074810` | Wave B |
+| `20260724200000_order_read_contracts` | `20260729074932` | Wave B |
+| `20260724170000_require_address_description` | `20260729075631` | Wave B |
+| `20260724180000_tap_reference_order_opaque` | `20260729080617` | Wave B |
+| `20260729090000_payment_refund_scheduler` | `20260729112224` | Wave C |
+| `20260729091000_caller_can_read_order_anon_revoke` | `20260729112238` | Wave C |
+
+**The refund worker scheduled by `payment_refund_scheduler` is DISABLED.** The
+cron job `payment-refund-worker` (jobid 6, `*/5 * * * *`) was set
+`active = false` on 2026-07-29 when the owner postponed all payment work
+pending gateway selection. The job row, its schedule and every refund object
+were **retained, not dropped** — see **§21** and `docs/PAYMENT_POSTPONEMENT.md`.
+
+### Earlier applications (all owner-approved, all class B)
+
+The 2026-07-20…22 wave, itemized in §5 (rows 39–46) and detailed in §13–§16:
+
+- `20260720120000_lazywait_sync_scheduler` → live **`20260720075244`** (§13)
+- `20260721120000_lazywait_confirmation_lifecycle` → live **`20260721082325`** (PR #69)
+- `20260721130000_lazywait_synced_ref_guard` → live **`20260721084330`** (PR #70)
+- `20260721150000_lazywait_sync_health_summary` → live **`20260721113811`** (PR #71; §14)
+- `20260721170000_order_integrity_watchdog` → live **`20260722053151`** (PR #73; §15)
+- `20260722100000_operations_health_center` → live **`20260722113923`** (PR #75, squash `91c11b7`; §16)
+- `20260723090000_smart_operations_alerts_digest` → live **`20260722143014`**
+- `20260723120000_activate_operations_alerts_digest_cron` → live **`20260722165557`**
+
+The **five account-deletion migrations** (live `20260715120000`,
+`20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`;
+repository files of the same names) are applied and live but **not yet
+itemized/classified in §4/§5** — a known documentation gap, deliberately left
+for a separate documentation PR so this reconciliation stays reviewable. They
+are counted in the 61 / 62 totals above.
+
+### Schema alignment
+
+The production schema is **functionally aligned with the repository in full**:
+every repository migration is applied and verified, based on catalog/object-state
+verification (tables, columns, functions and exact signatures,
+SECURITY DEFINER/INVOKER state, pinned `search_path`, grants, RLS policies,
+triggers, indexes, storage bucket and policies, realtime publication
+membership). The 2026-07-14 trigger-function grant hardening is applied and
+verified (§10). **Historical version identifiers and several migration
+boundaries still differ** between the repository and production — a *history*
+divergence only; the full mapping is in §5.
 
 ## 2. Non-negotiable safety rules
 
@@ -153,10 +154,10 @@ fields byte-identical before/after, fingerprint-verified).
 | primary classification | count |
 |---|---|
 | A. `EXACT_MATCH` (version + name + content) | **3** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **38** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **48** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
 | H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
 
@@ -166,35 +167,27 @@ both "live-only" and "superseded-by-consolidation"); **each ledger entry below
 carries exactly one primary classification**, with overlaps explained in its
 notes.
 
-> **Scope of these counts.** The table above itemizes the **47 repository / 47
-> live** rows detailed in §5 (rows 1–47, through
-> `20260723140000_operations_automation_cron_health`). Its per-class algebra is
-> internally consistent: repository side 3 A + 38 B + 3 C + 2 H + 1 E = **47
-> files**; live side 3 A + 38 B + 3 C + 3 F = **47 rows** (E is repository-only,
-> F is live-only, and the 2 H repository files are superseded consolidations of
-> live-only history). The **five account-deletion migrations** now live in
-> Production (§1) are applied and live but **not yet itemized** here; adding them
-> to both sides brings the true totals to the **52 repository / 52 live**
-> authoritative production totals carried at the top of §1. The Lazywait sync
-> scheduler (§5 row 39) is class **B** (`SAME_CONTENT_DIFFERENT_VERSION`):
-> repository `20260720120000` vs. the apply-time live version `20260720075244`,
-> same reviewed content; `20260721120000_lazywait_confirmation_lifecycle` (§5 row
-> 40) is likewise **applied**, class B, live `20260721082325` — it is **not**
-> unapplied.
+> **Scope of these counts.** The table above itemizes the **56 repository / 57
+> live** rows detailed in §5 (rows 1–56, through
+> `20260729091000_caller_can_read_order_anon_revoke`). Its per-class algebra is
+> internally consistent: repository side 3 A + 48 B + 3 C + 2 H = **56 files**;
+> live side 3 A + 48 B + 3 C + 3 F = **57 rows** (F is live-only, and the 2 H
+> repository files are superseded consolidations of live-only history). The
+> **five account-deletion migrations** now live in Production (§1) are applied
+> and live but **not yet itemized** here; adding them to both sides brings the
+> true totals to the **61 repository / 62 live** authoritative production totals
+> carried at the top of §1.
 >
-> **Current class-E row.** The single `REPOSITORY_ONLY_UNAPPLIED` (E) row is now
-> the operations-automation cron-health migration
-> `20260723140000_operations_automation_cron_health` (§5 row 47) — **merged to the
-> default branch** (commit `06c9bb0`) but not yet applied to Production (§17), and
-> therefore contributing no live `schema_migrations` row. The read-only
-> **Operations Health Center** `20260722100000_operations_health_center` (PR #75)
-> is **no longer class E**: it was applied to Production on 2026-07-22 → live
-> `20260722113923` as **class B** (same reviewed content, generated apply-time
-> version), alongside the Smart Operations Alerts & Daily Digest engine
-> (`20260723090000_smart_operations_alerts_digest` → `20260722143014`) and its
-> activation (`20260723120000_activate_operations_alerts_digest_cron` →
-> `20260722165557`). §1 carries the current authoritative production totals
-> (52 repository / 52 live). See §5 and §16.
+> **Class E is now empty.** Every repository migration is applied. The
+> operations-automation cron-health migration
+> `20260723140000_operations_automation_cron_health` — the last remaining
+> class-E row, recorded as repository-only in every earlier revision of this
+> document — was applied to Production on **2026-07-29** → live
+> **`20260729074316`**, reclassifying it to **B** (§5 row 47, §17, §20).
+> Likewise the order confirmation state machine (§18) and the two
+> loyalty-reason migrations (§19) are applied, not pending. **Class B is the
+> normal steady state of this repository**, because `apply_migration` always
+> stamps a generated apply-time version (§12).
 
 Fingerprints: `skel` = MD5 (first 12 hex) of the SQL after removing `--`
 comments, all whitespace and semicolons, lowercased — computed with identical
@@ -233,7 +226,7 @@ production.
 | 19 | 20260708160000 | sec_coupon_usage_race | `c6a0d4a1ed84` | 20260709064101 | sec_coupon_usage_race | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 20 | 20260709120000 | sec_trigger_search_path | `c71a95910669` | 20260709064120 | sec_trigger_search_path | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 21 | 20260709130000 | import_lazywait_catalog | `101b0d01f74b` | 20260709072709 | import_lazywait_catalog | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
-| 22 | 20260709140000 | payment_methods | `ee630dfd7d28` | 20260709111046 | payment_methods | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
+| 22 | 20260709140000 | payment_methods | `ee630dfd7d28` | 20260709111046 | payment_methods | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical. **Payment area — frozen (§21)** |
 | 23 | 20260710120000 | delivery_zones | `eab12cc0f3c1` | 20260709115813 | delivery_zones | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 24 | 20260710120100 | place_order_delivery_zone | `e63a1bfcba14` | 20260709151718 | place_order_delivery_zone | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical; recreates `place_order` (current live definition) |
 | 25 | 20260710140000 | whatsapp_otp | `5b681f22d61f` | 20260709165615 | whatsapp_otp | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
@@ -242,35 +235,43 @@ production.
 | 28 | 20260710160000 | fix_whatsapp_login_review | `393db5b25757` | 20260709191229 | fix_whatsapp_login_review | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 29 | 20260710170000 | email_integration | `2994d9e5e98c` | 20260709203911 | email_integration | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
 | 30 | 20260710180000 | lazywait_sync_one | `cf7f3fc5e851` | 20260710082112 | lazywait_sync_one | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
-| 31 | 20260712120000 | tap_payments | `2f3d84f9b4b4` | 20260712070033 | tap_payments | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
+| 31 | 20260712120000 | tap_payments | `2f3d84f9b4b4` | 20260712070033 | tap_payments | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical. **Payment area — frozen (§21)** |
 | 32 | 20260712130000 | homepage_banners | `a4070f36bcfc` | 20260712121739 | homepage_banners | `16fe7e5659ff` | **C** | ✔ | POSSIBLE (draft-vs-commit variance) | none | high if `db push` | live row was applied from a marginally different draft (one policy/phrasing delta). Final live state verified: 5 table policies + 4 `banner-images` storage policies + public bucket + trigger |
 | 33 | 20260712140000 | legal_documents | `0930fee9750d` | 20260712123717 | legal_documents | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
-| 34 | 20260712160000 | checkout_sessions | `4295c6e9ca6d` | 20260712185657 | checkout_sessions | `d3e294e05a77` | **C** | ✔ | STRONGLY SUPPORTED | none | high if `db push` | repository file is a pre-commit **consolidation** of the live base apply plus the two live-only fix applies below (repository file contains the payment_status-cast fix markers). Checkout flow verified live incl. zero-total settlement |
+| 34 | 20260712160000 | checkout_sessions | `4295c6e9ca6d` | 20260712185657 | checkout_sessions | `d3e294e05a77` | **C** | ✔ | STRONGLY SUPPORTED | none | high if `db push` | repository file is a pre-commit **consolidation** of the live base apply plus the two live-only fix applies below (repository file contains the payment_status-cast fix markers). Checkout flow verified live incl. zero-total settlement. **Payment area — frozen (§21)** |
 | — | — | — | — | 20260712191643 | checkout_sessions_fix_payment_status_cast | `8639b171467f` | **F** | ✔ | STRONGLY SUPPORTED | none | n/a (live-only) | live-only fix; content folded into the repository's consolidated `checkout_sessions.sql` (also semantically SUPERSEDED-by-consolidation) |
 | — | — | — | — | 20260712192526 | checkout_sessions_zero_total | `a62f0bfd577e` | **F** | ✔ | STRONGLY SUPPORTED | none | n/a (live-only) | live-only fix; content folded into the repository's consolidated `checkout_sessions.sql` (also semantically SUPERSEDED-by-consolidation) |
-| 35 | 20260712170000 | checkout_sessions_hardening | `9f1d8844c9a7` | 20260713044036 | checkout_sessions_hardening | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical |
+| 35 | 20260712170000 | checkout_sessions_hardening | `9f1d8844c9a7` | 20260713044036 | checkout_sessions_hardening | = | B | ✔ | CONFIRMED | none | high if `db push` | content-identical. **Payment area — frozen (§21)** |
 | 36 | 20260714070000 | support_contact | `f02603422918` | 20260714070000 | support_contact | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned to the repository filename by an approved single-row history write |
 | 37 | 20260714090000 | push_notifications | `d686d8f6e428` | 20260714090000 | push_notifications | = | **A** | ✔ | CONFIRMED | none | none (aligned) | applied 2026-07-14 via MCP `apply_migration`; version aligned as above |
 | 38 | 20260714130000 | trigger_function_execute_hardening | `dbd86ce8831e` | 20260714130000 | trigger_function_execute_hardening | = | **A** | ✔ verified live | CONFIRMED | none | none (aligned) | applied via `apply_migration` on 2026-07-14; originally recorded under generated version `20260714153905`, then separately aligned to `20260714130000` by an approved exact-one-row version update. Removed PUBLIC/anon/authenticated EXECUTE from the three trigger-only functions; the pre-existing explicit `service_role=X` ACL entry remained — it originates from Supabase's platform **default function privileges** applied at creation (CONFIRMED in `pg_default_acl`: postgres-owned functions default-grant EXECUTE to anon/authenticated/service_role), NOT from any live-only grant, so it is not production drift and reproduces identically in any environment built from these repository migrations; function bodies and trigger definitions unchanged |
 | 39 | 20260720120000 | lazywait_sync_scheduler | `26b85de4256e` | 20260720075244 | lazywait_sync_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Lazywait POS sync pg_cron driver + durable run ledger.** Owner-approved; applied **2026-07-20** via MCP `apply_migration` (exact merged content from PR #67, squash `c6579e6…`); generated apply-time live version `20260720075244` — **not** version-aligned (repository filename version `20260720120000` differs; no §9-D write performed). Verified live objects: `public.lazywait_sync_requests`, `public.lazywait_sync_cron_health`, `public.invoke_lazywait_sync_processor()`, cron job `lazywait-sync` (jobid 2, `* * * * *`, active). No payment/order-intake/worker/payload/delivery/POS change. Full detail in §13 |
-
 | 40 | 20260721120000 | lazywait_confirmation_lifecycle | — | 20260721082325 | lazywait_confirmation_lifecycle | = | B | ✔ verified live (`list_migrations` + live lifecycle objects in service) | CONFIRMED | none | high if `db push` | **Customer-visible POS confirmation lifecycle** (PR #69). Owner-approved; applied 2026-07-21 via MCP `apply_migration`; generated live version differs from the repository filename (class B, no §9-D alignment). No payment/cron/Vault change |
 | 41 | 20260721130000 | lazywait_synced_ref_guard | — | 20260721084330 | lazywait_synced_ref_guard | = | B | ✔ verified live (`list_migrations`; version recorded in the migration file header) | CONFIRMED | none | high if `db push` | **Producer-side synced/usable-ref invariant guard** (PR #70). Owner-approved; applied 2026-07-21; redefines `record_lazywait_sync` only. No payment/cron/Vault change |
 | 42 | 20260721150000 | lazywait_sync_health_summary | `0f4de301255c` | 20260721113811 | lazywait_sync_health_summary | = | B | ✔ verified live (function properties, grants, live output) | CONFIRMED | none | high if `db push` | **Service-role-only aggregate health summary for the lazywait-sync scheduler** (PR #71, squash `4c3d0bd…`). Owner-approved; applied **2026-07-21** via MCP `apply_migration` with the exact merged file content; observability-only (one new SECURITY DEFINER function; read-only over the ledger, `cron.job`, orders sync state). Full detail in §14 |
 | 43 | 20260721170000 | order_integrity_watchdog | — | 20260722053151 | order_integrity_watchdog | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Observe-only order-integrity watchdog** (PR #73, squash `411c7c9`). Owner-approved; applied **2026-07-22** via MCP `apply_migration` with the exact merged content; generated live version differs from the repository filename (class B, no §9-D alignment). Observe-only cron `order-integrity-watchdog` (`*/2`) active; alert outbox populated but unsent. Full detail in §15 |
 | 44 | 20260722100000 | operations_health_center | — | 20260722113923 | operations_health_center | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Read-only Operations Health Center** (PR #75, squash `91c11b7`; applied content SHA-256 `c86412dd…`, 33 198 bytes). Owner-approved; applied **2026-07-22** via MCP `apply_migration` with the exact merged content; generated live version differs from the repository filename (class B). Two read-only functions only — the `operations_health_summary()` RPC is staff-gated (`is_staff()`), the `operations_health_overall_state()` helper is `service_role`-only; no tables/cron/triggers. Full detail in §16 |
 | 45 | 20260723090000 | smart_operations_alerts_digest | — | 20260722143014 | smart_operations_alerts_digest | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Smart Operations Alerts & Daily Digest engine.** Owner-approved; applied **2026-07-22** via MCP `apply_migration`; class B (generated live version differs from the repository filename). External dispatch remains disabled |
-| 46 | 20260723120000 | activate_operations_alerts_digest_cron | — | 20260722165557 | activate_operations_alerts_digest_cron | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Activation of the alerts/digest crons** — the current latest live version. Owner-approved; applied **2026-07-22** via MCP `apply_migration`; class B. Created internal crons `operations-alerts-evaluator` (`*/5`) and `operations-digest-generator` (hourly); external dispatch disabled |
-| 47 | 20260723140000 | operations_automation_cron_health | — | — | — | — | **E** | — | CONFIRMED | apply pending | high if `db push` | **REPOSITORY-ONLY, UNAPPLIED.** Per-cadence staleness for the two internal-automation crons on the ops-health scheduled-jobs card. Reviewed and merged to the default branch; not yet applied to Production; no owner apply approval yet. Full detail in §17 |
+| 46 | 20260723120000 | activate_operations_alerts_digest_cron | — | 20260722165557 | activate_operations_alerts_digest_cron | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Activation of the alerts/digest crons.** Owner-approved; applied **2026-07-22** via MCP `apply_migration`; class B. Created internal crons `operations-alerts-evaluator` (`*/5`) and `operations-digest-generator` (hourly); external dispatch disabled |
+| 47 | 20260723140000 | operations_automation_cron_health | — | 20260729074316 | operations_automation_cron_health | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-cadence staleness for the two internal-automation crons** on the ops-health scheduled-jobs card (merged `06c9bb0`, PR #85). **Reclassified E → B**: owner-approved and applied **2026-07-29** (Wave A, §20). Two `create or replace function` statements only; no tables/cron/triggers/grants. Full detail in §17 |
+| 48 | 20260724130000 | loyalty_reason_no_order_number | — | 20260729073748 | loyalty_reason_no_order_number | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Stops the internal `SM-…` order number reaching the customer-readable `loyalty_transactions.reason`** (Issue #94). Applied 2026-07-29 (Wave A, §20). Adds a predicate, a safe-reason function, a normalizing trigger and a NOT VALID CHECK; `place_order` untouched. Full detail in §19 |
+| 49 | 20260724190000 | loyalty_reason_history_safe | — | 20260729073815 | loyalty_reason_history_safe | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Companion to row 48 — makes the historical loyalty reasons safe on read without rewriting them. Applied 2026-07-29 (Wave A, §20) |
+| 50 | 20260728120000 | discounts_campaigns | — | 20260729073932 | discounts_campaigns | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Discounts & campaigns schema.** Applied 2026-07-29 (Wave A, §20). See `docs/DISCOUNTS_CAMPAIGNS.md` for the open business questions that still gate wiring it into `place_order` |
+| 51 | 20260724120000 | order_confirmation_state_machine | — | 20260729074810 | order_confirmation_state_machine | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Customer-visible order confirmation state machine + refund enrolment** (Issue #94). Applied 2026-07-29 (Wave B, §20). Creates `order_refunds`, the `orders.refund_state` lifecycle columns, the transition-guard trigger, and the token-fenced `claim_order_refund`/`finalize_order_refund` worker RPCs. **Refund processing is NOT running** — the worker cron is disabled (§21). Full detail in §18 |
+| 52 | 20260724200000 | order_read_contracts | — | 20260729074932 | order_read_contracts | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Order read contracts** — the admin/staff order-read RPCs the deployed frontend requires, including `admin_list_orders_with_items`. Applied 2026-07-29 (Wave B, §20); this is the migration whose absence produced the `PGRST202` incident symptom |
+| 53 | 20260724170000 | require_address_description | — | 20260729075631 | require_address_description | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Requires a delivery-address description. Applied 2026-07-29 (Wave B, §20) |
+| 54 | 20260724180000 | tap_reference_order_opaque | — | 20260729080617 | tap_reference_order_opaque | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Makes the provider-facing order reference opaque. Applied 2026-07-29 (Wave B, §20). **Payment area — frozen (§21)** |
+| 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
+| 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). **Current latest live version** |
 
-Reconciliation check: the rows above detail **47 repository** rows
-(3×A + 38×B + 3×C + 2×H + 1×E) and **47 live** rows (3×A + 38×B + 3×C + 3×F).
+Reconciliation check: the rows above detail **56 repository** rows
+(3×A + 48×B + 3×C + 2×H) and **57 live** rows (3×A + 48×B + 3×C + 3×F).
 Adding the five applied-but-not-yet-itemized account-deletion migrations
 (§1, §4 note) — present on both sides — yields the current production totals of
-**52 repository / 52 live** recorded in §1 (47 + 5 repository; 47 + 5 live). The
-sole repository-only/UNAPPLIED file is `operations_automation_cron_health`
-(row 47, class E, §17); the pre-existing live-only F-class history rows carry no
-repository file. This is a history divergence, not new drift.
+**61 repository / 62 live** recorded in §1 (56 + 5 repository; 57 + 5 live).
+**There is no repository-only/UNAPPLIED file**; the pre-existing live-only
+F-class history rows carry no repository file. This is a history divergence,
+not new drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -280,22 +281,24 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**44 repository files** (52 − 8) unapplied and attempt to replay them against
-production. Eight shared versions do **not** make `db push` any safer — the
-permanent production prohibition stands, because **44 repository versions still
-do not match live history** (including the sole repository-only unapplied file
-`20260723140000_operations_automation_cron_health`), content boundaries differ for
-consolidated/split migrations, and replaying historical migrations against a live
-database remains unsafe regardless. Risks:
+**53 repository files** (61 − 8) unapplied and attempt to replay them against
+production — even though **every one of them is in fact already applied**.
+Eight shared versions do **not** make `db push` any safer; the permanent
+production prohibition stands, because 53 repository versions still do not
+match live history, content boundaries differ for consolidated/split
+migrations, and replaying historical migrations against a live database remains
+unsafe regardless. Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
 - **DO-block re-execution** (assertion/normalization blocks);
 - **partial failure** mid-batch, leaving a half-applied, half-recorded state;
-- **duplicate or misleading history rows** (44 junk records even on success);
+- **duplicate or misleading history rows** (53 junk records even on success);
 - **incorrect skip/replay behavior around consolidated migrations** — the
   repository's `checkout_sessions.sql` and the loyalty-era files do not map
-  1:1 onto live rows, so no version-based comparison can treat them correctly.
+  1:1 onto live rows, so no version-based comparison can treat them correctly;
+- **re-running the refund scheduler migration would re-create and re-activate
+  the `payment-refund-worker` cron**, defeating the deliberate disable in §21.
 
 ## 7. Why `migration repair` is not recommended
 
@@ -364,6 +367,9 @@ database remains unsafe regardless. Risks:
 4. Run the relevant Security/Performance Advisors.
 5. Run application smoke tests.
 6. Update this ledger (§5) and document the final state.
+7. **Verify writes in a separate statement.** A data-modifying CTE is not
+   visible to sibling SELECTs in the same statement; reading back in the same
+   statement can report a successful write as absent (§20).
 
 ## 10. Completed migration: trigger-function EXECUTE hardening (Stage 4)
 
@@ -405,6 +411,10 @@ database remains unsafe regardless. Risks:
   (advisors + application test suite) before use.
 - Production and new-environment migration histories **may legitimately
   differ**; each environment gets its own ledger section if tracked here.
+- A new environment built this way **will** schedule `payment-refund-worker`
+  as active, because the scheduler migration schedules it. While the payment
+  postponement (§21) stands, disable that job immediately after building the
+  environment.
 
 ## 12. Historical audit reference
 
@@ -420,13 +430,21 @@ database remains unsafe regardless. Risks:
   **`20260714130000`**.
 - **Ledger update (2026-07-20):** the Lazywait POS sync scheduler
   (repository `20260720120000` → live `20260720075244`) was owner-approved,
-  applied via MCP `apply_migration`, and verified — see §13. Current documented
-  live migration count: **45**; current documented latest live version:
+  applied via MCP `apply_migration`, and verified — see §13. Documented live
+  migration count at that point: **45**; latest live version:
   **`20260720075244`**. Repository base (default branch) for the live
-  operation: **`c6579e6414106abb6940ea4a19e789fec9754c04`**. The five
-  account-deletion migrations applied after Stage 4 remain to be itemized in
-  §4/§5 (documentation gap; see §1).
-- This ledger records the state as of the **2026-07-20** update. It **must be
+  operation: **`c6579e6414106abb6940ea4a19e789fec9754c04`**.
+- **Ledger update (2026-07-29):** ten migrations applied in three waves
+  (§20) — eight of them closing a Production incident caused by the database
+  running eight migrations behind the deployed frontend. Live migration count
+  after the wave: **62**; latest live version: **`20260729112238`**; repository
+  files on the default branch: **61**; unapplied files: **0**. Default-branch
+  head for the final wave: **`e36fff1`** (PR #112 squash). This revision of the
+  document also corrects §1, §4, §5, §6, §17, §18 and §19, which had continued
+  to describe migrations as pending or repository-only after they were applied.
+  The five account-deletion migrations remain to be itemized in §4/§5
+  (documentation gap; see §1).
+- This ledger records the state as of the **2026-07-29** update. It **must be
   updated after every approved live migration application** (new §5 row +
   fingerprints recorded), and re-validated if any tooling other than the §9
   workflow ever touches `schema_migrations`.
@@ -434,11 +452,12 @@ database remains unsafe regardless. Risks:
   (`SAME_CONTENT_DIFFERENT_VERSION`) is the normal, expected result immediately
   after `apply_migration`, because the tool stamps a **generated apply-time
   version** that differs from the repository filename version — this is exactly
-  what happened for the Lazywait scheduler (repo `20260720120000` → live
-  `20260720075244`, §5 row 39 / §13). **Class A** (`EXACT_MATCH`) applies **only**
-  when the live version already exactly equals the repository version, or after a
-  **separate, explicitly owner-approved §9-D version-alignment** write changes the
-  live version to match. Applying a migration **never** requires, implies, or
+  what happened for all ten 2026-07-29 applications and for the Lazywait
+  scheduler before them (repo `20260720120000` → live `20260720075244`, §5 row
+  39 / §13). **Class A** (`EXACT_MATCH`) applies **only** when the live version
+  already exactly equals the repository version, or after a **separate,
+  explicitly owner-approved §9-D version-alignment** write changes the live
+  version to match. Applying a migration **never** requires, implies, or
   pressures maintainers to perform a version-alignment write; version alignment
   is optional, separate, and needs its own explicit owner approval. **No
   version-alignment action is authorized by this documentation PR.**
@@ -459,7 +478,7 @@ database remains unsafe regardless. Risks:
 - **Owner approval:** explicit owner approval for this activation was given in
   the working conversation (create the Vault URL entry + apply the migration),
   per §2 rule 8. Merge approval (PR #67) and apply approval were separate.
-- **Live migration count after completion:** **45** (see §1).
+- **Live migration count after completion:** **45**.
 - **Verified objects (post-apply, read-only):**
   - `public.lazywait_sync_requests` — durable per-tick run ledger; RLS enabled;
     all client grants revoked; service-role-only; no secret/customer/order-data
@@ -739,35 +758,27 @@ schedule, or acknowledge/suppress/resolve an incident. There is **no external
 provider availability probe** in v1, so optional integrations (payment, push, email,
 OTP) are reported from database/configuration evidence only and are never marked
 `healthy` from `enabled/configured` alone — their normal state is `not_monitored`.
-The scheduled-jobs card observes exactly three allowlisted application jobs. This
-migration is already applied (2026-07-22, above); only an external provider
-availability probe remains a separate future deliverable requiring its own explicit
-owner approval.
+The scheduled-jobs card observed exactly three allowlisted application jobs in v1;
+the two internal automation crons were added by the cron-health migration (§17),
+applied 2026-07-29. Only an external provider availability probe remains a separate
+future deliverable requiring its own explicit owner approval.
 
-## 17. Merged migration: Operations automation cron health (merged to default, UNAPPLIED to Production)
+## 17. Applied migration: Operations automation cron health (applied 2026-07-29, class B)
 
-**Read-only observability. MERGED to the default branch, NOT applied to
-Production.** Records the migration merged via the Issue #79 follow-up (commit
-`06c9bb0`, PR #85); it is present in the repository but has **no** live
-`schema_migrations` row. No Production application is approved — merge approval is
-not apply approval (§2 rule 8).
+**Read-only observability. MERGED and APPLIED to Production on 2026-07-29
+(class B).** This entry was recorded as *merged but UNAPPLIED* from 2026-07-23
+until 2026-07-29; it is now applied and has live `schema_migrations` row
+`20260729074316`.
 
 - **Repository file:** `supabase/migrations/20260723140000_operations_automation_cron_health.sql`
-- **PR:** Issue #79 follow-up — **merged** to `claude/project-build-ie4b56` (commit
-  `06c9bb0`, PR #85); awaiting a separate owner-approved Production apply.
-- **Live version:** none (UNAPPLIED). On a future owner-approved application this
-  will be class **B** (same content; apply-time generated version differs from the
-  repository filename version `20260723140000`), applied **only** via MCP
-  `apply_migration` with the exact merged file content — never `db push` or
-  `migration repair`.
-
-**Ledger note.** The Operations Health Center (§16), the Smart Operations Alerts &
-Daily Digest engine, and its activation migration are all merged and live in
-Production; that reconciliation (**Issue #76**) is now **complete** — they are
-itemized in §5 (rows 44–46, class B) and reflected in §1, §4 and §16. This §17
-entry records the one operations-automation migration that remains repository-only
-and UNAPPLIED: `20260723140000_operations_automation_cron_health` (§5 row 47,
-class E).
+- **PR:** Issue #79 follow-up — merged to `claude/project-build-ie4b56` (commit
+  `06c9bb0`, PR #85).
+- **Live version:** **`20260729074316`** (name
+  `operations_automation_cron_health`) — class **B** (same reviewed content; the
+  apply-time generated version differs from the repository filename version
+  `20260723140000`). Applied via MCP `apply_migration` with the exact merged file
+  content in **Wave A** of the 2026-07-29 remediation (§20) — never `db push` or
+  `migration repair`. No §9-D version-alignment write was performed.
 
 **Purpose.** Extends the Operations Health scheduled-jobs card to also monitor the
 two INTERNAL automation crons delivered by the alerts/digest engine —
@@ -789,11 +800,16 @@ grants unchanged):
   follows the job's `critical` flag (the three critical crons stay critical; the
   two automation crons become warning). No other derivation changes.
 
-**Dependencies (must exist at apply time).** The alerts/digest engine migration
+**Dependencies (present at apply time).** The alerts/digest engine migration
 (`operations_health_snapshot_internal`, `operations_alerts_derive`,
 `operations_alerts_safe_bool`, `operations_alerts_sanitize_evidence`) and the
-activation migration that schedules the two automation crons — all present in
-Production today.
+activation migration that schedules the two automation crons.
+
+**Note on the job allowlist.** The card monitors a 5-job allowlist. The
+`payment-refund-worker` cron created later that day (§5 row 55) is **not** in that
+allowlist, so disabling it (§21) does not register as a health regression — which
+is correct, but means the Operations Health card is **not** the place to confirm
+the refund worker's state. Query `cron.job` directly.
 
 **Validation performed (repository / throwaway PG16 harness, not Production).**
 `supabase/tests/operations_automation_cron_health_test.sql` (allowlist shape,
@@ -803,17 +819,17 @@ projection) plus the updated `operations_health_center_test.sql` (5-job shape) a
 `operations_alerts_digest_test.sql` (automation crons pinned healthy) suites.
 Frontend gates: `tsc --noEmit`, vitest, `vite build`, mobile web build, mobile `tsc`.
 
-**Rollback.** The feature is isolated and read-only. Before any application,
-rollback is closing/reverting the PR. After a hypothetical application, re-apply the
-prior definitions of the two functions from
-`20260723090000_smart_operations_alerts_digest.sql` in a separate owner-approved
-follow-up migration (never an edit of an applied file).
+**Rollback.** The feature is isolated and read-only. Re-apply the prior definitions
+of the two functions from `20260723090000_smart_operations_alerts_digest.sql` in a
+separate owner-approved follow-up migration (never an edit of an applied file).
 
 ---
 
-## 18. Pending migration: Order confirmation state machine + automatic refunds (repository-only, UNAPPLIED)
+## 18. Applied migration: Order confirmation state machine + refund enrolment (applied 2026-07-29, class B)
 
-**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+**Status: APPLIED to Production on 2026-07-29** (Wave B, §20) → live
+`schema_migrations` row **`20260729074810`**, class **B**. This entry was
+recorded as *repository-only / UNAPPLIED* from 2026-07-24 until 2026-07-29.
 
 - Repository migration: `20260724120000_order_confirmation_state_machine.sql`
 - Issue: **#94** (customer-visible "Order placed" + "Not confirmed" contradiction;
@@ -822,8 +838,13 @@ follow-up migration (never an edit of an applied file).
   payment-verification / webhook / checkout-session / Lazywait-submission /
   retry / order-state / idempotency / automatic-refund areas for this issue,
   granted in-conversation on 2026-07-24, notwithstanding the CLAUDE.md §6 freeze.
-  The approval covers **repository work only** — it did not authorize a
-  Production apply, a function deployment, or any live payment operation.
+  The Production apply on 2026-07-29 was separately approved as part of the
+  incident remediation (§20).
+
+> **Superseded by the payment postponement.** As of 2026-07-29 the owner has
+> postponed all payment/refund work pending gateway selection (§21). The objects
+> below remain live and intact, but **no automated refund processing runs** — the
+> `payment-refund-worker` cron is `active = false`, and zero orders are enrolled.
 
 ### What it adds (all additive; no applied migration is edited)
 
@@ -873,9 +894,9 @@ publishes the delivery API and `set_lazywait_initial_sync` begins enqueuing
 delivery to `pending` like pickup, delivery becomes gate-active automatically with
 no change to this migration.
 
-### Validation performed (repository only — NOT Production)
+### Pre-apply validation (repository harness, 2026-07-24)
 
-**Executed 2026-07-24 against a disposable local PostgreSQL 16.9 + PostGIS 3.6.2
+**Executed against a disposable local PostgreSQL 16.9 + PostGIS 3.6.2
 cluster (127.0.0.1:5433, loopback-only, destroyed afterwards).** `pg_cron` and
 `pg_net` were installed as inert SHIMS: schedules are recorded but never run, and
 `net.http_post`/`http_get` perform no network I/O — so no payment, Lazywait,
@@ -902,55 +923,45 @@ Pre-existing rows derive correct customer states after the migration
 paid, dead-lettered, proven-not-sent historical order is offered its three manual
 resends rather than being refunded on sight.
 
-### The refund worker is NOT scheduled
+### Post-apply state (2026-07-29)
 
-- **No cron job is scheduled by this migration.** It creates no `cron.schedule`
-  entry, and `supabase/functions/payment-refund` is not wired to any scheduler.
-- **It was not invoked during validation.** `pg_cron`/`pg_net` were inert shims;
-  no scheduled command ran and no outbound HTTP was possible.
-- **Merging this PR, or applying the migration alone, cannot start refund
-  processing.** Enrollment only marks `orders.refund_state = 'pending'` and opens
-  an `order_refunds` ledger row; nothing drains that queue until the worker is
-  deliberately run.
-- **Scheduling it is a SEPARATE production action requiring explicit owner
-  approval**, alongside deploying `payment-refund` and configuring its required
-  `refund_trigger_secret`. Without that secret the function returns `503` and
-  processes nothing.
+Confirmed after the Wave B application and again after the payment postponement:
+**0** orders enrolled for refund (every `refund_state` is `none`), **0** rows in
+`order_refunds`, **0** paid orders, 23 orders total. The migration enrolled no
+historical order, exactly as the harness predicted.
 
-**APPLY INSIDE A TRANSACTION.** The migration file is not self-wrapped in
-`begin/commit`. Applied transactionally (as the `apply_migration` workflow does),
-a mid-way failure rolls back completely. Applied statement-by-statement in
-autocommit, a mid-way failure leaves partial objects; recovery is simply to
-re-run the corrected file, which is idempotent and converges.
+### The refund worker is NOT running
 
-```bash
-psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
-  -f supabase/tests/order_confirmation_state_machine_test.sql
-```
+- The migration itself **creates no cron job**. Scheduling arrived separately in
+  `20260729090000_payment_refund_scheduler` (§5 row 55).
+- That scheduler's cron `payment-refund-worker` is **`active = false`** (§21).
+- Enrollment alone only marks `orders.refund_state = 'pending'` and opens an
+  `order_refunds` ledger row; nothing drains that queue while the worker is
+  disabled.
+- `payment-refund` additionally returns `503` without its trigger secret — a
+  second, independent stop.
+- **Re-enabling refund processing requires explicit owner approval** and is
+  blocked by the payment postponement (§21).
 
 ### Rollback
 
-The feature is additive and isolated. Before any application, rollback is closing
-or reverting the PR. After a hypothetical application, drop the new triggers,
-functions and `order_refunds` table in a separate owner-approved follow-up
-migration (never an edit of an applied file); the added `orders` columns are
-nullable/defaulted and may be left in place.
-
-### Ledger reconciliation
-
-The §1 production-status counts in this document are **stale** and are owned by
-issue **#76**; this section deliberately does not restate or amend them. It records
-only the facts about this new repository-only migration.
+The feature is additive and isolated. Rollback is a separate owner-approved
+follow-up migration dropping the new triggers, functions and `order_refunds`
+table (never an edit of an applied file); the added `orders` columns are
+nullable/defaulted and may be left in place. Disable the `payment-refund-worker`
+cron first if it has been re-enabled.
 
 ---
 
-## 19. Pending migration: loyalty reason without the internal order number (repository-only, UNAPPLIED)
+## 19. Applied migrations: loyalty reason without the internal order number (applied 2026-07-29, class B)
 
-**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+**Status: APPLIED to Production on 2026-07-29** (Wave A, §20). This entry was
+recorded as *repository-only / UNAPPLIED* from 2026-07-24 until 2026-07-29.
 
-- Repository migration: `20260724130000_loyalty_reason_no_order_number.sql`
+- `20260724130000_loyalty_reason_no_order_number.sql` → live **`20260729073748`**
+- `20260724190000_loyalty_reason_history_safe.sql` → live **`20260729073815`**
 - Issue: **#94** (internal `SM-…` identifier must not reach a customer surface)
-- Companion to §18; both are unapplied and both must be applied inside a transaction.
+- Companion to §18.
 
 ### What it closes
 
@@ -978,13 +989,14 @@ is touched. Loyalty amounts, balances and `order_id` linkage are unchanged.
 
 ### Historical rows
 
-**Deliberately not rewritten.** Verified on the production stand-in: after
-applying both migrations, a pre-existing row containing `SM-…` is still present
-and unmodified. Remediation is a separate, explicitly owner-approved Production
-data action — the exact statements are in
+**Deliberately not rewritten.** Verified on the production stand-in and again
+after the live apply: a pre-existing row containing `SM-…` is still present and
+unmodified. The companion migration `loyalty_reason_history_safe` makes the
+history safe on read without rewriting it. Any further remediation is a separate,
+explicitly owner-approved Production data action — the exact statements are in
 `docs/ORDER_CONFIRMATION_FLOW.md` §10a.
 
-### Validation performed (repository only — NOT Production)
+### Pre-apply validation (repository harness, 2026-07-24)
 
 Same disposable PostgreSQL 16.9 + PostGIS 3.6.2 harness as §18 (pg_cron/pg_net
 inert shims; no scheduled job ran; no outbound HTTP possible).
@@ -1002,8 +1014,154 @@ inert shims; no scheduled job ran; no outbound HTTP possible).
 | Mid-migration failure in autocommit | partial, then converges on re-run |
 | SECURITY DEFINER / `search_path` contract | `place_order` + `insert_order_from_snapshot` unchanged |
 
+### Post-apply verification (2026-07-29)
+
+The loyalty fingerprint over `loyalty_transactions` was **byte-identical before
+and after** the Wave A application (`9877ab3b…`) — the migrations changed no
+historical loyalty row, exactly as designed.
+
 ### Rollback
 
-Additive and isolated. Before application, rollback is closing/reverting the PR.
-After a hypothetical application: drop the trigger, the constraint and the three
-functions in a separate owner-approved follow-up migration.
+Additive and isolated. A separate owner-approved follow-up migration drops the
+trigger, the constraint and the three functions (never an edit of an applied
+file).
+
+---
+
+## 20. The 2026-07-29 application wave (incident remediation + follow-ups)
+
+**Ten migrations applied, in three waves, all owner-approved, all class B.**
+
+### The incident
+
+The Admin Dashboard failed with a PostgREST `PGRST202`:
+
+```
+Could not find the function public.admin_list_orders_with_items(p_limit)
+in the schema cache
+```
+
+The missing RPC was only the visible symptom. The real cause: **the deployed
+frontend was running eight migrations ahead of the Production database.** Eight
+merged, reviewed migrations had never been applied, so the frontend was calling
+RPCs, columns and contracts that did not exist live. Repairing the one named RPC
+would have left the other seven gaps in place.
+
+This is exactly the failure mode §2 rule 5 warns about — *never assume a
+migration is unapplied (or applied) based only on filename/version*. It is also
+why §1 of this document now leads with the applied/unapplied count rather than
+burying it.
+
+### Wave A — independent, non-blocking migrations
+
+Applied first because nothing else depended on them:
+
+| Repository file | Live version |
+| --- | --- |
+| `20260724130000_loyalty_reason_no_order_number` | `20260729073748` |
+| `20260724190000_loyalty_reason_history_safe` | `20260729073815` |
+| `20260728120000_discounts_campaigns` | `20260729073932` |
+| `20260723140000_operations_automation_cron_health` | `20260729074316` |
+
+### Wave B — the order-contract chain
+
+Applied in dependency order. `order_read_contracts` is the migration that
+supplies `admin_list_orders_with_items` and the rest of the admin/staff
+order-read surface:
+
+| Repository file | Live version |
+| --- | --- |
+| `20260724120000_order_confirmation_state_machine` | `20260729074810` |
+| `20260724200000_order_read_contracts` | `20260729074932` |
+| `20260724170000_require_address_description` | `20260729075631` |
+| `20260724180000_tap_reference_order_opaque` | `20260729080617` |
+
+**Mobile-ordering outage window.** `order_read_contracts` changes the order-read
+contract that the deployed `order-intake` Edge Function relies on. The
+replacement `order-intake` payload was staged **before** the migration was
+applied and the function was redeployed (v4) **immediately after**, closing the
+window rather than leaving customer ordering broken between the two steps.
+
+### Wave C — refund scheduler + grant hardening
+
+Merged as PR #112 (squash `e36fff1`) and applied the same day:
+
+| Repository file | Live version |
+| --- | --- |
+| `20260729090000_payment_refund_scheduler` | `20260729112224` |
+| `20260729091000_caller_can_read_order_anon_revoke` | `20260729112238` |
+
+**The scheduler's cron was disabled hours later** when the owner postponed all
+payment work (§21). The migration remains applied and its objects intact.
+
+### Verification and data safety
+
+Each migration was verified individually after its apply (object existence,
+signatures, SECURITY DEFINER state, pinned `search_path`, grants, RLS, triggers,
+indexes). Across the whole wave:
+
+| Evidence | Result |
+| --- | --- |
+| Live `schema_migrations` rows | 52 → **62** |
+| Repository files unapplied afterwards | **0** |
+| Orders | **23**, unchanged |
+| Loyalty fingerprint over `loyalty_transactions` | `9877ab3b…` — **byte-identical** before and after |
+| Addresses | 1, untouched |
+| Orders enrolled for refund | **0** |
+| `order_refunds` rows | **0** |
+| In-flight payment rows | 3, **byte-identical** before and after |
+
+**One verification note worth recording**, because it produced a false negative
+mid-wave: a data-modifying CTE is **not visible to sibling SELECTs in the same
+statement**. A verification query that wrote and then read back in one statement
+reported the write as absent. Re-querying in a **fresh statement** confirmed the
+write had in fact succeeded. Always verify a write in a separate statement
+(§9-E rule 7).
+
+**A second note:** `admin_*` RPCs correctly raise `42501` when called through the
+service role, because `is_staff()` returns FALSE in a service-role context. That
+is the staff gate working, **not** a defect — do not "fix" it, and do not use a
+service-role call to prove an admin RPC is broken.
+
+---
+
+## 21. Payment & refund work — POSTPONED (2026-07-29)
+
+The owner has postponed all payment, payment-processing and refund work until a
+payment gateway provider is officially selected. **The authoritative record is
+`docs/PAYMENT_POSTPONEMENT.md`**; this section states only what the postponement
+means for migrations.
+
+- **No payment migration may be created, edited or applied** while the
+  postponement stands. That includes anything touching `checkout_sessions`, Tap
+  configuration, `payment_records`, the `order_refunds` stack, or the refund
+  worker's scheduling.
+- **Nothing was deleted.** Every payment/refund migration listed in §5 (rows 22,
+  31, 34, 35, 54, 55) remains applied and intact, and the repository files remain
+  in `supabase/migrations/`.
+- **The only live change** was disabling the cron job created by
+  `20260729090000_payment_refund_scheduler`:
+
+  ```sql
+  select cron.alter_job(
+    job_id := (select jobid from cron.job where jobname = 'payment-refund-worker'),
+    active := false
+  );
+  ```
+
+  The job row, its `*/5 * * * *` schedule and its command are **retained**. Only
+  `active` changed.
+- **This was deliberately not done by a migration**: the postponement is a
+  reversible operational state, not a schema change. Re-enabling it is a one-line
+  `cron.alter_job` call requiring explicit owner approval — not a new migration.
+- **Consequence for rebuilds (§11):** applying the repository chain to a fresh
+  database **will** schedule `payment-refund-worker` as active, because the
+  migration schedules it. Disable it immediately after building any new
+  environment while the postponement stands.
+- **Consequence for `db push` (§6):** replaying the chain against Production
+  would re-create and re-activate the worker. One more reason the prohibition is
+  permanent.
+
+The five operational crons — `account-deletion-processor`, `lazywait-sync`,
+`order-integrity-watchdog`, `operations-alerts-evaluator`,
+`operations-digest-generator` — are **unaffected and remain active**.
