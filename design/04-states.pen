@@ -1,0 +1,2749 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "BZn8k",
+      "x": 0,
+      "y": 0,
+      "name": "Order Confirmation States Board",
+      "width": 1520,
+      "fill": "$bg",
+      "layout": "vertical",
+      "gap": 32,
+      "padding": [
+        48,
+        40
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "Erm3W",
+          "name": "Board Title",
+          "fill": "$ink",
+          "content": "Order confirmation — twelve states",
+          "fontFamily": "Inter",
+          "fontSize": 28,
+          "fontWeight": "800"
+        },
+        {
+          "type": "text",
+          "id": "weRrd",
+          "name": "Board Subtitle",
+          "fill": "$muted",
+          "content": "Each card tracks two independent facts: whether the customer paid, and whether the order reached the branch POS.",
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "hpNy6",
+          "name": "Row 1",
+          "width": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "qScXl",
+              "name": "Col 1",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "T2kjm",
+                  "name": "1 payment_pending",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "SmWV6",
+                      "name": "1 payment_pending Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "HkQTI",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$grey-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "dKxmE",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "clock-3",
+                              "library": "lucide",
+                              "fill": "$grey-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "fawv5",
+                          "name": "1 payment_pending Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "K5VYDh",
+                              "name": "1 payment_pending Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يكتمل الدفع",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "feV8p",
+                              "name": "1 payment_pending English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Payment not completed",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "H4aNS",
+                      "name": "1 payment_pending Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ojSDM",
+                          "name": "1 payment_pending Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Payment not received. The order has not been sent to the branch.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KyFFO",
+                      "name": "1 payment_pending Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ENllS",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "uISTA",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "UazWt",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "TZXPk",
+                  "name": "1 payment_pending Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "MYAgg",
+                      "name": "1 payment_pending Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "payment_pending",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Dslcs",
+              "name": "Col 2",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "siz6W",
+                  "name": "2 accepted_no_pos_channel",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "NkBg8",
+                      "name": "2 accepted_no_pos_channel Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ZvXV9",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$purple-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "T8gMTL",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "clock-3",
+                              "library": "lucide",
+                              "fill": "$purple-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "NMh6a",
+                          "name": "2 accepted_no_pos_channel Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "S1deLr",
+                              "name": "2 accepted_no_pos_channel Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "تم استلام الدفع",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ah85u",
+                              "name": "2 accepted_no_pos_channel English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Payment received",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aQ6VI",
+                      "name": "2 accepted_no_pos_channel Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "lSTKX",
+                          "name": "2 accepted_no_pos_channel Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The order is processed through the delivery channel. Awaiting branch assignment.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "GxOzn",
+                      "name": "2 accepted_no_pos_channel Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "JPbWe",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "k55bh",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "FERtg",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Ne1gv",
+                  "name": "2 accepted_no_pos_channel Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "S4Uf2",
+                      "name": "2 accepted_no_pos_channel Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "accepted_no_pos_channel",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jtNFu",
+              "name": "Col 3",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "i9UTTN",
+                  "name": "3 accepted_no_pos_unpaid",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "oXJ0K",
+                      "name": "3 accepted_no_pos_unpaid Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "B4jbYy",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$purple-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "lH1ec",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "clock-3",
+                              "library": "lucide",
+                              "fill": "$purple-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "R7Cgq",
+                          "name": "3 accepted_no_pos_unpaid Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Y04ROw",
+                              "name": "3 accepted_no_pos_unpaid Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "تم استلام الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "gZ0Vj",
+                              "name": "3 accepted_no_pos_unpaid English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Order received (cash)",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "HqKcr",
+                      "name": "3 accepted_no_pos_unpaid Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "h0TQU",
+                          "name": "3 accepted_no_pos_unpaid Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Your order has been received and is being processed. No payment language.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "fdHKi",
+                      "name": "3 accepted_no_pos_unpaid Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "F0Lf60",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "ZsvXD",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "n75Fi",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "VZUEU",
+                  "name": "3 accepted_no_pos_unpaid Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "LLomQ",
+                      "name": "3 accepted_no_pos_unpaid Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "accepted_no_pos_channel_unpaid",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "BVKzy",
+              "name": "Col 4",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "gcpHr",
+                  "name": "4 sending_to_branch",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "G9z8K",
+                      "name": "4 sending_to_branch Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "HMmzR",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$purple-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "XPgwL",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "loader",
+                              "library": "lucide",
+                              "fill": "$purple-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "an7SU",
+                          "name": "4 sending_to_branch Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IdgA0",
+                              "name": "4 sending_to_branch Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "جارٍ الإرسال إلى الفرع…",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "w1IVoa",
+                              "name": "4 sending_to_branch English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Sending to the branch",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "N2zRl",
+                      "name": "4 sending_to_branch Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "KbDAq",
+                          "name": "4 sending_to_branch Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Please stay on this screen while we connect with the branch.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KMU14",
+                      "name": "4 sending_to_branch Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ac7WR",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "LbvyO",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "k5I7r",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ROtE7",
+                  "name": "4 sending_to_branch Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "V7toZ6",
+                      "name": "4 sending_to_branch Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "sending_to_branch",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "vff5F",
+          "name": "Row 2",
+          "width": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "CrE1g",
+              "name": "Col 5",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Z2iW6",
+                  "name": "5 confirmed_by_branch",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$success",
+                  "strokeWidth": 2,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "x0aTQy",
+                      "name": "5 confirmed_by_branch Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "fi4rq",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$green-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "I3ft4o",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "check",
+                              "library": "lucide",
+                              "fill": "$green-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "xYKX4",
+                          "name": "5 confirmed_by_branch Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zPdPT",
+                              "name": "5 confirmed_by_branch Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "تم تأكيد الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "dgL9W",
+                              "name": "5 confirmed_by_branch English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Order confirmed",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t3HO4",
+                      "name": "5 confirmed_by_branch Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "NHYIP",
+                          "name": "5 confirmed_by_branch Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The branch has confirmed your order. Your branch order number is shown below.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vJrst",
+                      "name": "5 confirmed_by_branch Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Y3SX7",
+                          "name": "Check Chip",
+                          "fill": "$chip-green-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "Ttre1",
+                              "name": "Check Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "check",
+                              "library": "lucide",
+                              "fill": "$chip-green-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "x31hE",
+                              "name": "Check Label",
+                              "fill": "$chip-green-fg",
+                              "content": "Success",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "OQoFd",
+                          "name": "Order Chip",
+                          "fill": "$chip-purple-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "zUI6p",
+                              "name": "Order Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "hash",
+                              "library": "lucide",
+                              "fill": "$chip-purple-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "hvgPK",
+                              "name": "Order Label",
+                              "fill": "$chip-purple-fg",
+                              "content": "#5",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "PiDJ2",
+                  "name": "5 confirmed_by_branch Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "jNyMK",
+                      "name": "5 confirmed_by_branch Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "confirmed_by_branch",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cBXz0",
+              "name": "Col 6",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "sysn6",
+                  "name": "6 verifying_with_branch",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "shId3",
+                      "name": "6 verifying_with_branch Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "UxwtQ",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$amber-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "jsAyQ",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "help",
+                              "library": "Material Symbols Rounded",
+                              "weight": 500,
+                              "fill": "$amber-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "REYeu",
+                          "name": "6 verifying_with_branch Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "foJzU",
+                              "name": "6 verifying_with_branch Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "جارٍ التحقق مع الفرع",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MIcsj",
+                              "name": "6 verifying_with_branch English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Checking with the branch",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I3fNN2",
+                      "name": "6 verifying_with_branch Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "MTtnd",
+                          "name": "6 verifying_with_branch Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "We are verifying with the branch. A ticket may already exist — please do not re-order.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "oEDPR",
+                      "name": "6 verifying_with_branch Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "GBJX3",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "oZrUw",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "WccOZ",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "JqtWs",
+                  "name": "6 verifying_with_branch Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gk913",
+                      "name": "6 verifying_with_branch Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "verifying_with_branch",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "A6NSD",
+              "name": "Col 7",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Bp1w7",
+                  "name": "7 branch_failed_retry",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "MWTQY",
+                      "name": "7 branch_failed_retry Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "m8Vs7Y",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$red-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "AXcuU",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "refresh-cw",
+                              "library": "lucide",
+                              "fill": "$red-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "poAux",
+                          "name": "7 branch_failed_retry Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ZhVvg",
+                              "name": "7 branch_failed_retry Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يُرسل الطلب بعد",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MBRnQ",
+                              "name": "7 branch_failed_retry English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Order not sent yet, paid",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AEza9",
+                      "name": "7 branch_failed_retry Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TgZrE",
+                          "name": "7 branch_failed_retry Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Payment succeeded but the order was not sent to the branch. You can resend it.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "dQ3lV",
+                      "name": "7 branch_failed_retry Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "qlUZt",
+                          "name": "Resend Chip",
+                          "fill": "$chip-red-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "XsQQq",
+                              "name": "Resend Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "refresh-cw",
+                              "library": "lucide",
+                              "fill": "$chip-red-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "KTEFz",
+                              "name": "Resend Label",
+                              "fill": "$chip-red-fg",
+                              "content": "Resend",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vAZ1X",
+                  "name": "7 branch_failed_retry Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hsYey",
+                      "name": "7 branch_failed_retry Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "branch_failed_retry_available",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "u3K6n",
+              "name": "Col 8",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Qyaye",
+                  "name": "8 unpaid_branch_failed",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "x5SYOr",
+                      "name": "8 unpaid_branch_failed Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "O0sEG",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$red-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "uBnxu",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "refresh-cw",
+                              "library": "lucide",
+                              "fill": "$red-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "iaqsy",
+                          "name": "8 unpaid_branch_failed Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "GKqXa",
+                              "name": "8 unpaid_branch_failed Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يُرسل الطلب بعد",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "OQAkq",
+                              "name": "8 unpaid_branch_failed English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Order not sent yet, cash",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ggRI1",
+                      "name": "8 unpaid_branch_failed Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "C5JKgn",
+                          "name": "8 unpaid_branch_failed Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The order was not sent to the branch. You can resend it. No payment was taken.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "be9DK",
+                      "name": "8 unpaid_branch_failed Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "DlOQx",
+                          "name": "Resend Chip",
+                          "fill": "$chip-red-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "N5Juo",
+                              "name": "Resend Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "refresh-cw",
+                              "library": "lucide",
+                              "fill": "$chip-red-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "LHCED",
+                              "name": "Resend Label",
+                              "fill": "$chip-red-fg",
+                              "content": "Resend",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "S0nwn",
+                  "name": "8 unpaid_branch_failed Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "eGdWB",
+                      "name": "8 unpaid_branch_failed Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "unpaid_branch_failed_retry_available",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "f3a6VW",
+          "name": "Row 3",
+          "width": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "NSsBi",
+              "name": "Col 9",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "EWBN3",
+                  "name": "9 final_failure_refund_pending",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "KD3Lb",
+                      "name": "9 final_failure_refund_pending Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "IhJ6w",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$red-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "p9iIU",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "x",
+                              "library": "lucide",
+                              "fill": "$red-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "t9SK9",
+                          "name": "9 final_failure_refund_pending Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Dvqfd",
+                              "name": "9 final_failure_refund_pending Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يتم إنشاء الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "NzU7p",
+                              "name": "9 final_failure_refund_pending English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Refund automatic",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "b6wlDc",
+                      "name": "9 final_failure_refund_pending Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "N5wPb",
+                          "name": "9 final_failure_refund_pending Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The order could not be created. Your refund is being processed automatically.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "MgMMG",
+                      "name": "9 final_failure_refund_pending Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "GsZKp",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "Rgz4L",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "v7eDN0",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "r3a91",
+                  "name": "9 final_failure_refund_pending Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lrLhH",
+                      "name": "9 final_failure_refund_pending Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "final_failure_refund_pending",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "MLhHS",
+              "name": "Col 10",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "jdEpO",
+                  "name": "10 final_failure_refunded",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "LEr45",
+                      "name": "10 final_failure_refunded Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "MMerv",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$grey-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "BpZGr",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "x",
+                              "library": "lucide",
+                              "fill": "$grey-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RSWVN",
+                          "name": "10 final_failure_refunded Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IZWGI",
+                              "name": "10 final_failure_refunded Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يتم إنشاء الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "VSArI",
+                              "name": "10 final_failure_refunded English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Refunded",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "W1BxDI",
+                      "name": "10 final_failure_refunded Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "vtKa7",
+                          "name": "10 final_failure_refunded Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The order was not created. Your refund has been confirmed by the payment provider.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "f9sRo",
+                      "name": "10 final_failure_refunded Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "P4c64n",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "Nj3SB",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "CduAz",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "O47bt",
+                  "name": "10 final_failure_refunded Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "BvH4Y",
+                      "name": "10 final_failure_refunded Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "final_failure_refunded",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "crcKv",
+              "name": "Col 11",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "Pk0Ju",
+                  "name": "11 final_failure_refund_failed",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "f7CSJf",
+                      "name": "11 final_failure_refund_failed Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "taZz9",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$amber-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "v6oYvB",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "warning",
+                              "library": "Material Symbols Rounded",
+                              "weight": 500,
+                              "fill": "$amber-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "qUtqm",
+                          "name": "11 final_failure_refund_failed Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "PDtyt",
+                              "name": "11 final_failure_refund_failed Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يتم إنشاء الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "GSQuL",
+                              "name": "11 final_failure_refund_failed English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Refund in progress",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zS6YL",
+                      "name": "11 final_failure_refund_failed Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xkrpv",
+                          "name": "11 final_failure_refund_failed Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The automatic refund could not complete. Our team will contact you to resolve this.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Bu2Xb",
+                      "name": "11 final_failure_refund_failed Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "JT9MM",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "EjkZp",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "a6m9y",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Tqnng",
+                  "name": "11 final_failure_refund_failed Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "xPGCS",
+                      "name": "11 final_failure_refund_failed Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "final_failure_refund_failed",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "zAVCT",
+              "name": "Col 12",
+              "width": 340,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "z5DrTz",
+                  "name": "12 unpaid_final_failure",
+                  "width": 340,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "j05vx",
+                      "name": "12 unpaid_final_failure Header",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": [
+                        24,
+                        20,
+                        16,
+                        20
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "kHFBH",
+                          "name": "Icon Wrap",
+                          "width": 48,
+                          "height": 48,
+                          "fill": "$grey-icon-bg",
+                          "cornerRadius": 999,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "rKDHK",
+                              "name": "Status Icon",
+                              "width": 22,
+                              "height": 22,
+                              "icon": "x",
+                              "library": "lucide",
+                              "fill": "$grey-icon-fg"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "xCdcQ",
+                          "name": "12 unpaid_final_failure Text Block",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "XnsxB",
+                              "name": "12 unpaid_final_failure Arabic Title",
+                              "fill": "$ink",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "لم يتم إنشاء الطلب",
+                              "textAlign": "center",
+                              "fontFamily": "Noto Sans Arabic",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "cauHA",
+                              "name": "12 unpaid_final_failure English Title",
+                              "fill": "$muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Not charged",
+                              "textAlign": "center",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "TbJtU",
+                      "name": "12 unpaid_final_failure Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "padding": [
+                        0,
+                        20,
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "dYak9",
+                          "name": "12 unpaid_final_failure Body Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "The order was not created. No payment was taken — nothing to refund.",
+                          "lineHeight": 1.5,
+                          "textAlign": "center",
+                          "fontFamily": "Inter",
+                          "fontSize": 12
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kfqWD",
+                      "name": "12 unpaid_final_failure Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "padding": [
+                        0,
+                        20,
+                        20,
+                        20
+                      ],
+                      "justifyContent": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "VNVCJ",
+                          "name": "No Flag Chip",
+                          "fill": "$chip-grey-bg",
+                          "cornerRadius": 999,
+                          "gap": 4,
+                          "padding": [
+                            4,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "rDwUD",
+                              "name": "Dash Icon",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "minus",
+                              "library": "lucide",
+                              "fill": "$chip-grey-fg"
+                            },
+                            {
+                              "type": "text",
+                              "id": "exrWP",
+                              "name": "Dash Label",
+                              "fill": "$chip-grey-fg",
+                              "content": "No flags",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "fCJxS",
+                  "name": "12 unpaid_final_failure Caption Wrap",
+                  "width": 340,
+                  "layout": "vertical",
+                  "padding": [
+                    4,
+                    0,
+                    0,
+                    0
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "RdRFZ",
+                      "name": "12 unpaid_final_failure Caption",
+                      "fill": "$muted",
+                      "textGrowth": "fixed-width",
+                      "width": 320,
+                      "content": "unpaid_final_failure",
+                      "textAlign": "center",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bgAlt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "overlay": {
+      "type": "color",
+      "value": "#1c163073"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-tint": {
+      "type": "color",
+      "value": "#fef3e0"
+    },
+    "brand-tint": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "grey-icon-bg": {
+      "type": "color",
+      "value": "#e8e5ef"
+    },
+    "grey-icon-fg": {
+      "type": "color",
+      "value": "#8a8399"
+    },
+    "amber-icon-bg": {
+      "type": "color",
+      "value": "#fef3e0"
+    },
+    "amber-icon-fg": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "green-icon-bg": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "green-icon-fg": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "red-icon-bg": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "red-icon-fg": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "purple-icon-bg": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "purple-icon-fg": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "chip-green-bg": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "chip-green-fg": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "chip-red-bg": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "chip-red-fg": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "chip-grey-bg": {
+      "type": "color",
+      "value": "#e8e5ef"
+    },
+    "chip-grey-fg": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "chip-purple-bg": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "chip-purple-fg": {
+      "type": "color",
+      "value": "#422e87"
+    }
+  },
+  "fileToken": "b5758179-0f40-48e1-910c-991cdb498de6"
+}
