@@ -33,6 +33,65 @@ import { OperationsAlertsPanel } from './admin/OperationsAlertsPanel';
 
 type AdminTab = 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'integrations' | 'health' | 'alerts' | 'integrity' | 'settings' | 'legal';
 
+/**
+ * Header copy per panel, in both languages.
+ *
+ * The Pen.dev design titles the header with the active panel and a one-line
+ * description of what it does, rather than repeating the product name on every
+ * screen. Keeping the strings here — beside the tab union — means adding a tab
+ * without its header copy is a type error rather than a blank heading.
+ */
+const PANEL_META: Record<AdminTab, Record<'en' | 'ar', { title: string; subtitle: string }>> = {
+  stats: {
+    en: { title: 'Sales Overview', subtitle: 'Real-time sales performance across all branches' },
+    ar: { title: 'ملخص المبيعات', subtitle: 'أداء المبيعات المباشر في جميع الفروع' },
+  },
+  orders: {
+    en: { title: 'Live Orders', subtitle: 'Track and manage incoming orders in real time' },
+    ar: { title: 'الطلبات المباشرة', subtitle: 'متابعة وإدارة الطلبات الواردة لحظياً' },
+  },
+  menu: {
+    en: { title: 'Menu Management', subtitle: 'Products, categories and modifier groups' },
+    ar: { title: 'إدارة القائمة', subtitle: 'المنتجات والتصنيفات ومجموعات الإضافات' },
+  },
+  banners: {
+    en: { title: 'Banners', subtitle: 'Homepage carousel · scheduled' },
+    ar: { title: 'البانرات', subtitle: 'شريط الصفحة الرئيسية · مجدول' },
+  },
+  branches: {
+    en: { title: 'Branch Management', subtitle: 'Channels, delivery zones and stock availability' },
+    ar: { title: 'إدارة الفروع', subtitle: 'القنوات ومناطق التوصيل وتوفر المنتجات' },
+  },
+  reports: {
+    en: { title: 'Financial Reports', subtitle: 'Revenue, orders and coupon analytics' },
+    ar: { title: 'التقارير المالية', subtitle: 'الإيرادات والطلبات وتحليلات الخصومات' },
+  },
+  integrations: {
+    en: { title: 'Integrations', subtitle: 'Payments · Messaging · POS and delivery' },
+    ar: { title: 'التكاملات', subtitle: 'المدفوعات · الرسائل · نقطة البيع والتوصيل' },
+  },
+  health: {
+    en: { title: 'Operations Health', subtitle: 'Read-only subsystem status · staff-gated' },
+    ar: { title: 'صحة العمليات', subtitle: 'حالة الأنظمة للقراءة فقط · مقصورة على الموظفين' },
+  },
+  alerts: {
+    en: { title: 'Operations Alerts', subtitle: 'Evaluated every 5 minutes · digest at 08:00 Asia/Riyadh' },
+    ar: { title: 'تنبيهات العمليات', subtitle: 'تُقيَّم كل ٥ دقائق · الملخص ٠٨:٠٠ بتوقيت الرياض' },
+  },
+  integrity: {
+    en: { title: 'Order Integrity', subtitle: 'Observe only — acknowledge or suppress' },
+    ar: { title: 'سلامة الطلبات', subtitle: 'للمراقبة فقط — إقرار أو كتم' },
+  },
+  settings: {
+    en: { title: 'Settings', subtitle: 'Brand, VAT, payment methods, maps and loyalty' },
+    ar: { title: 'الإعدادات', subtitle: 'الهوية والضريبة وطرق الدفع والخرائط والولاء' },
+  },
+  legal: {
+    en: { title: 'Legal Documents', subtitle: 'Versioned · bilingual · active-only reach the app' },
+    ar: { title: 'المستندات القانونية', subtitle: 'مُصدَّرة · ثنائية اللغة · النشطة فقط تصل للتطبيق' },
+  },
+};
+
 export const AdminDashboard: React.FC = () => {
   const {
     orders, currentUser,
@@ -138,56 +197,51 @@ export const AdminDashboard: React.FC = () => {
 
       {/* Admin Title bar Header */}
       <div className="bg-white border-b border-[var(--sm-border)] p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <div>
-          <h2 className="text-lg font-black text-primary flex items-center gap-2 flex-wrap">
-            <BarChart3 className="w-5 h-5 text-secondary" />
-            {t.dashboard_title}
-            {ordersLiveMode !== 'off' && (
-              <span
-                title={ordersLastUpdated ? `${isRTL ? 'آخر تحديث' : 'Last updated'} ${new Date(ordersLastUpdated).toLocaleTimeString()}` : ''}
-                className={`text-[9px] font-black px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${ordersLiveMode === 'realtime' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${ordersLiveMode === 'realtime' ? 'bg-green-500 animate-pulse' : 'bg-amber-500 animate-ping'}`} />
-                {ordersLiveMode === 'realtime' ? (isRTL ? 'مباشر' : 'Live') : (isRTL ? 'تحديث تلقائي' : 'Auto-refreshing')}
-                {ordersLastUpdated && (
-                  <span className="font-mono text-[8px] opacity-70">
-                    {new Date(ordersLastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                )}
-              </span>
-            )}
+        {/* The design titles the header with the ACTIVE PANEL rather than the
+            product, so an operator always knows where they are. The signed-in
+            role moved to the app header, where it belongs — it is a property of
+            the session, not of the panel. */}
+        <div className="min-w-0">
+          <h2 className="text-lg font-black text-slate-900 tracking-tight">
+            {PANEL_META[activeTab][adminLang].title}
           </h2>
-          <p className="text-[11px] text-gray-600 mt-0.5">{isRTL ? 'نظام التحكم والربط المباشر لفروع سبايسي ميل' : 'Real-time synchronization console connected to live Fast-Food branches'}</p>
+          <p className="text-[11px] text-slate-600 mt-0.5">
+            {PANEL_META[activeTab][adminLang].subtitle}
+          </p>
         </div>
 
-        {/* Global configurations / Language / Session roles */}
-        <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
-          {/* Audio sound toggler */}
+        <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+          {ordersLiveMode !== 'off' && (
+            <span
+              title={ordersLastUpdated ? `${isRTL ? 'آخر تحديث' : 'Last updated'} ${new Date(ordersLastUpdated).toLocaleTimeString()}` : ''}
+              className={`text-[10px] font-black px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 ${ordersLiveMode === 'realtime' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${ordersLiveMode === 'realtime' ? 'bg-green-700 animate-pulse' : 'bg-amber-700 animate-ping'}`} />
+              {ordersLiveMode === 'realtime' ? (isRTL ? 'مباشر' : 'LIVE') : (isRTL ? 'تحديث تلقائي' : 'AUTO')}
+              {ordersLastUpdated && (
+                <span className="font-mono tabular-nums opacity-80">
+                  {new Date(ordersLastUpdated).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              )}
+            </span>
+          )}
+
+          <button
+            onClick={() => setAdminLang(adminLang === 'en' ? 'ar' : 'en')}
+            className="glass-btn-outline text-xs px-3 py-1.5 rounded-xl flex items-center gap-1.5"
+            aria-label={adminLang === 'en' ? 'Switch language to Arabic' : 'التبديل إلى اللغة الإنجليزية'}
+          >
+            <Languages className="w-3.5 h-3.5" aria-hidden="true" /> {adminLang.toUpperCase()}
+          </button>
+
           <button
             onClick={() => setSoundMuted(!soundMuted)}
-            className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
+            className={`p-2 rounded-xl border transition-colors ${soundMuted ? 'bg-red-50 text-red-700 border-red-100' : 'glass-btn-outline text-slate-600'}`}
             title={soundMuted ? t.sound_alert_off : t.sound_alert_on}
             aria-label={soundMuted ? t.sound_alert_off : t.sound_alert_on}
             aria-pressed={soundMuted}
           >
             {soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </button>
-
-          {/* Signed-in role (from profiles.role — set by Supabase Auth, not switchable here) */}
-          <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
-            <span className="text-[10px] text-gray-600 font-extrabold px-1.5 uppercase">{t.role}:</span>
-            <span className="text-[10px] font-black px-2.5 py-1 rounded-lg capitalize bg-primary text-white shadow-sm">
-              {currentUser.fullName ? `${currentUser.fullName.split(' ')[0]} ` : ''}({currentUser.role})
-            </span>
-          </div>
-
-          {/* Admin panel English/Arabic translation switcher */}
-          <button 
-            onClick={() => setAdminLang(adminLang === 'en' ? 'ar' : 'en')}
-            className="text-xs bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-xl font-bold text-gray-800 flex items-center gap-1"
-            aria-label={adminLang === 'en' ? 'Switch language to Arabic' : 'التبديل إلى اللغة الإنجليزية'}
-          >
-            <Languages className="w-3.5 h-3.5" aria-hidden="true" /> {adminLang.toUpperCase()}
           </button>
         </div>
       </div>

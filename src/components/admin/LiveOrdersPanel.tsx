@@ -20,6 +20,41 @@ function syncStateOf(o: Order): string {
   return o.lazywaitSyncState ?? o.orderSyncStatus ?? 'not_synced';
 }
 
+/**
+ * Human label for a POS sync state.
+ *
+ * The chips previously rendered the raw enum — an operator saw `pending_sync`
+ * and `dead_letter` mid-rush. The states themselves are unchanged; only their
+ * presentation is. `dead_letter` deliberately reads as "needs verification"
+ * rather than "failed": that state means the outcome is ambiguous and a ticket
+ * may already exist at the branch, which is not the same as a clean failure.
+ */
+function syncLabel(state: string, isRTL: boolean): string {
+  const en: Record<string, string> = {
+    synced: 'Synced',
+    syncing: 'Sending',
+    pending_sync: 'Queued',
+    not_synced: 'Not sent',
+    failed: 'Send failed',
+    sync_failed: 'Send failed',
+    blocked: 'Blocked',
+    dead_letter: 'Needs verification',
+    skipped: 'Skipped',
+  };
+  const ar: Record<string, string> = {
+    synced: 'تمت المزامنة',
+    syncing: 'جارٍ الإرسال',
+    pending_sync: 'في الانتظار',
+    not_synced: 'لم يُرسل',
+    failed: 'فشل الإرسال',
+    sync_failed: 'فشل الإرسال',
+    blocked: 'محظور',
+    dead_letter: 'يحتاج تحققاً',
+    skipped: 'تم التخطي',
+  };
+  return (isRTL ? ar : en)[state] ?? state.replace(/_/g, ' ');
+}
+
 /** Colour tone for a POS sync state so failures/blocks read as problems. */
 function syncTone(state: string): string {
   switch (state) {
@@ -294,14 +329,19 @@ export const LiveOrdersPanel: React.FC = () => {
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">{t.live_alerts}</h3>
                 
-                <div className="flex flex-wrap gap-1.5 bg-slate-200/50 backdrop-blur-md p-1 rounded-xl border border-slate-300/30">
-                  {['all', 'received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'].map(st => (
-                    <button 
+                {/* Filter chips carry the same localized status labels the
+                    cards use. They previously rendered the raw enum, so an
+                    operator read "OUT_FOR_DELIVERY" in an Arabic console. */}
+                <div className="flex flex-wrap gap-1 bg-slate-100 p-1 rounded-xl">
+                  {(['all', 'received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled'] as const).map(st => (
+                    <button
                       key={st}
                       onClick={() => setOrderFilter(st)}
-                      className={`text-[9.5px] font-bold px-2.5 py-1 rounded-lg uppercase transition-all ${orderFilter === st ? 'glass-btn-primary text-white shadow-xs' : 'text-slate-700 hover:bg-white/40'}`}
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-colors ${orderFilter === st ? 'glass-btn-primary text-white' : 'text-slate-600 hover:bg-white'}`}
                     >
-                      {st === 'all' ? (isRTL ? 'الكل' : 'All') : st}
+                      {st === 'all'
+                        ? (isRTL ? 'الكل' : 'All')
+                        : (t[`status_${st}` as keyof typeof t] as string | undefined) ?? st.replace(/_/g, ' ')}
                     </button>
                   ))}
                 </div>
@@ -318,95 +358,98 @@ export const LiveOrdersPanel: React.FC = () => {
                 />
               </div>
 
-              {/* Data Table */}
-              <div className="glass-card rounded-2xl overflow-hidden overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-bold uppercase">
-                    <tr>
-                      <th className="px-4 py-3">{t.order_id}</th>
-                      <th className="px-4 py-3">{t.customer}</th>
-                      <th className="px-4 py-3">{t.branch}</th>
-                      <th className="px-4 py-3">{t.total_sar}</th>
-                      <th className="px-4 py-3">{t.status}</th>
-                      <th className="px-4 py-3">{t.sync}</th>
-                      <th className="px-4 py-3">{t.actions}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {filteredOrders.map(order => (
-                      <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3.5">
-                          {(() => { const d = orderDisplayNumber(order); return (
-                            <>
-                              <div className="font-black text-primary">{d.primary}</div>
-                              {d.secondary && <div className="text-[10px] text-gray-600 font-semibold">{d.secondary}</div>}
-                            </>
-                          ); })()}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="font-semibold text-gray-900">{order.customerName}</div>
-                          <div className={`text-[10px] ${order.customerPhone && order.customerPhone.trim() ? 'text-gray-600' : 'text-amber-600 italic'}`}>{phoneLabel(order.customerPhone)}</div>
-                        </td>
-                        <td className="px-4 py-3.5 font-medium text-gray-700">
-                          {isRTL ? order.branchNameAr : order.branchNameEn}
-                        </td>
-                        <td className="px-4 py-3.5 font-bold text-secondary">
-                          <Price amount={order.total} />
-                          <span className="mt-1 block text-[9px] font-bold text-gray-600 normal-case">{methodLabelText(order)}</span>
-                          {(() => {
-                            const badge = paymentBadge(order);
-                            return (
-                              <span className={`mt-1 block w-fit text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase ${badge.tone}`}>
-                                {badge.text}
+              {/* Order cards.
+                  The design replaces the data table with a card per order. A
+                  table forces every order into the same seven columns; during a
+                  rush what an operator needs is the ONE thing wrong with this
+                  order, which is why each card carries a severity stripe and
+                  states its payment problem in words rather than a status cell. */}
+              <div className="flex flex-col gap-2.5">
+                {filteredOrders.map(order => {
+                  const d = orderDisplayNumber(order);
+                  const badge = paymentBadge(order);
+                  const sync = syncStateOf(order);
+                  const paid = order.paymentStatus === 'paid';
+                  const blocked = Boolean(order.syncBlockedReason) || sync === 'failed';
+                  // Stripe = the order's most urgent fact, read left to right at
+                  // a glance: unpaid or blocked first, then anything not yet
+                  // through to the POS, then healthy.
+                  const stripe = blocked || (!paid && order.paymentMethod === 'online') ? 'bg-red-600'
+                    : sync !== 'synced' || !paid ? 'bg-amber-500'
+                    : 'bg-green-600';
+                  return (
+                    <div key={order.id} className="glass-card rounded-xl overflow-hidden">
+                      <div className="flex">
+                        <div className={`w-1 flex-none ${stripe}`} aria-hidden="true" />
+                        <div className="flex-1 min-w-0 p-3.5">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2 min-w-0">
+                              <span className="font-black text-slate-900 text-[13px]">{d.primary}</span>
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                                {(isRTL ? order.branchNameAr : order.branchNameEn)} · {order.orderType === 'delivery' ? (isRTL ? 'توصيل' : 'Delivery') : (isRTL ? 'استلام' : 'Pickup')}
                               </span>
-                            );
-                          })()}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`text-[9.5px] font-black px-2.5 py-0.5 rounded-full uppercase ${
-                            order.status === 'delivered' 
-                              ? 'bg-green-100 text-green-700'
-                              : order.status === 'cancelled'
-                              ? 'bg-red-100 text-red-700'
-                              : order.status === 'received'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {order.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <span className={`text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${syncTone(syncStateOf(order))}`}>
-                            {syncStateOf(order)}
-                          </span>
-                          {order.syncBlockedReason && (
-                            <span className="mt-1 block text-[9px] font-bold text-red-700 max-w-[130px] leading-tight">
-                              {order.syncBlockedReason}
+                              {d.secondary && (
+                                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-green-100 text-green-800">{d.secondary}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded ${badge.tone}`}>{badge.text}</span>
+                              <span className="text-[11px] text-slate-600 font-bold tabular-nums">
+                                {new Date(order.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="text-[11px] text-slate-600 mt-1.5">
+                            <span className="font-bold text-slate-800">{order.customerName}</span>
+                            <span className={order.customerPhone && order.customerPhone.trim() ? '' : 'text-amber-700 italic'}>
+                              {' · '}{phoneLabel(order.customerPhone)}
                             </span>
+                            {' · '}
+                            <span className="font-bold text-slate-800"><Price amount={order.total} /></span>
+                            {' · '}{methodLabelText(order)}
+                          </div>
+
+                          {order.items?.length ? (
+                            <div className="text-[11px] text-slate-700 mt-1.5 truncate">
+                              {order.items.map(i => `${i.quantity}× ${isRTL ? i.nameAr : i.nameEn}`).join(' · ')}
+                            </div>
+                          ) : null}
+
+                          {order.syncBlockedReason && (
+                            <div className="text-[11px] font-bold text-red-700 mt-1.5">{order.syncBlockedReason}</div>
                           )}
-                        </td>
-                        <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <button 
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 mt-2.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                                order.status === 'delivered' ? 'bg-green-100 text-green-800'
+                                : order.status === 'cancelled' ? 'bg-red-100 text-red-800'
+                                : order.status === 'received' ? 'bg-blue-100 text-blue-800'
+                                : 'bg-amber-100 text-amber-800'
+                              }`}>
+                                {t[`status_${order.status}` as keyof typeof t] ?? order.status}
+                              </span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${syncTone(sync)}`}>{syncLabel(sync, isRTL)}</span>
+                            </div>
+                            <button
                               onClick={() => setActiveReceiptOrder(order)}
-                              className="bg-primary/5 hover:bg-primary hover:text-white border border-primary/10 text-primary py-1 px-2.5 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
+                              className="glass-btn-outline text-[11px] py-1.5 px-3 rounded-lg flex items-center gap-1.5"
                             >
-                              <Eye className="w-3 h-3" />
+                              <Eye className="w-3.5 h-3.5" />
                               <span>{t.view_details}</span>
                             </button>
                           </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {filteredOrders.length === 0 && (
-                      <tr>
-                        <td colSpan={7} className="text-center py-12 text-gray-600 font-bold">
-                          {t.no_orders}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {filteredOrders.length === 0 && (
+                  <div className="glass-card rounded-xl text-center py-12 text-slate-600 font-bold">
+                    {t.no_orders}
+                  </div>
+                )}
               </div>
 
             </div>

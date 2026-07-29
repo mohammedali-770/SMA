@@ -23,6 +23,15 @@ export const ADMIN_LOCALES = {
     actions: 'Actions',
     view_details: 'View Receipt',
     no_orders: 'No incoming orders yet.',
+    // Order lifecycle, shown on the Live Orders cards and filter chips. These
+    // previously rendered the raw enum, so an Arabic console read
+    // "OUT_FOR_DELIVERY".
+    status_received: 'Received',
+    status_preparing: 'Preparing',
+    status_ready: 'Ready',
+    status_out_for_delivery: 'Out for delivery',
+    status_delivered: 'Delivered',
+    status_cancelled: 'Cancelled',
     categories_tab: 'Menu Categories',
     products_tab: 'Menu Products',
     csv_tab: 'Excel/CSV Bulk Import',
@@ -86,6 +95,12 @@ export const ADMIN_LOCALES = {
     actions: 'الإجراءات',
     view_details: 'عرض الفاتورة',
     no_orders: 'لا توجد طلبات واردة حالياً.',
+    status_received: 'تم الاستلام',
+    status_preparing: 'قيد التحضير',
+    status_ready: 'جاهز',
+    status_out_for_delivery: 'قيد التوصيل',
+    status_delivered: 'تم التوصيل',
+    status_cancelled: 'ملغي',
     categories_tab: 'تصنيفات الطعام',
     products_tab: 'قائمة وجبات المنيو',
     csv_tab: 'رفع منيو بملف Excel/CSV',
