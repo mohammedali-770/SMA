@@ -1,0 +1,4468 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "T8rOj4",
+      "x": 0,
+      "y": 0,
+      "name": "Sidebar",
+      "reusable": true,
+      "width": 220,
+      "height": 900,
+      "fill": "$surface",
+      "layout": "vertical",
+      "gap": 2,
+      "padding": [
+        24,
+        0
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "dizxk",
+          "name": "Logo Row",
+          "width": "fill_container",
+          "gap": 10,
+          "padding": [
+            0,
+            16
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "hOZ7m",
+              "name": "Logo Circle",
+              "fill": "$primary",
+              "width": 32,
+              "height": 32
+            },
+            {
+              "type": "text",
+              "id": "yQhrB",
+              "name": "Logo Text",
+              "fill": "$ink",
+              "content": "Spicy Meal",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "U8kIMd",
+          "name": "Logo Spacer",
+          "width": "fill_container",
+          "height": 24
+        },
+        {
+          "type": "frame",
+          "id": "oIUG5",
+          "name": "Nav Dashboard",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "uOguQ",
+              "name": "Icon Dashboard",
+              "width": 18,
+              "height": 18,
+              "icon": "layout-dashboard",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "Q9TXrV",
+              "name": "Label Dashboard",
+              "fill": "$muted",
+              "content": "Dashboard",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "o6OhLN",
+          "name": "Nav Orders",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "ALbC2",
+              "name": "Icon Orders",
+              "width": 18,
+              "height": 18,
+              "icon": "shopping-bag",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "qR8YF",
+              "name": "Label Orders",
+              "fill": "$muted",
+              "content": "Orders",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "UCoG9",
+          "name": "Nav Menu",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "fbwHe",
+              "name": "Icon Menu",
+              "width": 18,
+              "height": 18,
+              "icon": "utensils",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "mltK5",
+              "name": "Label Menu",
+              "fill": "$muted",
+              "content": "Menu",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "LTbFU",
+          "name": "Nav Branches",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "tPn4n",
+              "name": "Icon Branches",
+              "width": 18,
+              "height": 18,
+              "icon": "map-pin",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "SmPrN",
+              "name": "Label Branches",
+              "fill": "$muted",
+              "content": "Branches",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "s3mtI",
+          "name": "Nav Customers",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "OhzTf",
+              "name": "Icon Customers",
+              "width": 18,
+              "height": 18,
+              "icon": "users",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "qaUrX",
+              "name": "Label Customers",
+              "fill": "$muted",
+              "content": "Customers",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "yhcFO",
+          "name": "Nav Payments",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "xX2Y2",
+              "name": "Icon Payments",
+              "width": 18,
+              "height": 18,
+              "icon": "credit-card",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "PqJfI",
+              "name": "Label Payments",
+              "fill": "$muted",
+              "content": "Payments",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AKrE7",
+          "name": "Nav Promotions",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "XUaTX",
+              "name": "Icon Promotions",
+              "width": 18,
+              "height": 18,
+              "icon": "tag",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "TmKEI",
+              "name": "Label Promotions",
+              "fill": "$muted",
+              "content": "Promotions",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Hv1Yz",
+          "name": "Nav Delivery",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "ewnJX",
+              "name": "Icon Delivery",
+              "width": 18,
+              "height": 18,
+              "icon": "truck",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "huaKK",
+              "name": "Label Delivery",
+              "fill": "$muted",
+              "content": "Delivery",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "I3Ty1",
+          "name": "Nav Reports",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "C9cPr",
+              "name": "Icon Reports",
+              "width": 18,
+              "height": 18,
+              "icon": "chart-no-axes-column",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "HEkoQ",
+              "name": "Label Reports",
+              "fill": "$muted",
+              "content": "Reports",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gm2Vh",
+          "name": "Nav Operations",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "WRH3w",
+              "name": "Icon Operations",
+              "width": 18,
+              "height": 18,
+              "icon": "bell",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "a9s5Y",
+              "name": "Label Operations",
+              "fill": "$muted",
+              "content": "Operations",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "EVo6B",
+          "name": "Nav Settings",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "iQ656",
+              "name": "Icon Settings",
+              "width": 18,
+              "height": 18,
+              "icon": "settings",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "DDV2s",
+              "name": "Label Settings",
+              "fill": "$muted",
+              "content": "Settings",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "IPf43",
+          "name": "Nav Integrations",
+          "width": "fill_container",
+          "height": 40,
+          "cornerRadius": 8,
+          "gap": 10,
+          "padding": [
+            0,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "D8kBV",
+              "name": "Icon Integrations",
+              "width": 18,
+              "height": 18,
+              "icon": "plug",
+              "library": "lucide",
+              "fill": "$muted"
+            },
+            {
+              "type": "text",
+              "id": "xlVqZ",
+              "name": "Label Integrations",
+              "fill": "$muted",
+              "content": "Integrations",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "500"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "yeG4i",
+      "x": 0,
+      "y": -104,
+      "name": "Toggle On",
+      "reusable": true,
+      "width": 44,
+      "height": 24,
+      "fill": "$primary",
+      "cornerRadius": 999,
+      "layout": "none",
+      "children": [
+        {
+          "type": "ellipse",
+          "id": "Stl3N",
+          "x": 22,
+          "y": 2,
+          "name": "Toggle Knob",
+          "fill": "#ffffff",
+          "width": 20,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "eTC6D",
+      "x": 240,
+      "y": 0,
+      "name": "Toggle Off",
+      "reusable": true,
+      "width": 44,
+      "height": 24,
+      "fill": "$disabled",
+      "cornerRadius": 999,
+      "layout": "none",
+      "children": [
+        {
+          "type": "ellipse",
+          "id": "TjQMg",
+          "x": 2,
+          "y": 2,
+          "name": "Toggle Knob Off",
+          "fill": "#ffffff",
+          "width": 20,
+          "height": 20
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "yh5C2",
+      "x": 364,
+      "y": -104,
+      "name": "Screen 1 Label",
+      "fill": "$muted",
+      "content": "MENU MANAGEMENT",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "xmw2p",
+      "x": 364,
+      "y": -74,
+      "name": "Menu Management",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$bg",
+      "children": [
+        {
+          "id": "kT0km",
+          "type": "ref",
+          "ref": "T8rOj4",
+          "name": "Menu Sidebar",
+          "descendants": {
+            "UCoG9": {
+              "fill": "$primary",
+              "cornerRadius": 8
+            },
+            "fbwHe": {
+              "fill": "$on-primary"
+            },
+            "mltK5": {
+              "fill": "$on-primary",
+              "fontWeight": "600"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "JqPA5",
+          "name": "Menu Main",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            0,
+            32,
+            32,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "o3UI8N",
+              "name": "Menu Header",
+              "width": "fill_container",
+              "height": 72,
+              "gap": 16,
+              "padding": [
+                16,
+                0
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "JrQ0o",
+                  "name": "Header Left",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "h6e81",
+                      "name": "Header Title",
+                      "fill": "$ink",
+                      "content": "Menu Management",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "text",
+                      "id": "w2LxFa",
+                      "name": "Header Desc",
+                      "fill": "$muted",
+                      "content": "Products, categories and modifier groups",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "erdaP",
+                  "name": "Header Actions",
+                  "gap": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "SutL0",
+                      "name": "Btn CSV Download",
+                      "cornerRadius": 8,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        14
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "Tw7gX",
+                          "name": "Icon Download",
+                          "width": 15,
+                          "height": 15,
+                          "icon": "download",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "jaOzc",
+                          "name": "Label CSV Download",
+                          "fill": "$text",
+                          "content": "Download CSV template",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "A6e5Qn",
+                      "name": "Btn Import",
+                      "cornerRadius": 8,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        14
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "t6ZFYx",
+                          "name": "Icon Import",
+                          "width": 15,
+                          "height": 15,
+                          "icon": "upload",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "J8oEc8",
+                          "name": "Label Import",
+                          "fill": "$text",
+                          "content": "Import CSV",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "knKp3",
+                      "name": "Btn New Product",
+                      "fill": "$primary",
+                      "cornerRadius": 8,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "CEZEZ",
+                          "name": "Icon Plus",
+                          "width": 15,
+                          "height": 15,
+                          "icon": "plus",
+                          "library": "lucide",
+                          "fill": "$on-primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "W3NHyn",
+                          "name": "Label New Product",
+                          "fill": "$on-primary",
+                          "content": "New product",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "man5D",
+              "name": "Header Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "jlniD",
+              "name": "Menu Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "gap": 24,
+              "padding": [
+                24,
+                0,
+                0,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "MHVrB",
+                  "name": "Product Table Card",
+                  "width": "fill_container",
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "q7sbP",
+                      "name": "Table Header Row",
+                      "width": "fill_container",
+                      "height": 44,
+                      "fill": "$bg-alt",
+                      "cornerRadius": [
+                        12,
+                        12,
+                        0,
+                        0
+                      ],
+                      "padding": [
+                        0,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "s4RgLB",
+                          "name": "TH PRODUCT",
+                          "width": 280,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "xnHKK",
+                              "name": "TH Label PRODUCT",
+                              "fill": "$muted",
+                              "content": "PRODUCT",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600",
+                              "letterSpacing": 0.5
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "p8ISs7",
+                          "name": "TH CATEGORY",
+                          "width": 120,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "gqUry",
+                              "name": "TH Label CATEGORY",
+                              "fill": "$muted",
+                              "content": "CATEGORY",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600",
+                              "letterSpacing": 0.5
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "g1Y19w",
+                          "name": "TH PRICE",
+                          "width": 100,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "itwmo",
+                              "name": "TH Label PRICE",
+                              "fill": "$muted",
+                              "content": "PRICE",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600",
+                              "letterSpacing": 0.5
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "fopWc",
+                          "name": "TH KCAL",
+                          "width": 70,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "GKJyn",
+                              "name": "TH Label KCAL",
+                              "fill": "$muted",
+                              "content": "KCAL",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600",
+                              "letterSpacing": 0.5
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ZzxUj",
+                          "name": "TH ACTIVE",
+                          "width": 60,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Ms61u",
+                              "name": "TH Label ACTIVE",
+                              "fill": "$muted",
+                              "content": "ACTIVE",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600",
+                              "letterSpacing": 0.5
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cD3Eh",
+                      "name": "Row Smash Burger",
+                      "width": "fill_container",
+                      "height": 64,
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "top": 1
+                      },
+                      "padding": [
+                        0,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Vfs2M",
+                          "name": "Cell Product Smash Burger",
+                          "width": 280,
+                          "height": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 8,
+                              "id": "QxEii",
+                              "name": "Thumb Smash Burger",
+                              "fill": {
+                                "type": "gradient",
+                                "gradientType": "linear",
+                                "enabled": true,
+                                "rotation": 180,
+                                "size": {
+                                  "height": 1
+                                },
+                                "colors": [
+                                  {
+                                    "color": "#ffd9a3",
+                                    "position": 0
+                                  },
+                                  {
+                                    "color": "#f4a259",
+                                    "position": 0.5
+                                  },
+                                  {
+                                    "color": "#d1512f",
+                                    "position": 1
+                                  }
+                                ]
+                              },
+                              "width": 40,
+                              "height": 40
+                            },
+                            {
+                              "type": "frame",
+                              "id": "AcYW9",
+                              "name": "Info Smash Burger",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "xEHXr",
+                                  "name": "Name EN Smash Burger",
+                                  "fill": "$ink",
+                                  "content": "Smash Burger",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "u3MNgL",
+                                  "name": "Name AR Smash Burger",
+                                  "fill": "$muted",
+                                  "content": "سماش برجر · 3 modifier groups",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D6fWA",
+                          "name": "Cell Cat Smash Burger",
+                          "width": 120,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uPnsk",
+                              "name": "Cat Label Smash Burger",
+                              "fill": "$text",
+                              "content": "Burgers",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Tk9mK",
+                          "name": "Cell Price Smash Burger",
+                          "width": 100,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "y3dc9",
+                              "name": "Price Label Smash Burger",
+                              "fill": "$ink",
+                              "content": "SAR 32.00",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "r0cycG",
+                          "name": "Cell Kcal Smash Burger",
+                          "width": 70,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ex3sv",
+                              "name": "Kcal Label Smash Burger",
+                              "fill": "$muted",
+                              "content": "540",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "v2rZZ0",
+                          "name": "Cell Active Smash Burger",
+                          "width": 60,
+                          "height": "fill_container",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "xZ3Bd",
+                              "type": "ref",
+                              "ref": "yeG4i",
+                              "name": "Toggle Smash Burger"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PCjqp",
+                      "name": "Row Crispy Chicken Wrap",
+                      "width": "fill_container",
+                      "height": 64,
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "top": 1
+                      },
+                      "padding": [
+                        0,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "WTBlu",
+                          "name": "Cell Product Crispy Chicken Wrap",
+                          "width": 280,
+                          "height": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 8,
+                              "id": "oEYYe",
+                              "name": "Thumb Crispy Chicken Wrap",
+                              "fill": {
+                                "type": "gradient",
+                                "gradientType": "linear",
+                                "enabled": true,
+                                "rotation": 180,
+                                "size": {
+                                  "height": 1
+                                },
+                                "colors": [
+                                  {
+                                    "color": "#ffd9a3",
+                                    "position": 0
+                                  },
+                                  {
+                                    "color": "#f4a259",
+                                    "position": 0.5
+                                  },
+                                  {
+                                    "color": "#d1512f",
+                                    "position": 1
+                                  }
+                                ]
+                              },
+                              "width": 40,
+                              "height": 40
+                            },
+                            {
+                              "type": "frame",
+                              "id": "y1zcQ",
+                              "name": "Info Crispy Chicken Wrap",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "y9YQBv",
+                                  "name": "Name EN Crispy Chicken Wrap",
+                                  "fill": "$ink",
+                                  "content": "Crispy Chicken Wrap",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "YDAEo",
+                                  "name": "Name AR Crispy Chicken Wrap",
+                                  "fill": "$muted",
+                                  "content": "راب الدجاج المقرمش · 2 modifier groups",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "gyw3b",
+                          "name": "Cell Cat Crispy Chicken Wrap",
+                          "width": 120,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "EaBLK",
+                              "name": "Cat Label Crispy Chicken Wrap",
+                              "fill": "$text",
+                              "content": "Chicken",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "N8CDYg",
+                          "name": "Cell Price Crispy Chicken Wrap",
+                          "width": 100,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "GrUFc",
+                              "name": "Price Label Crispy Chicken Wrap",
+                              "fill": "$ink",
+                              "content": "SAR 28.00",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "YZP4B",
+                          "name": "Cell Kcal Crispy Chicken Wrap",
+                          "width": 70,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ltsVA",
+                              "name": "Kcal Label Crispy Chicken Wrap",
+                              "fill": "$muted",
+                              "content": "480",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "o77L99",
+                          "name": "Cell Active Crispy Chicken Wrap",
+                          "width": 60,
+                          "height": "fill_container",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "n54mn",
+                              "type": "ref",
+                              "ref": "yeG4i",
+                              "name": "Toggle Crispy Chicken Wrap"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "v8Zcnn",
+                      "name": "Row Loaded Fries",
+                      "width": "fill_container",
+                      "height": 64,
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "top": 1
+                      },
+                      "padding": [
+                        0,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "b7FEK",
+                          "name": "Cell Product Loaded Fries",
+                          "width": 280,
+                          "height": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 8,
+                              "id": "dn4MN",
+                              "name": "Thumb Loaded Fries",
+                              "fill": {
+                                "type": "gradient",
+                                "gradientType": "linear",
+                                "enabled": true,
+                                "rotation": 180,
+                                "size": {
+                                  "height": 1
+                                },
+                                "colors": [
+                                  {
+                                    "color": "#ffd9a3",
+                                    "position": 0
+                                  },
+                                  {
+                                    "color": "#f4a259",
+                                    "position": 0.5
+                                  },
+                                  {
+                                    "color": "#d1512f",
+                                    "position": 1
+                                  }
+                                ]
+                              },
+                              "width": 40,
+                              "height": 40
+                            },
+                            {
+                              "type": "frame",
+                              "id": "T45t0U",
+                              "name": "Info Loaded Fries",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "iqe5j",
+                                  "name": "Name EN Loaded Fries",
+                                  "fill": "$ink",
+                                  "content": "Loaded Fries",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "tW7tX",
+                                  "name": "Name AR Loaded Fries",
+                                  "fill": "$muted",
+                                  "content": "بطاطس محملة · 1 modifier groups",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "u6pHj",
+                          "name": "Cell Cat Loaded Fries",
+                          "width": 120,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ufiAK",
+                              "name": "Cat Label Loaded Fries",
+                              "fill": "$text",
+                              "content": "Sides",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "xix0u",
+                          "name": "Cell Price Loaded Fries",
+                          "width": 100,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ZWAYI",
+                              "name": "Price Label Loaded Fries",
+                              "fill": "$ink",
+                              "content": "SAR 18.00",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "khnFe",
+                          "name": "Cell Kcal Loaded Fries",
+                          "width": 70,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "R64VL",
+                              "name": "Kcal Label Loaded Fries",
+                              "fill": "$muted",
+                              "content": "620",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "FPYWx",
+                          "name": "Cell Active Loaded Fries",
+                          "width": 60,
+                          "height": "fill_container",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "Qj3bd",
+                              "type": "ref",
+                              "ref": "yeG4i",
+                              "name": "Toggle Loaded Fries"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "nLwcK",
+                      "name": "Row Mango Smoothie",
+                      "width": "fill_container",
+                      "height": 64,
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "top": 1
+                      },
+                      "padding": [
+                        0,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "no0Wv",
+                          "name": "Cell Product Mango Smoothie",
+                          "width": 280,
+                          "height": "fill_container",
+                          "gap": 12,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 8,
+                              "id": "C91A5K",
+                              "name": "Thumb Mango Smoothie",
+                              "fill": {
+                                "type": "gradient",
+                                "gradientType": "linear",
+                                "enabled": true,
+                                "rotation": 180,
+                                "size": {
+                                  "height": 1
+                                },
+                                "colors": [
+                                  {
+                                    "color": "#ffd9a3",
+                                    "position": 0
+                                  },
+                                  {
+                                    "color": "#f4a259",
+                                    "position": 0.5
+                                  },
+                                  {
+                                    "color": "#d1512f",
+                                    "position": 1
+                                  }
+                                ]
+                              },
+                              "width": 40,
+                              "height": 40
+                            },
+                            {
+                              "type": "frame",
+                              "id": "pABtL",
+                              "name": "Info Mango Smoothie",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ATiV5",
+                                  "name": "Name EN Mango Smoothie",
+                                  "fill": "$disabled",
+                                  "content": "Mango Smoothie",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "fBhGr",
+                                  "name": "Name AR Mango Smoothie",
+                                  "fill": "$disabled",
+                                  "content": "سموذي مانجو",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "g5etGP",
+                          "name": "Cell Cat Mango Smoothie",
+                          "width": 120,
+                          "height": "fill_container",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "vaSe4",
+                              "name": "Cat Label Mango Smoothie",
+                              "fill": "$disabled",
+                              "content": "Drinks",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "wEYMo",
+                          "name": "Cell Price Mango Smoothie",
+                          "width": 100,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "E5SMX",
+                              "name": "Price Label Mango Smoothie",
+                              "fill": "$disabled",
+                              "content": "SAR 15.00",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "mkgAQ",
+                          "name": "Cell Kcal Mango Smoothie",
+                          "width": 70,
+                          "height": "fill_container",
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uvQyu",
+                              "name": "Kcal Label Mango Smoothie",
+                              "fill": "$disabled",
+                              "content": "210",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "uTBtL",
+                          "name": "Cell Active Mango Smoothie",
+                          "width": 60,
+                          "height": "fill_container",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "AtTjh",
+                              "type": "ref",
+                              "ref": "eTC6D",
+                              "name": "Toggle Mango Smoothie"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "U8czgR",
+                  "name": "Menu Right Panel",
+                  "width": 340,
+                  "layout": "vertical",
+                  "gap": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "dmFWk",
+                      "name": "Categories Card",
+                      "width": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "an4Mu",
+                          "name": "Cat Card Header",
+                          "width": "fill_container",
+                          "padding": [
+                            16,
+                            16,
+                            12,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "pUsWV",
+                              "name": "Cat Card Title",
+                              "fill": "$ink",
+                              "content": "Categories",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "mUqGN",
+                          "name": "Cat Row Burgers",
+                          "width": "fill_container",
+                          "height": 44,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "CHckb",
+                              "name": "Cat Info Burgers",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "buxMh",
+                                  "name": "Cat EN Burgers",
+                                  "fill": "$ink",
+                                  "content": "Burgers",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "FsC0Q",
+                                  "name": "Cat AR Burgers",
+                                  "fill": "$muted",
+                                  "content": "· برجر",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "nin9c",
+                              "name": "Cat Chip Burgers",
+                              "fill": "$bg",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "cCx9u",
+                                  "name": "Cat Count Burgers",
+                                  "fill": "$muted",
+                                  "content": "8 items",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Ut1l3",
+                          "name": "Cat Row Chicken",
+                          "width": "fill_container",
+                          "height": 44,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "xOzpx",
+                              "name": "Cat Info Chicken",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "P1rJk",
+                                  "name": "Cat EN Chicken",
+                                  "fill": "$ink",
+                                  "content": "Chicken",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "i1pQNW",
+                                  "name": "Cat AR Chicken",
+                                  "fill": "$muted",
+                                  "content": "· دجاج",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "BB2BO",
+                              "name": "Cat Chip Chicken",
+                              "fill": "$bg",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "i3j2q",
+                                  "name": "Cat Count Chicken",
+                                  "fill": "$muted",
+                                  "content": "6 items",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ol42J",
+                          "name": "Cat Row Sides",
+                          "width": "fill_container",
+                          "height": 44,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "qL4jb",
+                              "name": "Cat Info Sides",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Ncead",
+                                  "name": "Cat EN Sides",
+                                  "fill": "$ink",
+                                  "content": "Sides",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "u7OwSb",
+                                  "name": "Cat AR Sides",
+                                  "fill": "$muted",
+                                  "content": "· المقبلات",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "D3ZdKv",
+                              "name": "Cat Chip Sides",
+                              "fill": "$bg",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "VJeo1",
+                                  "name": "Cat Count Sides",
+                                  "fill": "$muted",
+                                  "content": "5 items",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "CuAyW",
+                          "name": "Cat Row Drinks",
+                          "width": "fill_container",
+                          "height": 44,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "vUJBd",
+                              "name": "Cat Info Drinks",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "wMazB",
+                                  "name": "Cat EN Drinks",
+                                  "fill": "$ink",
+                                  "content": "Drinks",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ZB7TW",
+                                  "name": "Cat AR Drinks",
+                                  "fill": "$muted",
+                                  "content": "· المشروبات",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "UWRFH",
+                              "name": "Cat Chip Drinks",
+                              "fill": "$bg",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "rIRuO",
+                                  "name": "Cat Count Drinks",
+                                  "fill": "$muted",
+                                  "content": "4 items",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "U0P0hm",
+                      "name": "Modifier Groups Card",
+                      "width": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 12,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Hu21f",
+                          "name": "Mod Card Header",
+                          "width": "fill_container",
+                          "padding": [
+                            16,
+                            16,
+                            12,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "RsHnF",
+                              "name": "Mod Card Title",
+                              "fill": "$ink",
+                              "content": "Modifier groups",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "gwZXy",
+                          "name": "Mod Row Size",
+                          "width": "fill_container",
+                          "height": 48,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Wq4zJ",
+                              "name": "Mod Info Size",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "peWEN",
+                                  "name": "Mod EN Size",
+                                  "fill": "$ink",
+                                  "content": "Size",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "M8Jh0W",
+                                  "name": "Mod AR Size",
+                                  "fill": "$muted",
+                                  "content": "· الحجم",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "zRFAu",
+                              "name": "Mod Chip Size",
+                              "fill": "$danger-tint",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "uDAZx",
+                                  "name": "Mod Rule Size",
+                                  "fill": "$danger",
+                                  "content": "Required · 1 of 1",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Q9xc2",
+                          "name": "Mod Row Extras",
+                          "width": "fill_container",
+                          "height": 48,
+                          "stroke": "$border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "rPXh3",
+                              "name": "Mod Info Extras",
+                              "width": "fill_container",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Y6qh8f",
+                                  "name": "Mod EN Extras",
+                                  "fill": "$ink",
+                                  "content": "Extras",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 14,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "jlB7p",
+                                  "name": "Mod AR Extras",
+                                  "fill": "$muted",
+                                  "content": "· إضافات",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 13
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "RsgtZ",
+                              "name": "Mod Chip Extras",
+                              "fill": "$bg",
+                              "cornerRadius": 999,
+                              "padding": [
+                                3,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Iggxx",
+                                  "name": "Mod Rule Extras",
+                                  "fill": "$muted",
+                                  "content": "Optional · up to 3",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "dT4ey",
+      "x": 364,
+      "y": 906,
+      "name": "Screen 2 Label",
+      "fill": "$muted",
+      "content": "BRANCH MANAGEMENT",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "A352S",
+      "x": 364,
+      "y": 936,
+      "name": "Branch Management",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$bg",
+      "children": [
+        {
+          "id": "n4yfA",
+          "type": "ref",
+          "ref": "T8rOj4",
+          "name": "Branch Sidebar",
+          "descendants": {
+            "LTbFU": {
+              "fill": "$primary",
+              "cornerRadius": 8
+            },
+            "tPn4n": {
+              "fill": "$on-primary"
+            },
+            "SmPrN": {
+              "fill": "$on-primary",
+              "fontWeight": "600"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "hkXGC",
+          "name": "Branch Main",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            0,
+            32,
+            32,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "B48dCu",
+              "name": "Branch Header",
+              "width": "fill_container",
+              "height": 72,
+              "gap": 16,
+              "padding": [
+                16,
+                0
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "nnQXK",
+                  "name": "BH Left",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "g2RQqY",
+                      "name": "BH Title",
+                      "fill": "$ink",
+                      "content": "Branch Management",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "text",
+                      "id": "T56Ijg",
+                      "name": "BH Desc",
+                      "fill": "$muted",
+                      "content": "16 branches · channels, delivery zones and stock availability",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "t83XM",
+                  "name": "Btn Add Branch",
+                  "fill": "$primary",
+                  "cornerRadius": 8,
+                  "gap": 6,
+                  "padding": [
+                    8,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "fFtdv",
+                      "name": "Icon Add Branch",
+                      "width": 15,
+                      "height": 15,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "$on-primary"
+                    },
+                    {
+                      "type": "text",
+                      "id": "f7Xrth",
+                      "name": "Label Add Branch",
+                      "fill": "$on-primary",
+                      "content": "Add branch",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "Fdxsp",
+              "name": "Branch Divider",
+              "fill": "$border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "lrK4b",
+              "name": "Branch Body",
+              "width": "fill_container",
+              "gap": 24,
+              "padding": [
+                24,
+                0,
+                0,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "nqIKJ",
+                  "name": "Branch Left Card",
+                  "width": "fill_container",
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 20,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "ccGyI",
+                      "name": "Branch Title Row",
+                      "width": "fill_container",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "xZD7P",
+                          "name": "Branch Names",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 2,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "r1riFh",
+                              "name": "Branch EN",
+                              "fill": "$ink",
+                              "content": "Olaya Branch · فرع العليا",
+                              "fontFamily": "Inter",
+                              "fontSize": 17,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "D9RjxV",
+                              "name": "Branch Address",
+                              "fill": "$muted",
+                              "content": "King Fahd Road, Al Olaya, Riyadh · +966 11 234 5678",
+                              "fontFamily": "Inter",
+                              "fontSize": 13
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "q4p56F",
+                          "name": "POS Chip",
+                          "fill": "$success-tint",
+                          "cornerRadius": 999,
+                          "gap": 5,
+                          "padding": [
+                            4,
+                            10
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "ellipse",
+                              "id": "VXlel",
+                              "name": "POS Dot",
+                              "fill": "$success",
+                              "width": 6,
+                              "height": 6
+                            },
+                            {
+                              "type": "text",
+                              "id": "C3GAL",
+                              "name": "POS Label",
+                              "fill": "$success",
+                              "content": "Mapped to POS",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "omaQx",
+                      "name": "Stats Grid",
+                      "width": "fill_container",
+                      "gap": 12,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "C8ucTD",
+                          "name": "Stat Delivery fee",
+                          "width": "fill_container",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Hi8oN",
+                              "name": "Stat Label Delivery fee",
+                              "fill": "$muted",
+                              "content": "Delivery fee",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "PBqLA",
+                              "name": "Stat Value Delivery fee",
+                              "fill": "$ink",
+                              "content": "10.00 SAR",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "JyKfR",
+                          "name": "Stat Minimum order",
+                          "width": "fill_container",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "g6qvNu",
+                              "name": "Stat Label Minimum order",
+                              "fill": "$muted",
+                              "content": "Minimum order",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "pPu21",
+                              "name": "Stat Value Minimum order",
+                              "fill": "$ink",
+                              "content": "25.00 SAR",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ncHna",
+                          "name": "Stat Estimated delivery",
+                          "width": "fill_container",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "yAmgX",
+                              "name": "Stat Label Estimated delivery",
+                              "fill": "$muted",
+                              "content": "Estimated delivery",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "kuZxU",
+                              "name": "Stat Value Estimated delivery",
+                              "fill": "$ink",
+                              "content": "35 min",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "tSCSx",
+                          "name": "Stat Location",
+                          "width": "fill_container",
+                          "fill": "$bg",
+                          "cornerRadius": 8,
+                          "layout": "vertical",
+                          "gap": 4,
+                          "padding": [
+                            12,
+                            14
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Q86NwN",
+                              "name": "Stat Label Location",
+                              "fill": "$muted",
+                              "content": "Location",
+                              "fontFamily": "Inter",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "lNG7u",
+                              "name": "Stat Value Location",
+                              "fill": "$ink",
+                              "content": "Set",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Wl8h4",
+                      "name": "Toggle Divider",
+                      "fill": "$border",
+                      "width": "fill_container",
+                      "height": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Y8Bt0",
+                      "name": "Toggle Row Delivery",
+                      "width": "fill_container",
+                      "height": 36,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "XAKnO",
+                          "name": "Toggle Info Delivery",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "O15QlQ",
+                              "name": "Toggle Label Delivery",
+                              "fill": "$text",
+                              "content": "Delivery",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "GRnL7",
+                              "name": "On Chip Delivery",
+                              "fill": "$success-tint",
+                              "cornerRadius": 999,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "WzeQu",
+                                  "name": "On Text Delivery",
+                                  "fill": "$success",
+                                  "content": "ON",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 10,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "b0hRwV",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "Toggle Switch Delivery"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YcOUa",
+                      "name": "Toggle Row Pickup",
+                      "width": "fill_container",
+                      "height": 36,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "V32Yc",
+                          "name": "Toggle Info Pickup",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "r7B4ig",
+                              "name": "Toggle Label Pickup",
+                              "fill": "$text",
+                              "content": "Pickup",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "ElShe",
+                              "name": "On Chip Pickup",
+                              "fill": "$success-tint",
+                              "cornerRadius": 999,
+                              "padding": [
+                                2,
+                                8
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "E8Oyr",
+                                  "name": "On Text Pickup",
+                                  "fill": "$success",
+                                  "content": "ON",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 10,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "w3IVI",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "Toggle Switch Pickup"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "w6n8Ja",
+                      "name": "Toggle Row Delivery temporarily closed",
+                      "width": "fill_container",
+                      "height": 36,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "JirKE",
+                          "name": "Toggle Info Delivery temporarily closed",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "m5Zg4",
+                              "name": "Toggle Label Delivery temporarily closed",
+                              "fill": "$text",
+                              "content": "Delivery temporarily closed",
+                              "fontFamily": "Inter",
+                              "fontSize": 14,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "id": "t6cC74",
+                          "type": "ref",
+                          "ref": "eTC6D",
+                          "name": "Toggle Switch Delivery temporarily closed"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Gjoqq",
+                  "name": "Delivery Area Card",
+                  "width": 420,
+                  "fill": "$surface",
+                  "cornerRadius": 12,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": 20,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "erbEP",
+                      "name": "Delivery Title",
+                      "fill": "$ink",
+                      "content": "Delivery area",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t5390L",
+                      "name": "Map Panel",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": 280,
+                      "fill": "#eae7f0",
+                      "cornerRadius": 8,
+                      "layout": "none",
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "vfLOi",
+                          "x": 0,
+                          "y": 80,
+                          "name": "Road H1",
+                          "fill": "#d8d4e2",
+                          "width": 380,
+                          "height": 3
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "G0rMaa",
+                          "x": 0,
+                          "y": 160,
+                          "name": "Road H2",
+                          "fill": "#d8d4e2",
+                          "width": 380,
+                          "height": 3
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "M2XwR",
+                          "x": 20,
+                          "y": 220,
+                          "name": "Road H3",
+                          "fill": "#d8d4e2",
+                          "width": 360,
+                          "height": 2
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "nGadZ",
+                          "x": 100,
+                          "y": 0,
+                          "name": "Road V1",
+                          "fill": "#d8d4e2",
+                          "width": 3,
+                          "height": 280
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "R19gS",
+                          "x": 220,
+                          "y": 0,
+                          "name": "Road V2",
+                          "fill": "#d8d4e2",
+                          "width": 3,
+                          "height": 280
+                        },
+                        {
+                          "type": "rectangle",
+                          "cornerRadius": 2,
+                          "id": "OAiwr",
+                          "x": 300,
+                          "y": 40,
+                          "name": "Road V3",
+                          "fill": "#d8d4e2",
+                          "width": 2,
+                          "height": 240
+                        },
+                        {
+                          "type": "path",
+                          "id": "i1G3U",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Zone Polygon",
+                          "opacity": 0.1,
+                          "geometry": "M60 40l100-10 120 20 40 70-20 100-100 30-120-20-40-90z",
+                          "viewBox": [
+                            0,
+                            0,
+                            380,
+                            280
+                          ],
+                          "fill": "#422e87",
+                          "width": 380,
+                          "height": 280,
+                          "stroke": "$primary",
+                          "strokeWidth": 2,
+                          "strokeLinecap": "round"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "G7xP7f",
+                          "x": 170,
+                          "y": 120,
+                          "name": "Pin",
+                          "width": 24,
+                          "height": 32,
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "ellipse",
+                              "id": "XqQhG",
+                              "x": 0,
+                              "y": 0,
+                              "name": "Pin Head",
+                              "fill": "$danger",
+                              "width": 24,
+                              "height": 24
+                            },
+                            {
+                              "type": "ellipse",
+                              "id": "Zp6hD",
+                              "x": 8,
+                              "y": 8,
+                              "name": "Pin Dot",
+                              "fill": "#ffffff",
+                              "width": 8,
+                              "height": 8
+                            },
+                            {
+                              "type": "path",
+                              "id": "vIReY",
+                              "x": 0,
+                              "y": 20,
+                              "name": "Pin Tail",
+                              "geometry": "M12 0l6 10q-6 4-12 0z",
+                              "viewBox": [
+                                0,
+                                0,
+                                24,
+                                12
+                              ],
+                              "fill": "$danger",
+                              "width": 24,
+                              "height": 12
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BCfwd",
+                      "name": "Map Actions",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "WkR8M",
+                          "name": "Btn Edit Area",
+                          "width": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            0
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "LIpRI",
+                              "name": "Icon Edit Area",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "pencil",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "lW205",
+                              "name": "Label Edit Area",
+                              "fill": "$text",
+                              "content": "Edit area",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "u2Yw8",
+                          "name": "Btn Clear",
+                          "width": "fill_container",
+                          "cornerRadius": 8,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            0
+                          ],
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "jnzNP",
+                              "name": "Icon Clear",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "trash-2",
+                              "library": "lucide",
+                              "fill": "$danger"
+                            },
+                            {
+                              "type": "text",
+                              "id": "v3ijl",
+                              "name": "Label Clear",
+                              "fill": "$danger",
+                              "content": "Clear",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KwS6p",
+              "name": "Availability Matrix",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "hwNUu",
+                  "name": "Matrix Title Row",
+                  "width": "fill_container",
+                  "padding": [
+                    16,
+                    20,
+                    12,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ILEi5",
+                      "name": "Matrix Title",
+                      "fill": "$ink",
+                      "content": "Branch × product availability",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "S46MOe",
+                  "name": "Matrix Header",
+                  "width": "fill_container",
+                  "height": 40,
+                  "fill": "$bg-alt",
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "top": 1,
+                    "bottom": 1
+                  },
+                  "padding": [
+                    0,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Fp2CA",
+                      "name": "MH Product Col",
+                      "width": 200,
+                      "height": "fill_container",
+                      "alignItems": "center"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "SCETt",
+                      "name": "MH Olaya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "FyFXa",
+                          "name": "MH Label Olaya",
+                          "fill": "$muted",
+                          "content": "Olaya",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ufDju",
+                      "name": "MH Malqa",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "vQ6QN",
+                          "name": "MH Label Malqa",
+                          "fill": "$muted",
+                          "content": "Malqa",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "pv6q2",
+                      "name": "MH Sulaimaniyah",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Np154",
+                          "name": "MH Label Sulaimaniyah",
+                          "fill": "$muted",
+                          "content": "Sulaimaniyah",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "WqX9S",
+                      "name": "MH Khalidiya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "v9fJk",
+                          "name": "MH Label Khalidiya",
+                          "fill": "$muted",
+                          "content": "Khalidiya",
+                          "fontFamily": "Inter",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "u99al",
+                  "name": "Matrix Row Smash Burger",
+                  "width": "fill_container",
+                  "height": 48,
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "bottom": 1
+                  },
+                  "padding": [
+                    0,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "g2BQsS",
+                      "name": "MP Smash Burger",
+                      "width": 200,
+                      "height": "fill_container",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zfsWL",
+                          "name": "MP Label Smash Burger",
+                          "fill": "$text",
+                          "content": "Smash Burger",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AptcF",
+                      "name": "MT Smash Burger Olaya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "fSHyO",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Smash Burger Olaya"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "qDrn9",
+                      "name": "MT Smash Burger Malqa",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "O5IP6",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Smash Burger Malqa"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kYlYC",
+                      "name": "MT Smash Burger Sulaimaniyah",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "jHKx3",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Smash Burger Sulaimaniyah"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ooMYg",
+                      "name": "MT Smash Burger Khalidiya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "Wr8pr",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Smash Burger Khalidiya"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "pY0Pm",
+                  "name": "Matrix Row Crispy Chicken Wrap",
+                  "width": "fill_container",
+                  "height": 48,
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "bottom": 1
+                  },
+                  "padding": [
+                    0,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "kk6pD",
+                      "name": "MP Crispy Chicken Wrap",
+                      "width": 200,
+                      "height": "fill_container",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "G5kjCG",
+                          "name": "MP Label Crispy Chicken Wrap",
+                          "fill": "$text",
+                          "content": "Crispy Chicken Wrap",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "SuQpU",
+                      "name": "MT Crispy Chicken Wrap Olaya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "M9mBGf",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Crispy Chicken Wrap Olaya"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KNAtu",
+                      "name": "MT Crispy Chicken Wrap Malqa",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "Qi3rX",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Crispy Chicken Wrap Malqa"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "v0eNW1",
+                      "name": "MT Crispy Chicken Wrap Sulaimaniyah",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "Q9uLas",
+                          "type": "ref",
+                          "ref": "eTC6D",
+                          "name": "MT Toggle Crispy Chicken Wrap Sulaimaniyah"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "H4Nnt",
+                      "name": "MT Crispy Chicken Wrap Khalidiya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "urxCh",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Crispy Chicken Wrap Khalidiya"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "j1IG6M",
+                  "name": "Matrix Row Loaded Fries",
+                  "width": "fill_container",
+                  "height": 48,
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "bottom": 1
+                  },
+                  "padding": [
+                    0,
+                    20
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "o47qvY",
+                      "name": "MP Loaded Fries",
+                      "width": 200,
+                      "height": "fill_container",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ufLab",
+                          "name": "MP Label Loaded Fries",
+                          "fill": "$text",
+                          "content": "Loaded Fries",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Kv0ZZ",
+                      "name": "MT Loaded Fries Olaya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "PZByZ",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Loaded Fries Olaya"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "vAJNW",
+                      "name": "MT Loaded Fries Malqa",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "TFxyM",
+                          "type": "ref",
+                          "ref": "eTC6D",
+                          "name": "MT Toggle Loaded Fries Malqa"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "uHH4v",
+                      "name": "MT Loaded Fries Sulaimaniyah",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "U6a2u",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Loaded Fries Sulaimaniyah"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aMbU4",
+                      "name": "MT Loaded Fries Khalidiya",
+                      "width": 120,
+                      "height": "fill_container",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "hvXlB",
+                          "type": "ref",
+                          "ref": "yeG4i",
+                          "name": "MT Toggle Loaded Fries Khalidiya"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "mVPMB",
+      "x": 364,
+      "y": 1916,
+      "name": "Screen 3 Label",
+      "fill": "$muted",
+      "content": "OPERATIONS ALERTS — DARK MODE",
+      "fontFamily": "Inter",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "vHPEN",
+      "x": 364,
+      "y": 1946,
+      "name": "Operations Alerts",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$dark-bg",
+      "children": [
+        {
+          "id": "L3qXh",
+          "type": "ref",
+          "ref": "T8rOj4",
+          "name": "Ops Sidebar",
+          "fill": "$dark-surface",
+          "descendants": {
+            "hOZ7m": {
+              "fill": "#6b5fbf"
+            },
+            "yQhrB": {
+              "fill": "$dark-text"
+            },
+            "oIUG5": {
+              "fill": "none"
+            },
+            "uOguQ": {
+              "fill": "$dark-muted"
+            },
+            "Q9TXrV": {
+              "fill": "$dark-muted"
+            },
+            "o6OhLN": {
+              "fill": "none"
+            },
+            "ALbC2": {
+              "fill": "$dark-muted"
+            },
+            "qR8YF": {
+              "fill": "$dark-muted"
+            },
+            "UCoG9": {
+              "fill": "none"
+            },
+            "fbwHe": {
+              "fill": "$dark-muted"
+            },
+            "mltK5": {
+              "fill": "$dark-muted"
+            },
+            "LTbFU": {
+              "fill": "none"
+            },
+            "tPn4n": {
+              "fill": "$dark-muted"
+            },
+            "SmPrN": {
+              "fill": "$dark-muted"
+            },
+            "s3mtI": {
+              "fill": "none"
+            },
+            "OhzTf": {
+              "fill": "$dark-muted"
+            },
+            "qaUrX": {
+              "fill": "$dark-muted"
+            },
+            "yhcFO": {
+              "fill": "none"
+            },
+            "xX2Y2": {
+              "fill": "$dark-muted"
+            },
+            "PqJfI": {
+              "fill": "$dark-muted"
+            },
+            "AKrE7": {
+              "fill": "none"
+            },
+            "XUaTX": {
+              "fill": "$dark-muted"
+            },
+            "TmKEI": {
+              "fill": "$dark-muted"
+            },
+            "Hv1Yz": {
+              "fill": "none"
+            },
+            "ewnJX": {
+              "fill": "$dark-muted"
+            },
+            "huaKK": {
+              "fill": "$dark-muted"
+            },
+            "I3Ty1": {
+              "fill": "none"
+            },
+            "C9cPr": {
+              "fill": "$dark-muted"
+            },
+            "HEkoQ": {
+              "fill": "$dark-muted"
+            },
+            "gm2Vh": {
+              "fill": "$primary",
+              "cornerRadius": 8
+            },
+            "WRH3w": {
+              "fill": "$on-primary"
+            },
+            "a9s5Y": {
+              "fill": "$on-primary",
+              "fontWeight": "600"
+            },
+            "EVo6B": {
+              "fill": "none"
+            },
+            "iQ656": {
+              "fill": "$dark-muted"
+            },
+            "DDV2s": {
+              "fill": "$dark-muted"
+            },
+            "IPf43": {
+              "fill": "none"
+            },
+            "D8kBV": {
+              "fill": "$dark-muted"
+            },
+            "xlVqZ": {
+              "fill": "$dark-muted"
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "ufDDd",
+          "name": "Ops Main",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "padding": [
+            0,
+            32,
+            32,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "bxs0E",
+              "name": "Ops Header",
+              "width": "fill_container",
+              "height": 72,
+              "gap": 16,
+              "padding": [
+                16,
+                0
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "m4Xna",
+                  "name": "OH Left",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "S4e4iT",
+                      "name": "OH Title",
+                      "fill": "$dark-text",
+                      "content": "Operations Alerts",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kDBki",
+                      "name": "OH Desc Row",
+                      "gap": 10,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jB36o",
+                          "name": "OH Desc",
+                          "fill": "$dark-muted",
+                          "content": "Evaluated every 5 minutes · digest at 08:00 Asia/Riyadh",
+                          "fontFamily": "Inter",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "nHRt1",
+                          "name": "Dashboard Chip",
+                          "fill": "$dark-surface-2",
+                          "cornerRadius": 999,
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ZrSpH",
+                              "name": "Dashboard Chip Text",
+                              "fill": "$dark-muted",
+                              "content": "In-dashboard only",
+                              "fontFamily": "Inter",
+                              "fontSize": 10,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "uK9Pn",
+                  "name": "Btn Settings",
+                  "cornerRadius": 8,
+                  "stroke": "$dark-border",
+                  "strokeWidth": 1,
+                  "gap": 6,
+                  "padding": [
+                    8,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "IakVo",
+                      "name": "Icon Settings Btn",
+                      "width": 15,
+                      "height": 15,
+                      "icon": "settings",
+                      "library": "lucide",
+                      "fill": "$dark-muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kNeRp",
+                      "name": "Label Settings Btn",
+                      "fill": "$dark-text",
+                      "content": "Settings",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "fSY8F",
+              "name": "Ops Divider",
+              "fill": "$dark-border",
+              "width": "fill_container",
+              "height": 1
+            },
+            {
+              "type": "frame",
+              "id": "hrPG1",
+              "name": "Ops Body",
+              "width": "fill_container",
+              "height": "fill_container",
+              "gap": 24,
+              "padding": [
+                24,
+                0,
+                0,
+                0
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "RaiaG",
+                  "name": "Ops Left",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "IrCXc",
+                      "name": "Alert Critical",
+                      "clip": true,
+                      "width": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 12,
+                      "stroke": "$dark-border",
+                      "strokeWidth": 1,
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "id": "XKGC4",
+                          "name": "Stripe Critical",
+                          "fill": "$danger",
+                          "width": 4,
+                          "height": 200
+                        },
+                        {
+                          "type": "frame",
+                          "id": "R0FR1q",
+                          "name": "Crit Content",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 10,
+                          "padding": 16,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "BHJ9i",
+                              "name": "Crit Header",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "RTteM",
+                                  "name": "Crit Badge",
+                                  "fill": "$danger-tint",
+                                  "cornerRadius": 999,
+                                  "padding": [
+                                    2,
+                                    8
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "s3YfYj",
+                                      "name": "Crit Badge Text",
+                                      "fill": "$danger",
+                                      "content": "CRITICAL",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 10,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "y0Dyo",
+                                  "name": "Crit Time",
+                                  "fill": "$dark-muted",
+                                  "content": "12 min ago",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "Mydsi",
+                              "name": "Crit Title",
+                              "fill": "$dark-text",
+                              "content": "POS sync failing — Malqa",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "G88Y39",
+                              "name": "Crit Desc",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "4 orders exceeded the retry deadline. The branch is unmapped from POS — new orders will not reach the kitchen display.",
+                              "fontFamily": "Inter",
+                              "fontSize": 13
+                            },
+                            {
+                              "type": "text",
+                              "id": "ZOhH1",
+                              "name": "Crit AR",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "فشل مزامنة نقطة البيع — فرع الملقا",
+                              "fontFamily": "Inter",
+                              "fontSize": 13
+                            },
+                            {
+                              "type": "frame",
+                              "id": "vnmD8",
+                              "name": "Crit Actions",
+                              "gap": 10,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "PjjqE",
+                                  "name": "Btn Timeline",
+                                  "cornerRadius": 8,
+                                  "stroke": "$dark-border",
+                                  "strokeWidth": 1,
+                                  "padding": [
+                                    6,
+                                    12
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "krLxm",
+                                      "name": "Label Timeline",
+                                      "fill": "$dark-text",
+                                      "content": "Timeline",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "iNZdC",
+                                  "name": "Btn Integrity",
+                                  "cornerRadius": 8,
+                                  "stroke": "$dark-border",
+                                  "strokeWidth": 1,
+                                  "padding": [
+                                    6,
+                                    12
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "GFclu",
+                                      "name": "Label Integrity",
+                                      "fill": "$dark-text",
+                                      "content": "Open Order Integrity",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 12,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KcYyW",
+                      "name": "Alert Warning",
+                      "clip": true,
+                      "width": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 12,
+                      "stroke": "$dark-border",
+                      "strokeWidth": 1,
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "id": "n1cWI",
+                          "name": "Stripe Warning",
+                          "fill": "$warning",
+                          "width": 4,
+                          "height": 120
+                        },
+                        {
+                          "type": "frame",
+                          "id": "QIU81",
+                          "name": "Warn Content",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "padding": 16,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "C0XCk",
+                              "name": "Warn Header",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "L80IE",
+                                  "name": "Warn Badge",
+                                  "fill": "$warning-tint",
+                                  "cornerRadius": 999,
+                                  "padding": [
+                                    2,
+                                    8
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "NRSUi",
+                                      "name": "Warn Badge Text",
+                                      "fill": "$warning",
+                                      "content": "WARNING",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 10,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "s0qVG0",
+                                  "name": "Warn Time",
+                                  "fill": "$dark-muted",
+                                  "content": "1 h ago",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "y4Yop",
+                              "name": "Warn Title",
+                              "fill": "$dark-text",
+                              "content": "Delivery enabled without a zone — Sulaimaniyah",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "QLark",
+                              "name": "Warn Desc",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "The branch has delivery toggled on but no delivery area polygon is configured. Customers may place orders outside the serviceable range.",
+                              "fontFamily": "Inter",
+                              "fontSize": 13
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ICcCd",
+                      "name": "Alert Info",
+                      "clip": true,
+                      "width": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 12,
+                      "stroke": "$dark-border",
+                      "strokeWidth": 1,
+                      "children": [
+                        {
+                          "type": "rectangle",
+                          "id": "BUuay",
+                          "name": "Stripe Info",
+                          "fill": "$primary",
+                          "width": 4,
+                          "height": 120
+                        },
+                        {
+                          "type": "frame",
+                          "id": "EKHyJ",
+                          "name": "Info Content",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "padding": 16,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "YPI54",
+                              "name": "Info Header",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "L3trjR",
+                                  "name": "Info Badge",
+                                  "fill": "$primary-light",
+                                  "cornerRadius": 999,
+                                  "padding": [
+                                    2,
+                                    8
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "P8ykH",
+                                      "name": "Info Badge Text",
+                                      "fill": "$primary",
+                                      "content": "INFO",
+                                      "fontFamily": "Inter",
+                                      "fontSize": 10,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "x8O2Sh",
+                                  "name": "Info Time",
+                                  "fill": "$dark-muted",
+                                  "content": "3 h ago",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 11,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "U0pbY1",
+                              "name": "Info Title",
+                              "fill": "$dark-text",
+                              "content": "Online payment disabled 3 h",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MtfV0",
+                              "name": "Info Desc",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Cash orders continue and reach POS unpaid. Revenue reconciliation will be incomplete until the payment gateway is re-enabled.",
+                              "fontFamily": "Inter",
+                              "fontSize": 13
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "wYOlM",
+                  "name": "Ops Right",
+                  "width": 400,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "Q5TQcg",
+                      "name": "Daily Digest Card",
+                      "width": "fill_container",
+                      "fill": "$dark-surface",
+                      "cornerRadius": 12,
+                      "stroke": "$dark-border",
+                      "strokeWidth": 1,
+                      "layout": "vertical",
+                      "gap": 16,
+                      "padding": 20,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "FgWOv",
+                          "name": "Digest Header",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Iaije",
+                              "name": "Digest Title",
+                              "fill": "$dark-text",
+                              "content": "Daily digest",
+                              "fontFamily": "Inter",
+                              "fontSize": 15,
+                              "fontWeight": "700"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "E9LtO",
+                              "name": "Digest Meta",
+                              "gap": 8,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "uY41C",
+                                  "name": "Digest Date",
+                                  "fill": "$dark-muted",
+                                  "content": "2026-07-29 · Generated 08:00 · AR + EN",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 12,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "id": "BTLoC",
+                          "name": "Digest Divider",
+                          "fill": "$dark-border",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "frame",
+                          "id": "LLY5m",
+                          "name": "Figure Orders completed",
+                          "width": "fill_container",
+                          "height": 36,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "wzoOu",
+                              "name": "Fig Label Orders completed",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Orders completed",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "UZEVe",
+                              "name": "Fig Val Frame Orders completed",
+                              "gap": 4,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "TLEdP",
+                                  "name": "Fig Value Orders completed",
+                                  "fill": "$dark-text",
+                                  "content": "214",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 17,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "XjD4o",
+                          "name": "Figure POS failures",
+                          "width": "fill_container",
+                          "height": 36,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "hVPpU",
+                              "name": "Fig Label POS failures",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "POS failures",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "DqGk9",
+                              "name": "Fig Val Frame POS failures",
+                              "gap": 4,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "s5ZMo4",
+                                  "name": "Fig Value POS failures",
+                                  "fill": "$danger",
+                                  "content": "4",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 17,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "ellipse",
+                                  "id": "QzX7P",
+                                  "name": "Err Dot POS failures",
+                                  "fill": "$danger",
+                                  "width": 6,
+                                  "height": 6
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "AiDC0",
+                          "name": "Figure Refunds issued",
+                          "width": "fill_container",
+                          "height": 36,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "HWFZz",
+                              "name": "Fig Label Refunds issued",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Refunds issued",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "F0z27",
+                              "name": "Fig Val Frame Refunds issued",
+                              "gap": 4,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "KOtPR",
+                                  "name": "Fig Value Refunds issued",
+                                  "fill": "$dark-text",
+                                  "content": "1",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 17,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "OL8r9",
+                          "name": "Figure Branches closed early",
+                          "width": "fill_container",
+                          "height": 36,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "lx6fc",
+                              "name": "Fig Label Branches closed early",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Branches closed early",
+                              "fontFamily": "Inter",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "W1FXAE",
+                              "name": "Fig Val Frame Branches closed early",
+                              "gap": 4,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "jLkek",
+                                  "name": "Fig Value Branches closed early",
+                                  "fill": "$dark-text",
+                                  "content": "2",
+                                  "fontFamily": "Inter",
+                                  "fontSize": 17,
+                                  "fontWeight": "700"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "rectangle",
+                          "id": "N1wtL9",
+                          "name": "Digest Divider 2",
+                          "fill": "$dark-border",
+                          "width": "fill_container",
+                          "height": 1
+                        },
+                        {
+                          "type": "frame",
+                          "id": "rohwm",
+                          "name": "Digest Footer",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "sg9hZ",
+                              "name": "Footer Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "info",
+                              "library": "lucide",
+                              "fill": "$dark-muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "VQFhq",
+                              "name": "Footer Text",
+                              "fill": "$dark-muted",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "External delivery is disabled by design. This digest is read here in the dashboard and nowhere else.",
+                              "fontFamily": "Inter",
+                              "fontSize": 12
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-light": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "primary-hover": {
+      "type": "color",
+      "value": "#352372"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bg-alt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-tint": {
+      "type": "color",
+      "value": "#fef3e0"
+    },
+    "dark-bg": {
+      "type": "color",
+      "value": "#141218"
+    },
+    "dark-surface": {
+      "type": "color",
+      "value": "#1e1b25"
+    },
+    "dark-surface-2": {
+      "type": "color",
+      "value": "#2a2635"
+    },
+    "dark-border": {
+      "type": "color",
+      "value": "#3a3548"
+    },
+    "dark-text": {
+      "type": "color",
+      "value": "#e8e5f0"
+    },
+    "dark-muted": {
+      "type": "color",
+      "value": "#9490a3"
+    },
+    "on-primary": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "font-body": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "radius-sm": {
+      "type": "number",
+      "value": 8
+    },
+    "radius-md": {
+      "type": "number",
+      "value": 12
+    },
+    "radius-lg": {
+      "type": "number",
+      "value": 16
+    },
+    "radius-pill": {
+      "type": "number",
+      "value": 999
+    }
+  },
+  "fileToken": "e8f175ff-8b16-4213-bc7e-1f22a7a0ef9e"
+}
