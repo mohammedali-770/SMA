@@ -58,16 +58,45 @@ so releases always match the store binaries. The contract is pinned by
 
 ## Source maps
 
+> ### ⚠️ Source-map upload is currently DISABLED on every EAS profile
+>
+> `apps/mobile/eas.json` sets `SENTRY_DISABLE_AUTO_UPLOAD: "true"` on
+> **development**, **preview** and **production**. Production stack traces are
+> therefore **unsymbolicated**, and crash reports still arrive normally —
+> ingestion is unaffected, only symbolication is.
+>
+> **This flag MUST be removed from the `production` profile at the same time as
+> the `SENTRY_AUTH_TOKEN` EAS secret is created (Issue #81).** If the secret is
+> added while the flag remains, uploads will silently never happen and the
+> release will look correctly configured while staying unsymbolicated — a worse
+> failure than the build error it replaced, because nothing fails loudly.
+
+**Why the flag exists.** `production` was previously the only profile without
+it, so it alone attempted the upload and every production build failed at
+`createBundleReleaseJsAndAssets_SentryUpload` with *"Auth token is required for
+this request"*. That blocked **all** production mobile builds, including
+hotfixes, on a monitoring dependency. Production now degrades instead of
+blocking.
+
+**Note the asymmetry with web.** `vite.config.ts` gates upload *conditionally*
+on the token being present (`Boolean(process.env.SENTRY_AUTH_TOKEN)`), so the
+web build needs no flag and self-corrects the moment the token exists. The EAS
+flag is **static** — `eas.json` env values support no interpolation — so it does
+not self-correct and requires the manual removal described above.
+
 - Uploaded automatically **during EAS release builds** by the Sentry Expo
-  plugin when `SENTRY_AUTH_TOKEN` is present in the build environment.
+  plugin when `SENTRY_AUTH_TOKEN` is present in the build environment **and**
+  `SENTRY_DISABLE_AUTO_UPLOAD` is not set.
 - **Owner action (one-time)**: create the EAS secret —
   `eas env:create --scope project --name SENTRY_AUTH_TOKEN --visibility secret`
-  (or via the Expo dashboard). For any future GitHub-side upload steps, use a
-  GitHub Actions encrypted secret with the same name (the repo already uses
-  this pattern for `EXPO_TOKEN`).
-- Missing token: local development and CI dry-runs are unaffected; release
-  builds log the plugin's upload warning — treat an unsymbolicated
-  production release as a release-blocker per launch checklist.
+  (or via the Expo dashboard) — **and** delete `SENTRY_DISABLE_AUTO_UPLOAD`
+  from the `production` block of `apps/mobile/eas.json` in the same change. For
+  any future GitHub-side upload steps, use a GitHub Actions encrypted secret
+  with the same name (the repo already uses this pattern for `EXPO_TOKEN`).
+- Treat an unsymbolicated production release as a **release-blocker** per the
+  launch checklist below. That policy is unchanged; what changed is that the
+  build now completes so the decision is a human one rather than a build
+  failure.
 - Never commit maps (`*.js.map` gitignored); never serve maps publicly.
 
 ## Safe capture API (use this, not `@sentry/react-native` directly)
@@ -148,7 +177,9 @@ must not receive test events.
 
 1. Latest production build appears under Releases with the expected
    `<bundle id>@<version>+<build>` name.
-2. Source maps/dSYMs attached (symbolicated sample stack).
+2. Source maps/dSYMs attached (symbolicated sample stack). **Blocked today** —
+   see the Source maps warning above; requires the `SENTRY_AUTH_TOKEN` secret
+   *and* removal of `SENTRY_DISABLE_AUTO_UPLOAD` from the production profile.
 3. `environment:production` receiving sessions; crash-free rate visible.
 4. No PII in a sample of events (spot-check request/user/breadcrumbs).
 5. Alerts routing (Sentry alert rules) configured to the team — owner action

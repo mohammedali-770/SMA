@@ -81,7 +81,9 @@ The default branch **is** production. Everything below is deployed and active:
   project `react-native`) on all three surfaces:
   - mobile (PR #80): native + JS crashes, sampling prod 0.08;
   - web/admin (PR #83): `admin-web` + `expo-web` surface tags, sampling
-    prod 0.05 — see §5 for the pending owner action.
+    prod 0.05.
+  Ingestion works everywhere; **stack traces are unsymbolicated** until the
+  source-map upload is enabled (§5).
 - **Auth**: Supabase auth with WhatsApp OTP flow.
 - **Account deletion** flow (store-compliance requirement).
 - **Push notifications are DORMANT.** The `push`/`expo` integration row is
@@ -162,11 +164,15 @@ question that must be resolved before the worker is ever re-enabled:
 
 Open issues:
 
-- **Issue #81 (open, `blocks-production`)** — create the `SENTRY_AUTH_TOKEN`
-  secret in EAS *and* Vercel so release builds upload source maps. Until then
-  production EAS builds fail at the Sentry upload step, and crash reports arrive
-  unsymbolicated. The token is a real secret: never commit it, never put it in
-  `EXPO_PUBLIC_*`/`VITE_*`. Owner action only — no repository change needed.
+- **Issue #81 (open)** — create the `SENTRY_AUTH_TOKEN` secret in EAS *and*
+  Vercel so release builds upload source maps. Production EAS builds no longer
+  **fail** without it — `SENTRY_DISABLE_AUTO_UPLOAD` is now set on the
+  production profile, matching development and preview — but production stack
+  traces stay **unsymbolicated** until the token exists.
+  **When you create the secret, delete `SENTRY_DISABLE_AUTO_UPLOAD` from the
+  `production` block of `apps/mobile/eas.json` in the same change**, or uploads
+  will silently never happen. The token is a real secret: never commit it,
+  never put it in `EXPO_PUBLIC_*`/`VITE_*`. See `docs/SENTRY_OBSERVABILITY.md`.
 - **Issue #102 (open)** — set the Vercel **Production Branch** to
   `claude/project-build-ie4b56` and trigger a fresh Production redeploy. While it
   is unset, the default branch only deploys as a Preview and `/` and `/app/`
@@ -203,7 +209,7 @@ Documentation debt:
 | `docs/OPERATIONS_ALERTS_DIGEST.md` | Alerts/digest engine, activation state, runbook |
 | `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle + refund enrolment rules |
 | `docs/DISCOUNTS_CAMPAIGNS.md` | Campaigns schema, what is live, open business questions |
-| `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook |
+| `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook + source-map upload state |
 | `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
 | `README.md` / `README_MOBILE.md` | General app documentation |
 
@@ -235,6 +241,7 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #113 | Payment postponement + migration ledger reconciliation + doc corrections | `9f0ec87` |
 | #112 | Refund worker scheduler + stale-claim reaper; `caller_can_read_order` anon revoke | `e36fff1` |
 | #85 | Operations automation cron health | `06c9bb0` |
 | #84 | `PROJECT_STATUS.md` onboarding document | `e520f0a` |
@@ -244,7 +251,6 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 | #77 | Smart Operations Alerts + Daily Digest engine | `600b6d4` |
 | #75 | Operations Health Center | `91c11b7` |
 | #73 | Order Integrity Watchdog | `411c7c9` |
-| #71 | Health-summary foundation | `4c3d0bd` |
 
 `docs/MIGRATIONS.md` maps every repository migration file to its applied
 Production version.
