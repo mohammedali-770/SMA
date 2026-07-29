@@ -58,45 +58,48 @@ so releases always match the store binaries. The contract is pinned by
 
 ## Source maps
 
-> ### ⚠️ Source-map upload is currently DISABLED on every EAS profile
->
-> `apps/mobile/eas.json` sets `SENTRY_DISABLE_AUTO_UPLOAD: "true"` on
-> **development**, **preview** and **production**. Production stack traces are
-> therefore **unsymbolicated**, and crash reports still arrive normally —
-> ingestion is unaffected, only symbolication is.
->
-> **This flag MUST be removed from the `production` profile at the same time as
-> the `SENTRY_AUTH_TOKEN` EAS secret is created (Issue #81).** If the secret is
-> added while the flag remains, uploads will silently never happen and the
-> release will look correctly configured while staying unsymbolicated — a worse
-> failure than the build error it replaced, because nothing fails loudly.
+Upload is **gated on `SENTRY_AUTH_TOKEN` on both surfaces, conditionally**, so a
+missing token degrades to "no source maps" rather than "no build" — and both
+surfaces begin uploading automatically the moment the token exists. **There is
+no flag to remember to switch off.**
 
-**Why the flag exists.** `production` was previously the only profile without
-it, so it alone attempted the upload and every production build failed at
-`createBundleReleaseJsAndAssets_SentryUpload` with *"Auth token is required for
-this request"*. That blocked **all** production mobile builds, including
-hotfixes, on a monitoring dependency. Production now degrades instead of
-blocking.
+| Surface | Gate | Location |
+| --- | --- | --- |
+| Mobile (EAS) | the `@sentry/react-native/expo` config plugin is dropped when the token is absent | `apps/mobile/app.config.js` |
+| Web / admin (Vercel) | the Sentry Vite plugin is skipped and `sourcemap` falls back to `false` | `vite.config.ts` |
 
-**Note the asymmetry with web.** `vite.config.ts` gates upload *conditionally*
-on the token being present (`Boolean(process.env.SENTRY_AUTH_TOKEN)`), so the
-web build needs no flag and self-corrects the moment the token exists. The EAS
-flag is **static** — `eas.json` env values support no interpolation — so it does
-not self-correct and requires the manual removal described above.
+`apps/mobile/app.json` stays the single source of truth for every static field,
+including the Sentry plugin's organization/project/url. `app.config.js` receives
+it and — **only when the token is absent** — returns it with the Sentry plugin
+filtered out. When the token is present it hands the config back untouched.
 
-- Uploaded automatically **during EAS release builds** by the Sentry Expo
-  plugin when `SENTRY_AUTH_TOKEN` is present in the build environment **and**
-  `SENTRY_DISABLE_AUTO_UPLOAD` is not set.
-- **Owner action (one-time)**: create the EAS secret —
+**Why the gate exists.** The config plugin wires the native source-map /
+debug-symbol upload into release builds. Without a token that step fails and
+takes the whole build with it (`createBundleReleaseJsAndAssets_SentryUpload` →
+*"Auth token is required for this request"*), which previously blocked **all**
+production mobile builds, including hotfixes, on a monitoring dependency.
+
+**Crash reporting is not affected by the gate.** The native SDK is autolinked
+from the `@sentry/react-native` dependency and started by `Sentry.init()`; Debug
+IDs come from the `getSentryExpoConfig` Metro wrapper in `metro.config.js`. Only
+build-time upload wiring is conditional. Events flow in every case — stack
+traces are simply unsymbolicated until a token is configured.
+
+**`SENTRY_DISABLE_AUTO_UPLOAD` on development and preview is deliberate.** Those
+profiles must never upload source maps even when a token is present in the
+environment. The `production` profile carries **no** such flag — adding one back
+would suppress uploads even once the token exists, defeating the gate.
+
+- **Owner action (one-time, Issue #81)**: create the EAS secret —
   `eas env:create --scope project --name SENTRY_AUTH_TOKEN --visibility secret`
-  (or via the Expo dashboard) — **and** delete `SENTRY_DISABLE_AUTO_UPLOAD`
-  from the `production` block of `apps/mobile/eas.json` in the same change. For
-  any future GitHub-side upload steps, use a GitHub Actions encrypted secret
-  with the same name (the repo already uses this pattern for `EXPO_TOKEN`).
+  (or via the Expo dashboard) — and add the same variable in Vercel for
+  Production. **No code change is needed**; both gates self-correct. For any
+  future GitHub-side upload steps, use a GitHub Actions encrypted secret with
+  the same name (the repo already uses this pattern for `EXPO_TOKEN`).
 - Treat an unsymbolicated production release as a **release-blocker** per the
   launch checklist below. That policy is unchanged; what changed is that the
-  build now completes so the decision is a human one rather than a build
-  failure.
+  build completes, so shipping unsymbolicated is a deliberate human decision
+  rather than a build failure.
 - Never commit maps (`*.js.map` gitignored); never serve maps publicly.
 
 ## Safe capture API (use this, not `@sentry/react-native` directly)
@@ -157,6 +160,24 @@ unit-tested in `sanitize.test.ts`.
 **Never** run verification against a production-environment build; Production
 must not receive test events.
 
+## Verifying the source-map gate
+
+The gate is plain config resolution, so it can be checked without a build:
+
+```bash
+cd apps/mobile
+
+# No token → the Sentry plugin must be ABSENT
+npx expo config --type public --json | grep -c '@sentry/react-native/expo'   # expect 0
+
+# Token present → the Sentry plugin must be PRESENT (any non-empty value works;
+# this reads the gate only and performs no upload and no network call)
+SENTRY_AUTH_TOKEN=dummy npx expo config --type public --json \
+  | grep -c '@sentry/react-native/expo'                                       # expect 1
+```
+
+Use a throwaway value — never paste the real token into a shell.
+
 ## Triage workflow
 
 - **Native vs JS**: native crashes show signal/`EXC_*` info and an
@@ -177,9 +198,9 @@ must not receive test events.
 
 1. Latest production build appears under Releases with the expected
    `<bundle id>@<version>+<build>` name.
-2. Source maps/dSYMs attached (symbolicated sample stack). **Blocked today** —
-   see the Source maps warning above; requires the `SENTRY_AUTH_TOKEN` secret
-   *and* removal of `SENTRY_DISABLE_AUTO_UPLOAD` from the production profile.
+2. Source maps/dSYMs attached (symbolicated sample stack). Requires the
+   `SENTRY_AUTH_TOKEN` secret (Issue #81); no code change is needed once it
+   exists.
 3. `environment:production` receiving sessions; crash-free rate visible.
 4. No PII in a sample of events (spot-check request/user/breadcrumbs).
 5. Alerts routing (Sentry alert rules) configured to the team — owner action
@@ -192,5 +213,7 @@ must not receive test events.
   for dev noise.
 - **Server-level (immediate, no build)**: disable the DSN key in Sentry →
   ingestion stops instantly for all existing builds.
+- **Upload only**: unset `SENTRY_AUTH_TOKEN` in the EAS/Vercel environment —
+  both gates fall back to "no upload" and builds keep succeeding.
 - Never delete history; never rotate the DSN in a hurry without updating
   `EXPO_PUBLIC_SENTRY_DSN` in the next build.
