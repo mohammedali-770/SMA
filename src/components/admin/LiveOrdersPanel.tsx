@@ -196,12 +196,12 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
     <div className="glass-card rounded-2xl p-4 border border-amber-200/60 bg-amber-50/40">
       <div className="flex items-center gap-2 mb-1">
         <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
-        <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest">{t.verify_title}</h3>
+        <h3 className="text-sm font-bold text-amber-900">{t.verify_title}</h3>
         {total > 0 && (
           <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black">{total}</span>
         )}
       </div>
-      <p className="text-[10px] text-amber-700/80 font-semibold mb-3">{t.verify_sub}</p>
+      <p className="text-[10px] text-amber-700/80 font-medium mb-3">{t.verify_sub}</p>
       {loading ? (
         <div className="text-[11px] text-amber-700 font-bold animate-pulse">…</div>
       ) : data && data.items.length > 0 ? (
@@ -215,7 +215,7 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="font-bold text-secondary text-[11px]"><Price amount={it.total} /></span>
+                <span className="font-bold text-slate-900 text-[11px] tabular-nums"><Price amount={it.total} /></span>
                 <button
                   onClick={() => onView(it.id)}
                   className="bg-primary/5 hover:bg-primary hover:text-white border border-primary/10 text-primary py-1 px-2.5 rounded text-[10px] font-bold transition-colors flex items-center gap-1"
@@ -327,8 +327,16 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Filter controls bar */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">{t.live_alerts}</h3>
-                
+                {/* "Live Incoming Orders Stream" used to sit here; the shell
+                    header already says Live Orders. The count of what the
+                    current filter actually shows is the useful thing. */}
+                <span className="text-xs font-bold text-slate-600 tabular-nums">
+                  {filteredOrders.length}{' '}
+                  {isRTL
+                    ? (filteredOrders.length === 1 ? 'طلب' : 'طلبات')
+                    : (filteredOrders.length === 1 ? 'order' : 'orders')}
+                </span>
+
                 {/* Filter chips carry the same localized status labels the
                     cards use. They previously rendered the raw enum, so an
                     operator read "OUT_FOR_DELIVERY" in an Arabic console. */}
@@ -459,9 +467,9 @@ export const LiveOrdersPanel: React.FC = () => {
           <div className="glass-panel w-full max-w-md overflow-hidden rounded-[2rem] shadow-2xl animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="p-5 bg-white/20 border-b border-white/10 flex justify-between items-center">
               <div>
-                <h4 className="text-xs font-black text-gray-600 uppercase">{isRTL ? 'تعديل حالة الكاشير الموحدة' : 'Live POS Status Controller'}</h4>
+                <h4 className="text-xs font-black text-gray-600">{isRTL ? 'تعديل حالة الكاشير الموحدة' : 'Live POS Status Controller'}</h4>
                 {(() => { const d = orderDisplayNumber(activeReceiptOrder); return (
-                  <p className="text-sm font-extrabold text-primary">
+                  <p className="text-sm font-bold text-primary">
                     {d.primary}{d.secondary && <span className="text-[10px] text-gray-600 font-semibold ml-1">· {d.secondary}</span>}
                   </p>
                 ); })()}
@@ -491,7 +499,7 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Order Status Controller dropdown selector */}
               <div className="bg-purple-50/30 border border-purple-100 p-3 rounded-xl space-y-2">
-                <label className="block text-[10px] font-black text-primary uppercase">{isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}</label>
+                <label className="block text-[10px] font-black text-primary">{isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}</label>
                 <div className="flex gap-2">
                   <select 
                     disabled={isAccountant}
@@ -526,7 +534,7 @@ export const LiveOrdersPanel: React.FC = () => {
                     <span className="text-gray-600 block text-[10px] mb-0.5">Delivery Short Address:</span>
                     <span className="font-bold text-gray-800 bg-white p-1.5 border border-gray-100 rounded-lg block leading-relaxed">
                       {activeReceiptOrder.address.label} • {activeReceiptOrder.address.description} <br/>
-                      <span className="text-primary font-black uppercase text-[10px]">{activeReceiptOrder.address.nationalShortAddress}</span>
+                      <span className="text-primary font-black text-[10px]">{activeReceiptOrder.address.nationalShortAddress}</span>
                     </span>
                   </div>
                 )}
@@ -534,7 +542,7 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Items Table inside Dialog */}
               <div className="space-y-2">
-                <span className="block text-[10px] font-black text-gray-600 uppercase tracking-wider">Ordered Items:</span>
+                <span className="block text-xs font-bold text-slate-700">Ordered items</span>
                 <div className="space-y-1.5">
                   {activeReceiptOrder.items.map(item => (
                     <div key={item.id} className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-xl">
@@ -549,7 +557,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           </p>
                         )}
                       </div>
-                      <span className="font-black text-secondary"><Price amount={item.price * item.quantity} /></span>
+                      <span className="font-bold text-slate-900 tabular-nums"><Price amount={item.price * item.quantity} /></span>
                     </div>
                   ))}
                 </div>

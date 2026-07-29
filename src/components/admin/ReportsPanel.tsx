@@ -167,16 +167,16 @@ export const ReportsPanel: React.FC = () => {
 
             return (
               <div className="space-y-5 animate-fade-in text-xs" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
+                {/* Title comes from the shell header; the ZATCA note stays. */}
+                <div className="flex justify-between items-start gap-3">
                   <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRTL ? 'نظام التقارير والتحليلات المالية' : 'Financial Reports & Sales Analytics'}</h3>
-                    <p className="text-[10px] text-slate-600 font-bold mt-0.5">{isRTL ? 'تقارير فورية ودقيقة متوافقة مع متطلبات الهيئة العامة للزكاة والضريبة والجمارك' : 'Realtime financial audits and cashier reconciliation logs'}</p>
+                    <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">{isRTL ? 'تقارير فورية ودقيقة متوافقة مع متطلبات الهيئة العامة للزكاة والضريبة والجمارك' : 'Realtime financial audits and cashier reconciliation logs'}</p>
                   </div>
                   <button 
                     onClick={triggerCSVExport}
-                    className="glass-btn-secondary py-1.5 px-3 flex items-center gap-1.5 text-[10px]"
+                    className="glass-btn-primary py-2 px-3.5 rounded-xl flex items-center gap-1.5 text-[10px]"
                   >
-                    <Download className="w-3.5 h-3.5 text-slate-600" />
+                    <Download className="w-3.5 h-3.5" />
                     <span>{isRTL ? 'تصدير التقرير كـ Excel/CSV' : 'Export Active Audit CSV'}</span>
                   </button>
                 </div>
@@ -184,7 +184,7 @@ export const ReportsPanel: React.FC = () => {
                 {/* FILTERS PANEL */}
                 <div className="glass-card p-4 rounded-2xl grid grid-cols-1 md:grid-cols-4 gap-4 bg-white/20">
                   <div>
-                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'فرع المبيعات المستهدف' : 'Branch Scope'}</label>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1">{isRTL ? 'فرع المبيعات المستهدف' : 'Branch Scope'}</label>
                     <select
                       value={reportBranchId}
                       onChange={(e) => setReportBranchId(e.target.value)}
@@ -196,7 +196,7 @@ export const ReportsPanel: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'تاريخ البداية (من)' : 'Start Date (From)'}</label>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1">{isRTL ? 'تاريخ البداية (من)' : 'Start Date (From)'}</label>
                     <input 
                       type="date"
                       value={reportStartDate}
@@ -206,7 +206,7 @@ export const ReportsPanel: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'تاريخ النهاية (إلى)' : 'End Date (To)'}</label>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1">{isRTL ? 'تاريخ النهاية (إلى)' : 'End Date (To)'}</label>
                     <input 
                       type="date"
                       value={reportEndDate}
@@ -216,7 +216,7 @@ export const ReportsPanel: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'نوع التقرير المالي' : 'Reporting Metric'}</label>
+                    <label className="block text-[10px] font-black text-slate-600 mb-1">{isRTL ? 'نوع التقرير المالي' : 'Reporting Metric'}</label>
                     <select
                       value={selectedReport}
                       onChange={(e) => setSelectedReport(e.target.value as any)}
@@ -235,26 +235,26 @@ export const ReportsPanel: React.FC = () => {
                 {/* AUDIT SUMMARY CARDS */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                   <div className="glass-card p-3 rounded-2xl">
-                    <span className="text-[9px] font-bold text-gray-600 uppercase">{isRTL ? 'إجمالي المبيعات المفلترة' : 'Filtered Sales Revenue'}</span>
-                    <p className="text-base font-black text-primary mt-0.5"><Price amount={repGrossSales} /></p>
+                    <span className="text-[9px] font-bold text-gray-600">{isRTL ? 'إجمالي المبيعات المفلترة' : 'Filtered Sales Revenue'}</span>
+                    <p className="text-xl font-black text-slate-900 mt-0.5 tracking-tight tabular-nums"><Price amount={repGrossSales} /></p>
                     <span className="text-[8px] text-gray-600">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'Includes 15% VAT'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
-                    <span className="text-[9px] font-bold text-gray-600 uppercase">{isRTL ? 'عدد الطلبات المكتملة' : 'Completed Order Volume'}</span>
-                    <p className="text-base font-black text-secondary mt-0.5">{repOrdersCount} {isRTL ? 'طلب ناجح' : 'Orders'}</p>
+                    <span className="text-[9px] font-bold text-gray-600">{isRTL ? 'عدد الطلبات المكتملة' : 'Completed Order Volume'}</span>
+                    <p className="text-xl font-black text-slate-900 mt-0.5 tracking-tight tabular-nums">{repOrdersCount} {isRTL ? 'طلب ناجح' : 'Orders'}</p>
                     <span className="text-[8px] text-gray-600">{isRTL ? 'خلال النطاق الزمني المحدد' : 'Within date range scope'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
-                    <span className="text-[9px] font-bold text-gray-600 uppercase">{isRTL ? 'إجمالي خصومات الكوبونات' : 'Total Coupon Savings'}</span>
-                    <p className="text-base font-black text-slate-800 mt-0.5"><Price amount={repDiscounts} /></p>
-                    <span className="text-[8px] text-purple-600 font-bold">{isRTL ? 'مستقطعة من إيراد المبيعات' : 'Deducted from gross rev'}</span>
+                    <span className="text-[9px] font-bold text-gray-600">{isRTL ? 'إجمالي خصومات الكوبونات' : 'Total Coupon Savings'}</span>
+                    <p className="text-xl font-black text-slate-900 mt-0.5 tracking-tight tabular-nums"><Price amount={repDiscounts} /></p>
+                    <span className="text-[8px] text-slate-600 font-bold">{isRTL ? 'مستقطعة من إيراد المبيعات' : 'Deducted from gross rev'}</span>
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
-                    <span className="text-[9px] font-bold text-gray-600 uppercase">{isRTL ? 'رسوم التوصيل المحصلة' : 'Delivery Fees Collected'}</span>
-                    <p className="text-base font-black text-green-700 mt-0.5"><Price amount={repDeliveryFees} /></p>
+                    <span className="text-[9px] font-bold text-gray-600">{isRTL ? 'رسوم التوصيل المحصلة' : 'Delivery Fees Collected'}</span>
+                    <p className="text-xl font-black text-slate-900 mt-0.5 tracking-tight tabular-nums"><Price amount={repDeliveryFees} /></p>
                     <span className="text-[8px] text-gray-600">{isRTL ? 'من طلبات التوصيل الناجحة' : 'From completed deliveries'}</span>
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export const ReportsPanel: React.FC = () => {
                 {/* THE SELECTED TABULAR REPORT VIEWPORT */}
                 <div className="glass-card rounded-[1.5rem] overflow-hidden bg-white/40">
                   <div className="p-3 border-b border-slate-200/50 bg-white/30 flex justify-between items-center">
-                    <span className="text-[10px] font-black uppercase text-slate-700">
+                    <span className="text-[10px] font-black text-slate-700">
                       {selectedReport === 'sales_by_day' && (isRTL ? 'تقرير حركة المبيعات اليومية' : 'Daily Sales Ledger')}
                       {selectedReport === 'sales_by_branch' && (isRTL ? 'توزيع المبيعات وأداء الفروع' : 'Branch Performance Audit')}
                       {selectedReport === 'sales_by_product' && (isRTL ? 'حجم مبيعات الوجبات والمنتجات' : 'Product Sales Distribution Ledger')}
@@ -279,15 +279,15 @@ export const ReportsPanel: React.FC = () => {
                     {/* 1. SALES BY DAY */}
                     {selectedReport === 'sales_by_day' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'التاريخ اليومي' : 'Calendar Date'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'عدد الطلبات' : 'Orders Count'}</th>
                             <th className="py-2.5 px-4 text-right">{isRTL ? 'المبيعات قبل الخصم والرسوم' : 'Sales (Gross)'}</th>
                             <th className="py-2.5 px-4 text-right">{isRTL ? 'رسوم التوصيل' : 'Delivery Fees'}</th>
                             <th className="py-2.5 px-4 text-right">{isRTL ? 'خصومات الكوبونات' : 'Coupons Deduct'}</th>
-                            <th className="py-2.5 px-4 text-right text-primary">{isRTL ? 'صافي المبيعات (شامل الضريبة)' : 'Net Revenue (SAR)'}</th>
-                            <th className="py-2.5 px-4 text-right text-purple-700">{isRTL ? 'قيمة الضريبة ١٥٪' : 'VAT (15% Amount)'}</th>
+                            <th className="py-2.5 px-4 text-right">{isRTL ? 'صافي المبيعات (شامل الضريبة)' : 'Net Revenue (SAR)'}</th>
+                            <th className="py-2.5 px-4 text-right">{isRTL ? 'قيمة الضريبة ١٥٪' : 'VAT (15% Amount)'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -300,9 +300,9 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-2.5 px-4 text-center">{r.ordersCount}</td>
                                 <td className="py-2.5 px-4 text-right">{r.subtotal.toFixed(2)}</td>
                                 <td className="py-2.5 px-4 text-right">{r.deliveryFee.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-secondary font-semibold">-{r.discount.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-primary font-black">{r.total.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-purple-700 font-mono">{r.vat.toFixed(2)}</td>
+                                <td className="py-2.5 px-4 text-right text-red-700 font-semibold tabular-nums">-{r.discount.toFixed(2)}</td>
+                                <td className="py-2.5 px-4 text-right font-black text-slate-900 tabular-nums">{r.total.toFixed(2)}</td>
+                                <td className="py-2.5 px-4 text-right text-slate-700 tabular-nums">{r.vat.toFixed(2)}</td>
                               </tr>
                             ))
                           )}
@@ -313,11 +313,11 @@ export const ReportsPanel: React.FC = () => {
                     {/* 2. SALES BY BRANCH */}
                     {selectedReport === 'sales_by_branch' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'الفرع المستهدف' : 'Branch Location'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'حجم الطلبات' : 'Order Volume'}</th>
-                            <th className="py-2.5 px-4 text-right text-primary">{isRTL ? 'إجمالي المبيعات' : 'Revenue Gross (SAR)'}</th>
+                            <th className="py-2.5 px-4 text-right">{isRTL ? 'إجمالي المبيعات' : 'Revenue Gross (SAR)'}</th>
                             <th className="py-2.5 px-4 text-right">{isRTL ? 'رسوم التوصيل المحصلة' : 'Delivery Service'}</th>
                             <th className="py-2.5 px-4 text-right">{isRTL ? 'الخصومات الممنوحة' : 'Promo Deduct'}</th>
                             <th className="py-2.5 px-4 text-right text-slate-900">{isRTL ? 'معدل قيمة الفاتورة' : 'Avg. Ticket Value'}</th>
@@ -328,7 +328,7 @@ export const ReportsPanel: React.FC = () => {
                             <tr key={i} className="hover:bg-white/50">
                               <td className="py-3 px-4 text-xs font-black text-slate-800">{r.name}</td>
                               <td className="py-3 px-4 text-center">{r.ordersCount}</td>
-                              <td className="py-3 px-4 text-right text-primary font-black">{r.totalRevenue.toFixed(2)}</td>
+                              <td className="py-3 px-4 text-right font-black text-slate-900 tabular-nums">{r.totalRevenue.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right">{r.deliveryFees.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right text-red-700">-{r.discounts.toFixed(2)}</td>
                               <td className="py-3 px-4 text-right font-mono text-xs"><Price amount={r.avgTicket} /></td>
@@ -341,12 +341,12 @@ export const ReportsPanel: React.FC = () => {
                     {/* 3. SALES BY PRODUCT */}
                     {selectedReport === 'sales_by_product' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'اسم الوجبة / المنتج' : 'Menu Item Name'}</th>
                             <th className="py-2.5 px-4">{isRTL ? 'التصنيف' : 'Category'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'الكمية المباعة' : 'Units Sold'}</th>
-                            <th className="py-2.5 px-4 text-right text-primary">{isRTL ? 'صافي المبيعات المحققة' : 'Net Sales Revenue (SAR)'}</th>
+                            <th className="py-2.5 px-4 text-right">{isRTL ? 'صافي المبيعات المحققة' : 'Net Sales Revenue (SAR)'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -358,7 +358,7 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-2.5 px-4 font-black text-slate-800 text-xs">{r.name}</td>
                                 <td className="py-2.5 px-4 font-semibold text-slate-600">{r.category}</td>
                                 <td className="py-2.5 px-4 text-center text-slate-900 font-black">{r.qty}</td>
-                                <td className="py-2.5 px-4 text-right text-primary font-black"><Price amount={r.rev} /></td>
+                                <td className="py-2.5 px-4 text-right font-black text-slate-900 tabular-nums"><Price amount={r.rev} /></td>
                               </tr>
                             ))
                           )}
@@ -369,11 +369,11 @@ export const ReportsPanel: React.FC = () => {
                     {/* 4. COUPON USAGE */}
                     {selectedReport === 'coupon_usage' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'رمز الكوبون الترويجي' : 'Promo Coupon Code'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'مرات الاستخدام الناجحة' : 'Redemption Counts'}</th>
-                            <th className="py-2.5 px-4 text-right text-secondary">{isRTL ? 'إجمالي الخصومات الممنوحة' : 'Total Revenue Deductions (SAR)'}</th>
+                            <th className="py-2.5 px-4 text-right">{isRTL ? 'إجمالي الخصومات الممنوحة' : 'Total Revenue Deductions (SAR)'}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 text-[11px]">
@@ -395,7 +395,7 @@ export const ReportsPanel: React.FC = () => {
                     {/* 5. DELIVERY SERVICE FEES */}
                     {selectedReport === 'delivery_fees' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'الفرع المستفيد' : 'Operational Branch'}</th>
                             <th className="py-2.5 px-4 text-center">{isRTL ? 'عدد طلبات التوصيل' : 'Completed Deliveries'}</th>
@@ -419,7 +419,7 @@ export const ReportsPanel: React.FC = () => {
                     {/* 6. LAZYWAIT POS AUDIT */}
                     {selectedReport === 'lazywait_report' && (
                       <table className="w-full text-left font-bold text-slate-700">
-                        <thead className="bg-slate-100/60 text-[9px] uppercase text-slate-600 font-black">
+                        <thead className="bg-[var(--sm-surface-alt)] text-xs text-slate-600 font-bold">
                           <tr>
                             <th className="py-2.5 px-4">{isRTL ? 'رقم الطلب المحلي' : 'Local Order #'}</th>
                             <th className="py-2.5 px-4">{isRTL ? 'تاريخ الطلب' : 'Order Date'}</th>

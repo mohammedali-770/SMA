@@ -124,7 +124,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
               </span>
             </div>
             {!disabled && (
-              <p className="text-[10px] text-slate-600 font-semibold">
+              <p className="text-[10px] text-slate-600 font-medium">
                 {label('Click the map to drop the branch pin, or type the coordinates.', 'اضغط على الخريطة لتحديد موقع الفرع، أو أدخل الإحداثيات يدوياً.')}
               </p>
             )}
@@ -172,7 +172,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
-    <span className="block text-[9px] font-black text-slate-600 uppercase mb-1">{label}</span>
+    <span className="block text-[9px] font-black text-slate-600 mb-1">{label}</span>
     {children}
   </label>
 );

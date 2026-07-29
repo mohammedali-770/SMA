@@ -89,8 +89,8 @@ function exactTime(iso: string | null | undefined, lang: AdminLang): string {
 
 const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone }) => (
   <div className={`rounded-xl border px-3 py-2 ${tone ?? 'bg-white/50 border-slate-100'}`}>
-    <p className="text-[8px] uppercase font-black text-slate-600">{label}</p>
-    <p className="text-sm font-black text-slate-800">{value}</p>
+    <p className="text-[8px] font-bold text-slate-600">{label}</p>
+    <p className="text-sm font-bold text-slate-800">{value}</p>
   </div>
 );
 
@@ -132,7 +132,7 @@ const AlertRow: React.FC<{
               </span>
             )}
           </div>
-          <p className="text-[8.5px] text-slate-600 font-bold mt-0.5">
+          <p className="text-[8.5px] text-slate-600 font-medium mt-0.5">
             {isAr ? 'أول رصد' : 'First seen'}: <span title={exactTime(alert.first_seen_at, lang)}>{relativeAge(alert.first_seen_at, lang)}</span>
             {' · '}
             {isAr ? 'آخر رصد' : 'Last seen'}: <span title={exactTime(alert.last_seen_at, lang)}>{relativeAge(alert.last_seen_at, lang)}</span>
@@ -150,12 +150,12 @@ const AlertRow: React.FC<{
         <div className="border-t border-slate-100 px-3 py-2 space-y-1.5">
           <p className="font-mono text-[8.5px] text-slate-600 break-all">{alert.fingerprint}</p>
           {events === null ? (
-            <p className="text-[9px] text-slate-600 font-bold flex items-center gap-1">
+            <p className="text-[9px] text-slate-600 font-medium flex items-center gap-1">
               <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري تحميل الأحداث…' : 'Loading timeline…'}
             </p>
           ) : events.length === 0 ? (
-            <p className="text-[9px] text-slate-600 font-bold">{isAr ? 'لا توجد أحداث.' : 'No events.'}</p>
+            <p className="text-[9px] text-slate-600 font-medium">{isAr ? 'لا توجد أحداث.' : 'No events.'}</p>
           ) : (
             <ul className="space-y-1">
               {events.map((e) => (
@@ -316,13 +316,9 @@ export const OperationsAlertsPanel: React.FC<{
       <header className="glass-card rounded-2xl bg-white/45 p-4 border border-white/60 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <BellRing className="w-5 h-5 text-primary" aria-hidden="true" />
-              <h3 className="text-sm font-black text-slate-800">
-                {isAr ? 'تنبيهات العمليات والملخص اليومي' : 'Operations Alerts & Daily Digest'}
-              </h3>
-            </div>
-            <p className="text-[9px] text-slate-600 font-bold mt-1">
+            {/* Title dropped — the shell header carries it. The read-only
+                constraint is the part an operator must actually read. */}
+            <p className="text-[9px] text-slate-600 font-medium">
               {isAr
                 ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
                 : 'Read-only observability: no auto-remediation, no retries, no external messages.'}
@@ -370,7 +366,7 @@ export const OperationsAlertsPanel: React.FC<{
         </div>
 
         {summary && !summary.alert_evaluation_enabled && (
-          <p className="text-[9px] font-bold text-slate-600 flex items-center gap-1.5">
+          <p className="text-[9px] font-medium text-slate-600 flex items-center gap-1.5">
             <Clock3 className="w-3.5 h-3.5" aria-hidden="true" />
             {isAr
               ? 'محرك التقييم غير مفعل بعد (الوضع الخامل). لا يتم إنشاء تنبيهات جديدة.'
@@ -422,12 +418,12 @@ export const OperationsAlertsPanel: React.FC<{
           </div>
 
           {loading ? (
-            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
+            <p className="text-[10px] text-slate-600 font-medium flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري التحميل…' : 'Loading…'}
             </p>
           ) : alerts.length === 0 ? (
-            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
+            <p className="text-[10px] text-slate-600 font-medium flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" />
               {isAr
                 ? 'لا توجد تنبيهات مطابقة للمرشحات الحالية.'
@@ -453,7 +449,7 @@ export const OperationsAlertsPanel: React.FC<{
       {section === 'digest' && (
         <section className="glass-card rounded-2xl bg-white/45 border border-white/60 p-4 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h4 className="text-[11px] font-black text-slate-700 uppercase">
+            <h4 className="text-[11px] font-black text-slate-700">
               {isAr ? 'معاينة اليوم الحالي' : 'Live preview (today so far)'}
             </h4>
             <div className="flex items-center gap-1">
@@ -476,23 +472,23 @@ export const OperationsAlertsPanel: React.FC<{
           )}
           {preview ? (
             <div className="rounded-xl border border-slate-100 bg-white/60 p-3" dir={preview.language === 'ar' ? 'rtl' : 'ltr'}>
-              <p className="text-[10px] font-black text-slate-800">{preview.rendered_subject}</p>
+              <p className="text-[10px] font-bold text-slate-800">{preview.rendered_subject}</p>
               <pre className="text-[9px] font-bold text-slate-600 whitespace-pre-wrap mt-2 font-sans">
                 {preview.rendered_body}
               </pre>
             </div>
           ) : !digestError && (
-            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
+            <p className="text-[10px] text-slate-600 font-medium flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري إنشاء المعاينة…' : 'Building preview…'}
             </p>
           )}
 
-          <h4 className="text-[11px] font-black text-slate-700 uppercase pt-2">
+          <h4 className="text-[11px] font-black text-slate-700 pt-2">
             {isAr ? 'الملخصات المحفوظة' : 'Generated history'}
           </h4>
           {history.length === 0 ? (
-            <p className="text-[10px] text-slate-600 font-bold">
+            <p className="text-[10px] text-slate-600 font-medium">
               {isAr
                 ? 'لا توجد ملخصات محفوظة بعد — إنشاء الملخص اليومي غير مفعل في هذا الإصدار.'
                 : 'No stored digests yet — scheduled generation is not enabled in this version.'}
@@ -547,7 +543,7 @@ export const OperationsAlertsPanel: React.FC<{
           )}
           {!settings ? (
             !settingsError && (
-              <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
+              <p className="text-[10px] text-slate-600 font-medium flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                 {isAr ? 'جاري التحميل…' : 'Loading…'}
               </p>
@@ -555,7 +551,7 @@ export const OperationsAlertsPanel: React.FC<{
           ) : (
             <div className="space-y-3">
               {!isAdmin && (
-                <p className="text-[9px] font-bold text-slate-600">
+                <p className="text-[9px] font-medium text-slate-600">
                   {isAr
                     ? 'عرض للقراءة فقط — تعديل الإعدادات متاح للمشرفين فقط.'
                     : 'Read-only view — only admins can change these settings.'}
@@ -591,7 +587,7 @@ export const OperationsAlertsPanel: React.FC<{
                 <Metric label={isAr ? 'تذكير التحذير (دقائق)' : 'Warning reminder (min)'} value={settings.warning_reminder_minutes} />
                 <Metric label={isAr ? 'تذكير الحرج (دقائق)' : 'Critical reminder (min)'} value={settings.critical_reminder_minutes} />
               </div>
-              <p className="text-[8.5px] text-slate-600 font-bold">
+              <p className="text-[8.5px] text-slate-600 font-medium">
                 {isAr
                   ? 'ملاحظة: لا يوجد أي مرسل خارجي في هذا الإصدار؛ لا يمكن تفعيل الإرسال الخارجي حتى مع صلاحيات المشرف.'
                   : 'Note: no external dispatcher exists in this version; external delivery cannot be enabled even by admins.'}

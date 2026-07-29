@@ -181,8 +181,8 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
     <div className="space-y-3">
       <div className="flex justify-between items-center">
         <div>
-          <span className="text-[10px] font-black text-slate-600 uppercase">Catalog Mapping</span>
-          <p className="text-[8.5px] text-slate-600 font-bold mt-0.5">
+          <span className="text-[10px] font-black text-slate-600">Catalog Mapping</span>
+          <p className="text-[8.5px] text-slate-600 font-medium mt-0.5">
             {status?.last_pull_at ? `Last pull ${new Date(status.last_pull_at).toLocaleString()}` : 'Not pulled yet'}
           </p>
         </div>
@@ -217,7 +217,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       {status && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div className="glass-card rounded-xl p-2.5 bg-white/40">
-            <div className="text-[9px] font-black uppercase mb-1.5 flex items-center gap-1.5">
+            <div className="text-[9px] font-black mb-1.5 flex items-center gap-1.5">
               Pickup sync readiness
               <span className={`px-1.5 py-0.5 rounded-full text-[8px] ${status.readiness.ready ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                 {status.readiness.ready ? 'READY' : 'NOT READY'}
@@ -233,7 +233,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
             </div>
           </div>
           <div className="glass-card rounded-xl p-2.5 bg-white/40">
-            <div className="text-[9px] font-black uppercase mb-1.5">Mapping status</div>
+            <div className="text-[9px] font-black mb-1.5">Mapping status</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9.5px] font-bold text-slate-600">
               <SummaryRow label="Branches" c={status.branches} />
               <SummaryRow label="Categories" c={status.categories} />
@@ -269,12 +269,12 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       {loading ? (
         <div className="text-[10px] text-slate-600 font-bold flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</div>
       ) : cands.length === 0 ? (
-        <p className="text-[10px] text-slate-600 font-bold">No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.</p>
+        <p className="text-[10px] text-slate-600 font-medium">No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[10px]">
             <thead>
-              <tr className="text-slate-600 font-black uppercase text-[8.5px] text-left">
+              <tr className="text-slate-600 font-bold text-xs text-left">
                 <th className="py-1 pr-2">Local (EN / AR)</th>
                 <th className="py-1 pr-2">Suggested match</th>
                 <th className="py-1 pr-2">Map to Lazywait</th>
@@ -361,7 +361,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
         </div>
       )}
 
-      <p className="text-[8.5px] text-slate-600 font-bold leading-snug">
+      <p className="text-[8.5px] text-slate-600 font-medium leading-snug">
         <b>Import to App</b> makes Lazywait the menu source: it creates/updates your categories &amp; products from
         the latest pull (prices from Lazywait), hides local items not in Lazywait, and keeps branch delivery settings.
         Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). price_id,

@@ -87,10 +87,10 @@ export const LegalDocumentsPanel: React.FC = () => {
 
   return (
     <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
+      {/* Title comes from the shell header; the not-legal-advice caveat stays. */}
+      <div className="flex justify-between items-start gap-3">
         <div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRTL ? 'المستندات القانونية والسياسات' : 'Legal Documents & Policies'}</h3>
-          <p className="text-[10px] text-slate-600 font-bold mt-0.5">
+          <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">
             {isRTL ? 'حرّر السياسات بالعربية والإنجليزية — تظهر المفعّلة في التطبيق. المحتوى قابل للتعديل وليس استشارة قانونية.' : 'Edit policies in AR & EN — active ones show in the app. Content is editable placeholder text, not legal advice.'}
           </p>
         </div>
@@ -118,7 +118,7 @@ export const LegalDocumentsPanel: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-4">
           {/* Document list */}
           <div className="space-y-1.5">
-            <span className="text-[9px] font-black text-slate-600 uppercase px-1">{isRTL ? `المستندات (${activeCount}/${rows.length} مفعّل)` : `Documents (${activeCount}/${rows.length} active)`}</span>
+            <span className="text-[9px] font-black text-slate-600 px-1">{isRTL ? `المستندات (${activeCount}/${rows.length} مفعّل)` : `Documents (${activeCount}/${rows.length} active)`}</span>
             {ordered.map((d) => (
               <button
                 key={d.id}
@@ -138,7 +138,7 @@ export const LegalDocumentsPanel: React.FC = () => {
           {draft && selected ? (
             <div className="glass-card bg-white/50 rounded-2xl p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <span className="font-black text-slate-800 text-xs uppercase">{isRTL ? draft.title_ar : draft.title_en}</span>
+                <span className="font-black text-slate-800 text-xs">{isRTL ? draft.title_ar : draft.title_en}</span>
                 <div className="flex items-center gap-2">
                   <button onClick={() => setPreview((p) => !p)} className="text-[10px] font-black text-slate-600 hover:text-primary flex items-center gap-1">
                     {preview ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />} {preview ? (isRTL ? 'تحرير' : 'Edit') : (isRTL ? 'معاينة' : 'Preview')}
@@ -160,40 +160,40 @@ export const LegalDocumentsPanel: React.FC = () => {
                 <>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (EN)' : 'Title (EN)'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'العنوان (EN)' : 'Title (EN)'}</label>
                       <input value={draft.title_en} onChange={(e) => setDraft({ ...draft, title_en: e.target.value })} disabled={isAccountant} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
                       <input value={draft.title_ar} onChange={(e) => setDraft({ ...draft, title_ar: e.target.value })} disabled={isAccountant} dir="rtl" className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'المحتوى (EN)' : 'Content (EN)'}</label>
+                    <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'المحتوى (EN)' : 'Content (EN)'}</label>
                     <textarea value={draft.content_en} onChange={(e) => setDraft({ ...draft, content_en: e.target.value })} disabled={isAccountant} rows={9} className="glass-input w-full p-2 font-semibold text-slate-700 text-[11px] leading-relaxed" />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'المحتوى (AR)' : 'Content (AR)'}</label>
+                    <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'المحتوى (AR)' : 'Content (AR)'}</label>
                     <textarea value={draft.content_ar} onChange={(e) => setDraft({ ...draft, content_ar: e.target.value })} disabled={isAccountant} dir="rtl" rows={9} className="glass-input w-full p-2 font-semibold text-slate-700 text-[11px] leading-relaxed" />
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الإصدار' : 'Version'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الإصدار' : 'Version'}</label>
                       <input value={draft.version} onChange={(e) => setDraft({ ...draft, version: e.target.value })} disabled={isAccountant} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'تاريخ السريان' : 'Effective date'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'تاريخ السريان' : 'Effective date'}</label>
                       <input type="date" value={draft.effective_date} onChange={(e) => setDraft({ ...draft, effective_date: e.target.value })} disabled={isAccountant} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
                       <select value={draft.is_active ? 'true' : 'false'} onChange={(e) => setDraft({ ...draft, is_active: e.target.value === 'true' })} disabled={isAccountant} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                         <option value="true">{isRTL ? 'مفعّل' : 'Active'}</option>
                         <option value="false">{isRTL ? 'معطّل' : 'Inactive'}</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'يتطلب الموافقة' : 'Requires acceptance'}</label>
+                      <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'يتطلب الموافقة' : 'Requires acceptance'}</label>
                       <select value={draft.requires_acceptance ? 'true' : 'false'} onChange={(e) => setDraft({ ...draft, requires_acceptance: e.target.value === 'true' })} disabled={isAccountant} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                         <option value="false">{isRTL ? 'لا' : 'No'}</option>
                         <option value="true">{isRTL ? 'نعم' : 'Yes'}</option>

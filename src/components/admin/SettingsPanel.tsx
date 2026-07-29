@@ -85,17 +85,8 @@ export const SettingsPanel: React.FC = () => {
 
             return (
               <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-                <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
-                  <div>
-                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-                      {isRTL ? 'إعدادات النظام' : 'System Settings'}
-                    </h3>
-                    <p className="text-[10px] text-slate-600 font-bold mt-0.5">
-                      {isRTL ? 'تخصيص الهوية التجارية والضريبة وطرق الدفع والخرائط وبرنامج الولاء' : 'Customize branding, VAT, payment methods, maps, and the loyalty program'}
-                    </p>
-                  </div>
-                </div>
-
+                {/* Title and subtitle both come from the shell header now — the
+                    panel repeated them verbatim. */}
                 {/* SUB-TAB SELECTOR GRID */}
                 <div className="flex gap-1.5 overflow-x-auto pb-1 border-b border-slate-100">
                   <button
@@ -166,13 +157,13 @@ export const SettingsPanel: React.FC = () => {
                   {settingsSubTab === 'brand' && (
                     <div className="space-y-4">
                       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
-                        <span className="font-black text-slate-800 text-xs uppercase">{isRTL ? 'تخصيص الهوية وشروط الاستخدام والضريبة' : 'Brand Corporate Design & VAT Rules'}</span>
+                        <span className="font-black text-slate-800 text-xs">{isRTL ? 'تخصيص الهوية وشروط الاستخدام والضريبة' : 'Brand Corporate Design & VAT Rules'}</span>
                         <span className="text-[9px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black">{isRTL ? 'الوعاء الضريبي المعتمد' : 'ZATCA Active'}</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'رابط شعار العلامة التجارية' : 'Logo Image URL'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'رابط شعار العلامة التجارية' : 'Logo Image URL'}</label>
                           <input 
                             type="text"
                             value={brandSettings.logoUrl}
@@ -183,7 +174,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'اللون الأساسي للعلامة (HEX)' : 'Primary Color Theme'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'اللون الأساسي للعلامة (HEX)' : 'Primary Color Theme'}</label>
                           <div className="flex gap-2">
                             <input 
                               type="color"
@@ -203,7 +194,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'اللون الثانوي للعلامة (HEX)' : 'Secondary Color Theme'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'اللون الثانوي للعلامة (HEX)' : 'Secondary Color Theme'}</label>
                           <div className="flex gap-2">
                             <input 
                               type="color"
@@ -229,7 +220,7 @@ export const SettingsPanel: React.FC = () => {
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'نسبة الضريبة المضافة (%)' : 'VAT Percentage'}</label>
+                              <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'نسبة الضريبة المضافة (%)' : 'VAT Percentage'}</label>
                               <input 
                                 type="number"
                                 value={brandSettings.vatPercentage}
@@ -240,7 +231,7 @@ export const SettingsPanel: React.FC = () => {
                             </div>
 
                             <div>
-                              <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الأسعار تشمل الضريبة' : 'Prices Include VAT'}</label>
+                              <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الأسعار تشمل الضريبة' : 'Prices Include VAT'}</label>
                               <select
                                 value={brandSettings.vatIncluded ? 'true' : 'false'}
                                 onChange={(e) => updateBrandSettings({ vatIncluded: e.target.value === 'true' })}
@@ -259,7 +250,7 @@ export const SettingsPanel: React.FC = () => {
                           
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'هاتف خدمة العملاء' : 'Support Phone'}</label>
+                              <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'هاتف خدمة العملاء' : 'Support Phone'}</label>
                               <input 
                                 type="text"
                                 value={brandSettings.supportPhone}
@@ -270,7 +261,7 @@ export const SettingsPanel: React.FC = () => {
                             </div>
 
                             <div>
-                              <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'رقم الواتساب التجاري' : 'WhatsApp Hotline'}</label>
+                              <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'رقم الواتساب التجاري' : 'WhatsApp Hotline'}</label>
                               <input 
                                 type="text"
                                 value={brandSettings.whatsappNumber}
@@ -285,7 +276,7 @@ export const SettingsPanel: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'سياسة الخصوصية بالإنجليزية' : 'Privacy Policy (EN)'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'سياسة الخصوصية بالإنجليزية' : 'Privacy Policy (EN)'}</label>
                           <textarea 
                             value={brandSettings.privacyPolicyEn}
                             onChange={(e) => updateBrandSettings({ privacyPolicyEn: e.target.value })}
@@ -296,7 +287,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'سياسة الخصوصية بالعربية' : 'سياسة الخصوصية (AR)'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'سياسة الخصوصية بالعربية' : 'سياسة الخصوصية (AR)'}</label>
                           <textarea 
                             value={brandSettings.privacyPolicyAr}
                             onChange={(e) => updateBrandSettings({ privacyPolicyAr: e.target.value })}
@@ -309,7 +300,7 @@ export const SettingsPanel: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'شروط وأحكام الخدمة بالإنجليزية' : 'Terms & Conditions (EN)'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'شروط وأحكام الخدمة بالإنجليزية' : 'Terms & Conditions (EN)'}</label>
                           <textarea 
                             value={brandSettings.termsEn}
                             onChange={(e) => updateBrandSettings({ termsEn: e.target.value })}
@@ -320,7 +311,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'شروط وأحكام الخدمة بالعربية' : 'الشروط والأحكام (AR)'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'شروط وأحكام الخدمة بالعربية' : 'الشروط والأحكام (AR)'}</label>
                           <textarea 
                             value={brandSettings.termsAr}
                             onChange={(e) => updateBrandSettings({ termsAr: e.target.value })}
@@ -345,7 +336,7 @@ export const SettingsPanel: React.FC = () => {
                     <div className="space-y-4">
                       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                         <div>
-                          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'توفر طرق الدفع' : 'Payment Method Availability'}</span>
+                          <span className="font-black text-slate-800 text-xs block">{isRTL ? 'توفر طرق الدفع' : 'Payment Method Availability'}</span>
                           <span className="text-[9.5px] text-slate-600 font-bold">{isRTL ? 'تحكّم في الدفع الإلكتروني والنقدي — يُطبَّق على السلة والطلبات فوراً' : 'Control online vs cash — applied to checkout and new orders immediately'}</span>
                         </div>
                         <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
@@ -362,7 +353,7 @@ export const SettingsPanel: React.FC = () => {
 
                       {/* Current live availability (from the server, not the draft) */}
                       <div className="p-3 bg-slate-50/70 border border-slate-200/50 rounded-xl flex flex-wrap items-center gap-2 text-[10px] font-bold">
-                        <span className="text-slate-600 uppercase tracking-wide">{isRTL ? 'الوضع الحالي:' : 'Live now:'}</span>
+                        <span className="text-slate-600 font-medium">{isRTL ? 'الوضع الحالي:' : 'Live now:'}</span>
                         <span className={`px-2 py-0.5 rounded-full ${paymentSettings.onlineEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
                           {isRTL ? 'إلكتروني' : 'Online'} {paymentSettings.onlineEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </span>
@@ -381,7 +372,7 @@ export const SettingsPanel: React.FC = () => {
                             <CreditCard className="w-4 h-4 text-primary" />
                             <span className="font-black text-slate-800 text-[11px]">{isRTL ? 'الدفع الإلكتروني' : 'Online Payment'}</span>
                           </div>
-                          <p className="text-[9.5px] text-slate-600 font-semibold leading-relaxed">
+                          <p className="text-[9.5px] text-slate-600 font-medium leading-relaxed">
                             {isRTL ? 'بوابة الدفع غير مفعّلة بعد؛ الطلبات الإلكترونية لا تُرسل للكاشير حتى يتأكد الدفع.' : 'No gateway yet; online orders are held from POS until payment is verified.'}
                           </p>
                           <select
@@ -401,7 +392,7 @@ export const SettingsPanel: React.FC = () => {
                             <Banknote className="w-4 h-4 text-green-700" />
                             <span className="font-black text-slate-800 text-[11px]">{isRTL ? 'الدفع النقدي (عند الاستلام)' : 'Cash Payment (on Pickup/Delivery)'}</span>
                           </div>
-                          <p className="text-[9.5px] text-slate-600 font-semibold leading-relaxed">
+                          <p className="text-[9.5px] text-slate-600 font-medium leading-relaxed">
                             {isRTL ? 'الطلبات النقدية تُرسل للكاشير كغير مدفوعة؛ يُحصّل المبلغ من العميل.' : 'Cash orders are sent to POS as unpaid; collect the amount from the customer.'}
                           </p>
                           <select
@@ -418,7 +409,7 @@ export const SettingsPanel: React.FC = () => {
                         {/* DEFAULT method */}
                         <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
                           <span className="font-black text-slate-800 text-[11px] block">{isRTL ? 'الطريقة الافتراضية' : 'Default Method'}</span>
-                          <p className="text-[9.5px] text-slate-600 font-semibold leading-relaxed">
+                          <p className="text-[9.5px] text-slate-600 font-medium leading-relaxed">
                             {isRTL ? 'الطريقة المختارة مسبقاً في السلة (يجب أن تكون مفعّلة).' : 'Preselected in checkout (must be an enabled method).'}
                           </p>
                           <select
@@ -436,7 +427,7 @@ export const SettingsPanel: React.FC = () => {
                         {/* OUTAGE mode */}
                         <div className="p-3.5 bg-white border border-slate-100 rounded-2xl space-y-2">
                           <span className="font-black text-slate-800 text-[11px] block">{isRTL ? 'وضع انقطاع الدفع الإلكتروني' : 'Online Outage Mode'}</span>
-                          <p className="text-[9.5px] text-slate-600 font-semibold leading-relaxed">
+                          <p className="text-[9.5px] text-slate-600 font-medium leading-relaxed">
                             {isRTL ? 'علامة توضيحية عند تعطّل البوابة (تُعرض للفريق فقط).' : 'A label flag for when the gateway is down (informational for staff).'}
                           </p>
                           <select
@@ -505,7 +496,7 @@ export const SettingsPanel: React.FC = () => {
                     <div className="space-y-4">
                       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
                         <div>
-                          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'إعدادات الخريطة' : 'Map Settings'}</span>
+                          <span className="font-black text-slate-800 text-xs block">{isRTL ? 'إعدادات الخريطة' : 'Map Settings'}</span>
                           <span className="text-[9.5px] text-slate-600 font-bold">{isRTL ? 'مزوّد الخرائط لرسم مناطق التوصيل واختيار موقع العميل' : 'Provider for delivery-zone drawing + customer location picker'}</span>
                         </div>
                         <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
@@ -515,18 +506,18 @@ export const SettingsPanel: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="p-3 bg-white border border-slate-100 rounded-2xl">
-                          <span className="text-[9px] font-black text-slate-600 uppercase block">{isRTL ? 'المزوّد الحالي' : 'Current provider'}</span>
-                          <p className="text-sm font-black text-slate-800 mt-1 capitalize">{mapConfig.provider}</p>
+                          <span className="text-[9px] font-black text-slate-600 block">{isRTL ? 'المزوّد الحالي' : 'Current provider'}</span>
+                          <p className="text-sm font-bold text-slate-800 mt-1 capitalize">{mapConfig.provider}</p>
                         </div>
                         <div className="p-3 bg-white border border-slate-100 rounded-2xl">
-                          <span className="text-[9px] font-black text-slate-600 uppercase block">{isRTL ? 'الرمز العام مُهيّأ' : 'Public token configured'}</span>
+                          <span className="text-[9px] font-black text-slate-600 block">{isRTL ? 'الرمز العام مُهيّأ' : 'Public token configured'}</span>
                           <p className={`text-sm font-black mt-1 ${mapConfig.isConfigured ? 'text-green-700' : 'text-red-600'}`}>
                             {mapConfig.isConfigured ? (isRTL ? 'نعم' : 'Yes') : (isRTL ? 'لا' : 'No')}
                           </p>
                         </div>
                         <div className="p-3 bg-white border border-slate-100 rounded-2xl md:col-span-2">
-                          <span className="text-[9px] font-black text-slate-600 uppercase block">{isRTL ? 'رابط النمط' : 'Style URL'}</span>
-                          <p className="text-[11px] font-mono font-bold text-slate-600 mt-1 break-all">{mapConfig.styleUrl}</p>
+                          <span className="text-[9px] font-black text-slate-600 block">{isRTL ? 'رابط النمط' : 'Style URL'}</span>
+                          <p className="text-[11px] font-mono font-medium text-slate-600 mt-1 break-all">{mapConfig.styleUrl}</p>
                         </div>
                       </div>
 
@@ -563,7 +554,7 @@ export const SettingsPanel: React.FC = () => {
                   {settingsSubTab === 'loyalty' && (
                     <div className="space-y-4">
                       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
-                        <span className="font-black text-slate-800 text-xs uppercase">{isRTL ? 'برنامج المكافآت والنقاط الموحد' : 'Brand Customer Loyalty & Rewards System'}</span>
+                        <span className="font-black text-slate-800 text-xs">{isRTL ? 'برنامج المكافآت والنقاط الموحد' : 'Brand Customer Loyalty & Rewards System'}</span>
                         <div className="flex items-center gap-2">
                           <span className="text-[9px] text-gray-600 font-bold">{isRTL ? 'برنامج النقاط:' : 'Loyalty State:'}</span>
                           <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${loyaltySettings.isEnabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -574,7 +565,7 @@ export const SettingsPanel: React.FC = () => {
 
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'النقاط الممنوحة لكل ريال صرف' : 'Points Earned per Real Spent'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'النقاط الممنوحة لكل ريال صرف' : 'Points Earned per Real Spent'}</label>
                           <input 
                             type="number"
                             value={loyaltySettings.pointsPerRiyal}
@@ -585,7 +576,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الحد الأدنى لاستبدال النقاط' : 'Min Points to Redeem'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الحد الأدنى لاستبدال النقاط' : 'Min Points to Redeem'}</label>
                           <input 
                             type="number"
                             value={loyaltySettings.minPointsToRedeem}
@@ -596,7 +587,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'قيمة الخصم لكل نقطة (SAR)' : 'Discount Credit Value per Point (SAR)'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'قيمة الخصم لكل نقطة (SAR)' : 'Discount Credit Value per Point (SAR)'}</label>
                           <input 
                             type="number"
                             step="0.01"
@@ -608,7 +599,7 @@ export const SettingsPanel: React.FC = () => {
                         </div>
 
                         <div>
-                          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'تفعيل نظام المكافآت المالي' : 'Active Rewards Campaign'}</label>
+                          <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'تفعيل نظام المكافآت المالي' : 'Active Rewards Campaign'}</label>
                           <select
                             value={loyaltySettings.isEnabled ? 'true' : 'false'}
                             onChange={(e) => updateLoyaltySettings({ isEnabled: e.target.value === 'true' })}
@@ -627,32 +618,32 @@ export const SettingsPanel: React.FC = () => {
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
-                            <span className="text-[8.5px] font-bold text-gray-600 uppercase block">{isRTL ? 'إجمالي الأعضاء المسجلين' : 'Active Loyalty Members'}</span>
-                            <p className="text-sm font-black text-slate-800 mt-1">
+                            <span className="text-[8.5px] font-bold text-gray-600 block">{isRTL ? 'إجمالي الأعضاء المسجلين' : 'Active Loyalty Members'}</span>
+                            <p className="text-sm font-bold text-slate-800 mt-1">
                               {profiles.filter(p => p.role === 'customer').length} {isRTL ? 'عميل' : 'Users'}
                             </p>
                             <span className="text-[8px] text-green-700 font-bold block mt-0.5">● Live Database</span>
                           </div>
 
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
-                            <span className="text-[8.5px] font-bold text-gray-600 uppercase block">{isRTL ? 'إجمالي النقاط المجمعة' : 'Accumulated Point Balances'}</span>
-                            <p className="text-sm font-black text-slate-800 mt-1">
+                            <span className="text-[8.5px] font-bold text-gray-600 block">{isRTL ? 'إجمالي النقاط المجمعة' : 'Accumulated Point Balances'}</span>
+                            <p className="text-sm font-bold text-slate-800 mt-1">
                               {profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0).toLocaleString()} {isRTL ? 'نقطة' : 'Points'}
                             </p>
                             <span className="text-[8px] text-slate-600 block mt-0.5">{isRTL ? 'رصيد مستحق للعملاء' : 'Active liability points'}</span>
                           </div>
 
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
-                            <span className="text-[8.5px] font-bold text-gray-600 uppercase block">{isRTL ? 'إجمالي قيمة خصومات النقاط' : 'Deducted Points Discount Value'}</span>
-                            <p className="text-sm font-black text-primary mt-1">
+                            <span className="text-[8.5px] font-bold text-gray-600 block">{isRTL ? 'إجمالي قيمة خصومات النقاط' : 'Deducted Points Discount Value'}</span>
+                            <p className="text-sm font-bold text-primary mt-1">
                               <Price amount={profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1)} />
                             </p>
                             <span className="text-[8px] text-slate-600 block mt-0.5">{isRTL ? 'مستقطعة من قيمة الفواتير المكتملة' : 'Calculated at active conversions'}</span>
                           </div>
 
                           <div className="bg-white/80 p-3 rounded-xl border border-slate-100">
-                            <span className="text-[8.5px] font-bold text-gray-600 uppercase block">{isRTL ? 'متوسط قيمة الاسترداد لكل عميل' : 'Average Cashback per User'}</span>
-                            <p className="text-sm font-black text-green-700 mt-1">
+                            <span className="text-[8.5px] font-bold text-gray-600 block">{isRTL ? 'متوسط قيمة الاسترداد لكل عميل' : 'Average Cashback per User'}</span>
+                            <p className="text-sm font-bold text-green-700 mt-1">
                               {formatSAR(profiles.filter(p => p.role === 'customer').length
                                 ? (profiles.filter(p => p.role === 'customer').reduce((sum, p) => sum + (p.loyaltyPoints || 0), 0) * (loyaltySettings.discountPerPoint || 0.1) / profiles.filter(p => p.role === 'customer').length) 
                                 : 0, adminLang)}
@@ -663,11 +654,11 @@ export const SettingsPanel: React.FC = () => {
 
                         {/* CUSTOMER LOYALTY LEDGER & REAL-TIME POINT ADJUSTMENTS */}
                         <div className="space-y-3 pt-3.5 border-t border-primary/10">
-                          <span className="font-extrabold text-slate-800 text-[10px] block uppercase tracking-wider">
+                          <span className="font-bold text-slate-800 text-xs block">
                             {isRTL ? 'سجل أرصدة نقاط ولاء العملاء (Customer Loyalty Ledger)' : 'Customer Loyalty Ledger & Point Adjustments'}
                           </span>
                           {!loyaltyMutationsEnabled && (
-                            <p className="text-[9px] text-slate-600 font-bold bg-slate-100/70 border border-slate-200/60 rounded-lg p-2">
+                            <p className="text-[9px] text-slate-600 font-medium bg-slate-100/70 border border-slate-200/60 rounded-lg p-2">
                               {isRTL
                                 ? 'أرصدة النقاط للعرض فقط في هذه النسخة — لا يوجد إجراء خلفي لتعديل النقاط بعد.'
                                 : 'Point balances are read-only in this build — there is no backend routine to adjust loyalty points yet.'}
@@ -719,7 +710,7 @@ export const SettingsPanel: React.FC = () => {
 
                                   <div className="flex items-center gap-4 bg-primary/3 px-3 py-2 rounded-xl border border-purple-100/10 self-start md:self-auto min-w-[130px]">
                                     <div>
-                                      <span className="text-[8px] font-bold text-gray-600 uppercase block">{isRTL ? 'النقاط المتوفرة' : 'Point Balance'}</span>
+                                      <span className="text-[8px] font-bold text-gray-600 block">{isRTL ? 'النقاط المتوفرة' : 'Point Balance'}</span>
                                       <div className="flex items-baseline gap-1">
                                         <span className="text-sm font-black text-primary">{currentPoints}</span>
                                         <span className="text-[8px] text-slate-600 font-bold">{isRTL ? 'نقب' : 'pts'}</span>
@@ -885,7 +876,7 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
     })();
   };
 
-  if (loading) return <p className="text-[10px] font-bold text-slate-600">{isRTL ? 'جارٍ التحميل…' : 'Loading…'}</p>;
+  if (loading) return <p className="text-[10px] font-medium text-slate-600">{isRTL ? 'جارٍ التحميل…' : 'Loading…'}</p>;
 
   const channelRows: {
     key: 'phone' | 'whatsapp' | 'email';
@@ -902,7 +893,7 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
     <div className="space-y-4">
       <div className="border-b border-slate-100 pb-2 flex justify-between items-center">
         <div>
-          <span className="font-black text-slate-800 text-xs uppercase block">{isRTL ? 'التواصل والدعم' : 'Support & Contact'}</span>
+          <span className="font-black text-slate-800 text-xs block">{isRTL ? 'التواصل والدعم' : 'Support & Contact'}</span>
           <span className="text-[9.5px] text-slate-600 font-bold">
             {isRTL ? 'القنوات الظاهرة في تطبيق العملاء (المستندات والدعم). تُخفى أي قناة غير مفعّلة أو غير صالحة.' : 'Channels shown in the customer app (Legal & Support). Disabled or invalid channels are hidden automatically.'}
           </span>
@@ -918,7 +909,7 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
           return (
             <div key={row.key} className="p-3 bg-white border border-slate-100 rounded-2xl space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] font-black text-slate-600 uppercase">{row.label}</span>
+                <span className="text-[9px] font-black text-slate-600">{row.label}</span>
                 <label className="flex items-center gap-1.5 cursor-pointer">
                   <input
                     type="checkbox"
@@ -938,8 +929,8 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
                 onChange={(e) => set(row.valueKey, e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold"
               />
-              {w ? <p className="text-[9px] font-bold text-amber-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {w}</p>
-                 : <p className="text-[9px] font-bold text-green-700 flex items-center gap-1"><Check className="w-3 h-3" /> {isRTL ? 'ستظهر للعملاء' : 'Visible to customers'}</p>}
+              {w ? <p className="text-[9px] font-medium text-amber-700 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> {w}</p>
+                 : <p className="text-[9px] font-medium text-green-700 flex items-center gap-1"><Check className="w-3 h-3" /> {isRTL ? 'ستظهر للعملاء' : 'Visible to customers'}</p>}
             </div>
           );
         })}
@@ -947,25 +938,25 @@ const SupportContactSection: React.FC<{ isRTL: boolean; readOnly: boolean }> = (
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
-          <span className="text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'ساعات العمل (إنجليزي)' : 'Working hours (English)'}</span>
+          <span className="text-[9px] font-black text-slate-600">{isRTL ? 'ساعات العمل (إنجليزي)' : 'Working hours (English)'}</span>
           <input type="text" value={form.support_hours_en} disabled={readOnly} placeholder="Daily 11:00–23:00"
             onChange={(e) => set('support_hours_en', e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
         </div>
         <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
-          <span className="text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'ساعات العمل (عربي)' : 'Working hours (Arabic)'}</span>
+          <span className="text-[9px] font-black text-slate-600">{isRTL ? 'ساعات العمل (عربي)' : 'Working hours (Arabic)'}</span>
           <input type="text" dir="rtl" value={form.support_hours_ar} disabled={readOnly} placeholder="يومياً ١١:٠٠–٢٣:٠٠"
             onChange={(e) => set('support_hours_ar', e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
         </div>
         <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
-          <span className="text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'وصف الدعم (إنجليزي، اختياري)' : 'Support description (English, optional)'}</span>
+          <span className="text-[9px] font-black text-slate-600">{isRTL ? 'وصف الدعم (إنجليزي، اختياري)' : 'Support description (English, optional)'}</span>
           <input type="text" value={form.support_desc_en} disabled={readOnly} placeholder="We reply within minutes."
             onChange={(e) => set('support_desc_en', e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />
         </div>
         <div className="p-3 bg-white border border-slate-100 rounded-2xl space-y-1.5">
-          <span className="text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'وصف الدعم (عربي، اختياري)' : 'Support description (Arabic, optional)'}</span>
+          <span className="text-[9px] font-black text-slate-600">{isRTL ? 'وصف الدعم (عربي، اختياري)' : 'Support description (Arabic, optional)'}</span>
           <input type="text" dir="rtl" value={form.support_desc_ar} disabled={readOnly} placeholder="نرد خلال دقائق."
             onChange={(e) => set('support_desc_ar', e.target.value)}
             className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold" />

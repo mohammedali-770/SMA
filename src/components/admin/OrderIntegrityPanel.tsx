@@ -122,8 +122,8 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-primary" />
           <div>
-            <h4 className="text-xs font-black text-slate-800 uppercase">Order Integrity Watchdog</h4>
-            <p className="text-[9.5px] text-slate-600 font-bold mt-0.5">
+            {/* Title dropped — the shell header carries it. */}
+            <p className="text-[9.5px] text-slate-600 font-medium">
               Observe-only shadow mode — no automatic remediation. Alerts are not dispatched in v1.
             </p>
           </div>
@@ -139,26 +139,26 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         <div className="glass-card p-3 rounded-xl bg-white/50">
-          <p className="text-[8.5px] font-black text-slate-600 uppercase">Overall State</p>
+          <p className="text-[8.5px] font-bold text-slate-600">Overall State</p>
           <span className={`mt-1 inline-block px-2 py-0.5 rounded-full font-black text-[10px] ${STATE_TONE[state] ?? 'bg-slate-100 text-slate-600'}`}>{state}</span>
-          <p className="text-[8.5px] text-slate-600 font-bold mt-1">
+          <p className="text-[8.5px] text-slate-600 font-medium mt-1">
             cron {health?.watchdog_cron_active ? 'active' : 'inactive'}
           </p>
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">
-          <p className="text-[8.5px] font-black text-slate-600 uppercase">Open Critical</p>
-          <p className="text-lg font-black text-red-700">{health?.open_critical_count ?? 0}</p>
-          <p className="text-[8.5px] text-slate-600 font-bold">oldest {ageLabel(health?.oldest_open_critical_at ?? null)}</p>
+          <p className="text-[8.5px] font-bold text-slate-600">Open Critical</p>
+          <p className="text-lg font-bold text-red-700">{health?.open_critical_count ?? 0}</p>
+          <p className="text-[8.5px] text-slate-600 font-medium">oldest {ageLabel(health?.oldest_open_critical_at ?? null)}</p>
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">
-          <p className="text-[8.5px] font-black text-slate-600 uppercase">Open Warning</p>
-          <p className="text-lg font-black text-amber-700">{health?.open_warning_count ?? 0}</p>
-          <p className="text-[8.5px] text-slate-600 font-bold">ack {health?.acknowledged_count ?? 0} · suppressed {health?.suppressed_count ?? 0}</p>
+          <p className="text-[8.5px] font-bold text-slate-600">Open Warning</p>
+          <p className="text-lg font-bold text-amber-700">{health?.open_warning_count ?? 0}</p>
+          <p className="text-[8.5px] text-slate-600 font-medium">ack {health?.acknowledged_count ?? 0} · suppressed {health?.suppressed_count ?? 0}</p>
         </div>
         <div className="glass-card p-3 rounded-xl bg-white/50">
-          <p className="text-[8.5px] font-black text-slate-600 uppercase flex items-center gap-1"><Clock className="w-3 h-3" /> Last Scan</p>
-          <p className="text-[11px] font-black text-slate-700">{health?.latest_successful_run_at ? `${ageLabel(health.latest_successful_run_at)} ago` : '—'}</p>
-          <p className="text-[8.5px] text-slate-600 font-bold">24h: +{health?.incidents_opened_last_24h ?? 0} / -{health?.incidents_resolved_last_24h ?? 0}</p>
+          <p className="text-[8.5px] font-bold text-slate-600 flex items-center gap-1"><Clock className="w-3 h-3" /> Last Scan</p>
+          <p className="text-[11px] font-bold text-slate-700">{health?.latest_successful_run_at ? `${ageLabel(health.latest_successful_run_at)} ago` : '—'}</p>
+          <p className="text-[8.5px] text-slate-600 font-medium">24h: +{health?.incidents_opened_last_24h ?? 0} / -{health?.incidents_resolved_last_24h ?? 0}</p>
         </div>
       </div>
 
@@ -187,11 +187,11 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
       {/* Incident list */}
       <div className="overflow-x-auto">
         {incidents.length === 0 ? (
-          <p className="text-[10px] text-slate-600 font-bold py-3">No incidents match the current filters.</p>
+          <p className="text-[10px] text-slate-600 font-medium py-3">No incidents match the current filters.</p>
         ) : (
           <table className="w-full text-[10px]">
             <thead>
-              <tr className="text-slate-600 font-black uppercase text-[8.5px] text-left">
+              <tr className="text-slate-600 font-bold text-xs text-left">
                 <th className="py-1 pr-2">Rule</th><th className="py-1 pr-2">Sev</th><th className="py-1 pr-2">Status</th>
                 <th className="py-1 pr-2">Order</th><th className="py-1 pr-2">Branch</th>
                 <th className="py-1 pr-2">Last seen</th><th className="py-1 pr-2">Occ</th><th className="py-1 pr-2"></th>
@@ -254,7 +254,7 @@ export const OrderIntegrityPanel: React.FC<{ canTriage?: boolean }> = ({ canTria
         )}
       </div>
 
-      <p className="text-[8.5px] text-slate-600 font-bold leading-snug">
+      <p className="text-[8.5px] text-slate-600 font-medium leading-snug">
         Detection only. Investigate and remediate through the existing order / payment / Lazywait tools — this panel never
         creates, cancels, resends, refunds, or marks orders paid.
       </p>

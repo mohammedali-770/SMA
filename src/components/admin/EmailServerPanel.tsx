@@ -86,7 +86,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
 
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}</span>
+              <span className="text-[10px] font-black text-slate-600">{isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}</span>
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -108,7 +108,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
                   {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
                 </div>
               )}
-              <p className="text-[9px] text-slate-600 font-semibold">
+              <p className="text-[9px] text-slate-600 font-medium">
                 {isRTL
                   ? 'تُرسَل رسالة تجريبية عبر إعدادات SMTP المحفوظة. لا تُعرض كلمة المرور ولا تصل للمتصفح.'
                   : 'Sends a test message through the saved SMTP settings. The password is never shown and never reaches the browser.'}

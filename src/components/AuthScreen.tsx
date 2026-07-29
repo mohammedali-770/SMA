@@ -54,7 +54,7 @@ export const AuthScreen: React.FC = () => {
         <div className="flex flex-col items-center text-center mb-6">
           <img src="/logo.png" alt="Spicy Meal logo" className="w-14 h-14 rounded-2xl object-contain bg-white shadow-md border border-white/20 mb-3" />
           <h1 className="text-lg font-black text-primary tracking-tight">SPICY MEAL</h1>
-          <p className="text-[11px] text-slate-600 font-bold mt-1">
+          <p className="text-[11px] text-slate-600 font-medium mt-1">
             {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
           </p>
         </div>
@@ -81,7 +81,7 @@ export const AuthScreen: React.FC = () => {
           {mode === 'signup' && (
             <>
               <div>
-                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Full Name</label>
+                <label className="block text-[10px] font-black text-slate-600 mb-1">Full Name</label>
                 <input
                   type="text"
                   required
@@ -93,7 +93,7 @@ export const AuthScreen: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Phone (optional)</label>
+                <label className="block text-[10px] font-black text-slate-600 mb-1">Phone (optional)</label>
                 <input
                   type="tel"
                   value={phone}
@@ -107,7 +107,7 @@ export const AuthScreen: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Email</label>
+            <label className="block text-[10px] font-black text-slate-600 mb-1">Email</label>
             <input
               type="email"
               required
@@ -120,7 +120,7 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Password</label>
+            <label className="block text-[10px] font-black text-slate-600 mb-1">Password</label>
             <input
               type="password"
               required
@@ -134,10 +134,10 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           {error && (
-            <p className="text-[11px] text-red-700 font-bold bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>
+            <p className="text-[11px] text-red-700 font-medium bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>
           )}
           {notice && (
-            <p className="text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 rounded-lg p-2">{notice}</p>
+            <p className="text-[11px] text-emerald-700 font-medium bg-emerald-50 border border-emerald-100 rounded-lg p-2">{notice}</p>
           )}
 
           <button

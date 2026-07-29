@@ -158,8 +158,8 @@ function statusIcon(state: OperationsHealthState) {
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-white/50 border border-slate-100 px-2 py-1.5">
-      <p className="text-[8px] uppercase font-black text-slate-600">{label}</p>
-      <p className="text-[10px] font-black text-slate-700 break-words">{value}</p>
+      <p className="text-[8px] font-bold text-slate-600">{label}</p>
+      <p className="text-[10px] font-bold text-slate-700 break-words">{value}</p>
     </div>
   );
 }
@@ -271,7 +271,7 @@ const SystemCard: React.FC<{
               </span>
             )}
           </div>
-          <p className="text-[8.5px] text-slate-600 font-bold mt-1 leading-relaxed">
+          <p className="text-[8.5px] text-slate-600 font-medium mt-1 leading-relaxed">
             {isAr ? text.descAr : text.descEn}
           </p>
         </div>
@@ -312,7 +312,7 @@ function JobsTable({ jobs, lang }: { jobs: OperationsHealthJob[]; lang: AdminLan
     <div className="overflow-x-auto">
       <table className="w-full min-w-[680px] text-[9.5px]">
         <thead>
-          <tr className="text-slate-600 font-black uppercase text-[8px] text-start">
+          <tr className="text-slate-600 font-bold text-xs text-start">
             <th className="py-2 px-2">{isAr ? 'المهمة' : 'Job'}</th>
             <th className="py-2 px-2">{isAr ? 'الجدولة' : 'Cadence'}</th>
             <th className="py-2 px-2">{isAr ? 'الحالة' : 'State'}</th>
@@ -353,8 +353,8 @@ const AttentionRow: React.FC<{ item: OperationsHealthAttention; lang: AdminLang 
     }`}>
       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
       <div className="flex-1">
-        <p className="text-[10px] font-black">{text}</p>
-        <p className="text-[8.5px] font-bold opacity-75 mt-0.5">
+        <p className="text-[10px] font-bold">{text}</p>
+        <p className="text-[8.5px] font-medium opacity-75 mt-0.5">
           {isAr ? 'العدد' : 'Count'}: {item.count}
           {item.oldest_at ? ` · ${relativeAge(item.oldest_at, lang)}` : ''}
         </p>
@@ -412,17 +412,16 @@ export const OperationsHealthPanel: React.FC<{
       <header className="glass-card rounded-2xl bg-white/45 p-4 border border-white/60">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
+            {/* The shell header already names this panel. What belongs here is
+                the overall state and the read-only constraint. */}
             <div className="flex items-center gap-2">
               <HeartPulse className="w-5 h-5 text-primary" aria-hidden="true" />
-              <h3 className="text-sm font-black text-slate-800">
-                {isAr ? 'مركز صحة العمليات' : 'Operations Health Center'}
-              </h3>
               <span className={`border rounded-full px-2 py-1 text-[9px] font-black inline-flex items-center gap-1 ${STATE_TONE[overall]}`}>
                 {statusIcon(overall)}
                 {STATE_LABELS[overall][lang]}
               </span>
             </div>
-            <p className="text-[9px] text-slate-600 font-bold mt-1">
+            <p className="text-[9px] text-slate-600 font-medium mt-1">
               {isAr
                 ? 'مراقبة للقراءة فقط. لا توجد إعادة محاولة أو استرداد أو إصلاح تلقائي أو رسائل اختبار.'
                 : 'Read-only observability. No retries, refunds, auto-fixes or test messages.'}
@@ -464,7 +463,7 @@ export const OperationsHealthPanel: React.FC<{
       <section>
         <div className="flex items-center gap-2 mb-2">
           <Activity className="w-4 h-4 text-primary" aria-hidden="true" />
-          <h4 className="text-[11px] font-black text-slate-700 uppercase">
+          <h4 className="text-[11px] font-black text-slate-700">
             {isAr ? 'حالة الأنظمة' : 'System Health'}
           </h4>
         </div>
@@ -479,10 +478,10 @@ export const OperationsHealthPanel: React.FC<{
         <div className="flex items-center gap-2 mb-2">
           <Database className="w-4 h-4 text-primary" aria-hidden="true" />
           <div>
-            <h4 className="text-[11px] font-black text-slate-700 uppercase">
+            <h4 className="text-[11px] font-black text-slate-700">
               {isAr ? 'المهام المجدولة' : 'Scheduled Jobs'}
             </h4>
-            <p className="text-[8px] text-slate-600 font-bold mt-0.5">
+            <p className="text-[8px] text-slate-600 font-medium mt-0.5">
               {isAr ? 'لا يتم عرض أوامر Cron أو الأسرار.' : 'Cron commands and secrets are never exposed.'}
             </p>
           </div>
@@ -493,14 +492,14 @@ export const OperationsHealthPanel: React.FC<{
       <section className="glass-card rounded-2xl bg-white/45 border border-white/60 p-4">
         <div className="flex items-center gap-2 mb-3">
           <Clock3 className="w-4 h-4 text-primary" aria-hidden="true" />
-          <h4 className="text-[11px] font-black text-slate-700 uppercase">
+          <h4 className="text-[11px] font-black text-slate-700">
             {isAr ? 'يتطلب الانتباه' : 'Attention Required'}
           </h4>
         </div>
         {(summary?.attention ?? []).length === 0 ? (
           <div className="rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-3 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
-            <p className="text-[10px] font-black">
+            <p className="text-[10px] font-bold">
               {isAr ? 'لا توجد حوادث تشغيلية تحتاج إلى إجراء حاليًا.' : 'No current operational incidents require action.'}
             </p>
           </div>

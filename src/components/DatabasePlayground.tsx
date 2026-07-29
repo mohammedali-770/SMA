@@ -116,7 +116,7 @@ export const DatabasePlayground: React.FC = () => {
                 </div>
               ) : (
                 <table className="w-full text-[10.5px] text-slate-300 text-left">
-                  <thead className="bg-slate-900/80 border-b border-slate-800 text-slate-400 uppercase font-black tracking-wide text-[9.5px]">
+                  <thead className="bg-slate-900/80 border-b border-slate-800 text-slate-400 font-black text-[9.5px]">
                     {activeTable === 'branches' && (
                       <tr>
                         <th className="px-3 py-2.5">ID</th>

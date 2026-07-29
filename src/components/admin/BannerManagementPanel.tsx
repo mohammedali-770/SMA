@@ -133,11 +133,11 @@ export const BannerManagementPanel: React.FC = () => {
 
   return (
     <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
+      {/* The panel title lives in the dashboard shell header; this row carries
+          only what the shell cannot say — the operating rule and the gate. */}
+      <div className="flex justify-between items-start gap-3">
         <div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRTL ? 'بانرات الصفحة الرئيسية' : 'Homepage Banners'}</h3>
-          <p className="text-[10px] text-slate-600 font-bold mt-0.5">
+          <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">
             {isRTL ? 'تظهر في أعلى الصفحة الرئيسية للتطبيق (فوق شريط البحث). البانرات المفعّلة فقط تظهر للعملاء.' : 'Shown at the top of the app homepage (above search). Only active banners appear to customers.'}
           </p>
         </div>
@@ -163,12 +163,12 @@ export const BannerManagementPanel: React.FC = () => {
       {/* ADD NEW BANNER */}
       {!isAccountant && (
         <div className="glass-card p-4 rounded-2xl bg-white/50 space-y-3">
-          <span className="font-black text-slate-800 text-xs uppercase block border-b border-slate-100 pb-2">{isRTL ? 'إضافة بانر جديد' : 'Add New Banner'}</span>
+          <span className="font-black text-slate-800 text-xs block border-b border-slate-100 pb-2">{isRTL ? 'إضافة بانر جديد' : 'Add New Banner'}</span>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Upload + preview */}
             <div className="space-y-2">
-              <label className="block text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'صورة البانر' : 'Banner Image'}</label>
+              <label className="block text-[9px] font-black text-slate-600">{isRTL ? 'صورة البانر' : 'Banner Image'}</label>
               <div className="aspect-[16/6] w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                 {draft.image_url ? (
                   <img src={draft.image_url} alt="banner preview" className="w-full h-full object-cover" />
@@ -179,28 +179,28 @@ export const BannerManagementPanel: React.FC = () => {
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void onPickFile(e)} disabled={uploading} className="block w-full text-[10px] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary file:text-white file:font-black file:text-[10px] file:cursor-pointer" />
               {uploading && <span className="text-[10px] text-slate-600 font-bold flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}</span>}
               {uploadError && <span className="text-[10px] text-red-700 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {uploadError}</span>}
-              <p className="text-[9px] text-slate-600 font-semibold">{isRTL ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت' : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}</p>
+              <p className="text-[9px] text-slate-600 font-medium">{isRTL ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت' : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}</p>
             </div>
 
             {/* Fields */}
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}</label>
                   <input value={draft.title_en} onChange={(e) => setDraft(d => ({ ...d, title_en: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="Summer Combo" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
                   <input value={draft.title_ar} onChange={(e) => setDraft(d => ({ ...d, title_ar: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="عرض الصيف" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الترتيب' : 'Sort order'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الترتيب' : 'Sort order'}</label>
                   <input type="number" value={draft.sort_order} onChange={(e) => setDraft(d => ({ ...d, sort_order: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
                   <select value={draft.is_active ? 'true' : 'false'} onChange={(e) => setDraft(d => ({ ...d, is_active: e.target.value === 'true' }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                     <option value="true">{isRTL ? 'مفعّل' : 'Active'}</option>
                     <option value="false">{isRTL ? 'معطّل' : 'Inactive'}</option>
@@ -209,17 +209,17 @@ export const BannerManagementPanel: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
                   <input type="datetime-local" value={draft.starts_at} onChange={(e) => setDraft(d => ({ ...d, starts_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
                   <input type="datetime-local" value={draft.ends_at} onChange={(e) => setDraft(d => ({ ...d, ends_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 mb-1">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</label>
                   <select value={draft.action_type} onChange={(e) => setDraft(d => ({ ...d, action_type: e.target.value as Draft['action_type'] }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                     <option value="none">{isRTL ? 'بدون' : 'None'}</option>
                     <option value="category">{isRTL ? 'فئة' : 'Category'}</option>
@@ -228,7 +228,7 @@ export const BannerManagementPanel: React.FC = () => {
                 </div>
                 {draft.action_type !== 'none' && (
                   <div>
-                    <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{draft.action_type === 'product' ? (isRTL ? 'معرّف المنتج' : 'Product ID') : (isRTL ? 'معرّف الفئة' : 'Category ID')}</label>
+                    <label className="block text-[9px] font-black text-slate-600 mb-1">{draft.action_type === 'product' ? (isRTL ? 'معرّف المنتج' : 'Product ID') : (isRTL ? 'معرّف الفئة' : 'Category ID')}</label>
                     <input value={draft.action_value} onChange={(e) => setDraft(d => ({ ...d, action_value: e.target.value }))} className="glass-input w-full p-2 font-mono font-bold text-slate-700 text-[11px]" placeholder="uuid" />
                   </div>
                 )}
@@ -246,7 +246,7 @@ export const BannerManagementPanel: React.FC = () => {
 
       {/* EXISTING BANNERS */}
       <div className="space-y-2">
-        <span className="font-black text-slate-600 text-[10px] uppercase tracking-wider">{isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}</span>
+        <span className="font-bold text-slate-700 text-xs">{isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}</span>
         {loading ? (
           <div className="py-8 text-center text-slate-600 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
         ) : rows.length === 0 ? (

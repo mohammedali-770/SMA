@@ -53,7 +53,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary" />
           <div>
-            <span className="font-black text-slate-800 uppercase block">{isRTL ? 'أدوات الإشعارات' : 'Push tools'}</span>
+            <span className="font-black text-slate-800 block">{isRTL ? 'أدوات الإشعارات' : 'Push tools'}</span>
             <span className="text-[9.5px] text-slate-600 font-bold">
               {isRTL
                 ? 'إشعار تجريبي وبثّ ترويجي فوري للمشتركين فقط. يتطلب تفعيل التكامل أعلاه.'
@@ -117,7 +117,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
       )}
 
       {result ? (
-        <p className="text-[10px] font-black flex items-center gap-1.5 text-slate-700">
+        <p className="text-[10px] font-bold flex items-center gap-1.5 text-slate-700">
           <Check className="w-3.5 h-3.5 text-green-700" />
           {result.status === 'ok'
             ? (isRTL
@@ -127,7 +127,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
         </p>
       ) : null}
       {error ? (
-        <p className="text-[10px] font-black text-red-700 flex items-center gap-1.5">
+        <p className="text-[10px] font-bold text-red-700 flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5" /> {error}
         </p>
       ) : null}

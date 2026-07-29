@@ -225,7 +225,11 @@ describe('OperationsAlertsPanel — summary + inbox', () => {
     );
     const { container } = render(<OperationsAlertsPanel lang="ar" />);
 
-    expect(await screen.findByText('تنبيهات العمليات والملخص اليومي')).toBeTruthy();
+    // The panel title now comes from the dashboard shell header, so the panel's
+    // own Arabic copy is asserted through the read-only constraint line it owns.
+    expect(
+      await screen.findByText('مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'),
+    ).toBeTruthy();
     expect(screen.getByText('الإرسال الخارجي معطل')).toBeTruthy();
     const code = await screen.findByText('failed_deliveries');
     const row = code.closest('button') as HTMLElement;

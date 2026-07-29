@@ -56,7 +56,10 @@ export const BranchPoliciesPanel: React.FC = () => {
 
   return (
             <div className="space-y-4 animate-fade-in">
-              <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">{t.branch_tab}</h3>
+              {/* Sentence-case section heading, per the redesign. It titles the
+                  availability grid below, not the panel — the shell header
+                  already carries "Branch Management". */}
+              <h3 className="text-sm font-bold text-slate-900">{t.branch_tab}</h3>
 
               {/* Grid layout of Branches */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -72,7 +75,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
                         <h4 className="text-xs font-black text-gray-900 truncate">{branch.nameEn}</h4>
-                        <p className="text-[11px] font-bold text-gray-600 leading-tight truncate" dir="rtl">{branch.nameAr}</p>
+                        <p className="text-[11px] font-medium text-gray-600 leading-tight truncate" dir="rtl">{branch.nameAr}</p>
                         <p className="text-[10px] text-gray-600 mt-0.5 leading-tight truncate">{isRTL ? branch.addressAr : branch.addressEn}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
@@ -237,7 +240,7 @@ export const BranchPoliciesPanel: React.FC = () => {
 
                     {/* Custom Product Availability Sub Matrix */}
                     <div className="pt-2 border-t border-slate-200/50 space-y-1.5">
-                      <span className="block text-[9px] text-gray-600 font-bold uppercase mb-1">{isRTL ? 'توفر الوجبات الفوري بالفرع:' : 'Branch Product Stock Availability:'}</span>
+                      <span className="block text-[9px] text-gray-600 font-bold mb-1">{isRTL ? 'توفر الوجبات الفوري بالفرع:' : 'Branch Product Stock Availability:'}</span>
                       <div className="space-y-1 max-h-[140px] overflow-y-auto">
                         {products.map(p => {
                           const isAvailable = isProductAvailableInBranch(p.id, branch.id);

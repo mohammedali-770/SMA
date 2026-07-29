@@ -142,7 +142,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'اختبار الاتصال' : 'Test connection'}</span>
+                <span className="text-[10px] font-black text-slate-600">{isRTL ? 'اختبار الاتصال' : 'Test connection'}</span>
                 <button
                   onClick={() => void handleTest()}
                   disabled={testing || !status.active_key_set}
@@ -156,7 +156,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
                   {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
                 </div>
               )}
-              <p className="text-[9px] text-slate-600 font-semibold">
+              <p className="text-[9px] text-slate-600 font-medium">
                 {isRTL
                   ? 'يتحقق من المفتاح السري للوضع المحدد لدى Tap دون إنشاء أي عملية دفع.'
                   : 'Validates the selected-mode secret key against Tap without creating any charge.'}
@@ -168,7 +168,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
+                <span className="text-[10px] font-black text-slate-600">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
                 <button
                   onClick={() => void runTestCheckout()}
                   disabled={coRunning || !canRunTest}
@@ -177,13 +177,13 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
                   <CreditCard className="w-3 h-3" /> {coRunning ? '…' : (isRTL ? 'ابدأ' : 'Run')}
                 </button>
               </div>
-              <p className="text-[9px] text-slate-600 font-semibold">
+              <p className="text-[9px] text-slate-600 font-medium">
                 {isRTL
                   ? 'ينشئ عملية دفع تجريبية بقيمة ١ ريال عبر Tap (Sandbox) لاختبار صفحة الدفع. لا يُنشئ أو يدفع أي طلب في Spicy Meal.'
                   : 'Creates a 1 SAR Tap sandbox checkout to test the hosted payment page. It does not create or pay any Spicy Meal order.'}
               </p>
               {!canRunTest && (
-                <p className="text-[9px] text-amber-700 font-bold">
+                <p className="text-[9px] text-amber-700 font-medium">
                   {isRTL
                     ? 'متاح فقط عندما يكون Tap مفعّلاً في وضع الاختبار مع معرّف التاجر ومفتاح الاختبار.'
                     : 'Available only when Tap is enabled in TEST mode with a merchant id + test key.'}

@@ -44,7 +44,7 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-2 p-8 text-center font-sans bg-slate-50">
         <h1 className="text-base font-black text-slate-800">Something unexpected went wrong</h1>
-        <p className="text-sm font-bold text-slate-700" dir="rtl" lang="ar">حدث خطأ غير متوقع</p>
+        <p className="text-sm font-medium text-slate-700" dir="rtl" lang="ar">حدث خطأ غير متوقع</p>
         <p className="text-xs text-slate-600">
           Our team has been notified automatically — no data was lost.
         </p>

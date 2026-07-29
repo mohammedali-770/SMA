@@ -37,13 +37,11 @@ export const IntegrationsPanel: React.FC = () => {
 
   return (
     <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
+      {/* The panel title lives in the dashboard shell header; this row keeps the
+          secret-handling rule, which is the part an operator must not miss. */}
+      <div className="flex justify-between items-start gap-3">
         <div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-            {isRTL ? 'الربط والتكاملات' : 'Integrations'}
-          </h3>
-          <p className="text-[10px] text-slate-600 font-bold mt-0.5">
+          <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">
             {isRTL
               ? 'بوابات الدفع والرسائل والإشعارات والربط مع الكاشير والتوصيل — تُحفظ الأسرار في الخادم ولا تصل للمتصفح أبداً'
               : 'Payment, messaging, notifications & POS — secrets are stored server-side, never sent to the browser'}

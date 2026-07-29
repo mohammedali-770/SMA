@@ -284,8 +284,8 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-primary" />
             <div>
-              <h4 className="text-[10px] font-black text-gray-600 uppercase">{isRTL ? 'منطقة التوصيل' : 'Delivery Area'}</h4>
-              <p className="text-sm font-extrabold text-primary">{isRTL ? branch.nameAr : branch.nameEn}</p>
+              <h4 className="text-[10px] font-black text-gray-600">{isRTL ? 'منطقة التوصيل' : 'Delivery Area'}</h4>
+              <p className="text-sm font-bold text-primary">{isRTL ? branch.nameAr : branch.nameEn}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
@@ -294,8 +294,8 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
         {!mapConfig.isConfigured ? (
           <div className="p-8 text-center space-y-2">
             <AlertTriangle className="w-8 h-8 text-amber-700 mx-auto" />
-            <p className="text-sm font-black text-slate-700">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</p>
-            <p className="text-[11px] text-slate-600 font-bold max-w-sm mx-auto">
+            <p className="text-sm font-bold text-slate-700">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</p>
+            <p className="text-[11px] text-slate-600 font-medium max-w-sm mx-auto">
               {isGoogle
                 ? (isRTL
                   ? 'أضف مفتاح Google Maps ‏(VITE_GOOGLE_MAPS_API_KEY) لتفعيل رسم مناطق التوصيل.'
@@ -349,7 +349,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               </div>
             )}
             {disabled && (
-              <p className="text-[10px] text-slate-600 font-bold text-center">{isRTL ? 'العرض فقط' : 'View only'}</p>
+              <p className="text-[10px] text-slate-600 font-medium text-center">{isRTL ? 'العرض فقط' : 'View only'}</p>
             )}
           </div>
         )}

@@ -66,8 +66,8 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
         <div className="flex items-center gap-2">
           <PlugZap className="w-4 h-4 text-primary" />
           <div>
-            <h4 className="text-xs font-black text-slate-800 uppercase">Lazywait POS — Sync Monitor</h4>
-            <p className="text-[9.5px] text-slate-600 font-bold mt-0.5">Catalog id mapping + per-order sync status & retry</p>
+            <h4 className="text-xs font-black text-slate-800">Lazywait POS — Sync Monitor</h4>
+            <p className="text-[9.5px] text-slate-600 font-medium mt-0.5">Catalog id mapping + per-order sync status & retry</p>
           </div>
         </div>
         <button onClick={load} disabled={loading} className="text-[10px] font-black text-primary flex items-center gap-1 disabled:opacity-50">
@@ -87,14 +87,14 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
 
       {/* Per-order sync status */}
       <div className="border-t border-slate-100 pt-3">
-        <span className="text-[10px] font-black text-slate-600 uppercase">Recent Order Sync</span>
+        <span className="text-[10px] font-black text-slate-600">Recent Order Sync</span>
         {orderRows.length === 0 ? (
-          <p className="text-[10px] text-slate-600 font-bold mt-2">No orders queued for Lazywait sync yet.</p>
+          <p className="text-[10px] text-slate-600 font-medium mt-2">No orders queued for Lazywait sync yet.</p>
         ) : (
           <div className="mt-2 overflow-x-auto">
             <table className="w-full text-[10px]">
               <thead>
-                <tr className="text-slate-600 font-black uppercase text-[8.5px] text-left">
+                <tr className="text-slate-600 font-bold text-xs text-left">
                   <th className="py-1 pr-2">Order</th>
                   <th className="py-1 pr-2">State</th>
                   <th className="py-1 pr-2">POS Ref / #</th>
@@ -156,7 +156,7 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
         )}
       </div>
 
-      <p className="text-[8.5px] text-slate-600 font-bold leading-snug">
+      <p className="text-[8.5px] text-slate-600 font-medium leading-snug">
         Delivery orders are intentionally not synced (Lazywait delivery Create Order schema unconfirmed).
         Blocked = missing mapping or config; dead-letter = exhausted retries. Configure credentials in the Lazywait card above.
       </p>
