@@ -1,0 +1,7 @@
+{
+  "branches": [
+    { "branch_id": "BR_RUH", "name_en": "Riyadh Downtown", "name_ar": "وسط الرياض", "is_active": true },
+    { "branch_id": "BR_JED", "names": { "en": "Jeddah Corniche", "ar": "كورنيش جدة", "tr": "Cidde" }, "is_active": true },
+    { "branch_id": "BR_OLD", "name_en": "Closed Branch", "name_ar": "فرع مغلق", "is_active": false }
+  ]
+}

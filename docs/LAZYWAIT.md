@@ -204,6 +204,37 @@ select order_number, lazywait_sync_state, lazywait_ref, sync_last_error
 select * from integration_sync_logs where provider='lazywait' order by created_at desc limit 20;
 ```
 
+## Typed API v2 client (all 27 endpoints — additive, not yet wired live)
+`supabase/functions/_shared/lazywaitApi.ts` (partial issue #104) is a PURE,
+fully-typed layer over `lazywaitFetch` covering **all 27** documented endpoints
+(POS orders, menu products/categories, addons/groups, branches). For each: an
+explicit request interface, a pure serializer, an explicit response interface,
+and a hand-rolled runtime validator. It preserves the exact documented casing
+(`Trans_Amount`, `Approval_No`, `Card_Type`, `Card_Number`, `transaction_uuid`,
+`cancelation_reason`; addon `alert_level` numeric + `consumption` object; group
+`auto_selected_addons` / `included_custom_addons_ids` string arrays), applies
+menu pagination only when BOTH `offset` and `limit` are given, treats
+`order_items` on update as a full replacement, and parses the plain-text `ok`
+product/category DELETE as a typed success. `redactLazywait()` scrubs
+token/Bearer, customer phone/email, and card fields from any log/error.
+
+The reference scaffold + the field-casing table + the assumptions to confirm are
+in `docs/integrations/Lazywait_API_Reference.md` (the verbatim vendor reference
+is owner-supplied and replaces it once provided).
+
+- **Create Order** implements the confirmed pickup body AND the full
+  delivery/add-on body — but the delivery/add-on/customer/`price_id`
+  **assumptions** are assembled ONLY when the caller passes
+  `allowAssumedFields: true` (default OFF). The live `lazywait-sync` worker is
+  intentionally **unchanged** (still pickup-only via `buildCreateOrderPayload`,
+  delivery blocked). Assumed field names are listed in the reference doc's
+  "ASSUMPTIONS TO CONFIRM WITH LAZYWAIT" section.
+- **Payment endpoints** (`update-cash-payment`, `update-online-payment`) are
+  typed/serialized/validated only; live wiring stays **frozen** (CLAUDE.md §6).
+- The client never re-POSTs Create Order once an `order_ref` exists and never
+  reports a false success (reuses `shouldResendCreateOrder` +
+  `classifyCreateOrderResult`).
+
 ## Testing
 `supabase/functions/_shared/lazywait.test.ts` (Vitest) covers: Create Order
 payload mapping, delivery/missing-branch/missing-item blocking, price rounding,
@@ -218,7 +249,17 @@ confidence scoring, and that a low-confidence match requires manual confirmation
 while an exact match does not. `supabase/functions/_shared/lazywaitCatalog.test.ts`
 covers defensive catalog parsing: multi-price items, null addon price/price_id,
 null group min/max/multi, Turkish-only names, localized name objects, and id-less
-rows being dropped.
+rows being dropped. `supabase/functions/_shared/lazywaitApi.test.ts` (with
+synthetic, PII-free fixtures under `__fixtures__/lazywait/`) covers the typed v2
+client: request serialization + exact field casing for all 27 endpoints, menu
+pagination (both-or-neither), the confirmed pickup vs gated delivery/add-on
+Create Order body (assumed fields absent by default, present only under
+`allowAssumedFields`, server-owned identity fields never emitted), catalog/order
+response parsing incl. Arabic/English names and unknown/deactivated branches, the
+plain-text `ok` delete, redaction of token/phone/email/card, timeout+error
+mapping, create-order duplicate prevention / no-false-success, and a guard that
+no Lazywait secret or server client is importable from `src/**` or
+`apps/mobile/**`.
 
 `supabase/tests/*.sql` run against a throwaway Postgres 16 (all migrations
 applied):

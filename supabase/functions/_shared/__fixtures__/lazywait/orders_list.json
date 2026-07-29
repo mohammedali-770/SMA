@@ -1,0 +1,6 @@
+{
+  "orders": [
+    { "order_ref": "REF_1001", "order_status_id": "new-order", "branch_id": "BR_RUH" },
+    { "order_ref": "REF_1002", "order_status_id": "preparing", "branch_id": "BR_JED" }
+  ]
+}

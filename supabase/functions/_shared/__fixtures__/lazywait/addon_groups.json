@@ -1,0 +1,14 @@
+{
+  "groups": [
+    {
+      "addons_group_id": "GRP_TOPPINGS",
+      "name_en": "Toppings",
+      "name_ar": "الإضافات",
+      "min_selection": 0,
+      "max_selection": 3,
+      "multi_max": 2,
+      "auto_selected_addons": ["AD_CHEESE"],
+      "included_custom_addons_ids": ["AD_CHEESE", "AD_NULL"]
+    }
+  ]
+}
