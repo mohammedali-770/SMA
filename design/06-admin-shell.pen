@@ -487,7 +487,8 @@
                       "fill": "$muted",
                       "content": "Real-time sales performance across all branches",
                       "fontFamily": "$font-body",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1517,7 +1518,8 @@
                       "fill": "$muted",
                       "content": "Monitor and manage incoming orders in real time",
                       "fontFamily": "$font-body",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 },
@@ -1561,7 +1563,8 @@
                           "fill": "$disabled",
                           "content": "Search order #, client, phone…",
                           "fontFamily": "$font-body",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
@@ -1808,7 +1811,8 @@
                           "width": "fill_container",
                           "content": "2× Spicy Volcano Chicken (Large, extra cheese) · 1× Crispy Fries",
                           "fontFamily": "$font-body",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -2421,7 +2425,8 @@
                           "width": "fill_container",
                           "content": "1× Mixed Grill Platter · 2× Garlic Naan · 1× Mango Lassi",
                           "fontFamily": "$font-body",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -2612,7 +2617,8 @@
                           "fill": "$muted",
                           "content": "Revenue, orders and coupon analytics",
                           "fontFamily": "$font-body",
-                          "fontSize": 13
+                          "fontSize": 13,
+                          "fontWeight": "normal"
                         }
                       ]
                     },
