@@ -84,6 +84,9 @@ The default branch **is** production. Everything below is deployed and active:
     prod 0.05 — see §5 for the pending owner action.
 - **Auth**: Supabase auth with WhatsApp OTP flow.
 - **Account deletion** flow (store-compliance requirement).
+- **Push notifications are DORMANT.** The `push`/`expo` integration row is
+  `enabled = false` (set 2026-07-29 with owner approval), with zero credentials
+  and zero registered devices. Do not enable it.
 
 ### Active scheduled jobs (pg_cron)
 
@@ -173,15 +176,16 @@ Open issues:
 
 Needs an owner decision:
 
-- **Push notifications.** `CLAUDE.md` §7 and earlier revisions of this document
-  state the `push`/`expo` integration row is *disabled*. It is in fact
-  `enabled = true` in Production — but with **zero credentials and zero
-  registered devices**, so nothing can be sent and the stack is effectively
-  dormant. This was left as-is rather than changed, because push configuration
-  requires explicit owner approval. Decide whether to set the row to `false` to
-  match the documented intent.
 - **Discounts & campaigns** — eight business questions in
   `docs/DISCOUNTS_CAMPAIGNS.md` block wiring campaigns into `place_order`.
+
+Resolved 2026-07-29:
+
+- **Push integration row.** It had drifted to `enabled = true` in Production
+  (with zero credentials and zero devices) while `CLAUDE.md` §7 and this
+  document both described it as disabled. With owner approval it was set back to
+  `enabled = false`, so Production now matches the documented intent. Exactly one
+  row changed; no credentials were added or removed.
 
 Documentation debt:
 
@@ -215,7 +219,8 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 2. **Payment/Tap area is FROZEN and payment work is POSTPONED** — no changes
    without separate explicit owner approval, and none at all until a gateway
    provider is selected (`docs/PAYMENT_POSTPONEMENT.md`).
-3. **Push notifications stay dormant** — no credentials, no enabling.
+3. **Push notifications stay dormant** — row disabled, no credentials, no
+   enabling.
 4. **Production schema**: only the owner-approved `apply_migration` workflow;
    `supabase db push` / `migration repair` are permanently forbidden; never
    edit an already-applied migration file.
