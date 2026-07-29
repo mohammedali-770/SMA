@@ -128,7 +128,7 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
   return (
     <div className="relative">
       <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
-        <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+        <Search className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
         <input
           value={q}
           onChange={(e) => { setQ(e.target.value); if (!e.target.value) clear(); }}
@@ -139,7 +139,7 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
         />
         {loading && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />}
         {!loading && q && (
-          <button type="button" onClick={clear} aria-label={isRTL ? 'مسح' : 'Clear'} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
+          <button type="button" onClick={clear} aria-label={isRTL ? 'مسح' : 'Clear'} className="text-slate-600 hover:text-slate-600 flex-shrink-0">
             <X className="w-3.5 h-3.5" />
           </button>
         )}
@@ -156,7 +156,7 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
       {open && (
         <div className="absolute z-[60] mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-52 overflow-y-auto">
           {results.length === 0 ? (
-            <div className="px-3 py-2 text-[10px] font-bold text-slate-400">
+            <div className="px-3 py-2 text-[10px] font-bold text-slate-600">
               {searched ? (isRTL ? 'لا توجد نتائج' : 'No results') : ''}
             </div>
           ) : (

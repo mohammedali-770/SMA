@@ -182,7 +182,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
       <div className="flex justify-between items-center">
         <div>
           <span className="text-[10px] font-black text-slate-600 uppercase">Catalog Mapping</span>
-          <p className="text-[8.5px] text-slate-400 font-bold mt-0.5">
+          <p className="text-[8.5px] text-slate-600 font-bold mt-0.5">
             {status?.last_pull_at ? `Last pull ${new Date(status.last_pull_at).toLocaleString()}` : 'Not pulled yet'}
           </p>
         </div>
@@ -205,8 +205,8 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
         </div>
       </div>
 
-      {error && <div className="text-[10px] font-bold text-red-600 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{error}</div>}
-      {msg && <div className="text-[10px] font-bold text-green-600 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{msg}</div>}
+      {error && <div className="text-[10px] font-bold text-red-700 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{error}</div>}
+      {msg && <div className="text-[10px] font-bold text-green-700 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{msg}</div>}
       {pull && pull.errors.length > 0 && (
         <div className="text-[9px] font-bold text-amber-700 bg-amber-50 rounded-lg p-2 space-y-0.5">
           {pull.errors.map((e, i) => <div key={i}>⚠ {e.endpoint}: {e.message}</div>)}
@@ -226,7 +226,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
             <div className="space-y-1">
               {readinessItems.map((r, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-[9.5px] font-bold text-slate-600">
-                  {r.ok ? <CheckCircle2 className="w-3 h-3 text-green-600" /> : <Circle className="w-3 h-3 text-slate-300" />}
+                  {r.ok ? <CheckCircle2 className="w-3 h-3 text-green-700" /> : <Circle className="w-3 h-3 text-slate-500" />}
                   {r.label}
                 </div>
               ))}
@@ -242,7 +242,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
               <SummaryRow label="Modifiers" c={status.modifiers} />
               <div className="flex justify-between">
                 <span>Blocked orders</span>
-                <span className={status.blocked_orders ? 'text-red-600' : 'text-green-600'}>{status.blocked_orders}</span>
+                <span className={status.blocked_orders ? 'text-red-700' : 'text-green-600'}>{status.blocked_orders}</span>
               </div>
             </div>
           </div>
@@ -257,7 +257,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
             <button
               key={e.key}
               onClick={() => setTab(e.key)}
-              className={`text-[9px] font-black px-2.5 py-1 rounded-full ${tab === e.key ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}
+              className={`text-[9px] font-black px-2.5 py-1 rounded-full ${tab === e.key ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600'}`}
             >
               {e.label}{c ? ` ${c.mapped}/${c.total}` : ''}
             </button>
@@ -267,14 +267,14 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
 
       {/* Mapping table for the active entity */}
       {loading ? (
-        <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</div>
+        <div className="text-[10px] text-slate-600 font-bold flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</div>
       ) : cands.length === 0 ? (
-        <p className="text-[10px] text-slate-400 font-bold">No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.</p>
+        <p className="text-[10px] text-slate-600 font-bold">No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-[10px]">
             <thead>
-              <tr className="text-slate-400 font-black uppercase text-[8.5px] text-left">
+              <tr className="text-slate-600 font-black uppercase text-[8.5px] text-left">
                 <th className="py-1 pr-2">Local (EN / AR)</th>
                 <th className="py-1 pr-2">Suggested match</th>
                 <th className="py-1 pr-2">Map to Lazywait</th>
@@ -291,7 +291,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                   <tr key={row.id} className="border-t border-slate-100 align-top">
                     <td className="py-1.5 pr-2">
                       <div className="font-bold text-slate-700">{row.nameEn || '—'}</div>
-                      <div className="text-slate-400" dir="rtl">{row.nameAr || '—'}</div>
+                      <div className="text-slate-600" dir="rtl">{row.nameAr || '—'}</div>
                       {row.currentId && (
                         <span className="inline-flex items-center gap-1 text-[8px] font-black text-green-700 mt-0.5">
                           <Check className="w-2.5 h-2.5" /> mapped: {row.currentId}
@@ -306,7 +306,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                             {suggestion.level}{suggestion.requiresConfirmation ? ' · review' : ''}
                           </span>
                         </div>
-                      ) : <span className="text-slate-300">no suggestion</span>}
+                      ) : <span className="text-slate-600">no suggestion</span>}
                     </td>
                     <td className="py-1.5 pr-2 space-y-1">
                       <select
@@ -347,7 +347,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                         <button
                           onClick={() => clear(tab, row)}
                           disabled={disabled || busy === row.id}
-                          className="text-[9px] py-1 px-2 font-black text-red-500 disabled:opacity-40 inline-flex items-center gap-1 ml-1"
+                          className="text-[9px] py-1 px-2 font-black text-red-700 disabled:opacity-40 inline-flex items-center gap-1 ml-1"
                         >
                           <X className="w-3 h-3" /> Clear
                         </button>
@@ -361,7 +361,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
         </div>
       )}
 
-      <p className="text-[8.5px] text-slate-400 font-bold leading-snug">
+      <p className="text-[8.5px] text-slate-600 font-bold leading-snug">
         <b>Import to App</b> makes Lazywait the menu source: it creates/updates your categories &amp; products from
         the latest pull (prices from Lazywait), hides local items not in Lazywait, and keeps branch delivery settings.
         Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). price_id,
@@ -374,6 +374,6 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
 const SummaryRow: React.FC<{ label: string; c: { mapped: number; total: number } }> = ({ label, c }) => (
   <div className="flex justify-between">
     <span>{label}</span>
-    <span className={c.total > 0 && c.mapped === c.total ? 'text-green-600' : 'text-slate-500'}>{c.mapped}/{c.total}</span>
+    <span className={c.total > 0 && c.mapped === c.total ? 'text-green-700' : 'text-slate-500'}>{c.mapped}/{c.total}</span>
   </div>
 );

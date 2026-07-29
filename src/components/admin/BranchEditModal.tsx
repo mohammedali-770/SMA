@@ -84,7 +84,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
           <h3 className="text-sm font-black text-slate-800">
             {disabled ? label('View branch', 'عرض الفرع') : label('Edit branch', 'تعديل الفرع')}: {isRTL ? branch.nameAr : branch.nameEn}
           </h3>
-          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
+          <button onClick={onClose} aria-label="Close" className="text-slate-600 hover:text-slate-700"><X className="w-4 h-4" /></button>
         </div>
 
         <div className="p-4 space-y-3 text-xs">
@@ -124,7 +124,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
               </span>
             </div>
             {!disabled && (
-              <p className="text-[10px] text-slate-500 font-semibold">
+              <p className="text-[10px] text-slate-600 font-semibold">
                 {label('Click the map to drop the branch pin, or type the coordinates.', 'اضغط على الخريطة لتحديد موقع الفرع، أو أدخل الإحداثيات يدوياً.')}
               </p>
             )}
@@ -172,7 +172,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
 
 const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="block">
-    <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">{label}</span>
+    <span className="block text-[9px] font-black text-slate-600 uppercase mb-1">{label}</span>
     {children}
   </label>
 );
@@ -181,7 +181,7 @@ const Toggle: React.FC<{ on: boolean; disabled: boolean; onClick: () => void; la
   <button
     onClick={onClick}
     disabled={disabled}
-    className={`py-1.5 rounded-lg text-center text-[10px] font-black uppercase transition-all disabled:opacity-50 ${on ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
+    className={`py-1.5 rounded-lg text-center text-[10px] font-black uppercase transition-all disabled:opacity-50 ${on ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
   >
     {label} {on ? 'ON' : 'OFF'}
   </button>

@@ -137,7 +137,7 @@ export const BannerManagementPanel: React.FC = () => {
       <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
         <div>
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRTL ? 'بانرات الصفحة الرئيسية' : 'Homepage Banners'}</h3>
-          <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+          <p className="text-[10px] text-slate-600 font-bold mt-0.5">
             {isRTL ? 'تظهر في أعلى الصفحة الرئيسية للتطبيق (فوق شريط البحث). البانرات المفعّلة فقط تظهر للعملاء.' : 'Shown at the top of the app homepage (above search). Only active banners appear to customers.'}
           </p>
         </div>
@@ -148,7 +148,7 @@ export const BannerManagementPanel: React.FC = () => {
 
       {isAccountant && (
         <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
           {isRTL ? 'البانرات للعرض فقط — الإضافة والتعديل متاحان للمشرف.' : 'Banners are view-only for accountants — creating/editing is admin-only.'}
         </div>
       )}
@@ -168,39 +168,39 @@ export const BannerManagementPanel: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Upload + preview */}
             <div className="space-y-2">
-              <label className="block text-[9px] font-black text-slate-400 uppercase">{isRTL ? 'صورة البانر' : 'Banner Image'}</label>
+              <label className="block text-[9px] font-black text-slate-600 uppercase">{isRTL ? 'صورة البانر' : 'Banner Image'}</label>
               <div className="aspect-[16/6] w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                 {draft.image_url ? (
                   <img src={draft.image_url} alt="banner preview" className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-slate-300 flex flex-col items-center gap-1"><ImageIcon className="w-6 h-6" /><span className="text-[9px] font-bold">{isRTL ? 'معاينة' : 'Preview'}</span></span>
+                  <span className="text-slate-600 flex flex-col items-center gap-1"><ImageIcon className="w-6 h-6" /><span className="text-[9px] font-bold">{isRTL ? 'معاينة' : 'Preview'}</span></span>
                 )}
               </div>
               <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void onPickFile(e)} disabled={uploading} className="block w-full text-[10px] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary file:text-white file:font-black file:text-[10px] file:cursor-pointer" />
-              {uploading && <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}</span>}
-              {uploadError && <span className="text-[10px] text-red-600 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {uploadError}</span>}
-              <p className="text-[9px] text-slate-400 font-semibold">{isRTL ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت' : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}</p>
+              {uploading && <span className="text-[10px] text-slate-600 font-bold flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}</span>}
+              {uploadError && <span className="text-[10px] text-red-700 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {uploadError}</span>}
+              <p className="text-[9px] text-slate-600 font-semibold">{isRTL ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت' : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}</p>
             </div>
 
             {/* Fields */}
             <div className="space-y-2">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}</label>
                   <input value={draft.title_en} onChange={(e) => setDraft(d => ({ ...d, title_en: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="Summer Combo" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
                   <input value={draft.title_ar} onChange={(e) => setDraft(d => ({ ...d, title_ar: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="عرض الصيف" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الترتيب' : 'Sort order'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الترتيب' : 'Sort order'}</label>
                   <input type="number" value={draft.sort_order} onChange={(e) => setDraft(d => ({ ...d, sort_order: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
                   <select value={draft.is_active ? 'true' : 'false'} onChange={(e) => setDraft(d => ({ ...d, is_active: e.target.value === 'true' }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                     <option value="true">{isRTL ? 'مفعّل' : 'Active'}</option>
                     <option value="false">{isRTL ? 'معطّل' : 'Inactive'}</option>
@@ -209,17 +209,17 @@ export const BannerManagementPanel: React.FC = () => {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
                   <input type="datetime-local" value={draft.starts_at} onChange={(e) => setDraft(d => ({ ...d, starts_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
                 </div>
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
                   <input type="datetime-local" value={draft.ends_at} onChange={(e) => setDraft(d => ({ ...d, ends_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</label>
+                  <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</label>
                   <select value={draft.action_type} onChange={(e) => setDraft(d => ({ ...d, action_type: e.target.value as Draft['action_type'] }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
                     <option value="none">{isRTL ? 'بدون' : 'None'}</option>
                     <option value="category">{isRTL ? 'فئة' : 'Category'}</option>
@@ -228,7 +228,7 @@ export const BannerManagementPanel: React.FC = () => {
                 </div>
                 {draft.action_type !== 'none' && (
                   <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{draft.action_type === 'product' ? (isRTL ? 'معرّف المنتج' : 'Product ID') : (isRTL ? 'معرّف الفئة' : 'Category ID')}</label>
+                    <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{draft.action_type === 'product' ? (isRTL ? 'معرّف المنتج' : 'Product ID') : (isRTL ? 'معرّف الفئة' : 'Category ID')}</label>
                     <input value={draft.action_value} onChange={(e) => setDraft(d => ({ ...d, action_value: e.target.value }))} className="glass-input w-full p-2 font-mono font-bold text-slate-700 text-[11px]" placeholder="uuid" />
                   </div>
                 )}
@@ -246,11 +246,11 @@ export const BannerManagementPanel: React.FC = () => {
 
       {/* EXISTING BANNERS */}
       <div className="space-y-2">
-        <span className="font-black text-slate-500 text-[10px] uppercase tracking-wider">{isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}</span>
+        <span className="font-black text-slate-600 text-[10px] uppercase tracking-wider">{isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}</span>
         {loading ? (
-          <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+          <div className="py-8 text-center text-slate-600 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
         ) : rows.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-[11px] font-bold">{isRTL ? 'لا توجد بانرات بعد.' : 'No banners yet.'}</div>
+          <div className="py-8 text-center text-slate-600 text-[11px] font-bold">{isRTL ? 'لا توجد بانرات بعد.' : 'No banners yet.'}</div>
         ) : (
           <div className="space-y-2">
             {rows.map((b) => {
@@ -269,7 +269,7 @@ export const BannerManagementPanel: React.FC = () => {
                         {live ? (isRTL ? 'ظاهر الآن' : 'LIVE') : (b.is_active ? (isRTL ? 'مجدول/منتهٍ' : 'SCHEDULED') : (isRTL ? 'معطّل' : 'OFF'))}
                       </span>
                     </div>
-                    <span className="text-[9px] text-slate-400 font-bold">
+                    <span className="text-[9px] text-slate-600 font-bold">
                       {isRTL ? 'الترتيب' : 'Order'} {b.sort_order}
                       {b.starts_at ? ` • ${isRTL ? 'من' : 'from'} ${new Date(b.starts_at).toLocaleDateString()}` : ''}
                       {b.ends_at ? ` • ${isRTL ? 'إلى' : 'to'} ${new Date(b.ends_at).toLocaleDateString()}` : ''}
@@ -278,8 +278,8 @@ export const BannerManagementPanel: React.FC = () => {
                   {!isAccountant && (
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <div className="flex flex-col">
-                        <button title={isRTL ? 'أعلى' : 'Up'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order - 1 })} className="text-slate-400 hover:text-primary disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                        <button title={isRTL ? 'أسفل' : 'Down'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order + 1 })} className="text-slate-400 hover:text-primary disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
+                        <button title={isRTL ? 'أعلى' : 'Up'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order - 1 })} className="text-slate-600 hover:text-primary disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
+                        <button title={isRTL ? 'أسفل' : 'Down'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order + 1 })} className="text-slate-600 hover:text-primary disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
                       </div>
                       <button
                         disabled={busy}
@@ -288,7 +288,7 @@ export const BannerManagementPanel: React.FC = () => {
                       >
                         {busy ? '…' : b.is_active ? (isRTL ? 'تعطيل' : 'Disable') : (isRTL ? 'تفعيل' : 'Enable')}
                       </button>
-                      <button title={isRTL ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(b)} className="text-red-400 hover:text-red-600 disabled:opacity-30 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button title={isRTL ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(b)} className="text-red-700 hover:text-red-600 disabled:opacity-30 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   )}
                 </div>
@@ -297,7 +297,7 @@ export const BannerManagementPanel: React.FC = () => {
           </div>
         )}
         <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed mt-2">
-          <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+          <Check className="w-4 h-4 text-green-700 flex-shrink-0 mt-0.5" />
           <div>
             <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'كيف تظهر للعملاء' : 'How customers see them'}</span>
             {isRTL

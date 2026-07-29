@@ -150,7 +150,7 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
           <LocateFixed className="w-4 h-4" />
         </button>
       </div>
-      <p className="text-[9px] text-gray-400 font-bold">
+      <p className="text-[9px] text-gray-600 font-bold">
         {isRTL ? 'ابحث عن العنوان أعلاه، أو حرّك الدبوس إلى موقعك بالضبط.' : 'Search the address above, or move the pin to your exact location.'}
       </p>
     </div>

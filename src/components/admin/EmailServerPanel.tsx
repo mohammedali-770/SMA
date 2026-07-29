@@ -54,7 +54,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
           <Mail className="w-4 h-4 text-blue-600" />
           <div>
             <span className="font-black text-slate-800 text-xs block">{isRTL ? 'خادم البريد (SMTP)' : 'Email Server (SMTP)'}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض كلمة المرور' : 'Readiness + test send — password never shown'}</span>
+            <span className="text-[9px] text-slate-600 font-bold">{isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض كلمة المرور' : 'Readiness + test send — password never shown'}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
               {status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
             </span>
           )}
-          <button onClick={() => void load()} disabled={loading} className="text-slate-400 hover:text-primary disabled:opacity-40" aria-label="Refresh">
+          <button onClick={() => void load()} disabled={loading} className="text-slate-600 hover:text-primary disabled:opacity-40" aria-label="Refresh">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -86,7 +86,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
 
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}</span>
+              <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}</span>
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -108,7 +108,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
                   {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
                 </div>
               )}
-              <p className="text-[9px] text-slate-400 font-semibold">
+              <p className="text-[9px] text-slate-600 font-semibold">
                 {isRTL
                   ? 'تُرسَل رسالة تجريبية عبر إعدادات SMTP المحفوظة. لا تُعرض كلمة المرور ولا تصل للمتصفح.'
                   : 'Sends a test message through the saved SMTP settings. The password is never shown and never reaches the browser.'}
@@ -117,7 +117,7 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
           )}
         </>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <div className="py-4 text-center text-slate-600 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
       )}
     </div>
   );

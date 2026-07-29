@@ -25,28 +25,28 @@ export const StatsPanel: React.FC = () => {
                 
                 {/* Metric Gross revenue */}
                 <div className="glass-card p-4 rounded-2xl">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_revenue}</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{t.stats_revenue}</span>
                   <p className="text-xl font-black text-primary mt-1"><Price amount={totalRevenue} /></p>
-                  <p className="text-[9px] text-green-600 font-bold mt-1">↑ 12.5% {isRTL ? 'منذ الأمس' : 'vs yesterday'}</p>
+                  <p className="text-[9px] text-green-700 font-bold mt-1">↑ 12.5% {isRTL ? 'منذ الأمس' : 'vs yesterday'}</p>
                 </div>
 
                 {/* Metric Active order counts */}
                 <div className="glass-card p-4 rounded-2xl">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_orders}</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{t.stats_orders}</span>
                   <p className="text-xl font-black text-secondary mt-1">{activeOrdersCount} {isRTL ? 'طلبات قيد المتابعة' : 'Active'}</p>
                   <p className="text-[9px] text-primary font-bold mt-1">● {orders.length - activeOrdersCount} {isRTL ? 'طلبات مكتملة اليوم' : 'Completed today'}</p>
                 </div>
 
                 {/* Metric ticket value */}
                 <div className="glass-card p-4 rounded-2xl">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_ticket}</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{t.stats_ticket}</span>
                   <p className="text-xl font-black text-slate-800 mt-1"><Price amount={averageTicketValue} /></p>
-                  <p className="text-[9px] text-gray-400 mt-1">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'VAT-inclusive average ticket'}</p>
+                  <p className="text-[9px] text-gray-600 mt-1">{isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'VAT-inclusive average ticket'}</p>
                 </div>
 
                 {/* Metric Operational branches */}
                 <div className="glass-card p-4 rounded-2xl">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t.stats_branches}</span>
+                  <span className="text-[10px] font-bold text-gray-600 uppercase tracking-wider">{t.stats_branches}</span>
                   <p className="text-xl font-black text-green-700 mt-1">{operationalBranchesCount} / {branches.length}</p>
                   <p className="text-[9px] text-secondary font-bold mt-1">⚠ {branches.length - operationalBranchesCount} {isRTL ? 'فروع مغلقة للصيانة' : 'branches closed'}</p>
                 </div>

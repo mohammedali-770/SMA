@@ -111,7 +111,7 @@ export const DatabasePlayground: React.FC = () => {
             /* CONSOLE RENDER TABLE LAYOUT */
             <div className="flex-1 overflow-auto max-h-[350px]">
               {rows.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs font-black">
+                <div className="p-8 text-center text-slate-400 text-xs font-black">
                   [EMPTY TABLE - NO RECORDS AVAILABLE]
                 </div>
               ) : (
@@ -259,7 +259,7 @@ export const DatabasePlayground: React.FC = () => {
       </div>
 
       {/* SQL Quick Terminal Footer display */}
-      <div className="border-t border-slate-800 pt-3 mt-4 text-[9px] text-slate-500 flex justify-between">
+      <div className="border-t border-slate-800 pt-3 mt-4 text-[9px] text-slate-400 flex justify-between">
         <span>SQL Query Executed: SELECT * FROM public.{activeTable};</span>
         <span>Row Fetch Time: 0.001s</span>
       </div>

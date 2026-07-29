@@ -72,8 +72,8 @@ export const BranchPoliciesPanel: React.FC = () => {
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
                         <h4 className="text-xs font-black text-gray-900 truncate">{branch.nameEn}</h4>
-                        <p className="text-[11px] font-bold text-gray-500 leading-tight truncate" dir="rtl">{branch.nameAr}</p>
-                        <p className="text-[10px] text-gray-400 mt-0.5 leading-tight truncate">{isRTL ? branch.addressAr : branch.addressEn}</p>
+                        <p className="text-[11px] font-bold text-gray-600 leading-tight truncate" dir="rtl">{branch.nameAr}</p>
+                        <p className="text-[10px] text-gray-600 mt-0.5 leading-tight truncate">{isRTL ? branch.addressAr : branch.addressEn}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${branch.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -92,7 +92,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                             onClick={() => { void handleDeleteBranch(branch); }}
                             disabled={deletingBranchId === branch.id}
                             aria-label={isRTL ? `حذف فرع ${branch.nameAr}` : `Delete branch ${branch.nameEn}`}
-                            className="flex items-center gap-1 text-[9px] font-black uppercase text-red-600 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1 text-[9px] font-black uppercase text-red-700 bg-red-50 border border-red-200 hover:bg-red-600 hover:text-white rounded-lg px-2 py-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Trash2 className="w-2.5 h-2.5" />
                             {deletingBranchId === branch.id
@@ -108,10 +108,10 @@ export const BranchPoliciesPanel: React.FC = () => {
                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${hasCoords ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                         {isRTL ? 'الموقع' : 'Location'}: {hasCoords ? (isRTL ? 'محدّد' : 'Set') : (isRTL ? 'غير محدّد' : 'Not set')}
                       </span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${pickupEnabled ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${pickupEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                         {isRTL ? 'الاستلام' : 'Pickup'}: {pickupEnabled ? 'ON' : 'OFF'}
                       </span>
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${deliveryEnabled && !deliveryClosed ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${deliveryEnabled && !deliveryClosed ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                         {isRTL ? 'التوصيل' : 'Delivery'}: {deliveryClosed ? (isRTL ? 'موقوف' : 'PAUSED') : (deliveryEnabled ? 'ON' : 'OFF')}
                       </span>
                       <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${branch.lazywaitBranchId ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -160,14 +160,14 @@ export const BranchPoliciesPanel: React.FC = () => {
                         <button
                           onClick={() => updateBranchSettings(branch.id, { deliveryEnabled: !deliveryEnabled })}
                           disabled={isAccountant}
-                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${deliveryEnabled ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-400'}`}
+                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${deliveryEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
                         >
                           {isRTL ? 'التوصيل' : 'Delivery'} {deliveryEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </button>
                         <button
                           onClick={() => updateBranchSettings(branch.id, { pickupEnabled: !pickupEnabled })}
                           disabled={isAccountant}
-                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${pickupEnabled ? 'bg-green-50 text-green-600' : 'bg-slate-100 text-slate-400'}`}
+                          className={`py-1 rounded text-center text-[8.5px] font-black uppercase transition-all disabled:opacity-50 ${pickupEnabled ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-400'}`}
                         >
                           {isRTL ? 'الاستلام' : 'Pickup'} {pickupEnabled ? (isRTL ? 'مفعّل' : 'ON') : (isRTL ? 'معطّل' : 'OFF')}
                         </button>
@@ -184,7 +184,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                       {/* Delivery zone controls */}
                       <div className="pt-2 border-t border-slate-200/50 space-y-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="font-bold text-slate-500">{isRTL ? 'منطقة التوصيل' : 'Delivery area'}:</span>
+                          <span className="font-bold text-slate-600">{isRTL ? 'منطقة التوصيل' : 'Delivery area'}:</span>
                           <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${hasZone ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
                             {hasZone ? (isRTL ? 'مُعدّة' : 'Configured') : (isRTL ? 'منطقة التوصيل غير مُعدّة' : 'Delivery area not configured')}
                           </span>
@@ -229,7 +229,7 @@ export const BranchPoliciesPanel: React.FC = () => {
                       <button
                         onClick={() => updateBranchSettings(branch.id, { isActive: !branch.isActive })}
                         disabled={isAccountant}
-                        className={`w-full py-1.5 rounded text-center text-[9px] font-black uppercase transition-all disabled:opacity-50 ${branch.isActive ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                        className={`w-full py-1.5 rounded text-center text-[9px] font-black uppercase transition-all disabled:opacity-50 ${branch.isActive ? 'bg-red-50 text-red-700 hover:bg-red-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                       >
                         {branch.isActive ? 'Close Branch Maintenance' : 'Open Branch Operational'}
                       </button>
@@ -237,7 +237,7 @@ export const BranchPoliciesPanel: React.FC = () => {
 
                     {/* Custom Product Availability Sub Matrix */}
                     <div className="pt-2 border-t border-slate-200/50 space-y-1.5">
-                      <span className="block text-[9px] text-gray-400 font-bold uppercase mb-1">{isRTL ? 'توفر الوجبات الفوري بالفرع:' : 'Branch Product Stock Availability:'}</span>
+                      <span className="block text-[9px] text-gray-600 font-bold uppercase mb-1">{isRTL ? 'توفر الوجبات الفوري بالفرع:' : 'Branch Product Stock Availability:'}</span>
                       <div className="space-y-1 max-h-[140px] overflow-y-auto">
                         {products.map(p => {
                           const isAvailable = isProductAvailableInBranch(p.id, branch.id);

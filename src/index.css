@@ -50,7 +50,14 @@ body {
 }
 
 .glass-panel-dark {
-  background: rgba(15, 23, 42, 0.45);
+  /* 0.92, not 0.45. Over the light body this panel composites to whatever the
+     alpha gives: at 0.45 the result was a mid-grey (#8c8f9b) on which NOTHING
+     reaches WCAG AA — even pure white measured 3.22:1 against a 4.5:1
+     requirement, so every light-on-dark colour inside was unreadable. At 0.92
+     the ground is genuinely dark (#21293a) and the panel's existing slate-300 /
+     slate-400 text clears AA at 9.80:1 and 5.68:1. The blur still carries the
+     glass effect. Verified by src/lib/a11yContrast.audit.mjs. */
+  background: rgba(15, 23, 42, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);

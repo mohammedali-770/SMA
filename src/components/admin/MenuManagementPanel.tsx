@@ -186,19 +186,19 @@ export const MenuManagementPanel: React.FC = () => {
               <div className="flex border-b border-gray-200">
                 <button 
                   onClick={() => setMenuSubTab('products')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
                 >
                   {t.products_tab}
                 </button>
                 <button 
                   onClick={() => setMenuSubTab('categories')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'categories' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'categories' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
                 >
                   {t.categories_tab}
                 </button>
                 <button 
                   onClick={() => setMenuSubTab('csv')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all flex items-center gap-1.5 ${menuSubTab === 'csv' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all flex items-center gap-1.5 ${menuSubTab === 'csv' ? 'border-primary text-primary' : 'border-transparent text-gray-600 hover:text-gray-700'}`}
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" />
                   <span>{t.csv_tab}</span>
@@ -221,8 +221,8 @@ export const MenuManagementPanel: React.FC = () => {
                   </div>
 
                   <div className="glass-card rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <thead className="bg-gray-50 text-[10px] text-gray-400 font-bold uppercase">
+                    <table className="w-full text-left text-xs text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <thead className="bg-gray-50 text-[10px] text-gray-500 font-bold uppercase">
                         <tr>
                           <th className="px-4 py-3">Photo</th>
                           <th className="px-4 py-3">{t.product_name_en}</th>
@@ -292,8 +292,8 @@ export const MenuManagementPanel: React.FC = () => {
                   </div>
 
                   <div className="glass-card rounded-2xl overflow-hidden max-w-xl">
-                    <table className="w-full text-left text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <thead className="bg-gray-50 text-[10px] text-gray-400 font-bold uppercase">
+                    <table className="w-full text-left text-xs text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                      <thead className="bg-gray-50 text-[10px] text-gray-500 font-bold uppercase">
                         <tr>
                           <th className="px-4 py-3">Category Name (EN)</th>
                           <th className="px-4 py-3">Category Name (AR)</th>
@@ -337,7 +337,7 @@ export const MenuManagementPanel: React.FC = () => {
                 <div className="glass-card p-4 space-y-4">
                   <div>
                     <h3 className="text-sm font-black text-gray-900">{t.csv_title}</h3>
-                    <p className="text-xs text-gray-400 mt-1">{t.csv_help}</p>
+                    <p className="text-xs text-gray-600 mt-1">{t.csv_help}</p>
                   </div>
 
                   {/* Template download link button */}
@@ -362,13 +362,13 @@ export const MenuManagementPanel: React.FC = () => {
                     <button type="button" onClick={() => fileInputRef.current?.click()} className="space-y-1 w-full" aria-label={isRTL ? 'اختيار ملف CSV للاستيراد' : 'Choose a CSV file to import'}>
                       <FileSpreadsheet className="w-8 h-8 text-primary/40 mx-auto" />
                       <p className="text-xs font-bold text-gray-700">{t.drag_drop}</p>
-                      <p className="text-[10px] text-gray-400">supports raw text sheets</p>
+                      <p className="text-[10px] text-gray-600">supports raw text sheets</p>
                     </button>
                   </div>
 
                   {/* Pasted text container fallback */}
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-gray-400 uppercase">{t.pasted_csv}</label>
+                    <label className="block text-[10px] font-black text-gray-600 uppercase">{t.pasted_csv}</label>
                     <textarea 
                       rows={4}
                       value={rawCsvText}
@@ -399,7 +399,7 @@ export const MenuManagementPanel: React.FC = () => {
                       {csvResult.errors.length > 0 ? (
                         <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1">
                           <h4 className="text-[10px] font-black text-red-700 uppercase">{t.errors}:</h4>
-                          <ul className="list-disc pl-4 text-[9.5px] text-red-600 font-semibold space-y-0.5">
+                          <ul className="list-disc pl-4 text-[9.5px] text-red-700 font-semibold space-y-0.5">
                             {csvResult.errors.map((err, i) => <li key={i}>{err}</li>)}
                           </ul>
                         </div>
@@ -411,8 +411,8 @@ export const MenuManagementPanel: React.FC = () => {
 
                       {/* Preview table of products parsed */}
                       <div className="max-h-[140px] overflow-y-auto border border-gray-100 rounded-xl bg-white">
-                        <table className="w-full text-[10px] text-gray-500 text-left">
-                          <thead className="bg-gray-50 text-gray-400 font-bold uppercase">
+                        <table className="w-full text-[10px] text-gray-600 text-left">
+                          <thead className="bg-gray-50 text-gray-500 font-bold uppercase">
                             <tr>
                               <th className="px-3 py-2">Parsed Name (EN)</th>
                               <th className="px-3 py-2">Price</th>
@@ -434,7 +434,7 @@ export const MenuManagementPanel: React.FC = () => {
                       <button 
                         onClick={handleCommitCSV}
                         disabled={isAccountant || csvResult.products.length === 0}
-                        className={`w-full text-center text-xs font-black py-2.5 rounded-xl transition-all ${isAccountant || csvResult.products.length === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-secondary text-white hover:bg-secondary/95'}`}
+                        className={`w-full text-center text-xs font-black py-2.5 rounded-xl transition-all ${isAccountant || csvResult.products.length === 0 ? 'bg-gray-200 text-gray-600 cursor-not-allowed' : 'bg-secondary text-white hover:bg-secondary/95'}`}
                       >
                         {t.commit_btn}
                       </button>
@@ -452,12 +452,12 @@ export const MenuManagementPanel: React.FC = () => {
           <form onSubmit={handleSaveCategory} className="glass-panel w-full max-w-sm overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
               <h3 className="text-sm font-black text-slate-800 uppercase">{editingCategory ? 'Edit Menu Category' : 'Create Menu Category'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
+              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-slate-600 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category English Name</label>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Category English Name</label>
                 <input 
                   type="text"
                   required
@@ -469,7 +469,7 @@ export const MenuManagementPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category Arabic Name</label>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Category Arabic Name</label>
                 <input 
                   type="text"
                   required
@@ -494,13 +494,13 @@ export const MenuManagementPanel: React.FC = () => {
           <form onSubmit={handleSaveProduct} className="glass-panel w-full max-w-md overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
               <h3 className="text-sm font-black text-slate-800 uppercase">{editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}</h3>
-              <button type="button" onClick={() => setIsProductModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
+              <button type="button" onClick={() => setIsProductModalOpen(false)} className="text-slate-600 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
             </div>
 
             <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.product_name_en}</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{t.product_name_en}</label>
                   <input 
                     type="text"
                     required
@@ -511,7 +511,7 @@ export const MenuManagementPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.product_name_ar}</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">{t.product_name_ar}</label>
                   <input 
                     type="text"
                     required
@@ -525,7 +525,7 @@ export const MenuManagementPanel: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Description (EN)</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Description (EN)</label>
                   <textarea 
                     value={prodDescEn}
                     onChange={(e) => setProdDescEn(e.target.value)}
@@ -534,7 +534,7 @@ export const MenuManagementPanel: React.FC = () => {
                   ></textarea>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Description (AR)</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Description (AR)</label>
                   <textarea 
                     value={prodDescAr}
                     onChange={(e) => setProdDescAr(e.target.value)}
@@ -546,7 +546,7 @@ export const MenuManagementPanel: React.FC = () => {
 
               <div className="grid grid-cols-3 gap-2.5">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Price (SAR)</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Price (SAR)</label>
                   <input 
                     type="number"
                     step="0.01"
@@ -557,7 +557,7 @@ export const MenuManagementPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Calories</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Calories</label>
                   <input 
                     type="number"
                     required
@@ -567,7 +567,7 @@ export const MenuManagementPanel: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category</label>
+                  <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Category</label>
                   <select 
                     required
                     value={prodCatId}
@@ -581,7 +581,7 @@ export const MenuManagementPanel: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Image URL</label>
+                <label className="block text-[10px] font-black text-slate-600 uppercase mb-1">Image URL</label>
                 <input 
                   type="text"
                   value={prodImg}

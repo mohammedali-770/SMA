@@ -54,7 +54,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
           <Bell className="w-4 h-4 text-primary" />
           <div>
             <span className="font-black text-slate-800 uppercase block">{isRTL ? 'أدوات الإشعارات' : 'Push tools'}</span>
-            <span className="text-[9.5px] text-slate-400 font-bold">
+            <span className="text-[9.5px] text-slate-600 font-bold">
               {isRTL
                 ? 'إشعار تجريبي وبثّ ترويجي فوري للمشتركين فقط. يتطلب تفعيل التكامل أعلاه.'
                 : 'Test notification + immediate promo broadcast to opted-in devices only. Requires the integration above to be enabled.'}
@@ -62,7 +62,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
           </div>
         </div>
         {counts ? (
-          <div className="text-[9px] font-black text-slate-500 text-end">
+          <div className="text-[9px] font-black text-slate-600 text-end">
             <div>{isRTL ? `الأجهزة النشطة: ${counts.activeDevices}` : `Active devices: ${counts.activeDevices}`}</div>
             <div>{isRTL ? `مشتركو العروض: ${counts.promoOptIns}` : `Promo opt-ins: ${counts.promoOptIns}`}</div>
           </div>
@@ -77,7 +77,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
         >
           <Send className="w-3.5 h-3.5" /> {busy === 'test' ? (isRTL ? 'جارٍ الإرسال…' : 'Sending…') : (isRTL ? 'إرسال إشعار تجريبي' : 'Send test notification')}
         </button>
-        <span className="text-[9px] text-slate-400 font-bold">
+        <span className="text-[9px] text-slate-600 font-bold">
           {isRTL ? 'يُرسل إلى أجهزتك المسجّلة بنفس حساب المشرف.' : 'Goes to YOUR devices registered with this admin account.'}
         </span>
       </div>
@@ -110,7 +110,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
             className="bg-secondary text-white font-black px-3 py-1.5 rounded-xl disabled:opacity-50">
             {busy === 'broadcast' ? (isRTL ? 'جارٍ البث…' : 'Broadcasting…') : (isRTL ? 'تأكيد الإرسال' : 'Confirm send')}
           </button>
-          <button onClick={() => setConfirmBroadcast(false)} className="text-slate-500 font-black px-2 py-1.5">
+          <button onClick={() => setConfirmBroadcast(false)} className="text-slate-600 font-black px-2 py-1.5">
             {isRTL ? 'إلغاء' : 'Cancel'}
           </button>
         </div>
@@ -118,7 +118,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
 
       {result ? (
         <p className="text-[10px] font-black flex items-center gap-1.5 text-slate-700">
-          <Check className="w-3.5 h-3.5 text-green-600" />
+          <Check className="w-3.5 h-3.5 text-green-700" />
           {result.status === 'ok'
             ? (isRTL
               ? `النتيجة: مستهدف ${result.targeted ?? 0} · أُرسل ${result.sent ?? 0} · فشل ${result.failed ?? 0} · عُطّل ${result.deactivated ?? 0}`
@@ -127,7 +127,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
         </p>
       ) : null}
       {error ? (
-        <p className="text-[10px] font-black text-red-600 flex items-center gap-1.5">
+        <p className="text-[10px] font-black text-red-700 flex items-center gap-1.5">
           <AlertCircle className="w-3.5 h-3.5" /> {error}
         </p>
       ) : null}

@@ -166,7 +166,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
       <div className="flex justify-between items-start border-b border-slate-100 pb-2.5">
         <div>
           <h4 className="text-xs font-black text-slate-800 uppercase">{spec.title}</h4>
-          <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">{spec.subtitle}</p>
+          <p className="text-[9.5px] text-slate-600 font-bold mt-0.5">{spec.subtitle}</p>
         </div>
         <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${enabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
           {enabled ? 'ENABLED' : 'DISABLED'}
@@ -176,7 +176,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Provider select */}
         <div>
-          <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Provider</label>
+          <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">Provider</label>
           <select
             value={providerName}
             disabled={disabled}
@@ -191,7 +191,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
         {/* Public (non-secret) fields */}
         {spec.publicFields.map(f => (
           <div key={f.key}>
-            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{f.label}</label>
+            <label className="block text-[9px] font-black text-slate-600 uppercase mb-1">{f.label}</label>
             {f.type === 'bool' ? (
               <select
                 value={pub[f.key] ? 'true' : 'false'}
@@ -222,7 +222,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50/60 rounded-xl border border-slate-100">
         {spec.secretFields.map(f => (
           <div key={f.key}>
-            <label className="text-[9px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1">
+            <label className="text-[9px] font-black text-slate-600 uppercase mb-1 flex items-center gap-1">
               <KeyRound className="w-3 h-3 text-secondary" /> {f.label}
               {hasSecret && (
                 <span className="ml-1 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
@@ -242,8 +242,8 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
             />
           </div>
         ))}
-        <p className="md:col-span-2 text-[8.5px] text-slate-400 font-bold flex items-start gap-1 leading-snug">
-          <AlertCircle className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
+        <p className="md:col-span-2 text-[8.5px] text-slate-600 font-bold flex items-start gap-1 leading-snug">
+          <AlertCircle className="w-3 h-3 text-slate-500 flex-shrink-0 mt-0.5" />
           Secrets are stored server-side and never returned to the browser. Leave blank to keep the saved value.
         </p>
       </div>
@@ -262,7 +262,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
         </label>
         <div className="flex items-center gap-2">
           {msg && (
-            <span className={`text-[10px] font-bold flex items-center gap-1 ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>
+            <span className={`text-[10px] font-bold flex items-center gap-1 ${msg.ok ? 'text-green-700' : 'text-red-600'}`}>
               {msg.ok && <Check className="w-3.5 h-3.5" />}{msg.text}
             </span>
           )}

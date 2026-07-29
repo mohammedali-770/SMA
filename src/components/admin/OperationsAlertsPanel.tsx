@@ -89,7 +89,7 @@ function exactTime(iso: string | null | undefined, lang: AdminLang): string {
 
 const Metric: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone }) => (
   <div className={`rounded-xl border px-3 py-2 ${tone ?? 'bg-white/50 border-slate-100'}`}>
-    <p className="text-[8px] uppercase font-black text-slate-400">{label}</p>
+    <p className="text-[8px] uppercase font-black text-slate-600">{label}</p>
     <p className="text-sm font-black text-slate-800">{value}</p>
   </div>
 );
@@ -121,7 +121,7 @@ const AlertRow: React.FC<{
             <span className="text-[10px] font-black text-slate-800">
               {subsystemLabel(alert.subsystem, lang)}
             </span>
-            <span className="font-mono text-[8.5px] text-slate-500">{alert.condition_code}</span>
+            <span className="font-mono text-[8.5px] text-slate-600">{alert.condition_code}</span>
             <SevBadge severity={alert.severity} lang={lang} />
             <span className={`border rounded-full px-2 py-0.5 text-[8.5px] font-black ${STATUS_TONE[alert.status]}`}>
               {STATUS_TEXT[alert.status][lang]}
@@ -132,7 +132,7 @@ const AlertRow: React.FC<{
               </span>
             )}
           </div>
-          <p className="text-[8.5px] text-slate-400 font-bold mt-0.5">
+          <p className="text-[8.5px] text-slate-600 font-bold mt-0.5">
             {isAr ? 'أول رصد' : 'First seen'}: <span title={exactTime(alert.first_seen_at, lang)}>{relativeAge(alert.first_seen_at, lang)}</span>
             {' · '}
             {isAr ? 'آخر رصد' : 'Last seen'}: <span title={exactTime(alert.last_seen_at, lang)}>{relativeAge(alert.last_seen_at, lang)}</span>
@@ -143,30 +143,30 @@ const AlertRow: React.FC<{
           </p>
         </div>
         {expanded
-          ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />
-          : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" aria-hidden="true" />}
+          ? <ChevronUp className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />
+          : <ChevronDown className="w-4 h-4 text-slate-500 shrink-0" aria-hidden="true" />}
       </button>
       {expanded && (
         <div className="border-t border-slate-100 px-3 py-2 space-y-1.5">
-          <p className="font-mono text-[8.5px] text-slate-500 break-all">{alert.fingerprint}</p>
+          <p className="font-mono text-[8.5px] text-slate-600 break-all">{alert.fingerprint}</p>
           {events === null ? (
-            <p className="text-[9px] text-slate-400 font-bold flex items-center gap-1">
+            <p className="text-[9px] text-slate-600 font-bold flex items-center gap-1">
               <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري تحميل الأحداث…' : 'Loading timeline…'}
             </p>
           ) : events.length === 0 ? (
-            <p className="text-[9px] text-slate-400 font-bold">{isAr ? 'لا توجد أحداث.' : 'No events.'}</p>
+            <p className="text-[9px] text-slate-600 font-bold">{isAr ? 'لا توجد أحداث.' : 'No events.'}</p>
           ) : (
             <ul className="space-y-1">
               {events.map((e) => (
                 <li key={e.id} className="flex items-center gap-2 text-[9px] font-bold text-slate-600">
                   <SevBadge severity={e.severity} lang={lang} />
                   <span>{(EVENT_TEXT[e.event_type] ?? { en: e.event_type, ar: e.event_type })[lang]}</span>
-                  <span className="text-slate-400" title={exactTime(e.created_at, lang)}>
+                  <span className="text-slate-600" title={exactTime(e.created_at, lang)}>
                     {relativeAge(e.created_at, lang)}
                   </span>
                   {e.notification_suppressed && (
-                    <span className="text-[8px] text-slate-400">
+                    <span className="text-[8px] text-slate-600">
                       {isAr ? '(بدون إشعار)' : '(notification suppressed)'}
                     </span>
                   )}
@@ -322,7 +322,7 @@ export const OperationsAlertsPanel: React.FC<{
                 {isAr ? 'تنبيهات العمليات والملخص اليومي' : 'Operations Alerts & Daily Digest'}
               </h3>
             </div>
-            <p className="text-[9px] text-slate-400 font-bold mt-1">
+            <p className="text-[9px] text-slate-600 font-bold mt-1">
               {isAr
                 ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
                 : 'Read-only observability: no auto-remediation, no retries, no external messages.'}
@@ -370,7 +370,7 @@ export const OperationsAlertsPanel: React.FC<{
         </div>
 
         {summary && !summary.alert_evaluation_enabled && (
-          <p className="text-[9px] font-bold text-slate-500 flex items-center gap-1.5">
+          <p className="text-[9px] font-bold text-slate-600 flex items-center gap-1.5">
             <Clock3 className="w-3.5 h-3.5" aria-hidden="true" />
             {isAr
               ? 'محرك التقييم غير مفعل بعد (الوضع الخامل). لا يتم إنشاء تنبيهات جديدة.'
@@ -422,13 +422,13 @@ export const OperationsAlertsPanel: React.FC<{
           </div>
 
           {loading ? (
-            <p className="text-[10px] text-slate-400 font-bold flex items-center gap-2">
+            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري التحميل…' : 'Loading…'}
             </p>
           ) : alerts.length === 0 ? (
-            <p className="text-[10px] text-slate-500 font-bold flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" aria-hidden="true" />
+            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" />
               {isAr
                 ? 'لا توجد تنبيهات مطابقة للمرشحات الحالية.'
                 : 'No alerts match the current filters.'}
@@ -482,7 +482,7 @@ export const OperationsAlertsPanel: React.FC<{
               </pre>
             </div>
           ) : !digestError && (
-            <p className="text-[10px] text-slate-400 font-bold flex items-center gap-2">
+            <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
               {isAr ? 'جاري إنشاء المعاينة…' : 'Building preview…'}
             </p>
@@ -492,7 +492,7 @@ export const OperationsAlertsPanel: React.FC<{
             {isAr ? 'الملخصات المحفوظة' : 'Generated history'}
           </h4>
           {history.length === 0 ? (
-            <p className="text-[10px] text-slate-400 font-bold">
+            <p className="text-[10px] text-slate-600 font-bold">
               {isAr
                 ? 'لا توجد ملخصات محفوظة بعد — إنشاء الملخص اليومي غير مفعل في هذا الإصدار.'
                 : 'No stored digests yet — scheduled generation is not enabled in this version.'}
@@ -511,12 +511,12 @@ export const OperationsAlertsPanel: React.FC<{
                     >
                       <span className="text-[10px] font-black text-slate-800">{d.digest_date}</span>
                       <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[8px] font-black uppercase">{d.language}</span>
-                      <span className="text-[8.5px] text-slate-400 font-bold">
+                      <span className="text-[8.5px] text-slate-600 font-bold">
                         {isAr ? 'جديدة' : 'opened'}: {d.opened_count} · {isAr ? 'تعافت' : 'recovered'}: {d.recovered_count} · {isAr ? 'قائمة' : 'open'}: {d.unresolved_count}
                       </span>
                       {opened
-                        ? <ChevronUp className="w-4 h-4 text-slate-400 ms-auto" aria-hidden="true" />
-                        : <ChevronDown className="w-4 h-4 text-slate-400 ms-auto" aria-hidden="true" />}
+                        ? <ChevronUp className="w-4 h-4 text-slate-500 ms-auto" aria-hidden="true" />
+                        : <ChevronDown className="w-4 h-4 text-slate-500 ms-auto" aria-hidden="true" />}
                     </button>
                     {opened && (
                       <div className="border-t border-slate-100 px-3 py-2" dir={d.language === 'ar' ? 'rtl' : 'ltr'}>
@@ -547,7 +547,7 @@ export const OperationsAlertsPanel: React.FC<{
           )}
           {!settings ? (
             !settingsError && (
-              <p className="text-[10px] text-slate-400 font-bold flex items-center gap-2">
+              <p className="text-[10px] text-slate-600 font-bold flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
                 {isAr ? 'جاري التحميل…' : 'Loading…'}
               </p>
@@ -555,7 +555,7 @@ export const OperationsAlertsPanel: React.FC<{
           ) : (
             <div className="space-y-3">
               {!isAdmin && (
-                <p className="text-[9px] font-bold text-slate-500">
+                <p className="text-[9px] font-bold text-slate-600">
                   {isAr
                     ? 'عرض للقراءة فقط — تعديل الإعدادات متاح للمشرفين فقط.'
                     : 'Read-only view — only admins can change these settings.'}
@@ -579,7 +579,7 @@ export const OperationsAlertsPanel: React.FC<{
                   </label>
                 ))}
                 <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 opacity-80">
-                  <span className="text-[9.5px] font-black text-slate-500">
+                  <span className="text-[9.5px] font-black text-slate-600">
                     {isAr ? 'الإرسال الخارجي (معطل في هذا الإصدار)' : 'External dispatch (disabled in this version)'}
                   </span>
                   <input type="checkbox" checked={false} disabled aria-label="external dispatch disabled" />
@@ -591,7 +591,7 @@ export const OperationsAlertsPanel: React.FC<{
                 <Metric label={isAr ? 'تذكير التحذير (دقائق)' : 'Warning reminder (min)'} value={settings.warning_reminder_minutes} />
                 <Metric label={isAr ? 'تذكير الحرج (دقائق)' : 'Critical reminder (min)'} value={settings.critical_reminder_minutes} />
               </div>
-              <p className="text-[8.5px] text-slate-400 font-bold">
+              <p className="text-[8.5px] text-slate-600 font-bold">
                 {isAr
                   ? 'ملاحظة: لا يوجد أي مرسل خارجي في هذا الإصدار؛ لا يمكن تفعيل الإرسال الخارجي حتى مع صلاحيات المشرف.'
                   : 'Note: no external dispatcher exists in this version; external delivery cannot be enabled even by admins.'}

@@ -96,7 +96,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
           <CreditCard className="w-4 h-4 text-primary" />
           <div>
             <span className="font-black text-slate-800 text-xs block">{isRTL ? 'مدفوعات Tap' : 'Tap Payments'}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{isRTL ? 'الجاهزية واختبار الاتصال — لا يُعرض المفتاح السري' : 'Readiness + connection test — secret key never shown'}</span>
+            <span className="text-[9px] text-slate-600 font-bold">{isRTL ? 'الجاهزية واختبار الاتصال — لا يُعرض المفتاح السري' : 'Readiness + connection test — secret key never shown'}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
               </span>
             </>
           )}
-          <button onClick={() => void load()} disabled={loading} className="text-slate-400 hover:text-primary disabled:opacity-40" aria-label="Refresh">
+          <button onClick={() => void load()} disabled={loading} className="text-slate-600 hover:text-primary disabled:opacity-40" aria-label="Refresh">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -133,7 +133,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
             <Indicator label={isRTL ? 'مفتاح تجريبي' : 'Test key'} ok={status.test_key_set} />
             <Indicator label={isRTL ? 'مفتاح مباشر' : 'Live key'} ok={status.live_key_set} />
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-slate-500 font-bold px-1">
+          <div className="flex items-center gap-3 text-[10px] text-slate-600 font-bold px-1">
             <span>{isRTL ? 'العملة' : 'Currency'}: <b className="text-slate-700">{status.currency}</b></span>
             <span>Source: <b className="text-slate-700">{status.source_id}</b></span>
             <span>{isRTL ? 'انتهاء' : 'Expiry'}: <b className="text-slate-700">{status.expiry_minutes}m</b></span>
@@ -142,7 +142,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'اختبار الاتصال' : 'Test connection'}</span>
+                <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'اختبار الاتصال' : 'Test connection'}</span>
                 <button
                   onClick={() => void handleTest()}
                   disabled={testing || !status.active_key_set}
@@ -156,7 +156,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
                   {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
                 </div>
               )}
-              <p className="text-[9px] text-slate-400 font-semibold">
+              <p className="text-[9px] text-slate-600 font-semibold">
                 {isRTL
                   ? 'يتحقق من المفتاح السري للوضع المحدد لدى Tap دون إنشاء أي عملية دفع.'
                   : 'Validates the selected-mode secret key against Tap without creating any charge.'}
@@ -168,7 +168,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
+                <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
                 <button
                   onClick={() => void runTestCheckout()}
                   disabled={coRunning || !canRunTest}
@@ -177,13 +177,13 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
                   <CreditCard className="w-3 h-3" /> {coRunning ? '…' : (isRTL ? 'ابدأ' : 'Run')}
                 </button>
               </div>
-              <p className="text-[9px] text-slate-400 font-semibold">
+              <p className="text-[9px] text-slate-600 font-semibold">
                 {isRTL
                   ? 'ينشئ عملية دفع تجريبية بقيمة ١ ريال عبر Tap (Sandbox) لاختبار صفحة الدفع. لا يُنشئ أو يدفع أي طلب في Spicy Meal.'
                   : 'Creates a 1 SAR Tap sandbox checkout to test the hosted payment page. It does not create or pay any Spicy Meal order.'}
               </p>
               {!canRunTest && (
-                <p className="text-[9px] text-amber-600 font-bold">
+                <p className="text-[9px] text-amber-700 font-bold">
                   {isRTL
                     ? 'متاح فقط عندما يكون Tap مفعّلاً في وضع الاختبار مع معرّف التاجر ومفتاح الاختبار.'
                     : 'Available only when Tap is enabled in TEST mode with a merchant id + test key.'}
@@ -191,7 +191,7 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
               )}
               {coChargeId && (
                 <div className="flex items-center justify-between gap-2 pt-1">
-                  <span className="text-[9px] text-slate-500 font-bold">{isRTL ? 'بعد إتمام الدفع في النافذة:' : 'After paying in the new tab:'}</span>
+                  <span className="text-[9px] text-slate-600 font-bold">{isRTL ? 'بعد إتمام الدفع في النافذة:' : 'After paying in the new tab:'}</span>
                   <button
                     onClick={() => void checkTestResult()}
                     disabled={coChecking}
@@ -209,12 +209,12 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
               {coErr && (coErr.code || coErr.description) && (
                 <div className="bg-red-50 border border-red-100 rounded-lg p-2 text-[10px] space-y-1">
                   <div className="flex justify-between gap-2">
-                    <span className="text-red-400">{isRTL ? 'رمز خطأ Tap' : 'Tap error code'}</span>
+                    <span className="text-red-700">{isRTL ? 'رمز خطأ Tap' : 'Tap error code'}</span>
                     <span className="font-mono font-black text-red-700">{coErr.code ?? '—'}{coErr.httpStatus ? ` · HTTP ${coErr.httpStatus}` : ''}</span>
                   </div>
                   {coErr.description && (
                     <div className="flex justify-between gap-2">
-                      <span className="text-red-400 flex-shrink-0">{isRTL ? 'الوصف' : 'Description'}</span>
+                      <span className="text-red-700 flex-shrink-0">{isRTL ? 'الوصف' : 'Description'}</span>
                       <span className="font-bold text-red-700 text-right">{coErr.description}</span>
                     </div>
                   )}
@@ -222,17 +222,17 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
               )}
               {coResult && (
                 <div className="bg-white/70 border border-slate-100 rounded-lg p-2 text-[10px] space-y-1">
-                  <div className="flex justify-between gap-2"><span className="text-slate-400">{isRTL ? 'رقم العملية' : 'Charge ID'}</span><span className="font-mono text-[8.5px] text-slate-600 truncate">{coResult.chargeId}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الحالة' : 'Status'}</span><span className="font-black text-slate-700">{coResult.status}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'المبلغ' : 'Amount'}</span><span className="font-bold text-slate-700">{coResult.amount} {coResult.currency}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الوضع' : 'Mode'}</span><span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-700">{String(coResult.mode ?? 'test').toUpperCase()}</span></div>
+                  <div className="flex justify-between gap-2"><span className="text-slate-600">{isRTL ? 'رقم العملية' : 'Charge ID'}</span><span className="font-mono text-[8.5px] text-slate-600 truncate">{coResult.chargeId}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{isRTL ? 'الحالة' : 'Status'}</span><span className="font-black text-slate-700">{coResult.status}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{isRTL ? 'المبلغ' : 'Amount'}</span><span className="font-bold text-slate-700">{coResult.amount} {coResult.currency}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-600">{isRTL ? 'الوضع' : 'Mode'}</span><span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-700">{String(coResult.mode ?? 'test').toUpperCase()}</span></div>
                 </div>
               )}
             </div>
           )}
         </>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <div className="py-4 text-center text-slate-600 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
       )}
     </div>
   );

@@ -157,7 +157,7 @@ export const AdminDashboard: React.FC = () => {
               </span>
             )}
           </h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">{isRTL ? 'نظام التحكم والربط المباشر لفروع سبايسي ميل' : 'Real-time synchronization console connected to live Fast-Food branches'}</p>
+          <p className="text-[11px] text-gray-600 mt-0.5">{isRTL ? 'نظام التحكم والربط المباشر لفروع سبايسي ميل' : 'Real-time synchronization console connected to live Fast-Food branches'}</p>
         </div>
 
         {/* Global configurations / Language / Session roles */}
@@ -165,7 +165,7 @@ export const AdminDashboard: React.FC = () => {
           {/* Audio sound toggler */}
           <button
             onClick={() => setSoundMuted(!soundMuted)}
-            className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
+            className={`p-2 rounded-xl border transition-all ${soundMuted ? 'bg-red-50 text-red-700 border-red-100' : 'bg-green-50 text-green-700 border-green-100'}`}
             title={soundMuted ? t.sound_alert_off : t.sound_alert_on}
             aria-label={soundMuted ? t.sound_alert_off : t.sound_alert_on}
             aria-pressed={soundMuted}
@@ -175,7 +175,7 @@ export const AdminDashboard: React.FC = () => {
 
           {/* Signed-in role (from profiles.role — set by Supabase Auth, not switchable here) */}
           <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl border border-gray-200">
-            <span className="text-[10px] text-gray-500 font-extrabold px-1.5 uppercase">{t.role}:</span>
+            <span className="text-[10px] text-gray-600 font-extrabold px-1.5 uppercase">{t.role}:</span>
             <span className="text-[10px] font-black px-2.5 py-1 rounded-lg capitalize bg-primary text-white shadow-sm">
               {currentUser.fullName ? `${currentUser.fullName.split(' ')[0]} ` : ''}({currentUser.role})
             </span>
@@ -195,7 +195,7 @@ export const AdminDashboard: React.FC = () => {
       {/* Accountant role alert guard bar */}
       {isAccountant && (
         <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 flex items-center gap-2 text-amber-900 text-xs font-semibold">
-          <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
           <span>{t.role_accountant_warning}</span>
         </div>
       )}

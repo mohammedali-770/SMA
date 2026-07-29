@@ -58,7 +58,7 @@ const TapPaymentDetails: React.FC<{ order: Order; isAccountant: boolean; isRTL: 
   useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [order.id]);
 
   if (order.paymentMethod !== 'online') return null;
-  if (loading) return <div className="p-2.5 bg-gray-50 rounded-lg text-[9px] text-gray-400 font-bold animate-pulse">{isRTL ? 'جاري تحميل تفاصيل الدفع…' : 'Loading payment details…'}</div>;
+  if (loading) return <div className="p-2.5 bg-gray-50 rounded-lg text-[9px] text-gray-500 font-bold animate-pulse">{isRTL ? 'جاري تحميل تفاصيل الدفع…' : 'Loading payment details…'}</div>;
   if (!rec || rec.provider !== 'tap') return null;
 
   const isLive = rec.mode === 'live';
@@ -73,7 +73,7 @@ const TapPaymentDetails: React.FC<{ order: Order; isAccountant: boolean; isRTL: 
   return (
     <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
       <div className="flex justify-between items-center">
-        <span className="text-gray-400">Payment provider:</span>
+        <span className="text-gray-600">Payment provider:</span>
         <span className="font-black text-slate-700 flex items-center gap-1">
           Tap
           <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${isLive ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{isLive ? 'LIVE' : 'TEST'}</span>
@@ -81,35 +81,35 @@ const TapPaymentDetails: React.FC<{ order: Order; isAccountant: boolean; isRTL: 
       </div>
       {rec.provider_ref && (
         <div className="flex justify-between items-center gap-2">
-          <span className="text-gray-400">Charge ID:</span>
+          <span className="text-gray-600">Charge ID:</span>
           <span className="font-mono text-[8.5px] text-slate-600 truncate">{rec.provider_ref}</span>
         </div>
       )}
       <div className="flex justify-between items-center">
-        <span className="text-gray-400">Provider status:</span>
+        <span className="text-gray-600">Provider status:</span>
         <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase ${paid ? 'bg-green-100 text-green-700' : rec.status === 'failed' ? 'bg-red-100 text-red-700' : 'bg-yellow-50 text-yellow-700'}`}>{rec.status}</span>
       </div>
       {(rec.card_scheme || rec.card_last_four) && (
         <div className="flex justify-between items-center">
-          <span className="text-gray-400">Card:</span>
+          <span className="text-gray-600">Card:</span>
           <span className="font-semibold text-slate-600">{[rec.card_scheme, rec.card_last_four ? `•••• ${rec.card_last_four}` : ''].filter(Boolean).join(' ')}</span>
         </div>
       )}
       {rec.failure_message_safe && (
         <div className="flex justify-between items-center">
-          <span className="text-gray-400">Note:</span>
-          <span className="font-semibold text-red-600">{rec.failure_message_safe}</span>
+          <span className="text-gray-600">Note:</span>
+          <span className="font-semibold text-red-700">{rec.failure_message_safe}</span>
         </div>
       )}
       {!isAccountant && !paid && (
         <div className="pt-1.5 border-t border-gray-100 flex items-center justify-between gap-2">
-          <span className="text-[8.5px] text-gray-400 font-bold">{isRTL ? 'إعادة التحقق من الدفع عبر Tap' : 'Re-verify via Tap'}</span>
+          <span className="text-[8.5px] text-gray-600 font-bold">{isRTL ? 'إعادة التحقق من الدفع عبر Tap' : 'Re-verify via Tap'}</span>
           <button onClick={() => void verify()} disabled={verifying} className="bg-primary text-white text-[9px] font-black px-2.5 py-1 rounded-lg disabled:opacity-40">
             {verifying ? '…' : (isRTL ? 'تحقق' : 'Verify')}
           </button>
         </div>
       )}
-      {result && <div className="text-[8.5px] font-bold text-slate-500">{isRTL ? 'النتيجة' : 'Result'}: {result}</div>}
+      {result && <div className="text-[8.5px] font-bold text-slate-600">{isRTL ? 'النتيجة' : 'Result'}: {result}</div>}
     </div>
   );
 };
@@ -160,7 +160,7 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
   return (
     <div className="glass-card rounded-2xl p-4 border border-amber-200/60 bg-amber-50/40">
       <div className="flex items-center gap-2 mb-1">
-        <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+        <ShieldAlert className="w-4 h-4 text-amber-700 flex-shrink-0" />
         <h3 className="text-xs font-black text-amber-800 uppercase tracking-widest">{t.verify_title}</h3>
         {total > 0 && (
           <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-black">{total}</span>
@@ -175,7 +175,7 @@ const OrdersRequiringVerificationCard: React.FC<{ onView: (id: string) => void }
             <div key={it.id} className="flex items-center justify-between gap-2 bg-white/70 border border-amber-100 rounded-xl px-3 py-2">
               <div className="min-w-0">
                 <div className="font-black text-primary text-xs truncate">{it.order_number}</div>
-                <div className="text-[9.5px] text-gray-500 font-semibold truncate">
+                <div className="text-[9.5px] text-gray-600 font-semibold truncate">
                   {reasonText(it.reason)} · {t.verify_since} {whenText(it.first_pos_sync_failure_at ?? it.created_at)}
                 </div>
               </div>
@@ -320,8 +320,8 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Data Table */}
               <div className="glass-card rounded-2xl overflow-hidden overflow-x-auto">
-                <table className="w-full text-left text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                  <thead className="bg-gray-50 text-[10px] text-gray-400 font-bold uppercase">
+                <table className="w-full text-left text-xs text-gray-600" style={{ textAlign: isRTL ? 'right' : 'left' }}>
+                  <thead className="bg-gray-50 text-[10px] text-gray-500 font-bold uppercase">
                     <tr>
                       <th className="px-4 py-3">{t.order_id}</th>
                       <th className="px-4 py-3">{t.customer}</th>
@@ -339,20 +339,20 @@ export const LiveOrdersPanel: React.FC = () => {
                           {(() => { const d = orderDisplayNumber(order); return (
                             <>
                               <div className="font-black text-primary">{d.primary}</div>
-                              {d.secondary && <div className="text-[10px] text-gray-400 font-semibold">{d.secondary}</div>}
+                              {d.secondary && <div className="text-[10px] text-gray-600 font-semibold">{d.secondary}</div>}
                             </>
                           ); })()}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="font-semibold text-gray-900">{order.customerName}</div>
-                          <div className={`text-[10px] ${order.customerPhone && order.customerPhone.trim() ? 'text-gray-400' : 'text-amber-600 italic'}`}>{phoneLabel(order.customerPhone)}</div>
+                          <div className={`text-[10px] ${order.customerPhone && order.customerPhone.trim() ? 'text-gray-600' : 'text-amber-600 italic'}`}>{phoneLabel(order.customerPhone)}</div>
                         </td>
                         <td className="px-4 py-3.5 font-medium text-gray-700">
                           {isRTL ? order.branchNameAr : order.branchNameEn}
                         </td>
                         <td className="px-4 py-3.5 font-bold text-secondary">
                           <Price amount={order.total} />
-                          <span className="mt-1 block text-[9px] font-bold text-gray-500 normal-case">{methodLabelText(order)}</span>
+                          <span className="mt-1 block text-[9px] font-bold text-gray-600 normal-case">{methodLabelText(order)}</span>
                           {(() => {
                             const badge = paymentBadge(order);
                             return (
@@ -380,7 +380,7 @@ export const LiveOrdersPanel: React.FC = () => {
                             {syncStateOf(order)}
                           </span>
                           {order.syncBlockedReason && (
-                            <span className="mt-1 block text-[9px] font-bold text-red-600 max-w-[130px] leading-tight">
+                            <span className="mt-1 block text-[9px] font-bold text-red-700 max-w-[130px] leading-tight">
                               {order.syncBlockedReason}
                             </span>
                           )}
@@ -400,7 +400,7 @@ export const LiveOrdersPanel: React.FC = () => {
                     ))}
                     {filteredOrders.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="text-center py-12 text-gray-400 font-bold">
+                        <td colSpan={7} className="text-center py-12 text-gray-600 font-bold">
                           {t.no_orders}
                         </td>
                       </tr>
@@ -416,16 +416,16 @@ export const LiveOrdersPanel: React.FC = () => {
           <div className="glass-panel w-full max-w-md overflow-hidden rounded-[2rem] shadow-2xl animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
             <div className="p-5 bg-white/20 border-b border-white/10 flex justify-between items-center">
               <div>
-                <h4 className="text-xs font-black text-gray-500 uppercase">{isRTL ? 'تعديل حالة الكاشير الموحدة' : 'Live POS Status Controller'}</h4>
+                <h4 className="text-xs font-black text-gray-600 uppercase">{isRTL ? 'تعديل حالة الكاشير الموحدة' : 'Live POS Status Controller'}</h4>
                 {(() => { const d = orderDisplayNumber(activeReceiptOrder); return (
                   <p className="text-sm font-extrabold text-primary">
-                    {d.primary}{d.secondary && <span className="text-[10px] text-gray-400 font-semibold ml-1">· {d.secondary}</span>}
+                    {d.primary}{d.secondary && <span className="text-[10px] text-gray-600 font-semibold ml-1">· {d.secondary}</span>}
                   </p>
                 ); })()}
               </div>
               <button 
                 onClick={() => setActiveReceiptOrder(null)}
-                className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-400 hover:bg-gray-100 transition-all"
+                className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100 transition-all"
                 aria-label={isRTL ? 'إغلاق' : 'Close'}
               >
                 ✕
@@ -469,18 +469,18 @@ export const LiveOrdersPanel: React.FC = () => {
               {/* Invoice Breakdown Details */}
               <div className="border border-gray-100 rounded-2xl p-3 space-y-2 bg-gray-50/50">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Customer:</span>
+                  <span className="text-gray-600">Customer:</span>
                   <span className="font-bold text-gray-800">{activeReceiptOrder.customerName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Phone:</span>
+                  <span className="text-gray-600">Phone:</span>
                   <span className={`font-bold ${activeReceiptOrder.customerPhone && activeReceiptOrder.customerPhone.trim() ? 'text-gray-800' : 'text-amber-600 italic'}`}>
                     {phoneLabel(activeReceiptOrder.customerPhone)}
                   </span>
                 </div>
                 {activeReceiptOrder.address && (
                   <div className="pt-1.5 border-t border-gray-100">
-                    <span className="text-gray-400 block text-[10px] mb-0.5">Delivery Short Address:</span>
+                    <span className="text-gray-600 block text-[10px] mb-0.5">Delivery Short Address:</span>
                     <span className="font-bold text-gray-800 bg-white p-1.5 border border-gray-100 rounded-lg block leading-relaxed">
                       {activeReceiptOrder.address.label} • {activeReceiptOrder.address.description} <br/>
                       <span className="text-primary font-black uppercase text-[10px]">{activeReceiptOrder.address.nationalShortAddress}</span>
@@ -491,7 +491,7 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Items Table inside Dialog */}
               <div className="space-y-2">
-                <span className="block text-[10px] font-black text-gray-400 uppercase tracking-wider">Ordered Items:</span>
+                <span className="block text-[10px] font-black text-gray-600 uppercase tracking-wider">Ordered Items:</span>
                 <div className="space-y-1.5">
                   {activeReceiptOrder.items.map(item => (
                     <div key={item.id} className="flex justify-between items-center p-2 bg-white border border-gray-100 rounded-xl">
@@ -501,7 +501,7 @@ export const LiveOrdersPanel: React.FC = () => {
                           <span>{isRTL ? item.nameAr : item.nameEn}</span>
                         </div>
                         {item.selectedModifiers.length > 0 && (
-                          <p className="text-[9.5px] text-gray-400 pl-4 mt-0.5">
+                          <p className="text-[9.5px] text-gray-600 pl-4 mt-0.5">
                             + {item.selectedModifiers.map(m => isRTL ? m.nameAr : m.nameEn).join(', ')}
                           </p>
                         )}
@@ -514,18 +514,18 @@ export const LiveOrdersPanel: React.FC = () => {
 
               {/* Simple billing table */}
               <div className="pt-2 border-t border-gray-100 space-y-1">
-                <div className="flex justify-between text-gray-500">
+                <div className="flex justify-between text-gray-600">
                   <span>Subtotal:</span>
                   <span><Price amount={activeReceiptOrder.subtotal} /></span>
                 </div>
                 {activeReceiptOrder.deliveryFee > 0 && (
-                  <div className="flex justify-between text-gray-500">
+                  <div className="flex justify-between text-gray-600">
                     <span>Delivery Fee:</span>
                     <span><Price amount={activeReceiptOrder.deliveryFee} prefix="+" /></span>
                   </div>
                 )}
                 {(activeReceiptOrder.discountAmount ?? 0) > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-emerald-700">
                     <span>{isRTL ? 'خصم القسيمة' : 'Coupon Discount'}:</span>
                     <span><Price amount={activeReceiptOrder.discountAmount ?? 0} prefix="−" /></span>
                   </div>
@@ -543,7 +543,7 @@ export const LiveOrdersPanel: React.FC = () => {
               </div>
 
               {/* Mandatory VAT details stamp */}
-              <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-400 flex justify-between">
+              <div className="p-2 bg-gray-50 rounded-lg text-[9.5px] text-gray-500 flex justify-between">
                 <span>{brandSettings?.vatPercentage || 15}% Saudi VAT component:</span>
                 <span className="font-semibold"><Price amount={getVATBreakdown(activeReceiptOrder.total, brandSettings?.vatPercentage || 15).vatAmount} /></span>
               </div>
@@ -551,11 +551,11 @@ export const LiveOrdersPanel: React.FC = () => {
               {/* Payment — actual chosen method + derived status (method-aware) */}
               <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Payment method:</span>
+                  <span className="text-gray-600">Payment method:</span>
                   <span className="font-semibold text-gray-600">{methodLabelText(activeReceiptOrder)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Payment status:</span>
+                  <span className="text-gray-600">Payment status:</span>
                   {(() => {
                     const badge = paymentBadge(activeReceiptOrder);
                     return <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase ${badge.tone}`}>{badge.text}</span>;
@@ -574,13 +574,13 @@ export const LiveOrdersPanel: React.FC = () => {
                 return (
                   <div className="p-2.5 bg-gray-50 rounded-lg text-[9.5px] space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <span className="text-gray-400">POS sync status:</span>
+                      <span className="text-gray-600">POS sync status:</span>
                       <span className={`px-1.5 py-0.5 rounded-full text-[8px] font-black ${syncTone(state)}`}>{state}</span>
                     </div>
                     {activeReceiptOrder.syncBlockedReason && (
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Reason:</span>
-                        <span className="font-semibold text-red-600">{activeReceiptOrder.syncBlockedReason}</span>
+                        <span className="text-gray-600">Reason:</span>
+                        <span className="font-semibold text-red-700">{activeReceiptOrder.syncBlockedReason}</span>
                       </div>
                     )}
                     {activeReceiptOrder.syncBlockedReason === 'delivery_schema_unconfirmed' && (

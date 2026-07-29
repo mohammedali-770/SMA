@@ -20,7 +20,7 @@ const DatabasePlayground = lazy(() =>
 /** Placeholder shown while a lazily-loaded panel's chunk is fetched. */
 const PanelFallback: React.FC = () => (
   <div className="flex-1 glass-panel rounded-2xl min-h-[400px] flex items-center justify-center">
-    <span className="text-slate-400 text-sm font-bold animate-pulse">Loading…</span>
+    <span className="text-slate-600 text-sm font-bold animate-pulse">Loading…</span>
   </div>
 );
 
@@ -28,7 +28,7 @@ const PanelFallback: React.FC = () => (
 const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
   <div className="min-h-screen flex flex-col items-center justify-center gap-3 font-sans">
     <Loader2 className="w-8 h-8 text-primary animate-spin" />
-    <span className="text-sm font-bold text-slate-500">{label}</span>
+    <span className="text-sm font-bold text-slate-600">{label}</span>
   </div>
 );
 
@@ -72,7 +72,7 @@ const DataErrorPanel: React.FC = () => {
     <div className="max-w-md mx-auto mt-16 glass-panel rounded-2xl p-6 text-center space-y-3">
       <AlertTriangle className="w-8 h-8 text-secondary mx-auto" />
       <h2 className="text-sm font-black text-slate-800">Couldn't load your data</h2>
-      <p className="text-xs text-slate-500 font-medium break-words">{dataError}</p>
+      <p className="text-xs text-slate-600 font-medium break-words">{dataError}</p>
       <button
         onClick={() => { void reload(); }}
         className="inline-flex items-center gap-1.5 bg-primary text-white text-xs font-black py-2 px-4 rounded-xl mx-auto"
@@ -97,13 +97,13 @@ const WriteErrorBanner: React.FC = () => {
       <div className="max-w-7xl mx-auto flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 rounded-xl px-3 py-2.5 shadow-sm">
         <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
         <div className="flex-1 text-xs font-bold break-words">
-          <span className="block text-[10px] uppercase tracking-wide text-red-500 font-black">Save failed</span>
+          <span className="block text-[10px] uppercase tracking-wide text-red-700 font-black">Save failed</span>
           {writeError}
         </div>
         <button
           onClick={dismissWriteError}
           aria-label="Dismiss"
-          className="flex-shrink-0 text-red-400 hover:text-red-700 transition-colors"
+          className="flex-shrink-0 text-red-700 hover:text-red-700 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -175,7 +175,7 @@ function AppContent() {
       ) : (
         <StaffApp />
       )}
-      <footer className="backdrop-blur-md bg-white/10 text-slate-500 text-center py-5 border-t border-slate-200/60 mt-10 text-xs">
+      <footer className="backdrop-blur-md bg-white/10 text-slate-600 text-center py-5 border-t border-slate-200/60 mt-10 text-xs">
         <div className="max-w-7xl mx-auto px-6">
           <span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span>
         </div>

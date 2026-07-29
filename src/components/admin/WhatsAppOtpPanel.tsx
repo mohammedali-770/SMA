@@ -52,10 +52,10 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
     <div className="bg-white/50 border border-slate-200/60 rounded-2xl p-3.5 space-y-3">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <MessageCircle className="w-4 h-4 text-green-600" />
+          <MessageCircle className="w-4 h-4 text-green-700" />
           <div>
             <span className="font-black text-slate-800 text-xs block">{isRTL ? 'التحقق عبر واتساب (Meta Cloud API)' : 'WhatsApp OTP (Meta Cloud API)'}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض الأسرار' : 'Readiness + test send — no secret values shown'}</span>
+            <span className="text-[9px] text-slate-600 font-bold">{isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض الأسرار' : 'Readiness + test send — no secret values shown'}</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
               {status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
             </span>
           )}
-          <button onClick={() => void load()} disabled={loading} className="text-slate-400 hover:text-primary disabled:opacity-40" aria-label="Refresh">
+          <button onClick={() => void load()} disabled={loading} className="text-slate-600 hover:text-primary disabled:opacity-40" aria-label="Refresh">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -89,12 +89,12 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
 
           {/* Customer LOGIN (Send SMS Hook) readiness — distinct from verification. */}
           <div className="pt-2 border-t border-slate-100 space-y-1.5">
-            <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'تسجيل الدخول عبر واتساب' : 'WhatsApp customer login'}</span>
+            <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'تسجيل الدخول عبر واتساب' : 'WhatsApp customer login'}</span>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
               <Indicator label={isRTL ? 'تسجيل الدخول مُفعّل' : 'Login enabled'} ok={Boolean(status.login_enabled)} />
               <Indicator label={isRTL ? 'سر Send SMS Hook' : 'Send SMS Hook secret'} ok={Boolean(status.send_sms_hook_secret_set)} />
             </div>
-            <p className="text-[9px] text-slate-400 font-semibold">
+            <p className="text-[9px] text-slate-600 font-semibold">
               {isRTL
                 ? 'يتطلب تسجيل الدخول: تفعيل المزود + تفعيل تسجيل الدخول + سر الـHook + بيانات Meta + قالب معتمد، مع تفعيل مصادقة الهاتف في لوحة Supabase.'
                 : 'Login requires: provider enabled + login enabled + hook secret + Meta creds + an approved template, plus Phone Auth turned on in the Supabase dashboard.'}
@@ -103,7 +103,7 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
 
           {!disabled && (
             <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'إرسال رمز تجريبي' : 'Send test OTP'}</span>
+              <span className="text-[10px] font-black text-slate-600 uppercase">{isRTL ? 'إرسال رمز تجريبي' : 'Send test OTP'}</span>
               <div className="flex gap-2">
                 <input
                   type="tel"
@@ -129,7 +129,7 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
                   {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
                 </div>
               )}
-              <p className="text-[9px] text-slate-400 font-semibold">
+              <p className="text-[9px] text-slate-600 font-semibold">
                 {isRTL
                   ? 'يُرسَل الرمز عبر واتساب فقط؛ لا يُعرض الرمز هنا. لا تُخزَّن الأسرار في المتصفح.'
                   : 'The code is sent over WhatsApp only and never shown here. Secrets never reach the browser.'}
@@ -138,7 +138,7 @@ export const WhatsAppOtpPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
           )}
         </>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <div className="py-4 text-center text-slate-600 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
       )}
     </div>
   );

@@ -284,18 +284,18 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-primary" />
             <div>
-              <h4 className="text-[10px] font-black text-gray-500 uppercase">{isRTL ? 'منطقة التوصيل' : 'Delivery Area'}</h4>
+              <h4 className="text-[10px] font-black text-gray-600 uppercase">{isRTL ? 'منطقة التوصيل' : 'Delivery Area'}</h4>
               <p className="text-sm font-extrabold text-primary">{isRTL ? branch.nameAr : branch.nameEn}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-400 hover:bg-gray-100" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
+          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-500 hover:bg-gray-100" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
         </div>
 
         {!mapConfig.isConfigured ? (
           <div className="p-8 text-center space-y-2">
-            <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
+            <AlertTriangle className="w-8 h-8 text-amber-700 mx-auto" />
             <p className="text-sm font-black text-slate-700">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</p>
-            <p className="text-[11px] text-slate-500 font-bold max-w-sm mx-auto">
+            <p className="text-[11px] text-slate-600 font-bold max-w-sm mx-auto">
               {isGoogle
                 ? (isRTL
                   ? 'أضف مفتاح Google Maps ‏(VITE_GOOGLE_MAPS_API_KEY) لتفعيل رسم مناطق التوصيل.'
@@ -344,12 +344,12 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
               <div className="flex flex-wrap gap-2 justify-end">
                 <button onClick={startDraw} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-primary/10 text-primary border border-primary/20 disabled:opacity-40">{isRTL ? 'ارسم منطقة التوصيل' : 'Draw delivery area'}</button>
                 <button onClick={startEdit} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-white/60 text-slate-700 border border-slate-200 disabled:opacity-40">{isRTL ? 'تعديل منطقة التوصيل' : 'Edit delivery area'}</button>
-                <button onClick={handleClear} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-red-50 text-red-600 border border-red-200 disabled:opacity-40">{isRTL ? 'مسح منطقة التوصيل' : 'Clear delivery area'}</button>
+                <button onClick={handleClear} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-red-50 text-red-700 border border-red-200 disabled:opacity-40">{isRTL ? 'مسح منطقة التوصيل' : 'Clear delivery area'}</button>
                 <button onClick={handleSave} disabled={busy || !ready} className="text-[11px] font-black py-2 px-4 rounded-xl bg-primary text-white disabled:opacity-40">{busy ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'حفظ منطقة التوصيل' : 'Save delivery area')}</button>
               </div>
             )}
             {disabled && (
-              <p className="text-[10px] text-slate-400 font-bold text-center">{isRTL ? 'العرض فقط' : 'View only'}</p>
+              <p className="text-[10px] text-slate-600 font-bold text-center">{isRTL ? 'العرض فقط' : 'View only'}</p>
             )}
           </div>
         )}

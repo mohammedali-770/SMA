@@ -43,7 +43,7 @@ export const IntegrationsPanel: React.FC = () => {
           <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
             {isRTL ? 'الربط والتكاملات' : 'Integrations'}
           </h3>
-          <p className="text-[10px] text-slate-400 font-bold mt-0.5">
+          <p className="text-[10px] text-slate-600 font-bold mt-0.5">
             {isRTL
               ? 'بوابات الدفع والرسائل والإشعارات والربط مع الكاشير والتوصيل — تُحفظ الأسرار في الخادم ولا تصل للمتصفح أبداً'
               : 'Payment, messaging, notifications & POS — secrets are stored server-side, never sent to the browser'}
@@ -56,7 +56,7 @@ export const IntegrationsPanel: React.FC = () => {
 
       {isAccountant ? (
         <div className="p-4 bg-amber-50 border border-amber-100 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          <AlertCircle className="w-4 h-4 text-amber-700 flex-shrink-0" />
           {isRTL ? 'إعدادات التكامل متاحة للمشرف فقط.' : 'Integration settings are available to admins only.'}
         </div>
       ) : integrationsError ? (
@@ -65,7 +65,7 @@ export const IntegrationsPanel: React.FC = () => {
           <button onClick={() => { void loadIntegrations(); }} className="bg-red-600 text-white text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
         </div>
       ) : integrationsLoading ? (
-        <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <div className="py-8 text-center text-slate-600 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
       ) : (
         <>
           {/* GROUP SELECTOR */}
@@ -120,7 +120,7 @@ export const IntegrationsPanel: React.FC = () => {
 
           {/* Secure-storage footer note */}
           <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed">
-            <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+            <Check className="w-4 h-4 text-green-700 flex-shrink-0 mt-0.5" />
             <div>
               <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'تخزين آمن' : 'Secure storage'}</span>
               {isRTL

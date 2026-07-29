@@ -158,7 +158,7 @@ function statusIcon(state: OperationsHealthState) {
 function Metric({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-white/50 border border-slate-100 px-2 py-1.5">
-      <p className="text-[8px] uppercase font-black text-slate-400">{label}</p>
+      <p className="text-[8px] uppercase font-black text-slate-600">{label}</p>
       <p className="text-[10px] font-black text-slate-700 break-words">{value}</p>
     </div>
   );
@@ -271,7 +271,7 @@ const SystemCard: React.FC<{
               </span>
             )}
           </div>
-          <p className="text-[8.5px] text-slate-400 font-bold mt-1 leading-relaxed">
+          <p className="text-[8.5px] text-slate-600 font-bold mt-1 leading-relaxed">
             {isAr ? text.descAr : text.descEn}
           </p>
         </div>
@@ -289,7 +289,7 @@ const SystemCard: React.FC<{
       </div>
 
       <div className="flex justify-between items-center gap-2 border-t border-slate-100 pt-2">
-        <span className="text-[8px] font-bold text-slate-400">
+        <span className="text-[8px] font-bold text-slate-600">
           {isAr ? 'مصدر القياس:' : 'Telemetry:'} {system.source.replaceAll('_', ' ')}
         </span>
         {target && onNavigate && (
@@ -312,7 +312,7 @@ function JobsTable({ jobs, lang }: { jobs: OperationsHealthJob[]; lang: AdminLan
     <div className="overflow-x-auto">
       <table className="w-full min-w-[680px] text-[9.5px]">
         <thead>
-          <tr className="text-slate-400 font-black uppercase text-[8px] text-start">
+          <tr className="text-slate-600 font-black uppercase text-[8px] text-start">
             <th className="py-2 px-2">{isAr ? 'المهمة' : 'Job'}</th>
             <th className="py-2 px-2">{isAr ? 'الجدولة' : 'Cadence'}</th>
             <th className="py-2 px-2">{isAr ? 'الحالة' : 'State'}</th>
@@ -324,14 +324,14 @@ function JobsTable({ jobs, lang }: { jobs: OperationsHealthJob[]; lang: AdminLan
           {jobs.map((job) => (
             <tr key={job.job_name} className="border-t border-slate-100">
               <td className="py-2 px-2 font-mono font-bold text-slate-700">{job.job_name}</td>
-              <td className="py-2 px-2 font-mono text-slate-500">{job.schedule ?? '—'}</td>
+              <td className="py-2 px-2 font-mono text-slate-600">{job.schedule ?? '—'}</td>
               <td className="py-2 px-2">
                 <span className={`rounded-full border px-2 py-0.5 font-black text-[8px] ${STATE_TONE[job.state]}`}>
                   {STATE_LABELS[job.state][lang]}
                 </span>
               </td>
               <td className="py-2 px-2 text-slate-600">{job.latest_status ?? '—'}</td>
-              <td className="py-2 px-2 text-slate-500" title={exactTime(job.latest_success_at, lang)}>
+              <td className="py-2 px-2 text-slate-600" title={exactTime(job.latest_success_at, lang)}>
                 {relativeAge(job.latest_success_at, lang)}
               </td>
             </tr>
@@ -400,7 +400,7 @@ export const OperationsHealthPanel: React.FC<{
 
   if (loading && !summary) {
     return (
-      <div className="glass-card rounded-2xl bg-white/40 p-8 flex items-center justify-center gap-2 text-slate-500">
+      <div className="glass-card rounded-2xl bg-white/40 p-8 flex items-center justify-center gap-2 text-slate-600">
         <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
         <span className="text-xs font-black">{isAr ? 'جاري تحميل مركز صحة العمليات…' : 'Loading Operations Health Center…'}</span>
       </div>
@@ -422,14 +422,14 @@ export const OperationsHealthPanel: React.FC<{
                 {STATE_LABELS[overall][lang]}
               </span>
             </div>
-            <p className="text-[9px] text-slate-400 font-bold mt-1">
+            <p className="text-[9px] text-slate-600 font-bold mt-1">
               {isAr
                 ? 'مراقبة للقراءة فقط. لا توجد إعادة محاولة أو استرداد أو إصلاح تلقائي أو رسائل اختبار.'
                 : 'Read-only observability. No retries, refunds, auto-fixes or test messages.'}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <div className="text-[8.5px] text-slate-400 font-bold">
+            <div className="text-[8.5px] text-slate-600 font-bold">
               <p>{isAr ? 'تم إنشاء البيانات' : 'Generated'}: {relativeAge(summary?.generated_at, lang)}</p>
               <p title={exactTime(lastRefreshAt, lang)}>{isAr ? 'آخر تحديث للصفحة' : 'Page refreshed'}: {relativeAge(lastRefreshAt, lang)}</p>
             </div>
@@ -482,7 +482,7 @@ export const OperationsHealthPanel: React.FC<{
             <h4 className="text-[11px] font-black text-slate-700 uppercase">
               {isAr ? 'المهام المجدولة' : 'Scheduled Jobs'}
             </h4>
-            <p className="text-[8px] text-slate-400 font-bold mt-0.5">
+            <p className="text-[8px] text-slate-600 font-bold mt-0.5">
               {isAr ? 'لا يتم عرض أوامر Cron أو الأسرار.' : 'Cron commands and secrets are never exposed.'}
             </p>
           </div>
