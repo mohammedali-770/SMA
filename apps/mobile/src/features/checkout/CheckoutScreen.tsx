@@ -21,6 +21,7 @@ import { Header } from '../../components/Header';
 import { Notice, secondaryTextStyle } from '../../components/Notice';
 import { QuantityStepper } from '../../components/QuantityStepper';
 import { checkDescription, descriptionCopy, descriptionMessage } from '../order/locationDescription';
+import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses, checkout, coupons, orders, payments } from '../../services/api';
@@ -80,8 +81,16 @@ export function CheckoutScreen() {
   // delivery guidance, and never written into the description field.
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   // Set while a quantity change is settling; blocks submission so the server is
-  // never handed a cart the customer has not seen priced.
+  // never handed a cart the customer has not seen priced, and drives the
+  // stepper's `busy` state. Cleared by an effect once the cart re-renders (below)
+  // — NOT synchronously in the handler, which was a no-op that never survived a
+  // render.
   const [recalcLine, setRecalcLine] = useState<string | null>(null);
+  // Synchronous twin of recalcLine. A second tap dispatched in the SAME frame,
+  // before React commits the first, reads this ref (mutated inline) rather than
+  // the not-yet-updated state, so a fast double-tap cannot enqueue two mutations
+  // against one line. Reset together with recalcLine when the cart settles.
+  const recalcRef = useRef<string | null>(null);
   // Line the customer is about to remove by decrementing past 1.
   const [confirmRemove, setConfirmRemove] = useState<{ cartItemId: string; name: string } | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
@@ -242,34 +251,47 @@ export function CheckoutScreen() {
    * reason the button was dead.
    */
   const block = useMemo((): { title: string; action: string | null } | null => {
-    if (!selectedBranch) return { title: t('selectBranchCta'), action: null };
-    if (!branchOpen) return { title: t('branchClosedError'), action: pick('Try another branch or come back later.', 'جرّب فرعاً آخر أو عد لاحقاً.') };
-    if (!orderType) return { title: t('chooseOrderType'), action: null };
-    if (belowMin) {
-      return {
-        title: pick('Your order is below the delivery minimum', 'طلبك أقل من الحد الأدنى للتوصيل'),
-        action: pick(
-          `Add ${formatSAR(totals.missingForMinimum, lang)} more to your order, or switch to pickup.`,
-          `أضف ${formatSAR(totals.missingForMinimum, lang)} إلى طلبك، أو حوّل إلى الاستلام.`,
-        ),
-      };
+    // Priority order (and, critically, empty-cart BEFORE below-minimum) lives in
+    // the pure resolver; this only maps the winning reason to localized copy.
+    const reason: BlockReason | null = resolveBlockReason({
+      hasBranch: Boolean(selectedBranch),
+      branchOpen,
+      hasOrderType: Boolean(orderType),
+      isEmpty: cart.items.length === 0,
+      belowMinimum: belowMin,
+      paymentUnavailable: paymentBlocked || !paymentMethod,
+      deliveryBlocked: Boolean(deliveryBlockReason),
+      needsDescription: requiresDescription && !descCheck.valid,
+    });
+    switch (reason) {
+      case 'no-branch':
+        return { title: t('selectBranchCta'), action: null };
+      case 'branch-closed':
+        return { title: t('branchClosedError'), action: pick('Try another branch or come back later.', 'جرّب فرعاً آخر أو عد لاحقاً.') };
+      case 'no-order-type':
+        return { title: t('chooseOrderType'), action: null };
+      case 'empty-cart':
+        return { title: pick('Your cart is empty', 'سلتك فارغة'), action: pick('Add an item to continue.', 'أضف صنفاً للمتابعة.') };
+      case 'below-minimum':
+        return {
+          title: pick('Your order is below the delivery minimum', 'طلبك أقل من الحد الأدنى للتوصيل'),
+          action: pick(
+            `Add ${formatSAR(totals.missingForMinimum, lang)} more to your order, or switch to pickup.`,
+            `أضف ${formatSAR(totals.missingForMinimum, lang)} إلى طلبك، أو حوّل إلى الاستلام.`,
+          ),
+        };
+      case 'no-payment':
+        return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
+      case 'delivery-unserviceable':
+        return { title: deliveryBlockReason as string, action: pick('Move the pin to your exact location.', 'حرّك الدبوس إلى موقعك بالضبط.') };
+      case 'need-description':
+        return {
+          title: pick('Add a location description', 'أضف وصف الموقع'),
+          action: descriptionMessage(descCheck.problem, lang),
+        };
+      default:
+        return null;
     }
-    if (cart.items.length === 0) {
-      return { title: pick('Your cart is empty', 'سلتك فارغة'), action: pick('Add an item to continue.', 'أضف صنفاً للمتابعة.') };
-    }
-    if (paymentBlocked || !paymentMethod) {
-      return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
-    }
-    if (deliveryBlockReason) {
-      return { title: deliveryBlockReason, action: pick('Move the pin to your exact location.', 'حرّك الدبوس إلى موقعك بالضبط.') };
-    }
-    if (requiresDescription && !descCheck.valid) {
-      return {
-        title: pick('Add a location description', 'أضف وصف الموقع'),
-        action: descriptionMessage(descCheck.problem, lang),
-      };
-    }
-    return null;
   }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick,
       deliveryBlockReason, totals.missingForMinimum, cart.items.length, requiresDescription, descCheck]);
 
@@ -291,23 +313,47 @@ export function CheckoutScreen() {
    * an edited cart is correctly treated as a different order.
    */
   const changeQuantity = (cartItemId: string, direction: 1 | -1) => {
-    if (recalcLine) return;
+    // Re-read the LIVE line from cart state at action time (never a captured
+    // quantity), then let the pure guard decide. The decision is gated on the
+    // synchronous ref so a same-frame double-tap is ignored rather than racing a
+    // second decrement to zero.
     const item = cart.items.find((it) => it.cartItemId === cartItemId);
     if (!item) return;
-    if (direction === -1 && item.quantity <= 1) {
+    const decision = decideQuantityChange({
+      recalcActive: recalcRef.current !== null,
+      quantity: item.quantity,
+      direction,
+    });
+    if (decision.kind === 'ignore') return;
+    if (decision.kind === 'confirm-remove') {
       // Never drop a line silently — the app confirms removals everywhere else
       // (see the cart-conflict sheet in the order-type gate) and does so here.
       setConfirmRemove({ cartItemId, name: pick(item.product.nameEn, item.product.nameAr) });
       return;
     }
+    // Mark the line as settling BEFORE mutating: the ref blocks the next
+    // same-frame tap immediately; the state drives the stepper `busy` and blocks
+    // submission until the effect below clears it once the cart re-renders.
+    recalcRef.current = cartItemId;
     setRecalcLine(cartItemId);
     if (direction === 1) cart.incrementLine(cartItemId);
     else cart.decrementLine(cartItemId);
     // Coupons are validated against a subtotal that has just changed, so the
     // previous result no longer applies and must be re-entered.
     if (couponResult) setCouponResult(null);
-    setRecalcLine(null);
   };
+
+  // A quantity edit has settled once the cart — and therefore the preview totals
+  // and this row — have re-rendered with the new value. Release the recalc guard
+  // here so the stepper re-enables and submission unblocks. Doing it here rather
+  // than synchronously in changeQuantity is the fix: previously recalcLine was
+  // set and cleared in the same frame, so it never survived a render, the
+  // stepper never showed `busy`, and submission was never actually blocked
+  // mid-recalc.
+  useEffect(() => {
+    recalcRef.current = null;
+    setRecalcLine(null);
+  }, [cart.items]);
 
   const placeOrder = async () => {
     if (!canPlace || !selectedBranch || !orderType) return;

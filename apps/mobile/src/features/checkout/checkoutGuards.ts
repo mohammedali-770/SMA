@@ -1,0 +1,80 @@
+/**
+ * Framework-free decision helpers for the Checkout screen's two interaction
+ * hazards: the quantity stepper (never drop a line without confirming) and the
+ * sticky footer's single blocking message (say the right reason the button is
+ * dead). Kept pure and unit-tested so these rules can be verified without a
+ * renderer — CheckoutScreen is a thin wrapper that maps these decisions onto
+ * cart calls and localized copy.
+ */
+
+export type QuantityAction =
+  | { kind: 'ignore' } // a change is already settling for this line — drop the tap
+  | { kind: 'confirm-remove' } // a decrement that would remove the line
+  | { kind: 'apply'; direction: 1 | -1 };
+
+/**
+ * Decide what a single quantity-stepper tap should do.
+ *
+ * `recalcActive` is the caller's SYNCHRONOUS guard (a ref, not React state).
+ * A second "−" dispatched in the same frame — before React commits the first —
+ * must see the guard already set and be ignored. State cannot do this: both
+ * taps would read the same pre-commit value and both would fall through. The
+ * old code set and cleared the guard in the same handler, so it never survived a
+ * render and was a no-op — two fast "−" at qty 2 both read quantity===2, neither
+ * hit the confirm branch, and the functional decrement ran 2→1→0, silently
+ * dropping the line past the "Remove this item?" modal.
+ *
+ * With the guard held across the settle: the first tap applies (2→1) and the
+ * second is ignored; a genuine tap at qty 1 always routes to confirm-remove, so
+ * no rapid sequence can remove a line without the modal.
+ */
+export function decideQuantityChange(input: {
+  recalcActive: boolean;
+  quantity: number;
+  direction: 1 | -1;
+}): QuantityAction {
+  if (input.recalcActive) return { kind: 'ignore' };
+  if (input.direction === -1 && input.quantity <= 1) return { kind: 'confirm-remove' };
+  return { kind: 'apply', direction: input.direction };
+}
+
+export type BlockReason =
+  | 'no-branch'
+  | 'branch-closed'
+  | 'no-order-type'
+  | 'empty-cart'
+  | 'below-minimum'
+  | 'no-payment'
+  | 'delivery-unserviceable'
+  | 'need-description';
+
+/**
+ * The single blocking reason for the sticky footer, in priority order.
+ *
+ * `empty-cart` is checked BEFORE `below-minimum`: removing the last delivery
+ * line must read "your cart is empty", not "below the delivery minimum". An
+ * empty cart is trivially under every minimum, so the minimum check would
+ * otherwise win and show a nonsensical "add X more" for a cart with nothing in
+ * it. Everything upstream of the cart (no branch / closed / no order type) still
+ * outranks both.
+ */
+export function resolveBlockReason(input: {
+  hasBranch: boolean;
+  branchOpen: boolean;
+  hasOrderType: boolean;
+  isEmpty: boolean;
+  belowMinimum: boolean;
+  paymentUnavailable: boolean;
+  deliveryBlocked: boolean;
+  needsDescription: boolean;
+}): BlockReason | null {
+  if (!input.hasBranch) return 'no-branch';
+  if (!input.branchOpen) return 'branch-closed';
+  if (!input.hasOrderType) return 'no-order-type';
+  if (input.isEmpty) return 'empty-cart';
+  if (input.belowMinimum) return 'below-minimum';
+  if (input.paymentUnavailable) return 'no-payment';
+  if (input.deliveryBlocked) return 'delivery-unserviceable';
+  if (input.needsDescription) return 'need-description';
+  return null;
+}

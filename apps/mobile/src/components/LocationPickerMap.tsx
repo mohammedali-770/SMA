@@ -127,6 +127,12 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   // the customer is already using — only a failure to come up at all is fatal.
   const readyRef = useRef(false);
   const lastFixRef = useRef<CachedFix | null>(null);
+  // Coordinates applyFix has just published. window.recenter() posts the pin
+  // straight back through onMessage, which would fire onChange a SECOND time
+  // with these same coords; recording them here lets onMessage drop that echo so
+  // a programmatic recenter reports the move exactly once (a real pin drag lands
+  // on different coords and still passes through).
+  const lastAppliedRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const reportFailure = (reason: string) => {
     if (readyRef.current) return;
@@ -152,6 +158,10 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   const applyFix = useCallback((la: number, ln: number, reverseGeocode: boolean) => {
     const rLa = roundCoord(la);
     const rLn = roundCoord(ln);
+    // Record before injecting so the recenter echo (see onMessage) is deduped.
+    // onChange is still called directly here so the coordinate is published even
+    // if window.recenter isn't defined yet (map still loading) and no echo comes.
+    lastAppliedRef.current = { lat: rLa, lng: rLn };
     webRef.current?.injectJavaScript(`window.recenter(${rLa}, ${rLn}); true;`);
     onChange(rLa, rLn);
     if (!reverseGeocode || !onAddressResolved) return;
@@ -252,7 +262,15 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
                 return;
               }
               if (typeof d?.lat === 'number' && typeof d?.lng === 'number') {
-                onChange(Number(d.lat.toFixed(6)), Number(d.lng.toFixed(6)));
+                const la = Number(d.lat.toFixed(6));
+                const ln = Number(d.lng.toFixed(6));
+                const last = lastAppliedRef.current;
+                if (last && last.lat === la && last.lng === ln) {
+                  // Echo of our own recenter() — applyFix already reported it.
+                  lastAppliedRef.current = null;
+                  return;
+                }
+                onChange(la, ln);
               }
             } catch { /* ignore */ }
           }}
