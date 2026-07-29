@@ -14,10 +14,11 @@
  * payment / SMS / Lazywait call. Those stay server-side behind Edge Functions.
  */
 import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
+import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
-  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbOrder, DbOrderWithItems,
+  DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
   DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
 
@@ -153,23 +154,24 @@ export const legal = {
 };
 
 /** Order + nested lines/modifiers — the one nested order shape the app reads. */
-const ORDER_WITH_ITEMS_SELECT = '*, order_items(*, order_item_modifiers(*))';
+// Explicit customer-safe column list — NEVER `*`. The internal SM-… order number
+// and operational columns (including the POS fencing token) must not reach a
+// customer device. See lib/orderSelect.ts and its contract test.
+const ORDER_WITH_ITEMS_SELECT = CUSTOMER_ORDER_SELECT;
 
 export const orders = {
-  /** Server-authoritative order creation (place_order RPC). */
-  async place(input: PlaceOrderInput): Promise<DbOrder> {
-    return ok<DbOrder>(await supabase.rpc('place_order', {
-      p_branch_id: input.branchId,
-      p_order_type: input.orderType,
-      p_items: input.items,
-      p_address_id: input.addressId ?? null,
-      p_coupon_code: input.couponCode ?? null,
-      p_notes: input.notes ?? null,
-      p_loyalty_points: input.loyaltyPoints ?? 0,
-      p_idempotency_key: input.idempotencyKey ?? null,
-      p_payment_method: input.paymentMethod ?? null,
-    }));
-  },
+  // REMOVED: `orders.place()`.
+  //
+  // It called the place_order RPC directly and typed the result as `DbOrder` —
+  // the whole `public.orders` row, including the internal SM-… `order_number`
+  // and every operational column. It had no callers (the app creates orders
+  // through `placeAndSync` → the order-intake Edge Function, which returns an
+  // explicit customer-safe column list), but it left a dormant contract that
+  // would have reintroduced the exposure the moment anyone wired it up.
+  //
+  // Order creation from the client goes through `placeAndSync` only. Nothing in
+  // the customer app may receive a raw `public.orders` row — see
+  // lib/orderSelect.ts and its contract test.
   /**
    * Create the order AND synchronously sync it to Lazywait POS via the
    * `order-intake` Edge Function, so the receipt can show the POS order number
@@ -178,7 +180,7 @@ export const orders = {
    * background worker finishes the sync, so the app just falls back to the SM-…
    * number. place_order stays the authoritative order creation inside it.
    */
-  async placeAndSync(input: PlaceOrderInput): Promise<DbOrder> {
+  async placeAndSync(input: PlaceOrderInput): Promise<DbCustomerOrderWithItems> {
     const { data, error } = await supabase.functions.invoke('order-intake', {
       body: {
         branchId: input.branchId,
@@ -193,7 +195,7 @@ export const orders = {
       },
     });
     if (error) throw new Error(error.message);
-    const res = (data ?? {}) as { order?: DbOrder; error?: string };
+    const res = (data ?? {}) as { order?: DbCustomerOrderWithItems; error?: string };
     if (res.error) throw new Error(res.error);
     if (!res.order) throw new Error('Order was not created.');
     return res.order;
@@ -212,7 +214,7 @@ export const orders = {
    * read the pending order by id.
    */
   listWithItems: async (limit = 20) =>
-    ok<DbOrderWithItems[]>(await supabase
+    ok<DbCustomerOrderWithItems[]>(await supabase
       .from('orders')
       .select(ORDER_WITH_ITEMS_SELECT)
       .or('payment_method.is.null,payment_method.neq.online,payment_status.eq.paid')
@@ -220,11 +222,23 @@ export const orders = {
       .limit(limit)),
   /** A single order with its lines (RLS still scopes it to the owner). */
   byId: async (id: string) =>
-    ok<DbOrderWithItems>(await supabase
+    ok<DbCustomerOrderWithItems>(await supabase
       .from('orders')
       .select(ORDER_WITH_ITEMS_SELECT)
       .eq('id', id)
       .single()),
+  /**
+   * Customer "Resend order" for a paid/cash order that provably never reached the
+   * branch. The SERVER owns every rule: ownership, the proven-not-sent safety
+   * check (a resend can never duplicate a POS ticket) and the attempt budget.
+   *
+   * The response deliberately carries NO reason and NO counter — only an opaque
+   * outcome plus the freshly derived state, so the attempt limit is never
+   * disclosed to the client. The UI renders from `state` alone.
+   */
+  requestResend: async (id: string) =>
+    ok<{ outcome: 'accepted' | 'unavailable'; state: string }>(
+      await supabase.rpc('request_customer_pos_resend', { p_order_id: id })),
 };
 
 /** A temporary, pre-payment checkout session (NOT an order). */
@@ -268,11 +282,12 @@ export interface PaymentInitiateResult {
   chargeId?: string;
   checkoutUrl?: string | null;
   needsVerify?: boolean;
-  orderNumber?: string;
   checkoutSessionId?: string;
   orderId?: string | null;    // set when status === 'already_paid' (session flow)
 }
-export interface PaymentVerifyResult { status: string; messageKey?: string; orderNumber?: string | null; orderId?: string | null; }
+// No `orderNumber`: the internal SM-… id is never returned to a customer client
+// (Issue #94). The app navigates by orderId and renders the branch's number only.
+export interface PaymentVerifyResult { status: string; messageKey?: string; orderId?: string | null; }
 async function invokePaymentFn<T>(fn: string, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body });
   if (error) {

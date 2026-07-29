@@ -808,3 +808,202 @@ rollback is closing/reverting the PR. After a hypothetical application, re-apply
 prior definitions of the two functions from
 `20260723090000_smart_operations_alerts_digest.sql` in a separate owner-approved
 follow-up migration (never an edit of an applied file).
+
+---
+
+## 18. Pending migration: Order confirmation state machine + automatic refunds (repository-only, UNAPPLIED)
+
+**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+
+- Repository migration: `20260724120000_order_confirmation_state_machine.sql`
+- Issue: **#94** (customer-visible "Order placed" + "Not confirmed" contradiction;
+  internal `SM-…` order number exposed to customers)
+- Owner approval on record: an explicit, scoped unfreeze of the payment /
+  payment-verification / webhook / checkout-session / Lazywait-submission /
+  retry / order-state / idempotency / automatic-refund areas for this issue,
+  granted in-conversation on 2026-07-24, notwithstanding the CLAUDE.md §6 freeze.
+  The approval covers **repository work only** — it did not authorize a
+  Production apply, a function deployment, or any live payment operation.
+
+### What it adds (all additive; no applied migration is edited)
+
+| Object | Kind | Purpose |
+|---|---|---|
+| `orders.pos_customer_retry_count` / `…_last_at` | columns | SERVER-counted manual resends |
+| `orders.refund_state` + `refund_required_at` / `refund_completed_at` / `refund_failure_code` | columns | refund lifecycle, guarded by an explicit transition trigger |
+| `order_refunds` | table | append-only refund attempt ledger; RLS staff-read-only |
+| `pos_confirmation_channel_active()` | function | does this order have a branch-confirmation step at all? |
+| `customer_order_state()` | function | THE authority mapping columns → one customer-visible state |
+| `customer_pos_resend_eligibility()` | function | pure proven-not-sent + budget predicate |
+| `request_customer_pos_resend()` | RPC (authenticated) | owner-scoped, row-locked, server-counted resend |
+| `order_refund_due()` + 2 triggers | predicate + triggers | automatic, path-independent refund enrollment |
+| `enforce_refund_state_transition()` | trigger | rejects invalid/out-of-order refund transitions |
+| `claim_order_refund()` / `finalize_order_refund()` | RPCs (service_role) | token-fenced, idempotent refund worker |
+| `list_failed_order_refunds()` | RPC (admin) | manual-review feed; fingerprinted charge refs only |
+
+`payment_status` is an enum of only `('pending','paid')` and is **not** extended —
+the refund lifecycle lives in a separate `refund_state` column, avoiding an
+`ALTER TYPE … ADD VALUE` in the migration path.
+
+### Safety properties encoded in the migration
+
+- **Never refund an order Lazywait accepted.** `order_refund_due()` requires a
+  paid order with NO stored POS reference, NO may-have-been-sent phase marker, in
+  a proven-not-sent terminal state (`dead_letter`/`blocked`), with the manual
+  budget spent. Ambiguous orders (`confirmation_required`, or any stored ref
+  marker) are excluded and continue to the existing human-verification feed.
+- **Never refund twice.** A deterministic per-order idempotency key plus a partial
+  unique index allowing at most one `pending|processing|succeeded` refund per order.
+- **Never resend into a duplicate POS ticket.** Lazywait Create Order has no
+  idempotency key, so the customer resend fires only from proven-not-sent state.
+- **No false-success resends.** `request_customer_pos_resend()` extends
+  `pos_sync_deadline_at` in the same locked statement that re-queues the row, so
+  the deadline-bounded claim RPCs actually pick it up.
+- **The retry budget is never disclosed.** The RPC returns only
+  `{ outcome, state }` — no reason code, no counter, no limit.
+
+### Delivery-channel note (forward compatibility)
+
+Delivery orders are held at `blocked` / `delivery_schema_unconfirmed` because the
+Lazywait delivery Create Order schema is unconfirmed. Gating them on Lazywait
+acceptance would mark every delivery order permanently unconfirmed and refund all
+of them. Participation is therefore decided by `pos_confirmation_channel_active()`,
+expressed in terms of the SYNC STATE rather than the order type: when Lazywait
+publishes the delivery API and `set_lazywait_initial_sync` begins enqueuing
+delivery to `pending` like pickup, delivery becomes gate-active automatically with
+no change to this migration.
+
+### Validation performed (repository only — NOT Production)
+
+**Executed 2026-07-24 against a disposable local PostgreSQL 16.9 + PostGIS 3.6.2
+cluster (127.0.0.1:5433, loopback-only, destroyed afterwards).** `pg_cron` and
+`pg_net` were installed as inert SHIMS: schedules are recorded but never run, and
+`net.http_post`/`http_get` perform no network I/O — so no payment, Lazywait,
+email, push, SMS or OTP call was possible during validation. The refund worker
+was never scheduled or invoked.
+
+| Check | Result |
+|---|---|
+| Full 53-migration chain from an EMPTY database | **53 / 53 applied**, 0 errors, 0 warnings |
+| Notices across the whole chain | 110, **all** routine `… does not exist, skipping` / `… already exists, skipping` |
+| SQL suites (`supabase/tests/*.sql`) | **18 / 18 passed** |
+| SQL ↔ TypeScript state parity | **0 mismatches over 3,456 input combinations** |
+| `order_confirmation_state_machine_test.sql` | PASS — `DERIVATION OK; ELIGIBILITY OK; RESEND OK; ENROLLMENT OK; WORKER OK; SECURITY OK` |
+| Apply onto a production-schema stand-in (52 prior migrations + representative data) | applied clean |
+| Retroactive refunds against existing orders | **0** — no historical order is enrolled |
+| Idempotent re-apply (3× on a populated database) | clean; no duplicated triggers/objects |
+| Mid-migration failure INSIDE a transaction | fully rolled back — 0 columns, 0 tables, 0 functions left |
+| Mid-migration failure in autocommit | leaves partial state; a re-run of the corrected file converges (verified) |
+| Frontend gates | `tsc --noEmit` (root + mobile), vitest **764**, `vite build`, mobile web build |
+
+Pre-existing rows derive correct customer states after the migration
+(`confirmed_by_branch`, `sending_to_branch`, `branch_failed_retry_available`,
+`verifying_with_branch`, `accepted_no_pos_channel`, `payment_pending`), and a
+paid, dead-lettered, proven-not-sent historical order is offered its three manual
+resends rather than being refunded on sight.
+
+### The refund worker is NOT scheduled
+
+- **No cron job is scheduled by this migration.** It creates no `cron.schedule`
+  entry, and `supabase/functions/payment-refund` is not wired to any scheduler.
+- **It was not invoked during validation.** `pg_cron`/`pg_net` were inert shims;
+  no scheduled command ran and no outbound HTTP was possible.
+- **Merging this PR, or applying the migration alone, cannot start refund
+  processing.** Enrollment only marks `orders.refund_state = 'pending'` and opens
+  an `order_refunds` ledger row; nothing drains that queue until the worker is
+  deliberately run.
+- **Scheduling it is a SEPARATE production action requiring explicit owner
+  approval**, alongside deploying `payment-refund` and configuring its required
+  `refund_trigger_secret`. Without that secret the function returns `503` and
+  processes nothing.
+
+**APPLY INSIDE A TRANSACTION.** The migration file is not self-wrapped in
+`begin/commit`. Applied transactionally (as the `apply_migration` workflow does),
+a mid-way failure rolls back completely. Applied statement-by-statement in
+autocommit, a mid-way failure leaves partial objects; recovery is simply to
+re-run the corrected file, which is idempotent and converges.
+
+```bash
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/order_confirmation_state_machine_test.sql
+```
+
+### Rollback
+
+The feature is additive and isolated. Before any application, rollback is closing
+or reverting the PR. After a hypothetical application, drop the new triggers,
+functions and `order_refunds` table in a separate owner-approved follow-up
+migration (never an edit of an applied file); the added `orders` columns are
+nullable/defaulted and may be left in place.
+
+### Ledger reconciliation
+
+The §1 production-status counts in this document are **stale** and are owned by
+issue **#76**; this section deliberately does not restate or amend them. It records
+only the facts about this new repository-only migration.
+
+---
+
+## 19. Pending migration: loyalty reason without the internal order number (repository-only, UNAPPLIED)
+
+**Status: REPOSITORY-ONLY / UNAPPLIED. No Production action has been taken.**
+
+- Repository migration: `20260724130000_loyalty_reason_no_order_number.sql`
+- Issue: **#94** (internal `SM-…` identifier must not reach a customer surface)
+- Companion to §18; both are unapplied and both must be applied inside a transaction.
+
+### What it closes
+
+`place_order` (latest definition `20260710120100`) and
+`insert_order_from_snapshot` (latest `20260712170000`) write
+`'Earned on order ' || orders.order_number` into
+`public.loyalty_transactions.reason`. That table is customer-readable
+(`grant select … to authenticated` from `20260707120900`, RLS
+`profile_id = auth.uid() or is_staff()`), so any signed-in customer could read
+their own `SM-…` id via `GET /rest/v1/loyalty_transactions?select=reason`. The
+mobile app never queries the table — the exposure was PostgREST auto-exposure.
+
+### What it adds (additive; no applied migration is edited)
+
+| Object | Kind | Purpose |
+|---|---|---|
+| `text_has_internal_order_number(text)` | function | matches the generated VALUE SHAPE `SM-<4>-<6+>` |
+| `loyalty_safe_reason(type, order_id, reason)` | function | neutral text for order-linked rows; redaction for free text |
+| `set_loyalty_safe_reason()` + trigger | trigger | normalizes on INSERT **and** UPDATE, writer-independently |
+| `loyalty_transactions_reason_no_order_number` | CHECK (**NOT VALID**) | forward-only backstop; history neither validated nor rejected |
+
+**`place_order` is NOT redefined.** It is a ~200-line pricing authority; the fix
+lives on the destination column so no pricing, award-timing or idempotency logic
+is touched. Loyalty amounts, balances and `order_id` linkage are unchanged.
+
+### Historical rows
+
+**Deliberately not rewritten.** Verified on the production stand-in: after
+applying both migrations, a pre-existing row containing `SM-…` is still present
+and unmodified. Remediation is a separate, explicitly owner-approved Production
+data action — the exact statements are in
+`docs/ORDER_CONFIRMATION_FLOW.md` §10a.
+
+### Validation performed (repository only — NOT Production)
+
+Same disposable PostgreSQL 16.9 + PostGIS 3.6.2 harness as §18 (pg_cron/pg_net
+inert shims; no scheduled job ran; no outbound HTTP possible).
+
+| Check | Result |
+|---|---|
+| Full **54**-migration chain from an EMPTY database | **54 / 54 applied**, 0 errors, 0 warnings |
+| SQL suites | **19 / 19 passed** |
+| `loyalty_reason_no_order_number_test.sql` | PASS — PREDICATE · NORMALIZE · PLACE_ORDER AWARD · REDACT · CUSTOMER PROJECTION · ACCESS/CONSTRAINT · CUSTOMER SCAN · SECURITY CONTRACT |
+| Real `place_order` run | loyalty awarded **exactly once**; idempotency key honoured; totals and points unchanged |
+| End-to-end customer session (role `authenticated`, RLS on) | loyalty reason = "Points earned from an order"; `payment_records`, `integration_sync_logs`, `order_refunds` all **0 rows visible** |
+| Apply onto production stand-in + 3× idempotent re-apply | clean |
+| Historical `SM-…` loyalty row after apply | **still present, unmodified** |
+| Mid-migration failure inside a transaction | fully rolled back (0 functions, 0 triggers, 0 constraints) |
+| Mid-migration failure in autocommit | partial, then converges on re-run |
+| SECURITY DEFINER / `search_path` contract | `place_order` + `insert_order_from_snapshot` unchanged |
+
+### Rollback
+
+Additive and isolated. Before application, rollback is closing/reverting the PR.
+After a hypothetical application: drop the trigger, the constraint and the three
+functions in a separate owner-approved follow-up migration.

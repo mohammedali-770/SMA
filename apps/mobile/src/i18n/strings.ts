@@ -180,10 +180,11 @@ export const STRINGS = {
     minOrderError: 'Below the branch minimum for delivery.',
 
     // receipt
-    orderPlaced: 'Order placed!',
-    orderPlacedSub: 'Thank you. Your order has been received.',
+    // 'orderPlaced' / 'orderPlacedSub' / 'orderRef' were REMOVED with Issue #94.
+    // They were the unconditional "Order placed!" hero and the "Ref:" label for
+    // the internal SM-… number — the two strings that produced the contradictory
+    // receipt. Order copy now comes only from the oc_* confirmation states below.
     orderNumber: 'Order number',
-    orderRef: 'Ref',
     paymentStatus: 'Payment',
     paymentPending: 'Pending / Unpaid',
     paymentPaid: 'Paid',
@@ -279,17 +280,41 @@ export const STRINGS = {
     status_delivered: 'Delivered',
     status_cancelled: 'Cancelled',
 
-    // POS confirmation lifecycle (customer-facing). Short label + full message.
-    pos_lc_submitting: 'Sending to restaurant…',
-    pos_lc_submitting_body: 'Sending your order to the restaurant…',
-    pos_lc_retrying: 'Confirming…',
-    pos_lc_retrying_body: 'We received your order, but could not yet confirm that it reached the restaurant. We are retrying automatically. Please do not place another order.',
-    pos_lc_confirmed: 'Confirmed by restaurant',
-    pos_lc_confirmed_body: 'Your order has been confirmed by the restaurant',
-    pos_lc_verify: 'Verifying',
-    pos_lc_verify_body: 'We could not verify whether your order reached the restaurant. Our team is reviewing it. Please do not place another order.',
-    pos_lc_failed: 'Not confirmed',
-    pos_lc_failed_body: 'We could not send your order to the restaurant, and the order was not confirmed. Our team will follow up.',
+    // ---- Order-confirmation state machine (Issue #94) ----------------------
+    // Every string states the REAL backend state. Nothing here claims an order
+    // was placed, confirmed or refunded before that is actually true, and the
+    // three-attempt resend budget is never mentioned.
+    oc_payment_pending: 'Payment not completed',
+    oc_payment_pending_body: 'We have not received your payment yet. Your order has not been sent to the branch.',
+    // No-POS-channel states (delivery today). Neutral by design: payment
+    // settlement may be stated, branch acceptance may NOT be implied, and no
+    // success check is rendered — the branch has confirmed nothing.
+    oc_payment_received: 'Payment received',
+    oc_received: 'Order received',
+    oc_no_pos_channel_body: 'Your order is being processed through the delivery channel.',
+    oc_sending: 'Sending to the branch…',
+    oc_sending_body: 'We are sending your order to the branch. This usually takes a few moments — please stay on this screen.',
+    oc_confirmed: 'Order confirmed',
+    oc_confirmed_body: 'The branch has confirmed your order.',
+    oc_verifying: 'Checking with the branch',
+    oc_verifying_body: 'We are checking with the branch whether your order went through. Our team is on it — please do not place the order again.',
+    oc_not_sent: 'Order not sent yet',
+    oc_not_sent_paid_body: 'Your payment was successful, but we could not send your order to the branch. Please try sending it again.',
+    oc_not_sent_unpaid_body: 'We could not send your order to the branch. Please try sending it again.',
+    oc_failed: 'Order not placed',
+    oc_failed_refund_pending_body: 'Sorry — we could not send your order because the ordering service is unavailable. Your payment will be refunded automatically.',
+    oc_failed_refunded_body: 'Sorry — we could not send your order because the ordering service is unavailable. Your payment has been refunded.',
+    oc_failed_refund_failed_body: 'Sorry — we could not send your order because the ordering service is unavailable. We are arranging your refund and will contact you.',
+    oc_failed_unpaid_body: 'Sorry — we could not send your order because the ordering service is unavailable. You have not been charged.',
+    oc_resend: 'Resend order',
+    oc_resending: 'Sending…',
+    oc_resend_failed: 'We could not send it just now. Please try again in a moment.',
+    oc_refund_status: 'Refund status',
+    oc_refund_pending: 'Refund pending',
+    oc_refunded: 'Refunded',
+    oc_refund_failed: 'Refund in progress',
+    oc_branch_order_number: 'Branch order number',
+    oc_number_pending: 'Not issued yet',
   },
   ar: {
     appName: 'سبايسي ميل',
@@ -460,10 +485,7 @@ export const STRINGS = {
     branchClosedError: 'هذا الفرع مغلق. الرجاء اختيار فرع مفتوح.',
     minOrderError: 'أقل من الحد الأدنى للفرع للتوصيل.',
 
-    orderPlaced: 'تم إرسال الطلب!',
-    orderPlacedSub: 'شكراً لك. تم استلام طلبك.',
     orderNumber: 'رقم الطلب',
-    orderRef: 'مرجع',
     paymentStatus: 'الدفع',
     paymentPending: 'قيد الانتظار / غير مدفوع',
     paymentPaid: 'مدفوع',
@@ -557,16 +579,37 @@ export const STRINGS = {
     status_cancelled: 'ملغي',
 
     // POS confirmation lifecycle (customer-facing). Short label + full message.
-    pos_lc_submitting: 'جارٍ الإرسال إلى المطعم…',
-    pos_lc_submitting_body: 'جارٍ إرسال طلبك إلى المطعم…',
-    pos_lc_retrying: 'جارٍ التأكيد…',
-    pos_lc_retrying_body: 'استلمنا طلبك، لكن لم نتمكن من تأكيد وصوله إلى المطعم حتى الآن.\nنعيد المحاولة تلقائيًا. فضلاً لا تنشئ طلبًا جديدًا.',
-    pos_lc_confirmed: 'تم تأكيد الطلب',
-    pos_lc_confirmed_body: 'تم تأكيد وصول طلبك إلى المطعم',
-    pos_lc_verify: 'قيد المراجعة',
-    pos_lc_verify_body: 'تعذر علينا التحقق من وصول طلبك إلى المطعم.\nفريقنا يراجع الطلب. فضلاً لا تنشئ طلبًا جديدًا.',
-    pos_lc_failed: 'لم يتم التأكيد',
-    pos_lc_failed_body: 'تعذر إرسال طلبك إلى المطعم، ولم يتم تأكيد الطلب.\nفريقنا سيتابع الحالة.',
+    // ---- حالات تأكيد الطلب (Issue #94) -------------------------------------
+    // كل نص يعبّر عن الحالة الفعلية في الخادم. لا يُقال إن الطلب أُرسل أو تم
+    // تأكيده أو استُرد المبلغ قبل أن يتحقق ذلك فعلاً، ولا يُذكر عدد المحاولات.
+    oc_payment_pending: 'لم يكتمل الدفع',
+    oc_payment_pending_body: 'لم نستلم عملية الدفع بعد، ولم يتم إرسال طلبك إلى الفرع.',
+    oc_payment_received: 'تم استلام الدفع',
+    oc_received: 'تم استلام الطلب',
+    oc_no_pos_channel_body: 'طلبك قيد المعالجة عبر قناة التوصيل.',
+    oc_sending: 'جارٍ الإرسال إلى الفرع…',
+    oc_sending_body: 'جارٍ إرسال طلبك إلى الفرع. عادةً ما يستغرق ذلك لحظات — فضلاً ابقَ في هذه الشاشة.',
+    oc_confirmed: 'تم تأكيد الطلب',
+    oc_confirmed_body: 'قام الفرع بتأكيد طلبك.',
+    oc_verifying: 'جارٍ التحقق مع الفرع',
+    oc_verifying_body: 'نتحقق مع الفرع مما إذا كان طلبك قد وصل. فريقنا يتابع الأمر — فضلاً لا تُعد إنشاء الطلب.',
+    oc_not_sent: 'لم يُرسل الطلب بعد',
+    oc_not_sent_paid_body: 'تمت عملية الدفع بنجاح، لكن تعذر إرسال طلبك إلى الفرع. فضلاً حاول إرساله مرة أخرى.',
+    oc_not_sent_unpaid_body: 'تعذر إرسال طلبك إلى الفرع. فضلاً حاول إرساله مرة أخرى.',
+    oc_failed: 'لم يتم إنشاء الطلب',
+    oc_failed_refund_pending_body: 'نعتذر — تعذر إرسال طلبك لأن خدمة الطلبات غير متاحة حالياً. سيتم استرداد مبلغ الدفع تلقائياً.',
+    oc_failed_refunded_body: 'نعتذر — تعذر إرسال طلبك لأن خدمة الطلبات غير متاحة حالياً. تم استرداد مبلغ الدفع.',
+    oc_failed_refund_failed_body: 'نعتذر — تعذر إرسال طلبك لأن خدمة الطلبات غير متاحة حالياً. نعمل على استرداد مبلغك وسنتواصل معك.',
+    oc_failed_unpaid_body: 'نعتذر — تعذر إرسال طلبك لأن خدمة الطلبات غير متاحة حالياً. لم يتم خصم أي مبلغ منك.',
+    oc_resend: 'إعادة إرسال الطلب',
+    oc_resending: 'جارٍ الإرسال…',
+    oc_resend_failed: 'تعذر الإرسال في الوقت الحالي. فضلاً حاول مرة أخرى بعد قليل.',
+    oc_refund_status: 'حالة الاسترداد',
+    oc_refund_pending: 'الاسترداد قيد المعالجة',
+    oc_refunded: 'تم الاسترداد',
+    oc_refund_failed: 'الاسترداد قيد المتابعة',
+    oc_branch_order_number: 'رقم الطلب لدى الفرع',
+    oc_number_pending: 'لم يصدر بعد',
   },
 } as const;
 

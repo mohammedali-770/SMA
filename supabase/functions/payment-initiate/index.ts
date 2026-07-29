@@ -49,7 +49,10 @@ Deno.serve(async (req: Request) => {
   // returns it only if they own it, and its `total` is the server-computed amount.
   const { data: order, error: orderErr } = await supaUser
     .from('orders')
-    .select('id, total, payment_status, payment_method, order_number, order_type, customer_name, customer_phone')
+    // order_number is deliberately NOT selected: nothing in this function may
+    // forward the internal SM-… id to Tap. reference.order comes from the
+    // attempt's own opaque ORD-… value (migration 20260724180000).
+    .select('id, total, payment_status, payment_method, order_type, customer_name, customer_phone')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) return json({ error: orderErr.message }, 400);
@@ -113,7 +116,7 @@ async function initiateTap(
   if (attempt.reused && attempt.checkout_url && attempt.provider_ref) {
     return json({
       provider: 'tap', mode: tap.mode, chargeId: attempt.provider_ref,
-      checkoutUrl: attempt.checkout_url, orderNumber: order.order_number, expiryMinutes: tap.expiryMinutes,
+      checkoutUrl: attempt.checkout_url, expiryMinutes: tap.expiryMinutes,
     }, 200);
   }
 
@@ -127,9 +130,16 @@ async function initiateTap(
     amount: total,
     currency: tap.currency,
     descriptor: tap.descriptor,
-    description: `Spicy Meal order ${order.order_number}`,
+    // CUSTOMER-SAFE. Tap documents `description` only as "an arbitrary string
+    // which you can attach to a Charge request with more details" and does NOT
+    // state that it stays internal, so it must be assumed visible on the hosted
+    // payment page / receipt. It is NOT one of the bound fields
+    // validateAndConfirmTapCharge compares, and NOT part of the webhook
+    // hashstring (chargeHashFields), so neutralizing it cannot weaken
+    // verification. The binding stays on referenceOrder below, UNCHANGED.
+    description: 'Spicy Meal order',
     referenceTransaction: String(attempt.reference_transaction ?? ''),
-    referenceOrder: String(attempt.reference_order ?? order.order_number ?? ''),
+    referenceOrder: String(attempt.reference_order ?? ''),
     idempotent: String(attempt.reference_transaction ?? ''),
     sourceId: tap.sourceId,
     merchantId: tap.merchantId,
@@ -221,14 +231,14 @@ async function initiateTap(
   if (outcome === 'pending' && checkoutUrl) {
     return json({
       provider: 'tap', mode: tap.mode, chargeId, checkoutUrl,
-      orderNumber: order.order_number, expiryMinutes: tap.expiryMinutes,
+      expiryMinutes: tap.expiryMinutes,
     }, 200);
   }
   // CAPTURED-at-create (rare for hosted 3DS) or any other state → let the app run
   // the server verify path, which retrieves + confirms authoritatively.
   return json({
     provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
-    orderNumber: order.order_number, needsVerify: true,
+    needsVerify: true,
   }, 200);
 }
 
@@ -430,6 +440,5 @@ async function initiateGeidea(
   return json({
     sessionId,
     checkoutUrl: `${geideaHppBase(cfg.publicConfig)}/hpp/checkout/?${sessionId}`,
-    orderNumber: order.order_number,
   });
 }

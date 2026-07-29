@@ -238,12 +238,20 @@ begin
   --         unusable->usable correction can still create the legitimate confirmation.
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
+  -- The synced-ref guard (20260721130000, live 20260721084330) coerces this
+  -- unusable-ref request to 'confirmation_required' and enqueues exactly ONE
+  -- 'pos_confirmation_required' event, leaving the 'pos_confirmed' dedup slot free
+  -- so the unusable->usable correction below can still enqueue the real
+  -- confirmation. Assert the coerced state AND both precise (kind='pos_sync')
+  -- notification counts (merges the #107 state check with #101's scoped counts).
   if (select lazywait_sync_state from public.orders where id=v_corr) <> 'confirmation_required' then
     raise exception 'CASE 7 FAILED: unusable ref not coerced to confirmation_required'; end if;
-  if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed') <> 0 then
-    raise exception 'CASE 7 FAILED: pos_confirmed enqueued for unusable ref'; end if;
-  if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmation_required') <> 1 then
-    raise exception 'CASE 7 FAILED: unusable ref did not emit pos_confirmation_required'; end if;
+  if (select count(*) from public.notification_log
+       where order_id=v_corr and kind='pos_sync' and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking pos_confirmed row'; end if;
+  if (select count(*) from public.notification_log
+       where order_id=v_corr and kind='pos_sync' and status='pos_confirmation_required') <> 1 then
+    raise exception 'CASE 7 FAILED: synced-ref guard did not enqueue pos_confirmation_required'; end if;
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-FIXED'),'success','push',null,null,null,'pos_confirmed');
   if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed' and send_status='pending') <> 1 then
