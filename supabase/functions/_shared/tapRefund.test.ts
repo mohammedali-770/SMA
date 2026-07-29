@@ -50,6 +50,24 @@ describe('classifyRefundResponse — terminal rejections', () => {
     expect(v.failureCode).toBe('http_400');
     expect(v.errorSafe).toBe('Invalid charge');
   });
+
+  // Double-POST backstop (checker #101, P2): if a prior attempt timed out AFTER Tap
+  // issued the refund and the claim was released, a later run re-POSTs the same
+  // FULL refund. Because our refund is always the full captured amount, the charge
+  // then has zero refundable balance, so Tap rejects the duplicate with a 4xx
+  // (e.g. 2118 "amount exceeds refundable balance"). That MUST classify as 'failed'
+  // — never 'succeeded' — so the duplicate can neither double-refund the customer
+  // nor be reported as a fresh success. The DB partial-unique index (<=1
+  // live-or-succeeded refund per order) is the second, authoritative guard.
+  it('does not double-refund: a duplicate full refund rejected for balance is failed, not succeeded', () => {
+    const v = classifyRefundResponse(false, 400, {
+      errors: [{ code: '2118', description: 'The amount exceeds the refundable balance' }],
+    });
+    expect(v.outcome).toBe('failed');
+    expect(v.outcome).not.toBe('succeeded');
+    expect(v.failureCode).toBe('http_400');
+    expect(v.errorSafe).toBe('The amount exceeds the refundable balance');
+  });
 });
 
 describe('classifyRefundResponse — uncertainty is always retryable', () => {
