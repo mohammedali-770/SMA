@@ -642,14 +642,22 @@ the owner-approved MCP `apply_migration` workflow, and now has live
   exact merged file content — never `db push` or `migration repair`. Rollback was
   not required.
 
-**Ledger order.** Filename version `20260722100000` sorts strictly **after** every
-currently applied migration, including its two runtime dependencies
-`20260721150000_lazywait_sync_health_summary` (live `20260721113811`) and
-`20260721170000_order_integrity_watchdog` (live `20260722053151`). A clean rebuild
-from the repository applies it last, after both source functions exist.
+**Ledger order.** Filename version `20260722100000` sorts **after** its two runtime
+dependencies `20260721150000_lazywait_sync_health_summary` (live `20260721113811`)
+and `20260721170000_order_integrity_watchdog` (live `20260722053151`), but **before**
+the later migrations that build on it —
+`20260723090000_smart_operations_alerts_digest`,
+`20260723120000_activate_operations_alerts_digest_cron` and
+`20260723140000_operations_automation_cron_health`. A clean rebuild therefore applies
+it **after both source functions exist** (not last); the alerts/digest engine that
+depends on `operations_health_overall_state()` applies afterwards — see the
+dependency-ordering note under **Rollback**.
 
-**Purpose.** Adds a staff-gated, read-only Operations Health Center aggregate for
-the Admin Dashboard. It composes the existing authoritative
+**Purpose.** Adds a read-only Operations Health Center aggregate for the Admin
+Dashboard — its client-facing RPC `operations_health_summary()` is staff-gated
+(`is_staff()`), while its internal `operations_health_overall_state()` helper is
+`service_role`-only and never client-callable (see **Objects created** below). It
+composes the existing authoritative
 `lazywait_sync_health_summary()` and `order_integrity_health_summary()` outputs
 with safe database/cron aggregates for account deletion, payments, push, email and
 OTP, so staff can see what needs attention without touching secrets, provider
