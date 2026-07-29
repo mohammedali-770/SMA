@@ -16,7 +16,8 @@
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
+  StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -24,7 +25,9 @@ import * as Location from 'expo-location';
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
+import { Notice } from '../../components/Notice';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
+import { checkDescription, descriptionCopy, descriptionMessage } from './locationDescription';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
@@ -40,7 +43,7 @@ type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
 
 export function OrderTypeSelectScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, rtlText, rtlRow } = useI18n();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
   const { context, valid, setPickup, setDelivery } = useOrderContext();
   const cart = useCart();
@@ -52,10 +55,20 @@ export function OrderTypeSelectScreen() {
   const [pickedLat, setPickedLat] = useState<number | null>(null);
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [landmark, setLandmark] = useState('');
+  // Validation is only shown once the customer has tried to confirm (or has
+  // left the field), so an untouched form is not pre-painted with an error.
+  const [descTouched, setDescTouched] = useState(false);
+  // Reverse-geocoded address for the current pin. Context only — never the
+  // delivery guidance, and never written into the description field.
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const askedLocation = useRef(false);
+  const scrollRef = useRef<ScrollView | null>(null);
+  // Y offset of the description block inside the scroll view, so a validation
+  // failure can bring the field (and its message) above the keyboard.
+  const descOffsetRef = useRef(0);
 
   // Load the customer's saved addresses once.
   useEffect(() => {
@@ -119,24 +132,46 @@ export function OrderTypeSelectScreen() {
     const branch = resolveDeliveryBranch({ lat: a.lat, lng: a.lng }, branches, deliveryZones);
     if (!branch) { setResolveError(t('otDeliveryUnavailable')); return; }
     setResolveError(null);
-    runSelection(branch.id, () => setDelivery({ branch, addressId: a.id, lat: a.lat, lng: a.lng, description: a.description || null }));
+    // Addresses saved before the description became mandatory have none. Rather
+    // than block the customer on a card they cannot edit, open the editor on
+    // that exact pin so they only have to add the landmark.
+    const saved = checkDescription(a.description);
+    if (!saved.valid) {
+      setPickedLat(a.lat);
+      setPickedLng(a.lng);
+      setLandmark('');
+      setDescTouched(true);
+      setDeliveryMode('new');
+      return;
+    }
+    runSelection(branch.id, () => setDelivery({ branch, addressId: a.id, lat: a.lat, lng: a.lng, description: saved.value }));
   };
 
   const confirmNewAddress = () => {
+    // The description is mandatory: a courier cannot find a Saudi address from
+    // coordinates alone. Reveal the message and scroll it into view rather than
+    // failing silently on a disabled button.
+    setDescTouched(true);
+    const desc = checkDescription(landmark, resolvedAddress);
+    if (!desc.valid) {
+      scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true });
+      return;
+    }
     if (pickedLat == null || pickedLng == null) return;
     const branch = resolveDeliveryBranch({ lat: pickedLat, lng: pickedLng }, branches, deliveryZones);
     if (!branch) { setResolveError(t('otDeliveryUnavailable')); return; }
     setResolveError(null);
-    const desc = landmark.trim() || null;
     runSelection(branch.id, async () => {
       const created = await addresses.create({
-        label: (landmark.trim() || pick('Delivery location', 'موقع التوصيل')).slice(0, 60),
-        description: desc,
+        label: desc.value.slice(0, 60),
+        description: desc.value,
         latitude: pickedLat,
         longitude: pickedLng,
         isDefault: savedAddresses.length === 0,
       });
-      setDelivery({ branch, addressId: created.id, lat: pickedLat, lng: pickedLng, description: desc });
+      // Carried into Checkout through the order context, so the customer never
+      // retypes it and Checkout never creates an address without one.
+      setDelivery({ branch, addressId: created.id, lat: pickedLat, lng: pickedLng, description: desc.value });
     });
   };
 
@@ -156,6 +191,10 @@ export function OrderTypeSelectScreen() {
   const sortedPickup = useMemo(() => pickupBranches(branches, location), [branches, location]);
   const mapLat = pickedLat ?? mapConfig.defaultCenter.lat;
   const mapLng = pickedLng ?? mapConfig.defaultCenter.lng;
+
+  // Inline description validation, revealed only after a confirm attempt or blur.
+  const descCheck = checkDescription(landmark, resolvedAddress);
+  const descError = descTouched ? descriptionMessage(descCheck.problem, lang) : null;
 
   return (
     <View style={styles.root}>
@@ -204,8 +243,22 @@ export function OrderTypeSelectScreen() {
           })}
         </ScrollView>
       ) : (
-        // Delivery tab
-        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        // Delivery tab. KeyboardAvoidingView + a scrollable body keep the
+        // description field, its validation message and Confirm reachable while
+        // the keyboard is open; `keyboardShouldPersistTaps` lets Confirm be
+        // pressed directly without a dismiss tap first (which used to eat the
+        // press and look like the button was broken).
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
+        >
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.listKeyboard}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+        >
           {!deliveryPossible ? (
             <View style={styles.notice}><Text style={styles.noticeText}>{t('otNoDeliveryZones')}</Text></View>
           ) : deliveryMode === 'choose' ? (
@@ -230,22 +283,61 @@ export function OrderTypeSelectScreen() {
               <LocationPickerMap
                 lat={mapLat}
                 lng={mapLng}
+                lang={lang}
                 onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setResolveError(null); }}
-                labels={{ moveHint: t('otMapMoveHint'), useMyLocation: t('otUseMyLocation'), setupRequired: t('otMapSetup') }}
+                // The reverse-geocoded address is CONTEXT, never the delivery
+                // guidance: prefilling the field with it would let the map
+                // satisfy the mandatory-guidance rule on the customer's behalf.
+                onAddressResolved={setResolvedAddress}
+                labels={{ locateHint: t('otMapMoveHint'), useMyLocation: t('otUseMyLocation'), setupRequired: t('otMapSetup') }}
               />
-              <Text style={[styles.label, rtlText, { marginTop: spacing.md }]}>{t('otLocationDesc')}</Text>
-              <TextInput
-                value={landmark}
-                onChangeText={setLandmark}
-                placeholder={t('otLocationDescPlaceholder')}
-                placeholderTextColor={colors.muted}
-                style={[styles.input, rtlText]}
-                multiline
-              />
-              {resolveError ? <Text style={styles.err}>{resolveError}</Text> : null}
+
+              <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
+                {/* The pin's own address, read-only. Shown so the customer can
+                    confirm the map is right without it counting as guidance. */}
+                {resolvedAddress ? (
+                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
+                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
+                  </Text>
+                ) : null}
+                <Text style={[styles.label, rtlText, { marginTop: spacing.md }]}>
+                  {descriptionCopy[lang].label}
+                </Text>
+                <TextInput
+                  value={landmark}
+                  onChangeText={setLandmark}
+                  onBlur={() => setDescTouched(true)}
+                  onFocus={() => {
+                    // Bring the field above the keyboard on both platforms;
+                    // KeyboardAvoidingView alone does not scroll a field that is
+                    // already laid out below the fold.
+                    scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true });
+                  }}
+                  placeholder={descriptionCopy[lang].placeholder}
+                  placeholderTextColor={colors.muted}
+                  style={[styles.input, rtlText, descError ? styles.inputError : null]}
+                  multiline
+                  accessibilityLabel={descriptionCopy[lang].label}
+                  accessibilityHint={descriptionCopy[lang].placeholder}
+                />
+                {descError ? <Text style={[styles.fieldError, rtlText]}>{descError}</Text> : null}
+              </View>
+
+              {resolveError ? (
+                <Notice
+                  title={resolveError}
+                  action={pick('Move the pin to a location we deliver to.', 'حرّك الدبوس إلى موقع نقوم بالتوصيل إليه.')}
+                  rtlText={rtlText}
+                  style={{ marginTop: spacing.md }}
+                />
+              ) : null}
+
               <Button
                 label={t('otConfirmLocation')}
                 onPress={confirmNewAddress}
+                // Coordinates gate the button; the description reports its own
+                // problem on press so the customer is told what is missing
+                // instead of facing a silently dead button.
                 disabled={pickedLat == null || pickedLng == null}
                 variant="danger"
                 style={{ marginTop: spacing.md }}
@@ -254,6 +346,7 @@ export function OrderTypeSelectScreen() {
             </>
           )}
         </ScrollView>
+        </KeyboardAvoidingView>
       )}
 
       {busy ? (
@@ -303,7 +396,11 @@ const styles = StyleSheet.create({
   tabText: { color: colors.text, fontWeight: '700', fontSize: font.md },
   tabTextActive: { color: colors.white, fontWeight: '800' },
 
+  flex: { flex: 1 },
   list: { padding: spacing.lg, gap: spacing.md },
+  // Extra tail room so the Confirm button clears the keyboard when the
+  // description field is focused at the bottom of the form.
+  listKeyboard: { padding: spacing.lg, gap: spacing.md, paddingBottom: 260 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
   sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
   muted: { fontSize: font.sm, color: colors.muted },
@@ -321,6 +418,9 @@ const styles = StyleSheet.create({
   meta: { fontSize: font.sm, color: colors.text, fontWeight: '700' },
 
   input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, minHeight: 64, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white, marginTop: spacing.xs },
+  inputError: { borderColor: colors.danger },
+  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
+  fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
   notice: { backgroundColor: '#fdeaec', padding: spacing.lg, borderRadius: radius.md },
   noticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
   err: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },

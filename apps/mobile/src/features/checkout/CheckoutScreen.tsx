@@ -18,6 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
+import { Notice, secondaryTextStyle } from '../../components/Notice';
+import { QuantityStepper } from '../../components/QuantityStepper';
+import { checkDescription, descriptionCopy, descriptionMessage } from '../order/locationDescription';
+import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses, checkout, coupons, orders, payments } from '../../services/api';
 import { mapAddress } from '../../lib/mappers';
@@ -68,6 +73,28 @@ export function CheckoutScreen() {
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Mandatory delivery landmark. Seeded from the address chosen in the blocking
+  // order-type gate so the customer never retypes it (section 2).
+  const [addrDesc, setAddrDesc] = useState<string>(orderCtx.context?.deliveryDescription ?? '');
+  const [descTouched, setDescTouched] = useState(false);
+  // Reverse-geocoded address for the current pin. Context only — never the
+  // delivery guidance, and never written into the description field.
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  // Set while a quantity change is settling; blocks submission so the server is
+  // never handed a cart the customer has not seen priced, and drives the
+  // stepper's `busy` state. Cleared by an effect once the cart re-renders (below)
+  // — NOT synchronously in the handler, which was a no-op that never survived a
+  // render.
+  const [recalcLine, setRecalcLine] = useState<string | null>(null);
+  // Synchronous twin of recalcLine. A second tap dispatched in the SAME frame,
+  // before React commits the first, reads this ref (mutated inline) rather than
+  // the not-yet-updated state, so a fast double-tap cannot enqueue two mutations
+  // against one line. Reset together with recalcLine when the cart settles.
+  const recalcRef = useRef<string | null>(null);
+  // Line the customer is about to remove by decrementing past 1.
+  const [confirmRemove, setConfirmRemove] = useState<{ cartItemId: string; name: string } | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const descOffsetRef = useRef(0);
   // Online-payment (Tap) flow overlay. null = not paying.
   type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
   // sessionId is the checkout-session flow: the order does not exist until
@@ -169,17 +196,34 @@ export function CheckoutScreen() {
   };
 
   // ---- Preview math (display only) ----
+  // One tested function (previewTotals) owns every dependent number, so editing
+  // a quantity below moves the line total, subtotal, discounts, minimum-order
+  // eligibility and the final total together. place_order remains authoritative.
   const availablePoints = profile?.loyaltyPoints ?? 0;
   const loyaltyEnabled = Boolean(loyalty?.isEnabled) && availablePoints >= (loyalty?.minPointsToRedeem ?? Infinity);
-  const deliveryFee = orderType === 'delivery' ? (selectedBranch?.deliveryFee ?? 0) : 0;
   const couponDiscount = couponResult?.ok ? couponResult.discount : 0;
-  const loyaltyDiscountEst = redeemPoints && loyalty
-    ? Math.min(availablePoints * loyalty.discountPerPoint, Math.max(0, cart.subtotal - couponDiscount))
-    : 0;
-  const totalEst = Math.max(0, cart.subtotal + deliveryFee - couponDiscount - loyaltyDiscountEst);
 
-  const belowMin = orderType === 'delivery'
-    && cart.subtotal < (selectedBranch?.minDeliveryOrder ?? 0);
+  const totals = useMemo(() => computePreviewTotals({
+    items: cart.items,
+    orderType,
+    deliveryFee: selectedBranch?.deliveryFee ?? 0,
+    minDeliveryOrder: selectedBranch?.minDeliveryOrder ?? 0,
+    couponDiscount,
+    loyaltyPoints: redeemPoints ? availablePoints : 0,
+    discountPerPoint: loyalty?.discountPerPoint ?? 0,
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty]);
+
+  const deliveryFee = totals.deliveryFee;
+  const loyaltyDiscountEst = totals.loyaltyDiscount;
+  const totalEst = totals.total;
+  const belowMin = totals.belowMinimum;
+
+  // Delivery needs a landmark; pickup does not.
+  const requiresDescription = orderType === 'delivery';
+  const descCheck = checkDescription(addrDesc, resolvedAddress);
+  const descError = descTouched && requiresDescription
+    ? descriptionMessage(descCheck.problem, lang)
+    : null;
 
   // ---- Delivery serviceability pre-check (UX only; place_order is authoritative) ----
   const branchZone = deliveryZones.find((z) => z.branchId === selectedBranch?.id && z.isActive);
@@ -199,17 +243,117 @@ export function CheckoutScreen() {
     : !insideZone ? pick('Outside delivery area', 'خارج منطقة التوصيل')
     : null;
 
-  const blockReason = useMemo(() => {
-    if (!selectedBranch) return t('selectBranchCta');
-    if (!branchOpen) return t('branchClosedError');
-    if (!orderType) return t('chooseOrderType');
-    if (belowMin) return `${t('minOrderError')} ${formatSAR(selectedBranch?.minDeliveryOrder ?? 0, lang)}`;
-    if (paymentBlocked || !paymentMethod) return pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.');
-    if (deliveryBlockReason) return deliveryBlockReason;
-    return null;
-  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick, deliveryBlockReason]);
+  /**
+   * The one blocking problem, split into "what happened" and "what to do".
+   * Section 5: the title is the loudest thing on the footer and the action sits
+   * directly beneath it — previously this was a single grey sentence rendered
+   * *below* the policy-consent paragraph, so the legal text out-shouted the
+   * reason the button was dead.
+   */
+  const block = useMemo((): { title: string; action: string | null } | null => {
+    // Priority order (and, critically, empty-cart BEFORE below-minimum) lives in
+    // the pure resolver; this only maps the winning reason to localized copy.
+    const reason: BlockReason | null = resolveBlockReason({
+      hasBranch: Boolean(selectedBranch),
+      branchOpen,
+      hasOrderType: Boolean(orderType),
+      isEmpty: cart.items.length === 0,
+      belowMinimum: belowMin,
+      paymentUnavailable: paymentBlocked || !paymentMethod,
+      deliveryBlocked: Boolean(deliveryBlockReason),
+      needsDescription: requiresDescription && !descCheck.valid,
+    });
+    switch (reason) {
+      case 'no-branch':
+        return { title: t('selectBranchCta'), action: null };
+      case 'branch-closed':
+        return { title: t('branchClosedError'), action: pick('Try another branch or come back later.', 'جرّب فرعاً آخر أو عد لاحقاً.') };
+      case 'no-order-type':
+        return { title: t('chooseOrderType'), action: null };
+      case 'empty-cart':
+        return { title: pick('Your cart is empty', 'سلتك فارغة'), action: pick('Add an item to continue.', 'أضف صنفاً للمتابعة.') };
+      case 'below-minimum':
+        return {
+          title: pick('Your order is below the delivery minimum', 'طلبك أقل من الحد الأدنى للتوصيل'),
+          action: pick(
+            `Add ${formatSAR(totals.missingForMinimum, lang)} more to your order, or switch to pickup.`,
+            `أضف ${formatSAR(totals.missingForMinimum, lang)} إلى طلبك، أو حوّل إلى الاستلام.`,
+          ),
+        };
+      case 'no-payment':
+        return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
+      case 'delivery-unserviceable':
+        return { title: deliveryBlockReason as string, action: pick('Move the pin to your exact location.', 'حرّك الدبوس إلى موقعك بالضبط.') };
+      case 'need-description':
+        return {
+          title: pick('Add a location description', 'أضف وصف الموقع'),
+          action: descriptionMessage(descCheck.problem, lang),
+        };
+      default:
+        return null;
+    }
+  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick,
+      deliveryBlockReason, totals.missingForMinimum, cart.items.length, requiresDescription, descCheck]);
 
-  const canPlace = !blockReason && cart.items.length > 0 && !placing && !recovering;
+  const canPlace = canSubmitOrder({
+    totals,
+    blocked: Boolean(block) || recovering,
+    placing,
+    pendingRecalc: recalcLine !== null,
+    descriptionValid: descCheck.valid,
+    requiresDescription,
+  });
+
+  /**
+   * Quantity edits. The cart store is the single writer; this only guards the
+   * interaction. `recalcLine` blocks submission and both stepper controls for
+   * the frame the change settles in, so a fast double-tap cannot race.
+   *
+   * Changing the cart rotates the cart's idempotency key (see CartProvider), so
+   * an edited cart is correctly treated as a different order.
+   */
+  const changeQuantity = (cartItemId: string, direction: 1 | -1) => {
+    // Re-read the LIVE line from cart state at action time (never a captured
+    // quantity), then let the pure guard decide. The decision is gated on the
+    // synchronous ref so a same-frame double-tap is ignored rather than racing a
+    // second decrement to zero.
+    const item = cart.items.find((it) => it.cartItemId === cartItemId);
+    if (!item) return;
+    const decision = decideQuantityChange({
+      recalcActive: recalcRef.current !== null,
+      quantity: item.quantity,
+      direction,
+    });
+    if (decision.kind === 'ignore') return;
+    if (decision.kind === 'confirm-remove') {
+      // Never drop a line silently — the app confirms removals everywhere else
+      // (see the cart-conflict sheet in the order-type gate) and does so here.
+      setConfirmRemove({ cartItemId, name: pick(item.product.nameEn, item.product.nameAr) });
+      return;
+    }
+    // Mark the line as settling BEFORE mutating: the ref blocks the next
+    // same-frame tap immediately; the state drives the stepper `busy` and blocks
+    // submission until the effect below clears it once the cart re-renders.
+    recalcRef.current = cartItemId;
+    setRecalcLine(cartItemId);
+    if (direction === 1) cart.incrementLine(cartItemId);
+    else cart.decrementLine(cartItemId);
+    // Coupons are validated against a subtotal that has just changed, so the
+    // previous result no longer applies and must be re-entered.
+    if (couponResult) setCouponResult(null);
+  };
+
+  // A quantity edit has settled once the cart — and therefore the preview totals
+  // and this row — have re-rendered with the new value. Release the recalc guard
+  // here so the stepper re-enables and submission unblocks. Doing it here rather
+  // than synchronously in changeQuantity is the fix: previously recalcLine was
+  // set and cleared in the same frame, so it never survived a render, the
+  // stepper never showed `busy`, and submission was never actually blocked
+  // mid-recalc.
+  useEffect(() => {
+    recalcRef.current = null;
+    setRecalcLine(null);
+  }, [cart.items]);
 
   const placeOrder = async () => {
     if (!canPlace || !selectedBranch || !orderType) return;
@@ -234,12 +378,26 @@ export function CheckoutScreen() {
       let deliveryAddressId: string | null = null;
       if (orderType === 'delivery') {
         if (pickedLat == null || pickedLng == null) throw new Error(pick('Please select your location on the map', 'يرجى تحديد موقعك على الخريطة'));
+        // Mandatory landmark, re-checked here and not only on the button: the
+        // address row is written from this path, and it previously stored no
+        // description at all.
+        const desc = checkDescription(addrDesc, resolvedAddress);
+        if (!desc.valid) {
+          setDescTouched(true);
+          throw new Error(descriptionMessage(desc.problem, lang) ?? descriptionCopy[lang].empty);
+        }
         const saved = addressList.find((a) => a.id === addressId);
-        if (saved && saved.lat === pickedLat && saved.lng === pickedLng) {
+        if (saved && saved.lat === pickedLat && saved.lng === pickedLng && saved.description === desc.value) {
           deliveryAddressId = saved.id;
+        } else if (saved && saved.lat === pickedLat && saved.lng === pickedLng) {
+          // Same pin, edited landmark — update in place rather than creating a
+          // near-duplicate address for the customer.
+          const updated = await addresses.update(saved.id, { description: desc.value });
+          deliveryAddressId = updated.id;
         } else {
           const created = await addresses.create({
-            label: addrLabel.trim() || t('deliveryLocation'),
+            label: (addrLabel.trim() || desc.value).slice(0, 60),
+            description: desc.value,
             latitude: pickedLat,
             longitude: pickedLng,
             isDefault: addressList.length === 0,
@@ -404,7 +562,14 @@ export function CheckoutScreen() {
     <View style={styles.root}>
       <Header title={t('checkout')} showBack />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 190 }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          // Tail room clears the sticky footer AND the keyboard, so the focused
+          // description field and its message stay visible while typing.
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 260 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="none"
+        >
           {/* Order type + branch — PRESELECTED from the order context (read-only).
               Change re-opens the selection flow after a confirmation. */}
           <View style={[styles.otRow, rtlRow]}>
@@ -459,20 +624,48 @@ export function CheckoutScreen() {
                 key={recenterSeed}
                 lat={pickedLat ?? selectedBranch?.latitude ?? 24.7136}
                 lng={pickedLng ?? selectedBranch?.longitude ?? 46.6753}
+                lang={lang}
                 onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
+                onAddressResolved={setResolvedAddress}
                 labels={{
-                  moveHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
+                  locateHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
                   useMyLocation: pick('Use my location', 'استخدم موقعي'),
                   setupRequired: pick('Map setup required — ask support to enable the map.', 'إعداد الخريطة مطلوب — تواصل مع الدعم لتفعيل الخريطة.'),
                 }}
               />
 
+              {/* Mandatory location description — the same field, label and
+                  rule as the address gate (see order/locationDescription). */}
+              <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
+                {/* The pin's own address, read-only, so the customer can check
+                    the map is right without it counting as delivery guidance. */}
+                {resolvedAddress ? (
+                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
+                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
+                  </Text>
+                ) : null}
+                <Text style={[styles.fieldLabel, rtlText]}>{descriptionCopy[lang].label}</Text>
+                <TextInput
+                  value={addrDesc}
+                  onChangeText={setAddrDesc}
+                  onBlur={() => setDescTouched(true)}
+                  placeholder={descriptionCopy[lang].placeholder}
+                  placeholderTextColor={colors.muted}
+                  style={[styles.notesInput, rtlText, descError ? styles.inputError : null]}
+                  multiline
+                  accessibilityLabel={descriptionCopy[lang].label}
+                />
+                {descError ? <Text style={[styles.fieldError, rtlText]}>{descError}</Text> : null}
+              </View>
+
+              {/* Building / street stays genuinely optional and is clearly
+                  secondary to the required landmark above. */}
               <TextInput
                 value={addrLabel}
                 onChangeText={setAddrLabel}
                 placeholder={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
                 placeholderTextColor={colors.muted}
-                style={[styles.couponInput, rtlText, { marginTop: spacing.md }]}
+                style={[styles.couponInput, rtlText, { marginTop: spacing.sm }]}
               />
 
               {addressList.length > 0 ? (
@@ -558,11 +751,46 @@ export function CheckoutScreen() {
             />
           </View>
 
+          {/* Editable cart lines — fix a below-minimum order without leaving
+              Checkout and losing the pin, coupon and payment method. */}
+          <View style={styles.block}>
+            <Text style={[styles.sectionTitle, rtlText]}>{pick('Your items', 'أصنافك')}</Text>
+            {cart.items.map((it) => {
+              const name = pick(it.product.nameEn, it.product.nameAr);
+              const mods = Object.values(it.selectedModifiers).flat();
+              return (
+                <View key={it.cartItemId} style={[styles.lineRow, rtlRow]}>
+                  <View style={styles.lineInfo}>
+                    <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
+                    {mods.length > 0 ? (
+                      <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>
+                        {mods.map((m) => pick(m.nameEn, m.nameAr)).join(' • ')}
+                      </Text>
+                    ) : null}
+                    <Price amount={lineTotal(it)} size={font.sm} color={colors.muted} weight="700" />
+                  </View>
+                  <QuantityStepper
+                    quantity={it.quantity}
+                    busy={recalcLine === it.cartItemId}
+                    itemLabel={name}
+                    onIncrement={() => changeQuantity(it.cartItemId, 1)}
+                    onDecrement={() => changeQuantity(it.cartItemId, -1)}
+                    labels={{
+                      increase: pick('Increase quantity', 'زيادة الكمية'),
+                      decrease: pick('Decrease quantity', 'إنقاص الكمية'),
+                      quantity: pick('Quantity', 'الكمية'),
+                    }}
+                  />
+                </View>
+              );
+            })}
+          </View>
+
           {/* Totals preview */}
           <View style={styles.totals}>
-            <Row label={t('subtotal')} amount={cart.subtotal} />
+            <Row label={t('subtotal')} amount={totals.subtotal} />
             {orderType === 'delivery' ? <Row label={t('deliveryFee')} amount={deliveryFee} /> : null}
-            {couponDiscount > 0 ? <Row label={t('discount')} amount={couponDiscount} negative accent /> : null}
+            {totals.couponDiscount > 0 ? <Row label={t('discount')} amount={totals.couponDiscount} negative accent /> : null}
             {loyaltyDiscountEst > 0 ? <Row label={t('loyaltyDiscount')} amount={loyaltyDiscountEst} negative accent /> : null}
             <Row label={t('vat')} value="" muted />
             <View style={styles.totalDivider} />
@@ -572,10 +800,30 @@ export function CheckoutScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Sticky place-order */}
+      {/* Sticky place-order.
+          Information hierarchy (section 5), top to bottom:
+            1. the blocking problem + the exact fix — loudest;
+            2. any submit error;
+            3. the action itself;
+            4. legal consent — smallest and quietest, still fully legible and
+               link-accessible. It previously sat ABOVE the block reason in the
+               same size, so the policy paragraph dominated the screen while the
+               reason the button was dead read as a footnote. */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        {/* Policy links shown before Confirm & Order (does not block checkout). */}
-        <Text style={styles.policy}>
+        {block ? (
+          <Notice title={block.title} action={block.action} rtlText={rtlText} style={{ marginBottom: spacing.sm }} />
+        ) : null}
+        {error ? (
+          <Notice title={error} rtlText={rtlText} style={{ marginBottom: spacing.sm }} />
+        ) : null}
+        <Button
+          label={placing ? t('placingOrder') : t('placeOrder')}
+          onPress={placeOrder}
+          disabled={!canPlace}
+          loading={placing}
+          variant="danger"
+        />
+        <Text style={[styles.policy, rtlText]}>
           {pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
           <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
           {pick(', ', '، ')}
@@ -584,16 +832,31 @@ export function CheckoutScreen() {
           <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
           {'.'}
         </Text>
-        {blockReason ? <Text style={styles.blockReason}>{blockReason}</Text> : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <Button
-          label={placing ? t('placingOrder') : t('placeOrder')}
-          onPress={placeOrder}
-          disabled={!canPlace}
-          loading={placing}
-          variant="danger"
-        />
       </View>
+
+      {/* Confirm before a decrement removes the last unit of a line. */}
+      <Modal visible={confirmRemove !== null} transparent animationType="fade" onRequestClose={() => setConfirmRemove(null)}>
+        <View style={styles.payBackdrop}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>{pick('Remove this item?', 'إزالة هذا الصنف؟')}</Text>
+            <Text style={styles.payMsg}>{confirmRemove?.name ?? ''}</Text>
+            <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
+              <Button
+                label={pick('Remove', 'إزالة')}
+                variant="danger"
+                onPress={() => {
+                  if (confirmRemove) {
+                    cart.removeLine(confirmRemove.cartItemId);
+                    if (couponResult) setCouponResult(null);
+                  }
+                  setConfirmRemove(null);
+                }}
+              />
+              <Button label={t('cancel')} variant="secondary" onPress={() => setConfirmRemove(null)} />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Online-payment (Tap) overlay. onRequestClose (Android back) dismisses the
           modal like Close — it never touches the persisted session, so recovery
@@ -740,9 +1003,26 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
     borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
   },
-  blockReason: { color: colors.warning, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
   error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
-  policy: { color: colors.muted, fontSize: font.xs, lineHeight: 17, textAlign: 'center' },
+  // Legal consent: quiet but fully legible, and now BELOW the action rather
+  // than competing with the blocking message above it. Shared token so
+  // "secondary" means the same thing on every screen.
+  policy: { ...secondaryTextStyle, textAlign: 'center', marginTop: spacing.sm },
+
+  // Mandatory-field affordances (location description).
+  fieldLabel: { fontSize: font.sm, fontWeight: '800', color: colors.text, marginTop: spacing.md },
+  inputError: { borderColor: colors.danger },
+  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
+  fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
+
+  // Editable cart lines.
+  lineRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border,
+  },
+  lineInfo: { flex: 1, gap: 2 },
+  lineName: { fontSize: font.md, fontWeight: '700', color: colors.text },
+  lineMods: { fontSize: font.xs, color: colors.muted },
   policyLink: { color: colors.purple, fontWeight: '800' },
 
   payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },

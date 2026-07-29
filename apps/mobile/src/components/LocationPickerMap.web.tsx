@@ -1,21 +1,34 @@
 /**
  * Web build of the delivery-location picker: renders Google Maps JS directly
  * in the page (no WebView needed in a real browser) with the same props
- * contract as the native component — draggable pin, tap-to-set, "use my
- * location" via browser geolocation. Arabic labels are shaped natively by
- * Google. When the google provider/key is absent it shows the same setup
- * hint as native, and manual coordinate entry in the caller keeps working.
+ * contract as the native component — draggable pin, tap-to-set, and the same
+ * compact in-map current-location control. Arabic labels are shaped natively by
+ * Google. When the google provider/key is absent it shows the same setup hint as
+ * native, and manual coordinate entry in the caller keeps working.
+ *
+ * Browser geolocation replaces expo-location here, and Google's own Geocoder
+ * replaces expo's reverse geocoder, but both go through the same shared rules in
+ * ./locationControl so web and native cannot drift.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { mapConfig } from '../lib/map';
 import { colors, font, radius, spacing } from '../theme';
+import { CrosshairIcon } from './Icons';
+import {
+  FIX_FRESH_MS, LOCATE_TIMEOUT_MS, classifyLocateFailure, isFixFresh, isUsableFix,
+  locateFailureMessage, roundCoord, shouldStartLocate,
+  LOCATE_BTN_BOTTOM, LOCATE_BTN_RIGHT, LOCATE_BTN_SIZE, MAP_HEIGHT,
+  type CachedFix, type LocateLang, type LocateState,
+} from './locationControl';
 
 interface LocationPickerMapProps {
   lat: number;
   lng: number;
   onChange: (lat: number, lng: number) => void;
-  labels: { moveHint: string; useMyLocation: string; setupRequired: string };
+  lang: LocateLang;
+  labels: { locateHint: string; useMyLocation: string; setupRequired: string };
+  onAddressResolved?: (text: string) => void;
 }
 
 declare global {
@@ -39,14 +52,18 @@ function loadGoogleMapsWeb(key: string): Promise<void> {
   return globalThis.__smaGmapsReady;
 }
 
-export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, onChange, labels }) => {
+export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
+  lat, lng, onChange, lang, labels, onAddressResolved,
+}) => {
   const hostRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markerRef = useRef<any>(null);
-  const [locating, setLocating] = useState(false);
+  const [locateState, setLocateState] = useState<LocateState>('idle');
+  const [locateError, setLocateError] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const lastFixRef = useRef<CachedFix | null>(null);
 
   const configured = mapConfig.provider === 'google' && Boolean(mapConfig.googleKey);
 
@@ -61,25 +78,85 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
       const map = new g.Map(hostRef.current, {
         center: start, zoom: 14,
         clickableIcons: false, streetViewControl: false, mapTypeControl: false,
-        fullscreenControl: false, zoomControl: true,
+        fullscreenControl: false,
+        // Same stacking as native: zoom mid-right, locate control bottom-right.
+        zoomControl: true, zoomControlOptions: { position: g.ControlPosition.RIGHT_CENTER },
       });
       mapRef.current = map;
       const marker = new g.Marker({ position: start, map, draggable: true });
       markerRef.current = marker;
       marker.addListener('dragend', () => {
         const p = marker.getPosition();
-        if (p) onChange(Number(p.lat().toFixed(6)), Number(p.lng().toFixed(6)));
+        if (p) onChange(roundCoord(p.lat()), roundCoord(p.lng()));
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.addListener('click', (e: any) => {
         if (!e.latLng) return;
         marker.setPosition(e.latLng);
-        onChange(Number(e.latLng.lat().toFixed(6)), Number(e.latLng.lng().toFixed(6)));
+        onChange(roundCoord(e.latLng.lat()), roundCoord(e.latLng.lng()));
       });
     }).catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; markerRef.current?.setMap?.(null); markerRef.current = null; mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configured]);
+
+  /** Move camera + pin, publish coordinates, optionally name the place. */
+  const applyFix = useCallback((la: number, ln: number, reverseGeocode: boolean) => {
+    const rLa = roundCoord(la);
+    const rLn = roundCoord(ln);
+    mapRef.current?.panTo?.({ lat: rLa, lng: rLn });
+    markerRef.current?.setPosition?.({ lat: rLa, lng: rLn });
+    onChange(rLa, rLn);
+    if (!reverseGeocode || !onAddressResolved) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = (globalThis as any).google?.maps;
+    if (!g?.Geocoder) return;
+    try {
+      new g.Geocoder().geocode(
+        { location: { lat: rLa, lng: rLn }, language: lang },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (results: any[], status: string) => {
+          if (status !== 'OK' || !results?.[0]) return;
+          const text = results[0].formatted_address;
+          if (typeof text === 'string' && text) onAddressResolved(text);
+        },
+      );
+    } catch { /* best effort only */ }
+  }, [onChange, onAddressResolved, lang]);
+
+  const useMyLocation = useCallback(() => {
+    if (!shouldStartLocate(locateState)) return; // repeated-tap guard
+    if (!('geolocation' in navigator)) {
+      setLocateError(locateFailureMessage('unavailable', lang));
+      setLocateState('error');
+      return;
+    }
+    setLocateState('locating');
+    setLocateError(null);
+
+    // Reuse a recent fix for instant feedback; the live reading still refines it.
+    const cached = lastFixRef.current;
+    if (cached && isFixFresh(cached, Date.now())) applyFix(cached.lat, cached.lng, false);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        if (!isUsableFix(latitude, longitude)) {
+          setLocateError(locateFailureMessage('unavailable', lang));
+          setLocateState('error');
+          return;
+        }
+        lastFixRef.current = { lat: latitude, lng: longitude, at: Date.now() };
+        applyFix(latitude, longitude, true);
+        setLocateState('idle');
+      },
+      (err) => {
+        setLocateError(locateFailureMessage(classifyLocateFailure(err), lang));
+        setLocateState('error');
+      },
+      { enableHighAccuracy: true, timeout: LOCATE_TIMEOUT_MS, maximumAge: FIX_FRESH_MS },
+    );
+  }, [locateState, lang, applyFix]);
 
   if (!configured || failed) {
     return (
@@ -89,45 +166,51 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({ lat, lng, 
     );
   }
 
-  const useMyLocation = () => {
-    if (!('geolocation' in navigator)) return;
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const la = Number(pos.coords.latitude.toFixed(6));
-        const ln = Number(pos.coords.longitude.toFixed(6));
-        mapRef.current?.panTo?.({ lat: la, lng: ln });
-        markerRef.current?.setPosition?.({ lat: la, lng: ln });
-        onChange(la, ln);
-        setLocating(false);
-      },
-      () => setLocating(false), // denied → manual pin placement still works
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
-  };
+  const locating = locateState === 'locating';
 
   return (
     <View>
       <View style={styles.mapWrap}>
         {/* Plain DOM host for Google Maps — valid in react-native-web trees. */}
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.hint}>{labels.moveHint}</Text>
-        <Pressable onPress={useMyLocation} disabled={locating} style={styles.locBtn}>
-          <Text style={styles.locBtnText}>{locating ? '…' : labels.useMyLocation}</Text>
+        <Pressable
+          onPress={useMyLocation}
+          accessibilityRole="button"
+          accessibilityLabel={labels.useMyLocation}
+          accessibilityState={{ busy: locating, disabled: locating }}
+          accessibilityHint={labels.locateHint}
+          hitSlop={8}
+          style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
+        >
+          {locating
+            ? <ActivityIndicator size="small" color={colors.purple} />
+            : <CrosshairIcon size={22} color={colors.purple} />}
         </Pressable>
       </View>
+      <Text style={styles.hint}>{labels.locateHint}</Text>
+      {locateError ? <Text style={styles.locateError}>{locateError}</Text> : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  mapWrap: { height: 240, borderRadius: radius.md, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs, gap: spacing.sm },
-  hint: { flex: 1, fontSize: font.sm, color: colors.muted },
-  locBtn: { paddingVertical: spacing.xs, paddingHorizontal: spacing.md, borderRadius: radius.md, backgroundColor: colors.purple },
-  locBtnText: { color: colors.white, fontSize: font.sm, fontWeight: '800' },
+  mapWrap: {
+    height: MAP_HEIGHT, borderRadius: radius.md, overflow: 'hidden',
+    borderWidth: 1, borderColor: colors.border, position: 'relative',
+  },
+  locateBtn: {
+    // Geometry is asserted in locationControl.test.ts.
+    position: 'absolute', right: LOCATE_BTN_RIGHT, bottom: LOCATE_BTN_BOTTOM,
+    width: LOCATE_BTN_SIZE, height: LOCATE_BTN_SIZE, borderRadius: LOCATE_BTN_SIZE / 2,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1, borderColor: colors.border,
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 }, elevation: 3,
+  },
+  locateBtnPressed: { backgroundColor: colors.purpleBg },
+  hint: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
+  locateError: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.xs },
   fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
   fallbackText: { fontSize: font.sm, color: colors.muted, fontWeight: '700', textAlign: 'center' },
 });
