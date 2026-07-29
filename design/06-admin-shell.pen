@@ -1,0 +1,3816 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "aDHnR",
+      "x": 0,
+      "y": 0,
+      "name": "Nav Item",
+      "reusable": true,
+      "width": 192,
+      "cornerRadius": "$rad-sm",
+      "gap": 10,
+      "padding": [
+        10,
+        14
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "icon",
+          "id": "ZJMTH",
+          "name": "Nav Icon",
+          "width": 18,
+          "height": 18,
+          "icon": "layout-dashboard",
+          "library": "lucide",
+          "fill": "$muted"
+        },
+        {
+          "type": "text",
+          "id": "SRChk",
+          "name": "Nav Label",
+          "fill": "$muted",
+          "content": "Menu Item",
+          "fontFamily": "$font-body",
+          "fontSize": 13,
+          "fontWeight": "500"
+        },
+        {
+          "type": "frame",
+          "id": "KFLJ2",
+          "layoutPosition": "absolute",
+          "x": 160,
+          "y": 10,
+          "name": "Nav Badge",
+          "enabled": false,
+          "fill": "$secondary",
+          "cornerRadius": "$rad-pill",
+          "padding": [
+            2,
+            7
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "t4V20",
+              "name": "Badge Count",
+              "fill": "$white",
+              "content": "0",
+              "fontFamily": "$font-body",
+              "fontSize": 11,
+              "fontWeight": "700"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "UxAoN",
+      "x": 212,
+      "y": 0,
+      "name": "Nav Item Active",
+      "reusable": true,
+      "width": 192,
+      "fill": "$primary",
+      "cornerRadius": "$rad-sm",
+      "gap": 10,
+      "padding": [
+        10,
+        14
+      ],
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "icon",
+          "id": "igi7X",
+          "name": "Nav Icon",
+          "width": 18,
+          "height": 18,
+          "icon": "layout-dashboard",
+          "library": "lucide",
+          "fill": "$white"
+        },
+        {
+          "type": "text",
+          "id": "Zk5gv",
+          "name": "Nav Label",
+          "fill": "$white",
+          "content": "Menu Item",
+          "fontFamily": "$font-body",
+          "fontSize": 13,
+          "fontWeight": "600"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "C1HVE",
+      "x": 424,
+      "y": 0,
+      "name": "KPI Tile",
+      "reusable": true,
+      "width": 220,
+      "fill": "$white",
+      "cornerRadius": "$rad-md",
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 6,
+      "padding": [
+        16,
+        20
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "kqsYU",
+          "name": "KPI Label",
+          "fill": "$muted",
+          "content": "Label",
+          "fontFamily": "$font-body",
+          "fontSize": 12,
+          "fontWeight": "500"
+        },
+        {
+          "type": "text",
+          "id": "EBP1i",
+          "name": "KPI Value",
+          "fill": "$ink",
+          "content": "0",
+          "fontFamily": "$font-body",
+          "fontSize": 26,
+          "fontWeight": "800"
+        },
+        {
+          "type": "text",
+          "id": "aGqb9",
+          "name": "KPI Delta",
+          "fill": "$success",
+          "content": "▲ 0%",
+          "fontFamily": "$font-body",
+          "fontSize": 12,
+          "fontWeight": "600"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "YgURS",
+      "x": 0,
+      "y": -980,
+      "name": "Sidebar",
+      "reusable": true,
+      "width": 220,
+      "height": 900,
+      "fill": "$white",
+      "stroke": "$border",
+      "strokeWidth": {
+        "right": 1
+      },
+      "layout": "vertical",
+      "gap": 2,
+      "padding": [
+        24,
+        14
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "Thg5M",
+          "name": "Wordmark",
+          "width": "fill_container",
+          "gap": 8,
+          "padding": [
+            0,
+            0,
+            20,
+            0
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "AFf0X",
+              "name": "Logo Mark",
+              "width": 28,
+              "height": 28,
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 0,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#422e87",
+                    "position": 0
+                  },
+                  {
+                    "color": "#6b5ca5",
+                    "position": 1
+                  }
+                ]
+              },
+              "cornerRadius": 6
+            },
+            {
+              "type": "text",
+              "id": "PoYaK",
+              "name": "Brand Name",
+              "fill": "$ink",
+              "content": "SPICY MEAL",
+              "fontFamily": "$font-body",
+              "fontSize": 15,
+              "fontWeight": "800"
+            }
+          ]
+        },
+        {
+          "id": "m5ufAM",
+          "type": "ref",
+          "ref": "UxAoN",
+          "name": "Sales Overview",
+          "descendants": {
+            "igi7X": {
+              "icon": "bar-chart-3"
+            },
+            "Zk5gv": {
+              "content": "Sales Overview"
+            }
+          }
+        },
+        {
+          "id": "zmwLA",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Live Orders",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "shopping-bag"
+            },
+            "SRChk": {
+              "content": "Live Orders"
+            },
+            "KFLJ2": {
+              "enabled": true
+            },
+            "t4V20": {
+              "content": "7"
+            }
+          }
+        },
+        {
+          "id": "M9SCm",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Menu Management",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "utensils"
+            },
+            "SRChk": {
+              "content": "Menu Management"
+            }
+          }
+        },
+        {
+          "id": "Kciku",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Banners",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "image"
+            },
+            "SRChk": {
+              "content": "Banners"
+            }
+          }
+        },
+        {
+          "id": "XbIVy",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Branch Management",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "git-branch"
+            },
+            "SRChk": {
+              "content": "Branch Management"
+            }
+          }
+        },
+        {
+          "id": "JC7Om",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Financial Reports",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "file-text"
+            },
+            "SRChk": {
+              "content": "Financial Reports"
+            }
+          }
+        },
+        {
+          "id": "Qp7KT",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Integrations",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "puzzle"
+            },
+            "SRChk": {
+              "content": "Integrations"
+            }
+          }
+        },
+        {
+          "id": "T78zzG",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Operations Health",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "activity"
+            },
+            "SRChk": {
+              "content": "Operations Health"
+            }
+          }
+        },
+        {
+          "id": "m7W23",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Operations Alerts",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "alert-triangle"
+            },
+            "SRChk": {
+              "content": "Operations Alerts"
+            },
+            "KFLJ2": {
+              "enabled": true
+            },
+            "t4V20": {
+              "content": "3"
+            }
+          }
+        },
+        {
+          "id": "TezMz",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Order Integrity",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "shield-check"
+            },
+            "SRChk": {
+              "content": "Order Integrity"
+            }
+          }
+        },
+        {
+          "id": "RDz4a",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Settings",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "settings"
+            },
+            "SRChk": {
+              "content": "Settings"
+            }
+          }
+        },
+        {
+          "id": "Mx0Oj",
+          "type": "ref",
+          "ref": "aDHnR",
+          "name": "Legal Documents",
+          "descendants": {
+            "ZJMTH": {
+              "icon": "scroll"
+            },
+            "SRChk": {
+              "content": "Legal Documents"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "z6ynbp",
+      "x": 724,
+      "y": -980,
+      "name": "Screen 1 Label",
+      "fill": "$muted",
+      "content": "SCREEN 1 — SALES OVERVIEW",
+      "fontFamily": "$font-body",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "S1SvcX",
+      "x": 954,
+      "y": -980,
+      "name": "Sales Overview",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$bg",
+      "children": [
+        {
+          "id": "wb0nD",
+          "type": "ref",
+          "ref": "YgURS",
+          "name": "Sidebar",
+          "height": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "aBxxu",
+          "name": "Main Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 24,
+          "padding": [
+            24,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "kochX",
+              "name": "Header Row",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "YwemE",
+                  "name": "Header Left",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "thgF3",
+                      "name": "Page Title",
+                      "fill": "$ink",
+                      "content": "Sales Overview",
+                      "fontFamily": "$font-body",
+                      "fontSize": 22,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "text",
+                      "id": "m9zlJ",
+                      "name": "Page Description",
+                      "fill": "$muted",
+                      "content": "Real-time sales performance across all branches",
+                      "fontFamily": "$font-body",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G2YnC",
+                  "name": "Header Controls",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "jX9NP",
+                      "name": "Live Pill",
+                      "fill": "$success",
+                      "cornerRadius": "$rad-pill",
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "M8gCDN",
+                          "name": "Pulse Dot",
+                          "width": 8,
+                          "height": 8,
+                          "fill": "#ffffff",
+                          "cornerRadius": 999
+                        },
+                        {
+                          "type": "text",
+                          "id": "nk79C",
+                          "name": "Live Time",
+                          "fill": "$white",
+                          "content": "LIVE 21:14:07",
+                          "fontFamily": "$font-body",
+                          "fontSize": 12,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "VOvbk",
+                      "name": "Language Toggle",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        6,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "LVoxX",
+                          "name": "Globe Icon",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "globe",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        },
+                        {
+                          "type": "text",
+                          "id": "qBspf",
+                          "name": "Lang Text",
+                          "fill": "$text",
+                          "content": "AR",
+                          "fontFamily": "$font-body",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "yKdMe",
+                      "name": "Sound Button",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        6,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "W6WdZJ",
+                          "name": "Sound Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "volume-2",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "B5cpp",
+              "name": "KPI Row",
+              "width": "fill_container",
+              "gap": 16,
+              "children": [
+                {
+                  "id": "lYO2q",
+                  "type": "ref",
+                  "ref": "C1HVE",
+                  "name": "Today's Sales",
+                  "width": "fill_container",
+                  "descendants": {
+                    "kqsYU": {
+                      "content": "Today's Sales"
+                    },
+                    "EBP1i": {
+                      "content": "18,420"
+                    },
+                    "aGqb9": {
+                      "content": "▲ 12% vs yesterday",
+                      "fill": "$success"
+                    }
+                  }
+                },
+                {
+                  "id": "GjwLO",
+                  "type": "ref",
+                  "ref": "C1HVE",
+                  "name": "Active Orders",
+                  "width": "fill_container",
+                  "descendants": {
+                    "kqsYU": {
+                      "content": "Active Orders"
+                    },
+                    "EBP1i": {
+                      "content": "7"
+                    },
+                    "aGqb9": {
+                      "content": "2 awaiting POS",
+                      "fill": "$warning"
+                    }
+                  }
+                },
+                {
+                  "id": "FrziH",
+                  "type": "ref",
+                  "ref": "C1HVE",
+                  "name": "Completed Today",
+                  "width": "fill_container",
+                  "descendants": {
+                    "kqsYU": {
+                      "content": "Completed Today"
+                    },
+                    "EBP1i": {
+                      "content": "214"
+                    },
+                    "aGqb9": {
+                      "content": "▲ 8%",
+                      "fill": "$success"
+                    }
+                  }
+                },
+                {
+                  "id": "sw67o",
+                  "type": "ref",
+                  "ref": "C1HVE",
+                  "name": "Average Ticket",
+                  "width": "fill_container",
+                  "descendants": {
+                    "kqsYU": {
+                      "content": "Average Ticket · VAT incl."
+                    },
+                    "EBP1i": {
+                      "content": "86.07"
+                    },
+                    "aGqb9": {
+                      "content": "▼ 3%",
+                      "fill": "$danger"
+                    }
+                  }
+                },
+                {
+                  "id": "Y1pDSA",
+                  "type": "ref",
+                  "ref": "C1HVE",
+                  "name": "Branches Closed",
+                  "width": "fill_container",
+                  "descendants": {
+                    "kqsYU": {
+                      "content": "Branches Closed"
+                    },
+                    "EBP1i": {
+                      "content": "2"
+                    },
+                    "aGqb9": {
+                      "content": "of 16",
+                      "fill": "$muted"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "LUwM3",
+              "name": "Two Column Row",
+              "width": "fill_container",
+              "height": "fill_container",
+              "gap": 20,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "s1Vdj",
+                  "name": "Branch Sales Chart",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": [
+                    20,
+                    24
+                  ],
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "A6S72",
+                      "name": "Chart Header",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "HpsxG",
+                          "name": "Chart Title",
+                          "fill": "$ink",
+                          "content": "Daily Branch Sales",
+                          "fontFamily": "$font-body",
+                          "fontSize": 15,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "icNqp",
+                          "name": "Chart Subtitle",
+                          "fill": "$muted",
+                          "content": "Last 7 days · All branches",
+                          "fontFamily": "$font-body",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "mSswF",
+                      "name": "Chart Area",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "gap": 12,
+                      "padding": [
+                        0,
+                        0,
+                        32,
+                        0
+                      ],
+                      "alignItems": "end",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "fIJ3T",
+                          "name": "Sat Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "b6LHtt",
+                              "name": "Sat Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 180,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "nN0Xa",
+                              "name": "Sat Label",
+                              "fill": "$muted",
+                              "content": "Sat",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "hcmdw",
+                          "name": "Sun Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "zNhFh",
+                              "name": "Sun Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 220,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "mS2Wf",
+                              "name": "Sun Label",
+                              "fill": "$muted",
+                              "content": "Sun",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "m097WK",
+                          "name": "Mon Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "N6NALY",
+                              "name": "Mon Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 160,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "YBqtD",
+                              "name": "Mon Label",
+                              "fill": "$muted",
+                              "content": "Mon",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "j1oxe",
+                          "name": "Tue Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "U41aH",
+                              "name": "Tue Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 240,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "SuPHz",
+                              "name": "Tue Label",
+                              "fill": "$muted",
+                              "content": "Tue",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "m75Chv",
+                          "name": "Wed Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "mgi1C",
+                              "name": "Wed Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 280,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "el9kF",
+                              "name": "Wed Label",
+                              "fill": "$muted",
+                              "content": "Wed",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Bdj5W",
+                          "name": "Thu Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "WxdSS",
+                              "name": "Thu Bar",
+                              "width": "fill_container",
+                              "height": 140,
+                              "fill": "$secondary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "VnhxW",
+                              "name": "Thu Label",
+                              "fill": "$muted",
+                              "content": "Thu",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "cen5L",
+                          "name": "Fri Col",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "layout": "vertical",
+                          "gap": 8,
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "btzP0",
+                              "name": "Fri Bar",
+                              "opacity": 0.85,
+                              "width": "fill_container",
+                              "height": 200,
+                              "fill": "$primary",
+                              "cornerRadius": [
+                                6,
+                                6,
+                                0,
+                                0
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "wYEjr",
+                              "name": "Fri Label",
+                              "fill": "$muted",
+                              "content": "Fri",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "glQw5",
+                  "name": "Integration Sync",
+                  "width": 340,
+                  "height": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 14,
+                  "padding": [
+                    20,
+                    24
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "W6sizA",
+                      "name": "Sync Title",
+                      "fill": "$ink",
+                      "content": "Integration Sync",
+                      "fontFamily": "$font-body",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "T2MiZ9",
+                      "name": "Lazywait POS Row",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "zheW3",
+                          "name": "Lazywait POS Left",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "fIKt1",
+                              "name": "Lazywait POS Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "monitor",
+                              "library": "lucide",
+                              "fill": "$success"
+                            },
+                            {
+                              "type": "text",
+                              "id": "T4MtA",
+                              "name": "Lazywait POS Label",
+                              "fill": "$text",
+                              "content": "Lazywait POS",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "fCZnt",
+                          "name": "Lazywait POS Badge",
+                          "fill": "$success",
+                          "cornerRadius": "$rad-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "REEzI",
+                              "name": "Lazywait POS Status",
+                              "fill": "$white",
+                              "content": "Realtime",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "dzJrA",
+                      "name": "Tap Payments Row",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "J6YKR",
+                          "name": "Tap Payments Left",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "JzecX",
+                              "name": "Tap Payments Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "credit-card",
+                              "library": "lucide",
+                              "fill": "$success"
+                            },
+                            {
+                              "type": "text",
+                              "id": "LQQ6W",
+                              "name": "Tap Payments Label",
+                              "fill": "$text",
+                              "content": "Tap Payments",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "R8TXMM",
+                          "name": "Tap Payments Badge",
+                          "fill": "$success",
+                          "cornerRadius": "$rad-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Phqvu",
+                              "name": "Tap Payments Status",
+                              "fill": "$white",
+                              "content": "Live",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Q6XD8Z",
+                      "name": "WhatsApp OTP Row",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "j8Z31",
+                          "name": "WhatsApp OTP Left",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "ZsrCc",
+                              "name": "WhatsApp OTP Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "message-circle",
+                              "library": "lucide",
+                              "fill": "$success"
+                            },
+                            {
+                              "type": "text",
+                              "id": "l9KGV",
+                              "name": "WhatsApp OTP Label",
+                              "fill": "$text",
+                              "content": "WhatsApp OTP",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "qH5rk",
+                          "name": "WhatsApp OTP Badge",
+                          "fill": "$success",
+                          "cornerRadius": "$rad-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ZH5W0",
+                              "name": "WhatsApp OTP Status",
+                              "fill": "$white",
+                              "content": "Live",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "DlKeq",
+                      "name": "Push Notifications Row",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "WmR6d",
+                          "name": "Push Notifications Left",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "W3y3ti",
+                              "name": "Push Notifications Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "bell-off",
+                              "library": "lucide",
+                              "fill": "$disabled"
+                            },
+                            {
+                              "type": "text",
+                              "id": "q5jbBf",
+                              "name": "Push Notifications Label",
+                              "fill": "$text",
+                              "content": "Push Notifications",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "uYGCw",
+                          "name": "Push Notifications Badge",
+                          "fill": "$disabled",
+                          "cornerRadius": "$rad-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "fGt0T",
+                              "name": "Push Notifications Status",
+                              "fill": "$white",
+                              "content": "Dormant",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kqBQW",
+                      "name": "Awaiting Sync Row",
+                      "width": "fill_container",
+                      "gap": 10,
+                      "padding": [
+                        8,
+                        0
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "fRgcx",
+                          "name": "Awaiting Sync Left",
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "HRIgJ",
+                              "name": "Awaiting Sync Icon",
+                              "width": 16,
+                              "height": 16,
+                              "icon": "refresh-cw",
+                              "library": "lucide",
+                              "fill": "$warning"
+                            },
+                            {
+                              "type": "text",
+                              "id": "G3PE3L",
+                              "name": "Awaiting Sync Label",
+                              "fill": "$text",
+                              "content": "Awaiting Sync",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ONhbl",
+                          "name": "Awaiting Sync Badge",
+                          "fill": "$warning",
+                          "cornerRadius": "$rad-pill",
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "BYPzB",
+                              "name": "Awaiting Sync Status",
+                              "fill": "$white",
+                              "content": "2 orders",
+                              "fontFamily": "$font-body",
+                              "fontSize": 11,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "kU9cS",
+      "x": 2454,
+      "y": -980,
+      "name": "Screen 2 Label",
+      "fill": "$muted",
+      "content": "SCREEN 2 — LIVE ORDERS",
+      "fontFamily": "$font-body",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "jVfjr",
+      "x": 2655,
+      "y": -980,
+      "name": "Live Orders",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$bg",
+      "children": [
+        {
+          "id": "SUeZF",
+          "type": "ref",
+          "ref": "YgURS",
+          "name": "Sidebar",
+          "height": "fill_container",
+          "descendants": {
+            "m5ufAM": {
+              "id": "g8sDUR",
+              "type": "ref",
+              "ref": "aDHnR",
+              "name": "Sales Overview",
+              "descendants": {
+                "ZJMTH": {
+                  "icon": "bar-chart-3"
+                },
+                "SRChk": {
+                  "content": "Sales Overview"
+                }
+              }
+            },
+            "zmwLA": {
+              "id": "saeFl",
+              "type": "ref",
+              "ref": "UxAoN",
+              "name": "Live Orders",
+              "descendants": {
+                "igi7X": {
+                  "icon": "shopping-bag"
+                },
+                "Zk5gv": {
+                  "content": "Live Orders"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "K7RG7g",
+          "name": "Main Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 20,
+          "padding": [
+            24,
+            32
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "Dk3sb",
+              "name": "Header Row",
+              "width": "fill_container",
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "QHInl",
+                  "name": "Header Left",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "IGeq4",
+                      "name": "Page Title",
+                      "fill": "$ink",
+                      "content": "Live Orders",
+                      "fontFamily": "$font-body",
+                      "fontSize": 22,
+                      "fontWeight": "800"
+                    },
+                    {
+                      "type": "text",
+                      "id": "K9wJd",
+                      "name": "Page Description",
+                      "fill": "$muted",
+                      "content": "Monitor and manage incoming orders in real time",
+                      "fontFamily": "$font-body",
+                      "fontSize": 13
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "xsTl0",
+                  "name": "Header Controls",
+                  "gap": 12,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "PKhwe",
+                      "name": "Search Field",
+                      "width": 280,
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 8,
+                      "padding": [
+                        8,
+                        14
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "bH3YE",
+                          "name": "Search Icon",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "search",
+                          "library": "lucide",
+                          "fill": "$disabled"
+                        },
+                        {
+                          "type": "text",
+                          "id": "y3yBiA",
+                          "name": "Search Placeholder",
+                          "fill": "$disabled",
+                          "content": "Search order #, client, phone…",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "sYPvR",
+                      "name": "Status Filter",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        14
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "g9VqB6",
+                          "name": "Filter Label",
+                          "fill": "$text",
+                          "content": "All statuses",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "w8M6y",
+                          "name": "Chevron Icon",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "chevron-down",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zFivG",
+                      "name": "Sound Button",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "X3mKA",
+                          "name": "Sound Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "volume-2",
+                          "library": "lucide",
+                          "fill": "$muted"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "P2xXT",
+              "name": "Orders Stack",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "k5vo7u",
+                  "name": "Order Card 1",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "X1yLe7",
+                      "name": "Red Stripe",
+                      "width": 5,
+                      "height": 160,
+                      "fill": "$danger"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "S10ER",
+                      "name": "Card Content",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 12,
+                      "padding": [
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "nugRU",
+                          "name": "Card Top",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "AUgIA",
+                              "name": "Order Info",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "lDMhA",
+                                  "name": "Order ID",
+                                  "fill": "$ink",
+                                  "content": "SM-2026-004182",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 14,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "p4we2",
+                                  "name": "Branch Chip",
+                                  "fill": "$bg",
+                                  "cornerRadius": "$rad-pill",
+                                  "gap": 4,
+                                  "padding": [
+                                    3,
+                                    8
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "id": "GS9Wg",
+                                      "name": "Branch Icon",
+                                      "width": 12,
+                                      "height": 12,
+                                      "icon": "map-pin",
+                                      "library": "lucide",
+                                      "fill": "$muted"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "zAAW1",
+                                      "name": "Branch Text",
+                                      "fill": "$text",
+                                      "content": "Olaya · Delivery",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "nylYm",
+                                  "name": "Payment Badge",
+                                  "fill": "$danger-tint",
+                                  "cornerRadius": "$rad-pill",
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "nrhLe",
+                                      "name": "Payment Status",
+                                      "fill": "$danger",
+                                      "content": "PENDING ONLINE PAYMENT",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "PXvj5",
+                              "name": "Timestamp",
+                              "fill": "$muted",
+                              "content": "21:12",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "t0MvT",
+                          "name": "Customer Row",
+                          "width": "fill_container",
+                          "gap": 16,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "iZNgr",
+                              "name": "User Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "user",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "lsLQ9",
+                              "name": "Customer Name",
+                              "fill": "$text",
+                              "content": "Abdulrahman Al-Harbi  ·  +966 55 812 3456",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "J3MB7V",
+                          "name": "Items Line",
+                          "fill": "$text",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "2× Spicy Volcano Chicken (Large, extra cheese) · 1× Crispy Fries",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Z1ksME",
+                          "name": "Warning Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "UvQtb",
+                              "name": "Alert Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "triangle-alert",
+                              "library": "lucide",
+                              "fill": "$danger"
+                            },
+                            {
+                              "type": "text",
+                              "id": "TVYJJ",
+                              "name": "Warning Text",
+                              "fill": "$danger",
+                              "content": "Order held from POS until payment is verified",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "QgDAT",
+                          "name": "Action Row",
+                          "gap": 10,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "uKros",
+                              "name": "Re-verify Button",
+                              "fill": "$primary",
+                              "cornerRadius": "$rad-sm",
+                              "padding": [
+                                8,
+                                16
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "VLdek",
+                                  "name": "Btn Label",
+                                  "fill": "$white",
+                                  "content": "Re-verify via Tap",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "iCGcy",
+                              "name": "Set Status Button",
+                              "fill": "$white",
+                              "cornerRadius": "$rad-sm",
+                              "stroke": "$border",
+                              "strokeWidth": 1,
+                              "padding": [
+                                8,
+                                16
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "nL1Ha",
+                                  "name": "Btn Label",
+                                  "fill": "$text",
+                                  "content": "Set status",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "A3jz0",
+                  "name": "Order Card 2",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "fVKti",
+                      "name": "Green Stripe",
+                      "width": 5,
+                      "height": 180,
+                      "fill": "$success"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "GAGdO",
+                      "name": "Card Content",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 12,
+                      "padding": [
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "MUcHr",
+                          "name": "Card Top",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "Mfusw",
+                              "name": "Order Info",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "LvzW5",
+                                  "name": "Order ID",
+                                  "fill": "$ink",
+                                  "content": "SM-2026-004181",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 14,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "zVCvJ",
+                                  "name": "Branch Chip",
+                                  "fill": "$bg",
+                                  "cornerRadius": "$rad-pill",
+                                  "gap": 4,
+                                  "padding": [
+                                    3,
+                                    8
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "id": "fCAyk",
+                                      "name": "Pin Icon",
+                                      "width": 12,
+                                      "height": 12,
+                                      "icon": "map-pin",
+                                      "library": "lucide",
+                                      "fill": "$muted"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "SzFp0",
+                                      "name": "Branch Text",
+                                      "fill": "$text",
+                                      "content": "Nakheel · Pickup",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "XiXkx",
+                                  "name": "POS Chip",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": "$rad-pill",
+                                  "padding": [
+                                    3,
+                                    8
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "ARxJU",
+                                      "name": "POS Text",
+                                      "fill": "$success",
+                                      "content": "POS #5",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "600"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Q9VPq",
+                                  "name": "Paid Badge",
+                                  "fill": "$success-tint",
+                                  "cornerRadius": "$rad-pill",
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "C0U14Z",
+                                      "name": "Paid Text",
+                                      "fill": "$success",
+                                      "content": "PAID",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "YaE44",
+                              "name": "Timestamp",
+                              "fill": "$muted",
+                              "content": "21:08",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "S2qMr6",
+                          "name": "Customer Row",
+                          "width": "fill_container",
+                          "gap": 16,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "vmPSb",
+                              "name": "Customer Info",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "Q2yETe",
+                                  "name": "User Icon",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "user",
+                                  "library": "lucide",
+                                  "fill": "$muted"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "njSUm",
+                                  "name": "Customer Name",
+                                  "fill": "$text",
+                                  "content": "Noura Al-Qahtani  ·  +966 50 443 7890",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "qyjcq",
+                              "name": "Total",
+                              "fill": "$ink",
+                              "content": "SAR 142.50",
+                              "fontFamily": "$font-body",
+                              "fontSize": 14,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "jBy7B",
+                          "name": "Status Row",
+                          "width": "fill_container",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "z8B1zH",
+                              "name": "Received Chip",
+                              "fill": "$success-tint",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "o4oCKg",
+                                  "name": "Received Text",
+                                  "fill": "$success",
+                                  "content": "Received",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "V523Le",
+                              "name": "Preparing Chip",
+                              "fill": "$success",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "moDzf",
+                                  "name": "Preparing Text",
+                                  "fill": "$white",
+                                  "content": "Preparing",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "xbb3d",
+                              "name": "Ready Chip",
+                              "fill": "$bg",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IEdaH",
+                                  "name": "Ready Text",
+                                  "fill": "$muted",
+                                  "content": "Ready",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "WQkI9",
+                              "name": "Out for delivery Chip",
+                              "fill": "$bg",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "f6jAYS",
+                                  "name": "Out for delivery Text",
+                                  "fill": "$muted",
+                                  "content": "Out for delivery",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "lYfHP",
+                              "name": "Delivered Chip",
+                              "fill": "$bg",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Q0eaO",
+                                  "name": "Delivered Text",
+                                  "fill": "$muted",
+                                  "content": "Delivered",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "V1XIph",
+                              "name": "Cancelled Chip",
+                              "fill": "$danger-tint",
+                              "cornerRadius": "$rad-pill",
+                              "padding": [
+                                5,
+                                10
+                              ],
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "H2CwKF",
+                                  "name": "Cancelled Text",
+                                  "fill": "$danger",
+                                  "content": "Cancelled",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 11,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DjCFM",
+                  "name": "Order Card 3",
+                  "clip": true,
+                  "width": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "PJlfc",
+                      "name": "Amber Stripe",
+                      "width": 5,
+                      "height": 140,
+                      "fill": "$warning"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "R3pNw4",
+                      "name": "Card Content",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 12,
+                      "padding": [
+                        16,
+                        20
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "tFo8u",
+                          "name": "Card Top",
+                          "width": "fill_container",
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "MwZD7",
+                              "name": "Order Info",
+                              "gap": 10,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "gPuHQ",
+                                  "name": "Order ID",
+                                  "fill": "$ink",
+                                  "content": "SM-2026-004179",
+                                  "fontFamily": "$font-body",
+                                  "fontSize": 14,
+                                  "fontWeight": "700"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "U07MEv",
+                                  "name": "Branch Chip",
+                                  "fill": "$bg",
+                                  "cornerRadius": "$rad-pill",
+                                  "gap": 4,
+                                  "padding": [
+                                    3,
+                                    8
+                                  ],
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon",
+                                      "id": "x8E2dO",
+                                      "name": "Pin Icon",
+                                      "width": 12,
+                                      "height": 12,
+                                      "icon": "map-pin",
+                                      "library": "lucide",
+                                      "fill": "$muted"
+                                    },
+                                    {
+                                      "type": "text",
+                                      "id": "PhCea",
+                                      "name": "Branch Text",
+                                      "fill": "$text",
+                                      "content": "Malqa · Delivery",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "500"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "L0xc2t",
+                                  "name": "Cash Badge",
+                                  "fill": "$warning-tint",
+                                  "cornerRadius": "$rad-pill",
+                                  "padding": [
+                                    3,
+                                    10
+                                  ],
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "uPaVW",
+                                      "name": "Cash Text",
+                                      "fill": "$warning",
+                                      "content": "CASH PAYMENT REQUIRED",
+                                      "fontFamily": "$font-body",
+                                      "fontSize": 11,
+                                      "fontWeight": "700"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "text",
+                              "id": "KGIZT",
+                              "name": "Timestamp",
+                              "fill": "$muted",
+                              "content": "20:54",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "jToDN",
+                          "name": "Customer Row",
+                          "width": "fill_container",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "a4e9p8",
+                              "name": "User Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "user",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Q3atF",
+                              "name": "Customer Name",
+                              "fill": "$text",
+                              "content": "Khalid Al-Dosari  ·  +966 54 221 6789",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "vwKsc",
+                          "name": "Items Line",
+                          "fill": "$text",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "1× Mixed Grill Platter · 2× Garlic Naan · 1× Mango Lassi",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Yp0M8",
+                          "name": "Warning Row",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "APcRn",
+                              "name": "Warning Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "info",
+                              "library": "lucide",
+                              "fill": "$warning"
+                            },
+                            {
+                              "type": "text",
+                              "id": "hTL2N",
+                              "name": "Warning Text",
+                              "fill": "$warning",
+                              "content": "Branch is not mapped to a POS terminal",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "rpqOi",
+      "x": 4155,
+      "y": -980,
+      "name": "Screen 3 Label",
+      "fill": "$muted",
+      "content": "SCREEN 3 — FINANCIAL REPORTS (ACCOUNTANT ROLE)",
+      "fontFamily": "$font-body",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "qeaJR",
+      "x": 4563,
+      "y": -980,
+      "name": "Financial Reports",
+      "clip": true,
+      "width": 1440,
+      "height": 900,
+      "fill": "$bg",
+      "children": [
+        {
+          "id": "xWYl3",
+          "type": "ref",
+          "ref": "YgURS",
+          "name": "Sidebar",
+          "height": "fill_container",
+          "descendants": {
+            "m5ufAM": {
+              "id": "bvDjR",
+              "type": "ref",
+              "ref": "aDHnR",
+              "name": "Sales Overview",
+              "descendants": {
+                "ZJMTH": {
+                  "icon": "bar-chart-3"
+                },
+                "SRChk": {
+                  "content": "Sales Overview"
+                }
+              }
+            },
+            "JC7Om": {
+              "id": "g9X7Mi",
+              "type": "ref",
+              "ref": "UxAoN",
+              "name": "Financial Reports",
+              "descendants": {
+                "igi7X": {
+                  "icon": "file-text"
+                },
+                "Zk5gv": {
+                  "content": "Financial Reports"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "frame",
+          "id": "C3pTB",
+          "name": "Main Area",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "children": [
+            {
+              "type": "frame",
+              "id": "ihH3G",
+              "name": "Role Warning Bar",
+              "width": "fill_container",
+              "fill": "$warning-tint",
+              "gap": 8,
+              "padding": [
+                10,
+                32
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "kBWbO",
+                  "name": "Shield Icon",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "shield",
+                  "library": "lucide",
+                  "fill": "$warning"
+                },
+                {
+                  "type": "text",
+                  "id": "t7p8pE",
+                  "name": "Warning Text",
+                  "fill": "$warning",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Accountant role — reports and exports are available, write actions are hidden.",
+                  "fontFamily": "$font-body",
+                  "fontSize": 13,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Tc7it",
+              "name": "Content Area",
+              "width": "fill_container",
+              "height": "fill_container",
+              "layout": "vertical",
+              "gap": 20,
+              "padding": [
+                24,
+                32
+              ],
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "M05gx",
+                  "name": "Header Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "BMUVk",
+                      "name": "Header Left",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ty99R",
+                          "name": "Page Title",
+                          "fill": "$ink",
+                          "content": "Financial Reports",
+                          "fontFamily": "$font-body",
+                          "fontSize": 22,
+                          "fontWeight": "800"
+                        },
+                        {
+                          "type": "text",
+                          "id": "frOFa",
+                          "name": "Page Description",
+                          "fill": "$muted",
+                          "content": "Revenue, orders and coupon analytics",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KX69C",
+                      "name": "Header Controls",
+                      "gap": 12,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "W9LBc",
+                          "name": "Branch Dropdown",
+                          "fill": "$white",
+                          "cornerRadius": "$rad-sm",
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Q3TRq",
+                              "name": "Branch Label",
+                              "fill": "$text",
+                              "content": "All branches",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "icon",
+                              "id": "Db1Zb",
+                              "name": "Chevron",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "chevron-down",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "yeg0Z",
+                          "name": "Date Range",
+                          "fill": "$white",
+                          "cornerRadius": "$rad-sm",
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "p7TAP",
+                              "name": "Calendar Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "calendar",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            },
+                            {
+                              "type": "text",
+                              "id": "GkZKe",
+                              "name": "Date Text",
+                              "fill": "$text",
+                              "content": "2026-07-01 → 2026-07-29",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Knb1z",
+                          "name": "Export CSV Button",
+                          "fill": "$primary",
+                          "cornerRadius": "$rad-sm",
+                          "gap": 6,
+                          "padding": [
+                            8,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "vcfUP",
+                              "name": "Download Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "download",
+                              "library": "lucide",
+                              "fill": "$white"
+                            },
+                            {
+                              "type": "text",
+                              "id": "w9v86A",
+                              "name": "Export Label",
+                              "fill": "$white",
+                              "content": "Export CSV",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DpJQl",
+                  "name": "KPI Row",
+                  "width": "fill_container",
+                  "gap": 16,
+                  "children": [
+                    {
+                      "id": "lTKsm",
+                      "type": "ref",
+                      "ref": "C1HVE",
+                      "name": "Filtered Revenue",
+                      "width": "fill_container",
+                      "descendants": {
+                        "kqsYU": {
+                          "content": "Filtered Revenue"
+                        },
+                        "EBP1i": {
+                          "content": "412,880"
+                        },
+                        "aGqb9": {
+                          "content": "Includes 15% VAT",
+                          "fill": "$muted"
+                        }
+                      }
+                    },
+                    {
+                      "id": "oxtEe",
+                      "type": "ref",
+                      "ref": "C1HVE",
+                      "name": "Completed Orders",
+                      "width": "fill_container",
+                      "descendants": {
+                        "kqsYU": {
+                          "content": "Completed Orders"
+                        },
+                        "EBP1i": {
+                          "content": "4,796"
+                        },
+                        "aGqb9": {
+                          "content": "Filtered period",
+                          "fill": "$muted"
+                        }
+                      }
+                    },
+                    {
+                      "id": "umHSv",
+                      "type": "ref",
+                      "ref": "C1HVE",
+                      "name": "Coupon Savings",
+                      "width": "fill_container",
+                      "descendants": {
+                        "kqsYU": {
+                          "content": "Coupon Savings"
+                        },
+                        "EBP1i": {
+                          "content": "18,240"
+                        },
+                        "aGqb9": {
+                          "content": "Applied discounts",
+                          "fill": "$muted"
+                        }
+                      }
+                    },
+                    {
+                      "id": "oUUnW",
+                      "type": "ref",
+                      "ref": "C1HVE",
+                      "name": "Delivery Fees",
+                      "width": "fill_container",
+                      "descendants": {
+                        "kqsYU": {
+                          "content": "Delivery Fees"
+                        },
+                        "EBP1i": {
+                          "content": "29,410"
+                        },
+                        "aGqb9": {
+                          "content": "Collected total",
+                          "fill": "$muted"
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "zPQdd",
+                  "name": "Report Tabs",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "giooG",
+                      "name": "Sales by day Tab",
+                      "fill": "$primary",
+                      "cornerRadius": "$rad-sm",
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "TV7Cz",
+                          "name": "Sales by day Label",
+                          "fill": "$white",
+                          "content": "Sales by day",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "wXxMs",
+                      "name": "By branch Tab",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "W96We",
+                          "name": "By branch Label",
+                          "fill": "$text",
+                          "content": "By branch",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tlsoI",
+                      "name": "By product Tab",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "gXouA",
+                          "name": "By product Label",
+                          "fill": "$text",
+                          "content": "By product",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "hgxy3",
+                      "name": "Coupon usage Tab",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "K8Riuc",
+                          "name": "Coupon usage Label",
+                          "fill": "$text",
+                          "content": "Coupon usage",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "KsZ2c",
+                      "name": "Delivery fees Tab",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "F738Ls",
+                          "name": "Delivery fees Label",
+                          "fill": "$text",
+                          "content": "Delivery fees",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ULEM0",
+                      "name": "POS audit Tab",
+                      "fill": "$white",
+                      "cornerRadius": "$rad-sm",
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        8,
+                        16
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xz0yv",
+                          "name": "POS audit Label",
+                          "fill": "$text",
+                          "content": "POS audit",
+                          "fontFamily": "$font-body",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "vlylP",
+                  "name": "Data Table",
+                  "clip": true,
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "fill": "$white",
+                  "cornerRadius": "$rad-md",
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "xgWkN",
+                      "name": "Table Header",
+                      "width": "fill_container",
+                      "height": 44,
+                      "fill": "$bg-alt",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Fd6OP",
+                          "name": "Calendar Date Header",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "j2cWW8",
+                              "name": "Calendar Date Text",
+                              "fill": "$muted",
+                              "content": "Calendar Date",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ruPfs",
+                          "name": "Orders Header",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "zZ0Yv",
+                              "name": "Orders Text",
+                              "fill": "$muted",
+                              "content": "Orders",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "JHtlb",
+                          "name": "Gross Sales Header",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "T8YZf",
+                              "name": "Gross Sales Text",
+                              "fill": "$muted",
+                              "content": "Gross Sales",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "O0MVZ",
+                          "name": "Discounts Header",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Z5Jmqi",
+                              "name": "Discounts Text",
+                              "fill": "$muted",
+                              "content": "Discounts",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "LWnCM",
+                          "name": "Net Header",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "UwER5",
+                              "name": "Net Text",
+                              "fill": "$muted",
+                              "content": "Net",
+                              "fontFamily": "$font-body",
+                              "fontSize": 12,
+                              "fontWeight": "700"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "AENPH",
+                      "name": "Row 1",
+                      "width": "fill_container",
+                      "height": 48,
+                      "fill": "$white",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "MwRQp",
+                          "name": "Calendar Date Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "c30ty",
+                              "name": "Calendar Date Value",
+                              "fill": "$text",
+                              "content": "Tue, 29 Jul 2026",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "x3j9F",
+                          "name": "Orders Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "G1a4jb",
+                              "name": "Orders Value",
+                              "fill": "$ink",
+                              "content": "187",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "azjLp",
+                          "name": "Gross Sales Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "e9jp7",
+                              "name": "Gross Sales Value",
+                              "fill": "$ink",
+                              "content": "SAR 16,240",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "B8iZFU",
+                          "name": "Discounts Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "q504Q",
+                              "name": "Discounts Value",
+                              "fill": "$ink",
+                              "content": "SAR 820",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "fsvqv",
+                          "name": "Net Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "GbXCA",
+                              "name": "Net Value",
+                              "fill": "$ink",
+                              "content": "SAR 15,420",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "K1aSu",
+                      "name": "Row 2",
+                      "width": "fill_container",
+                      "height": 48,
+                      "fill": "$bg-alt",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "tgKzO",
+                          "name": "Calendar Date Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "pjBJy",
+                              "name": "Calendar Date Value",
+                              "fill": "$text",
+                              "content": "Mon, 28 Jul 2026",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "jICcg",
+                          "name": "Orders Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "a49w6",
+                              "name": "Orders Value",
+                              "fill": "$ink",
+                              "content": "201",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "D9SQ9",
+                          "name": "Gross Sales Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "b6LcqB",
+                              "name": "Gross Sales Value",
+                              "fill": "$ink",
+                              "content": "SAR 17,480",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "E4QAPJ",
+                          "name": "Discounts Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "x7j9Mj",
+                              "name": "Discounts Value",
+                              "fill": "$ink",
+                              "content": "SAR 940",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VrJpM",
+                          "name": "Net Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "J0xHy",
+                              "name": "Net Value",
+                              "fill": "$ink",
+                              "content": "SAR 16,540",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "X8SFw",
+                      "name": "Row 3",
+                      "width": "fill_container",
+                      "height": 48,
+                      "fill": "$white",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "b6hBw",
+                          "name": "Calendar Date Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "i8d1Ez",
+                              "name": "Calendar Date Value",
+                              "fill": "$text",
+                              "content": "Sun, 27 Jul 2026",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "R5jBfg",
+                          "name": "Orders Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "LAeUr",
+                              "name": "Orders Value",
+                              "fill": "$ink",
+                              "content": "168",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "UqJDe",
+                          "name": "Gross Sales Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "uyWC5",
+                              "name": "Gross Sales Value",
+                              "fill": "$ink",
+                              "content": "SAR 14,560",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "BpMCv",
+                          "name": "Discounts Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "driha",
+                              "name": "Discounts Value",
+                              "fill": "$ink",
+                              "content": "SAR 710",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Q8QYgP",
+                          "name": "Net Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "irC4B",
+                              "name": "Net Value",
+                              "fill": "$ink",
+                              "content": "SAR 13,850",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ZuwcC",
+                      "name": "Row 4",
+                      "width": "fill_container",
+                      "height": 48,
+                      "fill": "$bg-alt",
+                      "stroke": "$border",
+                      "strokeWidth": {
+                        "bottom": 1
+                      },
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "V6DP45",
+                          "name": "Calendar Date Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "G6Xa0M",
+                              "name": "Calendar Date Value",
+                              "fill": "$text",
+                              "content": "Sat, 26 Jul 2026",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "k9UPqM",
+                          "name": "Orders Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "iyoDQ",
+                              "name": "Orders Value",
+                              "fill": "$ink",
+                              "content": "224",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "rsfTh",
+                          "name": "Gross Sales Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "qQTpL",
+                              "name": "Gross Sales Value",
+                              "fill": "$ink",
+                              "content": "SAR 19,320",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n5gfgR",
+                          "name": "Discounts Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "nm5W8",
+                              "name": "Discounts Value",
+                              "fill": "$ink",
+                              "content": "SAR 1,060",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Wf04m",
+                          "name": "Net Cell",
+                          "width": "fill_container",
+                          "height": "fill_container",
+                          "padding": [
+                            0,
+                            16
+                          ],
+                          "justifyContent": "end",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "Y1bIR",
+                              "name": "Net Value",
+                              "fill": "$ink",
+                              "content": "SAR 18,260",
+                              "fontFamily": "$font-body",
+                              "fontSize": 13,
+                              "fontWeight": "600"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-light": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "primary-medium": {
+      "type": "color",
+      "value": "#6b5ca5"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "white": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bg-alt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-tint": {
+      "type": "color",
+      "value": "#fef3e0"
+    },
+    "font-body": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "sp-xs": {
+      "type": "number",
+      "value": 4
+    },
+    "sp-sm": {
+      "type": "number",
+      "value": 8
+    },
+    "sp-md": {
+      "type": "number",
+      "value": 12
+    },
+    "sp-lg": {
+      "type": "number",
+      "value": 16
+    },
+    "sp-xl": {
+      "type": "number",
+      "value": 20
+    },
+    "sp-xxl": {
+      "type": "number",
+      "value": 28
+    },
+    "rad-sm": {
+      "type": "number",
+      "value": 8
+    },
+    "rad-md": {
+      "type": "number",
+      "value": 12
+    },
+    "rad-lg": {
+      "type": "number",
+      "value": 16
+    },
+    "rad-pill": {
+      "type": "number",
+      "value": 999
+    }
+  },
+  "fileToken": "ae201aaa-4353-4d3e-8345-2725c8bf16e9"
+}
