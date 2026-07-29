@@ -194,7 +194,7 @@ declare
   v_ws   uuid := gen_random_uuid();   -- synced, patch ref whitespace -> no event
   v_uni  uuid := gen_random_uuid();   -- synced, patch ref NBSP        -> no event
   v_ok   uuid := gen_random_uuid();   -- synced, usable ref            -> one event
-  v_corr uuid := gen_random_uuid();   -- unusable (suppressed) then usable -> event
+  v_corr uuid := gen_random_uuid();   -- unusable (coerced->confirmation_required) then usable -> event
 begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
@@ -231,12 +231,19 @@ begin
   if (select count(*) from public.notification_log where order_id=v_ok and status='pos_confirmed' and send_status='pending') <> 1 then
     raise exception 'CASE 7 FAILED: usable pos_confirmed not exactly one event'; end if;
 
-  -- (5)+(6) an unusable ref leaves NO dedup row, so a LATER unusable->usable
-  --         correction can still create the legitimate confirmation.
+  -- (5)+(6) a synced request with an UNUSABLE ref is coerced to
+  --         'confirmation_required' and emits a 'pos_confirmation_required' event
+  --         (never 'pos_confirmed'), per migration 20260721130000. The
+  --         'pos_confirmed' slot stays free (different status), so a LATER
+  --         unusable->usable correction can still create the legitimate confirmation.
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
-  if (select count(*) from public.notification_log where order_id=v_corr and kind='pos_sync') <> 0 then
-    raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking row'; end if;
+  if (select lazywait_sync_state from public.orders where id=v_corr) <> 'confirmation_required' then
+    raise exception 'CASE 7 FAILED: unusable ref not coerced to confirmation_required'; end if;
+  if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed') <> 0 then
+    raise exception 'CASE 7 FAILED: pos_confirmed enqueued for unusable ref'; end if;
+  if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmation_required') <> 1 then
+    raise exception 'CASE 7 FAILED: unusable ref did not emit pos_confirmation_required'; end if;
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref','REF-FIXED'),'success','push',null,null,null,'pos_confirmed');
   if (select count(*) from public.notification_log where order_id=v_corr and status='pos_confirmed' and send_status='pending') <> 1 then
