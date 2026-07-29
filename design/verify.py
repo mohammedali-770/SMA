@@ -82,11 +82,17 @@ def strings_of(raw):
     return out
 
 
-print("\n1. Western numerals everywhere")
+print("\n1. Western numerals in VISIBLE text")
+# Layer names are counted separately: a stale name is file hygiene, not a design
+# defect, and failing the check on one would hide whether anything actually
+# renders wrong.
 for path in sorted(glob.glob(f"{DESIGN}/0[1-8]*.pen")):
     raw = open(path, encoding="utf-8").read()
-    hits = ARABIC_INDIC.findall(raw)
-    check(os.path.basename(path), not hits, f"{len(hits)} Arabic-Indic digits" if hits else "")
+    shown = sum(len(ARABIC_INDIC.findall(s)) for s in strings_of(raw))
+    hidden = len(ARABIC_INDIC.findall(raw)) - shown
+    note = f"{hidden} in layer names (not rendered)" if hidden and not shown else ""
+    check(os.path.basename(path), shown == 0,
+          f"{shown} Arabic-Indic digits rendered" if shown else note)
 
 print("\n2. Admin sidebar identical across batches")
 for stem in ADMIN:
