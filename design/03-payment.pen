@@ -1,0 +1,3643 @@
+{
+  "version": "2.14",
+  "children": [
+    {
+      "type": "frame",
+      "id": "jopvd",
+      "x": 0,
+      "y": 0,
+      "name": "Status Bar",
+      "reusable": true,
+      "width": 200,
+      "height": 62,
+      "fill": "$surface",
+      "padding": [
+        38,
+        24,
+        0,
+        24
+      ],
+      "justifyContent": "space_between",
+      "alignItems": "center",
+      "children": [
+        {
+          "type": "text",
+          "id": "Bj8Eg",
+          "name": "Time",
+          "fill": "$ink",
+          "content": "9:41",
+          "fontFamily": "$font-en",
+          "fontSize": 15,
+          "fontWeight": "600"
+        },
+        {
+          "type": "frame",
+          "id": "cwuq7",
+          "name": "Right Icons",
+          "gap": 6,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "uuIOQ",
+              "name": "Signal",
+              "width": 16,
+              "height": 16,
+              "icon": "signal_cellular_alt",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "vdgyp",
+              "name": "Wifi",
+              "width": 16,
+              "height": 16,
+              "icon": "wifi",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            },
+            {
+              "type": "icon",
+              "id": "Rmshn",
+              "name": "Battery",
+              "width": 16,
+              "height": 16,
+              "icon": "battery_full",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "lc9X7",
+      "x": 280,
+      "y": -36,
+      "name": "Screen 1 Label",
+      "fill": "$muted",
+      "content": "1 · Checkout — Complete",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "HK4BK",
+      "x": 280,
+      "y": 0,
+      "name": "Checkout Complete",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "F10DcL",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "H0cA2",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "$surface",
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "JLAjh",
+              "name": "Back Arrow",
+              "width": 24,
+              "height": 24,
+              "icon": "arrow_forward",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            },
+            {
+              "type": "text",
+              "id": "KktQq",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "إتمام الطلب",
+              "fontFamily": "$font-ar",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "kJfQT",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "nDA1K",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "gcCPr",
+              "name": "Order Type Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "CccuC",
+                  "name": "Delivery Chip",
+                  "fill": "$primary-light",
+                  "cornerRadius": 999,
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "qU2q2",
+                      "name": "Chip Inner",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "hLgDq",
+                          "name": "Delivery Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "moped",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "yFMNZ",
+                          "name": "Delivery Label",
+                          "fill": "$primary",
+                          "content": "توصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "O1HdF",
+                  "name": "Section Label",
+                  "fill": "$text",
+                  "content": "نوع الطلب",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Kd52y",
+              "name": "Location Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "lRpdV",
+                  "name": "Change Btn",
+                  "fill": "$primary",
+                  "content": "تغيير",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "dlbJx",
+                  "name": "Location Info",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "qU9Gn",
+                      "name": "Loc Section Label",
+                      "fill": "$text",
+                      "content": "موقع التوصيل",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CkeVj",
+                      "name": "Address",
+                      "fill": "$muted",
+                      "content": "المنزل · بجانب بقالة السلام",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FXrua",
+              "name": "Payment Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "v7ct89",
+                  "name": "Pay Label",
+                  "fill": "$text",
+                  "content": "طريقة الدفع",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "vY7X1",
+                  "name": "Segment Row",
+                  "width": "fill_container",
+                  "height": 44,
+                  "fill": "#eae6f3",
+                  "cornerRadius": 10,
+                  "gap": 3,
+                  "padding": 3,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "nGh7r",
+                      "name": "Cash Option",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Z37sV",
+                          "name": "Cash Label",
+                          "fill": "$muted",
+                          "content": "نقداً عند التوصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gwJk3",
+                      "name": "Electronic Option",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 8,
+                      "effect": {
+                        "type": "shadow",
+                        "shadowType": "outer",
+                        "color": "#00000015",
+                        "offset": {
+                          "x": 0,
+                          "y": 1
+                        },
+                        "blur": 3
+                      },
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "FpBJ4",
+                          "name": "Electronic Label",
+                          "fill": "$primary",
+                          "content": "الدفع الإلكتروني",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "SWkSz",
+              "name": "Promo Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "q4B7c",
+                  "name": "Promo Label",
+                  "fill": "$text",
+                  "content": "كود الخصم",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "O5Dod",
+                  "name": "Promo Row",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "HZ9GN",
+                      "name": "Apply Btn",
+                      "fill": "$primary",
+                      "cornerRadius": 8,
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "ZYeaf",
+                          "name": "Apply Text",
+                          "fill": "$on-primary",
+                          "content": "تطبيق",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "PGrZn",
+                      "name": "Promo Input",
+                      "width": "fill_container",
+                      "height": 42,
+                      "cornerRadius": 8,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "rFVbC",
+                          "name": "Promo Value",
+                          "fill": "$text",
+                          "content": "SPICY20",
+                          "fontFamily": "$font-en",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "BXpsW",
+                  "name": "Promo Success",
+                  "gap": 6,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "lW7tH",
+                      "name": "Success Text",
+                      "fill": "$success",
+                      "content": "تم تطبيق الخصم!",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "aZp1H",
+                      "name": "Check Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "check_circle",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$success"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "kZTcA",
+              "name": "Loyalty Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "zFwO3",
+                  "name": "Toggle",
+                  "width": 44,
+                  "height": 26,
+                  "fill": "$primary",
+                  "cornerRadius": 999,
+                  "padding": 3,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "i7Clv",
+                      "name": "Toggle Knob",
+                      "fill": "$on-primary",
+                      "width": 20,
+                      "height": 20
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "uJboL",
+                  "name": "Loyalty Info",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "EZ0Yt",
+                      "name": "Loyalty Label",
+                      "fill": "$text",
+                      "content": "استبدال نقاط الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "L6iJ1",
+                      "name": "Points Available",
+                      "fill": "$muted",
+                      "content": "240 نقطة متاحة",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "DPeNx",
+              "name": "Kitchen Notes Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "K3J38h",
+                  "name": "Notes Label",
+                  "fill": "$text",
+                  "content": "ملاحظات للمطبخ",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "odjaR",
+                  "name": "Notes Input",
+                  "width": "fill_container",
+                  "height": 72,
+                  "cornerRadius": 8,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "padding": 12,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "O1Pfx",
+                      "name": "Notes Placeholder",
+                      "fill": "$disabled",
+                      "content": "مثال: بدون بصل، حار جداً...",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "GupmE",
+              "name": "Totals Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "V6ZhPj",
+                  "name": "المجموع الفرعي",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "vMZiA",
+                      "name": "Value",
+                      "fill": "$text",
+                      "content": "78.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "orsHD",
+                      "name": "Label",
+                      "fill": "$text",
+                      "content": "المجموع الفرعي",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "gd1DU",
+                  "name": "رسوم التوصيل",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "V0K7Vp",
+                      "name": "Value",
+                      "fill": "$text",
+                      "content": "10.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "H9KE6G",
+                      "name": "Label",
+                      "fill": "$text",
+                      "content": "رسوم التوصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "R9SKs",
+                  "name": "خصم الحملة (20٪)",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "iiCQx",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "15.60- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "UY4dR",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الحملة (20٪)",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "MfSIJ",
+                  "name": "خصم الولاء",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YC2Ij",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "5.00- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jabVe",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Hzfug",
+                  "name": "ضريبة القيمة المضافة (١٥٪ شاملة)",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "uPkrG",
+                      "name": "Value",
+                      "fill": "$muted",
+                      "content": "8.79 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "PMHfz",
+                      "name": "Label",
+                      "fill": "$muted",
+                      "content": "ضريبة القيمة المضافة (١٥٪ شاملة)",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "nHvOS",
+                  "name": "Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "uKzyX",
+                  "name": "Total Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "hQn7S",
+                      "name": "Total Value",
+                      "fill": "$ink",
+                      "content": "67.40 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 18,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "kZLDS",
+                      "name": "Total Label",
+                      "fill": "$ink",
+                      "content": "الإجمالي",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "dvB5f",
+          "name": "Sticky Footer",
+          "width": "fill_container",
+          "fill": "$surface",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#1c163012",
+            "offset": {
+              "x": 0,
+              "y": -2
+            },
+            "blur": 8
+          },
+          "layout": "vertical",
+          "padding": [
+            12,
+            16,
+            32,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "qwd8l",
+              "name": "Confirm Button",
+              "width": "fill_container",
+              "height": 52,
+              "fill": "$primary",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Zy58w",
+                  "name": "Confirm Text",
+                  "fill": "$on-primary",
+                  "content": "تأكيد وإرسال الطلب",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 17,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "p6ZC2",
+      "x": 750,
+      "y": -36,
+      "name": "Screen 2 Label",
+      "fill": "$muted",
+      "content": "2 · Checkout — Blocked",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "hE0v1",
+      "x": 750,
+      "y": 0,
+      "name": "Checkout Blocked",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "qdzTT",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "BzTpP",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "$surface",
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "WOkIl",
+              "name": "Back Arrow",
+              "width": 24,
+              "height": 24,
+              "icon": "arrow_forward",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            },
+            {
+              "type": "text",
+              "id": "V4mkce",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "إتمام الطلب",
+              "fontFamily": "$font-ar",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "PIYKR",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "tZymU",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "anBeq",
+              "name": "Warning Notice",
+              "width": "fill_container",
+              "fill": "$warning-tint",
+              "cornerRadius": 10,
+              "stroke": "#c47f1730",
+              "strokeWidth": 1,
+              "gap": 10,
+              "padding": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "hYS2k",
+                  "name": "Warn Icon",
+                  "width": 20,
+                  "height": 20,
+                  "icon": "warning",
+                  "library": "Material Symbols Rounded",
+                  "fill": "$warning"
+                },
+                {
+                  "type": "text",
+                  "id": "Fxklu",
+                  "name": "Warn Text",
+                  "fill": "#7a5a0b",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "الطلب أقل من الحد الأدنى للتوصيل. يلزم إضافة 7.00 ر.س إضافية.",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "AyBBS",
+              "name": "Order Type Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "GA7Xm",
+                  "name": "Delivery Chip",
+                  "fill": "$primary-light",
+                  "cornerRadius": 999,
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "b6bjR",
+                      "name": "Chip Inner",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "D40IC6",
+                          "name": "Delivery Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "moped",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "cja2J",
+                          "name": "Delivery Label",
+                          "fill": "$primary",
+                          "content": "توصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "G57o9",
+                  "name": "Section Label",
+                  "fill": "$text",
+                  "content": "نوع الطلب",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "jh9LH",
+              "name": "Location Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "I27A6",
+                  "name": "Change Btn",
+                  "fill": "$primary",
+                  "content": "تغيير",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "i4fWBb",
+                  "name": "Location Info",
+                  "layout": "vertical",
+                  "gap": 4,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "QUfvg",
+                      "name": "Loc Section Label",
+                      "fill": "$text",
+                      "content": "موقع التوصيل",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "k2cCEX",
+                      "name": "Address",
+                      "fill": "$muted",
+                      "content": "المنزل · بجانب بقالة السلام",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "vW6Nv",
+              "name": "Payment Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "gdLpz",
+                  "name": "Pay Label",
+                  "fill": "$text",
+                  "content": "طريقة الدفع",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "xe7Mm",
+                  "name": "Segment Row",
+                  "width": "fill_container",
+                  "height": 44,
+                  "fill": "#eae6f3",
+                  "cornerRadius": 10,
+                  "gap": 3,
+                  "padding": 3,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AdlGA",
+                      "name": "Cash Option",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "cornerRadius": 8,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "jhbTm",
+                          "name": "Cash Label",
+                          "fill": "$muted",
+                          "content": "نقداً عند التوصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "z62Zm",
+                      "name": "Electronic Option",
+                      "width": "fill_container",
+                      "height": "fill_container",
+                      "fill": "$surface",
+                      "cornerRadius": 8,
+                      "effect": {
+                        "type": "shadow",
+                        "shadowType": "outer",
+                        "color": "#00000015",
+                        "offset": {
+                          "x": 0,
+                          "y": 1
+                        },
+                        "blur": 3
+                      },
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "BYon6",
+                          "name": "Electronic Label",
+                          "fill": "$primary",
+                          "content": "الدفع الإلكتروني",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "T4d6aW",
+                  "name": "Payment Error",
+                  "width": "fill_container",
+                  "fill": "$danger-tint",
+                  "cornerRadius": 8,
+                  "gap": 8,
+                  "padding": 10,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "VsR21",
+                      "name": "Error Icon",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "error",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$danger"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ZTLVI",
+                      "name": "Error Text",
+                      "fill": "$danger",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "الدفع الإلكتروني غير متاح حالياً. الدفع نقداً متاح.",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "uwV7N",
+              "name": "Promo Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "NGomr",
+                  "name": "Promo Label",
+                  "fill": "$text",
+                  "content": "كود الخصم",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "W5Z0M",
+                  "name": "Promo Row",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "UaCO0",
+                      "name": "Apply Btn",
+                      "fill": "$primary",
+                      "cornerRadius": 8,
+                      "padding": [
+                        10,
+                        16
+                      ],
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "m10PAk",
+                          "name": "Apply Text",
+                          "fill": "$on-primary",
+                          "content": "تطبيق",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "UuUxc",
+                      "name": "Promo Input",
+                      "width": "fill_container",
+                      "height": 42,
+                      "cornerRadius": 8,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "padding": [
+                        0,
+                        12
+                      ],
+                      "justifyContent": "end",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kwZT4",
+                          "name": "Promo Value",
+                          "fill": "$text",
+                          "content": "SPICY20",
+                          "fontFamily": "$font-en",
+                          "fontSize": 14,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "tX1Mu",
+                  "name": "Promo Success",
+                  "gap": 6,
+                  "justifyContent": "end",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "yYvTQ",
+                      "name": "Success Text",
+                      "fill": "$success",
+                      "content": "تم تطبيق الخصم!",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "m5tcZN",
+                      "name": "Check Icon",
+                      "width": 16,
+                      "height": 16,
+                      "icon": "check_circle",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$success"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UuIE2",
+              "name": "Loyalty Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "padding": 16,
+              "justifyContent": "space_between",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "V7NRb",
+                  "name": "Toggle",
+                  "width": 44,
+                  "height": 26,
+                  "fill": "$primary",
+                  "cornerRadius": 999,
+                  "padding": 3,
+                  "justifyContent": "end",
+                  "children": [
+                    {
+                      "type": "ellipse",
+                      "id": "zVJky",
+                      "name": "Toggle Knob",
+                      "fill": "$on-primary",
+                      "width": 20,
+                      "height": 20
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "n6Pomi",
+                  "name": "Loyalty Info",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "rcZ4D",
+                      "name": "Loyalty Label",
+                      "fill": "$text",
+                      "content": "استبدال نقاط الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "BF0cu",
+                      "name": "Points Available",
+                      "fill": "$muted",
+                      "content": "240 نقطة متاحة",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "uF585",
+              "name": "Kitchen Notes Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "aoVPo",
+                  "name": "Notes Label",
+                  "fill": "$text",
+                  "content": "ملاحظات للمطبخ",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "k14ae",
+                  "name": "Notes Input",
+                  "width": "fill_container",
+                  "height": 72,
+                  "cornerRadius": 8,
+                  "stroke": "$border",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "padding": 12,
+                  "alignItems": "end",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "T8U1HL",
+                      "name": "Notes Placeholder",
+                      "fill": "$disabled",
+                      "content": "مثال: بدون بصل، حار جداً...",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "QOV0x",
+              "name": "Totals Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "g3uqT",
+                  "name": "المجموع الفرعي",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "P4Jff",
+                      "name": "Value",
+                      "fill": "$text",
+                      "content": "78.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "iMTmf",
+                      "name": "Label",
+                      "fill": "$text",
+                      "content": "المجموع الفرعي",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GYlYN",
+                  "name": "رسوم التوصيل",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Xhywh",
+                      "name": "Value",
+                      "fill": "$text",
+                      "content": "10.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "M0wWnV",
+                      "name": "Label",
+                      "fill": "$text",
+                      "content": "رسوم التوصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GKZj1",
+                  "name": "خصم الحملة (20٪)",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "kogDU",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "15.60- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "lPYOX",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الحملة (20٪)",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "k77VnT",
+                  "name": "خصم الولاء",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "E6wf6H",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "5.00- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "XqDpQ",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "F5Ch3H",
+                  "name": "ضريبة القيمة المضافة (١٥٪ شاملة)",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "nSg0f",
+                      "name": "Value",
+                      "fill": "$muted",
+                      "content": "8.79 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "d2bEtt",
+                      "name": "Label",
+                      "fill": "$muted",
+                      "content": "ضريبة القيمة المضافة (١٥٪ شاملة)",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "T8gUe",
+                  "name": "Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "lYAI4",
+                  "name": "Total Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "OHE79",
+                      "name": "Total Value",
+                      "fill": "$ink",
+                      "content": "67.40 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 18,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "A9YddU",
+                      "name": "Total Label",
+                      "fill": "$ink",
+                      "content": "الإجمالي",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JgKbD",
+          "name": "Sticky Footer",
+          "width": "fill_container",
+          "fill": "$surface",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#1c163012",
+            "offset": {
+              "x": 0,
+              "y": -2
+            },
+            "blur": 8
+          },
+          "layout": "vertical",
+          "padding": [
+            12,
+            16,
+            32,
+            16
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "Wrj4K",
+              "name": "Blocker Reason",
+              "fill": "$warning",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "الطلب أقل من الحد الأدنى للتوصيل",
+              "textAlign": "center",
+              "fontFamily": "$font-ar",
+              "fontSize": 12,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "YlJEu",
+              "name": "Confirm Button",
+              "width": "fill_container",
+              "height": 52,
+              "fill": "$disabled-bg",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "rL3Rb",
+                  "name": "Confirm Text",
+                  "fill": "$disabled",
+                  "content": "تأكيد وإرسال الطلب",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 17,
+                  "fontWeight": "700"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "aJKsS",
+      "x": 1220,
+      "y": -36,
+      "name": "Screen 3 Label",
+      "fill": "$muted",
+      "content": "3 · Secure Payment",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "B0Yry",
+      "x": 1220,
+      "y": 0,
+      "name": "Secure Payment",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "G0gX1",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "U61hc",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "$surface",
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "v58f04",
+              "name": "Spacer",
+              "width": 24,
+              "height": 24
+            },
+            {
+              "type": "text",
+              "id": "Ca9jZ",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "الدفع الآمن",
+              "fontFamily": "$font-ar",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "icon",
+              "id": "E2dTxR",
+              "name": "Close",
+              "width": 24,
+              "height": 24,
+              "icon": "close",
+              "library": "Material Symbols Rounded",
+              "fill": "$ink"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "DPRAz",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "T6oHxM",
+              "name": "Secure Notice",
+              "width": "fill_container",
+              "fill": "$success-tint",
+              "cornerRadius": 10,
+              "gap": 8,
+              "padding": 12,
+              "justifyContent": "end",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "yaA6n",
+                  "name": "Secure Text",
+                  "fill": "#15803d",
+                  "content": "اتصال مشفّر وآمن",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 12,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "icon",
+                  "id": "H9dal",
+                  "name": "Lock Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "lock",
+                  "library": "Material Symbols Rounded",
+                  "fill": "$success"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Hxe7A",
+              "name": "Payment Form",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 16,
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#1c163010",
+                "offset": {
+                  "x": 0,
+                  "y": 2
+                },
+                "blur": 12
+              },
+              "layout": "vertical",
+              "gap": 20,
+              "padding": 24,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "hl6km",
+                  "name": "Amount Label",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "المبلغ المطلوب",
+                  "textAlign": "center",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "jroCr",
+                  "name": "Amount Value",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "67.40 SAR",
+                  "textAlign": "center",
+                  "fontFamily": "$font-en",
+                  "fontSize": 32,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "frame",
+                  "id": "wII7M",
+                  "name": "Form Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "JPyn0",
+                  "name": "Card Number Field",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "UkgZU",
+                      "name": "Card Label",
+                      "fill": "$muted",
+                      "content": "رقم البطاقة",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ucntl",
+                      "name": "Card Input",
+                      "width": "fill_container",
+                      "height": 48,
+                      "fill": "$bg-alt",
+                      "cornerRadius": 10,
+                      "stroke": "$border",
+                      "strokeWidth": 1.5,
+                      "padding": [
+                        0,
+                        14
+                      ],
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "f83V5B",
+                          "name": "Card Icon",
+                          "width": 20,
+                          "height": 20,
+                          "icon": "credit_card",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$disabled"
+                        },
+                        {
+                          "type": "text",
+                          "id": "J2wbC",
+                          "name": "Card Placeholder",
+                          "fill": "$disabled",
+                          "content": "0000  0000  0000  0000",
+                          "fontFamily": "$font-en",
+                          "fontSize": 15,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "stIGb",
+                  "name": "Exp CVV Row",
+                  "width": "fill_container",
+                  "gap": 12,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "ZXxDV",
+                      "name": "Expiry Field",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "kBzi7",
+                          "name": "Exp Label",
+                          "fill": "$muted",
+                          "content": "تاريخ الانتهاء",
+                          "textAlign": "right",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "HqeZH",
+                          "name": "Exp Input",
+                          "width": "fill_container",
+                          "height": 48,
+                          "fill": "$bg-alt",
+                          "cornerRadius": 10,
+                          "stroke": "$border",
+                          "strokeWidth": 1.5,
+                          "padding": [
+                            0,
+                            14
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "LiUbY",
+                              "name": "Exp Placeholder",
+                              "fill": "$disabled",
+                              "content": "MM / YY",
+                              "fontFamily": "$font-en",
+                              "fontSize": 15,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "HoBPs",
+                      "name": "CVV Field",
+                      "width": 120,
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "wGe8i",
+                          "name": "CVV Label",
+                          "fill": "$muted",
+                          "content": "CVV",
+                          "textAlign": "right",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "n7z7MU",
+                          "name": "CVV Input",
+                          "width": "fill_container",
+                          "height": 48,
+                          "fill": "$bg-alt",
+                          "cornerRadius": 10,
+                          "stroke": "$border",
+                          "strokeWidth": 1.5,
+                          "padding": [
+                            0,
+                            14
+                          ],
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "ZtvBK",
+                              "name": "CVV Icon",
+                              "width": 18,
+                              "height": 18,
+                              "icon": "lock",
+                              "library": "Material Symbols Rounded",
+                              "fill": "$disabled"
+                            },
+                            {
+                              "type": "text",
+                              "id": "MvEOM",
+                              "name": "CVV Placeholder",
+                              "fill": "$disabled",
+                              "content": "•••",
+                              "fontFamily": "$font-en",
+                              "fontSize": 15,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "oOSeP",
+                  "name": "Pay Button",
+                  "width": "fill_container",
+                  "height": 52,
+                  "fill": "$primary",
+                  "cornerRadius": 12,
+                  "gap": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fpE4S",
+                      "name": "Pay Text",
+                      "fill": "$on-primary",
+                      "content": "ادفع الآن",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "YjV9Z",
+                      "name": "Pay Lock",
+                      "width": 18,
+                      "height": 18,
+                      "icon": "lock",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$on-primary"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "c7zBEE",
+              "name": "Provider Note",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "هذه الصفحة مستضافة من مزوّد الدفع داخل التطبيق. بيانات بطاقتك لا تمر عبر خوادمنا.",
+              "textAlign": "center",
+              "fontFamily": "$font-ar",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "R9JBW",
+      "x": 1690,
+      "y": -36,
+      "name": "Screen 4 Label",
+      "fill": "$muted",
+      "content": "4 · Payment Verification",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "OSkMF",
+      "x": 1690,
+      "y": 0,
+      "name": "Payment Verification",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "f1UXS",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "P6DRV",
+          "name": "Center Content",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 20,
+          "padding": [
+            0,
+            40
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "Fp6yL",
+              "name": "Spinner Ring",
+              "fill": "#00000000",
+              "width": 72,
+              "height": 72,
+              "stroke": {
+                "type": "gradient",
+                "gradientType": "angular",
+                "enabled": true,
+                "rotation": 0,
+                "size": {
+                  "width": 1,
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$primary",
+                    "position": 0
+                  },
+                  {
+                    "color": "#422e8700",
+                    "position": 0.75
+                  }
+                ]
+              },
+              "strokeWidth": 4,
+              "strokeAlignment": "inner"
+            },
+            {
+              "type": "text",
+              "id": "S4ymj",
+              "name": "Verify Heading",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "جارٍ التحقق من الدفع…",
+              "textAlign": "center",
+              "fontFamily": "$font-ar",
+              "fontSize": 20,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "x0hDEr",
+              "name": "Verify Sub",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "يرجى عدم إغلاق التطبيق أثناء التحقق",
+              "textAlign": "center",
+              "fontFamily": "$font-ar",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "qh8hu",
+              "name": "Progress Bar BG",
+              "width": 200,
+              "height": 4,
+              "fill": "$border",
+              "cornerRadius": 999,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "t7Ut1Y",
+                  "name": "Progress Fill",
+                  "width": 130,
+                  "height": "fill_container",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 90,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "#6b4ecf",
+                        "position": 0
+                      },
+                      {
+                        "color": "$primary",
+                        "position": 1
+                      }
+                    ]
+                  },
+                  "cornerRadius": 999
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "y1FOb6",
+              "name": "Server Note",
+              "fill": "$disabled",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "يتم تأكيد الدفع من الخادم، وليس من هذه الصفحة.",
+              "textAlign": "center",
+              "fontFamily": "$font-ar",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "LvsSD",
+      "x": 2160,
+      "y": -36,
+      "name": "Screen 5 Label",
+      "fill": "$muted",
+      "content": "5 · Receipt — Confirmed",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "b3LWV",
+      "x": 2160,
+      "y": 0,
+      "name": "Receipt Confirmed",
+      "clip": true,
+      "width": 390,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "qalQ9",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "J7aLx",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "$surface",
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "qgRD9",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "تفاصيل الطلب",
+              "fontFamily": "$font-ar",
+              "fontSize": 18,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "gEwf0",
+          "name": "Content",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "hNNkK",
+              "name": "Confirmation Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 12,
+              "padding": 28,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "ellipse",
+                  "id": "E5fE7g",
+                  "name": "Check Circle",
+                  "fill": "$success-tint",
+                  "width": 56,
+                  "height": 56
+                },
+                {
+                  "type": "icon",
+                  "id": "Srv9z",
+                  "layoutPosition": "absolute",
+                  "x": 14,
+                  "y": 14,
+                  "name": "Check Mark",
+                  "width": 28,
+                  "height": 28,
+                  "icon": "check",
+                  "library": "Material Symbols Rounded",
+                  "fill": "$success"
+                },
+                {
+                  "type": "text",
+                  "id": "Hja0s",
+                  "name": "Confirmed Title",
+                  "fill": "$ink",
+                  "content": "تم تأكيد الطلب",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 20,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "JSuhV",
+                  "name": "Confirmed Sub",
+                  "fill": "$muted",
+                  "content": "قام الفرع بتأكيد طلبك.",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "fla1I",
+                  "name": "Card Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "text",
+                  "id": "WxbZ1",
+                  "name": "Branch Order Label",
+                  "fill": "$muted",
+                  "content": "رقم الطلب لدى الفرع",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "Bpkdf",
+                  "name": "Branch Order Number",
+                  "fill": "$primary",
+                  "content": "#5",
+                  "fontFamily": "$font-en",
+                  "fontSize": 48,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "WZJd8",
+              "name": "Details Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "au4sE",
+                  "name": "Payment Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "BI0oL",
+                      "name": "Paid Chip",
+                      "fill": "$success-tint",
+                      "cornerRadius": 999,
+                      "gap": 4,
+                      "padding": [
+                        4,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XTNdb",
+                          "name": "Paid Text",
+                          "fill": "$success",
+                          "content": "مدفوع",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "ECPj3",
+                          "name": "Paid Icon",
+                          "width": 14,
+                          "height": 14,
+                          "icon": "check_circle",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$success"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "tfefG",
+                      "name": "Pay Detail Label",
+                      "fill": "$muted",
+                      "content": "الدفع",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "JNNHt",
+                  "name": "Branch Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "eYf0o",
+                      "name": "Branch Value",
+                      "fill": "$text",
+                      "content": "فرع الرياض — العليا",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "F03h4",
+                      "name": "Branch Label",
+                      "fill": "$muted",
+                      "content": "الفرع",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "zZxjM",
+                  "name": "Time Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Wt1MQ",
+                      "name": "Time Value",
+                      "fill": "$text",
+                      "content": "2026-07-29  14:32",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "G5Iph",
+                      "name": "Time Label",
+                      "fill": "$muted",
+                      "content": "الوقت",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Muqck",
+              "name": "Order Summary Card",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "ub0HA",
+                  "name": "Summary Title",
+                  "fill": "$ink",
+                  "content": "ملخص الطلب",
+                  "textAlign": "right",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "b0Upej",
+                  "name": "دجاج مشوي حار × 2",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "yXA9s",
+                      "name": "Price",
+                      "fill": "$text",
+                      "content": "40.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fAjzH",
+                      "name": "Item",
+                      "fill": "$text",
+                      "content": "دجاج مشوي حار × 2",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "wTNoU",
+                  "name": "برجر لحم كلاسيكي × 1",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "F7IaaW",
+                      "name": "Price",
+                      "fill": "$text",
+                      "content": "28.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "k9VnRg",
+                      "name": "Item",
+                      "fill": "$text",
+                      "content": "برجر لحم كلاسيكي × 1",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "xx2XQ",
+                  "name": "بطاطس مقلية × 1",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "DEpDH",
+                      "name": "Price",
+                      "fill": "$text",
+                      "content": "10.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "JJv5B",
+                      "name": "Item",
+                      "fill": "$text",
+                      "content": "بطاطس مقلية × 1",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "Yjlum",
+                  "name": "Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "tdtLc",
+                  "name": "رسوم التوصيل",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "JCaxQ",
+                      "name": "Value",
+                      "fill": "$text",
+                      "content": "10.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "F2kba4",
+                      "name": "Label",
+                      "fill": "$text",
+                      "content": "رسوم التوصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DQDqq",
+                  "name": "خصم الحملة (20٪)",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "YaR7F",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "15.60- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "TSflX",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الحملة (20٪)",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "w9dWOF",
+                  "name": "خصم الولاء",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "XiGjg",
+                      "name": "Value",
+                      "fill": "$success",
+                      "content": "5.00- ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "psqYy",
+                      "name": "Label",
+                      "fill": "$success",
+                      "content": "خصم الولاء",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "x3HSqX",
+                  "name": "Divider 2",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "hFNIa",
+                  "name": "Total",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "JgVYJ",
+                      "name": "Total Value",
+                      "fill": "$ink",
+                      "content": "67.40 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 16,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "G5oAR",
+                      "name": "Total Label",
+                      "fill": "$ink",
+                      "content": "الإجمالي",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 15,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "TKdki",
+          "name": "Sticky Footer",
+          "width": "fill_container",
+          "fill": "$surface",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#1c163012",
+            "offset": {
+              "x": 0,
+              "y": -2
+            },
+            "blur": 8
+          },
+          "gap": 12,
+          "padding": [
+            12,
+            16,
+            32,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "R7yYx",
+              "name": "Menu Button",
+              "width": "fill_container",
+              "height": 48,
+              "fill": "$primary",
+              "cornerRadius": 12,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Enxgl",
+                  "name": "Menu Text",
+                  "fill": "$on-primary",
+                  "content": "القائمة",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "fcbrq",
+              "name": "Orders Button",
+              "width": "fill_container",
+              "height": 48,
+              "cornerRadius": 12,
+              "stroke": "$primary",
+              "strokeWidth": 1.5,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "iRL09",
+                  "name": "Orders Text",
+                  "fill": "$primary",
+                  "content": "طلباتي",
+                  "fontFamily": "$font-ar",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "XUc5r",
+      "x": 2630,
+      "y": -36,
+      "name": "Screen 6 Label",
+      "fill": "$muted",
+      "content": "6 · My Orders",
+      "fontFamily": "$font-en",
+      "fontSize": 14,
+      "fontWeight": "600"
+    },
+    {
+      "type": "frame",
+      "id": "a6XdM",
+      "x": 2630,
+      "y": 0,
+      "name": "My Orders",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$bg",
+      "layout": "vertical",
+      "children": [
+        {
+          "id": "AuOtM",
+          "type": "ref",
+          "ref": "jopvd",
+          "name": "Status Bar",
+          "width": "fill_container"
+        },
+        {
+          "type": "frame",
+          "id": "cI4Dj",
+          "name": "Header",
+          "width": "fill_container",
+          "height": 56,
+          "fill": "$surface",
+          "padding": [
+            0,
+            16
+          ],
+          "justifyContent": "center",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "B8Tig",
+              "name": "Title",
+              "fill": "$ink",
+              "content": "طلباتي",
+              "fontFamily": "$font-ar",
+              "fontSize": 18,
+              "fontWeight": "700"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "E3yXi",
+          "name": "Content",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 16,
+          "children": [
+            {
+              "type": "frame",
+              "id": "c6TXUw",
+              "name": "Order Card قيد التحضير",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "k1vpj",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "oLDFX",
+                      "name": "Time",
+                      "fill": "$muted",
+                      "content": "اليوم  14:32",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "xKnp7",
+                      "name": "Status Pill",
+                      "fill": "$warning-tint",
+                      "cornerRadius": 999,
+                      "gap": 4,
+                      "padding": [
+                        4,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xgVGI",
+                          "name": "Status Text",
+                          "fill": "$warning",
+                          "content": "قيد التحضير",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "J6fC1V",
+                  "name": "Mid Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "o7BTfB",
+                      "name": "Type",
+                      "fill": "$muted",
+                      "content": "توصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "c4ATzS",
+                      "name": "Branch",
+                      "fill": "$text",
+                      "content": "فرع الرياض — العليا",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "BqTpV",
+                  "name": "Row Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "M7xxO",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Q5C3z",
+                      "name": "Total",
+                      "fill": "$ink",
+                      "content": "67.40 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EDCwJ",
+                      "name": "Num Frame",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "z32EW",
+                          "name": "Num Value",
+                          "fill": "$primary",
+                          "content": "#5",
+                          "fontFamily": "$font-en",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "psi5Y",
+                          "name": "Num Prefix",
+                          "fill": "$muted",
+                          "content": "رقم الفرع:",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "F9t55i",
+              "name": "Order Card جارٍ التحقق مع الفرع",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "BEKUZ",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "dWZyv",
+                      "name": "Time",
+                      "fill": "$muted",
+                      "content": "اليوم  13:10",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "D3yrJe",
+                      "name": "Status Pill",
+                      "fill": "$primary-light",
+                      "cornerRadius": 999,
+                      "gap": 4,
+                      "padding": [
+                        4,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "zVRER",
+                          "name": "Status Text",
+                          "fill": "$primary",
+                          "content": "جارٍ التحقق مع الفرع",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ku3xV",
+                  "name": "Mid Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "P8rHv",
+                      "name": "Type",
+                      "fill": "$muted",
+                      "content": "توصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "SiOQk",
+                      "name": "Branch",
+                      "fill": "$text",
+                      "content": "فرع الرياض — العليا",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dONZH",
+                  "name": "Row Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "T6TyC",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "K6jQd",
+                      "name": "Total",
+                      "fill": "$ink",
+                      "content": "45.00 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bii5U",
+                      "name": "Num Frame",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "iKmb1",
+                          "name": "Num Value",
+                          "fill": "$muted",
+                          "content": "لم يصدر بعد",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 13
+                        },
+                        {
+                          "type": "text",
+                          "id": "FTyCS",
+                          "name": "Num Prefix",
+                          "fill": "$muted",
+                          "content": "رقم الفرع:",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rsqrp",
+              "name": "Order Card تم التوصيل",
+              "width": "fill_container",
+              "fill": "$surface",
+              "cornerRadius": 12,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "V1wiGK",
+                  "name": "Top Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ruS0k",
+                      "name": "Time",
+                      "fill": "$muted",
+                      "content": "أمس  20:15",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "K5KhEX",
+                      "name": "Status Pill",
+                      "fill": "$success-tint",
+                      "cornerRadius": 999,
+                      "gap": 4,
+                      "padding": [
+                        4,
+                        10
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Mcr7v",
+                          "name": "Status Text",
+                          "fill": "$success",
+                          "content": "تم التوصيل",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 11,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "G0JHnO",
+                  "name": "Mid Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "uxFI9",
+                      "name": "Type",
+                      "fill": "$muted",
+                      "content": "توصيل",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "yp6ms",
+                      "name": "Branch",
+                      "fill": "$text",
+                      "content": "فرع جدة — الحمراء",
+                      "textAlign": "right",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 13,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "C7Bu1",
+                  "name": "Row Divider",
+                  "width": "fill_container",
+                  "height": 1,
+                  "fill": "$border"
+                },
+                {
+                  "type": "frame",
+                  "id": "e2Xvd",
+                  "name": "Bottom Row",
+                  "width": "fill_container",
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "njNvx",
+                      "name": "Total",
+                      "fill": "$ink",
+                      "content": "112.50 ر.س",
+                      "fontFamily": "$font-en",
+                      "fontSize": 14,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "jPBro",
+                      "name": "Num Frame",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "tIS5K",
+                          "name": "Num Value",
+                          "fill": "$primary",
+                          "content": "#12",
+                          "fontFamily": "$font-en",
+                          "fontSize": 13,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "HuB8R",
+                          "name": "Num Prefix",
+                          "fill": "$muted",
+                          "content": "رقم الفرع:",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Wjxfd",
+          "name": "Tab Bar Wrap",
+          "width": "fill_container",
+          "padding": [
+            0,
+            16,
+            12,
+            16
+          ],
+          "justifyContent": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "zcfpp",
+              "name": "Tab Bar",
+              "width": "fill_container",
+              "height": 56,
+              "fill": "#ffffffB3",
+              "cornerRadius": 28,
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#1c163015",
+                "offset": {
+                  "x": 0,
+                  "y": 2
+                },
+                "blur": 12
+              },
+              "padding": 6,
+              "justifyContent": "space_around",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "XWgl2",
+                  "name": "Tab طلباتي",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "padding": [
+                    4,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AcnGP",
+                      "name": "Active BG",
+                      "fill": "$primary-light",
+                      "cornerRadius": 999,
+                      "layout": "vertical",
+                      "gap": 2,
+                      "padding": [
+                        6,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "ykEgh",
+                          "name": "Tab Icon",
+                          "width": 22,
+                          "height": 22,
+                          "icon": "receipt_long",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$primary"
+                        },
+                        {
+                          "type": "text",
+                          "id": "s247s",
+                          "name": "Tab Label",
+                          "fill": "$primary",
+                          "content": "طلباتي",
+                          "fontFamily": "$font-ar",
+                          "fontSize": 10,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ZHSuX",
+                  "name": "Tab الرئيسية",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "padding": [
+                    4,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "pqidM",
+                      "name": "Tab Icon",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "home",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Fdl1n",
+                      "name": "Tab Label",
+                      "fill": "$muted",
+                      "content": "الرئيسية",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ONM5p",
+                  "name": "Tab القائمة",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "padding": [
+                    4,
+                    16
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "WWqSB",
+                      "name": "Tab Icon",
+                      "width": 22,
+                      "height": 22,
+                      "icon": "menu_book",
+                      "library": "Material Symbols Rounded",
+                      "fill": "$muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "mAp2S",
+                      "name": "Tab Label",
+                      "fill": "$muted",
+                      "content": "القائمة",
+                      "fontFamily": "$font-ar",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "primary": {
+      "type": "color",
+      "value": "#422e87"
+    },
+    "primary-light": {
+      "type": "color",
+      "value": "#f1edfb"
+    },
+    "on-primary": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "secondary": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "ink": {
+      "type": "color",
+      "value": "#1c1630"
+    },
+    "text": {
+      "type": "color",
+      "value": "#241d3a"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#6b6580"
+    },
+    "border": {
+      "type": "color",
+      "value": "#ece9f2"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#ffffff"
+    },
+    "bg": {
+      "type": "color",
+      "value": "#f6f5fa"
+    },
+    "bg-alt": {
+      "type": "color",
+      "value": "#faf9fd"
+    },
+    "disabled": {
+      "type": "color",
+      "value": "#c9c4d6"
+    },
+    "disabled-bg": {
+      "type": "color",
+      "value": "#e8e5f0"
+    },
+    "success": {
+      "type": "color",
+      "value": "#1f9d55"
+    },
+    "success-tint": {
+      "type": "color",
+      "value": "#e7f6ee"
+    },
+    "danger": {
+      "type": "color",
+      "value": "#e02d3d"
+    },
+    "danger-tint": {
+      "type": "color",
+      "value": "#fdeaec"
+    },
+    "warning": {
+      "type": "color",
+      "value": "#c47f17"
+    },
+    "warning-tint": {
+      "type": "color",
+      "value": "#fef3cd"
+    },
+    "overlay": {
+      "type": "color",
+      "value": "#1c163073"
+    },
+    "font-ar": {
+      "type": "string",
+      "value": "IBM Plex Sans Arabic"
+    },
+    "font-en": {
+      "type": "string",
+      "value": "Inter"
+    }
+  },
+  "fileToken": "e835cee6-f438-405e-9260-02a5be485286"
+}
