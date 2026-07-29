@@ -1739,7 +1739,7 @@
                       "fill": "#1c1630",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "آخر تحديث قبل ٥ دقائق",
+                      "content": "آخر تحديث قبل 5 دقائق",
                       "lineHeight": 1.6666666666666667,
                       "fontFamily": "Cairo",
                       "fontSize": 12,
@@ -4270,7 +4270,7 @@
                           "id": "ukqeS",
                           "name": "Price",
                           "fill": "#422e87",
-                          "content": "٢٥٫٠٠ ر.س",
+                          "content": "25.00 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
@@ -4335,7 +4335,7 @@
                           "id": "S0KAV",
                           "name": "Price",
                           "fill": "#422e87",
-                          "content": "١٢٫٠٠ ر.س",
+                          "content": "12.00 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
@@ -4410,7 +4410,7 @@
                           "id": "taEql",
                           "name": "Price",
                           "fill": "#422e87",
-                          "content": "٥٫٠٠ ر.س",
+                          "content": "5.00 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
@@ -4507,7 +4507,7 @@
                                   "id": "enoua",
                                   "name": "Card Price",
                                   "fill": "#422e87",
-                                  "content": "٤٥٫٠٠ ر.س",
+                                  "content": "45.00 ر.س",
                                   "fontFamily": "Inter",
                                   "fontSize": 17,
                                   "fontWeight": "800"
@@ -4729,7 +4729,7 @@
                               "fill": "#c47f17",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "المطعم يغلق خلال ٣٠ دقيقة",
+                              "content": "المطعم يغلق خلال 30 دقيقة",
                               "fontFamily": "Cairo",
                               "fontSize": 14,
                               "fontWeight": "600"
@@ -4994,7 +4994,7 @@
                                   "id": "w7vsn",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٤",
+                                  "content": "4",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5020,7 +5020,7 @@
                                   "id": "feBCk",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٧",
+                                  "content": "7",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5046,7 +5046,7 @@
                                   "id": "R6vLvT",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٢",
+                                  "content": "2",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5141,7 +5141,7 @@
                                   "id": "jSUlz",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٤",
+                                  "content": "4",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5167,7 +5167,7 @@
                                   "id": "puexS",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٧",
+                                  "content": "7",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5193,7 +5193,7 @@
                                   "id": "z6H3lp",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٢",
+                                  "content": "2",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5219,7 +5219,7 @@
                                   "id": "ksji9",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٩",
+                                  "content": "9",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5245,7 +5245,7 @@
                                   "id": "rqYrH",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "١",
+                                  "content": "1",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5271,7 +5271,7 @@
                                   "id": "rGVW6",
                                   "name": "Digit",
                                   "fill": "#1c1630",
-                                  "content": "٦",
+                                  "content": "6",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5324,7 +5324,7 @@
                                   "id": "Dv5lf",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "٤",
+                                  "content": "4",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5350,7 +5350,7 @@
                                   "id": "JT8Iq",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "٧",
+                                  "content": "7",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5376,7 +5376,7 @@
                                   "id": "Ghg9L",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "٢",
+                                  "content": "2",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5402,7 +5402,7 @@
                                   "id": "L8Nl1u",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "٩",
+                                  "content": "9",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5428,7 +5428,7 @@
                                   "id": "uuOii",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "١",
+                                  "content": "1",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5454,7 +5454,7 @@
                                   "id": "EuoXW",
                                   "name": "Digit",
                                   "fill": "#e02d3d",
-                                  "content": "٦",
+                                  "content": "6",
                                   "fontFamily": "Inter",
                                   "fontSize": 24,
                                   "fontWeight": "700"
@@ -5702,7 +5702,7 @@
                           "id": "hWBRb",
                           "name": "Cart Label",
                           "fill": "#6b6580",
-                          "content": "السلة · ٣ أصناف",
+                          "content": "السلة · 3 أصناف",
                           "fontFamily": "Cairo",
                           "fontSize": 13,
                           "fontWeight": "600"
@@ -5719,7 +5719,7 @@
                               "id": "uwRgY",
                               "name": "Total",
                               "fill": "#1c1630",
-                              "content": "٤٢٫٠٠",
+                              "content": "42.00",
                               "fontFamily": "Inter",
                               "fontSize": 20,
                               "fontWeight": "800"
@@ -5902,7 +5902,7 @@
                               "id": "ftH2o",
                               "name": "AR",
                               "fill": "#1c1630",
-                              "content": "٤٥٫٠٠ ر.س",
+                              "content": "45.00 ر.س",
                               "fontFamily": "Cairo",
                               "fontSize": 20,
                               "fontWeight": "700"
@@ -5962,7 +5962,7 @@
                               "id": "VL31W",
                               "name": "AR",
                               "fill": "#1c1630",
-                              "content": "١٢٫٥٠ ر.س",
+                              "content": "12.50 ر.س",
                               "fontFamily": "Cairo",
                               "fontSize": 32,
                               "fontWeight": "700"
@@ -6022,7 +6022,7 @@
                               "id": "RLF60",
                               "name": "AR",
                               "fill": "#1c1630",
-                              "content": "المجموع: ٧٨٫٠٠ ر.س",
+                              "content": "المجموع: 78.00 ر.س",
                               "fontFamily": "Cairo",
                               "fontSize": 15,
                               "fontWeight": "700"
@@ -6082,7 +6082,7 @@
                               "id": "S0pQp",
                               "name": "AR",
                               "fill": "#1c1630",
-                              "content": "٥٫٠٠ ر.س",
+                              "content": "5.00 ر.س",
                               "fontFamily": "Cairo",
                               "fontSize": 12,
                               "fontWeight": "700"
@@ -6142,7 +6142,7 @@
                               "id": "M4F9r8",
                               "name": "AR",
                               "fill": "#1c1630",
-                              "content": "١٠٫٠٠ ر.س",
+                              "content": "10.00 ر.س",
                               "fontFamily": "Cairo",
                               "fontSize": 17,
                               "fontWeight": "700"
@@ -6270,7 +6270,7 @@
                           "fill": "#422e87",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Always show exactly two decimal places (٤٥٫٠٠ not ٤٥)",
+                          "content": "Always show exactly two decimal places (45.00 not 45)",
                           "fontFamily": "Inter",
                           "fontSize": 13,
                           "fontWeight": "500"
@@ -6301,7 +6301,7 @@
                           "fill": "#422e87",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Currency symbol follows the amount in Arabic (٤٥٫٠٠ ر.س)",
+                          "content": "Currency symbol follows the amount in Arabic (45.00 ر.س)",
                           "fontFamily": "Inter",
                           "fontSize": 13,
                           "fontWeight": "500"
@@ -6363,7 +6363,7 @@
                           "fill": "#422e87",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "Use Arabic-Indic numerals (٠١٢٣٤٥٦٧٨٩) in Arabic context",
+                          "content": "Use Western numerals (0123456789) in all contexts, including Arabic",
                           "fontFamily": "Inter",
                           "fontSize": 13,
                           "fontWeight": "500"
@@ -6406,249 +6406,327 @@
               ]
             }
           ]
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "S2LAa",
-      "x": 0,
-      "y": -220,
-      "name": "component/Swatch",
-      "reusable": true,
-      "width": 140,
-      "layout": "vertical",
-      "gap": 6,
-      "children": [
-        {
-          "type": "rectangle",
-          "cornerRadius": 8,
-          "id": "NEjxy",
-          "name": "Chip",
-          "fill": "#422e87",
-          "width": "fill_container",
-          "height": 72,
-          "stroke": "#ece9f2",
-          "strokeWidth": 1,
-          "strokeAlignment": "inner"
-        },
-        {
-          "type": "text",
-          "id": "Iqg0Y",
-          "name": "Role",
-          "fill": "#1c1630",
-          "content": "primary",
-          "fontFamily": "Inter",
-          "fontSize": 12,
-          "fontWeight": "600"
-        },
-        {
-          "type": "text",
-          "id": "YmMQR",
-          "name": "Hex",
-          "fill": "#6b6580",
-          "content": "#422e87",
-          "fontFamily": "Inter",
-          "fontSize": 11,
-          "fontWeight": "500"
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "s6lUL",
-      "x": 0,
-      "y": -352,
-      "name": "component/Button",
-      "reusable": true,
-      "fill": "#422e87",
-      "cornerRadius": 12,
-      "gap": 8,
-      "padding": [
-        12,
-        24
-      ],
-      "justifyContent": "center",
-      "alignItems": "center",
-      "children": [
-        {
-          "type": "icon",
-          "id": "C7PdU",
-          "x": 0,
-          "y": 0,
-          "name": "Icon",
-          "enabled": false,
-          "width": 18,
-          "height": 18,
-          "icon": "shopping-cart",
-          "library": "lucide",
-          "fill": "#ffffff"
-        },
-        {
-          "type": "text",
-          "id": "SnjnL",
-          "name": "Label",
-          "fill": "#ffffff",
-          "content": "Button",
-          "fontFamily": "Inter",
-          "fontSize": 17,
-          "fontWeight": "700"
-        },
-        {
-          "type": "icon",
-          "id": "cw7KV",
-          "x": 0,
-          "y": 0,
-          "name": "Spinner",
-          "enabled": false,
-          "width": 18,
-          "height": 18,
-          "icon": "loader",
-          "library": "lucide",
-          "fill": "#ffffff"
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "PtVmL",
-      "x": 0,
-      "y": -506,
-      "name": "component/TextField",
-      "reusable": true,
-      "width": 280,
-      "layout": "vertical",
-      "gap": 6,
-      "children": [
-        {
-          "type": "text",
-          "id": "E7vx6m",
-          "name": "Label",
-          "fill": "#1c1630",
-          "content": "Label",
-          "fontFamily": "Inter",
-          "fontSize": 13,
-          "fontWeight": "600"
         },
         {
           "type": "frame",
-          "id": "EFPId",
-          "name": "Input Box",
+          "id": "RTdvR",
+          "name": "Section: Component Library",
           "width": "fill_container",
-          "fill": "#ffffff",
-          "cornerRadius": 12,
-          "stroke": "#ece9f2",
-          "strokeWidth": 1,
-          "strokeAlignment": "inner",
-          "gap": 8,
-          "padding": [
-            12,
-            16
-          ],
-          "alignItems": "center",
+          "layout": "vertical",
+          "gap": 32,
           "children": [
             {
+              "type": "frame",
+              "id": "iMVp7",
+              "name": "Lib Section Title",
+              "width": "fill_container",
+              "gap": 16,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "aCifv",
+                  "name": "Badge",
+                  "fill": "#422e87",
+                  "cornerRadius": 999,
+                  "padding": [
+                    4,
+                    10
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "fyuX2",
+                      "name": "Num",
+                      "fill": "#ffffff",
+                      "content": "07",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "fFwvJ",
+                  "name": "Title EN",
+                  "fill": "#1c1630",
+                  "content": "Component Library",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "j0hqz",
+                  "name": "Title AR",
+                  "fill": "#6b6580",
+                  "content": "مكتبة المكونات",
+                  "fontFamily": "Cairo",
+                  "fontSize": 20,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
               "type": "text",
-              "id": "D8z6nl",
-              "name": "Placeholder",
-              "fill": "#c9c4d6",
+              "id": "cxNAx",
+              "name": "Caption",
+              "fill": "#6b6580",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "Placeholder",
+              "content": "Master component definitions — every instance in this design system references these originals. Edit here to update all instances.",
               "fontFamily": "Inter",
-              "fontSize": 15,
+              "fontSize": 13,
               "fontWeight": "500"
-            }
-          ]
-        },
-        {
-          "type": "text",
-          "id": "X5fgt",
-          "x": 0,
-          "y": 0,
-          "name": "Helper",
-          "enabled": false,
-          "fill": "#6b6580",
-          "fontFamily": "Inter",
-          "fontSize": 12,
-          "fontWeight": "500"
-        }
-      ]
-    },
-    {
-      "type": "frame",
-      "id": "yNBX9",
-      "x": 0,
-      "y": -630,
-      "name": "component/QtyStepper",
-      "reusable": true,
-      "fill": "#ffffff",
-      "cornerRadius": 12,
-      "stroke": "#ece9f2",
-      "strokeWidth": 1,
-      "strokeAlignment": "inner",
-      "alignItems": "center",
-      "children": [
-        {
-          "type": "frame",
-          "id": "vRvbl",
-          "name": "Minus Btn",
-          "width": 44,
-          "height": 44,
-          "justifyContent": "center",
-          "alignItems": "center",
-          "children": [
+            },
             {
-              "type": "icon",
-              "id": "LJxZa",
-              "name": "Minus Icon",
-              "width": 18,
-              "height": 18,
-              "icon": "minus",
-              "library": "lucide",
-              "fill": "#422e87"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "RMvTo",
-          "name": "Value Frame",
-          "width": 44,
-          "height": 44,
-          "justifyContent": "center",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "text",
-              "id": "T3XiBb",
-              "name": "Value",
-              "fill": "#1c1630",
-              "content": "1",
-              "fontFamily": "Inter",
-              "fontSize": 17,
-              "fontWeight": "700"
-            }
-          ]
-        },
-        {
-          "type": "frame",
-          "id": "SAzZw",
-          "name": "Plus Btn",
-          "width": 44,
-          "height": 44,
-          "justifyContent": "center",
-          "alignItems": "center",
-          "children": [
-            {
-              "type": "icon",
-              "id": "myM9q",
-              "name": "Plus Icon",
-              "width": 18,
-              "height": 18,
-              "icon": "plus",
-              "library": "lucide",
-              "fill": "#422e87"
+              "type": "frame",
+              "id": "L2ar0",
+              "name": "Component Grid",
+              "width": "fill_container",
+              "gap": 40,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "S2LAa",
+                  "name": "component/Swatch",
+                  "reusable": true,
+                  "width": 140,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "cornerRadius": 8,
+                      "id": "NEjxy",
+                      "name": "Chip",
+                      "fill": "#422e87",
+                      "width": "fill_container",
+                      "height": 72,
+                      "stroke": "#ece9f2",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Iqg0Y",
+                      "name": "Role",
+                      "fill": "#1c1630",
+                      "content": "primary",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YmMQR",
+                      "name": "Hex",
+                      "fill": "#6b6580",
+                      "content": "#422e87",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "s6lUL",
+                  "name": "component/Button",
+                  "reusable": true,
+                  "fill": "#422e87",
+                  "cornerRadius": 12,
+                  "gap": 8,
+                  "padding": [
+                    12,
+                    24
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "C7PdU",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Icon",
+                      "enabled": false,
+                      "width": 18,
+                      "height": 18,
+                      "icon": "shopping-cart",
+                      "library": "lucide",
+                      "fill": "#ffffff"
+                    },
+                    {
+                      "type": "text",
+                      "id": "SnjnL",
+                      "name": "Label",
+                      "fill": "#ffffff",
+                      "content": "Button",
+                      "fontFamily": "Inter",
+                      "fontSize": 17,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "cw7KV",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Spinner",
+                      "enabled": false,
+                      "width": 18,
+                      "height": 18,
+                      "icon": "loader",
+                      "library": "lucide",
+                      "fill": "#ffffff"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "PtVmL",
+                  "name": "component/TextField",
+                  "reusable": true,
+                  "width": 280,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "E7vx6m",
+                      "name": "Label",
+                      "fill": "#1c1630",
+                      "content": "Label",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EFPId",
+                      "name": "Input Box",
+                      "width": "fill_container",
+                      "fill": "#ffffff",
+                      "cornerRadius": 12,
+                      "stroke": "#ece9f2",
+                      "strokeWidth": 1,
+                      "strokeAlignment": "inner",
+                      "gap": 8,
+                      "padding": [
+                        12,
+                        16
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "D8z6nl",
+                          "name": "Placeholder",
+                          "fill": "#c9c4d6",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Placeholder",
+                          "fontFamily": "Inter",
+                          "fontSize": 15,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "X5fgt",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Helper",
+                      "enabled": false,
+                      "fill": "#6b6580",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "yNBX9",
+                  "name": "component/QtyStepper",
+                  "reusable": true,
+                  "fill": "#ffffff",
+                  "cornerRadius": 12,
+                  "stroke": "#ece9f2",
+                  "strokeWidth": 1,
+                  "strokeAlignment": "inner",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "vRvbl",
+                      "name": "Minus Btn",
+                      "width": 44,
+                      "height": 44,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "LJxZa",
+                          "name": "Minus Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "minus",
+                          "library": "lucide",
+                          "fill": "#422e87"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "RMvTo",
+                      "name": "Value Frame",
+                      "width": 44,
+                      "height": 44,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "T3XiBb",
+                          "name": "Value",
+                          "fill": "#1c1630",
+                          "content": "1",
+                          "fontFamily": "Inter",
+                          "fontSize": 17,
+                          "fontWeight": "700"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "SAzZw",
+                      "name": "Plus Btn",
+                      "width": 44,
+                      "height": 44,
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "myM9q",
+                          "name": "Plus Icon",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "plus",
+                          "library": "lucide",
+                          "fill": "#422e87"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
             }
           ]
         }
