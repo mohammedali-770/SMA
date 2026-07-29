@@ -1,0 +1,6 @@
+{
+  "categories": [
+    { "category_id": "CAT_MAIN", "name_en": "Main Dishes", "name_ar": "الأطباق الرئيسية" },
+    { "category_id": "CAT_DRINK", "names": { "ar": "المشروبات", "en": "Drinks" } }
+  ]
+}

@@ -63,30 +63,72 @@ HOOK_INPUT="$(cat 2>/dev/null || true)"
 
 TOOL_NAME=''
 TOOL_COMMAND=''
-if command -v jq >/dev/null 2>&1; then
-  printf '%s' "$HOOK_INPUT" | jq -e . >/dev/null 2>&1 \
-    || deny "change-control guard: unparseable PreToolUse JSON; failing closed."
-  TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)"
-  TOOL_COMMAND="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
-elif command -v python3 >/dev/null 2>&1; then
-  printf '%s' "$HOOK_INPUT" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1 \
-    || deny "change-control guard: unparseable PreToolUse JSON; failing closed."
-  TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | python3 -c '
+
+# Parser selection is CAPABILITY-PROBED, not presence-probed. `command -v` on
+# its own is not enough: on Windows, python3 commonly resolves to a 0-byte
+# Microsoft Store "App Execution Alias" that exists and is executable but
+# exits 9009 without ever running Python. The old presence-only chain
+# committed to that stub, so every hook invocation failed closed with a
+# misleading "unparseable PreToolUse JSON" reason — on EVERY branch, denying
+# all agent file work while protecting nothing.
+#
+# Each candidate must now parse a known-good fixture before it is trusted.
+# That separates "this parser is broken/absent" (try the next one) from "the
+# real payload is malformed" (deny). node is the last resort and is always
+# present in this repo's toolchain.
+#
+# Fail-closed is preserved end to end: no working parser => deny; the chosen
+# parser rejecting the real payload => deny; no tool_name => deny.
+JSON_PROBE='{"probe":1}'
+
+PY_VALIDATE='import json,sys; json.load(sys.stdin)'
+PY_FIELD='
 import json, sys
 d = json.load(sys.stdin)
-v = d.get("tool_name")
+if sys.argv[1] == "tool_name":
+    v = d.get("tool_name")
+else:
+    ti = d.get("tool_input")
+    v = ti.get("command") if isinstance(ti, dict) else None
 sys.stdout.write(v if isinstance(v, str) else "")
-' 2>/dev/null || true)"
-  TOOL_COMMAND="$(printf '%s' "$HOOK_INPUT" | python3 -c '
-import json, sys
-d = json.load(sys.stdin)
-ti = d.get("tool_input")
-v = ti.get("command") if isinstance(ti, dict) else None
-sys.stdout.write(v if isinstance(v, str) else "")
-' 2>/dev/null || true)"
+'
+NODE_VALIDATE='let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{JSON.parse(s)})'
+NODE_FIELD='let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const o=JSON.parse(s);let v;if(process.argv[1]==="tool_name"){v=o.tool_name}else{const t=o.tool_input;v=(t&&typeof t==="object")?t.command:undefined}process.stdout.write(typeof v==="string"?v:"")})'
+
+PARSER=''
+if command -v jq >/dev/null 2>&1 \
+  && printf '%s' "$JSON_PROBE" | jq -e . >/dev/null 2>&1; then
+  PARSER='jq'
+elif command -v python3 >/dev/null 2>&1 \
+  && printf '%s' "$JSON_PROBE" | python3 -c "$PY_VALIDATE" >/dev/null 2>&1; then
+  PARSER='python3'
+elif command -v node >/dev/null 2>&1 \
+  && printf '%s' "$JSON_PROBE" | node -e "$NODE_VALIDATE" >/dev/null 2>&1; then
+  PARSER='node'
 else
-  deny "change-control guard: no JSON parser (jq or python3) available; failing closed."
+  deny "change-control guard: no working JSON parser (jq, python3 or node) available; failing closed."
 fi
+
+case "$PARSER" in
+  jq)
+    printf '%s' "$HOOK_INPUT" | jq -e . >/dev/null 2>&1 \
+      || deny "change-control guard: unparseable PreToolUse JSON; failing closed."
+    TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)"
+    TOOL_COMMAND="$(printf '%s' "$HOOK_INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
+    ;;
+  python3)
+    printf '%s' "$HOOK_INPUT" | python3 -c "$PY_VALIDATE" >/dev/null 2>&1 \
+      || deny "change-control guard: unparseable PreToolUse JSON; failing closed."
+    TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | python3 -c "$PY_FIELD" tool_name 2>/dev/null || true)"
+    TOOL_COMMAND="$(printf '%s' "$HOOK_INPUT" | python3 -c "$PY_FIELD" tool_command 2>/dev/null || true)"
+    ;;
+  node)
+    printf '%s' "$HOOK_INPUT" | node -e "$NODE_VALIDATE" >/dev/null 2>&1 \
+      || deny "change-control guard: unparseable PreToolUse JSON; failing closed."
+    TOOL_NAME="$(printf '%s' "$HOOK_INPUT" | node -e "$NODE_FIELD" tool_name 2>/dev/null || true)"
+    TOOL_COMMAND="$(printf '%s' "$HOOK_INPUT" | node -e "$NODE_FIELD" tool_command 2>/dev/null || true)"
+    ;;
+esac
 
 [ -n "$TOOL_NAME" ] || deny "change-control guard: hook input has no tool_name; failing closed."
 

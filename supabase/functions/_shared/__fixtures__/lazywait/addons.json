@@ -1,0 +1,14 @@
+{
+  "addons": [
+    {
+      "addon_id": "AD_CHEESE",
+      "name_en": "Extra Cheese",
+      "name_ar": "جبن إضافي",
+      "addons_group_id": "GRP_TOPPINGS",
+      "price": 5,
+      "alert_level": 3,
+      "consumption": { "unit": "slice", "qty": 1 }
+    },
+    { "addon_id": "AD_NULL", "name_en": "No Price Addon", "price": null, "price_id": null }
+  ]
+}

@@ -31,6 +31,9 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      - name: Install mobile deps (so eas can resolve the app config)
+        run: npm ci
+
       - name: Poll EAS build until it finishes
         env:
           BID: a168a7f1-bfc5-482c-85ae-4a3afce3aa76
@@ -40,9 +43,10 @@ jobs:
           for i in $(seq 1 40); do
             # eas-cli can prepend update-notice lines to stdout; strip everything
             # before the first JSON bracket so jq always gets clean JSON.
-            # Run from a neutral dir: `eas build:view <id>` otherwise eagerly loads
-            # apps/mobile/app.json and fails to resolve expo-router without node_modules.
-            RAW=$(cd "$HOME" && eas build:view "$BID" --json 2>/dev/null)
+            # Run INSIDE apps/mobile: eas-cli 21.x refuses to run outside a project
+            # ("Run this command inside a project directory"). node_modules is installed
+            # in the step above so the app config plugins resolve.
+            RAW=$(eas build:view "$BID" --json 2>/dev/null)
             JSON=$(printf '%s\n' "$RAW" | awk '/^[[{]/{f=1} f{print}')
             STATUS=$(printf '%s' "$JSON" | jq -r '.status // empty' 2>/dev/null)
             echo "poll $i: status=${STATUS:-unparsed}"

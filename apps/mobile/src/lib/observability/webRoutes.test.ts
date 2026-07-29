@@ -28,7 +28,7 @@ describe('normalizeWebRoute', () => {
   it('drops query strings and fragments entirely', () => {
     expect(normalizeWebRoute('/admin/orders?id=42&phone=0501234567')).toBe('/admin/orders');
     expect(normalizeWebRoute('/auth#access_token=opaque123')).toBe('/auth');
-    expect(normalizeWebRoute('https://sma.vercel.app/app/product/42?ref=x#y'))
+    expect(normalizeWebRoute('https://app.spicymeal.com.sa/app/product/42?ref=x#y'))
       .toBe('/app/product/[id]');
   });
 
@@ -41,7 +41,7 @@ describe('normalizeWebRoute', () => {
 
   it('normalizes root, trailing slashes, and origin-only URLs', () => {
     expect(normalizeWebRoute('/')).toBe('/');
-    expect(normalizeWebRoute('https://sma.vercel.app')).toBe('/');
+    expect(normalizeWebRoute('https://app.spicymeal.com.sa')).toBe('/');
     expect(normalizeWebRoute('/orders/123/')).toBe('/orders/[id]');
   });
 });

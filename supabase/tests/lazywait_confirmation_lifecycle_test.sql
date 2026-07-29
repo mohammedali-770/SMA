@@ -194,7 +194,7 @@ declare
   v_ws   uuid := gen_random_uuid();   -- synced, patch ref whitespace -> no event
   v_uni  uuid := gen_random_uuid();   -- synced, patch ref NBSP        -> no event
   v_ok   uuid := gen_random_uuid();   -- synced, usable ref            -> one event
-  v_corr uuid := gen_random_uuid();   -- unusable (suppressed) then usable -> event
+  v_corr uuid := gen_random_uuid();   -- unusable (coerced->confirmation_required) then usable -> event
 begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
@@ -231,17 +231,21 @@ begin
   if (select count(*) from public.notification_log where order_id=v_ok and status='pos_confirmed' and send_status='pending') <> 1 then
     raise exception 'CASE 7 FAILED: usable pos_confirmed not exactly one event'; end if;
 
-  -- (5)+(6) an unusable ref leaves NO dedup row, so a LATER unusable->usable
-  --         correction can still create the legitimate confirmation.
+  -- (5)+(6) a synced request with an UNUSABLE ref is coerced to
+  --         'confirmation_required' and emits a 'pos_confirmation_required' event
+  --         (never 'pos_confirmed'), per migration 20260721130000. The
+  --         'pos_confirmed' slot stays free (different status), so a LATER
+  --         unusable->usable correction can still create the legitimate confirmation.
   perform public.record_lazywait_sync(v_corr,
     jsonb_build_object('lazywait_sync_state','synced','lazywait_ref',chr(160)),'success','push',null,null,null,'pos_confirmed');
-  -- The invariant is that the 'pos_confirmed' DEDUP SLOT stays free, so the
-  -- unusable->usable correction below can still enqueue the real confirmation.
-  -- Scoped to status='pos_confirmed' deliberately: the LATER synced-ref guard
-  -- (20260721130000, live 20260721084330) coerces this request to
-  -- 'confirmation_required' and legitimately enqueues ONE
-  -- 'pos_confirmation_required' event. Counting every kind='pos_sync' row
-  -- predates that guard and flagged correct behaviour as a failure.
+  -- The synced-ref guard (20260721130000, live 20260721084330) coerces this
+  -- unusable-ref request to 'confirmation_required' and enqueues exactly ONE
+  -- 'pos_confirmation_required' event, leaving the 'pos_confirmed' dedup slot free
+  -- so the unusable->usable correction below can still enqueue the real
+  -- confirmation. Assert the coerced state AND both precise (kind='pos_sync')
+  -- notification counts (merges the #107 state check with #101's scoped counts).
+  if (select lazywait_sync_state from public.orders where id=v_corr) <> 'confirmation_required' then
+    raise exception 'CASE 7 FAILED: unusable ref not coerced to confirmation_required'; end if;
   if (select count(*) from public.notification_log
        where order_id=v_corr and kind='pos_sync' and status='pos_confirmed') <> 0 then
     raise exception 'CASE 7 FAILED: unusable ref left a dedup-blocking pos_confirmed row'; end if;

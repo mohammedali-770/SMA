@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "menu_item_id": "IT_BURGER",
+      "names": { "en": "Beef Burger", "ar": "برجر لحم" },
+      "category_id": "CAT_MAIN",
+      "branches_ids": ["BR_RUH", "BR_JED"],
+      "prices": [
+        { "price_id": "PR_SINGLE", "name": "Single", "price_with_vat": 28.75, "price_excl_vat": 25 },
+        { "price_id": "PR_DOUBLE", "name": "Double", "price_with_vat": 40.25 }
+      ]
+    },
+    { "menu_item_id": "IT_JUICE", "name": "Fresh Orange", "category_id": "CAT_DRINK", "price": 15 }
+  ]
+}
