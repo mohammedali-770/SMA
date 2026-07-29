@@ -1,0 +1,3 @@
+# Full-resolution captures: regenerate with `node screenshots/capture.mjs`.
+# The downscaled JPGs under web/ are the committed, reviewable record.
+out/
