@@ -1,5 +1,6 @@
 -- ============================================================================
--- Spicy Meal — pg_cron driver for the automatic refund worker (payment-refund).
+-- Spicy Meal — pg_cron driver for the automatic refund worker (payment-refund),
+-- plus stale-lease escalation.
 --
 -- THE GAP THIS CLOSES
 -- 20260724120000 created the automatic-refund lifecycle: the order_refund_due()
@@ -10,10 +11,51 @@
 -- customer_order_state() showed the customer 'final_failure_refund_pending'
 -- ("refund in progress") — a promise the system could not keep.
 --
--- This migration adds ONLY the driver + schedule. It changes no refund decision,
--- no enrollment rule, no payment business logic, no Tap contract and no RPC.
--- Whether a refund is owed remains decided exclusively in Postgres by
--- order_refund_due(); this driver just makes the queue drain.
+-- This migration adds ONLY the driver, the stale-lease reaper, and the schedule.
+-- It changes no refund decision, no enrollment rule, no payment business logic,
+-- no Tap contract and no existing RPC. Whether a refund is owed remains decided
+-- exclusively in Postgres by order_refund_due(); this driver just makes the
+-- queue drain, and makes an abandoned lease visible instead of invisible.
+--
+-- ---------------------------------------------------------------------------
+-- STALE LEASES — WHY THEY ESCALATE TO A HUMAN AND ARE NEVER AUTO-RETRIED
+--
+-- claim_order_refund() moves a row to 'processing' and stamps a claim_token;
+-- finalize_order_refund() is token-fenced and resolves it. If the worker
+-- terminates BETWEEN those two steps — an abnormal exit, a container kill, or a
+-- finalize RPC error (which the worker does not currently inspect) — the row
+-- stays 'processing' forever: claim_order_refund() selects only
+-- status = 'pending', so no later tick can ever see it again. The order would
+-- remain refund_state='processing' and the customer would be shown "refund in
+-- progress" indefinitely.
+--
+-- The tempting fix is to return the row to 'pending' after a lease timeout. That
+-- is NOT safe here. We cannot distinguish "died before calling Tap" from "died
+-- after Tap accepted the refund but before we recorded it", and Tap's
+-- reference.merchant is a reconciliation aid, NOT a guaranteed idempotency key —
+-- 20260724120000 states plainly that our own DB claim is what prevents a double
+-- refund. Re-queueing could therefore refund a customer twice.
+--
+-- So a stale lease is resolved to status='failed' with failure_code
+-- 'lease_expired', which:
+--   * frees the one-active-refund slot (the partial unique index excludes
+--     'failed'), so an operator CAN deliberately open a fresh attempt after
+--     verifying with the provider;
+--   * surfaces the refund in list_failed_order_refunds() — the existing
+--     admin manual-review feed;
+--   * moves the customer from a permanent "refund in progress" to
+--     'final_failure_refund_failed', which is the honest state.
+-- 'processing' -> 'failed' is an allowed transition in
+-- enforce_refund_state_transition(), so no guard is weakened.
+--
+-- The window is 30 minutes: far beyond any healthy run (the worker is bounded to
+-- 5 refunds x 15s = 75s, and this driver's HTTP timeout is 100s), so a live
+-- in-flight refund can never be escalated out from under a working worker.
+--
+-- Note this is only reachable on ABNORMAL termination. The worker's own
+-- timeout/unknown path already finalizes as 'pending', which RELEASES the claim
+-- properly and is retried on the next tick — that path is unchanged.
+-- ---------------------------------------------------------------------------
 --
 -- WHY NO NEW RUN LEDGER (unlike 20260720120000)
 -- The lazywait scheduler needed lazywait_sync_requests because nothing else
@@ -21,8 +63,7 @@
 -- public.order_refunds carries status, attempt_count, failure_code,
 -- last_error_safe, completed_at and provider_ref, and the worker additionally
 -- writes an operational row to integration_sync_logs per processed refund. A
--- second ledger would duplicate that without adding a fact, so the driver stays
--- minimal and auditable in one screen.
+-- second ledger would duplicate that without adding a fact.
 --
 -- SECRET HANDLING — identical contract to the lazywait driver. The
 -- refund_trigger_secret is read LIVE from the authoritative integration_settings
@@ -52,14 +93,9 @@
 -- partial unique index allowing at most one live-or-succeeded refund per order —
 -- so overlapping ticks can never double-refund a customer.
 --
--- TIMEOUT — 100s. Worst case per invocation is 5 refunds x 15s provider timeout
--- (REFUND_TIMEOUT_MS) = 75s plus claim/finalize overhead. 100s covers that and
--- stays below Supabase's 150s HTTP idle timeout.
---
 -- OBSERVABILITY FOLLOW-UP (deliberately NOT in this migration)
 -- operations_health_snapshot_internal() allowlists five cron jobs. Adding a
--- sixth means re-emitting that function, which is a separate reviewed change; it
--- is intentionally left out so this migration stays a driver + schedule only.
+-- sixth means re-emitting that function, which is a separate reviewed change.
 -- Until then, refund health is visible through public.order_refunds and
 -- list_failed_order_refunds().
 --
@@ -69,6 +105,7 @@
 -- ROLLBACK (safe, immediate — never affects payments, orders or the queue):
 --   select cron.unschedule('payment-refund-worker');
 --   drop function if exists public.invoke_payment_refund_processor();
+--   drop function if exists public.expire_stale_order_refund_claims(interval);
 -- Enrolled refunds simply stop draining; no refund state is lost or altered.
 -- ============================================================================
 
@@ -84,6 +121,68 @@ begin
   end if;
 end $$;
 
+-- ---- Stale-lease escalation (see the header for why this never auto-retries).
+create or replace function public.expire_stale_order_refund_claims(
+  p_stale_after interval default interval '30 minutes'
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count integer := 0;
+  v_row   record;
+begin
+  -- Guard against an accidentally tiny window being passed in: never escalate a
+  -- lease younger than 10 minutes, which is already >> any healthy run.
+  if p_stale_after is null or p_stale_after < interval '10 minutes' then
+    p_stale_after := interval '10 minutes';
+  end if;
+
+  for v_row in
+    select id, order_id
+      from public.order_refunds
+     where status = 'processing'
+       and updated_at < now() - p_stale_after
+     order by updated_at
+     for update skip locked
+  loop
+    update public.order_refunds
+       set status          = 'failed',
+           failure_code    = 'lease_expired',
+           last_error_safe = 'The refund worker did not report an outcome. Verify with the provider before retrying.',
+           claim_token     = null,
+           updated_at      = now()
+     where id = v_row.id
+       and status = 'processing';          -- re-check under the lock
+
+    if found then
+      -- 'processing' -> 'failed' is an allowed transition; the guard is intact.
+      update public.orders
+         set refund_state        = 'failed',
+             refund_failure_code = 'lease_expired',
+             updated_at          = now()
+       where id = v_row.order_id
+         and refund_state = 'processing';
+
+      v_count := v_count + 1;
+    end if;
+  end loop;
+
+  return v_count;
+end;
+$$;
+
+revoke all on function public.expire_stale_order_refund_claims(interval)
+  from public, anon, authenticated;
+grant execute on function public.expire_stale_order_refund_claims(interval)
+  to service_role;
+
+comment on function public.expire_stale_order_refund_claims(interval) is
+  'Escalates refund leases abandoned by a crashed worker (status=processing, untouched for longer than the window) to status=failed / failure_code=lease_expired, so they appear in list_failed_order_refunds() instead of being unreachable forever. Deliberately does NOT re-queue: we cannot know whether the dead worker already sent the refund to Tap, and an automatic re-send could double-refund. Minimum window 10 minutes.';
+
+-- ---- The driver. SECURITY DEFINER; service-role-only EXECUTE. ---------------
 create or replace function public.invoke_payment_refund_processor()
 returns bigint
 language plpgsql
@@ -99,6 +198,14 @@ declare
   v_project_url    text;
   v_request_id     bigint;
 begin
+  -- Reclaim first, so an abandoned lease is escalated even on ticks that later
+  -- fail preflight. Best effort: a reaper hiccup must never abort the tick.
+  begin
+    perform public.expire_stale_order_refund_claims();
+  exception when others then
+    null;
+  end;
+
   -- ---- Preflight, fail closed. Every branch returns NULL without sending. ----
   select count(*) into v_row_count
     from public.integration_settings where provider_type = 'payment';
@@ -132,6 +239,8 @@ begin
   end if;
 
   -- ---- Send. Secret passed VERBATIM. Bounded batch. Fire-and-forget. --------
+  -- Timeout 100s: worst case is 5 refunds x 15s provider timeout = 75s plus
+  -- claim/finalize overhead, and it stays below Supabase's 150s idle timeout.
   select net.http_post(
     url := rtrim(v_project_url, '/') || '/functions/v1/payment-refund',
     headers := jsonb_build_object(
@@ -158,7 +267,7 @@ grant execute on function public.invoke_payment_refund_processor()
   to service_role;
 
 comment on function public.invoke_payment_refund_processor() is
-  'pg_cron driver for the payment-refund worker. Fail-closed preflight (single enabled Tap integration row, non-blank refund_trigger_secret, project URL in Vault); reads the secret live from integration_settings and sends it VERBATIM in x-refund-secret; POSTs {"limit":5}. Never decides that a refund is owed — enrollment is order_refund_due() in Postgres. The secret is never stored in cron.job, Vault, logs or any table.';
+  'pg_cron driver for the payment-refund worker. Escalates abandoned leases via expire_stale_order_refund_claims(), then runs a fail-closed preflight (single enabled Tap integration row, non-blank refund_trigger_secret, project URL in Vault) and POSTs {"limit":5} with the secret sent VERBATIM in x-refund-secret. Never decides that a refund is owed — enrollment is order_refund_due() in Postgres. The secret is never stored in cron.job, Vault, logs or any table.';
 
 -- Schedule: every 5 minutes. cron.job stores ONLY the bare function call, so the
 -- secret never appears in the scheduler catalog.
@@ -169,7 +278,8 @@ select cron.schedule(
 );
 
 -- Post-schedule self-verification: fail the migration if the job was not created
--- exactly once with the intended schedule and command.
+-- exactly once with the intended schedule and command, or if the reaper is
+-- missing/incorrectly granted.
 do $$
 declare
   v_count integer;
@@ -191,5 +301,13 @@ begin
   end if;
   if v_job.command is distinct from 'select public.invoke_payment_refund_processor();' then
     raise exception 'payment-refund-worker created with an unexpected command';
+  end if;
+
+  if to_regprocedure('public.expire_stale_order_refund_claims(interval)') is null then
+    raise exception 'expire_stale_order_refund_claims(interval) is missing';
+  end if;
+  if has_function_privilege('authenticated', 'public.expire_stale_order_refund_claims(interval)', 'execute')
+     or has_function_privilege('anon', 'public.expire_stale_order_refund_claims(interval)', 'execute') then
+    raise exception 'expire_stale_order_refund_claims must be service-role only';
   end if;
 end $$;
