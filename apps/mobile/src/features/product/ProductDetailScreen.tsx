@@ -110,7 +110,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                 <View style={[styles.groupHead, rtlRow]}>
                   <Text style={[styles.groupTitle, rtlText, { flex: 1 }]}>{pick(g.nameEn, g.nameAr)}</Text>
                   <View style={[styles.reqPill, g.isRequired ? styles.reqYes : styles.reqNo]}>
-                    <Text style={[styles.reqText, { color: g.isRequired ? colors.red : colors.muted }]}>
+                    <Text style={[styles.reqText, { color: g.isRequired ? colors.danger : colors.muted }]}>
                       {g.isRequired ? t('required') : t('optional')}
                     </Text>
                   </View>
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   reqYes: { backgroundColor: colors.dangerBg },
   reqNo: { backgroundColor: colors.bgAlt },
   reqText: { fontSize: font.xs, fontWeight: '800' },
-  groupError: { color: colors.red, fontSize: font.xs, fontWeight: '700', marginBottom: spacing.xs },
+  groupError: { color: colors.danger, fontSize: font.xs, fontWeight: '700', marginBottom: spacing.xs },
 
   modRow: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white,

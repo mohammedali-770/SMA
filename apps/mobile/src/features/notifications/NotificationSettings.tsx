@@ -133,5 +133,5 @@ const styles = StyleSheet.create({
   rowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
   rowLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
   rowSub: { fontSize: font.xs, color: colors.muted, marginTop: 1 },
-  denied: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
+  denied: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
 });

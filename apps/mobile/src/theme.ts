@@ -17,9 +17,21 @@ export const colors = {
   bg: '#f6f5fa',
   bgAlt: '#faf9fd',
 
-  success: '#1f9d55',
-  danger: '#e02d3d',
-  warning: '#c47f17',
+  // Semantic status colours, used for TEXT and icons on `surface` or on the
+  // tints below. These are deliberately darker than they look like they should
+  // be: measured against WCAG 2.1, the previous values failed AA for body text
+  // — success 3.13:1 and warning 2.99:1 on their own tints, against a 4.5:1
+  // requirement. Each value here is the smallest darkening that clears 4.5:1 on
+  // BOTH grounds it appears on (its tint and a white card).
+  //
+  // `danger` is intentionally NOT the same as `red`. The brand red stays #e02d3d
+  // for fills — a destructive button, the logo tag — where it carries white text
+  // at 4.55:1. Error TEXT needs its own darker value to clear 4.5:1 on the pink
+  // tint. Use `danger` for error text and icons; use `red` only for brand fills.
+  // Verified by apps/mobile/src/theme.contrast.test.ts.
+  success: '#197f45',
+  danger: '#ce2938',
+  warning: '#9b6412',
 
   // Status tints (previously inlined per-screen; single source of truth here)
   successBg: '#e7f6ee',

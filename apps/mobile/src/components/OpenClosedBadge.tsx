@@ -9,7 +9,7 @@ export function OpenClosedBadge({ open }: { open: boolean }) {
   const { t } = useI18n();
   return (
     <View style={[styles.badge, { backgroundColor: open ? colors.successBg : colors.dangerBg }]}>
-      <Text style={[styles.text, { color: open ? colors.success : colors.red }]}>
+      <Text style={[styles.text, { color: open ? colors.success : colors.danger }]}>
         {open ? t('open') : t('closed')}
       </Text>
     </View>

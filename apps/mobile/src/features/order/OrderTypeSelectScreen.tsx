@@ -422,8 +422,8 @@ const styles = StyleSheet.create({
   resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
   fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
   notice: { backgroundColor: '#fdeaec', padding: spacing.lg, borderRadius: radius.md },
-  noticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
-  err: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
+  noticeText: { color: colors.danger, fontWeight: '700', fontSize: font.sm },
+  err: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
 
   overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: spacing.md, backgroundColor: 'rgba(246,245,250,0.75)' },
   overlayText: { color: colors.text, fontWeight: '800', fontSize: font.md },

@@ -162,7 +162,7 @@ const CHIP_TONE: Record<ConfirmationTone, { bg: string; fg: string }> = {
   info: { bg: colors.purpleBg, fg: colors.purple },
   success: { bg: colors.successBg, fg: colors.success },
   warning: { bg: colors.bgAlt, fg: colors.warning },
-  danger: { bg: colors.dangerBg, fg: colors.red },
+  danger: { bg: colors.dangerBg, fg: colors.danger },
 };
 
 /**
@@ -194,7 +194,7 @@ function ConfirmationChip({ order }: { order: Order }) {
 function StatusBadge({ label, status }: { label: string; status: OrderStatus }) {
   const tone =
     status === 'delivered' ? { bg: colors.successBg, fg: colors.success }
-    : status === 'cancelled' ? { bg: colors.dangerBg, fg: colors.red }
+    : status === 'cancelled' ? { bg: colors.dangerBg, fg: colors.danger }
     : { bg: colors.purpleBg, fg: colors.purple };
   return (
     <View style={[styles.badge, { backgroundColor: tone.bg }]}>

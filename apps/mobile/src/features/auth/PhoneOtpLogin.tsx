@@ -159,5 +159,5 @@ const styles = StyleSheet.create({
     textAlign: 'center', writingDirection: 'ltr', marginBottom: spacing.sm,
   },
   notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
-  error: { color: colors.red, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
+  error: { color: colors.danger, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
 });

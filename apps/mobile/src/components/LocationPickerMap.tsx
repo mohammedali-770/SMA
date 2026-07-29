@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   locateBtnPressed: { backgroundColor: colors.purpleBg },
   hint: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
-  locateError: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.xs },
+  locateError: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.xs },
   fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
   fallbackText: { fontSize: font.sm, color: colors.muted, fontWeight: '700', textAlign: 'center' },
 });

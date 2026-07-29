@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   phoneField: { marginBottom: spacing.sm },
   codeField: { marginBottom: spacing.sm },
   notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
-  error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.sm },
+  error: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.sm },
   success: { fontSize: font.md, color: colors.success, fontWeight: '800', paddingVertical: spacing.sm },
   notAvailable: { fontSize: font.sm, color: colors.muted, fontWeight: '700', paddingVertical: spacing.sm },
 });

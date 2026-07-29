@@ -589,7 +589,7 @@ export function CheckoutScreen() {
           <View style={styles.block}>
             <Text style={[styles.sectionTitle, rtlText]}>{t('paymentMethodTitle')}</Text>
             {paymentBlocked ? (
-              <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700' }]}>
+              <Text style={[styles.note, rtlText, { color: colors.danger, fontWeight: '700' }]}>
                 {pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
               </Text>
             ) : (
@@ -690,7 +690,7 @@ export function CheckoutScreen() {
               ) : null}
 
               {deliveryBlockReason ? (
-                <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
+                <Text style={[styles.note, rtlText, { color: colors.danger, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
               ) : null}
             </View>
           ) : null}
@@ -710,7 +710,7 @@ export function CheckoutScreen() {
               <Button label={t('applyCoupon')} onPress={applyCoupon} loading={checkingCoupon} variant="secondary" style={styles.couponBtn} />
             </View>
             {couponResult ? (
-              <Text style={[styles.couponMsg, rtlText, { color: couponResult.ok ? colors.success : colors.red }]}>
+              <Text style={[styles.couponMsg, rtlText, { color: couponResult.ok ? colors.success : colors.danger }]}>
                 {couponResult.ok ? `${t('couponApplied')} −${formatSAR(couponResult.discount, lang)}` : couponResult.message}
               </Text>
             ) : null}
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
     borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
   },
-  error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
+  error: { color: colors.danger, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
   // Legal consent: quiet but fully legible, and now BELOW the action rather
   // than competing with the blocking message above it. Shared token so
   // "secondary" means the same thing on every screen.

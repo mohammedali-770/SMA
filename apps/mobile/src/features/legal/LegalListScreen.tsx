@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
   supportEmoji: { fontSize: font.xl },
   supportAction: { fontSize: font.md, fontWeight: '800', color: colors.text },
   supportValue: { fontSize: font.sm, color: colors.muted, marginTop: 1 },
-  openError: { color: colors.red, fontWeight: '700', fontSize: font.sm },
+  openError: { color: colors.danger, fontWeight: '700', fontSize: font.sm },
   pressed: { opacity: 0.7 },
 
   row: {

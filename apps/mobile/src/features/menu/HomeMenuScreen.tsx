@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
   closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
-  closedNoticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
+  closedNoticeText: { color: colors.danger, fontWeight: '700', fontSize: font.sm },
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: spacing.sm,

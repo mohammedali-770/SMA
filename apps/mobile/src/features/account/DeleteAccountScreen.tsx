@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   switchText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
   notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
-  error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
+  error: { fontSize: font.sm, color: colors.danger, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
 
   support: { marginTop: spacing.xl, gap: spacing.xs, alignItems: 'center' },
   supportLabel: { fontSize: font.sm, color: colors.muted, fontWeight: '600' },

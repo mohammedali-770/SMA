@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     minHeight: 34, justifyContent: 'center', paddingHorizontal: spacing.md,
     borderRadius: radius.pill, backgroundColor: colors.dangerBg,
   },
-  remove: { color: colors.red, fontWeight: '800', fontSize: font.sm },
+  remove: { color: colors.danger, fontWeight: '800', fontSize: font.sm },
 
   footer: {
     position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,

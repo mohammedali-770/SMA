@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', minHeight: 44,
     marginTop: spacing.md,
   },
-  deleteText: { color: colors.red, fontWeight: '700', fontSize: font.md, textDecorationLine: 'underline' },
+  deleteText: { color: colors.danger, fontWeight: '700', fontSize: font.md, textDecorationLine: 'underline' },
 
   footerNote: { textAlign: 'center', color: colors.muted, fontSize: font.xs, marginTop: spacing.xl },
 });
