@@ -1,0 +1,6 @@
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.

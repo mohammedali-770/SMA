@@ -9,3 +9,6 @@ exports/00-smoke.png
 # Second pipeline probe (absolute-path fix). Not a deliverable.
 00-smoke2.pen
 exports/00-smoke2.png
+
+# Pre-refinement baseline exports (kept locally for comparison, not a deliverable).
+exports/before/

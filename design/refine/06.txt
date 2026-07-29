@@ -1,0 +1,13 @@
+TARGETED CORRECTION PASS on these existing admin screens. Change only what is listed. Do not redesign any screen.
+
+1. Delete the ORPHANED SIDEBAR ARTBOARD — the standalone sidebar sitting on the canvas with no screen attached to it. It was scratch work from building the reusable component. Keep the sidebars that are part of the three real screens.
+2. Delete any other loose scratch geometry or unused component instance on the canvas (stray menu items, lone KPI tiles, sample labels).
+3. The sidebar in this file is CORRECT and is the canonical one for the whole product. Do not change its twelve items.
+4. Keep every KPI tile, badge and status chip exactly as it is — including 'Average Ticket · VAT incl.', '2 awaiting POS', 'Order held from POS until payment is verified', 'Branch is not mapped to a POS terminal', the Dormant push-notification row and the accountant role warning bar. These encode real system constraints.
+
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.

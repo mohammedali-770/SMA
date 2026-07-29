@@ -1,0 +1,12 @@
+TARGETED COPY CORRECTION on this twelve-state board. Change ONLY the two copy errors below. Do not restyle the board, do not change any icon, colour, border, flag chip or layout, and do not touch the other ten cards.
+
+1. On the 'accepted_no_pos_channel_unpaid' card (Arabic headline تم استلام الطلب, English sub-headline 'Order received (cash)'), the body currently ends with the literal words 'No payment language.' — that was an instruction to the generator, not customer copy. Delete that sentence. The body should read: 'Your order has been received and is being processed.'
+2. On the 'accepted_no_pos_channel' card (Arabic headline تم استلام الدفع, English 'Payment received'), the body currently says 'The order is processed through the delivery channel. Awaiting branch assignment.' Delete 'Awaiting branch assignment.' — no branch is involved in this state and nothing may imply a branch step is pending. The body should read: 'Your order is being processed through the delivery channel.'
+3. Leave the green success card, its border and its #5 branch number untouched. Leave the 'no resend' behaviour of the verifying card untouched.
+
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.

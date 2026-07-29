@@ -1,0 +1,35 @@
+TARGETED CORRECTION PASS on this existing admin panel-studies sheet. Change only what is listed. Do not redesign the six panels.
+
+CANONICAL ADMIN SIDEBAR — the twelve items below are the real navigation of this
+product. Replace whatever sidebar this file currently has so it matches exactly,
+in this order, with these labels and these two badges. Do not add, rename,
+reorder or drop any item:
+
+  1. Sales Overview
+  2. Live Orders            (red count badge: 7)
+  3. Menu Management
+  4. Banners
+  5. Branch Management
+  6. Financial Reports
+  7. Integrations
+  8. Operations Health
+  9. Operations Alerts      (red count badge: 3)
+  10. Order Integrity
+  11. Settings
+  12. Legal Documents
+
+Tabs named Dashboard, Orders, Menu, Branches, Customers, Payments, Promotions,
+Delivery, Reports, Operations or Legal Docs DO NOT EXIST in this product and must
+be removed. The active item stays a filled purple pill on whichever screen it
+belongs to. Keep the SPICY MEAL wordmark at the top.
+
+This sheet's sidebar currently reads Dashboard, Orders, Menu, Branches, Customers, Banners, Integrations, Operations, Order Integrity, Settings, Legal Docs, Reports. Replace it with the canonical twelve above. Keep Banners as the active item since this sheet leads with the Banners panel.
+
+Keep all six panels exactly as they are — Banners with its schedule rows and toggles, Integrations with its four providers and the Dormant push row, Operations Health with its five subsystem rows, Order Integrity with only Acknowledge/Suppress/Timeline and its closing line that no retry, refund, resend or mark-paid control exists by design, Settings with its four toggles and the warning that disabling both payment methods stops checkout entirely, and Legal Documents with its versioned rows. These encode real system constraints and must not be replaced with generic dashboard content.
+
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.

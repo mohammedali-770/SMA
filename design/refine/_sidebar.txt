@@ -1,0 +1,22 @@
+CANONICAL ADMIN SIDEBAR — the twelve items below are the real navigation of this
+product. Replace whatever sidebar this file currently has so it matches exactly,
+in this order, with these labels and these two badges. Do not add, rename,
+reorder or drop any item:
+
+  1. Sales Overview
+  2. Live Orders            (red count badge: 7)
+  3. Menu Management
+  4. Banners
+  5. Branch Management
+  6. Financial Reports
+  7. Integrations
+  8. Operations Health
+  9. Operations Alerts      (red count badge: 3)
+  10. Order Integrity
+  11. Settings
+  12. Legal Documents
+
+Tabs named Dashboard, Orders, Menu, Branches, Customers, Payments, Promotions,
+Delivery, Reports, Operations or Legal Docs DO NOT EXIST in this product and must
+be removed. The active item stays a filled purple pill on whichever screen it
+belongs to. Keep the SPICY MEAL wordmark at the top.

@@ -1,0 +1,35 @@
+TARGETED CORRECTION PASS on these existing admin panel screens. Change only what is listed. Do not redesign the panel content.
+
+CANONICAL ADMIN SIDEBAR — the twelve items below are the real navigation of this
+product. Replace whatever sidebar this file currently has so it matches exactly,
+in this order, with these labels and these two badges. Do not add, rename,
+reorder or drop any item:
+
+  1. Sales Overview
+  2. Live Orders            (red count badge: 7)
+  3. Menu Management
+  4. Banners
+  5. Branch Management
+  6. Financial Reports
+  7. Integrations
+  8. Operations Health
+  9. Operations Alerts      (red count badge: 3)
+  10. Order Integrity
+  11. Settings
+  12. Legal Documents
+
+Tabs named Dashboard, Orders, Menu, Branches, Customers, Payments, Promotions,
+Delivery, Reports, Operations or Legal Docs DO NOT EXIST in this product and must
+be removed. The active item stays a filled purple pill on whichever screen it
+belongs to. Keep the SPICY MEAL wordmark at the top.
+
+Apply that sidebar to ALL THREE screens in this file (Menu Management, Branch Management, and the dark-mode Operations Alerts screen), with the correct item active on each: Menu Management, Branch Management, and Operations Alerts respectively. On the dark screen use the dark-mode sidebar treatment but the same twelve items.
+
+Keep everything else exactly as it is — the product table, the category and modifier-group cards, the branch stats and channel toggles, the delivery-zone map and its polygon, the branch-by-product availability matrix, the three alert severity cards with their bilingual bodies, and the daily digest panel including the line stating that external delivery is disabled by design. Those encode real system constraints and must not be replaced with generic dashboard content.
+
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.

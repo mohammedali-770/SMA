@@ -1,0 +1,60 @@
+TARGETED CORRECTION PASS on these existing customer-app screens. Change only what is listed, then apply the craft pass. Do not add, remove or rename any screen or control.
+
+1. HEADER MIRRORING IS BACKWARDS. On the ARABIC screens the brand lockup must sit on the RIGHT and the language toggle on the LEFT. On the ENGLISH screen the brand lockup must sit on the LEFT and the language toggle on the RIGHT. The brand belongs at the start of the reading direction. Mirror the whole header row accordingly, including the branch bar beneath it (its label and branch name lead from the start edge, the Change chip sits at the end edge).
+2. BOTTOM TAB BAR. The app has exactly THREE tabs. Arabic: الرئيسية · طلباتي · حسابي. English: Home · Orders · Account. There is NO Menu tab — home is the menu. Remove any Menu/القائمة tab if present and keep the tab order mirrored (Home is rightmost in Arabic, leftmost in English).
+3. Verify every other mirrored element: back arrows, chevrons, icon-to-text spacing and text alignment must all follow the screen's direction.
+
+NUMERALS — use Western digits (0 1 2 3 4 5 6 7 8 9) everywhere, on Arabic screens
+as well as English ones. Convert any Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) you find in
+prices, calories, counts, quantities, timestamps, points balances and badges.
+Currency labels stay localised: "ر.س" on Arabic screens, "SAR" on English ones.
+Amounts keep two decimals. Numerals always run left-to-right, including inside
+right-to-left text.
+
+ARABIC TEXT CORRECTNESS — set every Arabic text run to right-to-left with
+right-aligned paragraphs, so sentence-ending punctuation (. ، ؛ ؟) sits at the
+END of the sentence and never jumps to the start of a wrapped line. Check the
+inline notices, hint lines and helper text in particular.
+
+CRAFT PASS — make these screens feel designed by a person, not generated.
+
+The current screens are correct but generic: every card is the same height, the
+brand purple is sprayed everywhere, the type sits at one weight, and the food
+blocks read as flat swatches. Fix the CRAFT, not the structure. Do not add,
+remove or rename any screen, control, field, button, tab, badge or feature. Do
+not invent menu items, promotions, ratings, delivery times or any content that is
+not already on the screen.
+
+Apply all of the following:
+
+1. TYPE CONTRAST. Widen the gap between levels. Product and screen names go
+   heavier and tighter (negative letter-spacing); descriptions go lighter, smaller
+   and a step cooler in colour. Prices are the second-loudest thing on a card
+   after the name. Right now everything sits at a similar weight and it reads flat.
+
+2. SPACING RHYTHM. Stop spacing everything evenly. Give section starts generous
+   breathing room above them and tighten the gaps inside a group, so the eye
+   groups content instead of scanning a uniform ladder. Vary the vertical rhythm
+   between sections rather than repeating one gap value.
+
+3. DEPTH. Cards should sit on the background, not be outlined on it. Prefer a
+   soft, low, wide shadow over a hairline border. Let the food block bleed to the
+   card's edge on at least the first card of a list instead of floating inset with
+   equal padding on all four sides.
+
+4. FOOD BLOCKS. These stand in for photography, so make them read as a photo crop,
+   not a colour chip: layered multi-stop gradients on an off-axis angle, a warm
+   highlight offset from centre, a darker vignette at one corner, and a slightly
+   different hue and angle per dish. No two dishes identical.
+
+5. BRAND RESTRAINT. Purple is currently everywhere. Pull it back to primary
+   actions, the active navigation state and one accent per screen. Let surfaces be
+   warm near-white and let the food carry the colour. The red stays reserved for
+   destructive and error states only.
+
+6. OPTICAL DETAIL. Align Arabic text optically rather than mechanically, keep
+   corner radii consistent within a screen, and let numerals sit on a tabular
+   baseline so columns of prices line up.
+
+Keep every existing label, string, state, warning and control exactly as it is.
+This is a visual craft pass only.

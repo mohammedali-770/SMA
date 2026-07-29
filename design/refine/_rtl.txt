@@ -1,0 +1,4 @@
+ARABIC TEXT CORRECTNESS — set every Arabic text run to right-to-left with
+right-aligned paragraphs, so sentence-ending punctuation (. ، ؛ ؟) sits at the
+END of the sentence and never jumps to the start of a wrapped line. Check the
+inline notices, hint lines and helper text in particular.
