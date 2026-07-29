@@ -363,7 +363,7 @@
               "content": "اختر طريقة الطلب",
               "fontFamily": "Inter",
               "fontSize": 17,
-              "fontWeight": "700"
+              "fontWeight": "800"
             }
           ]
         },
@@ -470,7 +470,7 @@
                   "name": "Icon Wrap",
                   "width": 40,
                   "height": 40,
-                  "fill": "$primary-light",
+                  "fill": "#F5F0EB",
                   "cornerRadius": 10,
                   "justifyContent": "center",
                   "alignItems": "center",
@@ -483,7 +483,7 @@
                       "height": 20,
                       "icon": "store",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "#8A7E72"
                     }
                   ]
                 },
@@ -504,6 +504,12 @@
                       "alignItems": "center",
                       "children": [
                         {
+                          "id": "iNK3i",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        },
+                        {
                           "type": "text",
                           "id": "eDwNP",
                           "name": "Branch Name",
@@ -512,12 +518,6 @@
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
-                        },
-                        {
-                          "id": "iNK3i",
-                          "type": "ref",
-                          "ref": "qp1ox",
-                          "name": "Open Badge"
                         }
                       ]
                     },
@@ -529,8 +529,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "طريق العليا العام، حي العليا",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -545,7 +547,7 @@
                           "id": "q2d7N",
                           "name": "Distance",
                           "fill": "$muted",
-                          "content": "١٫٢ كم",
+                          "content": "1.2 كم",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -565,7 +567,7 @@
                           "id": "xtF7p",
                           "name": "Min Order",
                           "fill": "$muted",
-                          "content": "الحد الأدنى: ٥٠ ر.س",
+                          "content": "الحد الأدنى: 50 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -601,7 +603,7 @@
                   "name": "Icon Wrap",
                   "width": 40,
                   "height": 40,
-                  "fill": "$primary-light",
+                  "fill": "#F5F0EB",
                   "cornerRadius": 10,
                   "justifyContent": "center",
                   "alignItems": "center",
@@ -614,7 +616,7 @@
                       "height": 20,
                       "icon": "store",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "#8A7E72"
                     }
                   ]
                 },
@@ -635,6 +637,12 @@
                       "alignItems": "center",
                       "children": [
                         {
+                          "id": "tnGrh",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        },
+                        {
                           "type": "text",
                           "id": "mVbUv",
                           "name": "Branch Name",
@@ -643,12 +651,6 @@
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
-                        },
-                        {
-                          "id": "tnGrh",
-                          "type": "ref",
-                          "ref": "qp1ox",
-                          "name": "Open Badge"
                         }
                       ]
                     },
@@ -660,8 +662,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "طريق الملك فهد، حي النخيل",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -676,7 +680,7 @@
                           "id": "k5oiT",
                           "name": "Distance",
                           "fill": "$muted",
-                          "content": "٣٫٨ كم",
+                          "content": "3.8 كم",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -686,7 +690,7 @@
                           "id": "xSodI",
                           "name": "Fee",
                           "fill": "$muted",
-                          "content": "توصيل: ٥ ر.س",
+                          "content": "توصيل: 5 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -696,7 +700,7 @@
                           "id": "aEEJI",
                           "name": "Min Order",
                           "fill": "$muted",
-                          "content": "الحد الأدنى: ٤٠ ر.س",
+                          "content": "الحد الأدنى: 40 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -732,7 +736,7 @@
                   "name": "Icon Wrap",
                   "width": 40,
                   "height": 40,
-                  "fill": "$primary-light",
+                  "fill": "#F5F0EB",
                   "cornerRadius": 10,
                   "justifyContent": "center",
                   "alignItems": "center",
@@ -745,7 +749,7 @@
                       "height": 20,
                       "icon": "store",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "#8A7E72"
                     }
                   ]
                 },
@@ -766,6 +770,12 @@
                       "alignItems": "center",
                       "children": [
                         {
+                          "id": "WfPLX",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        },
+                        {
                           "type": "text",
                           "id": "nKSHn",
                           "name": "Branch Name",
@@ -774,12 +784,6 @@
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
-                        },
-                        {
-                          "id": "WfPLX",
-                          "type": "ref",
-                          "ref": "qp1ox",
-                          "name": "Open Badge"
                         }
                       ]
                     },
@@ -791,8 +795,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "شارع أنس بن مالك، حي الملقا",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -807,7 +813,7 @@
                           "id": "kOb6M",
                           "name": "Distance",
                           "fill": "$muted",
-                          "content": "٦٫٥ كم",
+                          "content": "6.5 كم",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -817,7 +823,7 @@
                           "id": "GQb5J",
                           "name": "Fee",
                           "fill": "$muted",
-                          "content": "توصيل: ٨ ر.س",
+                          "content": "توصيل: 8 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -827,7 +833,7 @@
                           "id": "AG4jF",
                           "name": "Min Order",
                           "fill": "$muted",
-                          "content": "الحد الأدنى: ٤٠ ر.س",
+                          "content": "الحد الأدنى: 40 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -864,7 +870,7 @@
                   "name": "Icon Wrap",
                   "width": 40,
                   "height": 40,
-                  "fill": "$primary-light",
+                  "fill": "#F5F0EB",
                   "cornerRadius": 10,
                   "justifyContent": "center",
                   "alignItems": "center",
@@ -877,7 +883,7 @@
                       "height": 20,
                       "icon": "store",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "#8A7E72"
                     }
                   ]
                 },
@@ -898,6 +904,12 @@
                       "alignItems": "center",
                       "children": [
                         {
+                          "id": "AI4ZN",
+                          "type": "ref",
+                          "ref": "gNXWA",
+                          "name": "Closed Badge"
+                        },
+                        {
                           "type": "text",
                           "id": "Ths2V",
                           "name": "Branch Name",
@@ -906,12 +918,6 @@
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "700"
-                        },
-                        {
-                          "id": "AI4ZN",
-                          "type": "ref",
-                          "ref": "gNXWA",
-                          "name": "Closed Badge"
                         }
                       ]
                     },
@@ -923,8 +929,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "شارع الأمير سلطان، حي السويدي",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -939,7 +947,7 @@
                           "id": "UMgut",
                           "name": "Distance",
                           "fill": "$muted",
-                          "content": "١٢٫١ كم",
+                          "content": "12.1 كم",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -949,7 +957,7 @@
                           "id": "yW5Kn",
                           "name": "Fee",
                           "fill": "$muted",
-                          "content": "توصيل: ١٢ ر.س",
+                          "content": "توصيل: 12 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -959,7 +967,7 @@
                           "id": "urTDu",
                           "name": "Min Order",
                           "fill": "$muted",
-                          "content": "الحد الأدنى: ٦٠ ر.س",
+                          "content": "الحد الأدنى: 60 ر.س",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "500"
@@ -1088,7 +1096,7 @@
               "content": "اختر طريقة الطلب",
               "fontFamily": "Inter",
               "fontSize": 17,
-              "fontWeight": "700"
+              "fontWeight": "800"
             }
           ]
         },
@@ -1577,7 +1585,8 @@
                       "fill": "$disabled",
                       "content": "مثال: بقالة السلام، بجانب المسجد",
                       "fontFamily": "Inter",
-                      "fontSize": 14
+                      "fontSize": 14,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -1630,9 +1639,10 @@
                       "id": "l155G",
                       "name": "Zone Branch",
                       "fill": "$muted",
-                      "content": "فرع العليا · ١٫٢ كم",
+                      "content": "فرع العليا · 1.2 كم",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -1715,8 +1725,45 @@
           "children": [
             {
               "type": "frame",
+              "id": "L4xzJq",
+              "name": "Lang Toggle",
+              "fill": "$white",
+              "cornerRadius": 999,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "gap": 4,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "V7jKF",
+                  "name": "Globe Icon",
+                  "width": 14,
+                  "height": 14,
+                  "icon": "globe",
+                  "library": "lucide",
+                  "fill": "$muted"
+                },
+                {
+                  "type": "text",
+                  "id": "qlkD6",
+                  "name": "Lang Text",
+                  "fill": "$muted",
+                  "content": "EN",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
               "id": "g9jghI",
-              "name": "Logo Left",
+              "name": "Logo Right",
               "gap": 8,
               "alignItems": "center",
               "children": [
@@ -1754,43 +1801,6 @@
                   "fontWeight": "800"
                 }
               ]
-            },
-            {
-              "type": "frame",
-              "id": "L4xzJq",
-              "name": "Lang Toggle",
-              "fill": "$white",
-              "cornerRadius": 999,
-              "stroke": "$border",
-              "strokeWidth": 1,
-              "gap": 4,
-              "padding": [
-                6,
-                12
-              ],
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "icon",
-                  "id": "V7jKF",
-                  "name": "Globe Icon",
-                  "width": 14,
-                  "height": 14,
-                  "icon": "globe",
-                  "library": "lucide",
-                  "fill": "$muted"
-                },
-                {
-                  "type": "text",
-                  "id": "qlkD6",
-                  "name": "Lang Text",
-                  "fill": "$muted",
-                  "content": "EN",
-                  "fontFamily": "Inter",
-                  "fontSize": 12,
-                  "fontWeight": "600"
-                }
-              ]
             }
           ]
         },
@@ -1809,8 +1819,32 @@
           "children": [
             {
               "type": "frame",
+              "id": "IWLpS",
+              "name": "Change Chip",
+              "fill": "$primary-light",
+              "cornerRadius": 999,
+              "padding": [
+                6,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "oipyk",
+                  "name": "Change Text",
+                  "fill": "$primary",
+                  "content": "تغيير",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
               "id": "PjziE",
-              "name": "Branch Bar Left",
+              "name": "Branch Bar Right",
               "gap": 8,
               "alignItems": "center",
               "children": [
@@ -1822,7 +1856,7 @@
                   "height": 18,
                   "icon": "truck",
                   "library": "lucide",
-                  "fill": "$primary"
+                  "fill": "#8A7E72"
                 },
                 {
                   "type": "frame",
@@ -1849,6 +1883,12 @@
                       "alignItems": "center",
                       "children": [
                         {
+                          "id": "ygvyl",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge"
+                        },
+                        {
                           "type": "text",
                           "id": "E944rX",
                           "name": "Branch Name",
@@ -1857,40 +1897,10 @@
                           "fontFamily": "Inter",
                           "fontSize": 14,
                           "fontWeight": "700"
-                        },
-                        {
-                          "id": "ygvyl",
-                          "type": "ref",
-                          "ref": "qp1ox",
-                          "name": "Open Badge"
                         }
                       ]
                     }
                   ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "IWLpS",
-              "name": "Change Chip",
-              "fill": "$primary-light",
-              "cornerRadius": 999,
-              "padding": [
-                6,
-                12
-              ],
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "oipyk",
-                  "name": "Change Text",
-                  "fill": "$primary",
-                  "content": "تغيير",
-                  "fontFamily": "Inter",
-                  "fontSize": 12,
-                  "fontWeight": "600"
                 }
               ]
             }
@@ -1902,13 +1912,8 @@
           "name": "Content",
           "width": "fill_container",
           "layout": "vertical",
-          "gap": 16,
-          "padding": [
-            12,
-            16,
-            16,
-            16
-          ],
+          "gap": 20,
+          "padding": 16,
           "children": [
             {
               "type": "frame",
@@ -1934,15 +1939,15 @@
                     },
                     "colors": [
                       {
-                        "color": "#422e87",
+                        "color": "#2A1B52",
                         "position": 0
                       },
                       {
-                        "color": "#6b4fc7",
-                        "position": 0.5
+                        "color": "#4A3590",
+                        "position": 0.45
                       },
                       {
-                        "color": "#e02d3d",
+                        "color": "#B83535",
                         "position": 1
                       }
                     ]
@@ -1961,7 +1966,7 @@
                       "type": "ellipse",
                       "id": "b0NPtz",
                       "name": "Dot 0",
-                      "fill": "$primary",
+                      "fill": "$ink",
                       "width": 8,
                       "height": 8
                     },
@@ -1994,7 +1999,29 @@
               "fill": "$white",
               "cornerRadius": 12,
               "stroke": "$border",
-              "strokeWidth": 1,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143006",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 4
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 2
+                  },
+                  "blur": 10,
+                  "spread": -1
+                }
+              ],
               "gap": 8,
               "padding": [
                 0,
@@ -2019,7 +2046,8 @@
                   "fill": "$disabled",
                   "content": "ابحث عن برجر، مقبلات…",
                   "fontFamily": "Inter",
-                  "fontSize": 14
+                  "fontSize": 14,
+                  "fontWeight": "normal"
                 }
               ]
             },
@@ -2166,17 +2194,46 @@
               "name": "Product List",
               "width": "fill_container",
               "layout": "vertical",
-              "gap": 12,
+              "gap": 14,
               "children": [
                 {
                   "type": "frame",
                   "id": "rSyYA",
                   "name": "Card برجر كلاسيكي",
+                  "clip": true,
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
-                  "padding": 12,
+                  "padding": [
+                    6,
+                    0,
+                    6,
+                    12
+                  ],
                   "alignItems": "center",
                   "children": [
                     {
@@ -2185,7 +2242,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -2194,19 +2251,22 @@
                           "fill": "$ink",
                           "content": "برجر كلاسيكي",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "Z3khc",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "لحم أنغوس مشوي مع جبن شيدر وخضروات طازجة",
+                          "textAlign": "right",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -2220,21 +2280,21 @@
                               "type": "text",
                               "id": "V73Eof",
                               "name": "Calories",
-                              "fill": "$muted",
-                              "content": "٤٨٠ سعرة",
+                              "fill": "$text-desc",
+                              "content": "480 سعرة",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "oSQzF",
                               "name": "Price",
-                              "fill": "$primary",
-                              "content": "٣٥ ر.س",
+                              "fill": "$ink",
+                              "content": "35 ر.س",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -2242,7 +2302,7 @@
                           "type": "frame",
                           "id": "L8AaLV",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -2255,7 +2315,7 @@
                               "type": "text",
                               "id": "Wsft3",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "إضافة",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -2267,34 +2327,87 @@
                     },
                     {
                       "type": "rectangle",
-                      "cornerRadius": 12,
                       "id": "U8MufE",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 165,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#F5D0A0",
+                              "position": 0
+                            },
+                            {
+                              "color": "#C88040",
+                              "position": 0.4
+                            },
+                            {
+                              "color": "#7A3A12",
+                              "position": 0.85
+                            },
+                            {
+                              "color": "#4A2008",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffd9a3",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.7,
+                            "height": 0.7
                           },
-                          {
-                            "color": "#f4a259",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#d1512f",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFE8C880",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFE8C800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.7,
+                            "y": 0.22
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1.1,
+                            "height": 1.1
+                          },
+                          "colors": [
+                            {
+                              "color": "#3D180800",
+                              "position": 0.25
+                            },
+                            {
+                              "color": "#3D180860",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.12,
+                            "y": 0.88
+                          }
+                        }
+                      ],
                       "width": 100,
-                      "height": 100
+                      "height": 120
                     }
                   ]
                 },
@@ -2304,7 +2417,30 @@
                   "name": "Card برجر سبايسي",
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
                   "padding": 12,
                   "alignItems": "center",
@@ -2315,7 +2451,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -2324,19 +2460,22 @@
                           "fill": "$ink",
                           "content": "برجر سبايسي",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "cv7Qs",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "لحم مع صوص حار خاص وهالبينو مقرمش",
+                          "textAlign": "right",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -2350,21 +2489,21 @@
                               "type": "text",
                               "id": "phDPX",
                               "name": "Calories",
-                              "fill": "$muted",
-                              "content": "٥٢٠ سعرة",
+                              "fill": "$text-desc",
+                              "content": "520 سعرة",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "vxC1B",
                               "name": "Price",
-                              "fill": "$primary",
-                              "content": "٤٠ ر.س",
+                              "fill": "$ink",
+                              "content": "40 ر.س",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -2372,7 +2511,7 @@
                           "type": "frame",
                           "id": "GqcrJ",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -2385,7 +2524,7 @@
                               "type": "text",
                               "id": "TOCwU",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "تخصيص وإضافة",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -2400,29 +2539,83 @@
                       "cornerRadius": 12,
                       "id": "O2M69c",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 140,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#FFB08A",
+                              "position": 0
+                            },
+                            {
+                              "color": "#D84D2F",
+                              "position": 0.35
+                            },
+                            {
+                              "color": "#9A2020",
+                              "position": 0.7
+                            },
+                            {
+                              "color": "#5A1010",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffc97a",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.65,
+                            "height": 0.65
                           },
-                          {
-                            "color": "#e8944a",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#c4421f",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFCCA878",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFCCA800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.62,
+                            "y": 0.28
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1,
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#3D0E0E00",
+                              "position": 0.15
+                            },
+                            {
+                              "color": "#3D0E0E70",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.1,
+                            "y": 0.92
+                          }
+                        }
+                      ],
                       "width": 100,
                       "height": 100
                     }
@@ -2434,7 +2627,30 @@
                   "name": "Card دجاج مقرمش",
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
                   "padding": 12,
                   "alignItems": "center",
@@ -2445,7 +2661,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -2454,19 +2670,22 @@
                           "fill": "$ink",
                           "content": "دجاج مقرمش",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "VL6rj",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "قطع دجاج مقرمشة مع صوص العسل والماسترد",
+                          "textAlign": "right",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -2480,21 +2699,21 @@
                               "type": "text",
                               "id": "zPSI6",
                               "name": "Calories",
-                              "fill": "$muted",
-                              "content": "٣٨٠ سعرة",
+                              "fill": "$text-desc",
+                              "content": "380 سعرة",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "f55jCz",
                               "name": "Price",
-                              "fill": "$primary",
-                              "content": "٣٠ ر.س",
+                              "fill": "$ink",
+                              "content": "30 ر.س",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -2502,7 +2721,7 @@
                           "type": "frame",
                           "id": "DKzgD",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -2515,7 +2734,7 @@
                               "type": "text",
                               "id": "O8DrA",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "إضافة",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -2530,29 +2749,83 @@
                       "cornerRadius": 12,
                       "id": "uHomy",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 178,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#FFE0A8",
+                              "position": 0
+                            },
+                            {
+                              "color": "#D4983C",
+                              "position": 0.35
+                            },
+                            {
+                              "color": "#9A6A1A",
+                              "position": 0.72
+                            },
+                            {
+                              "color": "#5A3808",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffe0a8",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.8,
+                            "height": 0.8
                           },
-                          {
-                            "color": "#f0aa55",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#d45830",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFF2D888",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFF2D800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.38,
+                            "y": 0.2
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1,
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#40200500",
+                              "position": 0.2
+                            },
+                            {
+                              "color": "#40200568",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.88,
+                            "y": 0.82
+                          }
+                        }
+                      ],
                       "width": 100,
                       "height": 100
                     }
@@ -2576,6 +2849,16 @@
           "alignItems": "center",
           "children": [
             {
+              "type": "text",
+              "id": "NRmxN",
+              "name": "Cart Total",
+              "fill": "$on-primary",
+              "content": "75 ر.س",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
               "type": "frame",
               "id": "wVUoH",
               "name": "Cart Left",
@@ -2598,7 +2881,7 @@
                       "id": "KLD6O",
                       "name": "Cart Count",
                       "fill": "$on-primary",
-                      "content": "٢",
+                      "content": "2",
                       "fontFamily": "Inter",
                       "fontSize": 13,
                       "fontWeight": "700"
@@ -2616,16 +2899,6 @@
                   "fontWeight": "600"
                 }
               ]
-            },
-            {
-              "type": "text",
-              "id": "NRmxN",
-              "name": "Cart Total",
-              "fill": "$on-primary",
-              "content": "٧٥ ر.س",
-              "fontFamily": "Inter",
-              "fontSize": 15,
-              "fontWeight": "700"
             }
           ]
         },
@@ -2681,6 +2954,48 @@
           "children": [
             {
               "type": "frame",
+              "id": "oGSlq",
+              "name": "Logo Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "VWF8w",
+                  "name": "Logo Mark",
+                  "width": 32,
+                  "height": 32,
+                  "fill": "$primary",
+                  "cornerRadius": 8,
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "i6U24V",
+                      "name": "Logo Letter",
+                      "fill": "$on-primary",
+                      "content": "S",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "800"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "c5XYWe",
+                  "name": "Logo Text",
+                  "fill": "$ink",
+                  "content": "Spicy Meal",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
               "id": "gUZBl",
               "name": "Lang Toggle",
               "fill": "$white",
@@ -2715,48 +3030,6 @@
                   "fontWeight": "600"
                 }
               ]
-            },
-            {
-              "type": "frame",
-              "id": "oGSlq",
-              "name": "Logo Right",
-              "gap": 8,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "text",
-                  "id": "c5XYWe",
-                  "name": "Logo Text",
-                  "fill": "$ink",
-                  "content": "Spicy Meal",
-                  "fontFamily": "Inter",
-                  "fontSize": 18,
-                  "fontWeight": "800"
-                },
-                {
-                  "type": "frame",
-                  "id": "VWF8w",
-                  "name": "Logo Mark",
-                  "width": 32,
-                  "height": 32,
-                  "fill": "$primary",
-                  "cornerRadius": 8,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "i6U24V",
-                      "name": "Logo Letter",
-                      "fill": "$on-primary",
-                      "content": "S",
-                      "fontFamily": "Inter",
-                      "fontSize": 16,
-                      "fontWeight": "800"
-                    }
-                  ]
-                }
-              ]
             }
           ]
         },
@@ -2773,6 +3046,74 @@
           "justifyContent": "space_between",
           "alignItems": "center",
           "children": [
+            {
+              "type": "frame",
+              "id": "e6n7dI",
+              "name": "Branch Bar Left",
+              "gap": 8,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "zwCjL",
+                  "name": "Delivery Icon",
+                  "width": 18,
+                  "height": 18,
+                  "icon": "truck",
+                  "library": "lucide",
+                  "fill": "$primary"
+                },
+                {
+                  "type": "frame",
+                  "id": "yjcRh",
+                  "name": "Branch Bar Text",
+                  "layout": "vertical",
+                  "gap": 2,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "bEiIm",
+                      "name": "Delivery Label",
+                      "fill": "$muted",
+                      "content": "Delivery from",
+                      "fontFamily": "Inter",
+                      "fontSize": 11,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "b2EOKj",
+                      "name": "Branch Name Row",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "bQMsP",
+                          "name": "Branch Name",
+                          "fill": "$ink",
+                          "content": "Olaya Branch",
+                          "fontFamily": "Inter",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "id": "AD2nI",
+                          "type": "ref",
+                          "ref": "qp1ox",
+                          "name": "Open Badge",
+                          "descendants": {
+                            "PTy8W": {
+                              "content": "Open"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
             {
               "type": "frame",
               "id": "zaQvM",
@@ -2796,75 +3137,6 @@
                   "fontWeight": "600"
                 }
               ]
-            },
-            {
-              "type": "frame",
-              "id": "e6n7dI",
-              "name": "Branch Bar Right",
-              "gap": 8,
-              "alignItems": "center",
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "yjcRh",
-                  "name": "Branch Bar Text",
-                  "layout": "vertical",
-                  "gap": 2,
-                  "alignItems": "end",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "b2EOKj",
-                      "name": "Branch Name Row",
-                      "gap": 6,
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "id": "AD2nI",
-                          "type": "ref",
-                          "ref": "qp1ox",
-                          "name": "Open Badge",
-                          "descendants": {
-                            "PTy8W": {
-                              "content": "Open"
-                            }
-                          }
-                        },
-                        {
-                          "type": "text",
-                          "id": "bQMsP",
-                          "name": "Branch Name",
-                          "fill": "$ink",
-                          "content": "Olaya Branch",
-                          "fontFamily": "Inter",
-                          "fontSize": 14,
-                          "fontWeight": "700"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "bEiIm",
-                      "name": "Delivery Label",
-                      "fill": "$muted",
-                      "content": "Delivery from",
-                      "fontFamily": "Inter",
-                      "fontSize": 11,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "icon",
-                  "id": "zwCjL",
-                  "name": "Delivery Icon",
-                  "width": 18,
-                  "height": 18,
-                  "icon": "truck",
-                  "library": "lucide",
-                  "fill": "$primary"
-                }
-              ]
             }
           ]
         },
@@ -2874,13 +3146,8 @@
           "name": "Content",
           "width": "fill_container",
           "layout": "vertical",
-          "gap": 16,
-          "padding": [
-            12,
-            16,
-            16,
-            16
-          ],
+          "gap": 20,
+          "padding": 16,
           "children": [
             {
               "type": "frame",
@@ -2906,15 +3173,15 @@
                     },
                     "colors": [
                       {
-                        "color": "#422e87",
+                        "color": "#2A1B52",
                         "position": 0
                       },
                       {
-                        "color": "#6b4fc7",
-                        "position": 0.5
+                        "color": "#4A3590",
+                        "position": 0.45
                       },
                       {
-                        "color": "#e02d3d",
+                        "color": "#B83535",
                         "position": 1
                       }
                     ]
@@ -2933,7 +3200,7 @@
                       "type": "ellipse",
                       "id": "G3Ucs",
                       "name": "Dot 0",
-                      "fill": "$primary",
+                      "fill": "$ink",
                       "width": 8,
                       "height": 8
                     },
@@ -2966,7 +3233,29 @@
               "fill": "$white",
               "cornerRadius": 12,
               "stroke": "$border",
-              "strokeWidth": 1,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143006",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 4
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 2
+                  },
+                  "blur": 10,
+                  "spread": -1
+                }
+              ],
               "gap": 8,
               "padding": [
                 0,
@@ -2981,7 +3270,8 @@
                   "fill": "$disabled",
                   "content": "Search for burgers, sides…",
                   "fontFamily": "Inter",
-                  "fontSize": 14
+                  "fontSize": 14,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "icon",
@@ -3138,49 +3428,131 @@
               "name": "Product List",
               "width": "fill_container",
               "layout": "vertical",
-              "gap": 12,
+              "gap": 14,
               "children": [
                 {
                   "type": "frame",
                   "id": "kgB6G",
                   "name": "Card Classic Burger",
+                  "clip": true,
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
-                  "padding": 12,
+                  "padding": [
+                    6,
+                    12,
+                    6,
+                    0
+                  ],
                   "alignItems": "center",
                   "children": [
                     {
                       "type": "rectangle",
-                      "cornerRadius": 12,
                       "id": "Z8TKS",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 165,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#F5D0A0",
+                              "position": 0
+                            },
+                            {
+                              "color": "#C88040",
+                              "position": 0.4
+                            },
+                            {
+                              "color": "#7A3A12",
+                              "position": 0.85
+                            },
+                            {
+                              "color": "#4A2008",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffd9a3",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.7,
+                            "height": 0.7
                           },
-                          {
-                            "color": "#f4a259",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#d1512f",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFE8C880",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFE8C800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.7,
+                            "y": 0.22
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1.1,
+                            "height": 1.1
+                          },
+                          "colors": [
+                            {
+                              "color": "#3D180800",
+                              "position": 0.25
+                            },
+                            {
+                              "color": "#3D180860",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.12,
+                            "y": 0.88
+                          }
+                        }
+                      ],
                       "width": 100,
-                      "height": 100
+                      "height": 120
                     },
                     {
                       "type": "frame",
@@ -3188,7 +3560,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -3197,19 +3569,21 @@
                           "fill": "$ink",
                           "content": "Classic Burger",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "GIDCi",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "Grilled Angus beef with cheddar cheese and fresh vegetables",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -3223,21 +3597,21 @@
                               "type": "text",
                               "id": "IYkuu",
                               "name": "Calories",
-                              "fill": "$muted",
+                              "fill": "$text-desc",
                               "content": "480 cal",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "MtTAo",
                               "name": "Price",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "SAR 35",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -3245,7 +3619,7 @@
                           "type": "frame",
                           "id": "JbBUm",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -3258,7 +3632,7 @@
                               "type": "text",
                               "id": "fFMKl",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "Add",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -3276,7 +3650,30 @@
                   "name": "Card Spicy Burger",
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
                   "padding": 12,
                   "alignItems": "center",
@@ -3286,29 +3683,83 @@
                       "cornerRadius": 12,
                       "id": "WKfTb",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 140,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#FFB08A",
+                              "position": 0
+                            },
+                            {
+                              "color": "#D84D2F",
+                              "position": 0.35
+                            },
+                            {
+                              "color": "#9A2020",
+                              "position": 0.7
+                            },
+                            {
+                              "color": "#5A1010",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffc97a",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.65,
+                            "height": 0.65
                           },
-                          {
-                            "color": "#e8944a",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#c4421f",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFCCA878",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFCCA800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.62,
+                            "y": 0.28
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1,
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#3D0E0E00",
+                              "position": 0.15
+                            },
+                            {
+                              "color": "#3D0E0E70",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.1,
+                            "y": 0.92
+                          }
+                        }
+                      ],
                       "width": 100,
                       "height": 100
                     },
@@ -3318,7 +3769,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -3327,19 +3778,21 @@
                           "fill": "$ink",
                           "content": "Spicy Burger",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "FbNjV",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "Beef patty with special hot sauce and crispy jalapeno",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -3353,21 +3806,21 @@
                               "type": "text",
                               "id": "i7zgja",
                               "name": "Calories",
-                              "fill": "$muted",
+                              "fill": "$text-desc",
                               "content": "520 cal",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "uWKxE",
                               "name": "Price",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "SAR 40",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -3375,7 +3828,7 @@
                           "type": "frame",
                           "id": "OjVGg",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -3388,7 +3841,7 @@
                               "type": "text",
                               "id": "plvDn",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "Customize & Add",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -3406,7 +3859,30 @@
                   "name": "Card Crispy Chicken",
                   "width": "fill_container",
                   "fill": "$white",
-                  "cornerRadius": 16,
+                  "cornerRadius": 14,
+                  "effect": [
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#18143008",
+                      "offset": {
+                        "x": 0,
+                        "y": 1
+                      },
+                      "blur": 3
+                    },
+                    {
+                      "type": "shadow",
+                      "shadowType": "outer",
+                      "color": "#1814300A",
+                      "offset": {
+                        "x": 0,
+                        "y": 6
+                      },
+                      "blur": 20,
+                      "spread": -2
+                    }
+                  ],
                   "gap": 12,
                   "padding": 12,
                   "alignItems": "center",
@@ -3416,29 +3892,83 @@
                       "cornerRadius": 12,
                       "id": "B8FWBz",
                       "name": "Food Photo",
-                      "fill": {
-                        "type": "gradient",
-                        "gradientType": "linear",
-                        "enabled": true,
-                        "rotation": 150,
-                        "size": {
-                          "height": 1
+                      "fill": [
+                        {
+                          "type": "gradient",
+                          "gradientType": "linear",
+                          "enabled": true,
+                          "rotation": 178,
+                          "size": {
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#FFE0A8",
+                              "position": 0
+                            },
+                            {
+                              "color": "#D4983C",
+                              "position": 0.35
+                            },
+                            {
+                              "color": "#9A6A1A",
+                              "position": 0.72
+                            },
+                            {
+                              "color": "#5A3808",
+                              "position": 1
+                            }
+                          ]
                         },
-                        "colors": [
-                          {
-                            "color": "#ffe0a8",
-                            "position": 0
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 0.8,
+                            "height": 0.8
                           },
-                          {
-                            "color": "#f0aa55",
-                            "position": 0.5
-                          },
-                          {
-                            "color": "#d45830",
-                            "position": 1
+                          "colors": [
+                            {
+                              "color": "#FFF2D888",
+                              "position": 0
+                            },
+                            {
+                              "color": "#FFF2D800",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.38,
+                            "y": 0.2
                           }
-                        ]
-                      },
+                        },
+                        {
+                          "type": "gradient",
+                          "gradientType": "radial",
+                          "enabled": true,
+                          "rotation": 0,
+                          "size": {
+                            "width": 1,
+                            "height": 1
+                          },
+                          "colors": [
+                            {
+                              "color": "#40200500",
+                              "position": 0.2
+                            },
+                            {
+                              "color": "#40200568",
+                              "position": 1
+                            }
+                          ],
+                          "center": {
+                            "x": 0.88,
+                            "y": 0.82
+                          }
+                        }
+                      ],
                       "width": 100,
                       "height": 100
                     },
@@ -3448,7 +3978,7 @@
                       "name": "Card Info",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 4,
+                      "gap": 6,
                       "children": [
                         {
                           "type": "text",
@@ -3457,19 +3987,21 @@
                           "fill": "$ink",
                           "content": "Crispy Chicken",
                           "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
+                          "fontSize": 16,
+                          "fontWeight": "800",
+                          "letterSpacing": -0.3
                         },
                         {
                           "type": "text",
                           "id": "iePCf",
                           "name": "Product Desc",
-                          "fill": "$muted",
+                          "fill": "$text-desc",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "Crispy chicken strips with honey mustard dipping sauce",
                           "fontFamily": "Inter",
-                          "fontSize": 13
+                          "fontSize": 12,
+                          "fontWeight": "normal"
                         },
                         {
                           "type": "frame",
@@ -3483,21 +4015,21 @@
                               "type": "text",
                               "id": "O2Iie",
                               "name": "Calories",
-                              "fill": "$muted",
+                              "fill": "$text-desc",
                               "content": "380 cal",
                               "fontFamily": "Inter",
-                              "fontSize": 12,
+                              "fontSize": 11,
                               "fontWeight": "500"
                             },
                             {
                               "type": "text",
                               "id": "O9FF39",
                               "name": "Price",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "SAR 30",
                               "fontFamily": "Inter",
-                              "fontSize": 15,
-                              "fontWeight": "700"
+                              "fontSize": 16,
+                              "fontWeight": "800"
                             }
                           ]
                         },
@@ -3505,7 +4037,7 @@
                           "type": "frame",
                           "id": "wcrqW",
                           "name": "Action Btn",
-                          "fill": "$primary-light",
+                          "fill": "#F5F0EB",
                           "cornerRadius": 8,
                           "padding": [
                             6,
@@ -3518,7 +4050,7 @@
                               "type": "text",
                               "id": "uuZGe",
                               "name": "Action Text",
-                              "fill": "$primary",
+                              "fill": "$ink",
                               "content": "Add",
                               "fontFamily": "Inter",
                               "fontSize": 13,
@@ -3547,16 +4079,6 @@
           "justifyContent": "space_between",
           "alignItems": "center",
           "children": [
-            {
-              "type": "text",
-              "id": "l4Pfa",
-              "name": "Cart Total",
-              "fill": "$on-primary",
-              "content": "SAR 75",
-              "fontFamily": "Inter",
-              "fontSize": 15,
-              "fontWeight": "700"
-            },
             {
               "type": "frame",
               "id": "h6rAA9",
@@ -3598,6 +4120,16 @@
                   ]
                 }
               ]
+            },
+            {
+              "type": "text",
+              "id": "l4Pfa",
+              "name": "Cart Total",
+              "fill": "$on-primary",
+              "content": "SAR 75",
+              "fontFamily": "Inter",
+              "fontSize": 15,
+              "fontWeight": "700"
             }
           ]
         },
@@ -3783,14 +4315,11 @@
           "alignItems": "center",
           "children": [
             {
-              "type": "icon",
-              "id": "YtQXK",
-              "name": "Back Arrow",
+              "type": "frame",
+              "id": "UB7YD",
+              "name": "Spacer",
               "width": 24,
-              "height": 24,
-              "icon": "chevron-right",
-              "library": "lucide",
-              "fill": "$ink"
+              "height": 24
             },
             {
               "type": "text",
@@ -3800,14 +4329,17 @@
               "content": "تفاصيل المنتج",
               "fontFamily": "Inter",
               "fontSize": 17,
-              "fontWeight": "700"
+              "fontWeight": "800"
             },
             {
-              "type": "frame",
-              "id": "UB7YD",
-              "name": "Spacer",
+              "type": "icon",
+              "id": "YtQXK",
+              "name": "Back Arrow",
               "width": 24,
-              "height": 24
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
             }
           ]
         },
@@ -3815,29 +4347,83 @@
           "type": "rectangle",
           "id": "V0v7n",
           "name": "Hero Photo",
-          "fill": {
-            "type": "gradient",
-            "gradientType": "linear",
-            "enabled": true,
-            "rotation": 160,
-            "size": {
-              "height": 1
+          "fill": [
+            {
+              "type": "gradient",
+              "gradientType": "linear",
+              "enabled": true,
+              "rotation": 155,
+              "size": {
+                "height": 1
+              },
+              "colors": [
+                {
+                  "color": "#FFB890",
+                  "position": 0
+                },
+                {
+                  "color": "#E05535",
+                  "position": 0.3
+                },
+                {
+                  "color": "#8A1818",
+                  "position": 0.7
+                },
+                {
+                  "color": "#4A0808",
+                  "position": 1
+                }
+              ]
             },
-            "colors": [
-              {
-                "color": "#ffd9a3",
-                "position": 0
+            {
+              "type": "gradient",
+              "gradientType": "radial",
+              "enabled": true,
+              "rotation": 0,
+              "size": {
+                "width": 0.9,
+                "height": 0.9
               },
-              {
-                "color": "#f4a259",
-                "position": 0.4
-              },
-              {
-                "color": "#d1512f",
-                "position": 1
+              "colors": [
+                {
+                  "color": "#FFD0A870",
+                  "position": 0
+                },
+                {
+                  "color": "#FFD0A800",
+                  "position": 1
+                }
+              ],
+              "center": {
+                "x": 0.55,
+                "y": 0.32
               }
-            ]
-          },
+            },
+            {
+              "type": "gradient",
+              "gradientType": "radial",
+              "enabled": true,
+              "rotation": 0,
+              "size": {
+                "width": 1.3,
+                "height": 1.3
+              },
+              "colors": [
+                {
+                  "color": "#2D080800",
+                  "position": 0.15
+                },
+                {
+                  "color": "#2D080880",
+                  "position": 1
+                }
+              ],
+              "center": {
+                "x": 0.08,
+                "y": 0.95
+              }
+            }
+          ],
           "width": "fill_container",
           "height": 220
         },
@@ -3847,9 +4433,9 @@
           "name": "PD Content",
           "width": "fill_container",
           "layout": "vertical",
-          "gap": 16,
+          "gap": 20,
           "padding": [
-            20,
+            24,
             16,
             16,
             16
@@ -3864,23 +4450,24 @@
               "children": [
                 {
                   "type": "text",
+                  "id": "fyjAA",
+                  "name": "Price",
+                  "fill": "$ink",
+                  "content": "40 ر.س",
+                  "fontFamily": "Inter",
+                  "fontSize": 22,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
                   "id": "TQTpv",
                   "name": "Product Name",
                   "fill": "$ink",
                   "content": "برجر سبايسي",
                   "fontFamily": "Inter",
-                  "fontSize": 20,
-                  "fontWeight": "800"
-                },
-                {
-                  "type": "text",
-                  "id": "fyjAA",
-                  "name": "Price",
-                  "fill": "$primary",
-                  "content": "٤٠ ر.س",
-                  "fontFamily": "Inter",
-                  "fontSize": 20,
-                  "fontWeight": "800"
+                  "fontSize": 22,
+                  "fontWeight": "800",
+                  "letterSpacing": -0.5
                 }
               ]
             },
@@ -3896,12 +4483,14 @@
                   "type": "text",
                   "id": "Q4bRQK",
                   "name": "Description",
-                  "fill": "$muted",
+                  "fill": "$text-desc",
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
                   "content": "لحم أنغوس مشوي مع صوص حار خاص وشرائح هالبينو مقرمشة، يقدم مع خس وطماطم وجبن شيدر مدخن",
+                  "textAlign": "right",
                   "fontFamily": "Inter",
-                  "fontSize": 14
+                  "fontSize": 13,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "frame",
@@ -3924,10 +4513,10 @@
                       "type": "text",
                       "id": "JFnLt",
                       "name": "Cal Text",
-                      "fill": "$muted",
-                      "content": "٥٢٠ سعرة حرارية",
+                      "fill": "$text-desc",
+                      "content": "520 سعرة حرارية",
                       "fontFamily": "Inter",
-                      "fontSize": 13,
+                      "fontSize": 12,
                       "fontWeight": "500"
                     }
                   ]
@@ -3959,16 +4548,6 @@
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "oWyOI",
-                      "name": "Group Title",
-                      "fill": "$ink",
-                      "content": "اختر نوع الخبز",
-                      "fontFamily": "Inter",
-                      "fontSize": 15,
-                      "fontWeight": "700"
-                    },
-                    {
                       "type": "frame",
                       "id": "zU5fO",
                       "name": "Required Badge",
@@ -3990,6 +4569,16 @@
                           "fontWeight": "700"
                         }
                       ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "oWyOI",
+                      "name": "Group Title",
+                      "fill": "$ink",
+                      "content": "اختر نوع الخبز",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
                     }
                   ]
                 },
@@ -4061,6 +4650,16 @@
                   "alignItems": "center",
                   "children": [
                     {
+                      "type": "text",
+                      "id": "t3AJaM",
+                      "name": "Opt Price",
+                      "fill": "$muted",
+                      "content": "+ 3 ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
                       "type": "frame",
                       "id": "M2ixj",
                       "name": "Opt Left",
@@ -4088,16 +4687,6 @@
                           "fontWeight": "500"
                         }
                       ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "t3AJaM",
-                      "name": "Opt Price",
-                      "fill": "$muted",
-                      "content": "+ ٣ ر.س",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -4171,16 +4760,6 @@
                   "alignItems": "center",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "a2K2v",
-                      "name": "Group Title",
-                      "fill": "$ink",
-                      "content": "إضافات",
-                      "fontFamily": "Inter",
-                      "fontSize": 15,
-                      "fontWeight": "700"
-                    },
-                    {
                       "type": "frame",
                       "id": "UcBGy",
                       "name": "Optional Badge",
@@ -4196,12 +4775,22 @@
                           "id": "aYn7x",
                           "name": "Optional Text",
                           "fill": "$primary",
-                          "content": "اختياري · حتى ٣",
+                          "content": "اختياري · حتى 3",
                           "fontFamily": "Inter",
                           "fontSize": 11,
                           "fontWeight": "700"
                         }
                       ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "a2K2v",
+                      "name": "Group Title",
+                      "fill": "$ink",
+                      "content": "إضافات",
+                      "fontFamily": "Inter",
+                      "fontSize": 15,
+                      "fontWeight": "700"
                     }
                   ]
                 },
@@ -4217,6 +4806,16 @@
                   "justifyContent": "space_between",
                   "alignItems": "center",
                   "children": [
+                    {
+                      "type": "text",
+                      "id": "NW6wD",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ 4 ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
                     {
                       "type": "frame",
                       "id": "kfAjj",
@@ -4259,16 +4858,6 @@
                           "fontWeight": "500"
                         }
                       ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "NW6wD",
-                      "name": "Extra Price",
-                      "fill": "$muted",
-                      "content": "+ ٤ ر.س",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -4284,6 +4873,16 @@
                   "justifyContent": "space_between",
                   "alignItems": "center",
                   "children": [
+                    {
+                      "type": "text",
+                      "id": "Dz38F",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ 3 ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
                     {
                       "type": "frame",
                       "id": "BWXn9",
@@ -4326,16 +4925,6 @@
                           "fontWeight": "500"
                         }
                       ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "Dz38F",
-                      "name": "Extra Price",
-                      "fill": "$muted",
-                      "content": "+ ٣ ر.س",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -4351,6 +4940,16 @@
                   "justifyContent": "space_between",
                   "alignItems": "center",
                   "children": [
+                    {
+                      "type": "text",
+                      "id": "u7hCx",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "+ 2 ر.س",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
                     {
                       "type": "frame",
                       "id": "Ki8h4",
@@ -4380,16 +4979,6 @@
                           "fontWeight": "500"
                         }
                       ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "u7hCx",
-                      "name": "Extra Price",
-                      "fill": "$muted",
-                      "content": "+ ٢ ر.س",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "600"
                     }
                   ]
                 },
@@ -4405,6 +4994,16 @@
                   "justifyContent": "space_between",
                   "alignItems": "center",
                   "children": [
+                    {
+                      "type": "text",
+                      "id": "tVacG",
+                      "name": "Extra Price",
+                      "fill": "$muted",
+                      "content": "مجاني",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
                     {
                       "type": "frame",
                       "id": "Qxxdm",
@@ -4434,16 +5033,6 @@
                           "fontWeight": "500"
                         }
                       ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "tVacG",
-                      "name": "Extra Price",
-                      "fill": "$muted",
-                      "content": "مجاني",
-                      "fontFamily": "Inter",
-                      "fontSize": 13,
-                      "fontWeight": "600"
                     }
                   ]
                 }
@@ -4492,7 +5081,7 @@
                       "height": 20,
                       "icon": "minus",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "$ink"
                     }
                   ]
                 },
@@ -4503,7 +5092,7 @@
                   "fill": "$ink",
                   "textGrowth": "fixed-width",
                   "width": 36,
-                  "content": "١",
+                  "content": "1",
                   "textAlign": "center",
                   "fontFamily": "Inter",
                   "fontSize": 17,
@@ -4526,7 +5115,7 @@
                       "height": 20,
                       "icon": "plus",
                       "library": "lucide",
-                      "fill": "$primary"
+                      "fill": "$ink"
                     }
                   ]
                 }
@@ -4559,7 +5148,7 @@
                   "id": "g53UFi",
                   "name": "Add Total",
                   "fill": "$on-primary",
-                  "content": "٤٧ ر.س",
+                  "content": "47 ر.س",
                   "fontFamily": "Inter",
                   "fontSize": 16,
                   "fontWeight": "700"
@@ -4613,14 +5202,11 @@
           "alignItems": "center",
           "children": [
             {
-              "type": "icon",
-              "id": "tLYGf",
-              "name": "Back Arrow",
+              "type": "frame",
+              "id": "nOBUX",
+              "name": "Spacer",
               "width": 24,
-              "height": 24,
-              "icon": "chevron-right",
-              "library": "lucide",
-              "fill": "$ink"
+              "height": 24
             },
             {
               "type": "text",
@@ -4630,14 +5216,17 @@
               "content": "السلة",
               "fontFamily": "Inter",
               "fontSize": 17,
-              "fontWeight": "700"
+              "fontWeight": "800"
             },
             {
-              "type": "frame",
-              "id": "nOBUX",
-              "name": "Spacer",
+              "type": "icon",
+              "id": "tLYGf",
+              "name": "Back Arrow",
               "width": 24,
-              "height": 24
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
             }
           ]
         },
@@ -4647,13 +5236,8 @@
           "name": "Cart Content",
           "width": "fill_container",
           "layout": "vertical",
-          "gap": 12,
-          "padding": [
-            12,
-            16,
-            16,
-            16
-          ],
+          "gap": 14,
+          "padding": 16,
           "children": [
             {
               "type": "frame",
@@ -4661,7 +5245,30 @@
               "name": "Cart Item برجر سبايسي",
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "gap": 12,
               "padding": 12,
               "children": [
@@ -4670,29 +5277,83 @@
                   "cornerRadius": 10,
                   "id": "Bkxf2",
                   "name": "Thumb",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "linear",
-                    "enabled": true,
-                    "rotation": 150,
-                    "size": {
-                      "height": 1
+                  "fill": [
+                    {
+                      "type": "gradient",
+                      "gradientType": "linear",
+                      "enabled": true,
+                      "rotation": 140,
+                      "size": {
+                        "height": 1
+                      },
+                      "colors": [
+                        {
+                          "color": "#FFB08A",
+                          "position": 0
+                        },
+                        {
+                          "color": "#D84D2F",
+                          "position": 0.35
+                        },
+                        {
+                          "color": "#9A2020",
+                          "position": 0.7
+                        },
+                        {
+                          "color": "#5A1010",
+                          "position": 1
+                        }
+                      ]
                     },
-                    "colors": [
-                      {
-                        "color": "#ffc97a",
-                        "position": 0
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 0.65,
+                        "height": 0.65
                       },
-                      {
-                        "color": "#e8944a",
-                        "position": 0.5
-                      },
-                      {
-                        "color": "#c4421f",
-                        "position": 1
+                      "colors": [
+                        {
+                          "color": "#FFCCA878",
+                          "position": 0
+                        },
+                        {
+                          "color": "#FFCCA800",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.62,
+                        "y": 0.28
                       }
-                    ]
-                  },
+                    },
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 1,
+                        "height": 1
+                      },
+                      "colors": [
+                        {
+                          "color": "#3D0E0E00",
+                          "position": 0.15
+                        },
+                        {
+                          "color": "#3D0E0E70",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.1,
+                        "y": 0.92
+                      }
+                    }
+                  ],
                   "width": 64,
                   "height": 64
                 },
@@ -4702,7 +5363,7 @@
                   "name": "Item Info",
                   "width": "fill_container",
                   "layout": "vertical",
-                  "gap": 4,
+                  "gap": 5,
                   "children": [
                     {
                       "type": "text",
@@ -4711,19 +5372,22 @@
                       "fill": "$ink",
                       "content": "برجر سبايسي",
                       "fontFamily": "Inter",
-                      "fontSize": 15,
-                      "fontWeight": "700"
+                      "fontSize": 16,
+                      "fontWeight": "800",
+                      "letterSpacing": -0.3
                     },
                     {
                       "type": "text",
                       "id": "yYX7s",
                       "name": "Item Mods",
-                      "fill": "$muted",
+                      "fill": "$text-desc",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "خبز بريوش · جبن إضافي · بصل مقرمش",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 11,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -4733,16 +5397,6 @@
                       "justifyContent": "space_between",
                       "alignItems": "center",
                       "children": [
-                        {
-                          "type": "text",
-                          "id": "CHOun",
-                          "name": "Item Price",
-                          "fill": "$primary",
-                          "content": "٤٧ ر.س",
-                          "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
-                        },
                         {
                           "type": "frame",
                           "id": "yNOwr",
@@ -4768,7 +5422,7 @@
                                   "height": 14,
                                   "icon": "minus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             },
@@ -4779,7 +5433,7 @@
                               "fill": "$ink",
                               "textGrowth": "fixed-width",
                               "width": 28,
-                              "content": "١",
+                              "content": "1",
                               "textAlign": "center",
                               "fontFamily": "Inter",
                               "fontSize": 14,
@@ -4802,11 +5456,21 @@
                                   "height": 14,
                                   "icon": "plus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             }
                           ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "CHOun",
+                          "name": "Item Price",
+                          "fill": "$ink",
+                          "content": "47 ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "800"
                         }
                       ]
                     },
@@ -4849,7 +5513,30 @@
               "name": "Cart Item برجر كلاسيكي",
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "gap": 12,
               "padding": 12,
               "children": [
@@ -4858,29 +5545,83 @@
                   "cornerRadius": 10,
                   "id": "FZCST",
                   "name": "Thumb",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "linear",
-                    "enabled": true,
-                    "rotation": 150,
-                    "size": {
-                      "height": 1
+                  "fill": [
+                    {
+                      "type": "gradient",
+                      "gradientType": "linear",
+                      "enabled": true,
+                      "rotation": 165,
+                      "size": {
+                        "height": 1
+                      },
+                      "colors": [
+                        {
+                          "color": "#F5D0A0",
+                          "position": 0
+                        },
+                        {
+                          "color": "#C88040",
+                          "position": 0.4
+                        },
+                        {
+                          "color": "#7A3A12",
+                          "position": 0.85
+                        },
+                        {
+                          "color": "#4A2008",
+                          "position": 1
+                        }
+                      ]
                     },
-                    "colors": [
-                      {
-                        "color": "#ffd9a3",
-                        "position": 0
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 0.7,
+                        "height": 0.7
                       },
-                      {
-                        "color": "#f4a259",
-                        "position": 0.5
-                      },
-                      {
-                        "color": "#d1512f",
-                        "position": 1
+                      "colors": [
+                        {
+                          "color": "#FFE8C880",
+                          "position": 0
+                        },
+                        {
+                          "color": "#FFE8C800",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.7,
+                        "y": 0.22
                       }
-                    ]
-                  },
+                    },
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 1.1,
+                        "height": 1.1
+                      },
+                      "colors": [
+                        {
+                          "color": "#3D180800",
+                          "position": 0.25
+                        },
+                        {
+                          "color": "#3D180860",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.12,
+                        "y": 0.88
+                      }
+                    }
+                  ],
                   "width": 64,
                   "height": 64
                 },
@@ -4890,7 +5631,7 @@
                   "name": "Item Info",
                   "width": "fill_container",
                   "layout": "vertical",
-                  "gap": 4,
+                  "gap": 5,
                   "children": [
                     {
                       "type": "text",
@@ -4899,19 +5640,22 @@
                       "fill": "$ink",
                       "content": "برجر كلاسيكي",
                       "fontFamily": "Inter",
-                      "fontSize": 15,
-                      "fontWeight": "700"
+                      "fontSize": 16,
+                      "fontWeight": "800",
+                      "letterSpacing": -0.3
                     },
                     {
                       "type": "text",
                       "id": "Py4Im",
                       "name": "Item Mods",
-                      "fill": "$muted",
+                      "fill": "$text-desc",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "خبز برجر كلاسيكي",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 11,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -4921,16 +5665,6 @@
                       "justifyContent": "space_between",
                       "alignItems": "center",
                       "children": [
-                        {
-                          "type": "text",
-                          "id": "d8UW3",
-                          "name": "Item Price",
-                          "fill": "$primary",
-                          "content": "٣٥ ر.س",
-                          "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
-                        },
                         {
                           "type": "frame",
                           "id": "tiXcC",
@@ -4956,7 +5690,7 @@
                                   "height": 14,
                                   "icon": "minus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             },
@@ -4967,7 +5701,7 @@
                               "fill": "$ink",
                               "textGrowth": "fixed-width",
                               "width": 28,
-                              "content": "٢",
+                              "content": "2",
                               "textAlign": "center",
                               "fontFamily": "Inter",
                               "fontSize": 14,
@@ -4990,11 +5724,21 @@
                                   "height": 14,
                                   "icon": "plus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             }
                           ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "d8UW3",
+                          "name": "Item Price",
+                          "fill": "$ink",
+                          "content": "35 ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "800"
                         }
                       ]
                     },
@@ -5037,7 +5781,30 @@
               "name": "Cart Item دجاج مقرمش",
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "gap": 12,
               "padding": 12,
               "children": [
@@ -5046,29 +5813,83 @@
                   "cornerRadius": 10,
                   "id": "rh7DG",
                   "name": "Thumb",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "linear",
-                    "enabled": true,
-                    "rotation": 150,
-                    "size": {
-                      "height": 1
+                  "fill": [
+                    {
+                      "type": "gradient",
+                      "gradientType": "linear",
+                      "enabled": true,
+                      "rotation": 178,
+                      "size": {
+                        "height": 1
+                      },
+                      "colors": [
+                        {
+                          "color": "#FFE0A8",
+                          "position": 0
+                        },
+                        {
+                          "color": "#D4983C",
+                          "position": 0.35
+                        },
+                        {
+                          "color": "#9A6A1A",
+                          "position": 0.72
+                        },
+                        {
+                          "color": "#5A3808",
+                          "position": 1
+                        }
+                      ]
                     },
-                    "colors": [
-                      {
-                        "color": "#ffe0a8",
-                        "position": 0
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 0.8,
+                        "height": 0.8
                       },
-                      {
-                        "color": "#f0aa55",
-                        "position": 0.5
-                      },
-                      {
-                        "color": "#d45830",
-                        "position": 1
+                      "colors": [
+                        {
+                          "color": "#FFF2D888",
+                          "position": 0
+                        },
+                        {
+                          "color": "#FFF2D800",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.38,
+                        "y": 0.2
                       }
-                    ]
-                  },
+                    },
+                    {
+                      "type": "gradient",
+                      "gradientType": "radial",
+                      "enabled": true,
+                      "rotation": 0,
+                      "size": {
+                        "width": 1,
+                        "height": 1
+                      },
+                      "colors": [
+                        {
+                          "color": "#40200500",
+                          "position": 0.2
+                        },
+                        {
+                          "color": "#40200568",
+                          "position": 1
+                        }
+                      ],
+                      "center": {
+                        "x": 0.88,
+                        "y": 0.82
+                      }
+                    }
+                  ],
                   "width": 64,
                   "height": 64
                 },
@@ -5078,7 +5899,7 @@
                   "name": "Item Info",
                   "width": "fill_container",
                   "layout": "vertical",
-                  "gap": 4,
+                  "gap": 5,
                   "children": [
                     {
                       "type": "text",
@@ -5087,19 +5908,22 @@
                       "fill": "$ink",
                       "content": "دجاج مقرمش",
                       "fontFamily": "Inter",
-                      "fontSize": 15,
-                      "fontWeight": "700"
+                      "fontSize": 16,
+                      "fontWeight": "800",
+                      "letterSpacing": -0.3
                     },
                     {
                       "type": "text",
                       "id": "Aaj5D",
                       "name": "Item Mods",
-                      "fill": "$muted",
+                      "fill": "$text-desc",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "بدون إضافات",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 11,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -5109,16 +5933,6 @@
                       "justifyContent": "space_between",
                       "alignItems": "center",
                       "children": [
-                        {
-                          "type": "text",
-                          "id": "ZysmL",
-                          "name": "Item Price",
-                          "fill": "$primary",
-                          "content": "٣٠ ر.س",
-                          "fontFamily": "Inter",
-                          "fontSize": 15,
-                          "fontWeight": "700"
-                        },
                         {
                           "type": "frame",
                           "id": "ilbF5",
@@ -5144,7 +5958,7 @@
                                   "height": 14,
                                   "icon": "minus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             },
@@ -5155,7 +5969,7 @@
                               "fill": "$ink",
                               "textGrowth": "fixed-width",
                               "width": 28,
-                              "content": "١",
+                              "content": "1",
                               "textAlign": "center",
                               "fontFamily": "Inter",
                               "fontSize": 14,
@@ -5178,11 +5992,21 @@
                                   "height": 14,
                                   "icon": "plus",
                                   "library": "lucide",
-                                  "fill": "$primary"
+                                  "fill": "$ink"
                                 }
                               ]
                             }
                           ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "ZysmL",
+                          "name": "Item Price",
+                          "fill": "$ink",
+                          "content": "30 ر.س",
+                          "fontFamily": "Inter",
+                          "fontSize": 16,
+                          "fontWeight": "800"
                         }
                       ]
                     },
@@ -5225,7 +6049,30 @@
               "name": "Subtotal Card",
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "layout": "vertical",
               "gap": 10,
               "padding": 16,
@@ -5253,10 +6100,10 @@
                       "id": "SBGur",
                       "name": "Subtotal Value",
                       "fill": "$ink",
-                      "content": "١٤٧ ر.س",
+                      "content": "147 ر.س",
                       "fontFamily": "Inter",
-                      "fontSize": 17,
-                      "fontWeight": "700"
+                      "fontSize": 18,
+                      "fontWeight": "800"
                     }
                   ]
                 },
@@ -5293,8 +6140,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "رسوم التوصيل والضريبة تُحسب عند الدفع. الأسعار شاملة ضريبة القيمة المضافة.",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 12
+                      "fontSize": 12,
+                      "fontWeight": "normal"
                     }
                   ]
                 }
@@ -5325,7 +6174,7 @@
               "width": "fill_container",
               "descendants": {
                 "sytB8": {
-                  "content": "الدفع · ١٤٧ ر.س"
+                  "content": "الدفع · 147 ر.س"
                 }
               }
             }
@@ -5376,14 +6225,11 @@
           "alignItems": "center",
           "children": [
             {
-              "type": "icon",
-              "id": "OrTvF",
-              "name": "Back Arrow",
+              "type": "frame",
+              "id": "wyKoS",
+              "name": "Spacer",
               "width": 24,
-              "height": 24,
-              "icon": "chevron-right",
-              "library": "lucide",
-              "fill": "$ink"
+              "height": 24
             },
             {
               "type": "text",
@@ -5393,14 +6239,17 @@
               "content": "العروض والحملات",
               "fontFamily": "Inter",
               "fontSize": 17,
-              "fontWeight": "700"
+              "fontWeight": "800"
             },
             {
-              "type": "frame",
-              "id": "wyKoS",
-              "name": "Spacer",
+              "type": "icon",
+              "id": "OrTvF",
+              "name": "Back Arrow",
               "width": 24,
-              "height": 24
+              "height": 24,
+              "icon": "chevron-right",
+              "library": "lucide",
+              "fill": "$ink"
             }
           ]
         },
@@ -5410,13 +6259,8 @@
           "name": "Offers Content",
           "width": "fill_container",
           "layout": "vertical",
-          "gap": 16,
-          "padding": [
-            12,
-            16,
-            16,
-            16
-          ],
+          "gap": 18,
+          "padding": 16,
           "children": [
             {
               "type": "frame",
@@ -5425,7 +6269,30 @@
               "clip": true,
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "layout": "vertical",
               "children": [
                 {
@@ -5444,11 +6311,11 @@
                     },
                     "colors": [
                       {
-                        "color": "#422e87",
+                        "color": "#2A1B52",
                         "position": 0
                       },
                       {
-                        "color": "#6b4fc7",
+                        "color": "#4A3590",
                         "position": 1
                       }
                     ]
@@ -5487,7 +6354,7 @@
                           "id": "GfDqe",
                           "name": "Discount Value",
                           "fill": "$on-primary",
-                          "content": "٪٢٠",
+                          "content": "20%",
                           "fontFamily": "Inter",
                           "fontSize": 14,
                           "fontWeight": "800"
@@ -5522,9 +6389,11 @@
                       "fill": "$muted",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "احصل على خصم ٢٠٪ على جميع الطلبات عند الطلب بقيمة ٨٠ ر.س أو أكثر.",
+                      "content": "احصل على خصم 20% على جميع الطلبات عند الطلب بقيمة 80 ر.س أو أكثر.",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -5556,7 +6425,7 @@
                               "id": "V4F94m",
                               "name": "Min Text",
                               "fill": "$muted",
-                              "content": "الحد الأدنى للطلب: ٨٠ ر.س",
+                              "content": "الحد الأدنى للطلب: 80 ر.س",
                               "fontFamily": "Inter",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -5585,7 +6454,7 @@
                               "id": "Wkoh9",
                               "name": "Valid Text",
                               "fill": "$muted",
-                              "content": "صالح حتى ١٥ أغسطس ٢٠٢٦",
+                              "content": "صالح حتى 15 أغسطس 2026",
                               "fontFamily": "Inter",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -5605,7 +6474,30 @@
               "clip": true,
               "width": "fill_container",
               "fill": "$white",
-              "cornerRadius": 16,
+              "cornerRadius": 14,
+              "effect": [
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#18143008",
+                  "offset": {
+                    "x": 0,
+                    "y": 1
+                  },
+                  "blur": 3
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#1814300A",
+                  "offset": {
+                    "x": 0,
+                    "y": 6
+                  },
+                  "blur": 20,
+                  "spread": -2
+                }
+              ],
               "layout": "vertical",
               "children": [
                 {
@@ -5703,8 +6595,10 @@
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
                       "content": "استمتع بتوصيل مجاني على جميع الطلبات من فرع العليا.",
+                      "textAlign": "right",
                       "fontFamily": "Inter",
-                      "fontSize": 13
+                      "fontSize": 13,
+                      "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
@@ -5736,7 +6630,7 @@
                               "id": "Kd410",
                               "name": "Min Text",
                               "fill": "$muted",
-                              "content": "الحد الأدنى للطلب: ٥٠ ر.س",
+                              "content": "الحد الأدنى للطلب: 50 ر.س",
                               "fontFamily": "Inter",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -5765,7 +6659,7 @@
                               "id": "MpjXN",
                               "name": "Valid Text",
                               "fill": "$muted",
-                              "content": "صالح حتى ٣٠ سبتمبر ٢٠٢٦",
+                              "content": "صالح حتى 30 سبتمبر 2026",
                               "fontFamily": "Inter",
                               "fontSize": 12,
                               "fontWeight": "500"
@@ -5809,8 +6703,10 @@
                   "textGrowth": "fixed-width",
                   "width": "fill_container",
                   "content": "العروض تُطبق تلقائياً عند استيفاء الشروط. لإدخال رمز ترويجي، استخدم حقل الرمز في صفحة الدفع.",
+                  "textAlign": "right",
                   "fontFamily": "Inter",
-                  "fontSize": 13
+                  "fontSize": 13,
+                  "fontWeight": "normal"
                 }
               ]
             }
@@ -5826,7 +6722,7 @@
     },
     "primary-light": {
       "type": "color",
-      "value": "#f1edfb"
+      "value": "#F0ECFA"
     },
     "secondary": {
       "type": "color",
@@ -5846,23 +6742,23 @@
     },
     "muted": {
       "type": "color",
-      "value": "#6b6580"
+      "value": "#7D7686"
     },
     "border": {
       "type": "color",
-      "value": "#ece9f2"
+      "value": "#E8E4DD"
     },
     "surface": {
       "type": "color",
-      "value": "#ffffff"
+      "value": "#FFFFFF"
     },
     "bg": {
       "type": "color",
-      "value": "#f6f5fa"
+      "value": "#F8F6F2"
     },
     "bg-alt": {
       "type": "color",
-      "value": "#faf9fd"
+      "value": "#FAF8F5"
     },
     "disabled": {
       "type": "color",
@@ -5895,6 +6791,14 @@
     "on-secondary": {
       "type": "color",
       "value": "#ffffff"
+    },
+    "text-desc": {
+      "type": "color",
+      "value": "#9A93A3"
+    },
+    "card-shadow": {
+      "type": "color",
+      "value": "#1c163010"
     }
   },
   "fileToken": "10554d88-adb0-4b83-a4d7-8060434c8860"
