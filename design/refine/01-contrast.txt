@@ -1,0 +1,17 @@
+TARGETED COLOUR CORRECTION on this design-system sheet. Change ONLY the three swatches named below, in the LIGHT MODE row only. Do not restyle, re-lay-out or otherwise alter anything else on the sheet.
+
+Three light-mode status colours fail WCAG AA for body text. Replace both the swatch FILL and the hex value PRINTED UNDER IT so the sheet stays self-consistent:
+
+  1. LIGHT MODE swatch labelled "success"  — change #1f9d55 to #197f45
+  2. LIGHT MODE swatch labelled "warning"  — change #c47f17 to #9b6412
+  3. LIGHT MODE swatch labelled "danger"   — change #e02d3d to #ce2938
+
+Then update any component sample elsewhere on the sheet that uses those three colours as TEXT or ICON foreground — success/warning/error inline notices, status chips and the open/closed badge — so they use the new values too.
+
+DO NOT CHANGE, under any circumstances:
+  · the "secondary" swatch — it stays #e02d3d. It is the fixed brand red. It happens to share the old value with "danger", but they are now deliberately different tokens: brand red for fills, the darker red for error text.
+  · the "primary" swatch (#422e87), or on-primary / on-secondary.
+  · the entire DARK MODE row — it was measured and every pair already passes AA.
+  · the tint swatches success-tint, warning-tint and danger-tint — the grounds stay as they are; only the foregrounds move.
+
+Rationale to keep in mind: success text on its tint measured 3.13:1 against a 4.5:1 requirement, warning 2.99:1 and error 3.94:1. The new values are the smallest darkening that clears 4.5:1 against both the tint and a white card.

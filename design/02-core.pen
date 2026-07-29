@@ -6766,7 +6766,7 @@
     },
     "success": {
       "type": "color",
-      "value": "#1f9d55"
+      "value": "#197f45"
     },
     "success-tint": {
       "type": "color",
@@ -6774,7 +6774,7 @@
     },
     "danger": {
       "type": "color",
-      "value": "#e02d3d"
+      "value": "#ce2938"
     },
     "danger-tint": {
       "type": "color",
@@ -6782,7 +6782,7 @@
     },
     "warning": {
       "type": "color",
-      "value": "#c47f17"
+      "value": "#9b6412"
     },
     "on-primary": {
       "type": "color",
