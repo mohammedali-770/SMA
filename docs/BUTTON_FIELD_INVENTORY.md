@@ -25,12 +25,12 @@ never remove them.
 
 | # | Surface | Status |
 | --- | --- | --- |
-| 1 | **Authentication** | ✅ **Done** |
-| 2 | Customer App — Home / Menu | ⬜ |
-| 2 | Customer App — Product Details | ⬜ |
-| 2 | Customer App — Cart | ⬜ |
-| 2 | Customer App — Checkout | ⬜ |
-| 2 | Customer App — Payment | ⬜ |
+| 1 | **Authentication** | ✅ **Done** — PR #123 |
+| 2 | Customer App — Home / Menu | ✅ **Done** — PR #124 |
+| 2 | Customer App — Product Details | ✅ **Done** — PR #125 |
+| 2 | Customer App — Cart | ✅ **Done** — PR #125 |
+| 2 | Customer App — Checkout | ✅ **Done** — this PR |
+| 2 | Customer App — Payment | ✅ **Done** — this PR |
 | 2 | Customer App — Order Tracking | ⬜ |
 | 2 | Customer App — Profile | ⬜ |
 | 3 | Admin — Dashboard | ⬜ |
@@ -64,22 +64,56 @@ inlined — the hygiene check caught them as hardcoded colours.
 and cooldown hooks, keyboard types, `textContentType` / `autoComplete` autofill
 wiring, and all accessibility labels.
 
-## Not yet removable
+## Surface 4 — Checkout + Payment ✅
 
-`components/Button.tsx` (legacy) still backs **38** call sites across the
-customer app and cannot be deleted until surface 2 completes. It routes through
-the shared `buttonState` module, so its disabled/loading/guard behaviour already
-matches the design-system button.
+`CheckoutScreen` was 1,032 lines mixing payment-session orchestration with
+layout. It now owns **state and decisions only**; every piece of layout moved to
+`features/checkout/view/*` as pure presentational components.
+
+That split is not cosmetic. The payment states live in the screen's own state
+rather than in context, so before `PaymentStatusDialog` was extracted there was
+no way to look at "declined", "expired" or "still pending" without running a
+real charge. The dev fixture now renders that component directly, one scene per
+state, with every handler inert.
+
+Also migrated: `app/payment/checkout.tsx` (chrome only — the WebView props are a
+frozen security surface and are byte-identical) and `app/payment/return.tsx`.
+
+**Verified byte-identical** by diffing the logic half of the file: every effect,
+handler and guard — mount recovery, `placeOrder`, `runTapPaymentSession`,
+`verifyPaymentSession`, `retryFresh`, the single-flight `payRunningRef`, the
+`recalcRef` double-tap guard, `changeQuantity`, coupon validation, the
+address-resolution branch and every `router` call.
+
+Fixes found by the fixture pass, not by reading:
+
+* the below-minimum message printed **"31.00 SAR"** — the letters, which the
+  design system forbids for a visible amount. `Notice` gained an `amount` slot
+  so the figure renders through `<Price>` with the SAMA glyph;
+* the delivery problem rendered as a full red notice **twice** on one screen;
+* "Promo code" and "Notes for the kitchen" appeared as both a section heading
+  and a field label — `Field` gained `labelHidden` (visual only; still
+  announced);
+* the payment dialog stacked three near-identical buttons, so the dismissal read
+  as loud as the retry. `Close` is now `ghost`;
+* the column now caps at 640px so a tablet does not stretch checkout to a
+  120-character line and drag the money away from its labels.
+
+## Removed
+
+`components/QuantityStepper.tsx` — deleted, zero references. Checkout was its
+last consumer; the design-system `QtyStepper` absorbed its `busy` guard and
+per-item accessibility labels.
 
 ## Remaining legacy inventory
 
 | Surface | Legacy usage |
 | --- | ---: |
-| Mobile `<Button>` (legacy) | 38 call sites, 8 files |
-| Mobile `<TextInput>` | 10 across 5 files |
+| Mobile `<Button>` (legacy) | 3 files: `DeleteAccountScreen`, `OrderTypeSelectScreen`, `ReceiptScreen` |
+| Mobile `components/Notice` | 1 file: `OrderTypeSelectScreen` |
 | Web raw `<button>` | 129 (24 `glass-btn-*`) |
 | Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) |
 
-The web side has no shared Button or Field at all; admin panels use raw elements
-with `.glass-*` utilities. Those utilities are deleted once the last panel that
-references them is migrated.
+The legacy `Button` and `Notice` are deleted once Order Tracking and Profile
+land. The web side has no shared Button or Field at all; admin panels use raw
+elements with `.glass-*` utilities, deleted once the last panel is migrated.

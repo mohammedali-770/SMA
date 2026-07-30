@@ -170,6 +170,12 @@ export const STRINGS = {
     payUnavailable: 'Online payment is unavailable right now.',
     payTryAgain: 'Try again',
     payVerifyAgain: 'Check again',
+    // One-word state for the payment status pill. The sentence underneath
+    // explains; the pill only says which state this is, at a glance.
+    payStatusPending: 'Pending',
+    payStatusFailed: 'Failed',
+    payStatusCancelled: 'Not completed',
+    payStatusExpired: 'Expired',
     // In-app secure-payment WebView screen
     payScreenTitle: 'Secure Payment',
     payScreenLoading: 'Loading secure payment…',
@@ -476,6 +482,10 @@ export const STRINGS = {
     payUnavailable: 'الدفع الإلكتروني غير متاح حالياً.',
     payTryAgain: 'إعادة المحاولة',
     payVerifyAgain: 'تحقق مرة أخرى',
+    payStatusPending: 'قيد المعالجة',
+    payStatusFailed: 'فشل',
+    payStatusCancelled: 'لم يكتمل',
+    payStatusExpired: 'منتهية',
     // شاشة الدفع الآمن داخل التطبيق (WebView)
     payScreenTitle: 'الدفع الآمن',
     payScreenLoading: 'جارٍ تحميل صفحة الدفع الآمنة…',

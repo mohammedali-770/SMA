@@ -130,6 +130,23 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/features/cart/CartScreen.tsx',
   'apps/mobile/src/components/QtyStepper.tsx',
   'apps/mobile/src/components/Header.tsx',
+  // Surface 4 — Checkout + Payment
+  'apps/mobile/src/features/checkout/CheckoutScreen.tsx',
+  'apps/mobile/src/features/checkout/view/CheckoutFooter.tsx',
+  'apps/mobile/src/features/checkout/view/CheckoutLines.tsx',
+  'apps/mobile/src/features/checkout/view/CouponRow.tsx',
+  'apps/mobile/src/features/checkout/view/DeliveryLocationSection.tsx',
+  'apps/mobile/src/features/checkout/view/Dialog.tsx',
+  'apps/mobile/src/features/checkout/view/LoyaltyToggle.tsx',
+  'apps/mobile/src/features/checkout/view/OrderTypeRow.tsx',
+  'apps/mobile/src/features/checkout/view/PaymentMethodPicker.tsx',
+  'apps/mobile/src/features/checkout/view/PaymentStatusDialog.tsx',
+  'apps/mobile/src/features/checkout/view/SavedAddressList.tsx',
+  'apps/mobile/src/features/checkout/view/Section.tsx',
+  'apps/mobile/src/features/checkout/view/layout.ts',
+  'apps/mobile/src/features/checkout/view/TotalsCard.tsx',
+  'apps/mobile/src/app/payment/checkout.tsx',
+  'apps/mobile/src/app/payment/return.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

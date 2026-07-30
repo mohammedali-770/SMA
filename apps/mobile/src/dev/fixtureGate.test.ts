@@ -57,4 +57,15 @@ describe('fixture gate — fails closed', () => {
       expect(scene).not.toMatch(/^\//);
     }
   });
+
+  it('has no scene for the payment-return screen', () => {
+    // app/payment/return.tsx exists to RESOLVE an interrupted charge: it
+    // persists a session id and drives recoverPendingSession, which calls the
+    // real payment-verify endpoint when a pending session is present. A fixture
+    // must never be able to reach that, and the screen redirects within a frame
+    // anyway — there is nothing to review. Verified on-device instead.
+    for (const scene of FIXTURE_SCENES) {
+      expect(scene).not.toMatch(/return/);
+    }
+  });
 });
