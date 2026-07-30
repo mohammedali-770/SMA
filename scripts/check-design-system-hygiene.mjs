@@ -83,6 +83,13 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/features/profile/VerifyPhoneWhatsApp.tsx',
   'apps/mobile/src/components/SaudiPhoneInput.tsx',
   'apps/mobile/src/features/otp/OtpCodeInput.tsx',
+  // Surface 2 — Home + Menu
+  'apps/mobile/src/features/menu/HomeMenuScreen.tsx',
+  'apps/mobile/src/features/menu/BannerCarousel.tsx',
+  'apps/mobile/src/components/StateViews.tsx',
+  'apps/mobile/src/components/OpenClosedBadge.tsx',
+  'apps/mobile/src/components/Screen.tsx',
+  'apps/mobile/src/components/Logo.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

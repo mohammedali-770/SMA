@@ -17,7 +17,7 @@ import { Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type N
 
 import { catalog } from '../../services/api';
 import { mapBanner } from '../../lib/mappers';
-import { colors, radius, spacing } from '../../theme';
+import { color, radius, space } from '../../design-system/generated/tokens';
 import type { HomeBanner } from '../../types/models';
 
 const ROTATE_MS = 4000;
@@ -141,9 +141,9 @@ function BannerImage({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: spacing.lg, marginTop: spacing.md },
-  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.bgAlt, width: '100%' },
-  dots: { position: 'absolute', bottom: spacing.sm, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  wrap: { marginHorizontal: space.s4, marginTop: space.s3 },
+  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: color.appSurface2, width: '100%' },
+  dots: { position: 'absolute', bottom: space.s2, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
-  dotActive: { backgroundColor: colors.white, width: 16 },
+  dotActive: { backgroundColor: color.appSurface, width: 16 },
 });

@@ -18,7 +18,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View,
+  Pressable, ScrollView, SectionList, StyleSheet, TextInput, View,
   type LayoutChangeEvent, type SectionListData, type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,12 +29,19 @@ import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
 import { Price } from '../../components/Price';
 import { EmptyView, ErrorView, LoadingView } from '../../components/StateViews';
+import { color, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { SelectableChip, StatusPill } from '../../design-system/ui/Chip';
+import { ProductCard } from '../../design-system/ui/ProductCard';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { shouldForceSelection } from '../order/orderContext';
 import { useCart, useCatalog, useOrderContext } from '../../store';
-import { colors, font, motion, radius, shadow, spacing } from '../../theme';
 import { formatSAR } from '../../utils/format';
 import type { Product } from '../../types/models';
+
+// ProductCard now lives in the design system; re-exported so existing importers
+// (dev-preview) keep working against one implementation.
+export { ProductCard };
 
 // Approximate rendered height of a section header (title + margin) so a chip
 // tap positions the SECTION TITLE at the top, not the first card.
@@ -127,7 +134,7 @@ export function HomeMenuScreen() {
   // Keep the highlighted chip visible in the horizontal chip row.
   useEffect(() => {
     const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null;
-    if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - spacing.lg), animated: true });
+    if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true });
   }, [activeCatIdResolved]);
 
   // Stable add handler so memoized cards never re-render from a new closure.
@@ -146,20 +153,18 @@ export function HomeMenuScreen() {
   return (
     <View style={styles.root}>
       {/* Top bar: logo + language toggle (no phone icon) */}
-      <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + space.s2 }]}>
         <View style={styles.brandRow}>
           <Image source={require('../../../assets/icon.png')} style={styles.mark} contentFit="cover" />
           <View>
-            <Text style={styles.brand}>{pick('Spicy Meal', 'سبايسي ميل')}</Text>
-            <Text style={styles.brandTag} numberOfLines={1}>
-              {pick('Hot, ', 'حار، ')}
-              <Text style={styles.brandTagAccent}>{pick('Crispy', 'مقرمش')}</Text>
-              {pick(', Fresh and Golden Bites', '، طازج ولقيمات ذهبية')}
+            <Text variant="title">{pick('Spicy Meal', 'سبايسي ميل')}</Text>
+            <Text variant="caption" tone="secondary" numberOfLines={1}>
+              {pick('Hot, Crispy, Fresh and Golden Bites', 'حار، مقرمش، طازج ولقيمات ذهبية')}
             </Text>
           </View>
         </View>
         <Pressable onPress={toggle} hitSlop={8} style={styles.langBtn} accessibilityRole="button">
-          <Text style={styles.langText}>{lang === 'en' ? 'العربية' : 'EN'}</Text>
+          <Text variant="label" tone="ember" align="center">{lang === 'en' ? 'العربية' : 'EN'}</Text>
         </Pressable>
       </View>
 
@@ -172,18 +177,17 @@ export function HomeMenuScreen() {
           <View style={styles.ctxAccent} />
           <View style={{ flex: 1 }}>
             <View style={[styles.ctxTopRow, rtlRow]}>
-              <View style={styles.otChip}>
-                <Text style={styles.otChipText}>
-                  {orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
-                </Text>
-              </View>
+              <StatusPill
+                label={orderCtx.context.orderType === 'pickup' ? t('otPickup') : t('otDelivery')}
+                tone="info"
+              />
               {selectedBranch ? <OpenClosedBadge open={branchOpen} /> : null}
             </View>
-            <Text style={[styles.branchValue, rtlText]} numberOfLines={1}>
+            <Text variant="heading" numberOfLines={1}>
               {pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}
             </Text>
             {orderCtx.context.orderType === 'delivery' ? (
-              <Text style={[styles.branchSub, rtlText]} numberOfLines={1}>
+              <Text variant="caption" tone="secondary" numberOfLines={1}>
                 {[orderCtx.context.deliveryDescription,
                   orderCtx.context.deliveryFee != null ? `${t('deliveryFee')} ${formatSAR(orderCtx.context.deliveryFee, lang)}` : null]
                   .filter(Boolean).join(' · ')}
@@ -191,7 +195,7 @@ export function HomeMenuScreen() {
             ) : null}
           </View>
           <View style={styles.changeBtn}>
-            <Text style={styles.change}>{t('otChange')}</Text>
+            <Text variant="label" tone="ember" align="center">{t('otChange')}</Text>
           </View>
         </Pressable>
       ) : null}
@@ -214,18 +218,18 @@ export function HomeMenuScreen() {
         <>
           {!branchOpen ? (
             <View style={styles.closedNotice}>
-              <Text style={[styles.closedNoticeText, rtlText]}>{t('branchClosedNotice')}</Text>
+              <Text variant="label" style={{ color: color.danger }}>{t('branchClosedNotice')}</Text>
             </View>
           ) : null}
 
           {/* Search — mirrored so the icon sits on the reading edge in Arabic. */}
           <View style={[styles.searchWrap, rtlRow]}>
-            <SearchIcon color={colors.muted} />
+            <SearchIcon color={color.appText3} />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder={t('searchPlaceholder')}
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={color.appText3}
               style={[styles.searchInput, rtlText]}
               autoCapitalize="none"
               returnKeyType="search"
@@ -247,19 +251,15 @@ export function HomeMenuScreen() {
                 {sections.map((s) => {
                   const active = s.category.id === activeCatIdResolved;
                   return (
-                    <Pressable
+                    <SelectableChip
                       key={s.category.id}
+                      label={pick(s.category.nameEn, s.category.nameAr)}
+                      selected={active}
+                      onPress={() => scrollToCategory(s.category.id)}
                       onLayout={(e: LayoutChangeEvent) => {
                         chipOffsets.current[s.category.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
                       }}
-                      onPress={() => scrollToCategory(s.category.id)}
-                      hitSlop={6}
-                      style={[styles.chip, active && styles.chipActive]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{pick(s.category.nameEn, s.category.nameAr)}</Text>
-                    </Pressable>
+                    />
                   );
                 })}
               </ScrollView>
@@ -276,7 +276,9 @@ export function HomeMenuScreen() {
               keyExtractor={menuItemKey}
               renderItem={renderItem}
               renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => (
-                <Text style={[styles.sectionTitle, rtlText]}>{pick(section.category.nameEn, section.category.nameAr)}</Text>
+                <Text variant="title" style={styles.sectionTitle}>
+                  {pick(section.category.nameEn, section.category.nameAr)}
+                </Text>
               )}
               renderSectionFooter={SectionFooter}
               ItemSeparatorComponent={ItemSeparator}
@@ -287,7 +289,7 @@ export function HomeMenuScreen() {
               initialNumToRender={8}
               maxToRenderPerBatch={8}
               windowSize={9}
-              contentContainerStyle={{ padding: spacing.lg, paddingBottom: cart.count > 0 ? 120 : spacing.xxl }}
+              contentContainerStyle={{ padding: space.s4, paddingBottom: cart.count > 0 ? 120 : space.s6 }}
               showsVerticalScrollIndicator={false}
             />
           )}
@@ -296,13 +298,13 @@ export function HomeMenuScreen() {
 
       {/* Sticky cart bar (above the safe area) */}
       {cart.count > 0 ? (
-        <View style={[styles.cartBar, { paddingBottom: insets.bottom + spacing.sm }]}>
+        <View style={[styles.cartBar, { paddingBottom: insets.bottom + space.s2 }]}>
           <Pressable style={[styles.cartBtn, rtlRow]} onPress={() => router.push('/cart')} accessibilityRole="button">
             <View style={styles.cartCount}>
-              <Text style={styles.cartCountText}>{cart.count}</Text>
+              <Text variant="label" tone="onEmber" align="center">{cart.count}</Text>
             </View>
-            <Text style={[styles.cartBtnText, rtlText]}>{t('myCart')}</Text>
-            <Price amount={cart.subtotal} size={font.md} color={colors.white} weight="800" />
+            <Text variant="heading" tone="onEmber" style={{ flex: 1 }}>{t('myCart')}</Text>
+            <Price amount={cart.subtotal} size={typeScale.body.size} color={color.onEmber} weight="700" />
           </Pressable>
         </View>
       ) : null}
@@ -311,7 +313,7 @@ export function HomeMenuScreen() {
 }
 
 function ItemSeparator() {
-  return <View style={{ height: spacing.md }} />;
+  return <View style={{ height: space.s3 }} />;
 }
 
 /**
@@ -322,9 +324,9 @@ function ItemSeparator() {
  */
 function MenuSkeleton() {
   return (
-    <View style={{ padding: spacing.lg, gap: spacing.md }} pointerEvents="none" accessibilityElementsHidden>
+    <View style={{ padding: space.s4, gap: space.s3 }} pointerEvents="none" accessibilityElementsHidden>
       <View style={[skeleton.block, { height: 64 }]} />
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', gap: space.s2 }}>
         <View style={[skeleton.chip, { width: 88 }]} />
         <View style={[skeleton.chip, { width: 72 }]} />
         <View style={[skeleton.chip, { width: 96 }]} />
@@ -332,10 +334,10 @@ function MenuSkeleton() {
       {[0, 1, 2, 3].map((i) => (
         <View key={i} style={skeleton.card}>
           <View style={skeleton.img} />
-          <View style={{ flex: 1, padding: spacing.md, gap: spacing.sm }}>
+          <View style={{ flex: 1, padding: space.s3, gap: space.s2 }}>
             <View style={[skeleton.line, { width: '70%' }]} />
             <View style={[skeleton.line, { width: '95%' }]} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: space.s2 }}>
               <View style={[skeleton.line, { width: 64 }]} />
               <View style={[skeleton.chip, { width: 76 }]} />
             </View>
@@ -347,168 +349,82 @@ function MenuSkeleton() {
 }
 
 const skeleton = StyleSheet.create({
-  block: { backgroundColor: colors.bgAlt, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-  chip: { height: 34, borderRadius: radius.pill, backgroundColor: colors.bgAlt, borderWidth: 1, borderColor: colors.border },
-  card: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: colors.border },
-  img: { width: 104, minHeight: 112, backgroundColor: colors.bgAlt },
-  line: { height: 12, borderRadius: 6, backgroundColor: colors.bgAlt },
+  block: { backgroundColor: color.appSurface2, borderRadius: radius.md, borderWidth: 1, borderColor: color.appLine },
+  chip: { height: 34, borderRadius: radius.pill, backgroundColor: color.appSurface2, borderWidth: 1, borderColor: color.appLine },
+  card: { flexDirection: 'row', backgroundColor: color.appSurface, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, borderColor: color.appLine },
+  img: { width: 104, minHeight: 112, backgroundColor: color.appSurface2 },
+  line: { height: 12, borderRadius: 6, backgroundColor: color.appSurface2 },
 });
 
 function SectionFooter() {
-  return <View style={{ height: spacing.xl }} />;
+  return <View style={{ height: space.s5 }} />;
 }
 
-/**
- * One menu card. Memoized with stable props (product ref, boolean, stable
- * handler) so cart taps and searches don't re-render every card; language
- * changes still propagate because useI18n reads context (which bypasses memo).
- */
-export const ProductCard = React.memo(function ProductCard({
-  product, hasModifiers, onAdd,
-}: {
-  product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void;
-}) {
-  const { t, pick, rtlText, rtlRow } = useI18n();
-  const [imgFailed, setImgFailed] = useState(false);
-  const name = pick(product.nameEn, product.nameAr);
-  const description = pick(product.descriptionEn, product.descriptionAr);
-  const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
-  const actionLabel = hasModifiers ? t('customizeAdd') : t('addToCart');
-  const showImage = !!product.imageUrl && !imgFailed;
-  return (
-    // Mirrored in Arabic: image on the right, text block reading right-to-left.
-    <View style={[styles.card, rtlRow, shadow.card]}>
-      {showImage ? (
-        <Image
-          source={{ uri: product.imageUrl }}
-          style={styles.cardImg}
-          contentFit="cover"
-          transition={150}
-          // Keep decoded thumbnails in memory so cards scrolled back into view
-          // don't re-decode from disk; recyclingKey pairs with virtualization.
-          cachePolicy="memory-disk"
-          recyclingKey={product.id}
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        // Missing/broken image → quiet plate glyph instead of a blank block.
-        <View style={[styles.cardImg, styles.cardImgEmpty]}>
-          <DishIcon size={34} />
-        </View>
-      )}
-      <View style={styles.cardBody}>
-        <Text style={[styles.cardName, rtlText]} numberOfLines={2}>{name}</Text>
-        {description ? <Text style={[styles.cardDesc, rtlText]} numberOfLines={2}>{description}</Text> : null}
-        <View style={[styles.cardBottom, rtlRow]}>
-          <View>
-            <Price amount={product.price} size={font.md} color={colors.purple} weight="800" />
-            {kcalLabel ? <Text style={styles.cardKcal}>{kcalLabel}</Text> : null}
-          </View>
-          <Pressable style={({ pressed }) => [styles.addBtn, pressed && styles.addBtnPressed]} onPress={() => onAdd(product, hasModifiers)} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}>
-            <Text style={styles.addBtnText}>{actionLabel}</Text>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-});
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: color.appBg },
+
   topBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingBottom: spacing.md, backgroundColor: colors.white,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    paddingHorizontal: space.s4, paddingBottom: space.s3, backgroundColor: color.appSurface,
+    borderBottomWidth: 1, borderBottomColor: color.appLine,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   mark: { width: 38, height: 38, borderRadius: radius.sm },
-  brand: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
-  brandTag: { fontSize: font.xs, fontWeight: '700', color: colors.text, marginTop: -2 },
-  brandTagAccent: { color: colors.red, fontWeight: '800' },
   langBtn: {
-    paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill,
-    borderWidth: 1.5, borderColor: colors.purple,
+    paddingHorizontal: space.s3, paddingVertical: 6, borderRadius: radius.pill,
+    borderWidth: 1.5, borderColor: color.ember,
   },
-  langText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
+  // Order-context card. The reading-edge accent bar is ember so the current
+  // context scans instantly; everything else on the card stays quiet.
   branchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border, overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', gap: space.s3,
+    marginHorizontal: space.s4, marginTop: space.s3, padding: space.s3,
+    backgroundColor: color.appSurface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: color.appLine, overflow: 'hidden',
   },
-  ctxAccent: { alignSelf: 'stretch', width: 4, borderRadius: 2, backgroundColor: colors.purple },
-  ctxTopRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: 4 },
-  otChip: {
-    paddingHorizontal: spacing.sm + 2, paddingVertical: 2, borderRadius: radius.pill,
-    backgroundColor: colors.purpleBg,
-  },
-  otChipText: { fontSize: font.xs, color: colors.purple, fontWeight: '800' },
-  branchValue: { fontSize: font.md, color: colors.text, fontWeight: '800', marginTop: 2 },
-  branchSub: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
+  ctxAccent: { alignSelf: 'stretch', width: 4, borderRadius: 2, backgroundColor: color.ember },
+  ctxTopRow: { flexDirection: 'row', alignItems: 'center', gap: space.s2, marginBottom: 4 },
   changeBtn: {
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
-    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.purple,
+    paddingHorizontal: space.s3, paddingVertical: space.s2,
+    borderRadius: radius.pill, borderWidth: 1.5, borderColor: color.ember,
   },
-  change: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
 
-  closedNotice: { backgroundColor: colors.dangerBg, marginHorizontal: spacing.lg, marginTop: spacing.md, padding: spacing.md, borderRadius: radius.md },
-  closedNoticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
+  closedNotice: {
+    backgroundColor: color.dangerTint, marginHorizontal: space.s4, marginTop: space.s3,
+    padding: space.s3, borderRadius: radius.md, borderWidth: 1, borderColor: color.dangerLine,
+  },
 
   searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.lg, marginTop: spacing.md, paddingHorizontal: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.md, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border,
+    flexDirection: 'row', alignItems: 'center', gap: space.s2,
+    marginHorizontal: space.s4, marginTop: space.s3, paddingHorizontal: space.s3,
+    backgroundColor: color.appSurface, borderRadius: radius.md,
+    borderWidth: 1, borderColor: color.appLine,
   },
-  searchInput: { flex: 1, paddingVertical: spacing.md, fontSize: font.md, color: colors.text },
+  searchInput: {
+    flex: 1, paddingVertical: space.s3,
+    fontSize: typeScale.body.size, color: color.appText,
+  },
 
-  chipsWrap: { marginTop: spacing.md },
-  chips: { paddingHorizontal: spacing.lg, gap: spacing.sm },
+  chipsWrap: { marginTop: space.s3 },
+  chips: { paddingHorizontal: space.s4, gap: space.s2 },
   chipsRTL: { flexDirection: 'row-reverse' },
-  // Neutral resting chips keep purple meaningful: only the SELECTED category
-  // is purple. Identical padding + border width in both states → no layout
-  // jump when the selection moves.
-  chip: {
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, backgroundColor: colors.white,
-    borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.border,
-  },
-  chipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
-  chipText: { color: colors.text, fontWeight: '700', fontSize: font.sm },
-  chipTextActive: { color: colors.white, fontWeight: '800' },
 
-  sectionTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
+  sectionTitle: { marginBottom: space.s3 },
 
-  card: {
-    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
-    borderCurve: 'continuous', overflow: 'hidden', borderWidth: 1, borderColor: colors.border,
-  },
-  cardImg: { width: 104, alignSelf: 'stretch', minHeight: 116, backgroundColor: colors.bgAlt },
-  cardImgEmpty: { alignItems: 'center', justifyContent: 'center' },
-  cardBody: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
-  cardName: { fontSize: font.md, lineHeight: 20, fontWeight: '800', color: colors.text },
-  cardDesc: { fontSize: font.sm, lineHeight: 18, color: colors.muted, marginTop: 2 },
-  cardBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.md },
-  cardPrice: { fontSize: font.md, fontWeight: '800', color: colors.purple },
-  cardKcal: { fontSize: font.xs, color: colors.muted, marginTop: 2 },
-  addBtn: {
-    backgroundColor: colors.red, paddingHorizontal: spacing.lg, paddingVertical: spacing.sm,
-    borderRadius: radius.pill, minHeight: 36, justifyContent: 'center',
-  },
-  addBtnPressed: { opacity: motion.pressedOpacity, transform: [{ scale: motion.pressedScale }] },
-  addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
-
+  // Sticky cart bar. Ember, flat, hairline-free — it is the one primary action
+  // on the screen and does not need a shadow to say so.
   cartBar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.sm, backgroundColor: 'transparent',
+    paddingHorizontal: space.s4, paddingTop: space.s2, backgroundColor: 'transparent',
   },
   cartBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.purple, borderRadius: radius.lg, borderCurve: 'continuous',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.lg, ...shadow.card,
+    flexDirection: 'row', alignItems: 'center', gap: space.s3,
+    backgroundColor: color.ember, borderRadius: radius.lg,
+    paddingHorizontal: space.s4, paddingVertical: space.s4,
   },
-  cartCount: { minWidth: 26, height: 26, borderRadius: 13, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
-  cartCountText: { color: colors.white, fontWeight: '800', fontSize: font.sm },
-  cartBtnText: { color: colors.white, fontWeight: '800', fontSize: font.md, flex: 1 },
-  cartBtnPrice: { color: colors.white, fontWeight: '800', fontSize: font.md },
+  cartCount: {
+    minWidth: 26, height: 26, borderRadius: 13,
+    backgroundColor: color.emberDeep, alignItems: 'center', justifyContent: 'center',
+  },
 });

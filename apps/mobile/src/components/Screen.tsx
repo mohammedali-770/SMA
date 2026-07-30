@@ -7,7 +7,7 @@ import React from 'react';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
-import { colors } from '../theme';
+import { color } from '../design-system/generated/tokens';
 
 interface Props {
   children: React.ReactNode;
@@ -18,7 +18,7 @@ interface Props {
 
 export function Screen({ children, edges = ['top', 'left', 'right'], style, background }: Props) {
   return (
-    <SafeAreaView edges={edges} style={[styles.safe, { backgroundColor: background ?? colors.bg }]}>
+    <SafeAreaView edges={edges} style={[styles.safe, { backgroundColor: background ?? color.appBg }]}>
       <View style={[styles.inner, style]}>{children}</View>
     </SafeAreaView>
   );
