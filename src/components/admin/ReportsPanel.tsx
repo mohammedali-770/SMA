@@ -298,11 +298,11 @@ export const ReportsPanel: React.FC = () => {
                               <tr key={i} className="hover:bg-white/50">
                                 <td className="py-2.5 px-4 font-mono">{r.date}</td>
                                 <td className="py-2.5 px-4 text-center">{r.ordersCount}</td>
-                                <td className="py-2.5 px-4 text-right">{r.subtotal.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right">{r.deliveryFee.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-secondary font-semibold">-{r.discount.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-primary font-black">{r.total.toFixed(2)}</td>
-                                <td className="py-2.5 px-4 text-right text-purple-700 font-mono">{r.vat.toFixed(2)}</td>
+                                <td className="py-2.5 px-4 text-right"><Price amount={r.subtotal} lang={adminLang} /></td>
+                                <td className="py-2.5 px-4 text-right"><Price amount={r.deliveryFee} lang={adminLang} /></td>
+                                <td className="py-2.5 px-4 text-right text-secondary font-semibold"><Price amount={r.discount} prefix="-" lang={adminLang} /></td>
+                                <td className="py-2.5 px-4 text-right text-primary font-black"><Price amount={r.total} lang={adminLang} /></td>
+                                <td className="py-2.5 px-4 text-right text-purple-700 font-mono"><Price amount={r.vat} lang={adminLang} /></td>
                               </tr>
                             ))
                           )}
@@ -328,9 +328,9 @@ export const ReportsPanel: React.FC = () => {
                             <tr key={i} className="hover:bg-white/50">
                               <td className="py-3 px-4 text-xs font-black text-slate-800">{r.name}</td>
                               <td className="py-3 px-4 text-center">{r.ordersCount}</td>
-                              <td className="py-3 px-4 text-right text-primary font-black">{r.totalRevenue.toFixed(2)}</td>
-                              <td className="py-3 px-4 text-right">{r.deliveryFees.toFixed(2)}</td>
-                              <td className="py-3 px-4 text-right text-red-500">-{r.discounts.toFixed(2)}</td>
+                              <td className="py-3 px-4 text-right text-primary font-black"><Price amount={r.totalRevenue} lang={adminLang} /></td>
+                              <td className="py-3 px-4 text-right"><Price amount={r.deliveryFees} lang={adminLang} /></td>
+                              <td className="py-3 px-4 text-right text-red-500"><Price amount={r.discounts} prefix="-" lang={adminLang} /></td>
                               <td className="py-3 px-4 text-right font-mono text-xs"><Price amount={r.avgTicket} /></td>
                             </tr>
                           ))}
@@ -439,7 +439,7 @@ export const ReportsPanel: React.FC = () => {
                                 <td className="py-3 px-4 font-black text-slate-800">{r.orderNumber}</td>
                                 <td className="py-3 px-4 font-semibold text-slate-500 font-mono">{r.date}</td>
                                 <td className="py-3 px-4 font-bold text-slate-700">{r.branch}</td>
-                                <td className="py-3 px-4 text-right font-black text-slate-900">{r.total.toFixed(2)}</td>
+                                <td className="py-3 px-4 text-right font-black text-slate-900"><Price amount={r.total} lang={adminLang} /></td>
                                 <td className="py-3 px-4 text-center">
                                   <span className={`text-[8.5px] font-black px-2 py-0.5 rounded-full ${
                                     r.status === 'synced' ? 'bg-green-100 text-green-700' :

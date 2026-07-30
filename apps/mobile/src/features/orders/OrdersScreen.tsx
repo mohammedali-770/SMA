@@ -15,7 +15,8 @@ import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
 import { confirmationPresentation, orderConfirmationState, type ConfirmationTone } from './orderConfirmation';
 import { mapOrder, orderDisplayNumber } from '../../lib/mappers';
 import { colors, font, radius, shadow, spacing } from '../../theme';
-import { formatRiyadhDateTime, formatSAR } from '../../utils/format';
+import { priceAccessibilityLabel } from '../../design-system/generated/money';
+import { formatRiyadhDateTime } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Order, OrderStatus } from '../../types/models';
 
@@ -72,7 +73,11 @@ export function OrdersScreen() {
     const statusLabel = t(STATUS_KEY[item.status]);
     const itemCount = item.items.reduce((n, it) => n + it.quantity, 0);
     const meta = `${itemCount} ${t('items')} · ${item.orderType === 'delivery' ? t('delivery') : t('pickup')}`;
-    const totalLabel = formatSAR(item.total, lang);
+    // Screen-reader only. Uses the shared announcer so the currency is spoken
+    // ("ريال سعودي" / "Saudi Riyal") rather than the code "SAR" — the visible
+    // total below is the Price component, whose riyal SVG has no text
+    // equivalent, so this string is the only thing assistive tech can read.
+    const totalLabel = priceAccessibilityLabel(item.total, lang);
     return (
       <Pressable
         style={({ pressed }) => [styles.card, shadow.card, pressed && styles.cardPressed]}
