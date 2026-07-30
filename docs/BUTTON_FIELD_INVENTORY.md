@@ -31,8 +31,8 @@ never remove them.
 | 2 | Customer App — Cart | ✅ **Done** — PR #125 |
 | 2 | Customer App — Checkout | ✅ **Done** — this PR |
 | 2 | Customer App — Payment | ✅ **Done** — this PR |
-| 2 | Customer App — Order Tracking | ⬜ |
-| 2 | Customer App — Profile | ⬜ |
+| 2 | Customer App — Order Tracking / Receipt | ✅ **Done** — this PR |
+| 2 | Customer App — Profile | ✅ **Done** — this PR |
 | 3 | Admin — Dashboard | ⬜ |
 | 3 | Admin — Live Orders | ⬜ |
 | 3 | Admin — Menu Management | ⬜ |
@@ -105,12 +105,50 @@ Fixes found by the fixture pass, not by reading:
 last consumer; the design-system `QtyStepper` absorbed its `busy` guard and
 per-item accessibility labels.
 
+## Surface 5 — Order Tracking + Receipt + Profile ✅
+
+Orders, Receipt, Profile, Delete Account, Notification settings and the Legal /
+Support screens.
+
+`OrdersScreen` and `ReceiptScreen` now own **fetching and polling only**; the
+order card, the confirmation hero, the receipt body and the skeletons are pure
+components under `features/orders/view`. That split is what makes the order
+states reviewable: the screens call `orders.byId` / `orders.listWithItems` on
+mount and `orders.requestResend` is a real POS action, so the fixture renders
+the COMPONENTS against fixed mock orders and never mounts the screens.
+
+The confirmation states in those fixtures are not hand-written. Each mock order
+sets the RAW inputs the real state machine reads — payment status, sync state,
+POS ref, blocked reason, retry count, refund state — and
+`orderConfirmationState` derives the state exactly as in production, so the
+fixtures move with the machine instead of quietly disagreeing with it.
+
+**Preserved verbatim:** the order-status map, the focus/poll cycle and its
+terminal-status no-op, stale-while-revalidate on the list, the resend debounce,
+`accountDeletion` submit, the hardware-back lock, the OTP/reauth fallback
+choice, and the automatic post-acceptance sign-out (including `deactivateThisDevice`
+running before the JWT disappears).
+
+Fixes found by the fixture pass:
+
+* two confirmation tone maps had already drifted — `danger` resolved to
+  `colors.danger` in the receipt and `colors.red` in My Orders. One map now;
+* an order card with no branch number printed the state title as BOTH heading
+  and chip. The old rule named two states explicitly; the real rule is "never
+  repeat the heading", which is exactly `branchNo != null`.
+
+**Not built: name editing and address management.** Neither exists in the app —
+the screen's own docblock recorded them as deferred, and the addresses API is
+touched only by Checkout and the order-type gate. Adding them means new profile
+writes and address CRUD, which is feature work, not a design migration, and this
+pass adds no API calls. Tracked separately.
+
 ## Remaining legacy inventory
 
 | Surface | Legacy usage |
 | --- | ---: |
-| Mobile `<Button>` (legacy) | 3 files: `DeleteAccountScreen`, `OrderTypeSelectScreen`, `ReceiptScreen` |
-| Mobile `components/Notice` | 1 file: `OrderTypeSelectScreen` |
+| Mobile `<Button>` (legacy) | **1 file**: `OrderTypeSelectScreen` |
+| Mobile `components/Notice` | **1 file**: `OrderTypeSelectScreen` |
 | Web raw `<button>` | 129 (24 `glass-btn-*`) |
 | Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) |
 

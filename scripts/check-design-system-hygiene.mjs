@@ -147,6 +147,20 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/features/checkout/view/TotalsCard.tsx',
   'apps/mobile/src/app/payment/checkout.tsx',
   'apps/mobile/src/app/payment/return.tsx',
+  // Surface 5 - Order Tracking + Receipt + Profile
+  'apps/mobile/src/features/orders/OrdersScreen.tsx',
+  'apps/mobile/src/features/orders/ReceiptScreen.tsx',
+  'apps/mobile/src/features/orders/view/ConfirmationHero.tsx',
+  'apps/mobile/src/features/orders/view/OrderCard.tsx',
+  'apps/mobile/src/features/orders/view/ReceiptBody.tsx',
+  'apps/mobile/src/features/orders/view/ReceiptRow.tsx',
+  'apps/mobile/src/features/orders/view/Skeletons.tsx',
+  'apps/mobile/src/features/orders/view/confirmationTone.ts',
+  'apps/mobile/src/features/profile/ProfileScreen.tsx',
+  'apps/mobile/src/features/account/DeleteAccountScreen.tsx',
+  'apps/mobile/src/features/notifications/NotificationSettings.tsx',
+  'apps/mobile/src/features/legal/LegalListScreen.tsx',
+  'apps/mobile/src/features/legal/LegalDocScreen.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

@@ -14,7 +14,7 @@
  */
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Header } from '../../components/Header';
 import { Screen } from '../../components/Screen';
@@ -26,13 +26,14 @@ import {
 } from '../../lib/supportContact';
 import { legal } from '../../services/api';
 import { useCatalog } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
+import { color, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { Text } from '../../design-system/ui/Text';
 import type { DbLegalDocument } from '../../types/db';
 
 const CHANNEL_EMOJI: Record<SupportChannelKind, string> = { phone: '📞', whatsapp: '💬', email: '✉️' };
 
 export function LegalListScreen() {
-  const { t, pick, lang, isRTL, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, isRTL, rtlRow } = useI18n();
   const { support } = useCatalog();
   const [docs, setDocs] = useState<DbLegalDocument[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,19 +63,19 @@ export function LegalListScreen() {
   };
 
   return (
-    <Screen background={colors.bg} edges={['top', 'left', 'right']}>
+    <Screen background={color.appBg} edges={['top', 'left', 'right']}>
       <Header title={t('legalSupport')} showBack />
       {error ? (
         <ErrorView message={pick('Could not load documents.', 'تعذّر تحميل المستندات.')} onRetry={load} retryLabel={t('retry')} />
       ) : docs === null ? (
         <LoadingView label={t('loading')} />
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {/* Contact & Support — hidden entirely when nothing is configured. */}
           {channels.length > 0 || hours || desc ? (
-            <View style={[styles.supportCard, shadow.card]}>
-              <Text style={[styles.supportTitle, rtlText]}>{t('supportTitle')}</Text>
-              {desc ? <Text style={[styles.supportDesc, rtlText]}>{desc}</Text> : null}
+            <View style={styles.supportCard}>
+              <Text variant="title">{t('supportTitle')}</Text>
+              {desc ? <Text variant="caption" tone="secondary">{desc}</Text> : null}
               {channels.map((c) => (
                 <Pressable
                   key={c.kind}
@@ -83,24 +84,24 @@ export function LegalListScreen() {
                   accessibilityRole="button"
                   accessibilityLabel={channelLabel[c.kind]}
                 >
-                  <Text style={styles.supportEmoji}>{CHANNEL_EMOJI[c.kind]}</Text>
+                  <Text variant="title" style={styles.emoji}>{CHANNEL_EMOJI[c.kind]}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.supportAction, rtlText]}>{channelLabel[c.kind]}</Text>
-                    <Text style={[styles.supportValue, rtlText]} numberOfLines={1}>{c.display}</Text>
+                    <Text variant="label">{channelLabel[c.kind]}</Text>
+                    <Text variant="caption" tone="secondary" numberOfLines={1}>{c.display}</Text>
                   </View>
-                  <Text style={styles.chevron}>{isRTL ? '‹' : '›'}</Text>
+                  <Text variant="title" tone="ember">{isRTL ? '‹' : '›'}</Text>
                 </Pressable>
               ))}
               {hours ? (
                 <View style={[styles.supportRow, rtlRow]}>
-                  <Text style={styles.supportEmoji}>🕘</Text>
+                  <Text variant="title" style={styles.emoji}>🕘</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.supportAction, rtlText]}>{t('workingHours')}</Text>
-                    <Text style={[styles.supportValue, rtlText]}>{hours}</Text>
+                    <Text variant="label">{t('workingHours')}</Text>
+                    <Text variant="caption" tone="secondary">{hours}</Text>
                   </View>
                 </View>
               ) : null}
-              {openError ? <Text style={[styles.openError, rtlText]}>{t('supportOpenFailed')}</Text> : null}
+              {openError ? <Text variant="label" tone="danger">{t('supportOpenFailed')}</Text> : null}
             </View>
           ) : null}
 
@@ -108,17 +109,17 @@ export function LegalListScreen() {
             <Pressable
               key={d.id}
               onPress={() => router.push(`/legal/${d.document_type}`)}
-              style={[styles.row, shadow.card]}
+              style={({ pressed }) => [styles.row, rtlRow, pressed && styles.pressed]}
               accessibilityRole="button"
             >
-              <Text style={[styles.rowText, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={2}>
+              <Text variant="label" style={styles.rowText} numberOfLines={2}>
                 {pick(d.title_en, d.title_ar)}
               </Text>
-              <Text style={styles.chevron}>{isRTL ? '‹' : '›'}</Text>
+              <Text variant="title" tone="ember">{isRTL ? '‹' : '›'}</Text>
             </Pressable>
           ))}
           {docs.length === 0 ? (
-            <Text style={styles.empty}>{pick('No documents available.', 'لا توجد مستندات متاحة.')}</Text>
+            <Text variant="body" tone="secondary" align="center" style={styles.empty}>{pick('No documents available.', 'لا توجد مستندات متاحة.')}</Text>
           ) : null}
         </ScrollView>
       )}
@@ -127,24 +128,19 @@ export function LegalListScreen() {
 }
 
 const styles = StyleSheet.create({
+  scroll: { padding: space.s4, gap: space.s2 },
   supportCard: {
-    backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg,
-    gap: spacing.sm, marginBottom: spacing.sm,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s2, marginBottom: space.s1,
   },
-  supportTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  supportDesc: { fontSize: font.sm, color: colors.muted },
-  supportRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  supportEmoji: { fontSize: font.xl },
-  supportAction: { fontSize: font.md, fontWeight: '800', color: colors.text },
-  supportValue: { fontSize: font.sm, color: colors.muted, marginTop: 1 },
-  openError: { color: colors.red, fontWeight: '700', fontSize: font.sm },
+  supportRow: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s2 },
+  emoji: { lineHeight: typeScale.title.lineHeight },
   pressed: { opacity: 0.7 },
-
   row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.lg, paddingVertical: spacing.lg, paddingHorizontal: spacing.lg,
+    flexDirection: 'row', alignItems: 'center', gap: space.s3,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: color.appLine, padding: space.s4,
   },
-  rowText: { flex: 1, fontSize: font.md, fontWeight: '700', color: colors.text },
-  chevron: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
-  empty: { textAlign: 'center', color: colors.muted, fontSize: font.md, marginTop: spacing.xl },
+  rowText: { flex: 1 },
+  empty: { marginTop: space.s5 },
 });

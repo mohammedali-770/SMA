@@ -6,7 +6,7 @@
  */
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Header } from '../../components/Header';
 import { Screen } from '../../components/Screen';
@@ -14,7 +14,8 @@ import { ErrorView, LoadingView } from '../../components/StateViews';
 import { useI18n } from '../../i18n/I18nProvider';
 import { legalTitle } from '../../lib/legal';
 import { legal } from '../../services/api';
-import { colors, font, spacing } from '../../theme';
+import { color, space } from '../../design-system/generated/tokens';
+import { Text } from '../../design-system/ui/Text';
 import type { DbLegalDocument } from '../../types/db';
 
 type State =
@@ -25,7 +26,7 @@ type State =
 
 export function LegalDocScreen() {
   const { type } = useLocalSearchParams<{ type: string }>();
-  const { t, pick, lang, isRTL } = useI18n();
+  const { t, pick, lang } = useI18n();
   const [state, setState] = useState<State>({ kind: 'loading' });
   const docType = String(type ?? '');
 
@@ -38,10 +39,9 @@ export function LegalDocScreen() {
   useEffect(load, [docType]);
 
   const headerTitle = state.kind === 'ok' ? pick(state.doc.title_en, state.doc.title_ar) : legalTitle(docType, lang);
-  const align = { textAlign: isRTL ? 'right' : 'left', writingDirection: isRTL ? 'rtl' : 'ltr' } as const;
 
   return (
-    <Screen background={colors.bg} edges={['top', 'left', 'right']}>
+    <Screen background={color.appBg} edges={['top', 'left', 'right']}>
       <Header title={headerTitle} showBack />
       {state.kind === 'loading' ? (
         <LoadingView label={t('loading')} />
@@ -49,14 +49,14 @@ export function LegalDocScreen() {
         <ErrorView message={pick('Could not load this document.', 'تعذّر تحميل هذا المستند.')} onRetry={load} retryLabel={t('retry')} />
       ) : state.kind === 'missing' ? (
         <View style={styles.center}>
-          <Text style={styles.missing}>{pick('This document is not available.', 'هذا المستند غير متاح.')}</Text>
+          <Text variant="body" tone="secondary" align="center">{pick('This document is not available.', 'هذا المستند غير متاح.')}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.title, align]}>{pick(state.doc.title_en, state.doc.title_ar)}</Text>
-          <Text style={[styles.body, align]}>{pick(state.doc.content_en, state.doc.content_ar)}</Text>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          <Text variant="display" style={styles.title}>{pick(state.doc.title_en, state.doc.title_ar)}</Text>
+          <Text variant="body">{pick(state.doc.content_en, state.doc.content_ar)}</Text>
           <View style={styles.metaWrap}>
-            <Text style={[styles.meta, align]}>
+            <Text variant="caption" tone="tertiary">
               {pick('Version', 'الإصدار')} {state.doc.version}
               {state.doc.effective_date ? ` · ${pick('Effective', 'ساري من')} ${state.doc.effective_date}` : ''}
             </Text>
@@ -68,10 +68,8 @@ export function LegalDocScreen() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
-  missing: { fontSize: font.md, color: colors.muted, fontWeight: '700', textAlign: 'center' },
-  title: { fontSize: font.xl, fontWeight: '800', color: colors.text, marginBottom: spacing.md },
-  body: { fontSize: font.md, color: colors.text, lineHeight: 22 },
-  metaWrap: { marginTop: spacing.xl, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
-  meta: { fontSize: font.xs, color: colors.muted, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.s6 },
+  scroll: { padding: space.s4, paddingBottom: space.s6 },
+  title: { marginBottom: space.s3 },
+  metaWrap: { marginTop: space.s5, paddingTop: space.s3, borderTopWidth: 1, borderTopColor: color.appLine },
 });

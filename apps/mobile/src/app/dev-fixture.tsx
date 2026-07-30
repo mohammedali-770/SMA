@@ -26,7 +26,10 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
 
 import { FixtureProvider, type FixtureOptions } from '../dev/FixtureProvider';
+import { OrdersListFixture, ReceiptFixture } from '../dev/OrderFixtures';
 import { resolveFixtureGate, type FixtureScene } from '../dev/fixtureGate';
+import type { ReceiptSceneKey } from '../dev/fixtureOrders';
+import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { CheckoutScreen } from '../features/checkout/CheckoutScreen';
 import {
   PaymentStatusDialog,
@@ -53,6 +56,24 @@ const SCENE_OPTIONS: Record<FixtureScene, FixtureOptions> = {
   'payment-cancelled': {},
   'payment-expired': {},
   'payment-error': {},
+  orders: {},
+  'orders-empty': {},
+  'receipt-payment-pending': {},
+  'receipt-paid': {},
+  'receipt-cash': {},
+  'receipt-sending': {},
+  'receipt-confirmed': {},
+  'receipt-verifying': {},
+  'receipt-resend': {},
+  'receipt-resend-cash': {},
+  'receipt-refund-pending': {},
+  'receipt-refunded': {},
+  'receipt-refund-failed': {},
+  'receipt-ready': {},
+  'receipt-completed': {},
+  'receipt-cancelled': {},
+  profile: {},
+  'profile-no-name': { noProfileName: true },
 };
 
 /** Payment scene → the overlay state it puts the dialog in. */
@@ -76,6 +97,25 @@ export default function DevFixtureRoute() {
   useFixtureLanguage(gate.allowed ? lang : undefined);
 
   if (!gate.allowed) return <Redirect href="/" />;
+
+  // Orders / Receipt render PRESENTATIONAL components against fixed mock
+  // orders — never the fetching screens, which would call the orders API (and,
+  // for a resend, the POS) on mount.
+  if (gate.scene === 'orders' || gate.scene === 'orders-empty') {
+    return <OrdersListFixture empty={gate.scene === 'orders-empty'} />;
+  }
+  if (gate.scene.startsWith('receipt-')) {
+    return <ReceiptFixture scene={gate.scene.slice('receipt-'.length) as ReceiptSceneKey} />;
+  }
+  // Profile is the REAL screen: it reads auth from context, and its only
+  // actions are navigation and sign-out, both inert here.
+  if (gate.scene === 'profile' || gate.scene === 'profile-no-name') {
+    return (
+      <FixtureProvider options={SCENE_OPTIONS[gate.scene]}>
+        <ProfileScreen />
+      </FixtureProvider>
+    );
+  }
 
   const payState = PAY_STATE[gate.scene] ?? null;
 

@@ -4,8 +4,9 @@
  * These read the fixture source files as TEXT rather than importing them, so
  * they hold even for modules that pull in React Native (which the mobile test
  * environment forbids). The point is to make "the fixture cannot reach a real
- * API, Supabase, Lazywait, a payment SDK or order creation" a checked property
- * instead of a claim in a code comment.
+ * API, Supabase, Lazywait, a payment SDK, order creation, a POS resend, a
+ * refund or an account deletion" a checked property instead of a claim in a
+ * code comment.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -30,13 +31,30 @@ const FIXTURE_FILES = [
   'FixtureProvider.tsx',
   'fixtureData.ts',
   'fixtureGate.ts',
+  'fixtureOrders.ts',
+  'OrderFixtures.tsx',
 ];
 
-/** Anything that could reach the network, the database or money. */
+/**
+ * Anything that could reach the network, the database or money.
+ *
+ * The lazywait rule targets an IMPORT or a CALL, not the bare word. Three
+ * `lazywait*` fields are columns on the Order model — they are the raw inputs
+ * `deriveCustomerOrderState` reads, so an order fixture cannot describe a POS
+ * state without naming them. Matching the bare word fired on
+ * `lazywaitSyncState: 'synced'`, which is data, not a call. A check that cries
+ * wolf on legitimate data is a check that gets deleted, so it is narrowed to
+ * the shapes that could actually talk to the POS — and widened to cover the
+ * other endpoints this surface must never reach: resend, refund, deletion.
+ */
 const FORBIDDEN = [
   { pattern: /from\s+['"][^'"]*services\/api['"]/, label: 'services/api' },
   { pattern: /supabase/i, label: 'supabase' },
-  { pattern: /lazywait/i, label: 'lazywait' },
+  { pattern: /from\s+['"][^'"]*lazywait/i, label: 'a lazywait import' },
+  { pattern: /lazywait[A-Za-z]*\s*\(/i, label: 'a lazywait call' },
+  { pattern: /requestResend|resendToPos/i, label: 'POS resend' },
+  { pattern: /accountDeletion|deleteAccount/i, label: 'account deletion' },
+  { pattern: /refund[A-Za-z]*\s*\(/i, label: 'a refund call' },
   { pattern: /\bfetch\s*\(/, label: 'fetch(' },
   { pattern: /\btap\b(?!e)/i, label: 'Tap payment provider' },
   { pattern: /placeOrder|createOrder|payment-initiate|checkout-session/i, label: 'order/payment creation' },
@@ -69,7 +87,18 @@ describe('fixture mechanism cannot reach production systems', () => {
   });
 
   it('fixture data is deterministic — no clocks, no randomness', () => {
-    const src = read('fixtureData.ts');
-    expect(src).not.toMatch(/Date\.now|new Date\(|Math\.random/);
+    for (const file of ['fixtureData.ts', 'fixtureOrders.ts']) {
+      const src = read(file);
+      expect(src, `${file} must be deterministic`).not.toMatch(/Date\.now|new Date\(|Math\.random/);
+    }
+  });
+
+  it('the order fixtures render presentational components, never the screens', () => {
+    // OrdersScreen and ReceiptScreen call orders.listWithItems / orders.byId on
+    // mount, and requestResend is a REAL POS action. Mounting either under a
+    // fixture would put a live endpoint one render away from a review session.
+    const src = read('OrderFixtures.tsx');
+    expect(src).not.toMatch(/OrdersScreen/);
+    expect(src).not.toMatch(/ReceiptScreen/);
   });
 });
