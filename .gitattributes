@@ -1,0 +1,6 @@
+# The repository has core.autocrlf=true on Windows checkouts, which would give
+# .nvmrc a CRLF ending locally. nvm / nvm-windows read the file literally and
+# choke on the trailing \r, so the Node standard would silently fail to apply
+# for Windows developers. GitHub Actions' setup-node is unaffected (Linux
+# runners always see LF), so this is purely a local-developer guard.
+.nvmrc text eol=lf
