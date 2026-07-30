@@ -611,6 +611,7 @@ export function CheckoutScreen() {
           keyboardDismissMode="none"
           showsVerticalScrollIndicator={false}
         >
+          <View style={styles.column}>
           <OrderTypeRow
             typeLabel={orderTypeLabel}
             branchName={selectedBranch ? pick(selectedBranch.nameEn, selectedBranch.nameAr) : null}
@@ -732,6 +733,7 @@ export function CheckoutScreen() {
             }}
             serverNote={`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}
           />
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -775,7 +777,9 @@ export function CheckoutScreen() {
           charge; it never confirms or creates anything. */}
       <PaymentStatusDialog
         state={payFlow?.state ?? null}
-        message={payFlow?.message ?? null}
+        // `?? t('payFailed')` preserves the original fallback: a state that
+        // somehow arrives without a message must not render an empty dialog.
+        message={payFlow ? (payFlow.message ?? t('payFailed')) : null}
         busy={payBusy}
         labels={{
           title: t('payTitle'),
@@ -825,14 +829,16 @@ const styles = StyleSheet.create({
     padding: space.s4,
     // Tail room clears the sticky footer AND the keyboard.
     paddingBottom: 260,
-    gap: space.s5,
-    // Checkout is one column of decisions. On a tablet, letting it run the
-    // full width turns a 40-character line into a 120-character one and drags
-    // the money column metres away from its labels. Capped and centred; below
-    // the cap (every phone) this changes nothing.
-    width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
+    // Centre the capped column. `alignItems` on the content container plus
+    // `width: '100%'` on the child, rather than `alignSelf` on the container
+    // itself — the latter centres on web but is not dependable for a
+    // ScrollView's content container on native.
+    alignItems: 'center',
   },
+  // Checkout is one column of decisions. On a tablet, letting it run the full
+  // width turns a 40-character line into a 120-character one and drags the
+  // money column metres from its labels. Below the cap — every phone — this
+  // changes nothing.
+  column: { width: '100%', maxWidth: CONTENT_MAX_WIDTH, gap: space.s5 },
   multiline: { minHeight: 84, paddingTop: space.s3, textAlignVertical: 'top' },
 });

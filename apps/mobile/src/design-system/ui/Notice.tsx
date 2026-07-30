@@ -21,6 +21,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Price } from '../../components/Price';
 import { useI18n } from '../../i18n/I18nProvider';
+import { priceAccessibilityLabel } from '../generated/money';
 import { color, radius, space, type as typeScale } from '../generated/tokens';
 import { Text } from './Text';
 
@@ -63,11 +64,15 @@ export function Notice({ title, action, amount, amountLabel, tone = 'blocking', 
       style={[styles.wrap, { backgroundColor: c.bg, borderStartColor: c.bar }, style]}
       accessibilityRole="alert"
       accessible
-      // One announcement instead of three fragments, in reading order. The
-      // amount is spoken as a localized figure, not as a bare number.
+      // One announcement instead of three fragments, in reading order.
+      //
+      // The amount MUST go through priceAccessibilityLabel: this container is
+      // `accessible`, which collapses the <Price> inside it and swallows the
+      // label Price would otherwise have announced. Without this the user hears
+      // "Still needed, 31.00" — a bare number with no currency at all.
       accessibilityLabel={[
         title,
-        showAmount ? `${amountLabel}: ${amount.toFixed(2)}` : null,
+        showAmount ? `${amountLabel}: ${priceAccessibilityLabel(amount, lang)}` : null,
         action,
       ].filter(Boolean).join('. ')}
       accessibilityLanguage={lang}
