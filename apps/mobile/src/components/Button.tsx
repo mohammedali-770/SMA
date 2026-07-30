@@ -41,9 +41,14 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   const isDisabled = state.inert;
   // Guard the handler as well as setting Pressable's `disabled`: the prop alone
   // does not protect against a programmatic or direct call.
+  // Depend on `state.inert`, not `state`: resolveButtonState returns a fresh
+  // object every render, so a `[state, ...]` dependency never memoises anything
+  // and quietly implies a stability it does not provide. `shouldInvokePress`
+  // reads only `inert`, so the captured state stays consistent with the dep.
   const handlePress = useCallback(() => {
     if (shouldInvokePress(state)) onPress();
-  }, [state, onPress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.inert, onPress]);
   const bg =
     variant === 'primary' ? colors.purple
     : variant === 'danger' ? colors.red

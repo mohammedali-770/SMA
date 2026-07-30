@@ -69,9 +69,12 @@ export function Button({
 
   // Guard the handler rather than trusting `disabled` alone: a Pressable whose
   // disabled prop is forgotten downstream would otherwise double-submit.
+  // `state.inert`, not `state`: resolveButtonState returns a new object every
+  // render, so depending on the object never memoises anything.
   const handlePress = useCallback(() => {
     if (shouldInvokePress(state)) onPress();
-  }, [state, onPress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.inert, onPress]);
 
   const bg = state.muted ? color.disabledBg : surface.bg;
   const fg = state.muted ? color.disabledFg : surface.fg;
