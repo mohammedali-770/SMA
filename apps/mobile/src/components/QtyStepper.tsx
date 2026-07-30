@@ -3,7 +3,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useI18n } from '../i18n/I18nProvider';
-import { colors, font, radius } from '../theme';
+import { color, radius, type as typeScale } from '../design-system/generated/tokens';
 
 interface Props {
   value: number;
@@ -48,14 +48,14 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bgAlt,
+    backgroundColor: color.appSurface2,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: color.appLine,
   },
   btn: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },
-  sign: { fontSize: font.xl, fontWeight: '700', color: colors.purple, lineHeight: font.xl + 2 },
-  signDisabled: { color: colors.disabled },
-  value: { minWidth: 24, textAlign: 'center', fontSize: font.md, fontWeight: '700', color: colors.text },
+  sign: { fontSize: typeScale.title.size, fontWeight: '700', color: color.ember, lineHeight: typeScale.title.size + 2 },
+  signDisabled: { color: color.disabledBg },
+  value: { minWidth: 24, textAlign: 'center', fontSize: typeScale.body.size, fontWeight: '700', color: color.appText },
 });

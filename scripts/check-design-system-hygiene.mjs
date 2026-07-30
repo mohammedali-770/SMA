@@ -69,6 +69,41 @@ function walk(dir, out = []) {
 const violations = [];
 
 /**
+ * `npx expo start --web` rewrites apps/mobile/tsconfig.json#include, stripping
+ * the .expo generated-types entry and expo-env.d.ts. That edit is made by the Expo
+ * CLI, not authored, and silently removes the generated router types from
+ * typechecking. A visual-review session must not be able to commit it.
+ *
+ * See docs/DEV_VISUAL_REVIEW.md.
+ */
+const MOBILE_TSCONFIG = 'apps/mobile/tsconfig.json';
+const REQUIRED_TSCONFIG_INCLUDES = ['.expo/types/**/*.ts', 'expo-env.d.ts'];
+{
+  const full = join(ROOT, MOBILE_TSCONFIG);
+  if (existsSync(full)) {
+    let includes = [];
+    try {
+      includes = JSON.parse(readFileSync(full, 'utf8')).include ?? [];
+    } catch {
+      violations.push({
+        file: MOBILE_TSCONFIG, line: 0, rule: 'tsconfig-unparseable',
+        message: 'could not be parsed as JSON', snippet: '',
+      });
+    }
+    for (const required of REQUIRED_TSCONFIG_INCLUDES) {
+      if (!includes.includes(required)) {
+        violations.push({
+          file: MOBILE_TSCONFIG, line: 0, rule: 'expo-rewrote-tsconfig',
+          message: `"include" is missing ${required} — this is the edit \`expo start --web\` makes. Run: git checkout -- ${MOBILE_TSCONFIG}`,
+          snippet: JSON.stringify(includes),
+        });
+      }
+    }
+  }
+}
+
+
+/**
  * Surfaces that have completed their design-system migration. Once a file is
  * listed here it may no longer import the legacy `theme` module or the legacy
  * components it replaced — that is what stops a finished surface regressing
@@ -90,6 +125,11 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/components/OpenClosedBadge.tsx',
   'apps/mobile/src/components/Screen.tsx',
   'apps/mobile/src/components/Logo.tsx',
+  // Surface 3 — Product Details + Cart
+  'apps/mobile/src/features/product/ProductDetailScreen.tsx',
+  'apps/mobile/src/features/cart/CartScreen.tsx',
+  'apps/mobile/src/components/QtyStepper.tsx',
+  'apps/mobile/src/components/Header.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

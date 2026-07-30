@@ -4,7 +4,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, spacing, typography } from '../theme';
+import { color, radius, space, type as typeScale } from '../design-system/generated/tokens';
 import { useI18n } from '../i18n/I18nProvider';
 
 interface Props {
@@ -33,7 +33,7 @@ export function Header({ title, showBack, onBack, right, left, safeTop }: Props)
   return (
     // Mirrored in Arabic so Back sits on the trailing (right) edge, matching
     // native RTL convention; the chevron above already points the correct way.
-    <View style={[styles.wrap, rtlRow, safeTop && { paddingTop: insets.top + spacing.md }]}>
+    <View style={[styles.wrap, rtlRow, safeTop && { paddingTop: insets.top + space.s3 }]}>
       <View style={styles.side}>
         {showBack ? (
           <Pressable accessibilityRole="button" accessibilityLabel={t('back')} onPress={back} hitSlop={10} style={styles.backBtn}>
@@ -51,19 +51,26 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
+    paddingHorizontal: space.s4,
+    paddingVertical: space.s3,
+    backgroundColor: color.appSurface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: color.appLine,
   },
   side: { minWidth: 44, justifyContent: 'center' },
   right: { alignItems: 'flex-end' },
   rightRTL: { alignItems: 'flex-start' },
   backBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bgAlt,
+    backgroundColor: color.appSurface2,
   },
-  chevron: { fontSize: 28, fontWeight: '800', color: colors.purple, lineHeight: 30 },
-  title: { flex: 1, textAlign: 'center', ...typography.heading, fontWeight: '800', color: colors.text },
+  chevron: { fontSize: 28, fontWeight: '800', color: color.ember, lineHeight: 30 },
+  title: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: typeScale.heading.size,
+    lineHeight: typeScale.heading.lineHeight,
+    fontWeight: typeScale.heading.weight,
+    color: color.appText,
+  },
 });

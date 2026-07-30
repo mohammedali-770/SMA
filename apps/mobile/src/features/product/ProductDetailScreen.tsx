@@ -7,15 +7,17 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Header } from '../../components/Header';
 import { QtyStepper } from '../../components/QtyStepper';
 import { ErrorView, LoadingView } from '../../components/StateViews';
+import { color, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { StatusPill } from '../../design-system/ui/Chip';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
 import { computeUnitPrice } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Modifier, ModifierGroup } from '../../types/models';
@@ -89,13 +91,17 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
         <Image source={{ uri: product.imageUrl }} style={styles.hero} contentFit="cover" transition={150} />
         <View style={styles.body}>
-          <Text style={[styles.name, rtlText]}>{pick(product.nameEn, product.nameAr)}</Text>
+          <Text variant="display">{pick(product.nameEn, product.nameAr)}</Text>
           {pick(product.descriptionEn, product.descriptionAr) ? (
-            <Text style={[styles.desc, rtlText]}>{pick(product.descriptionEn, product.descriptionAr)}</Text>
+            <Text variant="body" tone="secondary" style={{ marginTop: space.s1 }}>
+              {pick(product.descriptionEn, product.descriptionAr)}
+            </Text>
           ) : null}
           <View style={[styles.metaRow, rtlRow]}>
-            <Price amount={product.price} size={font.xl} color={colors.purple} weight="800" />
-            {product.calories ? <Text style={styles.kcal}>{product.calories} {t('kcal')}</Text> : null}
+            <Price amount={product.price} size={typeScale.title.size} color={color.appText} weight="700" />
+            {product.calories ? (
+              <Text variant="caption" tone="tertiary">{product.calories} {t('kcal')}</Text>
+            ) : null}
           </View>
 
           {groups.map((g) => {
@@ -108,19 +114,18 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
               // group obvious without hiding the message.
               <View key={g.id} style={[styles.group, unmet && styles.groupUnmet]}>
                 <View style={[styles.groupHead, rtlRow]}>
-                  <Text style={[styles.groupTitle, rtlText, { flex: 1 }]}>{pick(g.nameEn, g.nameAr)}</Text>
-                  <View style={[styles.reqPill, g.isRequired ? styles.reqYes : styles.reqNo]}>
-                    <Text style={[styles.reqText, { color: g.isRequired ? colors.red : colors.muted }]}>
-                      {g.isRequired ? t('required') : t('optional')}
-                    </Text>
-                  </View>
+                  <Text variant="heading" style={{ flex: 1 }}>{pick(g.nameEn, g.nameAr)}</Text>
+                  <StatusPill
+                    label={g.isRequired ? t('required') : t('optional')}
+                    tone={g.isRequired ? 'danger' : 'neutral'}
+                  />
                 </View>
                 {unmet ? (
-                  <Text style={[styles.groupError, rtlText]}>
+                  <Text variant="caption" tone="danger" style={{ marginBottom: space.s1 }}>
                     {t('required')} · {min}
                   </Text>
                 ) : null}
-                <View style={{ gap: spacing.sm }}>
+                <View style={{ gap: space.s2 }}>
                   {g.modifiers.map((m) => {
                     const checked = (selected[g.id] ?? []).some((x) => x.id === m.id);
                     return (
@@ -132,10 +137,12 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                         accessibilityState={{ checked }}
                       >
                         <View style={[styles.check, g.maxSelection === 1 ? styles.radio : null, checked && styles.checkOn]}>
-                          {checked ? <Text style={styles.checkMark}>✓</Text> : null}
+                          {checked ? <Text variant="label" tone="onEmber" align="center">✓</Text> : null}
                         </View>
-                        <Text style={[styles.modName, rtlText]}>{pick(m.nameEn, m.nameAr)}</Text>
-                        {m.price > 0 ? <Price amount={m.price} prefix="+" size={font.sm} color={colors.purple} weight="800" /> : null}
+                        <Text variant="body" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>
+                        {m.price > 0 ? (
+                          <Price amount={m.price} prefix="+" size={typeScale.label.size} color={color.ember} weight="700" />
+                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -145,22 +152,27 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
           })}
 
           <View style={[styles.qtyRow, rtlRow]}>
-            <Text style={styles.qtyLabel}>{t('quantity')}</Text>
+            <Text variant="heading">{t('quantity')}</Text>
             <QtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} />
           </View>
         </View>
       </ScrollView>
 
       {/* Sticky add-to-cart */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <Pressable
           onPress={add}
           style={({ pressed }) => [styles.addBtn, rtlRow, !canAdd && styles.addBtnDim, pressed && canAdd && { opacity: 0.9 }]}
           accessibilityRole="button"
           accessibilityState={{ disabled: !canAdd }}
         >
-          <Text style={styles.addBtnText}>{t('addForPrice')}</Text>
-          <Price amount={total} size={font.lg} color={colors.white} weight="800" />
+          <Text variant="heading" tone={canAdd ? 'onEmber' : 'secondary'}>{t('addForPrice')}</Text>
+          <Price
+            amount={total}
+            size={typeScale.heading.size}
+            color={canAdd ? color.onEmber : color.disabledFg}
+            weight="700"
+          />
         </Pressable>
       </View>
     </View>
@@ -168,57 +180,50 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  hero: { width: '100%', height: 260, backgroundColor: colors.bgAlt },
-  body: { padding: spacing.lg },
-  name: { fontSize: font.xxl, fontWeight: '800', color: colors.text, lineHeight: font.xxl + 8 },
-  desc: { fontSize: font.md, color: colors.muted, marginTop: spacing.xs, lineHeight: font.md + 7 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.md },
-  price: { fontSize: font.xl, fontWeight: '800', color: colors.purple },
-  kcal: { fontSize: font.sm, color: colors.muted },
+  root: { flex: 1, backgroundColor: color.appBg },
+  hero: { width: '100%', height: 260, backgroundColor: color.appSurface2 },
+  body: { padding: space.s4 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.s4, marginTop: space.s3 },
 
+  // Each modifier group sits on its own flat surface so groups read as separate
+  // decisions; an unmet required group gets a danger edge, not a hidden message.
   group: {
-    marginTop: spacing.lg, backgroundColor: colors.white, borderRadius: radius.lg,
-    borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border, padding: spacing.md,
+    marginTop: space.s4, backgroundColor: color.appSurface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: color.appLine, padding: space.s3,
   },
-  groupUnmet: { borderColor: colors.red },
-  groupHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm },
-  groupTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  reqPill: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill },
-  reqYes: { backgroundColor: colors.dangerBg },
-  reqNo: { backgroundColor: colors.bgAlt },
-  reqText: { fontSize: font.xs, fontWeight: '800' },
-  groupError: { color: colors.red, fontSize: font.xs, fontWeight: '700', marginBottom: spacing.xs },
+  groupUnmet: { borderColor: color.danger },
+  groupHead: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginBottom: space.s2, gap: space.s2,
+  },
 
   modRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: colors.white,
-    borderRadius: radius.md, borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
-    padding: spacing.md, minHeight: 48,
+    flexDirection: 'row', alignItems: 'center', gap: space.s3, backgroundColor: color.appSurface,
+    borderRadius: radius.md, borderWidth: 1, borderColor: color.appLine,
+    padding: space.s3, minHeight: 48,
   },
-  modRowOn: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
+  modRowOn: { borderColor: color.ember, backgroundColor: color.appSurface2 },
   check: {
-    width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.border,
+    width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: color.appLine,
     alignItems: 'center', justifyContent: 'center',
   },
   radio: { borderRadius: 12 },
-  checkOn: { backgroundColor: colors.purple, borderColor: colors.purple },
-  checkMark: { color: colors.white, fontWeight: '900', fontSize: font.sm },
-  modName: { flex: 1, fontSize: font.md, color: colors.text, fontWeight: '600' },
-  modPrice: { fontSize: font.sm, color: colors.purple, fontWeight: '800' },
+  checkOn: { backgroundColor: color.ember, borderColor: color.ember },
 
-  qtyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xl },
-  qtyLabel: { fontSize: font.lg, fontWeight: '800', color: colors.text },
+  qtyRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginTop: space.s5,
+  },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
-    borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: color.appSurface,
+    borderTopWidth: 1, borderTopColor: color.appLine,
+    paddingHorizontal: space.s4, paddingTop: space.s3,
   },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
-    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
+    backgroundColor: color.ember, borderRadius: radius.lg,
+    paddingHorizontal: space.s5, paddingVertical: space.s4, minHeight: 54,
   },
-  addBtnDim: { backgroundColor: colors.disabled },
-  addBtnText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
-  addBtnPrice: { color: colors.white, fontWeight: '800', fontSize: font.lg },
+  addBtnDim: { backgroundColor: color.disabledBg },
 });
