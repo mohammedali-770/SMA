@@ -56,6 +56,9 @@ const styles = StyleSheet.create({
   btn: { alignItems: 'center', justifyContent: 'center' },
   pressed: { opacity: 0.6 },
   sign: { fontSize: typeScale.title.size, fontWeight: '700', color: color.ember, lineHeight: typeScale.title.size + 2 },
-  signDisabled: { color: color.disabledBg },
+  // `disabledFg`, NOT `disabledBg` — a background token used as a foreground
+  // made the disabled minus invisible against the stepper's own surface. A
+  // disabled control still has to be readable; only its colour changes.
+  signDisabled: { color: color.disabledFg },
   value: { minWidth: 24, textAlign: 'center', fontSize: typeScale.body.size, fontWeight: '700', color: color.appText },
 });
