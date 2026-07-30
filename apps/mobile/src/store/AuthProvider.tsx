@@ -19,7 +19,7 @@ import type { UserProfile } from '../types/models';
 
 type AuthStatus = 'loading' | 'signed_in' | 'signed_out';
 
-interface AuthValue {
+export interface AuthValue {
   status: AuthStatus;
   userId: string | null;
   profile: UserProfile | null;
@@ -27,7 +27,8 @@ interface AuthValue {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthValue | null>(null);
+/** Exported ONLY for the dev fixture provider (src/dev/FixtureProvider.tsx). */
+export const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');

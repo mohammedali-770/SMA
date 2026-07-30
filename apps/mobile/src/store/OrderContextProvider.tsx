@@ -28,7 +28,7 @@ interface DeliverySelection {
   description?: string | null;
 }
 
-interface OrderContextValue {
+export interface OrderContextValue {
   context: OrderContext | null;
   /** True once the persisted context has been read (avoids gating before hydration). */
   ready: boolean;
@@ -39,7 +39,12 @@ interface OrderContextValue {
   clear: () => void;
 }
 
-const Ctx = createContext<OrderContextValue | null>(null);
+/**
+ * Exported ONLY for the dev fixture provider (src/dev/FixtureProvider.tsx).
+ * Production code uses `useOrderContext()`.
+ */
+export const OrderCtx = createContext<OrderContextValue | null>(null);
+const Ctx = OrderCtx;
 
 export function OrderContextProvider({ children }: { children: React.ReactNode }) {
   const { branches, deliveryZones, loading, setSelectedBranch } = useCatalog();

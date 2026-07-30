@@ -13,7 +13,7 @@ import { computeUnitPrice, makeCartItemId, cartSubtotal } from '../utils/format'
 import { uuidv4 } from '../utils/uuid';
 import type { CartItem, Modifier, Product } from '../types/models';
 
-interface CartValue {
+export interface CartValue {
   items: CartItem[];
   count: number;
   subtotal: number;
@@ -28,7 +28,11 @@ interface CartValue {
   toOrderItems: () => { product_id: string; quantity: number; modifier_ids?: string[] }[];
 }
 
-const CartContext = createContext<CartValue | null>(null);
+/**
+ * Exported ONLY for the dev fixture provider (src/dev/FixtureProvider.tsx).
+ * Production code uses `useCart()`.
+ */
+export const CartContext = createContext<CartValue | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
