@@ -34,7 +34,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
+          # Already 22; reading the file keeps it that way if the standard moves.
+          # `node-version-file` resolves from the repository root and is
+          # unaffected by this job's `working-directory: apps/mobile`.
+          node-version-file: .nvmrc
 
       - name: Setup EAS / Expo
         uses: expo/expo-github-action@v8

@@ -24,7 +24,14 @@ in real time.
 
 ## Getting started
 
+**Node 22 is the repository standard** — `.nvmrc` is the single source of truth
+and every CI workflow reads it. Node 20 cannot run the unit suite at all. See
+[docs/NODE_VERSION.md](docs/NODE_VERSION.md).
+
 ```bash
+# Match the repository's Node version
+nvm use
+
 # Install dependencies
 npm install
 

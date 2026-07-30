@@ -44,12 +44,13 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          # 22, not 20. The unit suite imports src/lib/supabase.ts, and
-          # @supabase/realtime-js requires a native global WebSocket, which
-          # Node 20 does not provide:
-          #   Error: Node.js detected but native WebSocket not found.
-          # Matches eas-build.yml, which already pins 22.
-          node-version: 22
+          # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
+          # Read from the file rather than hardcoded so the version cannot drift
+          # between workflows again. Node 20 is not viable here: the unit suite
+          # imports src/lib/supabase.ts and @supabase/realtime-js requires a
+          # native global WebSocket, which Node 20 does not provide
+          # ("Error: Node.js detected but native WebSocket not found").
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: |
             package-lock.json
