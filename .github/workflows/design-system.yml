@@ -1,0 +1,47 @@
+name: Design system
+
+# Guards the "Ember on Cream" design system:
+#   1. the generated per-app token mirrors have not been hand-edited or drifted
+#      away from design-system/ (the repo is not an npm workspace, so the
+#      mirrors ARE the sharing mechanism — silent drift would be invisible);
+#   2. the design-system trees stay free of hardcoded colours, font families,
+#      shadows and currency strings;
+#   3. types and unit tests still pass.
+#
+# Deliberately scoped to what this PR introduced. It does not gate unrelated
+# pre-existing code, so it cannot become a blanket blocker on other work.
+
+on:
+  pull_request:
+    branches: [claude/project-build-ie4b56, main]
+  push:
+    branches: [claude/project-build-ie4b56, main]
+
+jobs:
+  design-system:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Token mirrors are in sync and design-system code is token-pure
+        run: npm run design-system:check
+
+      - name: Typecheck (web)
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Install mobile dependencies
+        run: npm --prefix apps/mobile ci --no-audit --no-fund
+
+      - name: Typecheck (mobile)
+        run: npm --prefix apps/mobile run typecheck

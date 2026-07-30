@@ -6,6 +6,7 @@
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthScreen } from './components/AuthScreen';
+import { BrandMark } from './design-system/ui/BrandMark';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 // The Admin POS panel and the Supabase console are heavy and secondary to the
@@ -40,7 +41,7 @@ const AppHeader: React.FC = () => {
     <header className="sticky top-0 backdrop-blur-md bg-white/30 border-b border-slate-200/60 text-slate-800 py-3 px-6 z-40">
       <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Spicy Meal logo" className="w-9 h-9 rounded-xl object-contain bg-white shadow-md border border-white/20" />
+          <BrandMark className="w-9 h-9 rounded-xl object-contain bg-white shadow-md border border-white/20" />
           <div>
             <h1 className="text-base font-black tracking-tight leading-tight text-primary">SPICY MEAL</h1>
           </div>
