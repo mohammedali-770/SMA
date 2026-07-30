@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { formatAmount } from '../design-system/generated/money';
 import { Product, Category } from '../types';
 
 /**
@@ -55,9 +56,18 @@ export function generateId(prefix: string): string {
  * the mobile and admin views. The admin views previously hardcoded " SAR" even
  * in Arabic; routing them through here makes the label follow the active
  * language ("ر.س" is the abbreviation used everywhere else in the app).
+ *
+ * STRING CONTEXTS ONLY. Where the amount is rendered as JSX, use the `Price`
+ * component instead — it draws the official SAMA riyal symbol rather than a
+ * text code. A textual label is unavoidable here because the remaining call
+ * sites interpolate the amount into a sentence, where an element cannot go.
+ *
+ * The number comes from the shared design-system money module, so decimals and
+ * grouping are identical to `Price`: one implementation of "how much" in the
+ * product, differing only in the label.
  */
 export function formatSAR(amount: number, lang: 'en' | 'ar' = 'en'): string {
-  return `${amount.toFixed(2)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
+  return `${formatAmount(amount)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
 }
 
 const RIYADH_TZ = 'Asia/Riyadh';

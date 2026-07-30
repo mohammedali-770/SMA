@@ -3,11 +3,23 @@
  * are platform-neutral. Note: all authoritative order math happens server-side
  * in place_order — these are for DISPLAY only (cart preview, receipts).
  */
+import { formatAmount } from '../design-system/generated/money';
 import type { CartItem, Modifier, Product } from '../types/models';
 
-/** "123.00 SAR" (en) / "123.00 ر.س" (ar). */
+/**
+ * "123.00 SAR" (en) / "123.00 ر.س" (ar).
+ *
+ * STRING CONTEXTS ONLY — sentences, alert bodies, joined metadata lines. Where
+ * the amount is its own element, use the `Price` component: it draws the
+ * official SAMA riyal symbol instead of a text code. A textual label is
+ * unavoidable here because a React element cannot be interpolated into a
+ * template string.
+ *
+ * The number comes from the shared design-system money module, so decimals and
+ * grouping match `Price` exactly.
+ */
 export function formatSAR(amount: number, lang: 'en' | 'ar' = 'en'): string {
-  return `${amount.toFixed(2)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
+  return `${formatAmount(amount)} ${lang === 'ar' ? 'ر.س' : 'SAR'}`;
 }
 
 const RIYADH_TZ = 'Asia/Riyadh';

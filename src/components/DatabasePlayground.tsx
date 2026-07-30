@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { Price } from './Price';
 import { Database, FileCode, Server, ListCollapse, RefreshCw, KeyRound, Info, Eye } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
@@ -178,7 +179,7 @@ export const DatabasePlayground: React.FC = () => {
                             <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.nameEn}</td>
                             <td className="px-3 py-2.5">{row.phone}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black">{row.deliveryFee.toFixed(2)} SAR</td>
+                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.deliveryFee} /></td>
                             <td className="px-3 py-2.5">
                               <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${row.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                                 {row.isActive ? 'TRUE' : 'FALSE'}
@@ -199,7 +200,7 @@ export const DatabasePlayground: React.FC = () => {
                             <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white truncate max-w-[120px]">{row.nameEn}</td>
                             <td className="px-3 py-2.5 text-slate-400 truncate max-w-[100px]">{row.categoryId}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black">{row.price.toFixed(2)}</td>
+                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.price} /></td>
                             <td className="px-3 py-2.5">{row.calories} kcal</td>
                           </>
                         )}
@@ -207,7 +208,7 @@ export const DatabasePlayground: React.FC = () => {
                           <>
                             <td className="px-3 py-2.5 text-primary font-black">{row.orderNumber}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.customerName}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black">{row.total.toFixed(2)} SAR</td>
+                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.total} /></td>
                             <td className="px-3 py-2.5">
                               <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${row.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
                                 {row.status}
