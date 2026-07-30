@@ -23,7 +23,7 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
   onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
 };
 
-interface CatalogValue {
+export interface CatalogValue {
   loading: boolean;
   error: string | null;
   reload: () => void;
@@ -50,7 +50,12 @@ interface CatalogValue {
   branchIsOpen: (branch: Branch | null | undefined) => boolean;
 }
 
-const CatalogContext = createContext<CatalogValue | null>(null);
+/**
+ * Exported ONLY so the dev fixture provider can supply deterministic mock state
+ * to the real screens (see src/dev/FixtureProvider.tsx). Production code must
+ * keep using `useCatalog()` — nothing outside src/dev may consume this directly.
+ */
+export const CatalogContext = createContext<CatalogValue | null>(null);
 
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
