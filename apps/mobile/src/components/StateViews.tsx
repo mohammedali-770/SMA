@@ -16,17 +16,18 @@
  * longer the headline).
  */
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { Button } from './Button';
 import { presentState } from './stateHierarchy';
-import { colors, font, spacing, typography } from '../theme';
+import { color, space } from '../design-system/generated/tokens';
+import { Button } from '../design-system/ui/Button';
+import { Text } from '../design-system/ui/Text';
 
 export function LoadingView({ label }: { label?: string }) {
   return (
     <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label}>
-      <ActivityIndicator size="large" color={colors.purple} />
-      {label ? <Text style={styles.muted}>{label}</Text> : null}
+      <ActivityIndicator size="large" color={color.ember} />
+      {label ? <Text variant="body" tone="secondary" align="center">{label}</Text> : null}
     </View>
   );
 }
@@ -54,13 +55,17 @@ export function ErrorView({
 
   return (
     <View style={styles.center} accessibilityRole="alert">
-      {icon ?? <Text style={styles.emoji}>⚠️</Text>}
-      <Text style={styles.title}>{heading}</Text>
+      {icon ?? <Text variant="display" align="center">⚠️</Text>}
+      <Text variant="heading" align="center">{heading}</Text>
       {onRetry ? (
-        <Button label={retryLabel ?? 'Try Again'} onPress={onRetry} variant="secondary" style={{ marginTop: spacing.lg }} />
+        <Button label={retryLabel ?? 'Try Again'} onPress={onRetry} variant="secondary" style={{ marginTop: space.s5 }} />
       ) : null}
       {/* Step 3: quiet, still selectable and legible for support. */}
-      {detail ? <Text style={styles.detail} selectable>{detail}</Text> : null}
+      {detail ? (
+        <Text variant="caption" tone="tertiary" align="center" selectable style={{ marginTop: space.s3 }}>
+          {detail}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -74,13 +79,13 @@ export function EmptyView({
 }) {
   return (
     <View style={styles.center}>
-      {icon ?? <Text style={styles.emoji}>{emoji ?? '🛒'}</Text>}
-      <Text style={styles.title}>{title}</Text>
+      {icon ?? <Text variant="display" align="center">{emoji ?? '🛒'}</Text>}
+      <Text variant="heading" align="center">{title}</Text>
       {/* Action before the explanation: the way out matters more than the why. */}
       {actionLabel && onAction ? (
-        <Button label={actionLabel} onPress={onAction} style={{ marginTop: spacing.md, alignSelf: 'stretch' }} />
+        <Button label={actionLabel} onPress={onAction} style={{ marginTop: space.s3, alignSelf: 'stretch' }} />
       ) : null}
-      {subtitle ? <Text style={styles.muted}>{subtitle}</Text> : null}
+      {subtitle ? <Text variant="body" tone="secondary" align="center">{subtitle}</Text> : null}
     </View>
   );
 }
@@ -90,15 +95,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xxl,
-    gap: spacing.sm,
-  },
-  emoji: { fontSize: 44, marginBottom: spacing.sm },
-  title: { ...typography.heading, color: colors.text, textAlign: 'center' },
-  muted: { ...typography.body, color: colors.muted, textAlign: 'center' },
-  // Technical/supporting detail: smallest and quietest, never removed.
-  detail: {
-    fontSize: font.xs, color: colors.muted, textAlign: 'center',
-    marginTop: spacing.md, lineHeight: 17,
+    padding: space.s6,
+    gap: space.s2,
   },
 });

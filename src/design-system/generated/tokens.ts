@@ -86,7 +86,13 @@ export const color = {
   /** On-colour foregrounds. */
   onEmber: '#FFFFFF',
   disabledBg: '#EFE6DC',
-  disabledFg: '#9C93AB',
+  /**
+   * Disabled label. NOT the tertiary ink (#9C93AB) — measured on a rendered
+   * login screen that was ~2.2:1 against `disabledBg` and effectively
+   * unreadable. A disabled control still has to be legible: the user must be
+   * able to read what they cannot yet press. This is ~4.9:1, which clears AA.
+   */
+  disabledFg: '#6E6280',
 } as const;
 
 /**

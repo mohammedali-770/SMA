@@ -1,10 +1,12 @@
 /** Spicy Meal logo lockup: brand mark + wordmark, shown at the top of screens. */
 import { Image } from 'expo-image';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { colors, font, radius, spacing } from '../theme';
+import { radius, space } from '../design-system/generated/tokens';
+import { Text } from '../design-system/ui/Text';
 
+// The official production mark — the same asset as the iOS/Android app icon.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const MARK = require('../../assets/icon.png');
 
@@ -14,8 +16,8 @@ export function Logo({ compact = false }: { compact?: boolean }) {
       <Image source={MARK} style={compact ? styles.markSm : styles.mark} contentFit="cover" />
       {!compact && (
         <View>
-          <Text style={styles.word}>Spicy Meal</Text>
-          <Text style={styles.tag}>سبايسي ميل</Text>
+          <Text variant="title">Spicy Meal</Text>
+          <Text variant="caption" tone="ember">سبايسي ميل</Text>
         </View>
       )}
     </View>
@@ -23,9 +25,7 @@ export function Logo({ compact = false }: { compact?: boolean }) {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   mark: { width: 40, height: 40, borderRadius: radius.sm },
   markSm: { width: 30, height: 30, borderRadius: radius.sm },
-  word: { fontSize: font.xl, fontWeight: '800', color: colors.purple, letterSpacing: 0.2 },
-  tag: { fontSize: font.xs, fontWeight: '600', color: colors.red, marginTop: -2 },
 });
