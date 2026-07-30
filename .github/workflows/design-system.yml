@@ -1,0 +1,80 @@
+name: Design system
+
+# Guards the "Ember on Cream" design system:
+#   1. the generated per-app token mirrors have not been hand-edited or drifted
+#      away from design-system/ (the repo is not an npm workspace, so the
+#      mirrors ARE the sharing mechanism — silent drift would be invisible);
+#   2. the design-system trees stay free of hardcoded colours, font families,
+#      shadows and currency strings;
+#   3. types and unit tests still pass on both apps.
+#
+# Deliberately scoped to what this PR introduced. It does not gate unrelated
+# pre-existing code, so it cannot become a blanket blocker on other work.
+
+on:
+  pull_request:
+    branches: [claude/project-build-ie4b56, main]
+  push:
+    branches: [claude/project-build-ie4b56, main]
+
+# Read-only. This workflow only inspects the checkout — it never comments,
+# pushes, publishes or touches releases. Declared explicitly rather than
+# inheriting the repository default, which may be read-write.
+permissions:
+  contents: read
+
+# One run per ref: a rapid series of pushes to a PR supersedes itself instead
+# of queueing several full installs of both apps.
+concurrency:
+  group: design-system-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  design-system:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Actions are pinned to commit SHAs, not floating tags: a tag can be
+      # repointed, and this job runs on pull_request against the default branch.
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          # 22, not 20. The unit suite imports src/lib/supabase.ts, and
+          # @supabase/realtime-js requires a native global WebSocket, which
+          # Node 20 does not provide:
+          #   Error: Node.js detected but native WebSocket not found.
+          # Matches eas-build.yml, which already pins 22.
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --no-fund
+
+      # MUST run before `npm test`. vitest.config.ts includes
+      # apps/mobile/src/**/*.test.ts, and Vite resolves the nearest tsconfig for
+      # those files — apps/mobile/tsconfig.json extends "expo/tsconfig.base",
+      # which only resolves once apps/mobile/node_modules exists. With the
+      # installs the other way round every mobile suite dies with
+      # TSConfckParseError before a single assertion runs.
+      - name: Install mobile dependencies
+        run: npm --prefix apps/mobile ci --no-audit --no-fund
+
+      - name: Token mirrors in sync and design-system code is token-pure
+        run: npm run design-system:check
+
+      - name: Typecheck (web)
+        run: npm run lint
+
+      - name: Typecheck (mobile)
+        run: npm --prefix apps/mobile run typecheck
+
+      - name: Unit tests
+        run: npm test

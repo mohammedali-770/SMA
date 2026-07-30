@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { LogIn, UserPlus, Loader2, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { BrandMark } from '../design-system/ui/BrandMark';
 
 /**
  * Email + password authentication gate (Supabase Auth / GoTrue). This replaces
@@ -52,7 +53,7 @@ export const AuthScreen: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center p-4 font-sans">
       <div className="w-full max-w-sm glass-panel rounded-[2rem] p-7 shadow-2xl">
         <div className="flex flex-col items-center text-center mb-6">
-          <img src="/logo.png" alt="Spicy Meal logo" className="w-14 h-14 rounded-2xl object-contain bg-white shadow-md border border-white/20 mb-3" />
+          <BrandMark className="w-14 h-14 rounded-2xl object-contain bg-white shadow-md border border-white/20 mb-3" />
           <h1 className="text-lg font-black text-primary tracking-tight">SPICY MEAL</h1>
           <p className="text-[11px] text-slate-500 font-bold mt-1">
             {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}

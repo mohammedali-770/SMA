@@ -13,6 +13,7 @@ import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ObservabilityErrorBoundary } from '../components/ObservabilityErrorBoundary';
+import { useDesignSystemFonts } from '../design-system/fonts';
 import { NotificationTapBridge } from '../features/notifications/NotificationTapBridge';
 import { I18nProvider } from '../i18n/I18nProvider';
 import { initObservability, wrapRoot } from '../lib/observability';
@@ -26,12 +27,20 @@ initObservability();
 
 void SplashScreen.preventAutoHideAsync();
 
-/** Hides the native splash once the persisted session has been resolved. */
+/**
+ * Hides the native splash once the persisted session has been resolved AND the
+ * design-system fonts have settled.
+ *
+ * `fontsReady` is true when the fonts load OR fail — a font that will not
+ * decode must never hold the splash open forever. Text still renders in the
+ * system face in that case.
+ */
 function SplashGate({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
+  const { ready: fontsReady } = useDesignSystemFonts();
   useEffect(() => {
-    if (status !== 'loading') void SplashScreen.hideAsync();
-  }, [status]);
+    if (status !== 'loading' && fontsReady) void SplashScreen.hideAsync();
+  }, [status, fontsReady]);
   return <>{children}</>;
 }
 

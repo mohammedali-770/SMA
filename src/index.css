@@ -1,10 +1,78 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;700&display=swap');
+/* Fonts are SELF-HOSTED via @fontsource — bundled by Vite and served from our
+   own origin. The previous `@import url('https://fonts.googleapis.com/...')`
+   was a third-party CDN request on every page load: it blocks first paint,
+   leaks visitor IPs to Google, and is not reliably reachable on every network
+   the console is used on. Identical families and weights to before. */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/inter/800.css";
+@import "@fontsource/space-grotesk/500.css";
+@import "@fontsource/space-grotesk/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/700.css";
+
+/* Design-system faces ("Ember on Cream"). Available but NOT applied to any
+   existing screen — only src/design-system/ui/* uses them today. The Arabic
+   subset is imported explicitly so Arabic copy is never served the Latin
+   subset and silently fall back to a system face. */
+@import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+@import "@fontsource/ibm-plex-sans-arabic/arabic-700.css";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* ── Design system: "Ember on Cream" ─────────────────────────────────────
+     ADDITIVE ONLY. Nothing here re-points an existing token, so no shipped
+     screen changes appearance. --color-primary / --color-secondary keep their
+     current values AND their runtime-override indirection (see below).
+     Consumed today only by src/design-system/ui/*; screens migrate in a
+     follow-up PR. Canonical source: design-system/tokens.ts — keep in sync. */
+  --font-ds-ar: "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-ds-en: "IBM Plex Sans", system-ui, sans-serif;
+  --font-ds-num: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-ember: #E02D3D;
+  --color-ember-deep: #AE0F20;
+  --color-saffron: #FFB800;
+  --color-brand-ink: #241436;
+
+  --color-con-bg: #F6F2EC;
+  --color-con-surface: #FFFFFF;
+  --color-con-surface-2: #FBF7F1;
+  --color-con-line: #E8DFD4;
+  --color-con-text: #241436;
+  --color-con-text-2: #6E6280;
+  --color-con-text-3: #9C93AB;
+
+  --color-app-bg: #FFF7EF;
+  --color-app-surface-2: #FFF0E1;
+  --color-app-surface-3: #FCE1C9;
+  --color-app-line: #F0E3D4;
+
+  --color-mint: #12A150;
+  --color-warn: #DE7C00;
+  --color-danger-ds: #D92D20;
+  --color-disabled-bg: #EFE6DC;
+  --color-disabled-fg: #9C93AB;
+
+  --radius-ds-sm: 8px;
+  --radius-ds-md: 14px;
+  --radius-ds-lg: 20px;
+
+  --ease-ds-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-ds-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Brand palette. These back every bg-primary/text-primary/bg-secondary/etc.
      utility used across the app; without them those classes emit no CSS.
@@ -140,6 +208,34 @@ body {
 }
 .edit-input:focus { border-color: color-mix(in srgb, var(--color-primary), transparent 55%); outline: none; }
 .edit-input:disabled { opacity: 0.55; background: rgb(248 250 252); }
+
+/* ── Design system helpers ("Ember on Cream") ─────────────────────────────
+   Scoped, opt-in classes. Nothing here applies unless a component asks for it. */
+
+/* Structured numbers: money, phone, OTP, national short address, POS reference.
+   `direction: ltr` + `unicode-bidi: isolate` keeps a number reading
+   left-to-right inside Arabic copy WITHOUT changing the bidi resolution of the
+   surrounding sentence (which `embed`/`override` would). `tabular-nums` stops
+   digits jittering when a live total updates. */
+.num {
+  font-family: var(--font-ds-num);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+/* Icons that encode direction (chevrons, arrows, progress) mirror in Arabic.
+   Direction-free icons (clock, lock, flame) must NOT carry this class. */
+[dir='rtl'] .icon-directional {
+  transform: scaleX(-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-motion {
+    transition: none !important;
+    animation: none !important;
+  }
+}
 
 /* Dashboard readability: the admin UI hard-codes many sub-10px arbitrary text
    sizes that were hard to read. Nudge the smallest ones up to a comfortable
