@@ -6,7 +6,7 @@ name: Design system
 #      mirrors ARE the sharing mechanism — silent drift would be invisible);
 #   2. the design-system trees stay free of hardcoded colours, font families,
 #      shadows and currency strings;
-#   3. types and unit tests still pass.
+#   3. types and unit tests still pass on both apps.
 #
 # Deliberately scoped to what this PR introduced. It does not gate unrelated
 # pre-existing code, so it cannot become a blanket blocker on other work.
@@ -17,21 +17,43 @@ on:
   push:
     branches: [claude/project-build-ie4b56, main]
 
+# Read-only. This workflow only inspects the checkout — it never comments,
+# pushes, publishes or touches releases. Declared explicitly rather than
+# inheriting the repository default, which may be read-write.
+permissions:
+  contents: read
+
+# One run per ref: a rapid series of pushes to a PR supersedes itself instead
+# of queueing several full installs of both apps.
+concurrency:
+  group: design-system-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   design-system:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to commit SHAs, not floating tags: a tag can be
+      # repointed, and this job runs on pull_request against the default branch.
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
 
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Token mirrors are in sync and design-system code is token-pure
+      - name: Token mirrors in sync and design-system code is token-pure
         run: npm run design-system:check
 
       - name: Typecheck (web)

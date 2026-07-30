@@ -18,7 +18,9 @@ import { color, fontFamily, radius, space } from './generated/tokens';
 
 describe('mobile design-system mirror', () => {
   it('formats money identically to the console', () => {
-    expect(formatAmount(1234.5)).toBe('1,234.50');
+    // Compat default: ungrouped, byte-identical to the previous toFixed(2).
+    expect(formatAmount(1234.5)).toBe('1234.50');
+    expect(formatAmount(1234.5, { grouping: true })).toBe('1,234.50');
     expect(priceAccessibilityLabel(24.5, 'ar')).toBe('24.50 ريال سعودي');
   });
 

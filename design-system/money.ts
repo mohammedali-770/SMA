@@ -26,12 +26,31 @@ export const MONEY_LOCALE = 'en-SA';
 
 const FRACTION_DIGITS = 2;
 
+export interface FormatOptions {
+  locale?: string;
+  /**
+   * Thousands separators.
+   *
+   * DEFAULTS TO FALSE, and that is a compatibility decision, not a style one.
+   * Every shipped screen previously rendered `amount.toFixed(2)`, so enabling
+   * grouping here would silently change every price at or above 1000 across
+   * the admin dashboard, reports and receipts (`48200.00` → `48,200.00`) in a
+   * PR whose entire premise is that no shipped screen changes appearance.
+   *
+   * This is the migration switch: the screen-port PR turns it on deliberately,
+   * with a visual pass, rather than it arriving unreviewed underneath a token
+   * refactor.
+   */
+  grouping?: boolean;
+}
+
 /**
  * Format a number for display next to the riyal symbol.
- * Always Latin digits, always two decimals, grouped thousands, never a
- * currency code or symbol (the SVG supplies the mark).
+ * Always Latin digits, always two decimals, never a currency code or symbol
+ * (the SVG supplies the mark).
  */
-export function formatAmount(amount: number, locale: string = MONEY_LOCALE): string {
+export function formatAmount(amount: number, options: FormatOptions = {}): string {
+  const { locale = MONEY_LOCALE, grouping = false } = options;
   if (!Number.isFinite(amount)) return (0).toFixed(FRACTION_DIGITS);
   try {
     return new Intl.NumberFormat(locale, {
@@ -40,10 +59,10 @@ export function formatAmount(amount: number, locale: string = MONEY_LOCALE): str
       // Guarantee Latin digits even if a locale/ICU build would otherwise
       // pick an Arabic-Indic numbering system.
       numberingSystem: 'latn',
-      useGrouping: true,
+      useGrouping: grouping,
     }).format(amount);
   } catch {
-    // Environments without full ICU still render a correct, ungrouped amount.
+    // Environments without full ICU still render a correct amount.
     return amount.toFixed(FRACTION_DIGITS);
   }
 }
@@ -61,9 +80,10 @@ export function priceAccessibilityLabel(
   amount: number,
   lang: Lang,
   prefix?: string,
+  options: FormatOptions = {},
 ): string {
   const head = prefix ? `${prefix} ` : '';
-  return `${head}${formatAmount(amount)} ${currencyName(lang)}`;
+  return `${head}${formatAmount(amount, options)} ${currencyName(lang)}`;
 }
 
 /**

@@ -28,9 +28,22 @@ describe('formatAmount — en-SA', () => {
     expect(formatAmount(24.567)).toBe('24.57');
   });
 
-  it('groups thousands', () => {
-    expect(formatAmount(1234.5)).toBe('1,234.50');
-    expect(formatAmount(1234567.89)).toBe('1,234,567.89');
+  /**
+   * REGRESSION LOCK. Every shipped screen rendered `amount.toFixed(2)` before
+   * this PR. If the default ever starts grouping, prices at or above 1000
+   * change across the admin dashboard, reports and receipts without a visual
+   * pass. These assertions must not be "fixed" by updating the expectation.
+   */
+  it('does NOT group by default — byte-identical to the previous toFixed(2)', () => {
+    for (const v of [0, 24.5, 999.99, 1000, 1234.5, 48200, 1234567.89, -1500]) {
+      expect(formatAmount(v)).toBe(v.toFixed(2));
+    }
+  });
+
+  it('groups only when explicitly asked (the migration switch)', () => {
+    expect(formatAmount(1234.5, { grouping: true })).toBe('1,234.50');
+    expect(formatAmount(1234567.89, { grouping: true })).toBe('1,234,567.89');
+    expect(formatAmount(999.99, { grouping: true })).toBe('999.99');
   });
 
   it('renders LATIN digits, never Arabic-Indic', () => {
@@ -56,7 +69,7 @@ describe('formatAmount — en-SA', () => {
 
   it('falls back to a correct amount when Intl is unavailable', () => {
     // Simulates a stripped-ICU runtime by forcing the Intl path to throw.
-    expect(formatAmount(24.5, 'not-a-locale!!')).toBe('24.50');
+    expect(formatAmount(24.5, { locale: 'not-a-locale!!' })).toBe('24.50');
   });
 });
 
@@ -72,7 +85,8 @@ describe('accessible labels — Arabic and English', () => {
   });
 
   it('keeps the digits Latin in the Arabic label too', () => {
-    expect(priceAccessibilityLabel(1234.5, 'ar')).toContain('1,234.50');
+    expect(priceAccessibilityLabel(1234.5, 'ar')).toContain('1234.50');
+    expect(priceAccessibilityLabel(1234.5, 'ar', undefined, { grouping: true })).toContain('1,234.50');
   });
 
   it('includes a sign prefix when given (discounts)', () => {
@@ -101,7 +115,7 @@ describe('RTL / LTR isolation', () => {
   });
 
   it('survives being embedded in Arabic copy', () => {
-    const sentence = `الإجمالي ${isolateLtr(formatAmount(1234.5))} فقط`;
+    const sentence = `الإجمالي ${isolateLtr(formatAmount(1234.5, { grouping: true }))} فقط`;
     // The amount is still present, contiguous and in Latin digits.
     expect(stripBidi(sentence)).toContain('1,234.50');
   });

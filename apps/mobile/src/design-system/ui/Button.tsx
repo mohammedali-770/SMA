@@ -90,7 +90,9 @@ export function Button({
       disabled={state.inert}
       style={({ pressed }) => [
         styles.base,
-        size === 'md' ? styles.md : styles.lg,
+        // Read from the resolved state, not the raw prop, so the default lives
+        // in exactly one place (resolveButtonState).
+        state.size === 'md' ? styles.md : styles.lg,
         { backgroundColor: bg, borderColor: state.muted ? color.disabledBg : surface.border },
         state.variant === 'secondary' && styles.bordered,
         pressed && state.allowPressFeedback && styles.pressed,

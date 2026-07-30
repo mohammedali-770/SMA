@@ -13,9 +13,12 @@ afterEach(cleanup);
  * never fall back to the letters "SAR".
  */
 describe('Price (web)', () => {
-  it('renders the grouped, two-decimal amount', () => {
+  it('renders the two-decimal amount exactly as before this PR', () => {
+    // Regression lock: admin KPIs and reports render values well above 1000.
+    // Grouping is the migration switch, not the default — see money.ts.
     const { container } = render(<Price amount={1234.5} />);
-    expect(container.textContent).toContain('1,234.50');
+    expect(container.textContent).toContain('1234.50');
+    expect(container.textContent).not.toContain('1,234.50');
   });
 
   it('pins the price LTR and isolates it from surrounding Arabic', () => {
