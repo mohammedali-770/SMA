@@ -1,10 +1,29 @@
-/** Primary / secondary / ghost button with a loading + disabled state. */
-import React from 'react';
+/**
+ * Primary / secondary / ghost button with a loading + disabled state.
+ *
+ * LEGACY VISUALS, SHARED BEHAVIOUR. This still renders the current purple
+ * treatment and still backs almost every shipped screen — the "Ember on Cream"
+ * replacement lives in `design-system/ui/Button`, and call sites move over
+ * gradually (see docs/BUTTON_FIELD_INVENTORY.md).
+ *
+ * What changed here: the disabled / loading / accessibility RULES now come from
+ * the shared framework-free `buttonState` module rather than being restated, so
+ * the legacy and design-system buttons cannot disagree about what "disabled"
+ * means. Critically, `onPress` is now GUARDED instead of being handed straight
+ * to Pressable — previously nothing stopped a caller (or a Pressable edge case)
+ * invoking the handler while the button was mid-flight, and on the
+ * payment-retry and place-order call sites that is a double submit.
+ *
+ * Every pixel is unchanged: the background still greys for BOTH disabled and
+ * loading, exactly as before.
+ */
+import React, { useCallback } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
+import { resolveButtonState, shouldInvokePress, type ButtonVariant } from '../design-system/generated/buttonState';
 import { colors, motion, radius, spacing, typography } from '../theme';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = ButtonVariant;
 
 interface Props {
   label: string;
@@ -17,7 +36,14 @@ interface Props {
 }
 
 export function Button({ label, onPress, variant = 'primary', disabled, loading, style, accessibilityLabel }: Props) {
-  const isDisabled = disabled || loading;
+  const state = resolveButtonState({ variant, disabled, loading });
+  // Same value as the previous `disabled || loading`, now derived in one place.
+  const isDisabled = state.inert;
+  // Guard the handler as well as setting Pressable's `disabled`: the prop alone
+  // does not protect against a programmatic or direct call.
+  const handlePress = useCallback(() => {
+    if (shouldInvokePress(state)) onPress();
+  }, [state, onPress]);
   const bg =
     variant === 'primary' ? colors.purple
     : variant === 'danger' ? colors.red
@@ -33,8 +59,8 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
-      onPress={onPress}
+      accessibilityState={{ disabled: state.accessibility.disabled, busy: state.accessibility.busy }}
+      onPress={handlePress}
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
