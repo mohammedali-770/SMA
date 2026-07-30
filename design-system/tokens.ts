@@ -61,6 +61,21 @@ export const color = {
   amberInk: '#8A5600',
   heatOff: '#DCCDBB',
 
+  /**
+   * Semantic surface tints. A status card is its hue at low saturation over
+   * cream, never a solid block of the hue — body text has to stay readable on
+   * it. Each tint carries a paired border so a tinted card still has a defined
+   * edge against the cream ground.
+   */
+  warnTint: '#FFF6E6',
+  warnLine: '#F2D9A8',
+  dangerTint: '#FDECEC',
+  dangerLine: '#F3C6C3',
+  infoTint: '#EAF3FD',
+  infoLine: '#C3DCF5',
+  mintTint: '#E6F6ED',
+  mintLine: '#B7E3C9',
+
   /** On-colour foregrounds. */
   onEmber: '#FFFFFF',
   disabledBg: '#EFE6DC',

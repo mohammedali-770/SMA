@@ -68,6 +68,48 @@ function walk(dir, out = []) {
 
 const violations = [];
 
+/**
+ * Surfaces that have completed their design-system migration. Once a file is
+ * listed here it may no longer import the legacy `theme` module or the legacy
+ * components it replaced — that is what stops a finished surface regressing
+ * while the next one is being migrated.
+ *
+ * Add files here as each surface lands. Do not remove entries.
+ */
+const MIGRATED_SURFACES = [
+  // Surface 1 — Authentication
+  'apps/mobile/src/features/auth/LoginScreen.tsx',
+  'apps/mobile/src/features/auth/PhoneOtpLogin.tsx',
+  'apps/mobile/src/features/profile/VerifyPhoneWhatsApp.tsx',
+  'apps/mobile/src/components/SaudiPhoneInput.tsx',
+  'apps/mobile/src/features/otp/OtpCodeInput.tsx',
+];
+
+const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;
+
+for (const rel of MIGRATED_SURFACES) {
+  const full = join(ROOT, rel);
+  if (!existsSync(full)) {
+    violations.push({
+      file: rel, line: 0, rule: 'migrated-surface-missing',
+      message: 'listed as migrated but the file does not exist — update MIGRATED_SURFACES',
+      snippet: '',
+    });
+    continue;
+  }
+  readFileSync(full, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    if (LEGACY_IMPORT.test(line)) {
+      violations.push({
+        file: rel, line: i + 1, rule: 'legacy-import-in-migrated-surface',
+        message: 'migrated surface may not import the legacy theme or legacy Button',
+        snippet: line.trim().slice(0, 100),
+      });
+    }
+  });
+}
+
+
+
 for (const dir of SCOPED_DIRS) {
   for (const file of walk(dir)) {
     const base = file.split(/[\\/]/).pop();

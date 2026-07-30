@@ -18,9 +18,11 @@
  */
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Button } from '../../components/Button';
+import { color, fontFamily, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { Text } from '../../design-system/ui/Text';
 import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
 import { useI18n } from '../../i18n/I18nProvider';
 import { formatSaudiE164, isSaudiMobile, toSaudiE164 } from '../../lib/phone';
@@ -30,13 +32,12 @@ import { OTP_RESEND_COOLDOWN_SECONDS } from '../otp/otpInput';
 import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
-import { colors, font, spacing } from '../../theme';
 import { requestLoginCode } from './loginAvailability';
 
 type Phase = 'phone' | 'code';
 
 export function PhoneOtpLogin() {
-  const { t, rtlText } = useI18n();
+  const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>('phone');
   const [national, setNational] = useState('');  // 9-digit national part (5XXXXXXXX)
   const [e164, setE164] = useState('');          // the canonical number sent to Supabase
@@ -102,15 +103,14 @@ export function PhoneOtpLogin() {
   });
 
   return (
-    <View style={{ gap: spacing.sm }}>
-      <Text style={[styles.title, rtlText]}>{t('loginPhoneTitle')}</Text>
-      <Text style={[styles.sub, rtlText]}>{t('loginPhoneSub')}</Text>
+    <View style={{ gap: space.s3 }}>
+      <Text variant="title">{t('loginPhoneTitle')}</Text>
+      <Text variant="body" tone="secondary" style={{ marginBottom: space.s2 }}>{t('loginPhoneSub')}</Text>
 
       <SaudiPhoneInput
         value={national}
         onChangeText={setNational}
         editable={phase === 'phone'}
-        showHint={phase === 'phone'}
         style={styles.field}
       />
 
@@ -118,9 +118,13 @@ export function PhoneOtpLogin() {
         <Button label={t('sendLoginCode')} onPress={sendCode} loading={busy} disabled={!isSaudiMobile(national)} />
       ) : (
         <>
-          <Text style={styles.sentTo}>{formatSaudiE164(e164)}</Text>
+          <Text variant="heading" tone="ember" align="center" style={styles.sentTo}>
+            {formatSaudiE164(e164)}
+          </Text>
           <View style={styles.field}>
-            <Text style={[styles.fieldLabel, rtlText]}>{t('enterLoginCode')}</Text>
+            <Text variant="label" tone="secondary" style={{ marginBottom: space.s2 }}>
+              {t('enterLoginCode')}
+            </Text>
             <OtpCodeInput
               value={code}
               onChange={setCode}
@@ -136,28 +140,26 @@ export function PhoneOtpLogin() {
             onPress={sendCode}
             disabled={busy || cooldown > 0}
             variant="ghost"
-            style={{ marginTop: spacing.xs }}
+            style={{ marginTop: space.s1 }}
           />
           <Button label={t('changeNumber')} onPress={changeNumber} disabled={busy} variant="ghost" />
         </>
       )}
 
-      {notice ? <Text style={[styles.notice, rtlText]}>{notice}</Text> : null}
-      {error ? <Text style={[styles.error, rtlText]}>{error}</Text> : null}
+      {notice ? <Text variant="caption" tone="success" style={styles.msg}>{notice}</Text> : null}
+      {error ? <Text variant="caption" tone="danger" style={styles.msg}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginTop: spacing.sm },
-  sub: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
-  field: { marginBottom: spacing.md },
-  fieldLabel: { fontSize: font.sm, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  // The number the code went to — always LTR so it reads correctly in Arabic.
+  field: { marginBottom: space.s3 },
+  // The number the code went to — always LTR so it reads correctly in Arabic,
+  // and mono because it is a structured number.
   sentTo: {
-    fontSize: font.md, fontWeight: '800', color: colors.purple,
-    textAlign: 'center', writingDirection: 'ltr', marginBottom: spacing.sm,
+    fontFamily: fontFamily.num.semibold,
+    writingDirection: 'ltr',
+    marginBottom: space.s2,
   },
-  notice: { color: colors.success, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
-  error: { color: colors.red, fontSize: font.sm, fontWeight: '600', marginTop: spacing.xs },
+  msg: { marginTop: space.s1 },
 });

@@ -12,9 +12,12 @@
  * verify key off the same canonical string the server derives.
  */
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { Button } from '../../components/Button';
+import { color, radius, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Text } from '../../design-system/ui/Text';
 import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
 import { useI18n } from '../../i18n/I18nProvider';
 import { sanitizeSaudiNationalInput, toSaudiE164 } from '../../lib/phone';
@@ -25,12 +28,11 @@ import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
 import { whatsappOtp } from '../../services/api';
-import { colors, font, radius, shadow, spacing } from '../../theme';
 
 type Phase = 'phone' | 'code' | 'verified';
 
 export function VerifyPhoneWhatsApp() {
-  const { t, lang, rtlText, rtlRow } = useI18n();
+  const { t, lang, rtlRow } = useI18n();
   const { profile, refreshProfile } = useAuth();
 
   const [phase, setPhase] = useState<Phase>(profile?.phoneVerified ? 'verified' : 'phone');
@@ -93,21 +95,21 @@ export function VerifyPhoneWhatsApp() {
   const verified = phase === 'verified' || profile?.phoneVerified;
 
   return (
-    <View style={[styles.card, shadow.card]}>
+    <Card style={styles.card}>
       <View style={[styles.headerRow, rtlRow]}>
-        <Text style={[styles.title, rtlText, { flex: 1 }]}>{t('verifyPhoneTitle')}</Text>
+        <Text variant="heading" style={{ flex: 1 }}>{t('verifyPhoneTitle')}</Text>
         {verified && (
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>✓ {t('phoneVerifiedBadge')}</Text>
+            <Text variant="caption" tone="success">✓ {t('phoneVerifiedBadge')}</Text>
           </View>
         )}
       </View>
-      <Text style={[styles.sub, rtlText]}>{t('verifyPhoneSub')}</Text>
+      <Text variant="body" tone="secondary" style={{ marginBottom: space.s3 }}>{t('verifyPhoneSub')}</Text>
 
       {notAvailable ? (
-        <Text style={[styles.notAvailable, rtlText]}>{t('whatsappNotAvailable')}</Text>
+        <Text variant="body" tone="secondary" style={styles.state}>{t('whatsappNotAvailable')}</Text>
       ) : phase === 'verified' ? (
-        <Text style={[styles.success, rtlText]}>{t('phoneVerifiedSuccess')}</Text>
+        <Text variant="heading" tone="success" style={styles.state}>{t('phoneVerifiedSuccess')}</Text>
       ) : (
         <>
           {/* Digits stay LTR in both languages so numbers read correctly. */}
@@ -115,7 +117,6 @@ export function VerifyPhoneWhatsApp() {
             value={national}
             onChangeText={setNational}
             editable={phase === 'phone'}
-            showHint={phase === 'phone'}
             label={t('phone')}
             style={styles.phoneField}
           />
@@ -138,33 +139,30 @@ export function VerifyPhoneWhatsApp() {
                 onPress={sendCode}
                 disabled={busy || cooldown > 0}
                 variant="ghost"
-                style={{ marginTop: spacing.xs }}
+                style={{ marginTop: space.s1 }}
               />
             </>
           )}
         </>
       )}
 
-      {notice ? <Text style={[styles.notice, rtlText]}>{notice}</Text> : null}
-      {error ? <Text style={[styles.error, rtlText]}>{error}</Text> : null}
-    </View>
+      {notice ? <Text variant="caption" tone="success" style={styles.msg}>{notice}</Text> : null}
+      {error ? <Text variant="caption" tone="danger" style={styles.msg}>{error}</Text> : null}
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
+  card: { marginBottom: space.s3 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s2 },
+  badge: {
+    paddingHorizontal: space.s3,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    backgroundColor: color.appSurface2,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  title: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  badge: { paddingHorizontal: spacing.md, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.successBg },
-  badgeText: { fontSize: font.xs, fontWeight: '800', color: colors.success },
-  sub: { fontSize: font.sm, color: colors.muted, marginTop: 2, marginBottom: spacing.md },
-  phoneField: { marginBottom: spacing.sm },
-  codeField: { marginBottom: spacing.sm },
-  notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.sm },
-  error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.sm },
-  success: { fontSize: font.md, color: colors.success, fontWeight: '800', paddingVertical: spacing.sm },
-  notAvailable: { fontSize: font.sm, color: colors.muted, fontWeight: '700', paddingVertical: spacing.sm },
+  phoneField: { marginBottom: space.s2 },
+  codeField: { marginBottom: space.s2 },
+  msg: { marginTop: space.s2 },
+  state: { paddingVertical: space.s2 },
 });

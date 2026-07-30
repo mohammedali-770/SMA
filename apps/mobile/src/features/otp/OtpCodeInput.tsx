@@ -30,7 +30,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, font, radius, spacing } from '../../theme';
+import { color, fontFamily, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { applyBackspace, applyBoxInput, joinBoxes, splitCodeToBoxes } from './otpAutofill';
 
 interface Props {
@@ -109,7 +109,7 @@ export function OtpCodeInput({
           selectTextOnFocus
           accessibilityLabel={`${accessibilityLabel ?? 'One-time code'} ${index + 1}`}
           style={[styles.box, digit ? styles.boxFilled : null, !editable ? styles.boxMuted : null]}
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={color.appText3}
         />
       ))}
     </View>
@@ -121,28 +121,29 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: space.s2,
     writingDirection: 'ltr',
   },
   box: {
     width: 44,
     height: 54,
     borderWidth: 1.5,
-    borderColor: colors.border,
+    borderColor: color.appLine,
     borderRadius: radius.md,
-    backgroundColor: colors.bgAlt,
+    backgroundColor: color.appSurface,
     textAlign: 'center',
-    fontSize: font.xl,
-    fontWeight: '800',
-    color: colors.text,
+    fontSize: typeScale.title.size,
+    // An OTP is a structured number: always mono, never the prose face.
+    fontFamily: fontFamily.num.semibold,
+    color: color.appText,
     writingDirection: 'ltr',
   },
   boxFilled: {
-    borderColor: colors.purple,
-    backgroundColor: colors.white,
+    borderColor: color.ember,
+    backgroundColor: color.appSurface2,
   },
   boxMuted: {
-    backgroundColor: colors.bg,
-    color: colors.muted,
+    backgroundColor: color.disabledBg,
+    color: color.disabledFg,
   },
 });

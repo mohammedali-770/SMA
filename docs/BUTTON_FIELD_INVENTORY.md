@@ -1,133 +1,85 @@
-# Button & Field migration inventory
+# Design-system migration tracker
 
-Tracking for [#119](https://github.com/mohammedali-770/SMA/issues/119) — moving
-call sites onto the "Ember on Cream" `Button` and `Field`.
+Tracking for [#119](https://github.com/mohammedali-770/SMA/issues/119).
 
-**Status: behaviour consolidated, no call sites swapped yet.** See
-"Why nothing was swapped in the first pass" below — that is a deliberate finding,
-not an omission.
+**Strategy: surface-by-surface replacement.** The product is pre-production —
+no users, no customer data, no requirement to preserve the current UI — so
+legacy components are replaced outright rather than maintained in parallel, and
+removed as soon as nothing references them. Consistency beats backwards
+compatibility.
+
+Business logic, auth flow, payment logic, order workflow, pricing, APIs,
+Supabase, Edge Functions and migrations are **not** touched by any surface pass.
+Where a component mixed logic and presentation, the logic is extracted first.
+
+## How a completed surface is kept from regressing
+
+`scripts/check-design-system-hygiene.mjs` holds a `MIGRATED_SURFACES` list. A
+file on that list may not import the legacy `theme` module or the legacy
+`components/Button`, and CI fails if it does. Add files as each surface lands;
+never remove them.
 
 ---
 
-## What the design-system components change
+## Progress
 
-Swapping a call site changes **two** things at once, not one:
-
-| | Legacy | Design system |
+| # | Surface | Status |
 | --- | --- | --- |
-| Primary colour | purple `#422e87` | ember `#E02D3D` |
-| Typeface | system font | IBM Plex Sans / Sans Arabic |
-
-Nothing shipped uses IBM Plex today (the faces were registered in #118 but no
-screen consumes them). So the first swapped button is the first Plex text in the
-product, sitting beside system-font headings.
-
-## Why nothing was swapped in the first pass
-
-The brief asked for "shared, low-risk call sites first". Working through the
-inventory, **no call site is currently low-risk to swap in isolation**: because
-the delta is colour *and* typeface, a partial swap produces a visibly
-half-migrated screen in production, and the smallest available units
-(`StateViews`, 2 buttons) deliver almost no value while looking broken next to
-their own headings.
-
-The migration unit that does work is a **whole surface at once** — every button
-*and* input on a screen — so the screen is at least internally consistent. That
-is a larger, screen-shaped change and belongs in its own PR with its own visual
-pass, which is exactly what #119 item 1 describes.
-
-What this pass does instead is the part that is genuinely low-risk and high value:
-consolidate the *behaviour* so every legacy call site is protected today, and
-write down the complete map so the surface-by-surface swaps are mechanical.
-
-## What this pass DID change
-
-`apps/mobile/src/components/Button.tsx` now derives its disabled / loading /
-accessibility rules from the shared framework-free `buttonState` module, and
-**guards `onPress`** instead of handing it straight to `Pressable`.
-
-Previously nothing stopped a caller — or a `Pressable` edge case — invoking the
-handler while the button was mid-flight. On payment-retry and place-order that
-is a double submit. All **42** legacy call sites are covered by that one change.
-
-Pixels are unchanged: the background still greys for both disabled *and*
-loading, the label colour rule is untouched, and `accessibilityState` resolves
-to exactly the same values it did before.
+| 1 | **Authentication** | ✅ **Done** |
+| 2 | Customer App — Home / Menu | ⬜ |
+| 2 | Customer App — Product Details | ⬜ |
+| 2 | Customer App — Cart | ⬜ |
+| 2 | Customer App — Checkout | ⬜ |
+| 2 | Customer App — Payment | ⬜ |
+| 2 | Customer App — Order Tracking | ⬜ |
+| 2 | Customer App — Profile | ⬜ |
+| 3 | Admin — Dashboard | ⬜ |
+| 3 | Admin — Live Orders | ⬜ |
+| 3 | Admin — Menu Management | ⬜ |
+| 3 | Admin — Branches | ⬜ |
+| 3 | Admin — Promotions | ⬜ |
+| 3 | Admin — Reports | ⬜ |
+| 3 | Admin — Settings | ⬜ |
 
 ---
 
-## Mobile — `<Button>` call sites (42)
+## Surface 1 — Authentication ✅
 
-| File | Sites | Tier | Decision |
-| --- | ---: | --- | --- |
-| `features/checkout/CheckoutScreen.tsx` | 12 | **Excluded** | Payment submission, coupon apply, order-type change. Out of scope by the brief. |
-| `features/account/DeleteAccountScreen.tsx` | 8 | **Excluded** | Destructive, irreversible; re-verification flow. |
-| `features/order/OrderTypeSelectScreen.tsx` | 7 | **Excluded** | Order-context and cart-conflict transitions. |
-| `features/auth/PhoneOtpLogin.tsx` | 4 | Surface | Migrate with the whole auth surface (needs `SaudiPhoneInput` + `OtpCodeInput` too). |
-| `features/profile/VerifyPhoneWhatsApp.tsx` | 3 | Surface | Same auth surface. |
-| `features/orders/ReceiptScreen.tsx` | 3 | Surface | Includes a resend-to-branch action — treat as order-adjacent. |
-| `components/StateViews.tsx` | 2 | Shared | Best first swap once a surface is migrated, so error/empty views match it. |
-| `app/payment/checkout.tsx` | 2 | **Excluded** | In-app payment WebView controls. |
-| `app/payment/return.tsx` | 1 | **Excluded** | Payment return handling. |
-
-**23 of 42** sit inside the brief's exclusion list (payment, destructive,
-order-state).
-
-## Mobile — input implementations (12 `<TextInput>`, 6 files)
-
-| File | Notes |
+| File | What changed |
 | --- | --- |
-| `components/SaudiPhoneInput.tsx` | Bespoke `+966` prefix, masking and validation. Not a plain `Field`; needs a `Field` variant before it can migrate. |
-| `features/otp/OtpCodeInput.tsx` | Six-box OTP with auto-advance and paste handling. Not a `Field` shape at all. |
-| `features/account/DeleteAccountScreen.tsx` | Password re-verification. Excluded (destructive). |
-| `features/checkout/CheckoutScreen.tsx` | Order notes, coupon code. Excluded (payment/checkout). |
-| `features/menu/HomeMenuScreen.tsx` | Menu search. No label or message — `Field`'s label + error anatomy does not fit a search box. |
-| `features/order/OrderTypeSelectScreen.tsx` | Address form incl. the national short address. Excluded (order context), but this is the **best eventual `Field` target** — it is the only labelled form in the app. |
+| `features/auth/LoginScreen.tsx` | Cream ground, DS `Text` + `Card`; the WhatsApp-unavailable panel is now a `warning` card. Legal links keep the platform `Text` because inline links must compose inside one text node. |
+| `features/auth/PhoneOtpLogin.tsx` | DS `Button` + `Text`; the code destination renders mono (structured number). |
+| `features/profile/VerifyPhoneWhatsApp.tsx` | DS `Card` + `Button` + `Text`; drop-shadow removed. |
+| `components/SaudiPhoneInput.tsx` | DS tokens, mono digits, ember focus edge, `error` prop. **Removed the "Saudi numbers only" helper line** — the `+966` prefix and the phone keypad already say it, and the DS voice rule is that a field never explains the format in advance. |
+| `features/otp/OtpCodeInput.tsx` | DS tokens; OTP boxes render in IBM Plex Mono. |
 
-**Finding: mobile has no clean `Field` target in this pass.** The design-system
-`Field` is label + control + one message; the mobile inputs are either bespoke
-(phone, OTP), unlabelled (search), or inside an excluded flow.
+New primitives added for this surface: `design-system/ui/Text.tsx` (language-aware
+IBM Plex + the type scale) and `design-system/ui/Card.tsx` (flat surface with
+semantic tints). Semantic tint tokens (`warnTint`/`warnLine`, `dangerTint`,
+`infoTint`, `mintTint`) were added to the canonical token set rather than being
+inlined — the hygiene check caught them as hardcoded colours.
 
-## Web / admin — no shared component exists
+**Unchanged:** every handler, the Supabase `signInWithOtp` / `verifyOtp` calls,
+`requestLoginCode`, `sanitizeSaudiNationalInput`, `toSaudiE164`, the OTP autofill
+and cooldown hooks, keyboard types, `textContentType` / `autoComplete` autofill
+wiring, and all accessibility labels.
 
-There is **no** shared Button or Field on the web side at all. Panels use raw
-elements with utility classes:
+## Not yet removable
 
-- **129** raw `<button>`, of which **24** use `glass-btn-*`
-- **72** raw `<input>`, of which **64** use `glass-input` and **10** `edit-input`
+`components/Button.tsx` (legacy) still backs **38** call sites across the
+customer app and cannot be deleted until surface 2 completes. It routes through
+the shared `buttonState` module, so its disabled/loading/guard behaviour already
+matches the design-system button.
 
-Largest concentrations:
+## Remaining legacy inventory
 
-| File | buttons | inputs |
-| --- | ---: | ---: |
-| `admin/MenuManagementPanel.tsx` | 16 | 8 |
-| `AdminDashboard.tsx` | 16 | 0 |
-| `admin/SettingsPanel.tsx` | 12 | 18 |
-| `admin/BranchPoliciesPanel.tsx` | 9 | 3 |
-| `admin/BannerManagementPanel.tsx` | 6 | 7 |
-| `admin/OperationsAlertsPanel.tsx` | 6 | 2 |
-| `admin/DeliveryZoneModal.tsx` | 6 | 0 |
-| `admin/OrderIntegrityPanel.tsx` | 5 | 2 |
-| `admin/LiveOrdersPanel.tsx` | 5 | 1 |
-| `admin/BranchEditModal.tsx` | 4 | 10 |
+| Surface | Legacy usage |
+| --- | ---: |
+| Mobile `<Button>` (legacy) | 38 call sites, 8 files |
+| Mobile `<TextInput>` | 10 across 5 files |
+| Web raw `<button>` | 129 (24 `glass-btn-*`) |
+| Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) |
 
-The `.glass-*` classes carry gradients, blur and hover transforms that the flat
-design-system components deliberately drop, so every web swap is a visible
-change. Web migration should go panel-by-panel, and `TapPaymentPanel`,
-`LiveOrdersPanel` status controls and `OrderIntegrityPanel` actions are
-excluded until the rest is settled.
-
----
-
-## Suggested sequencing
-
-1. **Auth surface** (mobile): `PhoneOtpLogin` + `VerifyPhoneWhatsApp` +
-   `SaudiPhoneInput` + `OtpCodeInput`. Self-contained, no payment or order
-   state, and it forces the `Field` variants (prefixed input, OTP boxes) that
-   everything else will need.
-2. **`StateViews`**, once one surface is migrated so error/empty views match.
-3. **Address form** in `OrderTypeSelectScreen` — the first true `Field` target.
-4. **Web panels**, least-destructive first: `LegalDocumentsPanel`,
-   `BannerManagementPanel`, then `MenuManagementPanel`.
-5. Excluded until last, each with its own PR and test plan: checkout, payment,
-   account deletion, order-state controls.
+The web side has no shared Button or Field at all; admin panels use raw elements
+with `.glass-*` utilities. Those utilities are deleted once the last panel that
+references them is migrated.
