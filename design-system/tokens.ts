@@ -86,6 +86,14 @@ export const color = {
    * able to read what they cannot yet press. This is ~4.9:1, which clears AA.
    */
   disabledFg: '#6E6280',
+
+  /**
+   * Modal scrim. Brand ink at 55%, NOT neutral black: a black veil over the
+   * cream ground reads grey and cold, which is the one thing this palette is
+   * meant to avoid. Flat rather than a blur so it renders identically on iOS,
+   * Android and the web export.
+   */
+  scrim: '#2414368C',
 } as const;
 
 /**

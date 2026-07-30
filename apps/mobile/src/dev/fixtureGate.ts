@@ -15,12 +15,33 @@
 
 /** Scenes a fixture route may render. Add one per surface as it is migrated. */
 export const FIXTURE_SCENES = [
+  // Checkout — the screen state matrix.
   'checkout',
+  'checkout-pickup',
   'checkout-invalid',
   'checkout-loading',
-  'payment-processing',
-  'payment-success',
-  'payment-failure',
+  'checkout-empty',
+  'checkout-below-minimum',
+  'checkout-no-address',
+  'checkout-delivery-closed',
+  'checkout-online-off',
+  'checkout-payment-none',
+  // Payment — the overlay states. These are driven by state INSIDE
+  // CheckoutScreen rather than by context, which is why the dialog is a
+  // presentational component the fixture can render directly.
+  'payment-opening',
+  'payment-verifying',
+  'payment-pending',
+  'payment-failed',
+  'payment-cancelled',
+  'payment-expired',
+  'payment-error',
+  // NOTE: there is deliberately NO scene for `app/payment/return.tsx`. That
+  // screen exists to RESOLVE an interrupted charge: it persists a session id
+  // from the deep link and drives `recoverPendingSession`, which calls the real
+  // payment-verify endpoint when a pending session is present. A fixture must
+  // never be able to touch a payment session, and the screen redirects within a
+  // frame anyway, so there is nothing to review. It is verified on-device.
 ] as const;
 
 export type FixtureScene = (typeof FIXTURE_SCENES)[number];

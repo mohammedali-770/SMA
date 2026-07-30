@@ -9,12 +9,17 @@
  * `order`) id, seeds the shared, unit-tested recovery (recoverPendingSession),
  * and routes: a captured charge → its receipt; anything unresolved → back to
  * checkout, whose mount effect resumes the SAME charge (never a new one).
+ *
+ * Presentation only in this pass — the effect, the UUID guard and every routing
+ * decision are unchanged.
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { Button } from '../../components/Button';
+import { color, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { payments } from '../../services/api';
 import {
@@ -24,7 +29,6 @@ import {
   clearPendingSession, loadPendingSession, savePendingSession,
 } from '../../features/checkout/pendingSessionStore';
 import { useCart } from '../../store';
-import { colors, font, spacing } from '../../theme';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -71,9 +75,18 @@ export default function PaymentReturnRoute() {
 
   return (
     <View style={styles.root}>
-      <ActivityIndicator size="large" color={colors.purple} />
-      <Text style={styles.msg}>
+      <ActivityIndicator size="large" color={color.ember} />
+      <Text variant="heading" align="center">
         {pick('Confirming your payment…', 'جارٍ تأكيد الدفع…')}
+      </Text>
+      {/* Money may have moved, so say so plainly rather than leaving a bare
+          spinner: the customer must not read this screen as "nothing is
+          happening" and start a second attempt elsewhere. */}
+      <Text variant="body" tone="secondary" align="center">
+        {pick(
+          'Please keep the app open — this only takes a moment.',
+          'يرجى إبقاء التطبيق مفتوحاً — لن يستغرق هذا سوى لحظات.',
+        )}
       </Text>
       {/* Escape hatch if the redirect ever leaves us here longer than expected. */}
       <View style={styles.fallback}>
@@ -88,7 +101,10 @@ export default function PaymentReturnRoute() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.lg },
-  msg: { fontSize: font.md, color: colors.text, fontWeight: '700', textAlign: 'center' },
-  fallback: { marginTop: spacing.xl, alignSelf: 'stretch' },
+  root: {
+    flex: 1, backgroundColor: color.appBg,
+    alignItems: 'center', justifyContent: 'center',
+    padding: space.s5, gap: space.s4,
+  },
+  fallback: { marginTop: space.s5, alignSelf: 'stretch' },
 });

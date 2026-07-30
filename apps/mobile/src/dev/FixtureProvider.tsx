@@ -31,14 +31,23 @@ import {
 import {
   FIXTURE_BRAND_SETTINGS,
   FIXTURE_BRANCH,
+  FIXTURE_BRANCH_DELIVERY_OFF,
+  FIXTURE_CART_BELOW_MIN,
   FIXTURE_CART_COUNT,
+  FIXTURE_CART_COUNT_BELOW_MIN,
   FIXTURE_CART_ITEMS,
-  FIXTURE_ORDER_CONTEXT,
-  FIXTURE_PRODUCTS,
+  FIXTURE_DELIVERY_ZONE,
   FIXTURE_LOYALTY,
+  FIXTURE_ORDER_CONTEXT,
+  FIXTURE_ORDER_CONTEXT_NO_ADDRESS,
+  FIXTURE_ORDER_CONTEXT_PICKUP,
   FIXTURE_PAYMENT,
+  FIXTURE_PAYMENT_NONE,
+  FIXTURE_PAYMENT_ONLINE_OFF,
+  FIXTURE_PRODUCTS,
   FIXTURE_PROFILE,
   FIXTURE_SUBTOTAL,
+  FIXTURE_SUBTOTAL_BELOW_MIN,
 } from './fixtureData';
 
 const noop = () => {};
@@ -50,8 +59,18 @@ export interface FixtureOptions {
   error?: string | null;
   /** Empty the cart (for empty-state review). */
   emptyCart?: boolean;
+  /** Cart below the branch delivery minimum (below-minimum block). */
+  belowMinimum?: boolean;
   /** Make the order context invalid (blocked-checkout review). */
   invalidContext?: boolean;
+  /** Pickup instead of delivery: no map, no landmark, no delivery fee. */
+  pickup?: boolean;
+  /** Delivery chosen but no pin and no landmark yet. */
+  missingAddress?: boolean;
+  /** Online off / everything off — drives the payment-unavailable states. */
+  payment?: 'both' | 'online-off' | 'none';
+  /** Branch has delivery temporarily closed. */
+  deliveryClosed?: boolean;
 }
 
 export function FixtureProvider({
@@ -77,6 +96,12 @@ function FixtureProviderInner({
   children: React.ReactNode;
   options: FixtureOptions;
 }) {
+  const branch = options.deliveryClosed ? FIXTURE_BRANCH_DELIVERY_OFF : FIXTURE_BRANCH;
+  const paymentSettings =
+    options.payment === 'none' ? FIXTURE_PAYMENT_NONE
+    : options.payment === 'online-off' ? FIXTURE_PAYMENT_ONLINE_OFF
+    : FIXTURE_PAYMENT;
+
   const catalog = useMemo(
     () =>
       ({
@@ -85,10 +110,10 @@ function FixtureProviderInner({
         reload: noop,
         categories: [],
         products: FIXTURE_PRODUCTS,
-        branches: [FIXTURE_BRANCH],
+        branches: [branch],
         modifierGroups: [],
-        selectedBranch: FIXTURE_BRANCH,
-        selectedBranchId: FIXTURE_BRANCH.id,
+        selectedBranch: branch,
+        selectedBranchId: branch.id,
         selectBranch: noop,
         isAvailable: () => true,
         branchIsOpen: () => true,
@@ -98,31 +123,51 @@ function FixtureProviderInner({
         // in a screenshot can be checked by hand.
         brand: FIXTURE_BRAND_SETTINGS,
         loyalty: FIXTURE_LOYALTY,
-        payment: FIXTURE_PAYMENT,
-        deliveryZones: [],
+        payment: paymentSettings,
+        // A real polygon covering the fixture pin. With an empty list the
+        // serviceability pre-check always failed, so a VALID delivery checkout
+        // could never be screenshotted.
+        deliveryZones: [FIXTURE_DELIVERY_ZONE],
       }) as unknown as CatalogValue,
-    [options.loading, options.error],
+    [options.loading, options.error, branch, paymentSettings],
   );
 
-  const orderContext = useMemo(
-    () =>
-      ({
-        ready: true,
-        valid: !options.invalidContext,
-        context: options.invalidContext ? null : FIXTURE_ORDER_CONTEXT,
-        setContext: noop,
-        clear: noop,
-        refresh: noop,
-      }) as unknown as OrderContextValue,
-    [options.invalidContext],
-  );
+  const orderContext = useMemo(() => {
+    const context =
+      options.pickup ? FIXTURE_ORDER_CONTEXT_PICKUP
+      : options.missingAddress ? FIXTURE_ORDER_CONTEXT_NO_ADDRESS
+      : FIXTURE_ORDER_CONTEXT;
+    return {
+      ready: true,
+      valid: !options.invalidContext,
+      context: options.invalidContext ? null : context,
+      setContext: noop,
+      clear: noop,
+      refresh: noop,
+    } as unknown as OrderContextValue;
+  }, [options.invalidContext, options.pickup, options.missingAddress]);
 
   const cart = useMemo(() => {
-    const items = options.emptyCart ? [] : FIXTURE_CART_ITEMS;
+    const items =
+      options.emptyCart ? []
+      : options.belowMinimum ? FIXTURE_CART_BELOW_MIN
+      : FIXTURE_CART_ITEMS;
+    const count =
+      options.emptyCart ? 0
+      : options.belowMinimum ? FIXTURE_CART_COUNT_BELOW_MIN
+      : FIXTURE_CART_COUNT;
+    const subtotal =
+      options.emptyCart ? 0
+      : options.belowMinimum ? FIXTURE_SUBTOTAL_BELOW_MIN
+      : FIXTURE_SUBTOTAL;
     return {
       items,
-      count: options.emptyCart ? 0 : FIXTURE_CART_COUNT,
-      subtotal: options.emptyCart ? 0 : FIXTURE_SUBTOTAL,
+      count,
+      subtotal,
+      // Fixed key: the real one is a uuid, which would make every screenshot
+      // differ. Nothing can submit it — every mutator here is inert.
+      idempotencyKey: 'fixture-idempotency-key',
+      toOrderItems: () => [],
       addItem: noop,
       removeLine: noop,
       incrementLine: noop,
@@ -131,13 +176,15 @@ function FixtureProviderInner({
       notes: '',
       setNotes: noop,
     } as unknown as CartValue;
-  }, [options.emptyCart]);
+  }, [options.emptyCart, options.belowMinimum]);
 
   const auth = useMemo(
     () =>
       ({
-        status: 'authenticated',
-        session: null,
+        // 'signed_in' — the real AuthStatus union. This said 'authenticated'
+        // before, which is not a value the app ever produces.
+        status: 'signed_in',
+        userId: FIXTURE_PROFILE.id,
         profile: FIXTURE_PROFILE,
         signOut: noop,
         refreshProfile: noop,
@@ -147,11 +194,11 @@ function FixtureProviderInner({
 
   return (
     <AuthContext.Provider value={auth}>
-    <CatalogContext.Provider value={catalog}>
-      <OrderCtx.Provider value={orderContext}>
-        <CartContext.Provider value={cart}>{children}</CartContext.Provider>
-      </OrderCtx.Provider>
-    </CatalogContext.Provider>
+      <CatalogContext.Provider value={catalog}>
+        <OrderCtx.Provider value={orderContext}>
+          <CartContext.Provider value={cart}>{children}</CartContext.Provider>
+        </OrderCtx.Provider>
+      </CatalogContext.Provider>
     </AuthContext.Provider>
   );
 }

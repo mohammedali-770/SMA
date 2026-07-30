@@ -7,19 +7,23 @@
  *   - The branch must be open (is_active) to place an order.
  *   - Delivery requires meeting the branch minimum.
  * The idempotency key from the cart store makes a retried submit safe.
+ *
+ * This file owns STATE AND DECISIONS ONLY. Every piece of layout lives in
+ * `./view/*`, which are pure presentational components that receive resolved
+ * values and handlers. That split is not cosmetic: the payment states are
+ * driven by internal state rather than context, so extracting
+ * `PaymentStatusDialog` is what makes "declined", "expired" and "still pending"
+ * reviewable without running a real charge (see src/dev/fixtureData.ts).
  */
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
-import { Notice, secondaryTextStyle } from '../../components/Notice';
-import { QuantityStepper } from '../../components/QuantityStepper';
+import { color, space } from '../../design-system/generated/tokens';
+import { Field } from '../../design-system/ui/Field';
 import { checkDescription, descriptionCopy, descriptionMessage } from '../order/locationDescription';
 import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
@@ -32,22 +36,53 @@ import {
   type PaymentMethod,
 } from '../../lib/payment';
 import { pointInPolygon } from '../../lib/geo';
-import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { useAuth, useCart, useCatalog, useOrderContext } from '../../store';
-import { colors, font, radius, spacing } from '../../theme';
-import { formatSAR } from '../../utils/format';
-import { Price } from '../../components/Price';
-import type { OrderType, SavedAddress } from '../../types/models';
+import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
 import { chooseCheckoutTransport } from './paymentFlow';
+import { CheckoutFooter } from './view/CheckoutFooter';
+import { CheckoutLines } from './view/CheckoutLines';
+import { CouponRow } from './view/CouponRow';
+import { DeliveryLocationSection } from './view/DeliveryLocationSection';
+import { ConfirmDialog } from './view/Dialog';
+import { LoyaltyToggle } from './view/LoyaltyToggle';
+import { OrderTypeRow } from './view/OrderTypeRow';
+import { PaymentMethodPicker } from './view/PaymentMethodPicker';
+import { PaymentStatusDialog, type PayState } from './view/PaymentStatusDialog';
+import { CONTENT_MAX_WIDTH } from './view/layout';
+import { Section } from './view/Section';
+import { TotalsCard } from './view/TotalsCard';
+
+const LEGAL_DOCS = [
+  'cancellation_refund_policy',
+  'delivery_pickup_policy',
+  'payment_policy',
+] as const;
+
+/**
+ * The one blocking problem, resolved to copy. `amount` is separate from the
+ * prose because a money figure has to render through `<Price>` rather than be
+ * interpolated into a string — see the below-minimum case.
+ */
+interface BlockMessage {
+  title: string;
+  action: string | null;
+  amount?: number;
+  amountLabel?: string;
+}
 
 export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang } = useI18n();
   const { profile } = useAuth();
-  const { selectedBranch, brand, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
+  // NOTE: `brand` is deliberately NOT read. It carries `vatPercentage`, but the
+  // VAT row is a label-only note whose copy hardcodes "15%" (see i18n `vat`),
+  // and VAT presentation is frozen for this pass. The old `vatPct` local read
+  // brand.vatPercentage and was never used by anything — removed as dead code.
+  // If VAT ever becomes configurable, the LABEL is what has to change.
+  const { selectedBranch, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
   const cart = useCart();
 
   // Order type + branch are PRESELECTED from the order context (chosen in the
@@ -93,10 +128,7 @@ export function CheckoutScreen() {
   const recalcRef = useRef<string | null>(null);
   // Line the customer is about to remove by decrementing past 1.
   const [confirmRemove, setConfirmRemove] = useState<{ cartItemId: string; name: string } | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
-  const descOffsetRef = useRef(0);
   // Online-payment (Tap) flow overlay. null = not paying.
-  type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
   // sessionId is the checkout-session flow: the order does not exist until
   // payment is verified server-side.
   const [payFlow, setPayFlow] = useState<{ state: PayState; sessionId?: string; message?: string } | null>(null);
@@ -110,7 +142,6 @@ export function CheckoutScreen() {
   const [recovering, setRecovering] = useState(true);
 
   const branchOpen = branchIsOpen(selectedBranch);
-  const vatPct = brand?.vatPercentage ?? 15;
 
   // Payment availability (admin-controlled; place_order re-validates server-side).
   const payMethods = availableMethods(payment);
@@ -213,11 +244,6 @@ export function CheckoutScreen() {
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
   }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty]);
 
-  const deliveryFee = totals.deliveryFee;
-  const loyaltyDiscountEst = totals.loyaltyDiscount;
-  const totalEst = totals.total;
-  const belowMin = totals.belowMinimum;
-
   // Delivery needs a landmark; pickup does not.
   const requiresDescription = orderType === 'delivery';
   const descCheck = checkDescription(addrDesc, resolvedAddress);
@@ -250,7 +276,7 @@ export function CheckoutScreen() {
    * *below* the policy-consent paragraph, so the legal text out-shouted the
    * reason the button was dead.
    */
-  const block = useMemo((): { title: string; action: string | null } | null => {
+  const block = useMemo((): BlockMessage | null => {
     // Priority order (and, critically, empty-cart BEFORE below-minimum) lives in
     // the pure resolver; this only maps the winning reason to localized copy.
     const reason: BlockReason | null = resolveBlockReason({
@@ -258,7 +284,7 @@ export function CheckoutScreen() {
       branchOpen,
       hasOrderType: Boolean(orderType),
       isEmpty: cart.items.length === 0,
-      belowMinimum: belowMin,
+      belowMinimum: totals.belowMinimum,
       paymentUnavailable: paymentBlocked || !paymentMethod,
       deliveryBlocked: Boolean(deliveryBlockReason),
       needsDescription: requiresDescription && !descCheck.valid,
@@ -273,12 +299,16 @@ export function CheckoutScreen() {
       case 'empty-cart':
         return { title: pick('Your cart is empty', 'سلتك فارغة'), action: pick('Add an item to continue.', 'أضف صنفاً للمتابعة.') };
       case 'below-minimum':
+        // The shortfall is a MONEY FIGURE, so it renders through <Price> on its
+        // own row rather than being interpolated into the sentence: a number
+        // inside a template string cannot carry the SAMA riyal glyph, and the
+        // previous `formatSAR(...)` here printed the letters "SAR" — the one
+        // thing the design system forbids for a visible amount.
         return {
           title: pick('Your order is below the delivery minimum', 'طلبك أقل من الحد الأدنى للتوصيل'),
-          action: pick(
-            `Add ${formatSAR(totals.missingForMinimum, lang)} more to your order, or switch to pickup.`,
-            `أضف ${formatSAR(totals.missingForMinimum, lang)} إلى طلبك، أو حوّل إلى الاستلام.`,
-          ),
+          amount: totals.missingForMinimum,
+          amountLabel: pick('Still needed', 'المتبقي'),
+          action: pick('Add more items, or switch to pickup.', 'أضف أصنافاً أخرى، أو حوّل إلى الاستلام.'),
         };
       case 'no-payment':
         return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
@@ -292,7 +322,7 @@ export function CheckoutScreen() {
       default:
         return null;
     }
-  }, [selectedBranch, branchOpen, orderType, belowMin, lang, t, paymentBlocked, paymentMethod, pick,
+  }, [selectedBranch, branchOpen, orderType, totals.belowMinimum, lang, t, paymentBlocked, paymentMethod, pick,
       deliveryBlockReason, totals.missingForMinimum, cart.items.length, requiresDescription, descCheck]);
 
   const canPlace = canSubmitOrder({
@@ -558,475 +588,257 @@ export function CheckoutScreen() {
     await placeOrder();
   };
 
+  // ---- Presentation ---------------------------------------------------------
+
+  const isDelivery = orderType === 'delivery';
+  const orderTypeLabel =
+    orderType === 'pickup' ? t('otPickup') : orderType === 'delivery' ? t('otDelivery') : '';
+
+  const paymentLabelFor = (m: PaymentMethod) =>
+    m === 'online' ? t('payOnline')
+    : isDelivery ? t('cashOnDelivery')
+    : t('cashOnPickup');
+
   return (
     <View style={styles.root}>
       <Header title={t('checkout')} showBack />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
-          ref={scrollRef}
           // Tail room clears the sticky footer AND the keyboard, so the focused
           // description field and its message stay visible while typing.
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 260 }}
+          contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="none"
+          showsVerticalScrollIndicator={false}
         >
-          {/* Order type + branch — PRESELECTED from the order context (read-only).
-              Change re-opens the selection flow after a confirmation. */}
-          <View style={[styles.otRow, rtlRow]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.sectionTitle, rtlText]}>{t('orderType')}</Text>
-              <Text style={[styles.otValue, rtlText]} numberOfLines={1}>
-                {orderType === 'pickup' ? t('otPickup') : orderType === 'delivery' ? t('otDelivery') : ''}
-                {selectedBranch ? ` · ${pick(selectedBranch.nameEn, selectedBranch.nameAr)}` : ''}
-              </Text>
-            </View>
-            <Pressable onPress={() => setShowTypeChange(true)} accessibilityRole="button" hitSlop={8}>
-              <Text style={styles.otChange}>{t('otChange')}</Text>
-            </Pressable>
-          </View>
+          <View style={styles.column}>
+          <OrderTypeRow
+            typeLabel={orderTypeLabel}
+            branchName={selectedBranch ? pick(selectedBranch.nameEn, selectedBranch.nameAr) : null}
+            changeLabel={t('otChange')}
+            onChange={() => setShowTypeChange(true)}
+          />
 
-          {/* Payment method — availability is admin-controlled */}
-          <View style={styles.block}>
-            <Text style={[styles.sectionTitle, rtlText]}>{t('paymentMethodTitle')}</Text>
-            {paymentBlocked ? (
-              <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700' }]}>
-                {pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
-              </Text>
-            ) : (
-              <>
-                <View style={styles.segment}>
-                  {payMethods.map((m) => {
-                    const label = m === 'online'
-                      ? t('payOnline')
-                      : orderType === 'delivery'
-                        ? t('cashOnDelivery')
-                        : t('cashOnPickup');
-                    return <SegmentBtn key={m} label={label} active={paymentMethod === m} onPress={() => setPaymentMethod(m)} />;
-                  })}
-                </View>
-                {paymentMethod === 'cash' ? (
-                  <Text style={[styles.note, rtlText]}>{pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')}</Text>
-                ) : null}
-                {showOnlineOutageNotice ? (
-                  <Text style={[styles.note, rtlText, { color: colors.purple, fontWeight: '700' }]}>
-                    {pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')}
-                  </Text>
-                ) : null}
-              </>
-            )}
-          </View>
+          <Section title={t('paymentMethodTitle')}>
+            <PaymentMethodPicker
+              methods={payMethods}
+              selected={paymentMethod}
+              onSelect={setPaymentMethod}
+              labelFor={paymentLabelFor}
+              blocked={paymentBlocked}
+              blockedTitle={pick('No payment method is currently available.', 'لا توجد طريقة دفع متاحة حالياً.')}
+              outageNotice={showOnlineOutageNotice
+                ? pick('Online payment is currently unavailable. Cash payment is enabled.', 'الدفع الإلكتروني غير متاح حالياً. الدفع النقدي مفعّل.')
+                : null}
+              cashNote={paymentMethod === 'cash'
+                ? pick('Pay in cash when you receive your order.', 'يُدفع المبلغ نقداً عند استلام طلبك.')
+                : null}
+            />
+          </Section>
 
-          {/* Delivery location — map picker + optional details */}
-          {orderType === 'delivery' ? (
-            <View style={styles.block}>
-              <Text style={[styles.sectionTitle, rtlText]}>{pick('Select your delivery location', 'حدّد موقع التوصيل')}</Text>
-              <LocationPickerMap
-                key={recenterSeed}
+          {isDelivery ? (
+            <Section title={pick('Select your delivery location', 'حدّد موقع التوصيل')}>
+              <DeliveryLocationSection
+                lang={lang}
+                recenterSeed={recenterSeed}
                 lat={pickedLat ?? selectedBranch?.latitude ?? 24.7136}
                 lng={pickedLng ?? selectedBranch?.longitude ?? 46.6753}
-                lang={lang}
-                onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
+                onPinChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
                 onAddressResolved={setResolvedAddress}
-                labels={{
+                resolvedAddress={resolvedAddress}
+                description={addrDesc}
+                onDescriptionChange={setAddrDesc}
+                onDescriptionBlur={() => setDescTouched(true)}
+                descriptionError={descError}
+                addressLabel={addrLabel}
+                onAddressLabelChange={setAddrLabel}
+                optionalLabel={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
+                addresses={addressList}
+                selectedAddressId={addressId}
+                onSelectAddress={chooseSavedAddress}
+                savedTitle={pick('Saved locations', 'المواقع المحفوظة')}
+                savedFallbackLabel={t('deliveryAddress')}
+                blockReason={deliveryBlockReason}
+                mapLabels={{
                   locateHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
                   useMyLocation: pick('Use my location', 'استخدم موقعي'),
                   setupRequired: pick('Map setup required — ask support to enable the map.', 'إعداد الخريطة مطلوب — تواصل مع الدعم لتفعيل الخريطة.'),
                 }}
               />
-
-              {/* Mandatory location description — the same field, label and
-                  rule as the address gate (see order/locationDescription). */}
-              <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
-                {/* The pin's own address, read-only, so the customer can check
-                    the map is right without it counting as delivery guidance. */}
-                {resolvedAddress ? (
-                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
-                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
-                  </Text>
-                ) : null}
-                <Text style={[styles.fieldLabel, rtlText]}>{descriptionCopy[lang].label}</Text>
-                <TextInput
-                  value={addrDesc}
-                  onChangeText={setAddrDesc}
-                  onBlur={() => setDescTouched(true)}
-                  placeholder={descriptionCopy[lang].placeholder}
-                  placeholderTextColor={colors.muted}
-                  style={[styles.notesInput, rtlText, descError ? styles.inputError : null]}
-                  multiline
-                  accessibilityLabel={descriptionCopy[lang].label}
-                />
-                {descError ? <Text style={[styles.fieldError, rtlText]}>{descError}</Text> : null}
-              </View>
-
-              {/* Building / street stays genuinely optional and is clearly
-                  secondary to the required landmark above. */}
-              <TextInput
-                value={addrLabel}
-                onChangeText={setAddrLabel}
-                placeholder={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
-                placeholderTextColor={colors.muted}
-                style={[styles.couponInput, rtlText, { marginTop: spacing.sm }]}
-              />
-
-              {addressList.length > 0 ? (
-                <View style={{ marginTop: spacing.md }}>
-                  <Text style={[styles.note, rtlText]}>{pick('Saved locations', 'المواقع المحفوظة')}</Text>
-                  {addressList.map((a) => (
-                    <Pressable
-                      key={a.id}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: addressId === a.id }}
-                      style={[styles.addrRow, rtlRow, addressId === a.id && styles.addrRowActive]}
-                      onPress={() => chooseSavedAddress(a)}
-                    >
-                      <View style={[styles.radioDot, addressId === a.id && styles.radioDotOn]} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.addrLabel, rtlText]}>{a.label || t('deliveryAddress')}</Text>
-                        {a.description ? <Text style={[styles.addrDesc, rtlText]}>{a.description}</Text> : null}
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
-
-              {deliveryBlockReason ? (
-                <Text style={[styles.note, rtlText, { color: colors.red, fontWeight: '700', marginTop: spacing.sm }]}>{deliveryBlockReason}</Text>
-              ) : null}
-            </View>
+            </Section>
           ) : null}
 
-          {/* Coupon */}
-          <View style={styles.block}>
-            <Text style={[styles.sectionTitle, rtlText]}>{t('couponTitle')}</Text>
-            <View style={[styles.couponRow, rtlRow]}>
-              <TextInput
-                value={couponCode}
-                onChangeText={(v) => { setCouponCode(v); setCouponResult(null); }}
-                placeholder={t('couponPlaceholder')}
-                placeholderTextColor={colors.muted}
-                autoCapitalize="characters"
-                style={[styles.couponInput, rtlText]}
-              />
-              <Button label={t('applyCoupon')} onPress={applyCoupon} loading={checkingCoupon} variant="secondary" style={styles.couponBtn} />
-            </View>
-            {couponResult ? (
-              <Text style={[styles.couponMsg, rtlText, { color: couponResult.ok ? colors.success : colors.red }]}>
-                {couponResult.ok ? `${t('couponApplied')} −${formatSAR(couponResult.discount, lang)}` : couponResult.message}
-              </Text>
-            ) : null}
-          </View>
+          <Section title={t('couponTitle')}>
+            <CouponRow
+              code={couponCode}
+              onChangeCode={(v) => { setCouponCode(v); setCouponResult(null); }}
+              onApply={applyCoupon}
+              applying={checkingCoupon}
+              label={t('couponTitle')}
+              placeholder={t('couponPlaceholder')}
+              applyLabel={t('applyCoupon')}
+              result={couponResult}
+              appliedLabel={t('couponApplied')}
+            />
+          </Section>
 
-          {/* Loyalty */}
           {loyaltyEnabled ? (
-            <View style={styles.block}>
-              <Pressable
-                style={[styles.toggleRow, rtlRow]}
-                onPress={() => setRedeemPoints((v) => !v)}
-                accessibilityRole="switch"
-                accessibilityState={{ checked: redeemPoints }}
-                accessibilityLabel={t('useLoyalty')}
-              >
-                <View style={[styles.switch, redeemPoints && styles.switchOn]}>
-                  <View style={[styles.knob, redeemPoints && styles.knobOn]} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.toggleLabel, rtlText]}>{t('useLoyalty')}</Text>
-                  <Text style={[styles.toggleSub, rtlText]}>{availablePoints} {t('pointsAvailable')}</Text>
-                </View>
-              </Pressable>
-              <Text style={[styles.note, rtlText]}>{t('redeemHint')}</Text>
-            </View>
+            <Section>
+              <LoyaltyToggle
+                on={redeemPoints}
+                onToggle={() => setRedeemPoints((v) => !v)}
+                label={t('useLoyalty')}
+                pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
+              />
+            </Section>
           ) : null}
 
-          {/* Notes */}
-          <View style={styles.block}>
-            <Text style={[styles.sectionTitle, rtlText]}>{t('orderNotes')}</Text>
-            <TextInput
+          <Section title={t('orderNotes')}>
+            <Field
+              id="checkout-notes"
+              label={t('orderNotes')}
+              labelHidden
               value={notes}
               onChangeText={setNotes}
               placeholder={t('notesPlaceholder')}
-              placeholderTextColor={colors.muted}
-              style={[styles.notesInput, rtlText]}
               multiline
+              inputStyle={styles.multiline}
             />
-          </View>
+          </Section>
 
           {/* Editable cart lines — fix a below-minimum order without leaving
               Checkout and losing the pin, coupon and payment method. */}
-          <View style={styles.block}>
-            <Text style={[styles.sectionTitle, rtlText]}>{pick('Your items', 'أصنافك')}</Text>
-            {cart.items.map((it) => {
-              const name = pick(it.product.nameEn, it.product.nameAr);
-              const mods = Object.values(it.selectedModifiers).flat();
-              return (
-                <View key={it.cartItemId} style={[styles.lineRow, rtlRow]}>
-                  <View style={styles.lineInfo}>
-                    <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
-                    {mods.length > 0 ? (
-                      <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>
-                        {mods.map((m) => pick(m.nameEn, m.nameAr)).join(' • ')}
-                      </Text>
-                    ) : null}
-                    <Price amount={lineTotal(it)} size={font.sm} color={colors.muted} weight="700" />
-                  </View>
-                  <QuantityStepper
-                    quantity={it.quantity}
-                    busy={recalcLine === it.cartItemId}
-                    itemLabel={name}
-                    onIncrement={() => changeQuantity(it.cartItemId, 1)}
-                    onDecrement={() => changeQuantity(it.cartItemId, -1)}
-                    labels={{
-                      increase: pick('Increase quantity', 'زيادة الكمية'),
-                      decrease: pick('Decrease quantity', 'إنقاص الكمية'),
-                      quantity: pick('Quantity', 'الكمية'),
-                    }}
-                  />
-                </View>
-              );
-            })}
-          </View>
+          <Section title={pick('Your items', 'أصنافك')}>
+            <CheckoutLines
+              items={cart.items}
+              recalcLineId={recalcLine}
+              nameOf={(it) => pick(it.product.nameEn, it.product.nameAr)}
+              modifierSummaryOf={(it) => modifierSummary(it, pick)}
+              amountOf={lineTotal}
+              onIncrement={(id) => changeQuantity(id, 1)}
+              onDecrement={(id) => changeQuantity(id, -1)}
+            />
+          </Section>
 
-          {/* Totals preview */}
-          <View style={styles.totals}>
-            <Row label={t('subtotal')} amount={totals.subtotal} />
-            {orderType === 'delivery' ? <Row label={t('deliveryFee')} amount={deliveryFee} /> : null}
-            {totals.couponDiscount > 0 ? <Row label={t('discount')} amount={totals.couponDiscount} negative accent /> : null}
-            {loyaltyDiscountEst > 0 ? <Row label={t('loyaltyDiscount')} amount={loyaltyDiscountEst} negative accent /> : null}
-            <Row label={t('vat')} value="" muted />
-            <View style={styles.totalDivider} />
-            <Row label={t('total')} amount={totalEst} big />
-            <Text style={[styles.serverNote, rtlText]}>{`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}</Text>
+          <TotalsCard
+            totals={totals}
+            isDelivery={isDelivery}
+            labels={{
+              subtotal: t('subtotal'),
+              deliveryFee: t('deliveryFee'),
+              discount: t('discount'),
+              loyaltyDiscount: t('loyaltyDiscount'),
+              vat: t('vat'),
+              total: t('total'),
+            }}
+            serverNote={`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}
+          />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Sticky place-order.
-          Information hierarchy (section 5), top to bottom:
-            1. the blocking problem + the exact fix — loudest;
-            2. any submit error;
-            3. the action itself;
-            4. legal consent — smallest and quietest, still fully legible and
-               link-accessible. It previously sat ABOVE the block reason in the
-               same size, so the policy paragraph dominated the screen while the
-               reason the button was dead read as a footnote. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        {block ? (
-          <Notice title={block.title} action={block.action} rtlText={rtlText} style={{ marginBottom: spacing.sm }} />
-        ) : null}
-        {error ? (
-          <Notice title={error} rtlText={rtlText} style={{ marginBottom: spacing.sm }} />
-        ) : null}
-        <Button
-          label={placing ? t('placingOrder') : t('placeOrder')}
-          onPress={placeOrder}
-          disabled={!canPlace}
-          loading={placing}
-          variant="danger"
-        />
-        <Text style={[styles.policy, rtlText]}>
-          {pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
-          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/cancellation_refund_policy')}>{legalTitle('cancellation_refund_policy', lang)}</Text>
-          {pick(', ', '، ')}
-          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/delivery_pickup_policy')}>{legalTitle('delivery_pickup_policy', lang)}</Text>
-          {pick(', and ', '، و')}
-          <Text accessibilityRole="link" style={styles.policyLink} onPress={() => router.push('/legal/payment_policy')}>{legalTitle('payment_policy', lang)}</Text>
-          {'.'}
-        </Text>
-      </View>
+      <CheckoutFooter
+        block={block}
+        error={error}
+        submitLabel={placing ? t('placingOrder') : t('placeOrder')}
+        submitDisabled={!canPlace}
+        submitting={placing}
+        onSubmit={placeOrder}
+        consentPrefix={pick('By placing this order, you agree to the ', 'بإتمام الطلب، فإنك توافق على ')}
+        consentSeparator={pick(', ', '، ')}
+        consentLastSeparator={pick(', and ', '، و')}
+        links={LEGAL_DOCS.map((doc) => ({
+          key: doc,
+          title: legalTitle(doc, lang),
+          onPress: () => router.push(`/legal/${doc}`),
+        }))}
+        paddingBottom={insets.bottom + space.s2}
+      />
 
       {/* Confirm before a decrement removes the last unit of a line. */}
-      <Modal visible={confirmRemove !== null} transparent animationType="fade" onRequestClose={() => setConfirmRemove(null)}>
-        <View style={styles.payBackdrop}>
-          <View style={styles.payCard}>
-            <Text style={styles.payTitle}>{pick('Remove this item?', 'إزالة هذا الصنف؟')}</Text>
-            <Text style={styles.payMsg}>{confirmRemove?.name ?? ''}</Text>
-            <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-              <Button
-                label={pick('Remove', 'إزالة')}
-                variant="danger"
-                onPress={() => {
-                  if (confirmRemove) {
-                    cart.removeLine(confirmRemove.cartItemId);
-                    if (couponResult) setCouponResult(null);
-                  }
-                  setConfirmRemove(null);
-                }}
-              />
-              <Button label={t('cancel')} variant="secondary" onPress={() => setConfirmRemove(null)} />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ConfirmDialog
+        visible={confirmRemove !== null}
+        title={pick('Remove this item?', 'إزالة هذا الصنف؟')}
+        message={confirmRemove?.name ?? ''}
+        confirmLabel={pick('Remove', 'إزالة')}
+        cancelLabel={t('cancel')}
+        onConfirm={() => {
+          if (confirmRemove) {
+            cart.removeLine(confirmRemove.cartItemId);
+            if (couponResult) setCouponResult(null);
+          }
+          setConfirmRemove(null);
+        }}
+        onCancel={() => setConfirmRemove(null)}
+      />
 
-      {/* Online-payment (Tap) overlay. onRequestClose (Android back) dismisses the
-          modal like Close — it never touches the persisted session, so recovery
-          still resolves an in-flight charge; it never confirms/creates anything. */}
-      <Modal visible={payFlow !== null} transparent animationType="fade" onRequestClose={dismissPayFlow}>
-        <View style={styles.payBackdrop}>
-          <View style={styles.payCard}>
-            <Text style={styles.payTitle}>{t('payTitle')}</Text>
-            {payFlow && (payFlow.state === 'opening' || payFlow.state === 'verifying') ? (
-              <View style={{ alignItems: 'center', gap: spacing.md, paddingVertical: spacing.lg }}>
-                <ActivityIndicator size="large" color={colors.purple} />
-                <Text style={styles.payMsg}>{t(payFlow.state === 'opening' ? 'payOpening' : 'payVerifying')}</Text>
-                {/* Escape hatch if initiate/verify stalls: dismiss keeps the session,
-                    so a still-open charge is resolved by recovery on next entry. */}
-                <Button label={t('cancel')} onPress={dismissPayFlow} variant="secondary" style={{ alignSelf: 'stretch' }} />
-              </View>
-            ) : payFlow ? (
-              <>
-                <Text style={styles.payMsg}>{payFlow.message ?? t('payFailed')}</Text>
-                <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-                  {payFlow.state === 'pending' ? (
-                    <>
-                      {/* Continue reopens the SAME Tap session (no new charge — the
-                          server reuses the existing one); Check status re-verifies. */}
-                      <Button label={t('payContinue')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
-                      <Button label={t('payVerifyAgain')} onPress={() => payFlow.sessionId && void verifyPaymentSession(payFlow.sessionId)} loading={payBusy} variant="secondary" />
-                    </>
-                  ) : payFlow.state === 'error' ? (
-                    // Transient error: the session may still be alive — resume it (same charge).
-                    <Button label={t('payTryAgain')} onPress={() => payFlow.sessionId && void runTapPaymentSession(payFlow.sessionId)} loading={payBusy} variant="danger" />
-                  ) : (
-                    // Terminal (failed/cancelled/expired): open a FRESH session, never reuse.
-                    <Button label={t('payTryAgain')} onPress={() => void retryFresh()} loading={payBusy} variant="danger" />
-                  )}
-                  <Button label={t('close')} onPress={dismissPayFlow} variant="secondary" />
-                </View>
-              </>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+      {/* Online-payment (Tap) overlay. Dismissing (including Android back) never
+          touches the persisted session, so recovery still resolves an in-flight
+          charge; it never confirms or creates anything. */}
+      <PaymentStatusDialog
+        state={payFlow?.state ?? null}
+        // `?? t('payFailed')` preserves the original fallback: a state that
+        // somehow arrives without a message must not render an empty dialog.
+        message={payFlow ? (payFlow.message ?? t('payFailed')) : null}
+        busy={payBusy}
+        labels={{
+          title: t('payTitle'),
+          opening: t('payOpening'),
+          verifying: t('payVerifying'),
+          cancel: t('cancel'),
+          close: t('close'),
+          continuePayment: t('payContinue'),
+          verifyAgain: t('payVerifyAgain'),
+          tryAgain: t('payTryAgain'),
+          statusPending: t('payStatusPending'),
+          statusFailed: t('payStatusFailed'),
+          statusCancelled: t('payStatusCancelled'),
+          statusExpired: t('payStatusExpired'),
+        }}
+        onContinue={() => payFlow?.sessionId && void runTapPaymentSession(payFlow.sessionId)}
+        onVerifyAgain={() => payFlow?.sessionId && void verifyPaymentSession(payFlow.sessionId)}
+        onResume={() => payFlow?.sessionId && void runTapPaymentSession(payFlow.sessionId)}
+        onRetryFresh={() => void retryFresh()}
+        onClose={dismissPayFlow}
+      />
 
       {/* Confirm before changing order type — it can change the branch, delivery
           fee, item availability and cart contents. Confirm → re-open selection. */}
-      <Modal visible={showTypeChange} transparent animationType="fade" onRequestClose={() => setShowTypeChange(false)}>
-        <View style={styles.payBackdrop}>
-          <View style={styles.payCard}>
-            <Text style={styles.payTitle}>{t('otChangeTypeTitle')}</Text>
-            <Text style={styles.payMsg}>{t('otChangeTypeBody')}</Text>
-            <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-              <Button label={t('otChange')} onPress={() => { setShowTypeChange(false); router.push('/select'); }} variant="danger" />
-              <Button label={t('cancel')} onPress={() => setShowTypeChange(false)} variant="secondary" />
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ConfirmDialog
+        visible={showTypeChange}
+        title={t('otChangeTypeTitle')}
+        message={t('otChangeTypeBody')}
+        confirmLabel={t('otChange')}
+        cancelLabel={t('cancel')}
+        onConfirm={() => { setShowTypeChange(false); router.push('/select'); }}
+        onCancel={() => setShowTypeChange(false)}
+      />
     </View>
   );
 }
 
-function SegmentBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable style={[styles.segBtn, active && styles.segBtnActive]} onPress={onPress} accessibilityRole="button">
-      <Text style={[styles.segText, active && styles.segTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function Row({ label, value, amount, negative, big, accent, muted }: { label: string; value?: string; amount?: number; negative?: boolean; big?: boolean; accent?: boolean; muted?: boolean }) {
-  const { rtlRow } = useI18n();
-  return (
-    <View style={[styles.row, rtlRow]}>
-      <Text style={[styles.rowLabel, big && styles.rowLabelBig, muted && styles.rowMuted]}>{label}</Text>
-      {amount != null ? (
-        <Price amount={amount} prefix={negative ? '−' : undefined} size={big ? font.lg : font.md} color={accent ? colors.success : big ? colors.purple : colors.text} weight={big ? '800' : '700'} />
-      ) : (
-        <Text style={[styles.rowValue, big && styles.rowValueBig, accent && { color: colors.success }]}>{value}</Text>
-      )}
-    </View>
-  );
+function modifierSummary(it: CartItem, pick: (en: string, ar: string) => string): string {
+  const mods = Object.values(it.selectedModifiers).flat();
+  return mods.map((m) => pick(m.nameEn, m.nameAr)).join(' · ');
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
-  hint: { fontSize: font.sm, color: colors.muted, marginBottom: spacing.sm },
-  otRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
-  otValue: { fontSize: font.md, color: colors.text, fontWeight: '700', marginTop: 2 },
-  otChange: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
-  block: { marginTop: spacing.xl },
-  note: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
-
-  segment: { flexDirection: 'row', gap: spacing.md },
-  segBtn: {
-    flex: 1, paddingVertical: spacing.lg, borderRadius: radius.md, backgroundColor: colors.white,
-    borderWidth: 1.5, borderColor: colors.border, alignItems: 'center',
+  root: { flex: 1, backgroundColor: color.appBg },
+  flex: { flex: 1 },
+  scroll: {
+    padding: space.s4,
+    // Tail room clears the sticky footer AND the keyboard.
+    paddingBottom: 260,
+    // Centre the capped column. `alignItems` on the content container plus
+    // `width: '100%'` on the child, rather than `alignSelf` on the container
+    // itself — the latter centres on web but is not dependable for a
+    // ScrollView's content container on native.
+    alignItems: 'center',
   },
-  segBtnActive: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
-  segText: { fontSize: font.md, fontWeight: '800', color: colors.muted },
-  segTextActive: { color: colors.purple },
-
-  addrRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginTop: spacing.sm,
-    backgroundColor: colors.white, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
-  },
-  addrRowActive: { borderColor: colors.purple },
-  radioDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border },
-  radioDotOn: { borderColor: colors.purple, backgroundColor: colors.purple },
-  addrLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
-  addrDesc: { fontSize: font.sm, color: colors.muted },
-
-  couponRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
-  couponInput: {
-    flex: 1, borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md, color: colors.text, backgroundColor: colors.white,
-  },
-  couponBtn: { minWidth: 96 },
-  couponMsg: { marginTop: spacing.sm, fontSize: font.sm, fontWeight: '700' },
-
-  toggleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  switch: { width: 48, height: 28, borderRadius: 14, backgroundColor: colors.border, padding: 3, justifyContent: 'center' },
-  switchOn: { backgroundColor: colors.purple },
-  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.white },
-  knobOn: { alignSelf: 'flex-end' },
-  toggleLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
-  toggleSub: { fontSize: font.sm, color: colors.muted },
-
-  notesInput: {
-    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md,
-    minHeight: 76, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white,
-  },
-
-  totals: { marginTop: spacing.xxl, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.xs },
-  rowLabel: { fontSize: font.md, color: colors.text, fontWeight: '600' },
-  rowLabelBig: { fontSize: font.lg, fontWeight: '800' },
-  rowMuted: { color: colors.muted, fontSize: font.sm },
-  rowValue: { fontSize: font.md, color: colors.text, fontWeight: '700' },
-  rowValueBig: { fontSize: font.lg, fontWeight: '800', color: colors.purple },
-  totalDivider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
-  serverNote: { fontSize: font.xs, color: colors.muted, marginTop: spacing.sm },
-
-  footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
-    borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.sm,
-  },
-  error: { color: colors.red, fontWeight: '700', fontSize: font.sm, textAlign: 'center' },
-  // Legal consent: quiet but fully legible, and now BELOW the action rather
-  // than competing with the blocking message above it. Shared token so
-  // "secondary" means the same thing on every screen.
-  policy: { ...secondaryTextStyle, textAlign: 'center', marginTop: spacing.sm },
-
-  // Mandatory-field affordances (location description).
-  fieldLabel: { fontSize: font.sm, fontWeight: '800', color: colors.text, marginTop: spacing.md },
-  inputError: { borderColor: colors.danger },
-  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
-  fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
-
-  // Editable cart lines.
-  lineRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border,
-  },
-  lineInfo: { flex: 1, gap: 2 },
-  lineName: { fontSize: font.md, fontWeight: '700', color: colors.text },
-  lineMods: { fontSize: font.xs, color: colors.muted },
-  policyLink: { color: colors.purple, fontWeight: '800' },
-
-  payBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  payCard: { width: '100%', maxWidth: 400, backgroundColor: colors.white, borderRadius: radius.lg, padding: spacing.xl },
-  payTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, textAlign: 'center', marginBottom: spacing.sm },
-  payMsg: { fontSize: font.md, color: colors.text, textAlign: 'center', lineHeight: 20 },
+  // Checkout is one column of decisions. On a tablet, letting it run the full
+  // width turns a 40-character line into a 120-character one and drags the
+  // money column metres from its labels. Below the cap — every phone — this
+  // changes nothing.
+  column: { width: '100%', maxWidth: CONTENT_MAX_WIDTH, gap: space.s5 },
+  multiline: { minHeight: 84, paddingTop: space.s3, textAlignVertical: 'top' },
 });

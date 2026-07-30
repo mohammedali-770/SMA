@@ -18,6 +18,7 @@ import {
   View,
   type StyleProp,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
@@ -35,9 +36,22 @@ interface Props extends Omit<TextInputProps, 'style' | 'editable'> {
   error?: string | null;
   required?: boolean;
   disabled?: boolean;
+  /**
+   * Hide the visible label when a section heading directly above already says
+   * the same thing — printing it twice is noise. The label is still applied to
+   * the input for assistive tech, so this changes what is SEEN, never what is
+   * announced.
+   */
+  labelHidden?: boolean;
   /** Renders the value in the mono face: money, phone, OTP, short address. */
   numeric?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
+  /**
+   * Extra style for the input box itself. Applied AFTER the resolved state, so
+   * it can set height/padding for a multiline field but cannot silently
+   * override the error/focus/disabled colours those states depend on.
+   */
+  inputStyle?: StyleProp<TextStyle>;
 }
 
 export function Field({
@@ -49,8 +63,10 @@ export function Field({
   error,
   required,
   disabled,
+  labelHidden,
   numeric,
   containerStyle,
+  inputStyle,
   ...inputProps
 }: Props) {
   const { lang, isRTL, rtlText } = useI18n();
@@ -66,13 +82,15 @@ export function Field({
 
   return (
     <View style={[styles.container, containerStyle]}>
-      <Text
-        nativeID={state.labelId}
-        style={[styles.label, rtlText, { fontFamily: labelFamily }]}
-      >
-        {label}
-        {required ? <Text style={styles.required}> *</Text> : null}
-      </Text>
+      {labelHidden ? null : (
+        <Text
+          nativeID={state.labelId}
+          style={[styles.label, rtlText, { fontFamily: labelFamily }]}
+        >
+          {label}
+          {required ? <Text style={styles.required}> *</Text> : null}
+        </Text>
+      )}
 
       <TextInput
         {...inputProps}
@@ -88,7 +106,9 @@ export function Field({
           inputProps.onBlur?.(e);
         }}
         accessibilityLabel={label}
-        accessibilityLabelledBy={state.labelId}
+        // Only point at the label element when one is actually rendered — a
+        // dangling nativeID reference is worse than no reference at all.
+        accessibilityLabelledBy={labelHidden ? undefined : state.labelId}
         // RN maps this to the platform "invalid" trait; VoiceOver/TalkBack then
         // announce the field as erroneous instead of the user hearing nothing.
         accessibilityState={{ disabled: state.disabled }}
@@ -105,6 +125,7 @@ export function Field({
             backgroundColor: state.disabled ? color.disabledBg : color.appSurface,
             color: state.disabled ? color.disabledFg : color.appText,
           },
+          inputStyle,
         ]}
       />
 

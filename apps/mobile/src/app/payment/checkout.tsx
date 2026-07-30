@@ -11,10 +11,14 @@
  *
  * The Tap checkout URL (which carries a short-lived token) is taken from the
  * in-memory handoff by session id — it is never a route param and never logged.
+ *
+ * This pass restyled the CHROME ONLY — header, loader, error overlay, footer.
+ * The WebView props are a frozen security surface (see the originWhitelist note
+ * below) and are byte-identical.
  */
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { type WebViewNavigation } from 'react-native-webview';
 // Platform-split: native re-exports react-native-webview verbatim (frozen Tap
@@ -22,13 +26,14 @@ import { type WebViewNavigation } from 'react-native-webview';
 import { WebView } from '../../components/TapWebView';
 import type { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
-import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
+import { color, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { SUPABASE_URL } from '../../lib/env';
 import { readCheckoutHandoff, settleCheckoutHandoff, type CheckoutHandoffResult } from '../../features/checkout/checkoutHandoff';
 import { decideNavigation, safeHostForLog, type WebviewNavConfig } from '../../features/checkout/webviewPolicy';
-import { colors, font, spacing } from '../../theme';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -129,13 +134,15 @@ export default function PaymentCheckoutScreen() {
       <Header
         title={pick('Secure Payment', 'الدفع الآمن')}
         left={(
-          <Text
+          <Pressable
             accessibilityRole="button"
+            accessibilityLabel={pick('Close', 'إغلاق')}
             onPress={() => finish('dismissed')}
-            style={styles.close}
+            hitSlop={8}
+            style={({ pressed }) => [styles.close, pressed && styles.pressed]}
           >
-            {pick('Close', 'إغلاق')}
-          </Text>
+            <Text variant="label" tone="ember">{pick('Close', 'إغلاق')}</Text>
+          </Pressable>
         )}
       />
       <View style={styles.body}>
@@ -175,9 +182,9 @@ export default function PaymentCheckoutScreen() {
 
         {failed ? (
           <View style={styles.overlay}>
-            <Text style={styles.errTitle}>{t('payScreenError')}</Text>
+            <Text variant="heading" align="center">{t('payScreenError')}</Text>
             <View style={styles.errActions}>
-              <Button label={t('payTryAgain')} onPress={reload} variant="danger" />
+              <Button label={t('payTryAgain')} onPress={reload} variant="primary" />
               <Button label={pick('Close', 'إغلاق')} onPress={() => finish('dismissed')} variant="secondary" />
             </View>
           </View>
@@ -185,14 +192,14 @@ export default function PaymentCheckoutScreen() {
           // Opaque loader only before the first paint; later Tap/3DS transitions
           // render on the page itself so we don't blank an interactive checkout.
           <View style={styles.overlay} pointerEvents="none">
-            <ActivityIndicator size="large" color={colors.purple} />
-            <Text style={styles.loadingMsg}>{t('payScreenLoading')}</Text>
+            <ActivityIndicator size="large" color={color.ember} />
+            <Text variant="body" tone="secondary" align="center">{t('payScreenLoading')}</Text>
           </View>
         ) : null}
       </View>
       {/* Reassurance strip: this is a hosted, secure page; we never see card data. */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <Text style={styles.footerText}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
+        <Text variant="caption" tone="tertiary" align="center">
           {pick('Your card details are entered on Tap’s secure page.', 'تُدخل بيانات بطاقتك في صفحة Tap الآمنة.')}
         </Text>
       </View>
@@ -201,21 +208,19 @@ export default function PaymentCheckoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: color.appBg },
   body: { flex: 1 },
-  web: { flex: 1, backgroundColor: colors.bg },
-  close: { color: colors.purple, fontWeight: '800', fontSize: font.md, paddingVertical: spacing.xs },
+  web: { flex: 1, backgroundColor: color.appBg },
+  close: { minHeight: 36, justifyContent: 'center', paddingHorizontal: space.s2 },
+  pressed: { opacity: 0.7 },
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl,
-    backgroundColor: colors.bg,
+    alignItems: 'center', justifyContent: 'center', gap: space.s4, padding: space.s5,
+    backgroundColor: color.appBg,
   },
-  loadingMsg: { color: colors.muted, fontSize: font.md, fontWeight: '700', textAlign: 'center' },
-  errTitle: { color: colors.text, fontSize: font.md, fontWeight: '800', textAlign: 'center', lineHeight: 22 },
-  errActions: { alignSelf: 'stretch', gap: spacing.sm, marginTop: spacing.md },
+  errActions: { alignSelf: 'stretch', gap: space.s2, marginTop: space.s3 },
   footer: {
-    backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.sm,
+    backgroundColor: color.appSurface, borderTopWidth: 1, borderTopColor: color.appLine,
+    paddingHorizontal: space.s4, paddingTop: space.s2,
   },
-  footerText: { color: colors.muted, fontSize: font.xs, textAlign: 'center' },
 });
