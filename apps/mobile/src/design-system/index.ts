@@ -19,5 +19,7 @@ export * from './generated/buttonState';
 export * from './generated/fieldState';
 
 export { Button } from './ui/Button';
+export { Card } from './ui/Card';
 export { Field } from './ui/Field';
+export { Text } from './ui/Text';
 export { useDesignSystemFonts, DESIGN_SYSTEM_FONTS } from './fonts';

@@ -68,9 +68,12 @@ export function Button({
 
   // Guard the handler as well as setting `disabled`: the DOM attribute is
   // trivially removable in devtools and does not stop a programmatic click.
+  // `state.inert`, not `state`: resolveButtonState returns a new object every
+  // render, so depending on the object never memoises anything.
   const handleClick = useCallback(() => {
     if (shouldInvokePress(state)) onClick();
-  }, [state, onClick]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.inert, onClick]);
 
   return (
     <button
