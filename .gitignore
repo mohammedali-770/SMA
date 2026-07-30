@@ -13,3 +13,8 @@ coverage/
 .sentryclirc
 *.js.map
 *.bundle.map
+
+# `npx expo start --web` rewrites apps/mobile/tsconfig.json#include (it strips
+# .expo/types and expo-env.d.ts). That edit is generated, not authored, and must
+# never reach a commit — see docs/DEV_VISUAL_REVIEW.md.
+apps/mobile/expo-web.log

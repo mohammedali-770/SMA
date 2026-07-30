@@ -1,10 +1,23 @@
 /**
- * DEV-ONLY UI preview harness. Renders key presentational components with mock
- * data so screens can be visually verified (English LTR / Arabic RTL, mobile
- * sizes) without auth or a backend. NEVER ships: the __DEV__ gate redirects
- * home in any release build, and nothing links to it. Mirrors /dev-sentry.
+ * DEV-ONLY UI fixture route. Renders the REAL production components against
+ * deterministic mock data so screens can be reviewed in English LTR and Arabic
+ * RTL, at phone and tablet widths, WITHOUT a WhatsApp OTP.
  *
- * Routes: /dev-preview (menu cards) · ?c=cart (cart lines) · ?c=riyal (Riyal symbol)
+ * Production safety, in order of strength:
+ *   1. `if (!__DEV__) return <Redirect href="/" />` — in any release build this
+ *      route renders nothing and bounces to home.
+ *   2. Nothing in the app links to it; it is reachable only by typing the path.
+ *   3. Every handler here is a no-op `() => {}`. It cannot call an API, write to
+ *      Supabase, create an order, or start a payment — there is no code path
+ *      from this file to any of them.
+ *   4. All data is the local `MOCK_*` constants below. No fetch, no store.
+ *
+ * Modes: /dev-preview (menu cards) · ?c=cart (cart lines) · ?c=riyal (Riyal scale)
+ *
+ * LIMITATION: these are component-level fixtures. Whole-screen fixtures for
+ * ProductDetail / Checkout / Payment need the catalog and cart React contexts
+ * exported from `src/store` so a mock provider can supply them — tracked in the
+ * migration tracker as the next step for this route.
  */
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import React from 'react';
@@ -15,7 +28,7 @@ import { Screen } from '../components/Screen';
 import { CartLine } from '../features/cart/CartScreen';
 import { ProductCard } from '../features/menu/HomeMenuScreen';
 import { useI18n } from '../i18n/I18nProvider';
-import { colors, spacing } from '../theme';
+import { color, space } from '../design-system/generated/tokens';
 import type { CartItem, Product } from '../types/models';
 
 const P = (o: Partial<Product>): Product => o as unknown as Product;
@@ -66,13 +79,13 @@ export default function DevPreview() {
   if (!__DEV__) return <Redirect href="/" />;
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+      <ScrollView contentContainerStyle={{ padding: space.s4, gap: space.s3 }}>
         {c === 'riyal'
           ? RIYAL_SAMPLES.map((r, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <Text style={{ width: 92, fontSize: 12, color: colors.muted }}>{r.label}</Text>
-                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.text} weight={r.w} />
-                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.purple} weight="800" />
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s3 }}>
+                <Text style={{ width: 92, fontSize: 12, color: color.appText3 }}>{r.label}</Text>
+                <Price amount={r.a} prefix={r.prefix} size={r.s} color={color.appText} weight={r.w} />
+                <Price amount={r.a} prefix={r.prefix} size={r.s} color={color.ember} weight="800" />
               </View>
             ))
           : c === 'cart'

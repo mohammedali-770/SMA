@@ -7,7 +7,7 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Header } from '../../components/Header';
@@ -15,9 +15,10 @@ import { BagIcon, DishIcon } from '../../components/Icons';
 import { Price } from '../../components/Price';
 import { QtyStepper } from '../../components/QtyStepper';
 import { EmptyView } from '../../components/StateViews';
+import { color, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useOrderContext } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
 import type { CartItem } from '../../types/models';
 
 export function CartScreen() {
@@ -44,8 +45,8 @@ export function CartScreen() {
   return (
     <View style={styles.root}>
       <Header title={t('myCart')} showBack safeTop />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
-        <View style={{ gap: spacing.md }}>
+      <ScrollView contentContainerStyle={{ padding: space.s4, paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+        <View style={{ gap: space.s3 }}>
           {cart.items.map((it) => (
             <CartLine
               key={it.cartItemId}
@@ -62,20 +63,22 @@ export function CartScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <View style={[styles.subtotalRow, rtlRow]}>
-          <Text style={styles.subtotalLabel}>{t('subtotal')}</Text>
-          <Price amount={cart.subtotal} size={font.lg} color={colors.purple} weight="800" />
+          <Text variant="body" tone="secondary">{t('subtotal')}</Text>
+          <Price amount={cart.subtotal} size={typeScale.heading.size} color={color.appText} weight="700" />
         </View>
         {orderCtx.valid ? (
           <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button">
-            <Text style={styles.checkoutText}>{t('goToCheckout')}</Text>
-            <Text style={styles.checkoutCount}>{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text>
+            <Text variant="heading" tone="onEmber">{t('goToCheckout')}</Text>
+            <Text variant="caption" tone="onEmber">
+              {cart.count} {cart.count === 1 ? t('item') : t('items')}
+            </Text>
           </Pressable>
         ) : (
           // No valid order context — checkout is blocked; send back to selection.
           <Pressable style={[styles.checkoutBtn, styles.checkoutBtnDisabled]} onPress={() => router.replace('/select')} accessibilityRole="button">
-            <Text style={styles.checkoutText}>{t('otSelectToOrder')}</Text>
+            <Text variant="heading" tone="secondary" align="center">{t('otSelectToOrder')}</Text>
           </Pressable>
         )}
       </View>
@@ -94,14 +97,14 @@ export function CartLine({
   item: CartItem; name: string; modifierSummary: string; lineAmount: number;
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
-  const { rtlText, rtlRow } = useI18n();
+  const { rtlRow } = useI18n();
   const [imgFailed, setImgFailed] = useState(false);
   // The full Product travels with every cart line, so the thumbnail reuses the
   // image already in the menu's memory-disk cache — no fetch is introduced.
   const showImage = !!item.product.imageUrl && !imgFailed;
   return (
     // Mirrored in Arabic: thumbnail on the reading edge, like the menu cards.
-    <View style={[styles.line, rtlRow, shadow.card]}>
+    <View style={[styles.line, rtlRow]}>
       {showImage ? (
         <Image
           source={{ uri: item.product.imageUrl }}
@@ -114,15 +117,17 @@ export function CartLine({
         />
       ) : (
         <View style={[styles.lineImg, styles.lineImgEmpty]}>
-          <DishIcon size={26} />
+          <DishIcon size={26} color={color.heatOff} />
         </View>
       )}
       <View style={styles.lineBody}>
         <View style={[styles.lineTop, rtlRow]}>
-          <Text style={[styles.lineName, rtlText]} numberOfLines={2}>{name}</Text>
-          <Price amount={lineAmount} size={font.md} color={colors.purple} weight="800" />
+          <Text variant="heading" style={{ flex: 1 }} numberOfLines={2}>{name}</Text>
+          <Price amount={lineAmount} size={typeScale.body.size} color={color.appText} weight="700" />
         </View>
-        {summary ? <Text style={[styles.lineMods, rtlText]} numberOfLines={2}>{summary}</Text> : null}
+        {summary ? (
+          <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text>
+        ) : null}
         <View style={[styles.lineBottom, rtlRow]}>
           <QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small />
           <Pressable
@@ -132,7 +137,7 @@ export function CartLine({
             accessibilityLabel={removeLabel}
             style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.7 }]}
           >
-            <Text style={styles.remove}>{removeLabel}</Text>
+            <Text variant="caption" align="center" style={{ color: color.danger }}>{removeLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -141,39 +146,39 @@ export function CartLine({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: color.appBg },
+
+  // Flat line: hairline border, no shadow — matches the menu card.
   line: {
-    flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.lg,
-    borderCurve: 'continuous', borderWidth: 1, borderColor: colors.border,
-    padding: spacing.md, gap: spacing.md,
+    flexDirection: 'row', backgroundColor: color.appSurface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: color.appLine, padding: space.s3, gap: space.s3,
   },
-  lineImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.bgAlt },
-  lineImgEmpty: { alignItems: 'center', justifyContent: 'center' },
-  lineBody: { flex: 1, gap: spacing.xs },
-  lineTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
-  lineName: { flex: 1, fontSize: font.md, fontWeight: '800', color: colors.text },
-  lineTotal: { fontSize: font.md, fontWeight: '800', color: colors.purple },
-  lineMods: { fontSize: font.sm, color: colors.muted },
-  lineBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs },
+  lineImg: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: color.appSurface2 },
+  lineImgEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: color.appSurface3 },
+  lineBody: { flex: 1, gap: space.s1 },
+  lineTop: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    justifyContent: 'space-between', gap: space.s3,
+  },
+  lineBottom: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', marginTop: space.s1,
+  },
   removeBtn: {
-    minHeight: 34, justifyContent: 'center', paddingHorizontal: spacing.md,
-    borderRadius: radius.pill, backgroundColor: colors.dangerBg,
+    minHeight: 34, justifyContent: 'center', paddingHorizontal: space.s3,
+    borderRadius: radius.pill, backgroundColor: color.dangerTint,
   },
-  remove: { color: colors.red, fontWeight: '800', fontSize: font.sm },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.white,
-    borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.lg, paddingTop: spacing.md, gap: spacing.md,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: color.appSurface,
+    borderTopWidth: 1, borderTopColor: color.appLine,
+    paddingHorizontal: space.s4, paddingTop: space.s3, gap: space.s3,
   },
   subtotalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  subtotalLabel: { fontSize: font.md, color: colors.muted, fontWeight: '700' },
-  subtotalValue: { fontSize: font.lg, color: colors.purple, fontWeight: '800' },
   checkoutBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.red, borderRadius: radius.lg, borderCurve: 'continuous',
-    paddingHorizontal: spacing.xl, paddingVertical: spacing.lg, minHeight: 54,
+    backgroundColor: color.ember, borderRadius: radius.lg,
+    paddingHorizontal: space.s5, paddingVertical: space.s4, minHeight: 54,
   },
-  checkoutBtnDisabled: { backgroundColor: colors.muted, justifyContent: 'center' },
-  checkoutText: { color: colors.white, fontWeight: '800', fontSize: font.lg },
-  checkoutCount: { color: colors.white, fontWeight: '700', fontSize: font.sm, opacity: 0.9 },
+  checkoutBtnDisabled: { backgroundColor: color.disabledBg, justifyContent: 'center' },
 });
