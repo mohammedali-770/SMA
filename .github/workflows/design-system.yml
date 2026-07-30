@@ -53,17 +53,23 @@ jobs:
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
+      # MUST run before `npm test`. vitest.config.ts includes
+      # apps/mobile/src/**/*.test.ts, and Vite resolves the nearest tsconfig for
+      # those files — apps/mobile/tsconfig.json extends "expo/tsconfig.base",
+      # which only resolves once apps/mobile/node_modules exists. With the
+      # installs the other way round every mobile suite dies with
+      # TSConfckParseError before a single assertion runs.
+      - name: Install mobile dependencies
+        run: npm --prefix apps/mobile ci --no-audit --no-fund
+
       - name: Token mirrors in sync and design-system code is token-pure
         run: npm run design-system:check
 
       - name: Typecheck (web)
         run: npm run lint
 
-      - name: Unit tests
-        run: npm test
-
-      - name: Install mobile dependencies
-        run: npm --prefix apps/mobile ci --no-audit --no-fund
-
       - name: Typecheck (mobile)
         run: npm --prefix apps/mobile run typecheck
+
+      - name: Unit tests
+        run: npm test
