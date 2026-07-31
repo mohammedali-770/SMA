@@ -29,6 +29,7 @@ import { FixtureProvider, type FixtureOptions } from '../dev/FixtureProvider';
 import { OrdersListFixture, ReceiptFixture } from '../dev/OrderFixtures';
 import { resolveFixtureGate, type FixtureScene } from '../dev/fixtureGate';
 import type { ReceiptSceneKey } from '../dev/fixtureOrders';
+import { OrderTypeSelectScreen } from '../features/order/OrderTypeSelectScreen';
 import { ProfileScreen } from '../features/profile/ProfileScreen';
 import { CheckoutScreen } from '../features/checkout/CheckoutScreen';
 import {
@@ -74,6 +75,10 @@ const SCENE_OPTIONS: Record<FixtureScene, FixtureOptions> = {
   'receipt-cancelled': {},
   profile: {},
   'profile-no-name': { noProfileName: true },
+  // The tab defaults to the context's own order type, so the pickup scene has
+  // to inject a pickup context to land on that tab.
+  'order-type-pickup': { noDeliveryZones: true, pickup: true },
+  'order-type-delivery': { noDeliveryZones: true },
 };
 
 /** Payment scene → the overlay state it puts the dialog in. */
@@ -106,6 +111,13 @@ export default function DevFixtureRoute() {
   }
   if (gate.scene.startsWith('receipt-')) {
     return <ReceiptFixture scene={gate.scene.slice('receipt-'.length) as ReceiptSceneKey} />;
+  }
+  if (gate.scene === 'order-type-pickup' || gate.scene === 'order-type-delivery') {
+    return (
+      <FixtureProvider options={SCENE_OPTIONS[gate.scene]}>
+        <OrderTypeSelectScreen />
+      </FixtureProvider>
+    );
   }
   // Profile is the REAL screen: it reads auth from context, and its only
   // actions are navigation and sign-out, both inert here.

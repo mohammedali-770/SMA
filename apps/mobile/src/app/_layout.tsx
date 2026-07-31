@@ -18,8 +18,7 @@ import { NotificationTapBridge } from '../features/notifications/NotificationTap
 import { I18nProvider } from '../i18n/I18nProvider';
 import { initObservability, wrapRoot } from '../lib/observability';
 import { AppStoreProvider, useAuth } from '../store';
-import { colors } from '../theme';
-
+import { color } from '../design-system/generated/tokens';
 // Crash reporting initializes ONCE, before any screen renders. Disabled in
 // tests and (by default) in development; native + JS + promise-rejection
 // capture in preview/production builds. See src/lib/observability.
@@ -56,7 +55,7 @@ function RootLayout() {
             <StatusBar style="dark" />
             {/* Push-notification taps → allow-listed internal routes only. */}
             <NotificationTapBridge />
-            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.appBg } }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />

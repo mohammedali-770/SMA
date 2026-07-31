@@ -16,8 +16,9 @@ import { StyleSheet, Text, View, type StyleProp, type TextStyle } from 'react-na
 import { formatAmount, isolateLtr, priceAccessibilityLabel } from '../design-system/generated/money';
 import { SaudiRiyalSymbol } from './SaudiRiyalSymbol';
 import { useI18n } from '../i18n/I18nProvider';
-import { colors } from '../theme';
-
+// Aliased: these components take a `color` PROP, which would shadow the
+// token import and make the default value reference itself.
+import { color as token } from '../design-system/generated/tokens';
 interface Props {
   amount: number;
   /** Font size of the amount; the symbol matches it. Default 15. */
@@ -30,7 +31,7 @@ interface Props {
   style?: StyleProp<TextStyle>;
 }
 
-export function Price({ amount, size = 15, color = colors.text, weight = '800', prefix, style }: Props) {
+export function Price({ amount, size = 15, color = token.appText, weight = '800', prefix, style }: Props) {
   const { lang } = useI18n();
   const value = formatAmount(amount);
   return (

@@ -14,6 +14,7 @@ import { AwardIcon, SignOutIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
 import { color, radius, space } from '../../design-system/generated/tokens';
 import { SelectableChip } from '../../design-system/ui/Chip';
+import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
 import { NotificationSettings } from '../notifications/NotificationSettings';
 import { deactivateThisDevice } from '../notifications/pushRegistration';
@@ -40,6 +41,7 @@ export function ProfileScreen() {
   return (
     <Screen background={color.appBg}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={[columnStyles.column, styles.column]}>
         <Text variant="display">{t('profile')}</Text>
 
         <View style={[styles.card, styles.identity, rtlRow]}>
@@ -132,6 +134,7 @@ export function ProfileScreen() {
         <Text variant="caption" tone="tertiary" align="center" style={styles.version}>
           {pick('Spicy Meal · v1.0.0', 'سبايسي ميل · الإصدار 1.0.0')}
         </Text>
+        </View>
       </ScrollView>
     </Screen>
   );
@@ -148,7 +151,8 @@ function DetailRow({ label, value, last }: { label: string; value: string; last?
 }
 
 const styles = StyleSheet.create({
-  scroll: { padding: space.s4, paddingBottom: space.s6 * 2, gap: space.s3 },
+  scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' },
+  column: { gap: space.s3 },
   card: {
     backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
     borderWidth: 1, borderColor: color.appLine, padding: space.s4,

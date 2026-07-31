@@ -24,8 +24,7 @@ import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
   captureException, captureMessage, isObservabilityInitialized, observabilityEnvironment,
 } from '../lib/observability';
-import { colors } from '../theme';
-
+import { color } from '../design-system/generated/tokens';
 export default function DevSentryScreen() {
   // Release builds: hard redirect. The dev-only body below is unreachable.
   if (!__DEV__) return <Redirect href="/" />;
@@ -92,11 +91,11 @@ function DevSentryBody() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
-  title: { fontSize: 17, fontWeight: '800', color: colors.ink },
-  meta: { fontSize: 12, color: colors.muted },
-  button: { backgroundColor: colors.purple, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12, minWidth: 240, alignItems: 'center' },
-  danger: { backgroundColor: colors.red },
-  buttonText: { color: colors.white, fontWeight: '800' },
-  note: { fontSize: 11, color: colors.muted, textAlign: 'center', marginTop: 12 },
+  wrap: { flex: 1, backgroundColor: color.appBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
+  title: { fontSize: 17, fontWeight: '800', color: color.appText },
+  meta: { fontSize: 12, color: color.appText2 },
+  button: { backgroundColor: color.ember, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12, minWidth: 240, alignItems: 'center' },
+  danger: { backgroundColor: color.danger },
+  buttonText: { color: color.appSurface, fontWeight: '800' },
+  note: { fontSize: 11, color: color.appText2, textAlign: 'center', marginTop: 12 },
 });
