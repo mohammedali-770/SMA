@@ -198,6 +198,10 @@ const ADMIN_MIGRATED = [
   // Shared admin form shell
   'src/components/admin/view/shared/AdminModal.tsx',
   'src/components/admin/view/shared/ToggleChip.tsx',
+  // Map helpers embedded in the migrated branch and delivery-zone editors.
+  // Restyled only — no map behaviour, provider logic or geocoding changed.
+  'src/components/MapSearchBox.tsx',
+  'src/components/mobile/LocationPicker.tsx',
 ];
 
 const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;
