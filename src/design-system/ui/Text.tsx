@@ -42,7 +42,7 @@ const TONE: Record<TextTone, string> = {
   onEmber: 'text-on-ember',
 };
 
-type Element = 'p' | 'span' | 'h1' | 'h2' | 'h3' | 'h4' | 'div' | 'label';
+type Element = 'p' | 'span' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' | 'div' | 'label';
 
 interface Props extends React.HTMLAttributes<HTMLElement> {
   variant?: TextVariant;

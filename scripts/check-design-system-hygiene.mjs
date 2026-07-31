@@ -166,6 +166,12 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/integrity/IntegritySummary.tsx',
   'src/components/admin/view/integrity/IntegrityTable.tsx',
   'src/components/admin/view/integrity/integrityView.ts',
+  // Operations Health
+  'src/components/admin/OperationsHealthPanel.tsx',
+  'src/components/admin/view/health/HealthJobsTable.tsx',
+  'src/components/admin/view/health/HealthMetric.tsx',
+  'src/components/admin/view/health/HealthSystemCard.tsx',
+  'src/components/admin/view/health/healthView.ts',
 ];
 
 const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;
