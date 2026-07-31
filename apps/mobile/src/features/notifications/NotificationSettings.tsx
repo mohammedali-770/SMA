@@ -9,7 +9,7 @@
  * sending is server-side and separately master-flag gated.
  */
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Switch, Text, View } from 'react-native';
+import { StyleSheet, Switch, View } from 'react-native';
 import * as Device from 'expo-device';
 
 import { useI18n } from '../../i18n/I18nProvider';
@@ -20,11 +20,12 @@ import {
 import {
   deactivateThisDeviceStrict, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
 } from './pushRegistration';
-import { colors, font, radius, shadow, spacing } from '../../theme';
+import { color, radius, space } from '../../design-system/generated/tokens';
+import { Text } from '../../design-system/ui/Text';
 import type { DbPushDevice } from '../../types/db';
 
 export function NotificationSettings() {
-  const { t, lang, rtlText, rtlRow } = useI18n();
+  const { t, lang, rtlRow } = useI18n();
   const { userId } = useAuth();
   const [device, setDevice] = useState<DbPushDevice | null>(null);
   const [prefs, setPrefs] = useState<DevicePrefs>({ orderUpdatesEnabled: false, promosEnabled: false });
@@ -85,53 +86,48 @@ export function NotificationSettings() {
   if (!supported) return null; // simulators/web — nothing to configure
 
   return (
-    <View style={[styles.card, shadow.card]}>
-      <Text style={[styles.title, rtlText]}>{t('notificationsTitle')}</Text>
-      <Text style={[styles.sub, rtlText]}>{t('notificationsSub')}</Text>
+    <View style={styles.card}>
+      <Text variant="title">{t('notificationsTitle')}</Text>
+      <Text variant="caption" tone="secondary">{t('notificationsSub')}</Text>
 
       <View style={[styles.row, rtlRow]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowLabel, rtlText]}>{t('notifOrderUpdates')}</Text>
-          <Text style={[styles.rowSub, rtlText]}>{t('notifOrderUpdatesSub')}</Text>
+          <Text variant="label">{t('notifOrderUpdates')}</Text>
+          <Text variant="caption" tone="secondary">{t('notifOrderUpdatesSub')}</Text>
         </View>
         <Switch
           value={prefs.orderUpdatesEnabled}
           disabled={busy}
           onValueChange={(v) => void apply({ ...prefs, orderUpdatesEnabled: v })}
-          trackColor={{ true: colors.purple, false: colors.border }}
+          trackColor={{ true: color.ember, false: color.appLine }}
           accessibilityLabel={t('notifOrderUpdates')}
         />
       </View>
 
       <View style={[styles.row, styles.rowDivider, rtlRow]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.rowLabel, rtlText]}>{t('notifPromos')}</Text>
-          <Text style={[styles.rowSub, rtlText]}>{t('notifPromosSub')}</Text>
+          <Text variant="label">{t('notifPromos')}</Text>
+          <Text variant="caption" tone="secondary">{t('notifPromosSub')}</Text>
         </View>
         <Switch
           value={prefs.promosEnabled}
           disabled={busy}
           onValueChange={(v) => void apply({ ...prefs, promosEnabled: v })}
-          trackColor={{ true: colors.purple, false: colors.border }}
+          trackColor={{ true: color.ember, false: color.appLine }}
           accessibilityLabel={t('notifPromos')}
         />
       </View>
 
-      {denied ? <Text style={[styles.denied, rtlText]}>{t('notifPermissionDenied')}</Text> : null}
+      {denied ? <Text variant="label" tone="danger">{t('notifPermissionDenied')}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginBottom: spacing.md,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s1,
   },
-  title: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  sub: { fontSize: font.sm, color: colors.muted, marginTop: 2, marginBottom: spacing.sm },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
-  rowDivider: { borderTopWidth: 1, borderTopColor: colors.border },
-  rowLabel: { fontSize: font.md, fontWeight: '800', color: colors.text },
-  rowSub: { fontSize: font.xs, color: colors.muted, marginTop: 1 },
-  denied: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
+  rowDivider: { borderTopWidth: 1, borderTopColor: color.appLine },
 });

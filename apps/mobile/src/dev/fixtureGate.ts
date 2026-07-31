@@ -42,6 +42,35 @@ export const FIXTURE_SCENES = [
   // payment-verify endpoint when a pending session is present. A fixture must
   // never be able to touch a payment session, and the screen redirects within a
   // frame anyway, so there is nothing to review. It is verified on-device.
+
+  // Orders + Receipt. These render the PRESENTATIONAL components against fixed
+  // mock orders — never the fetching screens. OrdersScreen and ReceiptScreen
+  // call `orders.listWithItems` / `orders.byId` / `orders.requestResend` on
+  // mount, and a resend is a real POS action, so they are deliberately not
+  // mounted here. Every handler passed to the components is inert.
+  'orders',
+  'orders-empty',
+  'receipt-payment-pending',
+  'receipt-paid',
+  'receipt-cash',
+  'receipt-sending',
+  'receipt-confirmed',
+  'receipt-verifying',
+  'receipt-resend',
+  'receipt-resend-cash',
+  'receipt-refund-pending',
+  'receipt-refunded',
+  'receipt-refund-failed',
+  'receipt-ready',
+  'receipt-completed',
+  'receipt-cancelled',
+
+  // Profile. Renders the REAL screen: it reads auth from context and its only
+  // actions are navigation and sign-out, both inert under the fixture's no-op
+  // auth value. Account deletion is NOT a scene — that screen calls
+  // `accountDeletion.current()` on mount and can submit a real deletion.
+  'profile',
+  'profile-no-name',
 ] as const;
 
 export type FixtureScene = (typeof FIXTURE_SCENES)[number];

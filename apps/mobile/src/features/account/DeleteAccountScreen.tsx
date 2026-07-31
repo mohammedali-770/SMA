@@ -10,26 +10,32 @@
  * enqueues the request server-side. Sign-out happens ONLY after the request is
  * accepted. No raw backend error is ever shown; statuses map to safe localized
  * strings.
+ *
+ * The design pass changed presentation only. Every phase transition, the
+ * hardware-back lock, the OTP/reauth fallback choice, the submit call and the
+ * automatic post-acceptance sign-out are unchanged.
  */
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BackHandler, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import {
   canSubmitDeletion, chooseReverifyMethod, deletionStatusMessageKey, isDeletionLockedPhase,
   isLikelyOffline, otpDeliverable, SUPPORT_EMAIL, SUPPORT_PHONE, type ReverifyMethod,
 } from './accountDeletion';
-import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { Screen } from '../../components/Screen';
 import { LoadingView } from '../../components/StateViews';
+import { color, radius, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { Field } from '../../design-system/ui/Field';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { OTP_RESEND_COOLDOWN_SECONDS, sanitizeOtpDigits } from '../otp/otpInput';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
 
 type Phase = 'checking' | 'pending' | 'intro' | 'reverify' | 'unavailable' | 'submitting' | 'success';
 
@@ -40,7 +46,7 @@ const CONSEQUENCE_KEYS = [
 ] as const;
 
 export function DeleteAccountScreen() {
-  const { t, lang, isRTL, rtlText, rtlRow } = useI18n();
+  const { t, lang, rtlRow } = useI18n();
   const { signOut } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('checking');
@@ -156,7 +162,7 @@ export function DeleteAccountScreen() {
   const canContinue = canSubmitDeletion({ acknowledged, method, code, password });
 
   return (
-    <Screen background={colors.bg} edges={['top', 'left', 'right', 'bottom']}>
+    <Screen background={color.appBg} edges={['top', 'left', 'right', 'bottom']}>
       <Header title={t('delTitle')} showBack={!isDeletionLockedPhase(phase)} />
 
       {phase === 'checking' ? (
@@ -168,12 +174,12 @@ export function DeleteAccountScreen() {
           accessibilityLabel={t('delSubmitting')}
           accessibilityState={{ busy: true }}
           accessibilityLiveRegion="polite"
-          style={{ flex: 1 }}
+          style={styles.flex}
         >
           <LoadingView label={t('delSubmitting')} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           {phase === 'pending' ? (
             <PendingCard statusKey={deletionStatusMessageKey(pendingStatus)} />
           ) : phase === 'success' ? (
@@ -182,12 +188,13 @@ export function DeleteAccountScreen() {
             <UnavailableCard />
           ) : phase === 'intro' ? (
             <>
-              <Text style={[styles.subtitle, rtlText]}>{t('delSubtitle')}</Text>
-              <View style={[styles.card, shadow.card]}>
+              <Text variant="body" tone="secondary">{t('delSubtitle')}</Text>
+
+              <View style={styles.card}>
                 {CONSEQUENCE_KEYS.map((k) => (
-                  <View key={k} style={[styles.bulletRow, rtlRow]}>
-                    <View style={styles.bulletDot} />
-                    <Text style={[styles.bulletText, rtlText]}>{t(k)}</Text>
+                  <View key={k} style={[styles.bullet, rtlRow]}>
+                    <View style={styles.dot} />
+                    <Text variant="body" style={styles.bulletText}>{t(k)}</Text>
                   </View>
                 ))}
               </View>
@@ -202,9 +209,9 @@ export function DeleteAccountScreen() {
                 style={[styles.ackRow, rtlRow]}
               >
                 <View style={[styles.checkbox, acknowledged && styles.checkboxOn]}>
-                  {acknowledged ? <Text style={styles.checkboxMark}>✓</Text> : null}
+                  {acknowledged ? <Text variant="label" tone="onEmber">✓</Text> : null}
                 </View>
-                <Text style={[styles.ackText, rtlText]}>{t('delAck')}</Text>
+                <Text variant="label" style={styles.ackText}>{t('delAck')}</Text>
               </Pressable>
 
               <Button
@@ -213,50 +220,56 @@ export function DeleteAccountScreen() {
                 disabled={!acknowledged}
                 variant="danger"
                 accessibilityLabel={t('delContinue')}
-                style={{ marginTop: spacing.lg }}
+                style={styles.primaryAction}
               />
               <SupportBlock onOpen={openSupport} />
             </>
           ) : (
             /* phase === 'reverify' */
             <>
-              <Text style={[styles.h2, rtlText]}>{t('delReverifyTitle')}</Text>
-              <Text style={[styles.subtitle, rtlText]}>
+              <Text variant="title">{t('delReverifyTitle')}</Text>
+              <Text variant="body" tone="secondary">
                 {method === 'reauth' ? t('delReverifyReauthSub') : t('delReverifyOtpSub')}
               </Text>
 
               {method === 'reauth' ? (
-                <TextInput
+                <Field
+                  id="delete-password"
+                  label={t('delPasswordLabel')}
                   value={password}
                   onChangeText={setPassword}
                   placeholder={t('delPasswordLabel')}
-                  placeholderTextColor={colors.muted}
                   secureTextEntry
                   autoCapitalize="none"
-                  style={[styles.input, rtlText]}
-                  accessibilityLabel={t('delPasswordLabel')}
                 />
               ) : (
                 <>
-                  <TextInput
+                  {/* The code is a structured number → mono face, wide tracking,
+                      centred, exactly like the login OTP. */}
+                  <Field
+                    id="delete-otp"
+                    label={t('delEnterCode')}
                     value={code}
                     onChangeText={(v) => setCode(sanitizeOtpDigits(v, 6))}
                     keyboardType="number-pad"
                     placeholder={t('delEnterCode')}
-                    placeholderTextColor={colors.muted}
-                    style={[styles.input, styles.codeInput]}
                     maxLength={6}
-                    accessibilityLabel={t('delEnterCode')}
+                    numeric
+                    inputStyle={styles.codeInput}
                   />
                   <Button
                     label={cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
                     onPress={() => void sendOtp()}
                     disabled={busy || cooldown > 0}
                     variant="ghost"
-                    style={{ marginTop: spacing.xs }}
                   />
-                  <Pressable onPress={usePasswordInstead} hitSlop={8} accessibilityRole="button" style={styles.switchLink}>
-                    <Text style={styles.switchText}>{t('delUsePassword')}</Text>
+                  <Pressable
+                    onPress={usePasswordInstead}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    style={styles.switchLink}
+                  >
+                    <Text variant="label" tone="ember" align="center">{t('delUsePassword')}</Text>
                   </Pressable>
                 </>
               )}
@@ -267,7 +280,7 @@ export function DeleteAccountScreen() {
                 disabled={!canContinue || busy}
                 loading={busy}
                 variant="danger"
-                style={{ marginTop: spacing.lg }}
+                style={styles.primaryAction}
               />
               <SupportBlock onOpen={openSupport} />
             </>
@@ -275,21 +288,32 @@ export function DeleteAccountScreen() {
 
           {/* Announced status/error/notice region */}
           {error ? (
-            <Text style={[styles.error, rtlText]} accessibilityLiveRegion="assertive">{error}</Text>
+            <Text variant="label" tone="danger" align="center" accessibilityLiveRegion="assertive">
+              {error}
+            </Text>
           ) : notice ? (
-            <Text style={[styles.notice, rtlText]} accessibilityLiveRegion="polite">{notice}</Text>
+            <Text variant="label" tone="success" align="center" accessibilityLiveRegion="polite">
+              {notice}
+            </Text>
           ) : null}
         </ScrollView>
       )}
 
       {/* Final confirmation (announced modal) */}
       {confirmVisible ? (
-        <View style={styles.modalOverlay} accessibilityViewIsModal>
-          <View style={[styles.modalCard, shadow.card]}>
-            <Text style={[styles.modalTitle, rtlText]}>{t('delFinalTitle')}</Text>
-            <Text style={[styles.modalBody, rtlText]}>{t('delFinalBody')}</Text>
-            <Button label={t('delFinalConfirm')} onPress={() => void doSubmit()} variant="danger" accessibilityLabel={t('delFinalConfirm')} />
-            <Button label={t('cancel')} onPress={() => setConfirmVisible(false)} variant="ghost" style={{ marginTop: spacing.xs }} />
+        <View style={styles.overlay} accessibilityViewIsModal>
+          <View style={styles.modal}>
+            <Text variant="title">{t('delFinalTitle')}</Text>
+            <Text variant="body" tone="secondary">{t('delFinalBody')}</Text>
+            <View style={styles.modalActions}>
+              <Button
+                label={t('delFinalConfirm')}
+                onPress={() => void doSubmit()}
+                variant="danger"
+                accessibilityLabel={t('delFinalConfirm')}
+              />
+              <Button label={t('cancel')} onPress={() => setConfirmVisible(false)} variant="ghost" />
+            </View>
           </View>
         </View>
       ) : null}
@@ -298,14 +322,14 @@ export function DeleteAccountScreen() {
 
   function SuccessCard() {
     return (
-      <View accessible accessibilityLiveRegion="polite">
-        <View style={[styles.card, shadow.card, styles.successCard]}>
-          <Text style={[styles.h2, rtlText]}>{t('delSuccessTitle')}</Text>
-          <Text style={[styles.bodyText, rtlText]}>{t('delSuccessBody')}</Text>
+      <View accessible accessibilityLiveRegion="polite" style={styles.phaseCard}>
+        <View style={[styles.card, styles.successCard]}>
+          <Text variant="title">{t('delSuccessTitle')}</Text>
+          <Text variant="body">{t('delSuccessBody')}</Text>
           {/* Honest: no completion message is sent (no operational channel). */}
-          <Text style={[styles.muted, rtlText]}>{t('delNoNotice')}</Text>
+          <Text variant="caption" tone="secondary">{t('delNoNotice')}</Text>
         </View>
-        <Button label={t('delDone')} onPress={() => void finish()} variant="primary" style={{ marginTop: spacing.lg }} />
+        <Button label={t('delDone')} onPress={() => void finish()} variant="primary" />
         <SupportBlock onOpen={openSupport} />
       </View>
     );
@@ -315,12 +339,12 @@ export function DeleteAccountScreen() {
     // Reached on login/session-restore for an account that is being deleted. The
     // account is locked server-side; the only forward action is to sign out.
     return (
-      <View accessible accessibilityLiveRegion="polite">
-        <View style={[styles.card, shadow.card]}>
-          <Text style={[styles.h2, rtlText]}>{t('delPendingTitle')}</Text>
-          <Text style={[styles.bodyText, rtlText]}>{t(statusKey)}</Text>
+      <View accessible accessibilityLiveRegion="polite" style={styles.phaseCard}>
+        <View style={styles.card}>
+          <Text variant="title">{t('delPendingTitle')}</Text>
+          <Text variant="body">{t(statusKey)}</Text>
         </View>
-        <Button label={t('signOut')} onPress={() => void finish()} variant="secondary" style={{ marginTop: spacing.lg }} />
+        <Button label={t('signOut')} onPress={() => void finish()} variant="secondary" />
         <SupportBlock onOpen={openSupport} />
       </View>
     );
@@ -328,12 +352,12 @@ export function DeleteAccountScreen() {
 
   function UnavailableCard() {
     return (
-      <View accessible accessibilityLiveRegion="polite">
-        <View style={[styles.card, shadow.card]}>
-          <Text style={[styles.h2, rtlText]}>{t('delTitle')}</Text>
-          <Text style={[styles.bodyText, rtlText]}>{t('delUnavailable')}</Text>
+      <View accessible accessibilityLiveRegion="polite" style={styles.phaseCard}>
+        <View style={styles.card}>
+          <Text variant="title">{t('delTitle')}</Text>
+          <Text variant="body">{t('delUnavailable')}</Text>
         </View>
-        <Button label={t('back')} onPress={() => router.back()} variant="secondary" style={{ marginTop: spacing.lg }} />
+        <Button label={t('back')} onPress={() => router.back()} variant="secondary" />
         <SupportBlock onOpen={openSupport} />
       </View>
     );
@@ -341,67 +365,59 @@ export function DeleteAccountScreen() {
 }
 
 function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
-  const { t, rtlText } = useI18n();
+  const { t } = useI18n();
   return (
     <View style={styles.support}>
-      <Text style={[styles.supportLabel, rtlText]}>{t('delSupport')}</Text>
+      <Text variant="caption" tone="secondary" align="center">{t('delSupport')}</Text>
       <Pressable onPress={() => onOpen(`mailto:${SUPPORT_EMAIL}`)} accessibilityRole="link" hitSlop={6}>
-        <Text style={styles.supportLink}>{SUPPORT_EMAIL}</Text>
+        <Text variant="label" tone="ember" align="center">{SUPPORT_EMAIL}</Text>
       </Pressable>
       <Pressable onPress={() => onOpen(`tel:${SUPPORT_PHONE}`)} accessibilityRole="link" hitSlop={6}>
-        <Text style={styles.supportLink}>{SUPPORT_PHONE}</Text>
+        {/* A phone number is a structured number — mono, and always LTR. */}
+        <Text variant="label" tone="ember" align="center">{SUPPORT_PHONE}</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  subtitle: { fontSize: font.md, color: colors.muted, marginBottom: spacing.md },
-  muted: { fontSize: font.sm, color: colors.muted, marginTop: spacing.sm, lineHeight: font.sm + 6 },
-  h2: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
-  bodyText: { fontSize: font.md, color: colors.text, lineHeight: font.md + 8 },
+  flex: { flex: 1 },
+  scroll: { padding: space.s4, paddingBottom: space.s6, gap: space.s3 },
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: colors.border, padding: spacing.lg,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s2,
   },
-  successCard: { borderColor: colors.success, backgroundColor: colors.successBg },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, paddingVertical: spacing.xs },
-  bulletDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.purple, marginTop: 8 },
-  bulletText: { flex: 1, fontSize: font.md, color: colors.text, lineHeight: font.md + 7 },
+  phaseCard: { gap: space.s3 },
+  successCard: { borderColor: color.mintLine, backgroundColor: color.mintTint },
 
-  ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginTop: spacing.lg },
+  bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s2, paddingVertical: space.s1 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: color.ember, marginTop: 8 },
+  bulletText: { flex: 1 },
+
+  ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3, marginTop: space.s2 },
   checkbox: {
-    width: 26, height: 26, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.border,
+    width: 26, height: 26, borderRadius: radius.sm, borderWidth: 2, borderColor: color.appLine,
     alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
-  checkboxOn: { backgroundColor: colors.red, borderColor: colors.red },
-  checkboxMark: { color: colors.white, fontWeight: '900', fontSize: font.md },
-  ackText: { flex: 1, fontSize: font.sm, color: colors.text, lineHeight: font.sm + 7 },
+  // Danger, not ember: ticking this box is the destructive commitment.
+  checkboxOn: { backgroundColor: color.danger, borderColor: color.danger },
+  ackText: { flex: 1 },
 
-  input: {
-    borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md, fontSize: font.md,
-    color: colors.text, backgroundColor: colors.white, marginTop: spacing.sm,
+  codeInput: { letterSpacing: 6, textAlign: 'center' },
+  switchLink: { paddingVertical: space.s2, alignItems: 'center' },
+  primaryAction: { marginTop: space.s2 },
+
+  support: { marginTop: space.s5, gap: space.s1, alignItems: 'center' },
+
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: color.scrim,
+    alignItems: 'center', justifyContent: 'center', padding: space.s5,
   },
-  codeInput: { letterSpacing: 6, textAlign: 'center', fontWeight: '800' },
-  switchLink: { paddingVertical: spacing.sm, alignItems: 'center' },
-  switchText: { color: colors.purple, fontWeight: '800', fontSize: font.sm },
-
-  notice: { fontSize: font.sm, color: colors.success, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
-  error: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.md, textAlign: 'center' },
-
-  support: { marginTop: spacing.xl, gap: spacing.xs, alignItems: 'center' },
-  supportLabel: { fontSize: font.sm, color: colors.muted, fontWeight: '600' },
-  supportLink: { fontSize: font.md, color: colors.purple, fontWeight: '800' },
-
-  modalOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.45)',
-    alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
+  modal: {
+    width: '100%', maxWidth: 400,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    padding: space.s5, gap: space.s2,
   },
-  modalCard: {
-    width: '100%', backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
-    padding: spacing.xl, gap: spacing.sm,
-  },
-  modalTitle: { fontSize: font.xl, fontWeight: '800', color: colors.text },
-  modalBody: { fontSize: font.md, color: colors.muted, lineHeight: font.md + 7, marginBottom: spacing.md },
+  modalActions: { gap: space.s2, marginTop: space.s3 },
 });

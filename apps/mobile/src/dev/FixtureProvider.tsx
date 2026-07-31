@@ -71,6 +71,8 @@ export interface FixtureOptions {
   payment?: 'both' | 'online-off' | 'none';
   /** Branch has delivery temporarily closed. */
   deliveryClosed?: boolean;
+  /** Signed in but the profile carries no name — Profile's fallback state. */
+  noProfileName?: boolean;
 }
 
 export function FixtureProvider({
@@ -185,11 +187,13 @@ function FixtureProviderInner({
         // before, which is not a value the app ever produces.
         status: 'signed_in',
         userId: FIXTURE_PROFILE.id,
-        profile: FIXTURE_PROFILE,
+        profile: options.noProfileName
+          ? { ...FIXTURE_PROFILE, fullName: '', email: undefined }
+          : FIXTURE_PROFILE,
         signOut: noop,
         refreshProfile: noop,
       }) as unknown as AuthValue,
-    [],
+    [options.noProfileName],
   );
 
   return (

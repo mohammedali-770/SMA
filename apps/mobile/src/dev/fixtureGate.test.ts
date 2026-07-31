@@ -58,6 +58,15 @@ describe('fixture gate — fails closed', () => {
     }
   });
 
+  it('has no scene for account deletion', () => {
+    // DeleteAccountScreen calls accountDeletion.current() on mount and can
+    // submit a REAL deletion request. It must never be reachable from a
+    // fixture, at any stage of its flow.
+    for (const scene of FIXTURE_SCENES) {
+      expect(scene).not.toMatch(/delete|deletion/i);
+    }
+  });
+
   it('has no scene for the payment-return screen', () => {
     // app/payment/return.tsx exists to RESOLVE an interrupted charge: it
     // persists a session id and drives recoverPendingSession, which calls the
