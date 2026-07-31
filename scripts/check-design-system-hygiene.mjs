@@ -176,6 +176,14 @@ const ADMIN_MIGRATED = [
   'src/components/admin/OperationsAlertsPanel.tsx',
   'src/components/admin/view/alerts/AlertRow.tsx',
   'src/components/admin/view/alerts/alertsView.ts',
+  // Live Orders
+  'src/components/admin/LiveOrdersPanel.tsx',
+  'src/components/admin/view/orders/DetailRow.tsx',
+  'src/components/admin/view/orders/OrderReceiptModal.tsx',
+  'src/components/admin/view/orders/OrdersRequiringVerificationCard.tsx',
+  'src/components/admin/view/orders/OrdersTable.tsx',
+  'src/components/admin/view/orders/TapPaymentDetails.tsx',
+  'src/components/admin/view/orders/ordersView.ts',
   // Shared by Operations Health and Operations Alerts
   'src/components/admin/view/adminTime.ts',
 ];
