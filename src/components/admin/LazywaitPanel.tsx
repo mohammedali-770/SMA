@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Loader2, AlertCircle, Check, PlugZap } from 'lucide-react';
+import { Loader2, PlugZap, RefreshCw } from 'lucide-react';
+
+import { Card } from '../../design-system/ui/Card';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
 import { orders as ordersApi, DbOrder } from '../../lib/api';
 import { lazywaitRequeueEligibility, requeueEligibilityMessage, isUsablePosRef } from '../../lib/lazywaitRequeue';
 import { LazywaitCatalogMapping } from './LazywaitCatalogMapping';
@@ -13,16 +18,19 @@ import { LazywaitCatalogMapping } from './LazywaitCatalogMapping';
  *  - re-queue a failed / blocked / dead-lettered order.
  * Self-contained (loads its own data) so it drops into Settings without context wiring.
  */
-const STATE_TONE: Record<string, string> = {
-  synced: 'bg-green-100 text-green-700',
-  syncing: 'bg-blue-100 text-blue-700',
-  pending: 'bg-slate-100 text-slate-600',
-  failed: 'bg-amber-100 text-amber-700',
-  blocked: 'bg-red-100 text-red-700',
-  dead_letter: 'bg-red-200 text-red-800',
-  skipped: 'bg-slate-100 text-slate-400',
+const STATE_TONE: Record<string, PillTone> = {
+  synced: 'success',
+  syncing: 'info',
+  pending: 'neutral',
+  failed: 'warning',
+  blocked: 'danger',
+  dead_letter: 'danger',
+  skipped: 'neutral',
 };
 const RETRYABLE = new Set(['failed', 'blocked', 'dead_letter', 'skipped']);
+
+const TH = 'py-1 pe-2 text-start';
+const TD = 'py-1.5 pe-2 align-top';
 
 export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
   const [orderRows, setOrderRows] = useState<DbOrder[]>([]);
@@ -61,46 +69,50 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
   };
 
   return (
-    <div className="glass-card p-4 rounded-2xl bg-white/40 space-y-4">
-      <div className="flex justify-between items-center border-b border-slate-100 pb-2.5">
-        <div className="flex items-center gap-2">
-          <PlugZap className="w-4 h-4 text-primary" />
-          <div>
-            <h4 className="text-xs font-black text-slate-800 uppercase">Lazywait POS — Sync Monitor</h4>
-            <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">Catalog id mapping + per-order sync status & retry</p>
+    <Card className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-con-line pb-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <PlugZap className="size-4 shrink-0 text-ember" aria-hidden="true" />
+          <div className="min-w-0">
+            <Text variant="heading" as="h4">Lazywait POS — Sync Monitor</Text>
+            <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">
+              Catalog id mapping + per-order sync status &amp; retry
+            </Text>
           </div>
         </div>
-        <button onClick={load} disabled={loading} className="text-[10px] font-black text-primary flex items-center gap-1 disabled:opacity-50">
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="ds-motion inline-flex min-h-9 shrink-0 items-center gap-1 rounded-[var(--radius-ds-md)] px-2 transition-colors duration-150 hover:bg-con-surface-2 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2"
+        >
+          <RefreshCw className={`size-3.5 text-ember ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
+          <Text variant="caption" tone="ember" as="span">Refresh</Text>
         </button>
       </div>
 
-      {error && (
-        <div className="text-[10px] font-bold text-red-600 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{error}</div>
-      )}
-      {msg && (
-        <div className="text-[10px] font-bold text-green-600 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{msg}</div>
-      )}
+      {error && <Notice title={error} tone="blocking" />}
+      {msg && <Notice title={msg} tone="success" />}
 
       {/* Catalog pull + id mapping (branches/categories/products/groups/modifiers) */}
       <LazywaitCatalogMapping disabled={disabled} />
 
-      {/* Per-order sync status */}
-      <div className="border-t border-slate-100 pt-3">
-        <span className="text-[10px] font-black text-slate-600 uppercase">Recent Order Sync</span>
+      <div className="border-t border-con-line pt-3">
+        <Text variant="caption" tone="secondary" as="p">Recent Order Sync</Text>
         {orderRows.length === 0 ? (
-          <p className="text-[10px] text-slate-400 font-bold mt-2">No orders queued for Lazywait sync yet.</p>
+          <Text variant="caption" tone="tertiary" as="p" className="mt-2">
+            No orders queued for Lazywait sync yet.
+          </Text>
         ) : (
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-[10px]">
+            <table className="w-full">
               <thead>
-                <tr className="text-slate-400 font-black uppercase text-[8.5px] text-left">
-                  <th className="py-1 pr-2">Order</th>
-                  <th className="py-1 pr-2">State</th>
-                  <th className="py-1 pr-2">POS Ref / #</th>
-                  <th className="py-1 pr-2">Attempts</th>
-                  <th className="py-1 pr-2">Reason / Error</th>
-                  <th className="py-1 pr-2"></th>
+                <tr className="border-b border-con-line">
+                  {['Order', 'State', 'POS Ref / #', 'Attempts', 'Reason / Error', ''].map((h, i) => (
+                    <th key={h || `sp-${i}`} className={TH}>
+                      <Text variant="caption" tone="tertiary" as="span">{h}</Text>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -113,38 +125,55 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
                   const canRetry = !disabled && elig === 'requeued';
                   const eligMsg = RETRYABLE.has(state) ? requeueEligibilityMessage(elig) : null;
                   return (
-                    <tr key={o.id} className="border-t border-slate-100">
-                      <td className="py-1.5 pr-2 font-bold text-slate-700">{o.order_number}</td>
-                      <td className="py-1.5 pr-2">
-                        <span className={`px-1.5 py-0.5 rounded-full font-black text-[8.5px] ${STATE_TONE[state] ?? 'bg-slate-100 text-slate-500'}`}>{state}</span>
+                    <tr key={o.id} className="border-t border-con-line">
+                      <td className={TD}>
+                        <Text variant="caption" numeric as="span">{o.order_number}</Text>
                       </td>
-                      <td className="py-1.5 pr-2 font-mono text-slate-500">
-                        {o.lazywait_order_number || (o.lazywait_ref ? `${o.lazywait_ref.slice(0, 8)}…` : '—')}
+                      <td className={TD}>
+                        <StatusPill label={state} tone={STATE_TONE[state] ?? 'neutral'} />
                       </td>
-                      <td className="py-1.5 pr-2 text-slate-500">{o.sync_attempt_count ?? 0}</td>
-                      <td className="py-1.5 pr-2 text-slate-500 max-w-[220px] truncate" title={o.sync_last_error || o.sync_blocked_reason || ''}>
-                        {o.sync_blocked_reason || o.sync_last_error || (
-                          state === 'synced'
-                            // 'synced' is only truly confirmed WITH a USABLE POS ref;
-                            // flag a marker-only / ref-less synced row instead of "OK".
-                            ? (isUsablePosRef(o.lazywait_ref)
-                                ? 'OK'
-                                : <span className="text-amber-600 font-bold">synced without usable POS ref — verify</span>)
-                            : '—')}
+                      <td className={TD}>
+                        <Text variant="caption" tone="secondary" numeric as="span">
+                          {o.lazywait_order_number || (o.lazywait_ref ? `${o.lazywait_ref.slice(0, 8)}…` : '—')}
+                        </Text>
                       </td>
-                      <td className="py-1.5 pr-2 text-right">
+                      <td className={TD}>
+                        <Text variant="caption" tone="secondary" numeric as="span">{o.sync_attempt_count ?? 0}</Text>
+                      </td>
+                      <td className={`${TD} max-w-[220px] truncate`} title={o.sync_last_error || o.sync_blocked_reason || ''}>
+                        {o.sync_blocked_reason || o.sync_last_error ? (
+                          <Text variant="caption" tone="secondary" as="span">
+                            {o.sync_blocked_reason || o.sync_last_error}
+                          </Text>
+                        ) : state === 'synced' ? (
+                          // 'synced' is only truly confirmed WITH a USABLE POS ref;
+                          // flag a marker-only / ref-less synced row instead of "OK".
+                          isUsablePosRef(o.lazywait_ref)
+                            ? <Text variant="caption" tone="success" as="span">OK</Text>
+                            : <Text variant="caption" tone="warning" as="span">synced without usable POS ref — verify</Text>
+                        ) : (
+                          <Text variant="caption" tone="tertiary" as="span">—</Text>
+                        )}
+                      </td>
+                      <td className={`${TD} text-end`}>
                         {canRetry ? (
                           <button
+                            type="button"
                             onClick={() => retry(o.id)}
                             disabled={busy === `order:${o.id}`}
-                            className="text-[9px] font-black text-primary flex items-center gap-1 disabled:opacity-50 ml-auto"
+                            className="ds-motion ms-auto inline-flex min-h-8 items-center gap-1 rounded-[var(--radius-ds-sm)] px-2 transition-colors duration-150 hover:bg-con-surface-2 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2"
                           >
-                            {busy === `order:${o.id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />} Retry
+                            {busy === `order:${o.id}`
+                              ? <Loader2 className="size-3 animate-spin text-ember" aria-hidden="true" />
+                              : <RefreshCw className="size-3 text-ember" aria-hidden="true" />}
+                            <Text variant="caption" tone="ember" as="span">Retry</Text>
                           </button>
                         ) : eligMsg ? (
                           // No Retry action for an expired / ambiguous order — show a
                           // clear internal reason instead of a button that would fail.
-                          <span className="text-[8.5px] font-bold text-slate-400 leading-tight block max-w-[150px] ml-auto">{eligMsg}</span>
+                          <Text variant="caption" tone="tertiary" as="span" className="ms-auto block max-w-[150px]">
+                            {eligMsg}
+                          </Text>
                         ) : null}
                       </td>
                     </tr>
@@ -156,10 +185,10 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
         )}
       </div>
 
-      <p className="text-[8.5px] text-slate-400 font-bold leading-snug">
+      <Text variant="caption" tone="tertiary" as="p">
         Delivery orders are intentionally not synced (Lazywait delivery Create Order schema unconfirmed).
         Blocked = missing mapping or config; dead-letter = exhausted retries. Configure credentials in the Lazywait card above.
-      </p>
-    </div>
+      </Text>
+    </Card>
   );
 };

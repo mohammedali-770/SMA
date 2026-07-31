@@ -42,19 +42,23 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
   render(): React.ReactNode {
     if (!this.state.hasError) return this.props.children;
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-2 p-8 text-center font-sans bg-slate-50">
-        <h1 className="text-base font-black text-slate-800">Something unexpected went wrong</h1>
-        <p className="text-sm font-bold text-slate-700" dir="rtl" lang="ar">حدث خطأ غير متوقع</p>
-        <p className="text-xs text-slate-500">
+      // Design-system TOKENS, but not design-system COMPONENTS. This renders
+      // after something has already thrown, so it must not depend on a hook,
+      // a context or an import that could throw again on the way to showing
+      // the message.
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 bg-con-bg p-8 text-center font-sans">
+        <h1 className="text-base font-bold text-con-text">Something unexpected went wrong</h1>
+        <p className="text-sm font-semibold text-con-text-2" dir="rtl" lang="ar">حدث خطأ غير متوقع</p>
+        <p className="text-xs text-con-text-2">
           Our team has been notified automatically — no data was lost.
         </p>
-        <p className="text-xs text-slate-500" dir="rtl" lang="ar">
+        <p className="text-xs text-con-text-2" dir="rtl" lang="ar">
           تم إشعار فريقنا تلقائيًا — لم تُفقد أي بيانات.
         </p>
         <button
           type="button"
           onClick={this.retry}
-          className="mt-4 bg-slate-800 text-white text-xs font-black py-2.5 px-6 rounded-xl hover:bg-slate-700 transition-colors"
+          className="ds-motion mt-4 rounded-[var(--radius-ds-md)] bg-ember px-6 py-2.5 text-xs font-bold text-on-ember transition-opacity duration-150 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2"
         >
           Try again · إعادة المحاولة
         </button>

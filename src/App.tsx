@@ -20,16 +20,16 @@ const DatabasePlayground = lazy(() =>
 
 /** Placeholder shown while a lazily-loaded panel's chunk is fetched. */
 const PanelFallback: React.FC = () => (
-  <div className="flex-1 glass-panel rounded-2xl min-h-[400px] flex items-center justify-center">
-    <span className="text-slate-400 text-sm font-bold animate-pulse">Loading…</span>
+  <div className="flex-1 border border-con-line bg-con-surface rounded-2xl min-h-[400px] flex items-center justify-center">
+    <span className="text-con-text-3 text-sm font-bold animate-pulse">Loading…</span>
   </div>
 );
 
 /** Full-screen centered spinner used while auth/session or data is loading. */
 const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
   <div className="min-h-screen flex flex-col items-center justify-center gap-3 font-sans">
-    <Loader2 className="w-8 h-8 text-primary animate-spin" />
-    <span className="text-sm font-bold text-slate-500">{label}</span>
+    <Loader2 className="w-8 h-8 text-ember animate-spin" />
+    <span className="text-sm font-bold text-con-text-2">{label}</span>
   </div>
 );
 
@@ -38,24 +38,24 @@ const AppHeader: React.FC = () => {
   const { currentUser, signOut } = useApp();
   const roleLabel = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
   return (
-    <header className="sticky top-0 backdrop-blur-md bg-white/30 border-b border-slate-200/60 text-slate-800 py-3 px-6 z-40">
+    <header className="sticky top-0 backdrop-blur-md bg-con-surface/30 border-b border-con-line text-con-text py-3 px-6 z-40">
       <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
         <div className="flex items-center gap-3">
-          <BrandMark className="w-9 h-9 rounded-xl object-contain bg-white shadow-md border border-white/20" />
+          <BrandMark className="w-9 h-9 rounded-xl object-contain bg-con-surface border border-con-line" />
           <div>
-            <h1 className="text-base font-black tracking-tight leading-tight text-primary">SPICY MEAL</h1>
+            <h1 className="text-base font-black tracking-tight leading-tight text-ember">SPICY MEAL</h1>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
-            <p className="text-xs font-black text-slate-800 leading-tight">{currentUser.fullName || currentUser.email}</p>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+            <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
+            <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">
               {roleLabel}
             </span>
           </div>
           <button
             onClick={() => { void signOut(); }}
-            className="flex items-center gap-1.5 text-xs font-bold bg-white/50 hover:bg-white text-slate-600 hover:text-secondary border border-slate-200/60 py-1.5 px-3 rounded-xl transition-colors"
+            className="flex items-center gap-1.5 text-xs font-bold bg-con-surface/50 hover:bg-con-surface text-con-text-2 hover:text-ember border border-con-line py-1.5 px-3 rounded-xl transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Sign out</span>
@@ -70,13 +70,13 @@ const AppHeader: React.FC = () => {
 const DataErrorPanel: React.FC = () => {
   const { dataError, reload } = useApp();
   return (
-    <div className="max-w-md mx-auto mt-16 glass-panel rounded-2xl p-6 text-center space-y-3">
-      <AlertTriangle className="w-8 h-8 text-secondary mx-auto" />
-      <h2 className="text-sm font-black text-slate-800">Couldn't load your data</h2>
-      <p className="text-xs text-slate-500 font-medium break-words">{dataError}</p>
+    <div className="max-w-md mx-auto mt-16 border border-con-line bg-con-surface rounded-2xl p-6 text-center space-y-3">
+      <AlertTriangle className="w-8 h-8 text-ember mx-auto" />
+      <h2 className="text-sm font-black text-con-text">Couldn't load your data</h2>
+      <p className="text-xs text-con-text-2 font-medium break-words">{dataError}</p>
       <button
         onClick={() => { void reload(); }}
-        className="inline-flex items-center gap-1.5 bg-primary text-white text-xs font-black py-2 px-4 rounded-xl mx-auto"
+        className="inline-flex items-center gap-1.5 bg-ember text-white text-xs font-black py-2 px-4 rounded-xl mx-auto"
       >
         <RefreshCw className="w-3.5 h-3.5" /> Retry
       </button>
@@ -95,16 +95,16 @@ const WriteErrorBanner: React.FC = () => {
   if (!writeError) return null;
   return (
     <div className="px-4 md:px-6 pt-3">
-      <div className="max-w-7xl mx-auto flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 rounded-xl px-3 py-2.5 shadow-sm">
-        <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+      <div className="max-w-7xl mx-auto flex items-start gap-2 bg-danger-tint border border-danger-line text-danger-ds rounded-xl px-3 py-2.5 shadow-sm">
+        <AlertTriangle className="w-4 h-4 text-danger-ds flex-shrink-0 mt-0.5" />
         <div className="flex-1 text-xs font-bold break-words">
-          <span className="block text-[10px] uppercase tracking-wide text-red-500 font-black">Save failed</span>
+          <span className="block text-[10px] uppercase tracking-wide text-danger-ds font-black">Save failed</span>
           {writeError}
         </div>
         <button
           onClick={dismissWriteError}
           aria-label="Dismiss"
-          className="flex-shrink-0 text-red-400 hover:text-red-700 transition-colors"
+          className="flex-shrink-0 text-danger-ds hover:text-danger-ds transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -123,8 +123,8 @@ const CustomerApp: React.FC = () => {
   React.useEffect(() => { window.location.replace('/app'); }, []);
   return (
     <main className="flex-grow p-6 max-w-md mx-auto w-full text-center space-y-3">
-      <p className="text-sm font-black text-slate-700">Opening the Spicy Meal app…</p>
-      <a href="/app" className="text-primary text-sm font-black underline">/app</a>
+      <p className="text-sm font-black text-con-text-2">Opening the Spicy Meal app…</p>
+      <a href="/app" className="text-ember text-sm font-black underline">/app</a>
     </main>
   );
 };
@@ -144,8 +144,8 @@ const StaffApp: React.FC = () => {
       </Suspense>
       {showDbConsole && (
         <div className="flex flex-col">
-          <span className="text-xs bg-white/50 backdrop-blur-md text-slate-600 font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 flex items-center gap-1 shadow-2xs">
-            <Server className="w-3.5 h-3.5 text-secondary" />
+          <span className="text-xs bg-con-surface/50 backdrop-blur-md text-con-text-2 font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 flex items-center gap-1 shadow-2xs">
+            <Server className="w-3.5 h-3.5 text-ember" />
             <span>Supabase Data Console</span>
           </span>
           <Suspense fallback={<PanelFallback />}>
@@ -176,7 +176,7 @@ function AppContent() {
       ) : (
         <StaffApp />
       )}
-      <footer className="backdrop-blur-md bg-white/10 text-slate-500 text-center py-5 border-t border-slate-200/60 mt-10 text-xs">
+      <footer className="backdrop-blur-md bg-con-surface/10 text-con-text-2 text-center py-5 border-t border-con-line mt-10 text-xs">
         <div className="max-w-7xl mx-auto px-6">
           <span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span>
         </div>

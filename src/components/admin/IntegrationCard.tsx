@@ -1,7 +1,22 @@
 import React, { useState } from 'react';
-import { Check, Loader2, KeyRound, ShieldCheck, AlertCircle } from 'lucide-react';
+import { AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
+
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Field } from '../../design-system/ui/Field';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
+import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import { DbIntegrationSetting, UpsertIntegrationInput } from '../../lib/api';
 import { initialProviderName } from '../../lib/integrationProvider';
+
+const SELECT = [
+  'ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3',
+  'text-[15px] text-con-text transition-colors duration-150',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50',
+].join(' ');
+
+const LABEL = 'text-start text-[13px] font-semibold text-con-text-2';
 
 type FieldType = 'text' | 'bool';
 interface PublicField { key: string; label: string; type: FieldType; placeholder?: string; }
@@ -128,6 +143,7 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
   const [hasSecret, setHasSecret] = useState<boolean>(row?.has_secret ?? false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const family = useDsFontClass();
 
   const handleSave = async () => {
     // Explicit confirmation before switching Tap to LIVE (real payments).
@@ -162,74 +178,76 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
   };
 
   return (
-    <div className="glass-card p-4 rounded-2xl bg-white/40 space-y-3.5">
-      <div className="flex justify-between items-start border-b border-slate-100 pb-2.5">
-        <div>
-          <h4 className="text-xs font-black text-slate-800 uppercase">{spec.title}</h4>
-          <p className="text-[9.5px] text-slate-400 font-bold mt-0.5">{spec.subtitle}</p>
+    <Card className="space-y-4">
+      <div className="flex items-start justify-between gap-3 border-b border-con-line pb-3">
+        <div className="min-w-0">
+          <Text variant="heading" as="h4">{spec.title}</Text>
+          <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">{spec.subtitle}</Text>
         </div>
-        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${enabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-          {enabled ? 'ENABLED' : 'DISABLED'}
-        </span>
+        <StatusPill label={enabled ? 'ENABLED' : 'DISABLED'} tone={enabled ? 'success' : 'neutral'} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Provider select */}
-        <div>
-          <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">Provider</label>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <label className="flex flex-col gap-2">
+          <span className={LABEL}>Provider</span>
           <select
             value={providerName}
             disabled={disabled}
             aria-label={`${spec.title} provider`}
             onChange={(e) => setProviderName(e.target.value)}
-            className="glass-input w-full p-2 font-bold text-slate-800 text-xs disabled:opacity-50"
+            className={`${SELECT} ${family}`}
           >
             {(spec.providerOptions ?? [providerName]).map(o => <option key={o} value={o}>{o}</option>)}
           </select>
-        </div>
+        </label>
 
-        {/* Public (non-secret) fields */}
         {spec.publicFields.map(f => (
-          <div key={f.key}>
-            <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{f.label}</label>
-            {f.type === 'bool' ? (
+          f.type === 'bool' ? (
+            <label key={f.key} className="flex flex-col gap-2">
+              <span className={LABEL}>{f.label}</span>
               <select
                 value={pub[f.key] ? 'true' : 'false'}
                 disabled={disabled}
                 aria-label={f.label}
                 onChange={(e) => setPub(p => ({ ...p, [f.key]: e.target.value === 'true' }))}
-                className="glass-input w-full p-2 font-bold text-slate-800 text-xs disabled:opacity-50"
+                className={`${SELECT} ${family}`}
               >
                 <option value="true">Yes</option>
                 <option value="false">No</option>
               </select>
-            ) : (
-              <input
-                type="text"
-                value={(pub[f.key] as string) ?? ''}
-                placeholder={f.placeholder}
-                disabled={disabled}
-                aria-label={f.label}
-                onChange={(e) => setPub(p => ({ ...p, [f.key]: e.target.value }))}
-                className="glass-input w-full p-2 font-mono text-slate-800 text-xs disabled:opacity-50"
-              />
-            )}
-          </div>
+            </label>
+          ) : (
+            // Mono: every one of these is an identifier, a host, a port or a
+            // template name — values an admin copies from a provider console
+            // and compares character by character.
+            <Field
+              key={f.key}
+              label={f.label}
+              numeric
+              value={(pub[f.key] as string) ?? ''}
+              placeholder={f.placeholder}
+              disabled={disabled}
+              onValueChange={(v) => setPub(p => ({ ...p, [f.key]: v }))}
+            />
+          )
         ))}
       </div>
 
-      {/* Secret (write-only) fields */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50/60 rounded-xl border border-slate-100">
+      {/* Write-only secrets. These are never read back from the server, so the
+          placeholder is the only signal of whether one is already stored. */}
+      <div className="grid grid-cols-1 gap-3 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3 md:grid-cols-2">
         {spec.secretFields.map(f => (
-          <div key={f.key}>
-            <label className="text-[9px] font-black text-slate-400 uppercase mb-1 flex items-center gap-1">
-              <KeyRound className="w-3 h-3 text-secondary" /> {f.label}
+          <div key={f.key} className="space-y-2">
+            <span className="flex items-center gap-1">
+              <KeyRound className="size-3 shrink-0 text-con-text-2" aria-hidden="true" />
+              <Text variant="label" tone="secondary" as="span">{f.label}</Text>
               {hasSecret && (
-                <span className="ml-1 text-[8px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
-                  <ShieldCheck className="w-2.5 h-2.5" /> configured
+                <span className="inline-flex items-center gap-0.5 rounded-full bg-mint-tint px-1.5 py-0.5">
+                  <ShieldCheck className="size-2.5 text-mint" aria-hidden="true" />
+                  <Text variant="caption" tone="success" as="span">configured</Text>
                 </span>
               )}
-            </label>
+            </span>
             <input
               type="password"
               autoComplete="new-password"
@@ -238,44 +256,41 @@ export const IntegrationCard: React.FC<Props> = ({ providerType, row, disabled, 
               aria-label={f.label}
               placeholder={hasSecret ? '•••••••• (leave blank to keep)' : 'not set — enter to configure'}
               onChange={(e) => setSecrets(s => ({ ...s, [f.key]: e.target.value }))}
-              className="glass-input w-full p-2 font-mono text-xs disabled:opacity-50"
+              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 font-ds-num text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
             />
           </div>
         ))}
-        <p className="md:col-span-2 text-[8.5px] text-slate-400 font-bold flex items-start gap-1 leading-snug">
-          <AlertCircle className="w-3 h-3 text-slate-400 flex-shrink-0 mt-0.5" />
-          Secrets are stored server-side and never returned to the browser. Leave blank to keep the saved value.
-        </p>
+        <div className="flex items-start gap-1 md:col-span-2">
+          <AlertCircle className="mt-0.5 size-3 shrink-0 text-con-text-3" aria-hidden="true" />
+          <Text variant="caption" tone="tertiary" as="p">
+            Secrets are stored server-side and never returned to the browser. Leave blank to keep the saved value.
+          </Text>
+        </div>
       </div>
 
-      {/* Enable + save */}
-      <div className="flex items-center justify-between gap-3 pt-1">
-        <label className="flex items-center gap-2 text-[10px] font-extrabold text-slate-700">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={enabled}
             disabled={disabled}
             onChange={(e) => setEnabled(e.target.checked)}
-            className="w-4 h-4 cursor-pointer accent-primary disabled:opacity-50"
+            className="size-4 cursor-pointer accent-ember disabled:opacity-50"
           />
-          Enable this integration
+          <Text variant="label" as="span">Enable this integration</Text>
         </label>
         <div className="flex items-center gap-2">
           {msg && (
-            <span className={`text-[10px] font-bold flex items-center gap-1 ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>
-              {msg.ok && <Check className="w-3.5 h-3.5" />}{msg.text}
-            </span>
+            <Text variant="label" tone={msg.ok ? 'success' : 'danger'} as="span">{msg.text}</Text>
           )}
-          <button
-            onClick={handleSave}
+          <Button
+            label="Save"
+            onClick={() => { void handleSave(); }}
             disabled={disabled || saving}
-            className="glass-btn-primary text-[10px] py-1.5 px-4 flex items-center gap-1.5 font-black text-white disabled:opacity-50"
-          >
-            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Save
-          </button>
+            loading={saving}
+          />
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
