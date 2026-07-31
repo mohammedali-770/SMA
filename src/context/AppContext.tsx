@@ -153,7 +153,13 @@ interface AppContextType {
   updateCustomerPoints: (userId: string, points: number) => void;
 }
 
-const AppContext = createContext<AppContextType | undefined>(undefined);
+/**
+ * Exported ONLY so the design system can read the active language DEFENSIVELY
+ * (see design-system/ui/useDsLang.ts). `useApp` throws without a provider,
+ * which is correct for app code but wrong for a primitive that must also render
+ * in a unit test or a storybook. Application code uses `useApp`.
+ */
+export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 /**
  * Allowed forward-only order-status transitions. A status can advance to any of

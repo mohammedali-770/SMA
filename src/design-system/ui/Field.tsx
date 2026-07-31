@@ -12,6 +12,7 @@
 import React, { useId, useState } from 'react';
 
 import { resolveFieldState } from '../generated/fieldState';
+import { useDsFontClass } from './useDsLang';
 
 interface Props extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'id' | 'className'> {
   label: string;
@@ -45,6 +46,10 @@ export function Field({
   const fieldId = id ?? generatedId;
   const [focused, setFocused] = useState(false);
   const state = resolveFieldState({ id: fieldId, hint, error, focused, disabled, required });
+  // `.num` (not font-ds-num) preserves the existing numeric class, which the
+  // stylesheet already binds to --font-ds-num. Prose follows the language.
+  const langFamily = useDsFontClass();
+  const valueFamily = numeric ? 'num' : langFamily;
 
   const border =
     state.tone === 'error'
@@ -96,7 +101,9 @@ export function Field({
           'ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border-[1.5px] px-4',
           'bg-white text-con-text transition-colors duration-150',
           'disabled:bg-disabled-bg disabled:text-disabled-fg disabled:cursor-not-allowed',
-          numeric ? 'num text-start' : 'font-ds-en text-start',
+          // Follows the ACTIVE language; `numeric` still wins, because a
+          // structured number is mono in both.
+          `${valueFamily} text-start`,
           border,
         ].join(' ')}
       />
