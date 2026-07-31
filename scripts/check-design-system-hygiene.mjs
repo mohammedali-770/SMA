@@ -184,8 +184,20 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/orders/OrdersTable.tsx',
   'src/components/admin/view/orders/TapPaymentDetails.tsx',
   'src/components/admin/view/orders/ordersView.ts',
+  // Catalog + Branch Operations
+  'src/components/admin/BannerManagementPanel.tsx',
+  'src/components/admin/BranchEditModal.tsx',
+  'src/components/admin/BranchPoliciesPanel.tsx',
+  'src/components/admin/DeliveryZoneModal.tsx',
+  'src/components/admin/LazywaitCatalogMapping.tsx',
+  'src/components/admin/MenuManagementPanel.tsx',
+  'src/components/admin/view/banners/BannerRow.tsx',
+  'src/components/admin/view/branches/BranchCard.tsx',
   // Shared by Operations Health and Operations Alerts
   'src/components/admin/view/adminTime.ts',
+  // Shared admin form shell
+  'src/components/admin/view/shared/AdminModal.tsx',
+  'src/components/admin/view/shared/ToggleChip.tsx',
 ];
 
 const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;

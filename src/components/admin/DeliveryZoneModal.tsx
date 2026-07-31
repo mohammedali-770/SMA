@@ -3,12 +3,17 @@ import mapboxgl from 'mapbox-gl';
 import MapboxDraw from '@mapbox/mapbox-gl-draw';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import '@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css';
-import { AlertTriangle, LocateFixed, MapPin } from 'lucide-react';
+import { AlertTriangle, LocateFixed } from 'lucide-react';
+
+import { Button } from '../../design-system/ui/Button';
+import { Notice } from '../../design-system/ui/Notice';
+import { Text } from '../../design-system/ui/Text';
 import { Branch, DeliveryZone } from '../../types';
 import { ensureRtlTextPlugin, mapConfig } from '../../lib/map';
 import { circleRing, geometryToPolygons, loadGoogleMaps, locateMe, polygonsToGeometry, type LngLat } from '../../lib/googleMaps';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import { MapSearchBox } from '../MapSearchBox';
+import { AdminModal } from './view/shared/AdminModal';
 
 interface DeliveryZoneModalProps {
   branch: Branch;
@@ -20,7 +25,10 @@ interface DeliveryZoneModalProps {
   onClear: (branchId: string) => Promise<void>;
 }
 
-const ZONE_STYLE = { fillColor: '#7c3aed', fillOpacity: 0.12, strokeColor: '#7c3aed', strokeWeight: 2 };
+// Ember. The literal mirrors `--color-ember` because a map SDK draws to its own
+// canvas and cannot read a CSS custom property; if that token moves, move this.
+const ZONE_COLOR = '#E02D3D';
+const ZONE_STYLE = { fillColor: ZONE_COLOR, fillOpacity: 0.12, strokeColor: ZONE_COLOR, strokeWeight: 2 };
 
 // "Draw" seeds a ready-made circular zone (editable + draggable) instead of
 // point-by-point clicking — Google removed DrawingManager in v3.65, and the
@@ -139,7 +147,7 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
 
     map.on('load', () => {
       if (hasBranchCoords) {
-        new mapboxgl.Marker({ color: '#7c3aed' })
+        new mapboxgl.Marker({ color: ZONE_COLOR })
           .setLngLat([branch.longitude, branch.latitude])
           .setPopup(new mapboxgl.Popup().setText(isRTL ? branch.nameAr : branch.nameEn))
           .addTo(map);
@@ -278,82 +286,97 @@ export const DeliveryZoneModal: React.FC<DeliveryZoneModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-50 flex items-center justify-center p-4" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      <div className="glass-panel w-full max-w-2xl overflow-hidden rounded-[1.5rem] shadow-2xl animate-scale-up">
-        <div className="p-4 bg-white/20 border-b border-white/10 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" />
-            <div>
-              <h4 className="text-[10px] font-black text-gray-500 uppercase">{isRTL ? 'منطقة التوصيل' : 'Delivery Area'}</h4>
-              <p className="text-sm font-extrabold text-primary">{isRTL ? branch.nameAr : branch.nameEn}</p>
-            </div>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 rounded-full bg-white border border-gray-200 flex items-center justify-center font-bold text-gray-400 hover:bg-gray-100" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
+    <AdminModal
+      title={isRTL ? 'منطقة التوصيل' : 'Delivery Area'}
+      subtitle={isRTL ? branch.nameAr : branch.nameEn}
+      isRTL={isRTL}
+      onClose={onClose}
+      size="xl"
+      footer={
+        disabled ? (
+          <Text variant="caption" tone="tertiary" as="p">{isRTL ? 'العرض فقط' : 'View only'}</Text>
+        ) : mapConfig.isConfigured ? (
+          <>
+            <Button
+              label={isRTL ? 'ارسم منطقة التوصيل' : 'Draw delivery area'}
+              onClick={startDraw}
+              disabled={busy || !ready}
+              variant="secondary"
+            />
+            <Button
+              label={isRTL ? 'تعديل منطقة التوصيل' : 'Edit delivery area'}
+              onClick={startEdit}
+              disabled={busy || !ready}
+              variant="ghost"
+            />
+            <Button
+              label={isRTL ? 'مسح منطقة التوصيل' : 'Clear delivery area'}
+              onClick={() => { void handleClear(); }}
+              disabled={busy || !ready}
+              variant="danger"
+            />
+            <Button
+              label={busy ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'حفظ منطقة التوصيل' : 'Save delivery area')}
+              onClick={() => { void handleSave(); }}
+              disabled={busy || !ready}
+              loading={busy}
+            />
+          </>
+        ) : null
+      }
+    >
+      {!mapConfig.isConfigured ? (
+        <div className="space-y-2 py-8 text-center">
+          <AlertTriangle className="mx-auto size-8 text-amber-ink" aria-hidden="true" />
+          <Text variant="heading" as="p">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</Text>
+          <Text variant="body" tone="secondary" as="p" className="mx-auto max-w-sm">
+            {isGoogle
+              ? (isRTL
+                ? 'أضف مفتاح Google Maps ‏(VITE_GOOGLE_MAPS_API_KEY) لتفعيل رسم مناطق التوصيل.'
+                : 'Set VITE_GOOGLE_MAPS_API_KEY to enable delivery-area drawing. The rest of the dashboard is unaffected.')
+              : (isRTL
+                ? 'أضف رمز Mapbox العام (VITE_MAPBOX_PUBLIC_TOKEN) لتفعيل رسم مناطق التوصيل.'
+                : 'Set VITE_MAPBOX_PUBLIC_TOKEN to enable delivery-area drawing. The rest of the dashboard is unaffected.')}
+          </Text>
         </div>
+      ) : (
+        <>
+          {!hasBranchCoords && (
+            <Notice
+              title={isRTL ? 'حدّد موقع الفرع قبل رسم منطقة التوصيل.' : 'Set branch location before drawing delivery area.'}
+              tone="warning"
+            />
+          )}
 
-        {!mapConfig.isConfigured ? (
-          <div className="p-8 text-center space-y-2">
-            <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
-            <p className="text-sm font-black text-slate-700">{isRTL ? 'إعداد الخريطة مطلوب' : 'Map setup required'}</p>
-            <p className="text-[11px] text-slate-500 font-bold max-w-sm mx-auto">
-              {isGoogle
-                ? (isRTL
-                  ? 'أضف مفتاح Google Maps ‏(VITE_GOOGLE_MAPS_API_KEY) لتفعيل رسم مناطق التوصيل.'
-                  : 'Set VITE_GOOGLE_MAPS_API_KEY to enable delivery-area drawing. The rest of the dashboard is unaffected.')
-                : (isRTL
-                  ? 'أضف رمز Mapbox العام (VITE_MAPBOX_PUBLIC_TOKEN) لتفعيل رسم مناطق التوصيل.'
-                  : 'Set VITE_MAPBOX_PUBLIC_TOKEN to enable delivery-area drawing. The rest of the dashboard is unaffected.')}
-            </p>
+          <MapSearchBox isRTL={isRTL} onSelect={flyTo} />
+
+          <div className="relative">
+            <div ref={mapContainer} className="h-[360px] w-full overflow-hidden rounded-[var(--radius-ds-md)] border border-con-line" />
+            <button
+              type="button"
+              onClick={() => void handleLocate()}
+              disabled={locating || !ready}
+              title={isRTL ? 'موقعي' : 'My location'}
+              aria-label={isRTL ? 'موقعي' : 'My location'}
+              className="ds-motion absolute bottom-3 end-3 z-10 inline-flex size-9 items-center justify-center rounded-full border border-con-line bg-con-surface transition-colors duration-150 hover:bg-con-surface-2 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <LocateFixed className={`size-4 text-ember ${locating ? 'animate-pulse' : ''}`} aria-hidden="true" />
+            </button>
           </div>
-        ) : (
-          <div className="p-4 space-y-3">
-            {!hasBranchCoords && (
-              <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-[11px] font-bold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                {isRTL ? 'حدّد موقع الفرع قبل رسم منطقة التوصيل.' : 'Set branch location before drawing delivery area.'}
-              </div>
-            )}
 
-            <MapSearchBox isRTL={isRTL} onSelect={flyTo} />
-            <div className="relative">
-              <div ref={mapContainer} className="w-full h-[360px] rounded-xl overflow-hidden border border-slate-200" />
-              <button
-                type="button"
-                onClick={() => void handleLocate()}
-                disabled={locating || !ready}
-                title={isRTL ? 'موقعي' : 'My location'}
-                aria-label={isRTL ? 'موقعي' : 'My location'}
-                className="absolute bottom-3 end-3 z-10 w-9 h-9 rounded-full bg-white shadow-md border border-slate-200 flex items-center justify-center text-primary hover:bg-slate-50 disabled:opacity-40"
-              >
-                <LocateFixed className={locating ? 'w-4 h-4 animate-pulse' : 'w-4 h-4'} />
-              </button>
-            </div>
-
-            {gAdjusting && (
-              <div className="p-2 bg-primary/5 border border-primary/15 rounded-xl text-primary text-[10px] font-bold text-center">
+          {gAdjusting && (
+            <div className="rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-2 text-center">
+              <Text variant="caption" tone="secondary" as="p">
                 {isRTL
                   ? 'اسحب النقاط لتشكيل منطقة التوصيل، واسحب بين النقاط لإضافة نقطة، واسحب الشكل لنقله — ثم احفظ.'
                   : 'Drag the points to shape the area, drag between points to add one, drag the shape to move it — then Save.'}
-              </div>
-            )}
-            {error && (
-              <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold">{error}</div>
-            )}
+              </Text>
+            </div>
+          )}
 
-            {!disabled && (
-              <div className="flex flex-wrap gap-2 justify-end">
-                <button onClick={startDraw} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-primary/10 text-primary border border-primary/20 disabled:opacity-40">{isRTL ? 'ارسم منطقة التوصيل' : 'Draw delivery area'}</button>
-                <button onClick={startEdit} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-white/60 text-slate-700 border border-slate-200 disabled:opacity-40">{isRTL ? 'تعديل منطقة التوصيل' : 'Edit delivery area'}</button>
-                <button onClick={handleClear} disabled={busy || !ready} className="text-[11px] font-black py-2 px-3 rounded-xl bg-red-50 text-red-600 border border-red-200 disabled:opacity-40">{isRTL ? 'مسح منطقة التوصيل' : 'Clear delivery area'}</button>
-                <button onClick={handleSave} disabled={busy || !ready} className="text-[11px] font-black py-2 px-4 rounded-xl bg-primary text-white disabled:opacity-40">{busy ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'حفظ منطقة التوصيل' : 'Save delivery area')}</button>
-              </div>
-            )}
-            {disabled && (
-              <p className="text-[10px] text-slate-400 font-bold text-center">{isRTL ? 'العرض فقط' : 'View only'}</p>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+          {error && <Notice title={error} tone="blocking" />}
+        </>
+      )}
+    </AdminModal>
   );
 };

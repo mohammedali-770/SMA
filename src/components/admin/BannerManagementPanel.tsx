@@ -1,8 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Check, ChevronDown, ChevronUp, ImageIcon, Loader2, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { Check, ImageIcon, Loader2, Plus, ShieldCheck } from 'lucide-react';
+
 import { useApp } from '../../context/AppContext';
 import { banners as bannerApi, DbHomepageBanner } from '../../lib/api';
 import { isAllowedBannerSize, isAllowedBannerType, selectActiveBanners } from '../../lib/banners';
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Field } from '../../design-system/ui/Field';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
+import { useDsFontClass } from '../../design-system/ui/useDsLang';
+import { BannerRow } from './view/banners/BannerRow';
 
 /**
  * Admin-only Banner Management. Admins add/enable/order/delete homepage banners
@@ -31,10 +40,18 @@ const EMPTY_DRAFT: Draft = {
 /** datetime-local value ("YYYY-MM-DDTHH:mm") -> ISO string, or null when empty. */
 const toIso = (v: string): string | null => (v ? new Date(v).toISOString() : null);
 
+/** Native select, styled to match the design-system Field it sits beside. */
+const SELECT = [
+  'ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3',
+  'text-[15px] text-con-text transition-colors duration-150',
+  'focus-visible:outline-2 focus-visible:outline-offset-2',
+].join(' ');
+
 export const BannerManagementPanel: React.FC = () => {
   const { currentUser, adminLang } = useApp();
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
+  const family = useDsFontClass();
 
   const [rows, setRows] = useState<DbHomepageBanner[]>([]);
   const [loading, setLoading] = useState(false);
@@ -132,177 +149,215 @@ export const BannerManagementPanel: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 animate-fade-in text-xs animate-scale-up" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-      {/* Header */}
-      <div className="flex justify-between items-center pb-2.5 border-b border-slate-200/50">
-        <div>
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{isRTL ? 'بانرات الصفحة الرئيسية' : 'Homepage Banners'}</h3>
-          <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-            {isRTL ? 'تظهر في أعلى الصفحة الرئيسية للتطبيق (فوق شريط البحث). البانرات المفعّلة فقط تظهر للعملاء.' : 'Shown at the top of the app homepage (above search). Only active banners appear to customers.'}
-          </p>
+    <div className="space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="flex items-start justify-between gap-3 border-b border-con-line pb-3">
+        <div className="min-w-0">
+          <Text variant="title" as="h3">{isRTL ? 'بانرات الصفحة الرئيسية' : 'Homepage Banners'}</Text>
+          <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">
+            {isRTL
+              ? 'تظهر في أعلى الصفحة الرئيسية للتطبيق (فوق شريط البحث). البانرات المفعّلة فقط تظهر للعملاء.'
+              : 'Shown at the top of the app homepage (above search). Only active banners appear to customers.'}
+          </Text>
         </div>
-        <span className="text-[8px] bg-indigo-100 text-primary px-2 py-0.5 rounded font-black flex items-center gap-1">
-          <ShieldCheck className="w-3 h-3" /> {isRTL ? 'للمشرف فقط' : 'Admin only'}
+        <span className="inline-flex shrink-0 items-center gap-1">
+          <ShieldCheck className="size-3 text-sky" aria-hidden="true" />
+          <StatusPill label={isRTL ? 'للمشرف فقط' : 'Admin only'} tone="info" />
         </span>
       </div>
 
+      {/* Read-only rather than hidden: an accountant reconciling a promotion
+          still needs to see which banners were running. */}
       {isAccountant && (
-        <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl text-amber-900 text-[11px] font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-          {isRTL ? 'البانرات للعرض فقط — الإضافة والتعديل متاحان للمشرف.' : 'Banners are view-only for accountants — creating/editing is admin-only.'}
-        </div>
+        <Notice
+          title={isRTL
+            ? 'البانرات للعرض فقط — الإضافة والتعديل متاحان للمشرف.'
+            : 'Banners are view-only for accountants — creating/editing is admin-only.'}
+          tone="warning"
+        />
       )}
 
       {error && (
-        <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[11px] font-bold flex items-center justify-between gap-2">
-          <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />{error}</span>
-          <button onClick={() => void load()} className="bg-red-600 text-white text-[10px] font-black py-1 px-3 rounded-lg">{isRTL ? 'إعادة المحاولة' : 'Retry'}</button>
-        </div>
+        <Notice title={error} tone="blocking">
+          <Button label={isRTL ? 'إعادة المحاولة' : 'Retry'} onClick={() => { void load(); }} variant="secondary" />
+        </Notice>
       )}
 
-      {/* ADD NEW BANNER */}
       {!isAccountant && (
-        <div className="glass-card p-4 rounded-2xl bg-white/50 space-y-3">
-          <span className="font-black text-slate-800 text-xs uppercase block border-b border-slate-100 pb-2">{isRTL ? 'إضافة بانر جديد' : 'Add New Banner'}</span>
+        <Card className="space-y-3">
+          <Text variant="heading" as="h4" className="border-b border-con-line pb-2">
+            {isRTL ? 'إضافة بانر جديد' : 'Add New Banner'}
+          </Text>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Upload + preview */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="block text-[9px] font-black text-slate-400 uppercase">{isRTL ? 'صورة البانر' : 'Banner Image'}</label>
-              <div className="aspect-[16/6] w-full rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
+              <Text variant="caption" tone="tertiary" as="p">{isRTL ? 'صورة البانر' : 'Banner Image'}</Text>
+              <div className="flex aspect-[16/6] w-full items-center justify-center overflow-hidden rounded-[var(--radius-ds-md)] border-2 border-dashed border-con-line bg-con-surface-2">
                 {draft.image_url ? (
-                  <img src={draft.image_url} alt="banner preview" className="w-full h-full object-cover" />
+                  <img src={draft.image_url} alt="banner preview" className="size-full object-cover" />
                 ) : (
-                  <span className="text-slate-300 flex flex-col items-center gap-1"><ImageIcon className="w-6 h-6" /><span className="text-[9px] font-bold">{isRTL ? 'معاينة' : 'Preview'}</span></span>
+                  <span className="flex flex-col items-center gap-1 text-con-text-3">
+                    <ImageIcon className="size-6" aria-hidden="true" />
+                    <Text variant="caption" tone="tertiary" as="span">{isRTL ? 'معاينة' : 'Preview'}</Text>
+                  </span>
                 )}
               </div>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void onPickFile(e)} disabled={uploading} className="block w-full text-[10px] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-primary file:text-white file:font-black file:text-[10px] file:cursor-pointer" />
-              {uploading && <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}</span>}
-              {uploadError && <span className="text-[10px] text-red-600 font-bold flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {uploadError}</span>}
-              <p className="text-[9px] text-slate-400 font-semibold">{isRTL ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت' : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}</p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => void onPickFile(e)}
+                disabled={uploading}
+                aria-label={isRTL ? 'اختر صورة البانر' : 'Choose banner image'}
+                className={`block w-full text-[13px] text-con-text-2 file:me-2 file:cursor-pointer file:rounded-[var(--radius-ds-md)] file:border-0 file:bg-ember file:px-3 file:py-1.5 file:text-[13px] file:font-bold file:text-on-ember ${family}`}
+              />
+              {uploading && (
+                <Text variant="caption" tone="secondary" as="span" className="flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" aria-hidden="true" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}
+                </Text>
+              )}
+              {uploadError && <Notice title={uploadError} tone="blocking" />}
+              <Text variant="caption" tone="tertiary" as="p">
+                {isRTL
+                  ? 'المقاس المفضّل ١٢٠٠×٤٥٠ بكسل • JPG/WebP • أقل من ٥ ميجابايت'
+                  : 'Recommended 1200×450 px • JPG/WebP • under 5 MB'}
+              </Text>
             </div>
 
-            {/* Fields */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}</label>
-                  <input value={draft.title_en} onChange={(e) => setDraft(d => ({ ...d, title_en: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="Summer Combo" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'العنوان (AR)' : 'Title (AR)'}</label>
-                  <input value={draft.title_ar} onChange={(e) => setDraft(d => ({ ...d, title_ar: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" placeholder="عرض الصيف" />
-                </div>
+                <Field
+                  label={isRTL ? 'العنوان (EN) / اسم داخلي' : 'Title (EN) / internal'}
+                  value={draft.title_en}
+                  onValueChange={(v) => setDraft(d => ({ ...d, title_en: v }))}
+                  placeholder="Summer Combo"
+                />
+                <Field
+                  label={isRTL ? 'العنوان (AR)' : 'Title (AR)'}
+                  value={draft.title_ar}
+                  onValueChange={(v) => setDraft(d => ({ ...d, title_ar: v }))}
+                  placeholder="عرض الصيف"
+                  dir="rtl"
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الترتيب' : 'Sort order'}</label>
-                  <input type="number" value={draft.sort_order} onChange={(e) => setDraft(d => ({ ...d, sort_order: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الحالة' : 'Status'}</label>
-                  <select value={draft.is_active ? 'true' : 'false'} onChange={(e) => setDraft(d => ({ ...d, is_active: e.target.value === 'true' }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
+                <Field
+                  label={isRTL ? 'الترتيب' : 'Sort order'}
+                  type="number"
+                  numeric
+                  value={draft.sort_order}
+                  onValueChange={(v) => setDraft(d => ({ ...d, sort_order: v }))}
+                />
+                <label className="flex flex-col gap-2">
+                  <span className="text-start text-[13px] font-semibold text-con-text-2">{isRTL ? 'الحالة' : 'Status'}</span>
+                  <select
+                    value={draft.is_active ? 'true' : 'false'}
+                    onChange={(e) => setDraft(d => ({ ...d, is_active: e.target.value === 'true' }))}
+                    className={`${SELECT} ${family}`}
+                  >
                     <option value="true">{isRTL ? 'مفعّل' : 'Active'}</option>
                     <option value="false">{isRTL ? 'معطّل' : 'Inactive'}</option>
                   </select>
-                </div>
+                </label>
               </div>
+
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}</label>
-                  <input type="datetime-local" value={draft.starts_at} onChange={(e) => setDraft(d => ({ ...d, starts_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}</label>
-                  <input type="datetime-local" value={draft.ends_at} onChange={(e) => setDraft(d => ({ ...d, ends_at: e.target.value }))} className="glass-input w-full p-2 font-bold text-slate-700 text-[11px]" />
-                </div>
+                <Field
+                  label={isRTL ? 'يبدأ (اختياري)' : 'Starts (optional)'}
+                  type="datetime-local"
+                  numeric
+                  value={draft.starts_at}
+                  onValueChange={(v) => setDraft(d => ({ ...d, starts_at: v }))}
+                />
+                <Field
+                  label={isRTL ? 'ينتهي (اختياري)' : 'Ends (optional)'}
+                  type="datetime-local"
+                  numeric
+                  value={draft.ends_at}
+                  onValueChange={(v) => setDraft(d => ({ ...d, ends_at: v }))}
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</label>
-                  <select value={draft.action_type} onChange={(e) => setDraft(d => ({ ...d, action_type: e.target.value as Draft['action_type'] }))} className="glass-input w-full p-2 font-bold text-slate-700 text-xs">
+                <label className="flex flex-col gap-2">
+                  <span className="text-start text-[13px] font-semibold text-con-text-2">{isRTL ? 'الإجراء عند الضغط' : 'Tap action'}</span>
+                  <select
+                    value={draft.action_type}
+                    onChange={(e) => setDraft(d => ({ ...d, action_type: e.target.value as Draft['action_type'] }))}
+                    className={`${SELECT} ${family}`}
+                  >
                     <option value="none">{isRTL ? 'بدون' : 'None'}</option>
                     <option value="category">{isRTL ? 'فئة' : 'Category'}</option>
                     <option value="product">{isRTL ? 'منتج' : 'Product'}</option>
                   </select>
-                </div>
+                </label>
                 {draft.action_type !== 'none' && (
-                  <div>
-                    <label className="block text-[9px] font-black text-slate-400 uppercase mb-1">{draft.action_type === 'product' ? (isRTL ? 'معرّف المنتج' : 'Product ID') : (isRTL ? 'معرّف الفئة' : 'Category ID')}</label>
-                    <input value={draft.action_value} onChange={(e) => setDraft(d => ({ ...d, action_value: e.target.value }))} className="glass-input w-full p-2 font-mono font-bold text-slate-700 text-[11px]" placeholder="uuid" />
-                  </div>
+                  <Field
+                    label={draft.action_type === 'product'
+                      ? (isRTL ? 'معرّف المنتج' : 'Product ID')
+                      : (isRTL ? 'معرّف الفئة' : 'Category ID')}
+                    value={draft.action_value}
+                    onValueChange={(v) => setDraft(d => ({ ...d, action_value: v }))}
+                    numeric
+                    placeholder="uuid"
+                  />
                 )}
               </div>
             </div>
           </div>
 
           <div className="flex justify-end">
-            <button onClick={() => void addBanner()} disabled={creating || uploading || !draft.image_url} className="bg-primary hover:bg-primary/90 text-white text-[11px] font-black py-2 px-4 rounded-xl flex items-center gap-1.5 disabled:opacity-40">
-              <Plus className="w-3.5 h-3.5" /> {creating ? (isRTL ? 'جاري الإضافة…' : 'Adding…') : (isRTL ? 'إضافة البانر' : 'Add Banner')}
-            </button>
+            <Button
+              label={creating ? (isRTL ? 'جاري الإضافة…' : 'Adding…') : (isRTL ? 'إضافة البانر' : 'Add Banner')}
+              onClick={() => { void addBanner(); }}
+              disabled={creating || uploading || !draft.image_url}
+              loading={creating}
+              leading={<Plus className="size-3.5" aria-hidden="true" />}
+            />
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* EXISTING BANNERS */}
       <div className="space-y-2">
-        <span className="font-black text-slate-500 text-[10px] uppercase tracking-wider">{isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}</span>
+        <Text variant="caption" tone="secondary" as="p">
+          {isRTL ? `البانرات (${rows.length})` : `Banners (${rows.length})`}
+        </Text>
+
         {loading ? (
-          <div className="py-8 text-center text-slate-400 text-xs font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+          <Text variant="body" tone="tertiary" as="p" className="py-8 text-center">
+            {isRTL ? 'جاري التحميل…' : 'Loading…'}
+          </Text>
         ) : rows.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-[11px] font-bold">{isRTL ? 'لا توجد بانرات بعد.' : 'No banners yet.'}</div>
+          <Text variant="body" tone="tertiary" as="p" className="py-8 text-center">
+            {isRTL ? 'لا توجد بانرات بعد.' : 'No banners yet.'}
+          </Text>
         ) : (
           <div className="space-y-2">
-            {rows.map((b) => {
-              const live = liveIds.has(b.id);
-              const busy = busyId === b.id;
-              return (
-                <div key={b.id} className="glass-card bg-white/50 rounded-2xl p-2.5 flex items-center gap-3">
-                  <div className="w-28 h-[42px] rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 border border-slate-100">
-                    <img src={b.image_url} alt={b.title_en ?? 'banner'} className="w-full h-full object-cover" loading="lazy"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-black text-slate-800 text-[11px] truncate">{b.title_en || b.title_ar || (isRTL ? 'بدون عنوان' : 'Untitled')}</span>
-                      <span className={`text-[7.5px] font-black px-1.5 py-0.5 rounded-full ${live ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
-                        {live ? (isRTL ? 'ظاهر الآن' : 'LIVE') : (b.is_active ? (isRTL ? 'مجدول/منتهٍ' : 'SCHEDULED') : (isRTL ? 'معطّل' : 'OFF'))}
-                      </span>
-                    </div>
-                    <span className="text-[9px] text-slate-400 font-bold">
-                      {isRTL ? 'الترتيب' : 'Order'} {b.sort_order}
-                      {b.starts_at ? ` • ${isRTL ? 'من' : 'from'} ${new Date(b.starts_at).toLocaleDateString()}` : ''}
-                      {b.ends_at ? ` • ${isRTL ? 'إلى' : 'to'} ${new Date(b.ends_at).toLocaleDateString()}` : ''}
-                    </span>
-                  </div>
-                  {!isAccountant && (
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <div className="flex flex-col">
-                        <button title={isRTL ? 'أعلى' : 'Up'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order - 1 })} className="text-slate-400 hover:text-primary disabled:opacity-30"><ChevronUp className="w-3.5 h-3.5" /></button>
-                        <button title={isRTL ? 'أسفل' : 'Down'} disabled={busy} onClick={() => void patch(b.id, { sort_order: b.sort_order + 1 })} className="text-slate-400 hover:text-primary disabled:opacity-30"><ChevronDown className="w-3.5 h-3.5" /></button>
-                      </div>
-                      <button
-                        disabled={busy}
-                        onClick={() => void patch(b.id, { is_active: !b.is_active })}
-                        className={`text-[9px] font-black px-2.5 py-1.5 rounded-lg disabled:opacity-40 ${b.is_active ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}
-                      >
-                        {busy ? '…' : b.is_active ? (isRTL ? 'تعطيل' : 'Disable') : (isRTL ? 'تفعيل' : 'Enable')}
-                      </button>
-                      <button title={isRTL ? 'حذف' : 'Delete'} disabled={busy} onClick={() => void remove(b)} className="text-red-400 hover:text-red-600 disabled:opacity-30 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {rows.map((b) => (
+              <BannerRow
+                key={b.id}
+                banner={b}
+                live={liveIds.has(b.id)}
+                busy={busyId === b.id}
+                canEdit={!isAccountant}
+                isRTL={isRTL}
+                onMove={(delta) => { void patch(b.id, { sort_order: b.sort_order + delta }); }}
+                onToggleActive={() => { void patch(b.id, { is_active: !b.is_active }); }}
+                onDelete={() => { void remove(b); }}
+              />
+            ))}
           </div>
         )}
-        <div className="bg-slate-50 border border-slate-200/50 p-3 rounded-xl flex items-start gap-2 text-slate-500 text-[10px] leading-relaxed mt-2">
-          <Check className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+
+        <div className="mt-2 flex items-start gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3">
+          <Check className="mt-0.5 size-4 shrink-0 text-mint" aria-hidden="true" />
           <div>
-            <span className="font-extrabold text-slate-700 block mb-0.5">{isRTL ? 'كيف تظهر للعملاء' : 'How customers see them'}</span>
-            {isRTL
-              ? 'يعرض التطبيق البانرات المفعّلة فقط ضمن نطاق التاريخ، مرتّبة حسب الترتيب. أكثر من بانر = شريط متحرك تلقائي. لا يوجد بانر مفعّل = تختفي المساحة.'
-              : 'The app shows only active, in-window banners, ordered by sort order. More than one = an auto-rotating carousel. No active banner = the area is hidden.'}
+            <Text variant="label" as="p">{isRTL ? 'كيف تظهر للعملاء' : 'How customers see them'}</Text>
+            <Text variant="caption" tone="secondary" as="p" className="mt-0.5">
+              {isRTL
+                ? 'يعرض التطبيق البانرات المفعّلة فقط ضمن نطاق التاريخ، مرتّبة حسب الترتيب. أكثر من بانر = شريط متحرك تلقائي. لا يوجد بانر مفعّل = تختفي المساحة.'
+                : 'The app shows only active, in-window banners, ordered by sort order. More than one = an auto-rotating carousel. No active banner = the area is hidden.'}
+            </Text>
           </div>
         </div>
       </div>
