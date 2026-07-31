@@ -145,12 +145,13 @@ for (const gone of ['theme.ts', join('components', 'Button.tsx'), join('componen
 /**
  * ADMIN CONSOLE: files whose migration is complete.
  *
- * A migrated admin file may no longer use the legacy `.glass-*` utilities. The
- * global utilities themselves STAY — unmigrated panels still depend on them and
- * are removed only when the last reference goes. This list is what stops a
- * finished panel sliding back while its neighbours are still legacy.
+ * This list is now a RECORD and an existence check, not the ban itself. The
+ * `.glass-*` ban below is GLOBAL over `src/`, because the utilities themselves
+ * have been deleted from `index.css` — there is no longer any file where using
+ * one would be legitimate, so an allowlist would only describe where we happen
+ * to have looked.
  *
- * Add files as each panel lands. Do not remove entries.
+ * Add files as each surface lands. Do not remove entries.
  */
 const ADMIN_MIGRATED = [
   // Console shell
@@ -202,25 +203,66 @@ const ADMIN_MIGRATED = [
   // Restyled only — no map behaviour, provider logic or geocoding changed.
   'src/components/MapSearchBox.tsx',
   'src/components/mobile/LocationPicker.tsx',
+  // Settings, Reports, Stats, Integrations, Legal — the final Admin surfaces
+  'src/components/admin/SettingsPanel.tsx',
+  'src/components/admin/ReportsPanel.tsx',
+  'src/components/admin/StatsPanel.tsx',
+  'src/components/admin/IntegrationsPanel.tsx',
+  'src/components/admin/IntegrationCard.tsx',
+  'src/components/admin/TapPaymentPanel.tsx',
+  'src/components/admin/WhatsAppOtpPanel.tsx',
+  'src/components/admin/EmailServerPanel.tsx',
+  'src/components/admin/PushToolsPanel.tsx',
+  'src/components/admin/LazywaitPanel.tsx',
+  'src/components/admin/LegalDocumentsPanel.tsx',
+  // Web shell + admin auth — the last three files that referenced .glass-*
+  'src/App.tsx',
+  'src/components/AuthScreen.tsx',
+  'src/components/DatabasePlayground.tsx',
 ];
 
 const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;
+const LEGACY_EDIT_INPUT = /\bedit-input\b/;
 
 for (const rel of ADMIN_MIGRATED) {
-  const full = join(ROOT, rel);
-  if (!existsSync(full)) {
+  if (!existsSync(join(ROOT, rel))) {
     violations.push({
       file: rel, line: 0, rule: 'admin-migrated-missing',
       message: 'listed as migrated but the file does not exist — update ADMIN_MIGRATED',
       snippet: '',
     });
-    continue;
   }
+}
+
+/**
+ * GLOBAL BAN on the deleted legacy presentation utilities.
+ *
+ * `.glass-panel`, `.glass-panel-dark`, `.glass-card`, `.glass-btn-*`,
+ * `.glass-input` and `.edit-input` no longer exist in `index.css`. Anything
+ * naming one is either a class that will silently do NOTHING, or a stylesheet
+ * bringing the old console back — both worth failing the build over.
+ *
+ * The scan covers every `src/` file, not a list, because the point is that
+ * there is nowhere left these belong. Comments that merely NAME a class (this
+ * file, the Card and Button docblocks that explain what they replaced) are
+ * allowed: a guard that fires on its own documentation is a guard people delete.
+ */
+const LEGACY_DOC_MENTION = /^\s*(\/\/|\/\*|\*|<!--)/;
+
+const legacyScanFiles = [
+  ...walk(join(ROOT, 'src')),
+  join(ROOT, 'src/index.css'),
+].filter((f) => existsSync(f));
+
+for (const full of legacyScanFiles) {
+  const rel = relative(ROOT, full).split('\\').join('/');
   readFileSync(full, 'utf8').split(/\r?\n/).forEach((line, i) => {
-    if (LEGACY_GLASS.test(line)) {
+    if (LEGACY_DOC_MENTION.test(line)) return;
+    const hit = LEGACY_GLASS.test(line) || LEGACY_EDIT_INPUT.test(line);
+    if (hit) {
       violations.push({
-        file: rel, line: i + 1, rule: 'legacy-glass-in-migrated-admin',
-        message: 'migrated admin surface may not use the legacy .glass-* utilities',
+        file: rel, line: i + 1, rule: 'deleted-legacy-utility',
+        message: 'the legacy .glass-* / .edit-input utilities were deleted — use the design system',
         snippet: line.trim().slice(0, 100),
       });
     }

@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Check, Mail, RefreshCw, Send } from 'lucide-react';
+import { Mail, RefreshCw, Send } from 'lucide-react';
+
 import { useApp } from '../../context/AppContext';
+import { Card } from '../../design-system/ui/Card';
+import { Field } from '../../design-system/ui/Field';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
 import { emailServer, EmailServerStatus } from '../../lib/api';
 
 /**
@@ -8,6 +14,10 @@ import { emailServer, EmailServerStatus } from '../../lib/api';
  * the `email-test-config` Edge Function (never the SMTP password) and lets an
  * admin send a test email. Credentials are entered in the Email IntegrationCard
  * above; this panel shows readiness + verifies delivery. Accountant = view-only.
+ *
+ * The readiness grid shows PRESENCE, not values — `host_set`, `password_set` and
+ * friends are booleans the function returns precisely so the browser never has
+ * to hold a credential in order to report whether one exists.
  */
 export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
   const { adminLang } = useApp();
@@ -39,43 +49,51 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
   };
 
   const Indicator: React.FC<{ label: string; ok: boolean }> = ({ label, ok }) => (
-    <div className="flex items-center justify-between bg-white/70 border border-slate-100 rounded-lg px-2.5 py-1.5">
-      <span className="text-[10px] font-bold text-slate-600">{label}</span>
-      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
-        {ok ? (isRTL ? 'مُهيّأ' : 'Yes') : (isRTL ? 'غير مُهيّأ' : 'No')}
-      </span>
+    <div className="flex items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-2.5 py-1.5">
+      <Text variant="caption" tone="secondary" as="span">{label}</Text>
+      <StatusPill
+        label={ok ? (isRTL ? 'مُهيّأ' : 'Yes') : (isRTL ? 'غير مُهيّأ' : 'No')}
+        tone={ok ? 'success' : 'neutral'}
+      />
     </div>
   );
 
   return (
-    <div className="bg-white/50 border border-slate-200/60 rounded-2xl p-3.5 space-y-3">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <Mail className="w-4 h-4 text-blue-600" />
-          <div>
-            <span className="font-black text-slate-800 text-xs block">{isRTL ? 'خادم البريد (SMTP)' : 'Email Server (SMTP)'}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض كلمة المرور' : 'Readiness + test send — password never shown'}</span>
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <Mail className="size-4 shrink-0 text-sky" aria-hidden="true" />
+          <div className="min-w-0">
+            <Text variant="label" as="p">{isRTL ? 'خادم البريد (SMTP)' : 'Email Server (SMTP)'}</Text>
+            <Text variant="caption" tone="tertiary" as="p">
+              {isRTL ? 'حالة الإعداد واختبار الإرسال — لا تُعرض كلمة المرور' : 'Readiness + test send — password never shown'}
+            </Text>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {status && (
-            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${status.enabled ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-              {status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
-            </span>
+            <StatusPill
+              label={status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
+              tone={status.enabled ? 'success' : 'warning'}
+            />
           )}
-          <button onClick={() => void load()} disabled={loading} className="text-slate-400 hover:text-primary disabled:opacity-40" aria-label="Refresh">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label={isRTL ? 'تحديث' : 'Refresh'}
+            className="ds-motion inline-flex size-8 items-center justify-center rounded-[var(--radius-ds-sm)] transition-colors duration-150 hover:bg-con-surface-2 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <RefreshCw className={`size-3.5 text-con-text-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {error ? (
-        <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[10px] font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /> {error}
-        </div>
+        <Notice title={error} tone="blocking" />
       ) : status ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
             <Indicator label={isRTL ? 'الخادم (Host)' : 'SMTP host'} ok={status.host_set} />
             <Indicator label={isRTL ? `المنفذ (${status.port ?? '—'})` : `Port (${status.port ?? '—'})`} ok={Boolean(status.port)} />
             <Indicator label={isRTL ? 'TLS/SSL' : 'TLS/SSL'} ok={status.secure} />
@@ -85,40 +103,46 @@ export const EmailServerPanel: React.FC<{ disabled: boolean }> = ({ disabled }) 
           </div>
 
           {!disabled && (
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}</span>
-              <div className="flex gap-2">
-                <input
+            <div className="space-y-2 border-t border-con-line pt-3">
+              <Text variant="caption" tone="secondary" as="p">
+                {isRTL ? 'إرسال بريد تجريبي' : 'Send test email'}
+              </Text>
+              <div className="flex items-end gap-2">
+                <Field
+                  label={isRTL ? 'إلى' : 'To'}
                   type="email"
+                  numeric
                   value={testTo}
-                  onChange={(e) => setTestTo(e.target.value)}
+                  onValueChange={setTestTo}
                   placeholder="you@example.com"
-                  className="glass-input flex-1 p-2 text-xs font-bold text-slate-800"
+                  className="flex-1"
                 />
                 <button
+                  type="button"
                   onClick={() => void handleTest()}
                   disabled={testing || !testTo.trim()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black px-3 rounded-xl flex items-center gap-1 disabled:opacity-40"
+                  className="ds-motion inline-flex min-h-11 shrink-0 items-center gap-1 rounded-[var(--radius-ds-md)] bg-ember px-3 transition-opacity duration-150 hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
                 >
-                  <Send className="w-3 h-3" /> {testing ? '…' : (isRTL ? 'إرسال' : 'Send')}
+                  <Send className="size-3 text-on-ember" aria-hidden="true" />
+                  <Text variant="label" tone="onEmber" as="span">
+                    {testing ? '…' : (isRTL ? 'إرسال' : 'Send')}
+                  </Text>
                 </button>
               </div>
-              {testMsg && (
-                <div className={`text-[10px] font-bold flex items-center gap-1 ${testMsg.ok ? 'text-green-700' : 'text-red-600'}`}>
-                  {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
-                </div>
-              )}
-              <p className="text-[9px] text-slate-400 font-semibold">
+              {testMsg && <Notice title={testMsg.text} tone={testMsg.ok ? 'success' : 'blocking'} />}
+              <Text variant="caption" tone="tertiary" as="p">
                 {isRTL
                   ? 'تُرسَل رسالة تجريبية عبر إعدادات SMTP المحفوظة. لا تُعرض كلمة المرور ولا تصل للمتصفح.'
                   : 'Sends a test message through the saved SMTP settings. The password is never shown and never reaches the browser.'}
-              </p>
+              </Text>
             </div>
           )}
         </>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <Text variant="caption" tone="tertiary" as="p" className="py-4 text-center">
+          {isRTL ? 'جاري التحميل…' : 'Loading…'}
+        </Text>
       )}
-    </div>
+    </Card>
   );
 };

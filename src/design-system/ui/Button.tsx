@@ -1,9 +1,10 @@
 /**
  * Design-system Button (admin console).
  *
- * ADDITIVE: the existing `.glass-btn-*` classes still back every shipped
- * panel. This is the "Ember on Cream" button — red is the only interactive
- * colour. Panels migrate in a follow-up PR.
+ * The "Ember on Cream" button, and now the only one — the legacy button
+ * utilities it replaced are deleted. Red is the sole interactive colour, which
+ * is what lets a dense console separate the two or three things you can press
+ * from the fifty states you cannot.
  *
  * Behaviour comes from the framework-free `buttonState` module, so the mobile
  * and web buttons cannot disagree about what "disabled" or "loading" means.

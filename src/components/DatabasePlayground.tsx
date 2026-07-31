@@ -31,48 +31,48 @@ export const DatabasePlayground: React.FC = () => {
   const rows = getTableRows();
 
   return (
-    <div className="flex-1 glass-panel-dark text-slate-100 rounded-2xl p-5 border border-white/10 shadow-2xl font-mono flex flex-col h-full min-h-[600px]">
+    <div className="flex-1 bg-brand-ink text-on-ember rounded-2xl p-5 border border-con-line font-mono flex flex-col h-full min-h-[600px]">
       
       {/* Console Top Header */}
-      <div className="border-b border-slate-800 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+      <div className="border-b border-con-line pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <Database className="w-5 h-5 text-secondary animate-pulse" />
+          <Database className="w-5 h-5 text-ember animate-pulse" />
           <div>
             <h2 className="text-sm font-black text-white tracking-wide">SUPABASE DATABASE CONSOLE (EMULATED)</h2>
-            <p className="text-[10px] text-slate-400 mt-0.5">Connected Schema: postgresql://postgres:spicymeal-db@localhost:5432/main</p>
+            <p className="text-[10px] text-con-text-3 mt-0.5">Connected Schema: postgresql://postgres:spicymeal-db@localhost:5432/main</p>
           </div>
         </div>
 
         {/* View togglers JSON vs Table */}
         <div className="flex items-center gap-2 text-xs">
-          <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+          <div className="flex bg-brand-ink border border-con-line rounded-lg p-0.5">
             <button 
               onClick={() => setViewMode('table')}
-              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'table' ? 'bg-primary text-white' : 'text-slate-400'}`}
+              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'table' ? 'bg-ember text-white' : 'text-con-text-3'}`}
             >
               TABLE VIEW
             </button>
             <button 
               onClick={() => setViewMode('json')}
-              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'json' ? 'bg-primary text-white' : 'text-slate-400'}`}
+              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'json' ? 'bg-ember text-white' : 'text-con-text-3'}`}
             >
               RAW JSON
             </button>
           </div>
-          <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-extrabold px-2.5 py-1 rounded-lg">
+          <span className="text-[10px] bg-mint-tint border border-mint-line text-mint font-extrabold px-2.5 py-1 rounded-lg">
             ● SYSTEM ACTIVE
           </span>
         </div>
       </div>
 
       {/* RLS warning information row */}
-      <div className="mt-3 bg-slate-900/40 border border-slate-800/80 rounded-xl p-3 flex items-start gap-2.5 text-[10px] text-slate-300">
-        <KeyRound className="w-4 h-4 text-secondary flex-shrink-0 mt-0.5" />
+      <div className="mt-3 bg-brand-ink/40 border border-con-line/80 rounded-xl p-3 flex items-start gap-2.5 text-[10px] text-con-text-3">
+        <KeyRound className="w-4 h-4 text-ember flex-shrink-0 mt-0.5" />
         <div className="leading-normal">
           <span className="font-bold text-white">Row Level Security (RLS) policies are active on this schema:</span>
-          <p className="text-slate-400 mt-0.5">
-            - <code className="text-secondary font-black">branches</code>, <code className="text-secondary font-black">products</code>: READ is granted publicly to everyone; UPDATE is restricted to <code className="text-purple-400">role = 'admin'</code>.<br/>
-            - <code className="text-secondary font-black">orders</code>, <code className="text-secondary font-black">addresses</code>: Select is isolated by <code className="text-purple-400">auth.uid() = customer_id</code>. Admin bypassing overrides RLS.
+          <p className="text-con-text-3 mt-0.5">
+            - <code className="text-ember font-black">branches</code>, <code className="text-ember font-black">products</code>: READ is granted publicly to everyone; UPDATE is restricted to <code className="text-saffron">role = 'admin'</code>.<br/>
+            - <code className="text-ember font-black">orders</code>, <code className="text-ember font-black">addresses</code>: Select is isolated by <code className="text-saffron">auth.uid() = customer_id</code>. Admin bypassing overrides RLS.
           </p>
         </div>
       </div>
@@ -95,8 +95,8 @@ export const DatabasePlayground: React.FC = () => {
               onClick={() => setActiveTable(table.key as any)}
               className={`w-full text-left flex justify-between items-center text-[11px] py-2 px-3 rounded-lg border transition-all ${
                 activeTable === table.key 
-                  ? 'bg-primary/20 border-primary text-white font-black' 
-                  : 'bg-slate-900/40 border-slate-800/50 text-slate-400 hover:bg-slate-900/80 hover:text-white'
+                  ? 'bg-ember/20 border-primary text-white font-black' 
+                  : 'bg-brand-ink/40 border-con-line/50 text-con-text-3 hover:bg-brand-ink/80 hover:text-white'
               }`}
             >
               <span>{table.label}</span>
@@ -106,18 +106,18 @@ export const DatabasePlayground: React.FC = () => {
         </div>
 
         {/* Right Content Editor viewport */}
-        <div className="flex-grow bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+        <div className="flex-grow bg-brand-ink/40 border border-con-line rounded-xl overflow-hidden flex flex-col">
           
           {viewMode === 'table' ? (
             /* CONSOLE RENDER TABLE LAYOUT */
             <div className="flex-1 overflow-auto max-h-[350px]">
               {rows.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs font-black">
+                <div className="p-8 text-center text-con-text-2 text-xs font-black">
                   [EMPTY TABLE - NO RECORDS AVAILABLE]
                 </div>
               ) : (
-                <table className="w-full text-[10.5px] text-slate-300 text-left">
-                  <thead className="bg-slate-900/80 border-b border-slate-800 text-slate-400 uppercase font-black tracking-wide text-[9.5px]">
+                <table className="w-full text-[10.5px] text-con-text-3 text-left">
+                  <thead className="bg-brand-ink/80 border-b border-con-line text-con-text-3 uppercase font-black tracking-wide text-[9.5px]">
                     {activeTable === 'branches' && (
                       <tr>
                         <th className="px-3 py-2.5">ID</th>
@@ -171,17 +171,17 @@ export const DatabasePlayground: React.FC = () => {
                       </tr>
                     )}
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-con-line">
                     {rows.map((row: any, idx: number) => (
-                      <tr key={row.id || idx} className="hover:bg-slate-900/50">
+                      <tr key={row.id || idx} className="hover:bg-brand-ink/50">
                         {activeTable === 'branches' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
+                            <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.nameEn}</td>
                             <td className="px-3 py-2.5">{row.phone}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.deliveryFee} /></td>
+                            <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.deliveryFee} /></td>
                             <td className="px-3 py-2.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${row.isActive ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-black ${row.isActive ? 'bg-mint-tint text-mint' : 'bg-danger-tint text-danger-ds'}`}>
                                 {row.isActive ? 'TRUE' : 'FALSE'}
                               </span>
                             </td>
@@ -189,7 +189,7 @@ export const DatabasePlayground: React.FC = () => {
                         )}
                         {activeTable === 'categories' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
+                            <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.nameEn}</td>
                             <td className="px-3 py-2.5">{row.nameAr}</td>
                             <td className="px-3 py-2.5">{row.sortOrder}</td>
@@ -197,45 +197,45 @@ export const DatabasePlayground: React.FC = () => {
                         )}
                         {activeTable === 'products' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
+                            <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white truncate max-w-[120px]">{row.nameEn}</td>
-                            <td className="px-3 py-2.5 text-slate-400 truncate max-w-[100px]">{row.categoryId}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.price} /></td>
+                            <td className="px-3 py-2.5 text-con-text-3 truncate max-w-[100px]">{row.categoryId}</td>
+                            <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.price} /></td>
                             <td className="px-3 py-2.5">{row.calories} kcal</td>
                           </>
                         )}
                         {activeTable === 'orders' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black">{row.orderNumber}</td>
+                            <td className="px-3 py-2.5 text-ember font-black">{row.orderNumber}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.customerName}</td>
-                            <td className="px-3 py-2.5 text-secondary font-black"><Price amount={row.total} /></td>
+                            <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.total} /></td>
                             <td className="px-3 py-2.5">
-                              <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${row.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                              <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${row.status === 'delivered' ? 'bg-mint-tint text-mint' : 'bg-info-tint text-sky'}`}>
                                 {row.status}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 font-bold text-purple-400">{row.orderSyncStatus}</td>
+                            <td className="px-3 py-2.5 font-bold text-saffron">{row.orderSyncStatus}</td>
                           </>
                         )}
                         {activeTable === 'addresses' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
+                            <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.label}</td>
                             <td className="px-3 py-2.5 truncate max-w-[150px]">{row.description}</td>
-                            <td className="px-3 py-2.5 text-purple-400 font-bold">{row.nationalShortAddress}</td>
+                            <td className="px-3 py-2.5 text-saffron font-bold">{row.nationalShortAddress}</td>
                           </>
                         )}
                         {activeTable === 'profiles' && (
                           <>
-                            <td className="px-3 py-2.5 text-primary font-black truncate max-w-[80px]">{row.id}</td>
+                            <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white">{row.fullName}</td>
                             <td className="px-3 py-2.5">{row.phoneNumber}</td>
                             <td className="px-3 py-2.5">
-                              <span className="bg-primary/20 text-primary px-2 py-0.5 rounded text-[8px] font-black uppercase">
+                              <span className="bg-ember/20 text-ember px-2 py-0.5 rounded text-[8px] font-black uppercase">
                                 {row.role}
                               </span>
                             </td>
-                            <td className="px-3 py-2.5 text-purple-400 font-extrabold font-mono text-[10px]">
+                            <td className="px-3 py-2.5 text-saffron font-extrabold font-mono text-[10px]">
                               {row.role === 'customer' ? `${row.loyaltyPoints || 0} pts` : '-'}
                             </td>
                           </>
@@ -249,7 +249,7 @@ export const DatabasePlayground: React.FC = () => {
           ) : (
             /* CONSOLE RENDER JSON VIEW */
             <div className="flex-1 p-4 overflow-auto max-h-[350px]">
-              <pre className="text-[10px] text-purple-300 leading-normal select-text whitespace-pre-wrap">
+              <pre className="text-[10px] text-saffron leading-normal select-text whitespace-pre-wrap">
                 {JSON.stringify(rows, null, 2)}
               </pre>
             </div>
@@ -260,7 +260,7 @@ export const DatabasePlayground: React.FC = () => {
       </div>
 
       {/* SQL Quick Terminal Footer display */}
-      <div className="border-t border-slate-800 pt-3 mt-4 text-[9px] text-slate-500 flex justify-between">
+      <div className="border-t border-con-line pt-3 mt-4 text-[9px] text-con-text-2 flex justify-between">
         <span>SQL Query Executed: SELECT * FROM public.{activeTable};</span>
         <span>Row Fetch Time: 0.001s</span>
       </div>

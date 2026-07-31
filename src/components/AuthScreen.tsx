@@ -51,28 +51,28 @@ export const AuthScreen: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-sm glass-panel rounded-[2rem] p-7 shadow-2xl">
+      <div className="w-full max-w-sm border border-con-line bg-con-surface rounded-[2rem] p-7">
         <div className="flex flex-col items-center text-center mb-6">
-          <BrandMark className="w-14 h-14 rounded-2xl object-contain bg-white shadow-md border border-white/20 mb-3" />
-          <h1 className="text-lg font-black text-primary tracking-tight">SPICY MEAL</h1>
-          <p className="text-[11px] text-slate-500 font-bold mt-1">
+          <BrandMark className="w-14 h-14 rounded-2xl object-contain bg-con-surface border border-con-line mb-3" />
+          <h1 className="text-lg font-black text-ember tracking-tight">SPICY MEAL</h1>
+          <p className="text-[11px] text-con-text-2 font-bold mt-1">
             {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
           </p>
         </div>
 
         {/* Mode switch */}
-        <div className="flex gap-1.5 p-1 bg-slate-200/50 rounded-xl border border-slate-300/40 mb-5">
+        <div className="flex gap-1.5 p-1 bg-con-surface-2 rounded-xl border border-con-line mb-5">
           <button
             type="button"
             onClick={() => { setMode('signin'); setError(null); setNotice(null); }}
-            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signin' ? 'bg-white text-primary shadow-sm' : 'text-slate-600 hover:bg-white/40'}`}
+            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signin' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
           >
             <LogIn className="w-3.5 h-3.5" /> Sign In
           </button>
           <button
             type="button"
             onClick={() => { setMode('signup'); setError(null); setNotice(null); }}
-            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signup' ? 'bg-white text-primary shadow-sm' : 'text-slate-600 hover:bg-white/40'}`}
+            className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signup' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
           >
             <UserPlus className="w-3.5 h-3.5" /> Sign Up
           </button>
@@ -82,25 +82,25 @@ export const AuthScreen: React.FC = () => {
           {mode === 'signup' && (
             <>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Full Name</label>
+                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Full Name</label>
                 <input
                   type="text"
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Mohammed Ali"
-                  className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
+                  className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
                   aria-label="Full name"
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Phone (optional)</label>
+                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Phone (optional)</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+966 5X XXX XXXX"
-                  className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
+                  className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
                   aria-label="Phone number"
                 />
               </div>
@@ -108,20 +108,20 @@ export const AuthScreen: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Email</label>
+            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
+              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-label="Email"
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Password</label>
+            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Password</label>
             <input
               type="password"
               required
@@ -129,30 +129,30 @@ export const AuthScreen: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
+              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2"
               aria-label="Password"
             />
           </div>
 
           {error && (
-            <p className="text-[11px] text-red-600 font-bold bg-red-50 border border-red-100 rounded-lg p-2">{error}</p>
+            <p className="text-[11px] text-danger-ds font-bold bg-danger-tint border border-danger-line rounded-lg p-2">{error}</p>
           )}
           {notice && (
-            <p className="text-[11px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-100 rounded-lg p-2">{notice}</p>
+            <p className="text-[11px] text-mint font-bold bg-mint-tint border border-mint-line rounded-lg p-2">{notice}</p>
           )}
 
           <button
             type="submit"
             disabled={busy}
-            className="w-full bg-secondary text-white text-xs font-black py-2.5 rounded-full shadow-sm hover:bg-secondary/95 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+            className="w-full bg-ember text-white text-xs font-black py-2.5 rounded-full shadow-sm hover:bg-ember/95 transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             {mode === 'signin' ? 'Sign In' : 'Create Account'}
           </button>
         </form>
 
-        <div className="mt-5 pt-4 border-t border-slate-200/60 flex items-center gap-1.5 text-[9.5px] text-slate-400 font-semibold justify-center">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+        <div className="mt-5 pt-4 border-t border-con-line flex items-center gap-1.5 text-[9.5px] text-con-text-3 font-semibold justify-center">
+          <ShieldCheck className="w-3.5 h-3.5 text-mint" />
           <span>Secured by Supabase Auth · role-based access</span>
         </div>
       </div>

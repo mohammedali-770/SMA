@@ -122,8 +122,8 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ lat, lng, onChan
 
   if (!mapConfig.isConfigured) {
     return (
-      <div className="w-full rounded-lg border border-amber-200 bg-amber-50 p-3 text-[10px] font-bold text-amber-800 flex items-center gap-2">
-        <MapPin className="w-4 h-4 flex-shrink-0" />
+      <div className="flex w-full items-center gap-2 rounded-[var(--radius-ds-md)] border border-warn-line bg-warn-tint p-3 text-[11.5px] font-medium text-amber-ink">
+        <MapPin className="size-4 shrink-0" aria-hidden="true" />
         {isRTL ? 'إعداد الخريطة مطلوب — أدخل الإحداثيات يدوياً أدناه.' : 'Map setup required — enter coordinates manually below.'}
       </div>
     );

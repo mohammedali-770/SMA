@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { AlertCircle, Check, CreditCard, RefreshCw, Plug } from 'lucide-react';
+import { CreditCard, Plug, RefreshCw } from 'lucide-react';
+
 import { useApp } from '../../context/AppContext';
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
 import { paymentGateway, PaymentGatewayStatus } from '../../lib/api';
 import { canRunAdminTestCheckout } from '../../lib/tapAdminTest';
 
@@ -9,6 +15,11 @@ import { canRunAdminTestCheckout } from '../../lib/tapAdminTest';
  * from the `payment-test-config` Edge Function (never any secret key) and lets an
  * admin validate the selected-mode key against Tap WITHOUT creating a charge.
  * Keys are entered in the Tap IntegrationCard above. Accountant = view-only.
+ *
+ * LIVE is DANGER, TEST is WARNING. Reading a live gateway as a sandbox is the
+ * mistake that charges real cards, so it gets the louder tone — and the sandbox
+ * checkout below is gated by `canRunAdminTestCheckout`, which refuses to run in
+ * live mode at all.
  */
 export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => {
   const { adminLang } = useApp();
@@ -81,159 +92,193 @@ export const TapPaymentPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =
   };
 
   const Indicator: React.FC<{ label: string; ok: boolean }> = ({ label, ok }) => (
-    <div className="flex items-center justify-between bg-white/70 border border-slate-100 rounded-lg px-2.5 py-1.5">
-      <span className="text-[10px] font-bold text-slate-600">{label}</span>
-      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-500'}`}>
-        {ok ? (isRTL ? 'مُهيّأ' : 'Yes') : (isRTL ? 'غير مُهيّأ' : 'No')}
-      </span>
+    <div className="flex items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-2.5 py-1.5">
+      <Text variant="caption" tone="secondary" as="span">{label}</Text>
+      <StatusPill
+        label={ok ? (isRTL ? 'مُهيّأ' : 'Yes') : (isRTL ? 'غير مُهيّأ' : 'No')}
+        tone={ok ? 'success' : 'neutral'}
+      />
+    </div>
+  );
+
+  const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+    <div className="flex items-center justify-between gap-2">
+      <Text variant="caption" tone="tertiary" as="span">{label}</Text>
+      {children}
     </div>
   );
 
   return (
-    <div className="bg-white/50 border border-slate-200/60 rounded-2xl p-3.5 space-y-3">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-primary" />
-          <div>
-            <span className="font-black text-slate-800 text-xs block">{isRTL ? 'مدفوعات Tap' : 'Tap Payments'}</span>
-            <span className="text-[9px] text-slate-400 font-bold">{isRTL ? 'الجاهزية واختبار الاتصال — لا يُعرض المفتاح السري' : 'Readiness + connection test — secret key never shown'}</span>
+    <Card className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <CreditCard className="size-4 shrink-0 text-ember" aria-hidden="true" />
+          <div className="min-w-0">
+            <Text variant="label" as="p">{isRTL ? 'مدفوعات Tap' : 'Tap Payments'}</Text>
+            <Text variant="caption" tone="tertiary" as="p">
+              {isRTL ? 'الجاهزية واختبار الاتصال — لا يُعرض المفتاح السري' : 'Readiness + connection test — secret key never shown'}
+            </Text>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {status && (
             <>
-              <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${isLive ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                {isLive ? (isRTL ? 'مباشر' : 'LIVE') : (isRTL ? 'تجريبي' : 'TEST')}
-              </span>
-              <span className={`text-[8px] font-black px-2 py-0.5 rounded-full ${status.enabled ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                {status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
-              </span>
+              <StatusPill
+                label={isLive ? (isRTL ? 'مباشر' : 'LIVE') : (isRTL ? 'تجريبي' : 'TEST')}
+                tone={isLive ? 'danger' : 'warning'}
+              />
+              <StatusPill
+                label={status.enabled ? (isRTL ? 'مفعّل' : 'ENABLED') : (isRTL ? 'معطّل' : 'DISABLED')}
+                tone={status.enabled ? 'success' : 'neutral'}
+              />
             </>
           )}
-          <button onClick={() => void load()} disabled={loading} className="text-slate-400 hover:text-primary disabled:opacity-40" aria-label="Refresh">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <button
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label={isRTL ? 'تحديث' : 'Refresh'}
+            className="ds-motion inline-flex size-8 items-center justify-center rounded-[var(--radius-ds-sm)] transition-colors duration-150 hover:bg-con-surface-2 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <RefreshCw className={`size-3.5 text-con-text-2 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           </button>
         </div>
       </div>
 
       {error ? (
-        <div className="p-2.5 bg-red-50 border border-red-100 rounded-xl text-red-800 text-[10px] font-bold flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" /> {error}
-        </div>
+        <Notice title={error} tone="blocking" />
       ) : status ? (
         <>
           {!isTap && (
-            <div className="p-2 bg-amber-50 border border-amber-100 rounded-lg text-amber-800 text-[10px] font-bold">
-              {isRTL ? "اضبط مزوّد الدفع على 'tap' في البطاقة أعلاه." : "Set the payment provider to 'tap' in the card above."}
-            </div>
+            <Notice
+              title={isRTL ? "اضبط مزوّد الدفع على 'tap' في البطاقة أعلاه." : "Set the payment provider to 'tap' in the card above."}
+              tone="warning"
+            />
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+
+          <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2">
             <Indicator label={isRTL ? 'معرّف التاجر' : 'Merchant ID'} ok={status.merchant_id_set} />
             <Indicator label={isRTL ? `مفتاح الوضع (${status.mode})` : `Key for mode (${status.mode})`} ok={status.active_key_set} />
             <Indicator label={isRTL ? 'مفتاح تجريبي' : 'Test key'} ok={status.test_key_set} />
             <Indicator label={isRTL ? 'مفتاح مباشر' : 'Live key'} ok={status.live_key_set} />
           </div>
-          <div className="flex items-center gap-3 text-[10px] text-slate-500 font-bold px-1">
-            <span>{isRTL ? 'العملة' : 'Currency'}: <b className="text-slate-700">{status.currency}</b></span>
-            <span>Source: <b className="text-slate-700">{status.source_id}</b></span>
-            <span>{isRTL ? 'انتهاء' : 'Expiry'}: <b className="text-slate-700">{status.expiry_minutes}m</b></span>
+
+          <div className="flex flex-wrap items-center gap-3 px-1">
+            <Text variant="caption" tone="secondary" as="span">
+              {isRTL ? 'العملة' : 'Currency'}: <span className="num">{status.currency}</span>
+            </Text>
+            <Text variant="caption" tone="secondary" as="span">
+              Source: <span className="num">{status.source_id}</span>
+            </Text>
+            <Text variant="caption" tone="secondary" as="span">
+              {isRTL ? 'انتهاء' : 'Expiry'}: <span className="num">{status.expiry_minutes}m</span>
+            </Text>
           </div>
 
           {!disabled && (
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'اختبار الاتصال' : 'Test connection'}</span>
-                <button
-                  onClick={() => void handleTest()}
+            <div className="space-y-2 border-t border-con-line pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Text variant="caption" tone="secondary" as="span">
+                  {isRTL ? 'اختبار الاتصال' : 'Test connection'}
+                </Text>
+                <Button
+                  label={testing ? '…' : (isRTL ? 'اختبار' : 'Test')}
+                  onClick={() => { void handleTest(); }}
                   disabled={testing || !status.active_key_set}
-                  className="bg-primary hover:opacity-90 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-1 disabled:opacity-40"
-                >
-                  <Plug className="w-3 h-3" /> {testing ? '…' : (isRTL ? 'اختبار' : 'Test')}
-                </button>
+                  loading={testing}
+                  variant="secondary"
+                  leading={<Plug className="size-3" aria-hidden="true" />}
+                />
               </div>
-              {testMsg && (
-                <div className={`text-[10px] font-bold flex items-center gap-1 ${testMsg.ok ? 'text-green-700' : 'text-red-600'}`}>
-                  {testMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {testMsg.text}
-                </div>
-              )}
-              <p className="text-[9px] text-slate-400 font-semibold">
+              {testMsg && <Notice title={testMsg.text} tone={testMsg.ok ? 'success' : 'blocking'} />}
+              <Text variant="caption" tone="tertiary" as="p">
                 {isRTL
                   ? 'يتحقق من المفتاح السري للوضع المحدد لدى Tap دون إنشاء أي عملية دفع.'
                   : 'Validates the selected-mode secret key against Tap without creating any charge.'}
-              </p>
+              </Text>
             </div>
           )}
 
           {/* Isolated admin TEST checkout — 1 SAR sandbox, no Spicy Meal order created */}
           {!disabled && (
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[10px] font-black text-slate-500 uppercase">{isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}</span>
-                <button
-                  onClick={() => void runTestCheckout()}
+            <div className="space-y-2 border-t border-con-line pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <Text variant="caption" tone="secondary" as="span">
+                  {isRTL ? 'تجربة الدفع عبر Tap' : 'Run Tap test checkout'}
+                </Text>
+                <Button
+                  label={coRunning ? '…' : (isRTL ? 'ابدأ' : 'Run')}
+                  onClick={() => { void runTestCheckout(); }}
                   disabled={coRunning || !canRunTest}
-                  className="bg-primary hover:opacity-90 text-white text-[11px] font-black px-3 py-1.5 rounded-xl flex items-center gap-1 disabled:opacity-40"
-                >
-                  <CreditCard className="w-3 h-3" /> {coRunning ? '…' : (isRTL ? 'ابدأ' : 'Run')}
-                </button>
+                  loading={coRunning}
+                  leading={<CreditCard className="size-3" aria-hidden="true" />}
+                />
               </div>
-              <p className="text-[9px] text-slate-400 font-semibold">
+              <Text variant="caption" tone="tertiary" as="p">
                 {isRTL
                   ? 'ينشئ عملية دفع تجريبية بقيمة ١ ريال عبر Tap (Sandbox) لاختبار صفحة الدفع. لا يُنشئ أو يدفع أي طلب في Spicy Meal.'
                   : 'Creates a 1 SAR Tap sandbox checkout to test the hosted payment page. It does not create or pay any Spicy Meal order.'}
-              </p>
+              </Text>
               {!canRunTest && (
-                <p className="text-[9px] text-amber-600 font-bold">
+                <Text variant="caption" tone="warning" as="p">
                   {isRTL
                     ? 'متاح فقط عندما يكون Tap مفعّلاً في وضع الاختبار مع معرّف التاجر ومفتاح الاختبار.'
                     : 'Available only when Tap is enabled in TEST mode with a merchant id + test key.'}
-                </p>
+                </Text>
               )}
               {coChargeId && (
-                <div className="flex items-center justify-between gap-2 pt-1">
-                  <span className="text-[9px] text-slate-500 font-bold">{isRTL ? 'بعد إتمام الدفع في النافذة:' : 'After paying in the new tab:'}</span>
-                  <button
-                    onClick={() => void checkTestResult()}
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <Text variant="caption" tone="secondary" as="span">
+                    {isRTL ? 'بعد إتمام الدفع في النافذة:' : 'After paying in the new tab:'}
+                  </Text>
+                  <Button
+                    label={coChecking ? '…' : (isRTL ? 'تحقق من النتيجة' : 'Check test result')}
+                    onClick={() => { void checkTestResult(); }}
                     disabled={coChecking}
-                    className="bg-white border border-primary/30 text-primary text-[11px] font-black px-3 py-1.5 rounded-xl disabled:opacity-40"
-                  >
-                    {coChecking ? '…' : (isRTL ? 'تحقق من النتيجة' : 'Check test result')}
-                  </button>
+                    loading={coChecking}
+                    variant="secondary"
+                  />
                 </div>
               )}
-              {coMsg && (
-                <div className={`text-[10px] font-bold flex items-center gap-1 ${coMsg.ok ? 'text-green-700' : 'text-red-600'}`}>
-                  {coMsg.ok ? <Check className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />} {coMsg.text}
-                </div>
-              )}
+              {coMsg && <Notice title={coMsg.text} tone={coMsg.ok ? 'success' : 'blocking'} />}
               {coErr && (coErr.code || coErr.description) && (
-                <div className="bg-red-50 border border-red-100 rounded-lg p-2 text-[10px] space-y-1">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-red-400">{isRTL ? 'رمز خطأ Tap' : 'Tap error code'}</span>
-                    <span className="font-mono font-black text-red-700">{coErr.code ?? '—'}{coErr.httpStatus ? ` · HTTP ${coErr.httpStatus}` : ''}</span>
-                  </div>
+                <div className="space-y-1 rounded-[var(--radius-ds-md)] border border-danger-line bg-danger-tint p-2">
+                  <Row label={isRTL ? 'رمز خطأ Tap' : 'Tap error code'}>
+                    <Text variant="caption" tone="danger" numeric as="span">
+                      {coErr.code ?? '—'}{coErr.httpStatus ? ` · HTTP ${coErr.httpStatus}` : ''}
+                    </Text>
+                  </Row>
                   {coErr.description && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-red-400 flex-shrink-0">{isRTL ? 'الوصف' : 'Description'}</span>
-                      <span className="font-bold text-red-700 text-right">{coErr.description}</span>
-                    </div>
+                    <Row label={isRTL ? 'الوصف' : 'Description'}>
+                      <Text variant="caption" tone="danger" as="span" className="text-end">{coErr.description}</Text>
+                    </Row>
                   )}
                 </div>
               )}
               {coResult && (
-                <div className="bg-white/70 border border-slate-100 rounded-lg p-2 text-[10px] space-y-1">
-                  <div className="flex justify-between gap-2"><span className="text-slate-400">{isRTL ? 'رقم العملية' : 'Charge ID'}</span><span className="font-mono text-[8.5px] text-slate-600 truncate">{coResult.chargeId}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الحالة' : 'Status'}</span><span className="font-black text-slate-700">{coResult.status}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'المبلغ' : 'Amount'}</span><span className="font-bold text-slate-700">{coResult.amount} {coResult.currency}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400">{isRTL ? 'الوضع' : 'Mode'}</span><span className="px-1.5 py-0.5 rounded-full text-[8px] font-black bg-amber-100 text-amber-700">{String(coResult.mode ?? 'test').toUpperCase()}</span></div>
+                <div className="space-y-1 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-2">
+                  <Row label={isRTL ? 'رقم العملية' : 'Charge ID'}>
+                    <Text variant="caption" tone="secondary" numeric as="span" className="truncate">{coResult.chargeId}</Text>
+                  </Row>
+                  <Row label={isRTL ? 'الحالة' : 'Status'}>
+                    <Text variant="caption" as="span">{coResult.status}</Text>
+                  </Row>
+                  <Row label={isRTL ? 'المبلغ' : 'Amount'}>
+                    <Text variant="caption" numeric as="span">{coResult.amount} {coResult.currency}</Text>
+                  </Row>
+                  <Row label={isRTL ? 'الوضع' : 'Mode'}>
+                    <StatusPill label={String(coResult.mode ?? 'test').toUpperCase()} tone="warning" />
+                  </Row>
                 </div>
               )}
             </div>
           )}
         </>
       ) : (
-        <div className="py-4 text-center text-slate-400 text-[10px] font-bold animate-pulse">{isRTL ? 'جاري التحميل…' : 'Loading…'}</div>
+        <Text variant="caption" tone="tertiary" as="p" className="py-4 text-center">
+          {isRTL ? 'جاري التحميل…' : 'Loading…'}
+        </Text>
       )}
-    </div>
+    </Card>
   );
 };
