@@ -5,8 +5,8 @@
  * this panel has NO realtime subscription, NO polling timer and NO
  * acknowledgement action. It is a load-on-mount read surface; an operator sees
  * new alerts only by changing a filter or switching sections. That absence is
- * part of the contract this migration preserves, and `alertsProbes` in the
- * verification script asserts none of them appear.
+ * part of the contract this migration preserves, and
+ * `OperationsAlertsPanel.states.test.tsx` asserts none of them appear.
  *
  * Everything here is a total function of its inputs. These were inline
  * expressions inside the panel, checkable only by rendering it.

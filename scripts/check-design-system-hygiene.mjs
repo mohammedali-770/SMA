@@ -172,6 +172,12 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/health/HealthMetric.tsx',
   'src/components/admin/view/health/HealthSystemCard.tsx',
   'src/components/admin/view/health/healthView.ts',
+  // Operations Alerts
+  'src/components/admin/OperationsAlertsPanel.tsx',
+  'src/components/admin/view/alerts/AlertRow.tsx',
+  'src/components/admin/view/alerts/alertsView.ts',
+  // Shared by Operations Health and Operations Alerts
+  'src/components/admin/view/adminTime.ts',
 ];
 
 const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;
