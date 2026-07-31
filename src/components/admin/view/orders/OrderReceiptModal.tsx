@@ -75,9 +75,13 @@ export function OrderReceiptModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/60 p-4">
+      {/* role="dialog" WITHOUT aria-modal: nothing here traps focus or marks the
+          page inert, and claiming modality a screen reader then finds untrue is
+          worse than not claiming it. Focus management would be a behaviour
+          change; this migration does not make one. */}
       <div
         role="dialog"
-        aria-modal="true"
+        aria-label={isRTL ? 'تفاصيل الطلب' : 'Order receipt'}
         className="w-full max-w-md overflow-hidden rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
@@ -130,7 +134,9 @@ export function OrderReceiptModal({
           )}
 
           <div className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3">
-            <Text variant="caption" tone="tertiary" as="label" className="block">
+            {/* A <p>, not a <label>: the select is named by its aria-label, and
+                a <label> bound to no control is a dead end for a screen reader. */}
+            <Text variant="caption" tone="tertiary" as="p">
               {isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}
             </Text>
             <select
