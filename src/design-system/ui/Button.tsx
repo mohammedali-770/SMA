@@ -16,6 +16,7 @@ import {
   type ButtonSize,
   type ButtonVariant,
 } from '../generated/buttonState';
+import { useDsFontClass } from './useDsLang';
 
 interface Props {
   label: string;
@@ -65,6 +66,11 @@ export function Button({
   'data-testid': testId,
 }: Props) {
   const state = resolveButtonState({ variant, size, disabled, loading });
+  // Follows the ACTIVE language. This used to hardcode the Latin family, so
+  // every Arabic label fell through to a system font instead of IBM Plex Sans
+  // Arabic. The guard in consolePrimitives.test.ts scans for the literal, which
+  // is why this comment describes it rather than naming it.
+  const family = useDsFontClass();
 
   // Guard the handler as well as setting `disabled`: the DOM attribute is
   // trivially removable in devtools and does not stop a programmatic click.
@@ -85,7 +91,7 @@ export function Button({
       aria-busy={state.accessibility.busy}
       className={[
         'ds-motion inline-flex items-center justify-center gap-2 rounded-[var(--radius-ds-md)]',
-        'border font-ds-en font-bold transition-colors duration-150',
+        `border ${family} font-bold transition-colors duration-150`,
         'focus-visible:outline-2 focus-visible:outline-offset-2',
         SIZE[state.size],
         state.muted

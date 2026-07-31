@@ -13,7 +13,7 @@
  */
 import React from 'react';
 
-import { useApp } from '../../context/AppContext';
+import { useDsFontClass } from './useDsLang';
 
 export type TextVariant =
   | 'display' | 'title' | 'heading' | 'body' | 'label' | 'caption';
@@ -67,12 +67,9 @@ export function Text({
   children,
   ...rest
 }: Props) {
-  const { adminLang } = useApp();
-  const family = numeric
-    ? 'font-ds-num'
-    : adminLang === 'ar'
-      ? 'font-ds-ar'
-      : 'font-ds-en';
+  // Via the shared defensive hook, not useApp(): useApp throws without a
+  // provider, which would make this primitive unrenderable in a unit test.
+  const family = useDsFontClass(numeric);
 
   return (
     <Tag
