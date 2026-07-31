@@ -143,6 +143,75 @@ for (const gone of ['theme.ts', join('components', 'Button.tsx'), join('componen
 }
 
 /**
+ * ADMIN CONSOLE: files whose migration is complete.
+ *
+ * A migrated admin file may no longer use the legacy `.glass-*` utilities. The
+ * global utilities themselves STAY — unmigrated panels still depend on them and
+ * are removed only when the last reference goes. This list is what stops a
+ * finished panel sliding back while its neighbours are still legacy.
+ *
+ * Add files as each panel lands. Do not remove entries.
+ */
+const ADMIN_MIGRATED = [
+  // Console shell
+  'src/components/AdminDashboard.tsx',
+  'src/components/admin/view/AdminHeader.tsx',
+  'src/components/admin/view/AdminSidebar.tsx',
+  'src/components/admin/view/LiveModeBadge.tsx',
+  'src/components/admin/view/NewOrderAlertBar.tsx',
+  'src/components/admin/view/adminNav.ts',
+  // Order Integrity
+  'src/components/admin/OrderIntegrityPanel.tsx',
+  'src/components/admin/view/integrity/IntegrityFilters.tsx',
+  'src/components/admin/view/integrity/IntegritySummary.tsx',
+  'src/components/admin/view/integrity/IntegrityTable.tsx',
+  'src/components/admin/view/integrity/integrityView.ts',
+  // Operations Health
+  'src/components/admin/OperationsHealthPanel.tsx',
+  'src/components/admin/view/health/HealthJobsTable.tsx',
+  'src/components/admin/view/health/HealthMetric.tsx',
+  'src/components/admin/view/health/HealthSystemCard.tsx',
+  'src/components/admin/view/health/healthView.ts',
+  // Operations Alerts
+  'src/components/admin/OperationsAlertsPanel.tsx',
+  'src/components/admin/view/alerts/AlertRow.tsx',
+  'src/components/admin/view/alerts/alertsView.ts',
+  // Live Orders
+  'src/components/admin/LiveOrdersPanel.tsx',
+  'src/components/admin/view/orders/DetailRow.tsx',
+  'src/components/admin/view/orders/OrderReceiptModal.tsx',
+  'src/components/admin/view/orders/OrdersRequiringVerificationCard.tsx',
+  'src/components/admin/view/orders/OrdersTable.tsx',
+  'src/components/admin/view/orders/TapPaymentDetails.tsx',
+  'src/components/admin/view/orders/ordersView.ts',
+  // Shared by Operations Health and Operations Alerts
+  'src/components/admin/view/adminTime.ts',
+];
+
+const LEGACY_GLASS = /\bglass-(card|panel|btn|input)[a-z-]*/;
+
+for (const rel of ADMIN_MIGRATED) {
+  const full = join(ROOT, rel);
+  if (!existsSync(full)) {
+    violations.push({
+      file: rel, line: 0, rule: 'admin-migrated-missing',
+      message: 'listed as migrated but the file does not exist — update ADMIN_MIGRATED',
+      snippet: '',
+    });
+    continue;
+  }
+  readFileSync(full, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    if (LEGACY_GLASS.test(line)) {
+      violations.push({
+        file: rel, line: i + 1, rule: 'legacy-glass-in-migrated-admin',
+        message: 'migrated admin surface may not use the legacy .glass-* utilities',
+        snippet: line.trim().slice(0, 100),
+      });
+    }
+  });
+}
+
+/**
  * Surfaces that have completed their design-system migration. Kept as a record,
  * and as a guard that these files continue to exist.
  *
