@@ -1,25 +1,69 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Download, Edit, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+
 import { useApp } from '../../context/AppContext';
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Field } from '../../design-system/ui/Field';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
+import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import { Product, Category } from '../../types';
 import { getCSVTemplateData, parseCSVMenu } from '../../utils/calculations';
 import { Price } from '../Price';
 import { ADMIN_LOCALES } from './adminLocales';
+import { AdminModal } from './view/shared/AdminModal';
 
+const TH = 'px-4 py-3 text-start';
+const TD = 'px-4 py-2 align-middle';
+
+const ICON_BTN = [
+  'ds-motion inline-flex size-8 items-center justify-center rounded-[var(--radius-ds-sm)]',
+  'border border-con-line bg-con-surface-2 transition-colors duration-150',
+  'hover:bg-con-surface disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2',
+].join(' ');
+
+const TEXTAREA = [
+  'ds-motion w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-2.5',
+  'text-[13px] text-con-text transition-colors duration-150',
+  'focus-visible:outline-2 focus-visible:outline-offset-2',
+].join(' ');
+
+const SELECT = [
+  'ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3',
+  'text-[15px] text-con-text transition-colors duration-150',
+  'focus-visible:outline-2 focus-visible:outline-offset-2',
+].join(' ');
+
+/**
+ * Menu management — products, categories and the CSV bulk uploader.
+ *
+ * Every write, validation rule and confirmation is carried over unchanged. Two
+ * worth naming because they are easy to "tidy" into bugs:
+ *
+ *   The product price is REJECTED when it is not a finite number above zero,
+ *   rather than silently defaulting. The default it used to fall back to hid
+ *   typos and turned a legitimate 0 into 20.00 SAR.
+ *
+ *   The CSV commit is a two-step: parse and review first, then commit. The
+ *   parse is deliberately allowed to succeed WITH warnings, because a sheet with
+ *   one bad row should still let the other ninety through after a human looks.
+ */
 export const MenuManagementPanel: React.FC = () => {
   const {
-    categories, products, branches,
+    categories, products,
     addCategory, updateCategory, deleteCategory,
     addProduct, updateProduct, deleteProduct,
-    toggleProductAvailability, isProductAvailableInBranch, bulkUploadMenu,
-    currentUser, adminLang,
+    bulkUploadMenu, currentUser, adminLang,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
+  const family = useDsFontClass();
 
   const [menuSubTab, setMenuSubTab] = useState<'categories' | 'products' | 'csv'>('products');
-  
+
   // Dialogs and edits states
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -145,9 +189,9 @@ export const MenuManagementPanel: React.FC = () => {
   const handleCommitCSV = () => {
     if (isAccountant || !csvResult || csvResult.products.length === 0) return;
     bulkUploadMenu(csvResult.categories, csvResult.products);
-    
-    alert(adminLang === 'en' 
-      ? `Successfully loaded ${csvResult.products.length} products to the active menu database!` 
+
+    alert(adminLang === 'en'
+      ? `Successfully loaded ${csvResult.products.length} products to the active menu database!`
       : `تم إدراج ${csvResult.products.length} وجبات بنجاح في منيو المطعم!`);
 
     setRawCsvText('');
@@ -178,425 +222,349 @@ export const MenuManagementPanel: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const subTab = (id: typeof menuSubTab, label: string, icon?: React.ReactNode) => (
+    <button
+      type="button"
+      onClick={() => setMenuSubTab(id)}
+      aria-current={menuSubTab === id ? 'page' : undefined}
+      className={[
+        'ds-motion inline-flex min-h-11 items-center gap-1.5 border-b-2 px-4',
+        'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2',
+        menuSubTab === id ? 'border-ember' : 'border-transparent hover:bg-con-surface-2',
+      ].join(' ')}
+    >
+      {icon}
+      <Text variant="label" tone={menuSubTab === id ? 'ember' : 'secondary'} as="span">{label}</Text>
+    </button>
+  );
+
   return (
     <>
-            <div className="space-y-4 animate-fade-in">
-              
-              {/* Sub tabs selectors */}
-              <div className="flex border-b border-gray-200">
-                <button 
-                  onClick={() => setMenuSubTab('products')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'products' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                  {t.products_tab}
-                </button>
-                <button 
-                  onClick={() => setMenuSubTab('categories')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all ${menuSubTab === 'categories' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                  {t.categories_tab}
-                </button>
-                <button 
-                  onClick={() => setMenuSubTab('csv')}
-                  className={`py-2 px-4 text-xs font-black border-b-2 transition-all flex items-center gap-1.5 ${menuSubTab === 'csv' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  <span>{t.csv_tab}</span>
-                </button>
+      <div className="space-y-4">
+        <div className="flex border-b border-con-line">
+          {subTab('products', t.products_tab)}
+          {subTab('categories', t.categories_tab)}
+          {subTab('csv', t.csv_tab, <FileSpreadsheet className="size-3.5" aria-hidden="true" />)}
+        </div>
+
+        {menuSubTab === 'products' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <Text variant="heading" as="h3">{t.products_tab}</Text>
+              <Button
+                label={t.add_prod_btn}
+                onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
+                disabled={isAccountant}
+                leading={<Plus className="size-4" aria-hidden="true" />}
+              />
+            </div>
+
+            <Card flush className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-con-line">
+                      {['Photo', t.product_name_en, t.product_name_ar, t.category, t.price, t.calories, t.actions].map((h, i) => (
+                        <th key={h || `sp-${i}`} className={TH}>
+                          <Text variant="caption" tone="tertiary" as="span">{h}</Text>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map(p => {
+                      const catMatch = categories.find(c => c.id === p.categoryId);
+                      return (
+                        <tr key={p.id} className="border-t border-con-line">
+                          <td className={TD}>
+                            <img src={p.imageUrl} alt={p.nameEn}
+                              className="size-10 rounded-[var(--radius-ds-sm)] border border-con-line bg-con-surface-2 object-cover" />
+                          </td>
+                          <td className={TD}><Text variant="label" as="span">{p.nameEn}</Text></td>
+                          <td className={TD}><Text variant="label" as="span" dir="rtl">{p.nameAr}</Text></td>
+                          <td className={TD}>
+                            {/* An orphaned product is a real problem — it cannot
+                                appear in the app menu at all — so it reads as a
+                                warning rather than as grey filler. */}
+                            {catMatch
+                              ? <Text variant="body" tone="secondary" as="span">{isRTL ? catMatch.nameAr : catMatch.nameEn}</Text>
+                              : <StatusPill label="No Category" tone="warning" />}
+                          </td>
+                          <td className={TD}>
+                            <Text variant="label" as="span"><Price amount={p.price} lang={adminLang} /></Text>
+                          </td>
+                          <td className={TD}>
+                            <Text variant="body" tone="secondary" numeric as="span">{p.calories} kcal</Text>
+                          </td>
+                          <td className={TD}>
+                            <div className="flex gap-1.5">
+                              <button type="button" onClick={() => handleOpenEditProduct(p)} disabled={isAccountant}
+                                aria-label={isRTL ? 'تعديل المنتج' : 'Edit product'} className={ICON_BTN}>
+                                <Edit className="size-3.5 text-con-text-2" aria-hidden="true" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => { if (confirm('Delete product?')) deleteProduct(p.id); }}
+                                disabled={isAccountant}
+                                aria-label={isRTL ? 'حذف المنتج' : 'Delete product'}
+                                className={ICON_BTN}
+                              >
+                                <Trash2 className="size-3.5 text-danger-ds" aria-hidden="true" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </Card>
+          </div>
+        )}
 
-              {/* SUB TAB 1: PRODUCT LIST & ADD FORM */}
-              {menuSubTab === 'products' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-black text-gray-800 uppercase">{t.products_tab}</h3>
-                    <button 
-                      onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
-                      disabled={isAccountant}
-                      className={`bg-primary text-white text-xs font-extrabold py-2 px-3.5 rounded-xl flex items-center gap-1 transition-all ${isAccountant ? 'opacity-50 cursor-not-allowed' : 'hover:scale-102'}`}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{t.add_prod_btn}</span>
-                    </button>
-                  </div>
+        {menuSubTab === 'categories' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <Text variant="heading" as="h3">{t.categories_tab}</Text>
+              <Button
+                label={t.add_cat_btn}
+                onClick={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
+                disabled={isAccountant}
+                leading={<Plus className="size-4" aria-hidden="true" />}
+              />
+            </div>
 
-                  <div className="glass-card rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <thead className="bg-gray-50 text-[10px] text-gray-400 font-bold uppercase">
-                        <tr>
-                          <th className="px-4 py-3">Photo</th>
-                          <th className="px-4 py-3">{t.product_name_en}</th>
-                          <th className="px-4 py-3">{t.product_name_ar}</th>
-                          <th className="px-4 py-3">{t.category}</th>
-                          <th className="px-4 py-3">{t.price}</th>
-                          <th className="px-4 py-3">{t.calories}</th>
-                          <th className="px-4 py-3">{t.actions}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {products.map(p => {
-                          const catMatch = categories.find(c => c.id === p.categoryId);
-                          return (
-                            <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="px-4 py-2">
-                                <img src={p.imageUrl} alt={p.nameEn} className="w-10 h-10 object-cover rounded-lg bg-gray-50 border border-gray-100" />
-                              </td>
-                              <td className="px-4 py-2 font-bold text-gray-900">{p.nameEn}</td>
-                              <td className="px-4 py-2 font-bold text-gray-900">{p.nameAr}</td>
-                              <td className="px-4 py-2 text-primary font-bold">
-                                {catMatch ? (isRTL ? catMatch.nameAr : catMatch.nameEn) : 'No Category'}
-                              </td>
-                              <td className="px-4 py-2 font-black text-secondary"><Price amount={p.price} /></td>
-                              <td className="px-4 py-2 font-semibold text-gray-600">{p.calories} kcal</td>
-                              <td className="px-4 py-2">
-                                <div className="flex gap-1.5">
-                                  <button 
-                                    onClick={() => handleOpenEditProduct(p)}
-                                    disabled={isAccountant}
-                                    className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-gray-100 hover:text-primary transition-all disabled:opacity-50"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => { if (confirm('Delete product?')) deleteProduct(p.id); }}
-                                    disabled={isAccountant}
-                                    className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
-                                    aria-label={isRTL ? 'حذف المنتج' : 'Delete product'}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+            <Card flush className="max-w-xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-con-line">
+                      {['Category Name (EN)', 'Category Name (AR)', t.actions].map((h, i) => (
+                        <th key={h || `sp-${i}`} className={TH}>
+                          <Text variant="caption" tone="tertiary" as="span">{h}</Text>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map(c => (
+                      <tr key={c.id} className="border-t border-con-line">
+                        <td className={`${TD} py-3`}><Text variant="label" as="span">{c.nameEn}</Text></td>
+                        <td className={`${TD} py-3`}><Text variant="label" as="span" dir="rtl">{c.nameAr}</Text></td>
+                        <td className={`${TD} py-3`}>
+                          <div className="flex gap-1.5">
+                            <button type="button" onClick={() => handleOpenEditCategory(c)} disabled={isAccountant}
+                              aria-label={isRTL ? 'تعديل الفئة' : 'Edit category'} className={ICON_BTN}>
+                              <Edit className="size-3.5 text-con-text-2" aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { if (confirm('Delete Category? All associated products will be disabled.')) deleteCategory(c.id); }}
+                              disabled={isAccountant}
+                              aria-label={isRTL ? 'حذف الفئة' : 'Delete category'}
+                              className={ICON_BTN}
+                            >
+                              <Trash2 className="size-3.5 text-danger-ds" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {menuSubTab === 'csv' && (
+          <Card className="space-y-4">
+            <div>
+              <Text variant="title" as="h3">{t.csv_title}</Text>
+              <Text variant="body" tone="tertiary" as="p" className="mt-1">{t.csv_help}</Text>
+            </div>
+
+            <a
+              href={getCSVTemplateData()}
+              download="spicy_meal_menu_template.csv"
+              className="ds-motion inline-flex min-h-9 items-center gap-1.5 rounded-[var(--radius-ds-md)] focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <Download className="size-4 text-ember" aria-hidden="true" />
+              <Text variant="label" tone="ember" as="span" className="underline">{t.download_template}</Text>
+            </a>
+
+            <div className="rounded-[var(--radius-ds-lg)] border-2 border-dashed border-con-line bg-con-surface-2 p-6 text-center">
+              <input type="file" accept=".csv" onChange={handleFileUpload} ref={fileInputRef} className="hidden" />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label={isRTL ? 'اختيار ملف CSV للاستيراد' : 'Choose a CSV file to import'}
+                className="ds-motion w-full space-y-1 focus-visible:outline-2 focus-visible:outline-offset-2"
+              >
+                <FileSpreadsheet className="mx-auto size-8 text-con-text-3" aria-hidden="true" />
+                <Text variant="label" as="p">{t.drag_drop}</Text>
+                <Text variant="caption" tone="tertiary" as="p">supports raw text sheets</Text>
+              </button>
+            </div>
+
+            <label className="block space-y-1.5">
+              <Text variant="caption" tone="tertiary" as="span" className="block">
+                {t.pasted_csv}
+              </Text>
+              <textarea
+                rows={4}
+                value={rawCsvText}
+                onChange={(e) => setRawCsvText(e.target.value)}
+                placeholder="category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url"
+                className={`${TEXTAREA} font-ds-num`}
+              />
+            </label>
+
+            <Button label={t.parse_btn} onClick={handleParseCSV} />
+
+            {csvResult && (
+              <div className="space-y-3 rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface-2 p-4">
+                <div className="flex items-center justify-between gap-2 border-b border-con-line pb-2">
+                  <Text variant="label" as="span">{csvMsg}</Text>
+                  <StatusPill label={`${t.parsed_count}: ${csvResult.products.length}`} tone="info" />
                 </div>
-              )}
 
-              {/* SUB TAB 2: CATEGORY LIST & ADD FORM */}
-              {menuSubTab === 'categories' && (
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h3 className="text-xs font-black text-gray-800 uppercase">{t.categories_tab}</h3>
-                    <button 
-                      onClick={() => { setEditingCategory(null); setIsCategoryModalOpen(true); }}
-                      disabled={isAccountant}
-                      className={`bg-primary text-white text-xs font-extrabold py-2 px-3.5 rounded-xl flex items-center gap-1 transition-all ${isAccountant ? 'opacity-50 cursor-not-allowed' : 'hover:scale-102'}`}
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{t.add_cat_btn}</span>
-                    </button>
-                  </div>
+                {/* Warnings do NOT block the commit: a sheet with one bad row
+                    should still let the other ninety through once a human has
+                    read the list. */}
+                {csvResult.errors.length > 0 ? (
+                  <Notice title={`${t.errors}:`} tone="blocking">
+                    <ul className="list-disc ps-4">
+                      {csvResult.errors.map((err, i) => (
+                        <li key={i}><Text variant="caption" tone="danger" as="span">{err}</Text></li>
+                      ))}
+                    </ul>
+                  </Notice>
+                ) : (
+                  <Notice title={`✓ ${t.no_errors}`} tone="success" />
+                )}
 
-                  <div className="glass-card rounded-2xl overflow-hidden max-w-xl">
-                    <table className="w-full text-left text-xs text-gray-500" style={{ textAlign: isRTL ? 'right' : 'left' }}>
-                      <thead className="bg-gray-50 text-[10px] text-gray-400 font-bold uppercase">
-                        <tr>
-                          <th className="px-4 py-3">Category Name (EN)</th>
-                          <th className="px-4 py-3">Category Name (AR)</th>
-                          <th className="px-4 py-3">{t.actions}</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {categories.map(c => (
-                          <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="px-4 py-3 font-extrabold text-primary">{c.nameEn}</td>
-                            <td className="px-4 py-3 font-extrabold text-primary">{c.nameAr}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex gap-1.5">
-                                <button 
-                                  onClick={() => handleOpenEditCategory(c)}
-                                  disabled={isAccountant}
-                                  className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-gray-100 hover:text-primary transition-all disabled:opacity-50"
-                                >
-                                  <Edit className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => { if (confirm('Delete Category? All associated products will be disabled.')) deleteCategory(c.id); }}
-                                  disabled={isAccountant}
-                                  className="p-1 rounded bg-gray-50 border border-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all disabled:opacity-50"
-                                  aria-label={isRTL ? 'حذف الفئة' : 'Delete category'}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
+                <div className="max-h-[140px] overflow-y-auto rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-con-line">
+                        {['Parsed Name (EN)', 'Price', 'Calories'].map((h) => (
+                          <th key={h} className="px-3 py-2 text-start">
+                            <Text variant="caption" tone="tertiary" as="span">{h}</Text>
+                          </th>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {csvResult.products.map((cp, idx) => (
+                        <tr key={idx} className="border-t border-con-line">
+                          <td className="px-3 py-1.5"><Text variant="caption" as="span">{cp.nameEn}</Text></td>
+                          <td className="px-3 py-1.5">
+                            <Text variant="caption" as="span"><Price amount={cp.price} lang={adminLang} /></Text>
+                          </td>
+                          <td className="px-3 py-1.5">
+                            <Text variant="caption" tone="secondary" numeric as="span">{cp.calories} kcal</Text>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              )}
 
-              {/* SUB TAB 3: SMART EXCEL/CSV BULK MENU UPLOADER */}
-              {menuSubTab === 'csv' && (
-                <div className="glass-card p-4 space-y-4">
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900">{t.csv_title}</h3>
-                    <p className="text-xs text-gray-400 mt-1">{t.csv_help}</p>
-                  </div>
+                <Button
+                  label={t.commit_btn}
+                  onClick={handleCommitCSV}
+                  disabled={isAccountant || csvResult.products.length === 0}
+                  className="w-full"
+                />
+              </div>
+            )}
+          </Card>
+        )}
+      </div>
 
-                  {/* Template download link button */}
-                  <a 
-                    href={getCSVTemplateData()} 
-                    download="spicy_meal_menu_template.csv"
-                    className="inline-flex items-center gap-1.5 text-xs text-secondary font-black hover:underline"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>{t.download_template}</span>
-                  </a>
-
-                  {/* Drag and Drop uploader box */}
-                  <div className="border-2 border-dashed border-slate-200 hover:border-primary rounded-2xl p-6 text-center transition-all cursor-pointer bg-white/40">
-                    <input 
-                      type="file" 
-                      accept=".csv" 
-                      onChange={handleFileUpload}
-                      ref={fileInputRef}
-                      className="hidden" 
-                    />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="space-y-1 w-full" aria-label={isRTL ? 'اختيار ملف CSV للاستيراد' : 'Choose a CSV file to import'}>
-                      <FileSpreadsheet className="w-8 h-8 text-primary/40 mx-auto" />
-                      <p className="text-xs font-bold text-gray-700">{t.drag_drop}</p>
-                      <p className="text-[10px] text-gray-400">supports raw text sheets</p>
-                    </button>
-                  </div>
-
-                  {/* Pasted text container fallback */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-gray-400 uppercase">{t.pasted_csv}</label>
-                    <textarea 
-                      rows={4}
-                      value={rawCsvText}
-                      onChange={(e) => setRawCsvText(e.target.value)}
-                      placeholder="category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url"
-                      className="w-full text-[10px] font-mono p-2.5 border border-gray-100 bg-gray-50/50 rounded-xl outline-none focus:bg-white"
-                    ></textarea>
-                  </div>
-
-                  <button 
-                    onClick={handleParseCSV}
-                    className="bg-primary text-white text-xs font-extrabold py-2 px-4 rounded-xl shadow-xs"
-                  >
-                    {t.parse_btn}
-                  </button>
-
-                  {/* Render parser outputs */}
-                  {csvResult && (
-                    <div className="border border-purple-100 bg-purple-50/20 rounded-2xl p-4 space-y-3">
-                      <div className="flex justify-between items-center pb-2 border-b border-purple-50">
-                        <span className="text-xs font-black text-primary">{csvMsg}</span>
-                        <span className="text-xs bg-secondary text-white font-black px-2.5 py-0.5 rounded-full">
-                          {t.parsed_count}: {csvResult.products.length}
-                        </span>
-                      </div>
-
-                      {/* Validator reports */}
-                      {csvResult.errors.length > 0 ? (
-                        <div className="p-3 bg-red-50 border border-red-100 rounded-xl space-y-1">
-                          <h4 className="text-[10px] font-black text-red-700 uppercase">{t.errors}:</h4>
-                          <ul className="list-disc pl-4 text-[9.5px] text-red-600 font-semibold space-y-0.5">
-                            {csvResult.errors.map((err, i) => <li key={i}>{err}</li>)}
-                          </ul>
-                        </div>
-                      ) : (
-                        <div className="p-2.5 bg-green-50 text-green-700 text-[10px] rounded-lg font-bold border border-green-100">
-                          ✓ {t.no_errors}
-                        </div>
-                      )}
-
-                      {/* Preview table of products parsed */}
-                      <div className="max-h-[140px] overflow-y-auto border border-gray-100 rounded-xl bg-white">
-                        <table className="w-full text-[10px] text-gray-500 text-left">
-                          <thead className="bg-gray-50 text-gray-400 font-bold uppercase">
-                            <tr>
-                              <th className="px-3 py-2">Parsed Name (EN)</th>
-                              <th className="px-3 py-2">Price</th>
-                              <th className="px-3 py-2">Calories</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-50">
-                            {csvResult.products.map((cp, idx) => (
-                              <tr key={idx}>
-                                <td className="px-3 py-1.5 font-bold text-gray-800">{cp.nameEn}</td>
-                                <td className="px-3 py-1.5 font-bold text-secondary"><Price amount={cp.price} /></td>
-                                <td className="px-3 py-1.5">{cp.calories} kcal</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <button 
-                        onClick={handleCommitCSV}
-                        disabled={isAccountant || csvResult.products.length === 0}
-                        className={`w-full text-center text-xs font-black py-2.5 rounded-xl transition-all ${isAccountant || csvResult.products.length === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-secondary text-white hover:bg-secondary/95'}`}
-                      >
-                        {t.commit_btn}
-                      </button>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-
-      {/* MODAL 5: CATEGORY CREATE/EDIT DRAWER */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveCategory} className="glass-panel w-full max-w-sm overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
-              <h3 className="text-sm font-black text-slate-800 uppercase">{editingCategory ? 'Edit Menu Category' : 'Create Menu Category'}</h3>
-              <button type="button" onClick={() => setIsCategoryModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category English Name</label>
-                <input 
-                  type="text"
-                  required
-                  value={catNameEn}
-                  onChange={(e) => setCatNameEn(e.target.value)}
-                  placeholder="e.g., Crunchy Sides"
-                  className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category Arabic Name</label>
-                <input 
-                  type="text"
-                  required
-                  value={catNameAr}
-                  onChange={(e) => setCatNameAr(e.target.value)}
-                  placeholder="مثال: مقبلات مقرمشة"
-                  className="glass-input w-full text-xs p-2.5 outline-none text-slate-800"
-                />
-              </div>
-            </div>
-
-            <button type="submit" className="glass-btn-primary w-full py-2.5 text-xs">
-              {t.save}
+        <AdminModal
+          title={editingCategory ? 'Edit Menu Category' : 'Create Menu Category'}
+          isRTL={isRTL}
+          onClose={() => setIsCategoryModalOpen(false)}
+          size="md"
+        >
+          {/* The form lives INSIDE the body, not split across body and footer,
+              so Enter-to-submit and the browser's own `required` validation
+              keep working exactly as they did. */}
+          <form onSubmit={handleSaveCategory} className="space-y-3">
+            <Field
+              label="Category English Name"
+              required
+              value={catNameEn}
+              onValueChange={setCatNameEn}
+              placeholder="e.g., Crunchy Sides"
+            />
+            <Field
+              label="Category Arabic Name"
+              required
+              value={catNameAr}
+              onValueChange={setCatNameAr}
+              placeholder="مثال: مقبلات مقرمشة"
+              dir="rtl"
+            />
+            <button
+              type="submit"
+              className="ds-motion inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-ds-md)] bg-ember px-4 transition-opacity duration-150 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <Text variant="label" tone="onEmber" as="span">{t.save}</Text>
             </button>
           </form>
-        </div>
+        </AdminModal>
       )}
 
-      {/* MODAL 6: PRODUCT CREATE/EDIT DRAWER */}
       {isProductModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleSaveProduct} className="glass-panel w-full max-w-md overflow-hidden p-6 space-y-4 rounded-[2rem] shadow-2xl" style={{ direction: isRTL ? 'rtl' : 'ltr' }}>
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200/50">
-              <h3 className="text-sm font-black text-slate-800 uppercase">{editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}</h3>
-              <button type="button" onClick={() => setIsProductModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold" aria-label={isRTL ? 'إغلاق' : 'Close'}>✕</button>
+        <AdminModal
+          title={editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}
+          isRTL={isRTL}
+          onClose={() => setIsProductModalOpen(false)}
+        >
+          <form onSubmit={handleSaveProduct} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2.5">
+              <Field label={t.product_name_en} required value={prodNameEn} onValueChange={setProdNameEn} placeholder="Spicy Tender Strips" />
+              <Field label={t.product_name_ar} required value={prodNameAr} onValueChange={setProdNameAr} placeholder="ستربس الدجاج الحار" dir="rtl" />
             </div>
 
-            <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.product_name_en}</label>
-                  <input 
-                    type="text"
-                    required
-                    value={prodNameEn}
-                    onChange={(e) => setProdNameEn(e.target.value)}
-                    placeholder="Spicy Tender Strips"
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">{t.product_name_ar}</label>
-                  <input 
-                    type="text"
-                    required
-                    value={prodNameAr}
-                    onChange={(e) => setProdNameAr(e.target.value)}
-                    placeholder="ستربس الدجاج الحار"
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Description (EN)</label>
-                  <textarea 
-                    value={prodDescEn}
-                    onChange={(e) => setProdDescEn(e.target.value)}
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                    rows={2}
-                  ></textarea>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Description (AR)</label>
-                  <textarea 
-                    value={prodDescAr}
-                    onChange={(e) => setProdDescAr(e.target.value)}
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                    rows={2}
-                  ></textarea>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Price (SAR)</label>
-                  <input 
-                    type="number"
-                    step="0.01"
-                    required
-                    value={prodPrice}
-                    onChange={(e) => setProdPrice(e.target.value)}
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Calories</label>
-                  <input 
-                    type="number"
-                    required
-                    value={prodCalories}
-                    onChange={(e) => setProdCalories(e.target.value)}
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Category</label>
-                  <select 
-                    required
-                    value={prodCatId}
-                    onChange={(e) => setProdCatId(e.target.value)}
-                    className="glass-input w-full text-xs p-2 outline-none text-slate-800 font-bold"
-                  >
-                    <option value="">-- Choose --</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{isRTL ? c.nameAr : c.nameEn}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Image URL</label>
-                <input 
-                  type="text"
-                  value={prodImg}
-                  onChange={(e) => setProdImg(e.target.value)}
-                  placeholder="https://unsplash..."
-                  className="glass-input w-full text-xs p-2 outline-none text-slate-800"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-2.5">
+              <label className="flex flex-col gap-2">
+                <span className="text-start text-[13px] font-semibold text-con-text-2">Description (EN)</span>
+                <textarea rows={2} value={prodDescEn} onChange={(e) => setProdDescEn(e.target.value)} className={`${TEXTAREA} ${family}`} />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-start text-[13px] font-semibold text-con-text-2">Description (AR)</span>
+                <textarea rows={2} dir="rtl" value={prodDescAr} onChange={(e) => setProdDescAr(e.target.value)} className={`${TEXTAREA} font-ds-ar`} />
+              </label>
             </div>
 
-            <button type="submit" className="glass-btn-primary w-full py-2.5 text-xs">
-              {t.save}
+            <div className="grid grid-cols-3 gap-2.5">
+              <Field label="Price (SAR)" type="number" step="0.01" required numeric value={prodPrice} onValueChange={setProdPrice} />
+              <Field label="Calories" type="number" required numeric value={prodCalories} onValueChange={setProdCalories} />
+              <label className="flex flex-col gap-2">
+                <span className="text-start text-[13px] font-semibold text-con-text-2">Category</span>
+                <select required value={prodCatId} onChange={(e) => setProdCatId(e.target.value)} className={`${SELECT} ${family}`}>
+                  <option value="">-- Choose --</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{isRTL ? c.nameAr : c.nameEn}</option>)}
+                </select>
+              </label>
+            </div>
+
+            <Field label="Image URL" value={prodImg} onValueChange={setProdImg} placeholder="https://unsplash..." />
+
+            <button
+              type="submit"
+              className="ds-motion inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-ds-md)] bg-ember px-4 transition-opacity duration-150 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              <Text variant="label" tone="onEmber" as="span">{t.save}</Text>
             </button>
           </form>
-        </div>
+        </AdminModal>
       )}
     </>
   );

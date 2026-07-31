@@ -1,5 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Search, Loader2, MapPin, X } from 'lucide-react';
+
+import { Text } from '../design-system/ui/Text';
+import { useDsFontClass } from '../design-system/ui/useDsLang';
 import { mapConfig } from '../lib/map';
 
 interface GeoResult {
@@ -30,6 +33,7 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const family = useDsFontClass();
 
   const runSearch = async () => {
     const query = q.trim();
@@ -127,37 +131,45 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-lg px-2 py-1.5 shadow-sm">
-        <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+      <div className="flex items-center gap-1.5 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-2 py-1.5">
+        <Search className="size-3.5 shrink-0 text-con-text-3" aria-hidden="true" />
         <input
           value={q}
           onChange={(e) => { setQ(e.target.value); if (!e.target.value) clear(); }}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runSearch(); } }}
           placeholder={isRTL ? 'ابحث عن عنوان أو مكان…' : 'Search address or place…'}
+          aria-label={isRTL ? 'ابحث عن عنوان أو مكان' : 'Search address or place'}
           dir={isRTL ? 'rtl' : 'ltr'}
-          className="flex-1 bg-transparent text-[11px] font-bold text-slate-800 placeholder:text-slate-400 outline-none min-w-0"
+          className={`ds-motion min-w-0 flex-1 bg-transparent text-[13px] text-con-text outline-none placeholder:text-con-text-3 ${family}`}
         />
-        {loading && <Loader2 className="w-3.5 h-3.5 text-primary animate-spin flex-shrink-0" />}
+        {loading && <Loader2 className="size-3.5 shrink-0 animate-spin text-ember" aria-hidden="true" />}
         {!loading && q && (
-          <button type="button" onClick={clear} aria-label={isRTL ? 'مسح' : 'Clear'} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
-            <X className="w-3.5 h-3.5" />
+          <button
+            type="button"
+            onClick={clear}
+            aria-label={isRTL ? 'مسح' : 'Clear'}
+            className="ds-motion shrink-0 rounded-[var(--radius-ds-sm)] focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            <X className="size-3.5 text-con-text-3" aria-hidden="true" />
           </button>
         )}
         <button
           type="button"
           onClick={() => void runSearch()}
           disabled={q.trim().length < 2}
-          className="text-[10px] font-black text-primary disabled:opacity-40 flex-shrink-0 px-1"
+          className="ds-motion shrink-0 rounded-[var(--radius-ds-sm)] px-1 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
         >
-          {isRTL ? 'بحث' : 'Go'}
+          <Text variant="caption" tone="ember" as="span">{isRTL ? 'بحث' : 'Go'}</Text>
         </button>
       </div>
 
       {open && (
-        <div className="absolute z-[60] mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl overflow-hidden max-h-52 overflow-y-auto">
+        <div className="absolute z-[60] mt-1 max-h-52 w-full overflow-y-auto overflow-x-hidden rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface">
           {results.length === 0 ? (
-            <div className="px-3 py-2 text-[10px] font-bold text-slate-400">
-              {searched ? (isRTL ? 'لا توجد نتائج' : 'No results') : ''}
+            <div className="px-3 py-2">
+              <Text variant="caption" tone="tertiary" as="span">
+                {searched ? (isRTL ? 'لا توجد نتائج' : 'No results') : ''}
+              </Text>
             </div>
           ) : (
             results.map((r) => (
@@ -165,10 +177,10 @@ export const MapSearchBox: React.FC<MapSearchBoxProps> = ({ isRTL, onSelect }) =
                 key={r.id}
                 type="button"
                 onClick={() => pick(r)}
-                className="w-full text-start flex items-start gap-2 px-3 py-2 hover:bg-slate-50 border-b border-slate-50 last:border-b-0"
+                className="ds-motion flex w-full items-start gap-2 border-b border-con-line px-3 py-2 text-start transition-colors duration-150 last:border-b-0 hover:bg-con-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2"
               >
-                <MapPin className="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-                <span className="text-[11px] font-semibold text-slate-700 leading-snug">{r.label}</span>
+                <MapPin className="mt-0.5 size-3.5 shrink-0 text-ember" aria-hidden="true" />
+                <Text variant="caption" tone="secondary" as="span">{r.label}</Text>
               </button>
             ))
           )}

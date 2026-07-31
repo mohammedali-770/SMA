@@ -1,12 +1,22 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import React from 'react';
 import type { Branch } from '../../types';
 
 // The panel pulls everything from the app context; mock it so we can drive the
 // delete control in isolation (no Supabase, no realtime, no provider tree).
+//
+// `AppContext` itself is also exported, because the design-system primitives
+// this panel now renders read the active language through `useDsLang`, which
+// reads the context DEFENSIVELY (`useContext(AppContext)?.adminLang ?? 'en'`).
+// An empty context is exactly the fallback path that hook exists for, so the
+// primitives render in English here rather than crashing. Assertions unchanged.
 const useApp = vi.fn();
-vi.mock('../../context/AppContext', () => ({ useApp: () => useApp() }));
+vi.mock('../../context/AppContext', () => ({
+  AppContext: React.createContext(undefined),
+  useApp: () => useApp(),
+}));
 
 import { BranchPoliciesPanel } from './BranchPoliciesPanel';
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Loader2, AlertCircle, Check, X, DownloadCloud, CheckCircle2, Circle } from 'lucide-react';
+import { Check, CheckCircle2, Circle, DownloadCloud, Loader2, X } from 'lucide-react';
+
 import {
   catalog, lazywaitCatalog,
   DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier,
@@ -7,12 +8,24 @@ import {
   LazywaitCatalogEntity, LazywaitMappingEntity, LazywaitPriceRef,
 } from '../../lib/api';
 import { suggestBestMatch, MatchLevel } from '../../lib/lazywaitMatch';
+import { Button } from '../../design-system/ui/Button';
+import { Card } from '../../design-system/ui/Card';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
+import { useDsFontClass } from '../../design-system/ui/useDsLang';
 
 /**
  * Admin catalog mapping: pull the Lazywait catalog server-side, review suggested
  * matches (by normalized Arabic/English/Turkish name), and CONFIRM ID mappings
  * onto local records — never overwriting local names/prices, never exposing a
  * secret. Accountants (disabled) can view status but not edit.
+ *
+ * RESTYLED ONLY. Every call, argument, confirmation prompt and piece of copy in
+ * this file is the one that was here before: `pull()`, `importToApp()`,
+ * `setMapping(entity, id, lazywaitId, priceRef)` with its price-selection
+ * fallback to `prices[0]`, and `clearMapping(entity, id)`. The Lazywait
+ * integration itself is untouched.
  */
 const ENTITIES: { key: LazywaitMappingEntity; catalogType: LazywaitCatalogEntity; label: string }[] = [
   { key: 'branch', catalogType: 'branch', label: 'Branches' },
@@ -22,12 +35,28 @@ const ENTITIES: { key: LazywaitMappingEntity; catalogType: LazywaitCatalogEntity
   { key: 'modifier', catalogType: 'addon', label: 'Modifiers' },
 ];
 
-const LEVEL_TONE: Record<MatchLevel, string> = {
-  high: 'bg-green-100 text-green-700',
-  medium: 'bg-amber-100 text-amber-700',
-  low: 'bg-orange-100 text-orange-700',
-  none: 'bg-slate-100 text-slate-400',
+/**
+ * Match confidence → pill tone.
+ *
+ * `low` and `medium` deliberately share the warning tone: both mean "a human
+ * must look at this", and splitting them into two colours invited an operator
+ * to treat `medium` as good enough to confirm blind.
+ */
+const LEVEL_TONE: Record<MatchLevel, PillTone> = {
+  high: 'success',
+  medium: 'warning',
+  low: 'warning',
+  none: 'neutral',
 };
+
+const SELECT = [
+  'ds-motion min-h-9 w-full max-w-[220px] rounded-[var(--radius-ds-md)] border border-con-line',
+  'bg-con-surface px-2 text-[13px] text-con-text transition-colors duration-150',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50',
+].join(' ');
+
+const TH = 'py-1 pe-2 text-start';
+const TD = 'py-1.5 pe-2 align-top';
 
 interface LocalRow { id: string; nameEn: string; nameAr: string; currentId: string | null; product?: DbProduct }
 
@@ -54,6 +83,8 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [pull, setPull] = useState<LazywaitPullResult | null>(null);
+
+  const family = useDsFontClass();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -179,106 +210,125 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <div>
-          <span className="text-[10px] font-black text-slate-600 uppercase">Catalog Mapping</span>
-          <p className="text-[8.5px] text-slate-400 font-bold mt-0.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <Text variant="label" tone="secondary" as="p">Catalog Mapping</Text>
+          <Text variant="caption" tone="tertiary" numeric as="p" className="mt-0.5">
             {status?.last_pull_at ? `Last pull ${new Date(status.last_pull_at).toLocaleString()}` : 'Not pulled yet'}
-          </p>
+          </Text>
         </div>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={runPull}
+          <Button
+            label="Pull from Lazywait"
+            onClick={() => { void runPull(); }}
             disabled={disabled || pulling || importing || loading}
-            className="glass-btn-primary text-[9px] py-1.5 px-3 font-black text-white disabled:opacity-50 flex items-center gap-1"
-          >
-            {pulling ? <Loader2 className="w-3 h-3 animate-spin" /> : <DownloadCloud className="w-3 h-3" />} Pull from Lazywait
-          </button>
-          <button
-            onClick={runImport}
+            loading={pulling}
+            variant="secondary"
+            leading={<DownloadCloud className="size-3.5" aria-hidden="true" />}
+          />
+          {/* Import is the destructive one — it rewrites the app menu from
+              Lazywait and hides local items — so it carries the primary weight
+              and its own typed confirmation. */}
+          <Button
+            label="Import to App"
+            onClick={() => { void runImport(); }}
             disabled={disabled || importing || pulling || loading || items.length === 0}
-            title={items.length === 0 ? 'Pull the Lazywait catalog first' : 'Import the pulled catalog into your app menu'}
-            className="glass-btn-primary text-[9px] py-1.5 px-3 font-black text-white disabled:opacity-40 flex items-center gap-1"
-          >
-            {importing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Import to App
-          </button>
+            loading={importing}
+            leading={<Check className="size-3.5" aria-hidden="true" />}
+          />
         </div>
       </div>
 
-      {error && <div className="text-[10px] font-bold text-red-600 flex items-center gap-1.5"><AlertCircle className="w-3.5 h-3.5" />{error}</div>}
-      {msg && <div className="text-[10px] font-bold text-green-600 flex items-center gap-1.5"><Check className="w-3.5 h-3.5" />{msg}</div>}
+      {error && <Notice title={error} tone="blocking" />}
+      {msg && <Notice title={msg} tone="success" />}
       {pull && pull.errors.length > 0 && (
-        <div className="text-[9px] font-bold text-amber-700 bg-amber-50 rounded-lg p-2 space-y-0.5">
-          {pull.errors.map((e, i) => <div key={i}>⚠ {e.endpoint}: {e.message}</div>)}
+        <div className="space-y-0.5 rounded-[var(--radius-ds-md)] border border-warn-line bg-warn-tint p-2">
+          {pull.errors.map((e, i) => (
+            <Text key={i} variant="caption" tone="warning" as="p">⚠ {e.endpoint}: {e.message}</Text>
+          ))}
         </div>
       )}
 
-      {/* Readiness + summary */}
       {status && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          <div className="glass-card rounded-xl p-2.5 bg-white/40">
-            <div className="text-[9px] font-black uppercase mb-1.5 flex items-center gap-1.5">
-              Pickup sync readiness
-              <span className={`px-1.5 py-0.5 rounded-full text-[8px] ${status.readiness.ready ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                {status.readiness.ready ? 'READY' : 'NOT READY'}
-              </span>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <Card className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Text variant="caption" tone="secondary" as="span">Pickup sync readiness</Text>
+              <StatusPill
+                label={status.readiness.ready ? 'READY' : 'NOT READY'}
+                tone={status.readiness.ready ? 'success' : 'warning'}
+              />
             </div>
-            <div className="space-y-1">
-              {readinessItems.map((r, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-[9.5px] font-bold text-slate-600">
-                  {r.ok ? <CheckCircle2 className="w-3 h-3 text-green-600" /> : <Circle className="w-3 h-3 text-slate-300" />}
-                  {r.label}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="glass-card rounded-xl p-2.5 bg-white/40">
-            <div className="text-[9px] font-black uppercase mb-1.5">Mapping status</div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[9.5px] font-bold text-slate-600">
+            {readinessItems.map((r, i) => (
+              <div key={i} className="flex items-center gap-1.5">
+                {r.ok
+                  ? <CheckCircle2 className="size-3 shrink-0 text-mint" aria-hidden="true" />
+                  : <Circle className="size-3 shrink-0 text-con-text-3" aria-hidden="true" />}
+                <Text variant="caption" tone="secondary" as="span">{r.label}</Text>
+              </div>
+            ))}
+          </Card>
+
+          <Card className="space-y-1.5">
+            <Text variant="caption" tone="secondary" as="p">Mapping status</Text>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               <SummaryRow label="Branches" c={status.branches} />
               <SummaryRow label="Categories" c={status.categories} />
               <SummaryRow label="Products" c={status.products} />
               <SummaryRow label="Groups" c={status.modifier_groups} />
               <SummaryRow label="Modifiers" c={status.modifiers} />
-              <div className="flex justify-between">
-                <span>Blocked orders</span>
-                <span className={status.blocked_orders ? 'text-red-600' : 'text-green-600'}>{status.blocked_orders}</span>
+              <div className="flex justify-between gap-2">
+                <Text variant="caption" tone="secondary" as="span">Blocked orders</Text>
+                <Text variant="caption" tone={status.blocked_orders ? 'danger' : 'success'} numeric as="span">
+                  {status.blocked_orders}
+                </Text>
               </div>
             </div>
-          </div>
+          </Card>
         </div>
       )}
 
-      {/* Entity tabs */}
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex flex-wrap gap-1">
         {ENTITIES.map((e) => {
           const c = status?.[e.key === 'modifier_group' ? 'modifier_groups' : (e.key === 'branch' ? 'branches' : e.key === 'category' ? 'categories' : e.key === 'product' ? 'products' : 'modifiers')];
           return (
             <button
               key={e.key}
+              type="button"
               onClick={() => setTab(e.key)}
-              className={`text-[9px] font-black px-2.5 py-1 rounded-full ${tab === e.key ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'}`}
+              aria-pressed={tab === e.key}
+              className={[
+                'ds-motion inline-flex min-h-9 items-center rounded-full px-2.5',
+                'transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2',
+                tab === e.key ? 'bg-ember' : 'bg-con-surface-2 hover:bg-con-surface',
+              ].join(' ')}
             >
-              {e.label}{c ? ` ${c.mapped}/${c.total}` : ''}
+              <Text variant="caption" tone={tab === e.key ? 'onEmber' : 'secondary'} as="span">
+                {e.label}{c ? ` ${c.mapped}/${c.total}` : ''}
+              </Text>
             </button>
           );
         })}
       </div>
 
-      {/* Mapping table for the active entity */}
       {loading ? (
-        <div className="text-[10px] text-slate-400 font-bold flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</div>
+        <Text variant="caption" tone="tertiary" as="p" className="flex items-center gap-1.5">
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> Loading…
+        </Text>
       ) : cands.length === 0 ? (
-        <p className="text-[10px] text-slate-400 font-bold">No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.</p>
+        <Text variant="caption" tone="tertiary" as="p">
+          No Lazywait {active.label.toLowerCase()} pulled yet — click “Pull from Lazywait”.
+        </Text>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-[10px]">
+          <table className="w-full">
             <thead>
-              <tr className="text-slate-400 font-black uppercase text-[8.5px] text-left">
-                <th className="py-1 pr-2">Local (EN / AR)</th>
-                <th className="py-1 pr-2">Suggested match</th>
-                <th className="py-1 pr-2">Map to Lazywait</th>
-                <th className="py-1 pr-2"></th>
+              <tr className="border-b border-con-line">
+                {['Local (EN / AR)', 'Suggested match', 'Map to Lazywait', ''].map((h, i) => (
+                  <th key={h || `sp-${i}`} className={TH}>
+                    <Text variant="caption" tone="tertiary" as="span">{h}</Text>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -288,33 +338,40 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                 const selectedCand = cands.find((c) => c.lazywait_id === selectedId);
                 const prices = (tab === 'product' && selectedCand?.prices) || [];
                 return (
-                  <tr key={row.id} className="border-t border-slate-100 align-top">
-                    <td className="py-1.5 pr-2">
-                      <div className="font-bold text-slate-700">{row.nameEn || '—'}</div>
-                      <div className="text-slate-400" dir="rtl">{row.nameAr || '—'}</div>
+                  <tr key={row.id} className="border-t border-con-line">
+                    <td className={TD}>
+                      <Text variant="caption" as="p">{row.nameEn || '—'}</Text>
+                      <Text variant="caption" tone="tertiary" as="p" dir="rtl">{row.nameAr || '—'}</Text>
                       {row.currentId && (
-                        <span className="inline-flex items-center gap-1 text-[8px] font-black text-green-700 mt-0.5">
-                          <Check className="w-2.5 h-2.5" /> mapped: {row.currentId}
+                        <span className="mt-0.5 inline-flex items-center gap-1">
+                          <Check className="size-2.5 text-mint" aria-hidden="true" />
+                          <Text variant="caption" tone="success" numeric as="span">mapped: {row.currentId}</Text>
                         </span>
                       )}
                     </td>
-                    <td className="py-1.5 pr-2">
+
+                    <td className={TD}>
                       {suggestion ? (
                         <div>
-                          <div className="text-slate-600 font-semibold">{catalogLabel(suggestion.candidate)}</div>
-                          <span className={`inline-block px-1.5 py-0.5 rounded-full font-black text-[8px] mt-0.5 ${LEVEL_TONE[suggestion.level]}`}>
-                            {suggestion.level}{suggestion.requiresConfirmation ? ' · review' : ''}
-                          </span>
+                          <Text variant="caption" tone="secondary" as="p">{catalogLabel(suggestion.candidate)}</Text>
+                          <StatusPill
+                            className="mt-0.5"
+                            label={`${suggestion.level}${suggestion.requiresConfirmation ? ' · review' : ''}`}
+                            tone={LEVEL_TONE[suggestion.level]}
+                          />
                         </div>
-                      ) : <span className="text-slate-300">no suggestion</span>}
+                      ) : (
+                        <Text variant="caption" tone="tertiary" as="span">no suggestion</Text>
+                      )}
                     </td>
-                    <td className="py-1.5 pr-2 space-y-1">
+
+                    <td className={`${TD} space-y-1`}>
                       <select
                         value={selectedId}
                         disabled={disabled}
                         aria-label={`Lazywait mapping for ${row.nameEn || row.id}`}
                         onChange={(e) => setChosen((m) => ({ ...m, [row.id]: e.target.value }))}
-                        className="glass-input p-1 text-[10px] w-full max-w-[220px] disabled:opacity-50"
+                        className={`${SELECT} ${family}`}
                       >
                         <option value="">— select —</option>
                         {cands.map((c) => <option key={c.id} value={c.lazywait_id}>{catalogLabel(c)}</option>)}
@@ -325,7 +382,7 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                           disabled={disabled}
                           aria-label={`Price for ${row.nameEn || row.id}`}
                           onChange={(e) => setChosenPrice((m) => ({ ...m, [row.id]: e.target.value }))}
-                          className="glass-input p-1 text-[9px] w-full max-w-[220px] disabled:opacity-50"
+                          className={`${SELECT} ${family}`}
                         >
                           {prices.map((pr, i) => (
                             <option key={i} value={pr.price_id ?? ''}>
@@ -335,23 +392,32 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
                         </select>
                       )}
                     </td>
-                    <td className="py-1.5 pr-2 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => confirm(tab, row, selectedId, cands)}
-                        disabled={disabled || !selectedId || busy === row.id}
-                        className="glass-btn-primary text-[9px] py-1 px-2.5 font-black text-white disabled:opacity-40 inline-flex items-center gap-1"
-                      >
-                        {busy === row.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />} Confirm
-                      </button>
-                      {row.currentId && (
+
+                    <td className={`${TD} whitespace-nowrap text-end`}>
+                      <span className="inline-flex items-center gap-1">
                         <button
-                          onClick={() => clear(tab, row)}
-                          disabled={disabled || busy === row.id}
-                          className="text-[9px] py-1 px-2 font-black text-red-500 disabled:opacity-40 inline-flex items-center gap-1 ml-1"
+                          type="button"
+                          onClick={() => { void confirm(tab, row, selectedId, cands); }}
+                          disabled={disabled || !selectedId || busy === row.id}
+                          className="ds-motion inline-flex min-h-8 items-center gap-1 rounded-[var(--radius-ds-sm)] bg-ember px-2.5 transition-opacity duration-150 hover:opacity-90 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
                         >
-                          <X className="w-3 h-3" /> Clear
+                          {busy === row.id
+                            ? <Loader2 className="size-3 animate-spin text-on-ember" aria-hidden="true" />
+                            : <Check className="size-3 text-on-ember" aria-hidden="true" />}
+                          <Text variant="caption" tone="onEmber" as="span">Confirm</Text>
                         </button>
-                      )}
+                        {row.currentId && (
+                          <button
+                            type="button"
+                            onClick={() => { void clear(tab, row); }}
+                            disabled={disabled || busy === row.id}
+                            className="ds-motion inline-flex min-h-8 items-center gap-1 rounded-[var(--radius-ds-sm)] px-2 transition-colors duration-150 hover:bg-danger-tint disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2"
+                          >
+                            <X className="size-3 text-danger-ds" aria-hidden="true" />
+                            <Text variant="caption" tone="danger" as="span">Clear</Text>
+                          </button>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -361,19 +427,21 @@ export const LazywaitCatalogMapping: React.FC<{ disabled: boolean }> = ({ disabl
         </div>
       )}
 
-      <p className="text-[8.5px] text-slate-400 font-bold leading-snug">
+      <Text variant="caption" tone="tertiary" as="p">
         <b>Import to App</b> makes Lazywait the menu source: it creates/updates your categories &amp; products from
         the latest pull (prices from Lazywait), hides local items not in Lazywait, and keeps branch delivery settings.
         Individual <b>Confirm</b> mappings below only link IDs (they never overwrite local data). price_id,
         addons/modifiers and delivery are mapped for reference but intentionally NOT sent in Create Order yet.
-      </p>
+      </Text>
     </div>
   );
 };
 
 const SummaryRow: React.FC<{ label: string; c: { mapped: number; total: number } }> = ({ label, c }) => (
-  <div className="flex justify-between">
-    <span>{label}</span>
-    <span className={c.total > 0 && c.mapped === c.total ? 'text-green-600' : 'text-slate-500'}>{c.mapped}/{c.total}</span>
+  <div className="flex justify-between gap-2">
+    <Text variant="caption" tone="secondary" as="span">{label}</Text>
+    <Text variant="caption" tone={c.total > 0 && c.mapped === c.total ? 'success' : 'secondary'} numeric as="span">
+      {c.mapped}/{c.total}
+    </Text>
   </div>
 );

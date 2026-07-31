@@ -1,6 +1,14 @@
-import React, { useState, Suspense } from 'react';
-import { X, MapPin, AlertTriangle, Save } from 'lucide-react';
+import React, { Suspense, useState } from 'react';
+import { MapPin } from 'lucide-react';
+
+import { Button } from '../../design-system/ui/Button';
+import { Field } from '../../design-system/ui/Field';
+import { Notice } from '../../design-system/ui/Notice';
+import { StatusPill } from '../../design-system/ui/StatusPill';
+import { Text } from '../../design-system/ui/Text';
 import type { Branch } from '../../types';
+import { AdminModal } from './view/shared/AdminModal';
+import { ToggleChip } from './view/shared/ToggleChip';
 
 // Lazy so mapbox-gl only loads when the modal is actually opened.
 const LocationPicker = React.lazy(() =>
@@ -24,6 +32,11 @@ const num = (v: string): number => {
  * branch LOCATION (map pin + manual lat/lng), fees, minimums, ETA, and channel
  * toggles — then saves via the admin-only branch update path (server RLS is the
  * real gate; accountants open this read-only). Cancel closes without saving.
+ *
+ * Validation, the save payload and the read-only mode are carried over exactly.
+ * Note that `disabled` hides the Save button entirely rather than greying it:
+ * an accountant's write is refused by RLS, so a live-looking button would
+ * advertise something they can never complete.
  */
 export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onClose, onSave }) => {
   const [nameEn, setNameEn] = useState(branch.nameEn ?? '');
@@ -78,111 +91,71 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
   const label = (en: string, ar: string) => (isRTL ? ar : en);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 sticky top-0 bg-white">
-          <h3 className="text-sm font-black text-slate-800">
-            {disabled ? label('View branch', 'عرض الفرع') : label('Edit branch', 'تعديل الفرع')}: {isRTL ? branch.nameAr : branch.nameEn}
-          </h3>
-          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-700"><X className="w-4 h-4" /></button>
-        </div>
-
-        <div className="p-4 space-y-3 text-xs">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={label('Name (English)', 'الاسم (إنجليزي)')}>
-              <input value={nameEn} onChange={(e) => setNameEn(e.target.value)} disabled={disabled} className="edit-input" />
-            </Field>
-            <Field label={label('Name (Arabic)', 'الاسم (عربي)')}>
-              <input value={nameAr} onChange={(e) => setNameAr(e.target.value)} disabled={disabled} dir="rtl" className="edit-input" />
-            </Field>
-            <Field label={label('Address (English)', 'العنوان (إنجليزي)')}>
-              <input value={addressEn} onChange={(e) => setAddressEn(e.target.value)} disabled={disabled} className="edit-input" />
-            </Field>
-            <Field label={label('Address (Arabic)', 'العنوان (عربي)')}>
-              <input value={addressAr} onChange={(e) => setAddressAr(e.target.value)} disabled={disabled} dir="rtl" className="edit-input" />
-            </Field>
-            <Field label={label('Phone', 'الهاتف')}>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} disabled={disabled} className="edit-input" placeholder="+9665XXXXXXXX" />
-            </Field>
-            <Field label={label('Estimated delivery (min)', 'وقت التوصيل (دقيقة)')}>
-              <input type="number" value={etaMin} onChange={(e) => setEtaMin(e.target.value)} disabled={disabled} className="edit-input" placeholder="—" />
-            </Field>
-            <Field label={label('Delivery fee (SAR)', 'رسوم التوصيل')}>
-              <input type="number" value={deliveryFee} onChange={(e) => setDeliveryFee(num(e.target.value))} disabled={disabled} className="edit-input" />
-            </Field>
-            <Field label={label('Delivery minimum (SAR)', 'الحد الأدنى للتوصيل')}>
-              <input type="number" value={minDeliveryOrder} onChange={(e) => setMinDeliveryOrder(num(e.target.value))} disabled={disabled} className="edit-input" />
-            </Field>
-          </div>
-
-          {/* Branch location setter */}
-          <div className="pt-2 border-t border-slate-100 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-black text-slate-700 flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {label('Branch location', 'موقع الفرع')}</span>
-              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${locationSet ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                {locationSet ? label('Set', 'محدّد') : label('Not set', 'غير محدّد')}
-              </span>
-            </div>
-            {!disabled && (
-              <p className="text-[10px] text-slate-500 font-semibold">
-                {label('Click the map to drop the branch pin, or type the coordinates.', 'اضغط على الخريطة لتحديد موقع الفرع، أو أدخل الإحداثيات يدوياً.')}
-              </p>
-            )}
-            <Suspense fallback={<div className="h-40 rounded-lg bg-slate-50 animate-pulse" />}>
-              <LocationPicker lat={lat} lng={lng} isRTL={isRTL} onChange={(la, lo) => { if (!disabled) { setLat(la); setLng(lo); } }} />
-            </Suspense>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label={label('Latitude', 'خط العرض')}>
-                <input type="number" value={lat || ''} onChange={(e) => setLat(num(e.target.value))} disabled={disabled} className="edit-input" step="0.000001" />
-              </Field>
-              <Field label={label('Longitude', 'خط الطول')}>
-                <input type="number" value={lng || ''} onChange={(e) => setLng(num(e.target.value))} disabled={disabled} className="edit-input" step="0.000001" />
-              </Field>
-            </div>
-          </div>
-
-          {/* Channel toggles */}
-          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100">
-            <Toggle on={deliveryEnabled} disabled={disabled} onClick={() => setDeliveryEnabled(v => !v)} label={label('Delivery', 'التوصيل')} />
-            <Toggle on={pickupEnabled} disabled={disabled} onClick={() => setPickupEnabled(v => !v)} label={label('Pickup', 'الاستلام')} />
-            <Toggle on={isActive} disabled={disabled} onClick={() => setIsActive(v => !v)} label={label('Open', 'مفتوح')} />
-          </div>
-
-          {error && (
-            <div className="p-2 bg-red-50 border border-red-100 rounded-lg text-red-700 text-[11px] font-bold flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> {error}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100 sticky bottom-0 bg-white">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-xl text-xs font-black text-slate-600 bg-slate-100 hover:bg-slate-200">
-            {label('Cancel', 'إلغاء')}
-          </button>
+    <AdminModal
+      title={`${disabled ? label('View branch', 'عرض الفرع') : label('Edit branch', 'تعديل الفرع')}: ${isRTL ? branch.nameAr : branch.nameEn}`}
+      isRTL={isRTL}
+      onClose={onClose}
+      footer={
+        <>
+          <Button label={label('Cancel', 'إلغاء')} onClick={onClose} variant="ghost" />
           {!disabled && (
-            <button onClick={() => void handleSave()} disabled={busy} className="px-3 py-1.5 rounded-xl text-xs font-black text-white bg-primary hover:opacity-90 disabled:opacity-50 flex items-center gap-1.5">
-              <Save className="w-3.5 h-3.5" /> {busy ? label('Saving…', 'جارٍ الحفظ…') : label('Save', 'حفظ')}
-            </button>
+            <Button
+              label={busy ? label('Saving…', 'جارٍ الحفظ…') : label('Save', 'حفظ')}
+              onClick={() => { void handleSave(); }}
+              disabled={busy}
+              loading={busy}
+            />
           )}
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label={label('Name (English)', 'الاسم (إنجليزي)')} value={nameEn} onValueChange={setNameEn} disabled={disabled} required />
+        <Field label={label('Name (Arabic)', 'الاسم (عربي)')} value={nameAr} onValueChange={setNameAr} disabled={disabled} required dir="rtl" />
+        <Field label={label('Address (English)', 'العنوان (إنجليزي)')} value={addressEn} onValueChange={setAddressEn} disabled={disabled} />
+        <Field label={label('Address (Arabic)', 'العنوان (عربي)')} value={addressAr} onValueChange={setAddressAr} disabled={disabled} dir="rtl" />
+        <Field label={label('Phone', 'الهاتف')} value={phone} onValueChange={setPhone} disabled={disabled} numeric placeholder="+9665XXXXXXXX" />
+        <Field label={label('Estimated delivery (min)', 'وقت التوصيل (دقيقة)')} type="number" value={etaMin} onValueChange={setEtaMin} disabled={disabled} numeric placeholder="—" />
+        <Field label={label('Delivery fee (SAR)', 'رسوم التوصيل')} type="number" value={String(deliveryFee)} onValueChange={(v) => setDeliveryFee(num(v))} disabled={disabled} numeric />
+        <Field label={label('Delivery minimum (SAR)', 'الحد الأدنى للتوصيل')} type="number" value={String(minDeliveryOrder)} onValueChange={(v) => setMinDeliveryOrder(num(v))} disabled={disabled} numeric />
+      </div>
+
+      {/* Branch location setter */}
+      <div className="space-y-2 border-t border-con-line pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin className="size-3.5 shrink-0 text-con-text-2" aria-hidden="true" />
+            <Text variant="label" as="span">{label('Branch location', 'موقع الفرع')}</Text>
+          </span>
+          {/* Warning, not neutral, when unset: a branch with no pin cannot be
+              distance-matched, so this is a real gap rather than a blank field. */}
+          <StatusPill
+            label={locationSet ? label('Set', 'محدّد') : label('Not set', 'غير محدّد')}
+            tone={locationSet ? 'success' : 'warning'}
+          />
+        </div>
+        {!disabled && (
+          <Text variant="caption" tone="tertiary" as="p">
+            {label('Click the map to drop the branch pin, or type the coordinates.', 'اضغط على الخريطة لتحديد موقع الفرع، أو أدخل الإحداثيات يدوياً.')}
+          </Text>
+        )}
+        <Suspense fallback={<div className="h-40 rounded-[var(--radius-ds-md)] bg-con-surface-2" />}>
+          <LocationPicker lat={lat} lng={lng} isRTL={isRTL} onChange={(la, lo) => { if (!disabled) { setLat(la); setLng(lo); } }} />
+        </Suspense>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={label('Latitude', 'خط العرض')} type="number" step="0.000001" value={lat ? String(lat) : ''} onValueChange={(v) => setLat(num(v))} disabled={disabled} numeric />
+          <Field label={label('Longitude', 'خط الطول')} type="number" step="0.000001" value={lng ? String(lng) : ''} onValueChange={(v) => setLng(num(v))} disabled={disabled} numeric />
         </div>
       </div>
-    </div>
+
+      {/* Channel toggles */}
+      <div className="grid grid-cols-3 gap-2 border-t border-con-line pt-3">
+        <ToggleChip on={deliveryEnabled} disabled={disabled} onToggle={() => setDeliveryEnabled(v => !v)} label={label('Delivery', 'التوصيل')} />
+        <ToggleChip on={pickupEnabled} disabled={disabled} onToggle={() => setPickupEnabled(v => !v)} label={label('Pickup', 'الاستلام')} />
+        <ToggleChip on={isActive} disabled={disabled} onToggle={() => setIsActive(v => !v)} label={label('Open', 'مفتوح')} />
+      </div>
+
+      {error && <Notice title={error} tone="blocking" />}
+    </AdminModal>
   );
 };
-
-const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
-  <label className="block">
-    <span className="block text-[9px] font-black text-slate-400 uppercase mb-1">{label}</span>
-    {children}
-  </label>
-);
-
-const Toggle: React.FC<{ on: boolean; disabled: boolean; onClick: () => void; label: string }> = ({ on, disabled, onClick, label }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    className={`py-1.5 rounded-lg text-center text-[10px] font-black uppercase transition-all disabled:opacity-50 ${on ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
-  >
-    {label} {on ? 'ON' : 'OFF'}
-  </button>
-);
