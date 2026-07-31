@@ -11,8 +11,7 @@ import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
 import { useI18n } from '../../i18n/I18nProvider';
 import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
-import { colors } from '../../theme';
-
+import { color } from '../../design-system/generated/tokens';
 export default function TabsLayout() {
   const { status } = useAuth();
   const { t, pick } = useI18n();
@@ -44,9 +43,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.purple,
-        tabBarInactiveTintColor: colors.muted,
-        tabBarStyle: { borderTopColor: colors.border, backgroundColor: colors.white },
+        tabBarActiveTintColor: color.ember,
+        tabBarInactiveTintColor: color.appText2,
+        tabBarStyle: { borderTopColor: color.appLine, backgroundColor: color.appSurface },
         tabBarLabelStyle: { fontWeight: '700' },
       }}
     >

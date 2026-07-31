@@ -73,6 +73,14 @@ export interface FixtureOptions {
   deliveryClosed?: boolean;
   /** Signed in but the profile carries no name — Profile's fallback state. */
   noProfileName?: boolean;
+  /**
+   * Inject NO delivery zones. On the order-type gate this makes
+   * `resolveDeliveryBranch` return null for every pin, so `confirmNewAddress`
+   * returns at the "delivery unavailable" branch and can never reach
+   * `addresses.create`. That is a structural block on the write, not a
+   * side effect of the review environment.
+   */
+  noDeliveryZones?: boolean;
 }
 
 export function FixtureProvider({
@@ -129,9 +137,9 @@ function FixtureProviderInner({
         // A real polygon covering the fixture pin. With an empty list the
         // serviceability pre-check always failed, so a VALID delivery checkout
         // could never be screenshotted.
-        deliveryZones: [FIXTURE_DELIVERY_ZONE],
+        deliveryZones: options.noDeliveryZones ? [] : [FIXTURE_DELIVERY_ZONE],
       }) as unknown as CatalogValue,
-    [options.loading, options.error, branch, paymentSettings],
+    [options.loading, options.error, branch, paymentSettings, options.noDeliveryZones],
   );
 
   const orderContext = useMemo(() => {

@@ -15,6 +15,7 @@ import { Screen } from '../../components/Screen';
 import { EmptyView, ErrorView } from '../../components/StateViews';
 import { color, space } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
+import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { ORDERS_PAGE_LIMIT } from './ordersRefresh';
@@ -69,8 +70,10 @@ export function OrdersScreen() {
 
   return (
     <Screen background={color.appBg}>
-      <View style={styles.header}>
-        <Text variant="display">{t('orderHistory')}</Text>
+      <View style={styles.headerBar}>
+        <View style={columnStyles.column}>
+          <Text variant="display">{t('orderHistory')}</Text>
+        </View>
       </View>
 
       {loading ? (
@@ -104,12 +107,16 @@ export function OrdersScreen() {
               tintColor={color.ember}
             />
           }
+          // The cap goes on each ROW, not on the scroller, so the
+          // RefreshControl still spans the full width on a tablet.
           renderItem={({ item }) => (
-            <OrderCard
-              order={item}
-              statusLabel={t(STATUS_KEY[item.status])}
-              onPress={() => router.push(`/receipt/${item.id}`)}
-            />
+            <View style={columnStyles.column}>
+              <OrderCard
+                order={item}
+                statusLabel={t(STATUS_KEY[item.status])}
+                onPress={() => router.push(`/receipt/${item.id}`)}
+              />
+            </View>
           )}
         />
       )}
@@ -118,6 +125,6 @@ export function OrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { paddingHorizontal: space.s4, paddingTop: space.s2, paddingBottom: space.s3 },
-  list: { padding: space.s4, gap: space.s3 },
+  headerBar: { paddingHorizontal: space.s4, paddingTop: space.s2, paddingBottom: space.s3, alignItems: 'center' },
+  list: { padding: space.s4, gap: space.s3, alignItems: 'center' },
 });

@@ -28,7 +28,7 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { mapConfig } from '../lib/map';
 import { captureMessage } from '../lib/observability';
-import { colors, font, radius, spacing } from '../theme';
+import { color, radius, space, type } from '../design-system/generated/tokens';
 import { CrosshairIcon } from './Icons';
 import {
   FIX_FRESH_MS, LOCATE_TIMEOUT_MS, classifyLocateFailure, isFixFresh, isUsableFix,
@@ -290,8 +290,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
         >
           {locating
-            ? <ActivityIndicator size="small" color={colors.purple} />
-            : <CrosshairIcon size={22} color={colors.purple} />}
+            ? <ActivityIndicator size="small" color={color.ember} />
+            : <CrosshairIcon size={22} color={color.ember} />}
         </Pressable>
       </View>
 
@@ -306,7 +306,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
 const styles = StyleSheet.create({
   mapWrap: {
     height: MAP_HEIGHT, borderRadius: radius.md, overflow: 'hidden',
-    borderWidth: 1, borderColor: colors.border, position: 'relative',
+    borderWidth: 1, borderColor: color.appLine, position: 'relative',
   },
   web: { flex: 1 },
   // 44x44 keeps the control at the platform minimum touch target while staying
@@ -316,15 +316,15 @@ const styles = StyleSheet.create({
     position: 'absolute', right: LOCATE_BTN_RIGHT, bottom: LOCATE_BTN_BOTTOM,
     width: LOCATE_BTN_SIZE, height: LOCATE_BTN_SIZE, borderRadius: LOCATE_BTN_SIZE / 2,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1, borderColor: colors.border,
+    backgroundColor: color.appSurface,
+    borderWidth: 1, borderColor: color.appLine,
     // Matches the elevation Google's own map controls carry.
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 }, elevation: 3,
   },
-  locateBtnPressed: { backgroundColor: colors.purpleBg },
-  hint: { fontSize: font.sm, color: colors.muted, marginTop: spacing.xs },
-  locateError: { fontSize: font.sm, color: colors.red, fontWeight: '700', marginTop: spacing.xs },
-  fallback: { padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white },
-  fallbackText: { fontSize: font.sm, color: colors.muted, fontWeight: '700', textAlign: 'center' },
+  locateBtnPressed: { backgroundColor: color.appSurface2 },
+  hint: { fontSize: type.label.size, color: color.appText2, marginTop: space.s1 },
+  locateError: { fontSize: type.label.size, color: color.danger, fontWeight: '700', marginTop: space.s1 },
+  fallback: { padding: space.s4, borderRadius: radius.md, borderWidth: 1, borderColor: color.appLine, backgroundColor: color.appSurface },
+  fallbackText: { fontSize: type.label.size, color: color.appText2, fontWeight: '700', textAlign: 'center' },
 });

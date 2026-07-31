@@ -28,6 +28,7 @@ import { Screen } from '../../components/Screen';
 import { ErrorView } from '../../components/StateViews';
 import { color, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
+import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { useI18n } from '../../i18n/I18nProvider';
 import { orders } from '../../services/api';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
@@ -122,6 +123,7 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
       ) : (
         <View style={styles.flex}>
           <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+            <View style={columnStyles.column}>
             {/* ONE state drives the icon, the title and the message together, so
                 a success hero can never sit above a "not confirmed" message. */}
             <ConfirmationHero
@@ -131,11 +133,14 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               resendError={resendError}
             />
             <ReceiptBody order={order} />
+            </View>
           </ScrollView>
 
           <View style={styles.footer}>
+            <View style={[columnStyles.column, styles.footerColumn]}>
             <Button label={t('viewMyOrders')} onPress={() => router.replace('/(tabs)/orders')} variant="primary" />
             <Button label={t('backToMenu')} onPress={() => router.replace('/(tabs)')} variant="secondary" />
+            </View>
           </View>
         </View>
       )}
@@ -145,9 +150,13 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: { padding: space.s4, paddingBottom: space.s5 },
+  scroll: { padding: space.s4, paddingBottom: space.s5, alignItems: 'center' },
+  // The bar spans the full width so it reads as a floor, but its CONTENTS are
+  // capped to the same column as the receipt above it.
   footer: {
-    padding: space.s4, gap: space.s2,
+    padding: space.s4,
     borderTopWidth: 1, borderTopColor: color.appLine, backgroundColor: color.appSurface,
+    alignItems: 'center',
   },
+  footerColumn: { gap: space.s2 },
 });

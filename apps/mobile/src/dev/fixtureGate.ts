@@ -71,6 +71,14 @@ export const FIXTURE_SCENES = [
   // `accountDeletion.current()` on mount and can submit a real deletion.
   'profile',
   'profile-no-name',
+
+  // Order-type gate. Rendered with NO delivery zones injected, which makes
+  // `resolveDeliveryBranch` return null for any pin — so `confirmNewAddress`
+  // always returns at the "delivery unavailable" branch and can never reach
+  // `addresses.create`. The write is unreachable by construction, not by the
+  // accident of the review environment lacking a Maps API key.
+  'order-type-pickup',
+  'order-type-delivery',
 ] as const;
 
 export type FixtureScene = (typeof FIXTURE_SCENES)[number];

@@ -33,6 +33,7 @@ never remove them.
 | 2 | Customer App — Payment | ✅ **Done** — this PR |
 | 2 | Customer App — Order Tracking / Receipt | ✅ **Done** — this PR |
 | 2 | Customer App — Profile | ✅ **Done** — this PR |
+| 2 | Customer App — Order Type Selection | ✅ **Done** — this PR |
 | 3 | Admin — Dashboard | ⬜ |
 | 3 | Admin — Live Orders | ⬜ |
 | 3 | Admin — Menu Management | ⬜ |
@@ -143,12 +144,40 @@ touched only by Checkout and the order-type gate. Adding them means new profile
 writes and address CRUD, which is feature work, not a design migration, and this
 pass adds no API calls. Tracked separately.
 
+## Surface 6 — Order Type Selection + legacy removal ✅
+
+The blocking order-type gate migrated, and with it the last legacy consumers.
+
+**Deleted:** `apps/mobile/src/theme.ts`, `components/Button.tsx`,
+`components/Notice.tsx`. The mobile app now has **zero** legacy UI.
+
+The hygiene guard changed from an allowlist to a **global ban**: it walks the
+whole `apps/mobile/src` tree, so the rule cannot be sidestepped by adding a new
+file — which is exactly what the per-surface list could not prevent. It also
+fails if any of the three deleted files reappears. Both branches were
+negative-tested.
+
+**Tablet width** now uses one shared container, `design-system/ui/ContentColumn`,
+promoted from the pattern Checkout adopted first: `alignItems` on the scrolling
+parent plus `width: '100%'` up to a 640px cap on the child. `CONTENT_MAX_WIDTH`
+has exactly one definition. Applied to Checkout, Order Tracking, Receipt,
+Profile and Order Type Selection. On the orders list the cap sits on each ROW,
+not the scroller, so the pull-to-refresh control still spans the full width.
+
+**Preserved verbatim:** branch selection, the pickup/delivery rules, the
+location permission flow, `validateCartForBranch` and the cart-conflict sheet,
+`resolveDeliveryBranch`, the mandatory-landmark rule, the blocking hardware-back
+behaviour and every navigation target.
+
+Contrast fix caught in review: the busy overlay was a LIGHT scrim with dark
+text; moving it to the shared dark `scrim` token would have made the label
+invisible, so its spinner and label are now white.
+
 ## Remaining legacy inventory
 
 | Surface | Legacy usage |
 | --- | ---: |
-| Mobile `<Button>` (legacy) | **1 file**: `OrderTypeSelectScreen` |
-| Mobile `components/Notice` | **1 file**: `OrderTypeSelectScreen` |
+| Mobile legacy theme / Button / Notice | **ZERO — deleted** |
 | Web raw `<button>` | 129 (24 `glass-btn-*`) |
 | Web raw `<input>` | 72 (64 `glass-input`, 10 `edit-input`) |
 

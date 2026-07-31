@@ -17,8 +17,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { captureRenderError } from '../lib/observability';
 import { shouldCaptureBoundaryError } from '../lib/observability/classify';
-import { colors } from '../theme';
-
+import { color } from '../design-system/generated/tokens';
 interface Props { children: React.ReactNode }
 interface State { hasError: boolean }
 
@@ -66,15 +65,15 @@ export class ObservabilityErrorBoundary extends React.Component<Props, State> {
 const styles = StyleSheet.create({
   wrap: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.bg, padding: 32, gap: 6,
+    backgroundColor: color.appBg, padding: 32, gap: 6,
   },
-  titleAr: { fontSize: 18, fontWeight: '800', color: colors.ink, textAlign: 'center' },
-  titleEn: { fontSize: 15, fontWeight: '700', color: colors.ink, textAlign: 'center', marginBottom: 8 },
-  bodyAr: { fontSize: 13, color: colors.muted, textAlign: 'center' },
-  bodyEn: { fontSize: 12, color: colors.muted, textAlign: 'center', marginBottom: 16 },
+  titleAr: { fontSize: 18, fontWeight: '800', color: color.appText, textAlign: 'center' },
+  titleEn: { fontSize: 15, fontWeight: '700', color: color.appText, textAlign: 'center', marginBottom: 8 },
+  bodyAr: { fontSize: 13, color: color.appText2, textAlign: 'center' },
+  bodyEn: { fontSize: 12, color: color.appText2, textAlign: 'center', marginBottom: 16 },
   button: {
-    backgroundColor: colors.purple, borderRadius: 12,
+    backgroundColor: color.ember, borderRadius: 12,
     paddingHorizontal: 24, paddingVertical: 12, marginTop: 8,
   },
-  buttonText: { color: colors.white, fontWeight: '800', fontSize: 14 },
+  buttonText: { color: color.appSurface, fontWeight: '800', fontSize: 14 },
 });

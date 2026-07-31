@@ -104,10 +104,47 @@ const REQUIRED_TSCONFIG_INCLUDES = ['.expo/types/**/*.ts', 'expo-env.d.ts'];
 
 
 /**
- * Surfaces that have completed their design-system migration. Once a file is
- * listed here it may no longer import the legacy `theme` module or the legacy
- * components it replaced — that is what stops a finished surface regressing
- * while the next one is being migrated.
+ * GLOBAL: the mobile app has no legacy UI left.
+ *
+ * `apps/mobile/src/theme.ts`, `components/Button.tsx` and `components/Notice.tsx`
+ * are DELETED. This scans the whole mobile tree — not a per-surface list — so
+ * the ban cannot be sidestepped by adding a new file, which the allowlist
+ * approach could not prevent. Reintroducing any of the three now fails CI
+ * wherever it is imported from.
+ *
+ * The per-surface list below is kept for the same reason its entries were never
+ * removed: it is a record of what has been migrated, and it still fails if one
+ * of those files disappears.
+ */
+const MOBILE_SRC = join(ROOT, 'apps', 'mobile', 'src');
+const BANNED_MOBILE_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button|\/components\/Notice)['"]/;
+
+for (const file of walk(MOBILE_SRC)) {
+  readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, i) => {
+    if (BANNED_MOBILE_IMPORT.test(line)) {
+      violations.push({
+        file: relative(ROOT, file), line: i + 1, rule: 'legacy-mobile-ui-import',
+        message: 'the legacy theme / Button / Notice are deleted — use design-system/ui',
+        snippet: line.trim().slice(0, 100),
+      });
+    }
+  });
+}
+
+/** These three must stay deleted. */
+for (const gone of ['theme.ts', join('components', 'Button.tsx'), join('components', 'Notice.tsx')]) {
+  if (existsSync(join(MOBILE_SRC, gone))) {
+    violations.push({
+      file: `apps/mobile/src/${gone.replace(/\\/g, '/')}`, line: 0, rule: 'legacy-mobile-ui-restored',
+      message: 'this legacy component was deleted and must not come back',
+      snippet: '',
+    });
+  }
+}
+
+/**
+ * Surfaces that have completed their design-system migration. Kept as a record,
+ * and as a guard that these files continue to exist.
  *
  * Add files here as each surface lands. Do not remove entries.
  */
@@ -161,6 +198,9 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/features/notifications/NotificationSettings.tsx',
   'apps/mobile/src/features/legal/LegalListScreen.tsx',
   'apps/mobile/src/features/legal/LegalDocScreen.tsx',
+  // Surface 6 - Order Type Selection + legacy removal
+  'apps/mobile/src/features/order/OrderTypeSelectScreen.tsx',
+  'apps/mobile/src/design-system/ui/ContentColumn.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

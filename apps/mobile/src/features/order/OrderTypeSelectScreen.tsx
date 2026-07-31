@@ -12,21 +12,30 @@
  *
  * The screen never creates an order and never touches payment — it only sets the
  * order context (the server re-validates branch + zone when the order is placed).
+ *
+ * The design pass changed presentation only: branch selection, the pickup and
+ * delivery rules, the location behaviour, the availability check and every
+ * navigation target are unchanged.
  */
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, Text, TextInput, View,
+  StyleSheet, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 
-import { Button } from '../../components/Button';
 import { Header } from '../../components/Header';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
-import { Notice } from '../../components/Notice';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
+import { color, radius, space } from '../../design-system/generated/tokens';
+import { Button } from '../../design-system/ui/Button';
+import { SelectableChip } from '../../design-system/ui/Chip';
+import { columnStyles } from '../../design-system/ui/ContentColumn';
+import { Field } from '../../design-system/ui/Field';
+import { Notice } from '../../design-system/ui/Notice';
+import { Text } from '../../design-system/ui/Text';
 import { checkDescription, descriptionCopy, descriptionMessage } from './locationDescription';
 import { useI18n } from '../../i18n/I18nProvider';
 import { addresses } from '../../services/api';
@@ -34,7 +43,6 @@ import { mapAddress } from '../../lib/mappers';
 import { mapConfig } from '../../lib/map';
 import { distanceKm, type GeoPoint } from '../../lib/geo';
 import { useCart, useCatalog, useOrderContext } from '../../store';
-import { colors, font, radius, shadow, spacing } from '../../theme';
 import { isBranchOpen, pickupBranches, resolveDeliveryBranch } from './orderContext';
 import { validateCartForBranch } from './cartValidation';
 import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/models';
@@ -43,7 +51,7 @@ type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
 
 export function OrderTypeSelectScreen() {
   const insets = useSafeAreaInsets();
-  const { t, pick, lang, rtlText, rtlRow } = useI18n();
+  const { t, pick, lang, rtlRow } = useI18n();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
   const { context, valid, setPickup, setDelivery } = useOrderContext();
   const cart = useCart();
@@ -200,47 +208,62 @@ export function OrderTypeSelectScreen() {
     <View style={styles.root}>
       <Header title={t('otTitle')} showBack={valid} onBack={done} safeTop />
 
-      {/* Pickup / Delivery — a single segmented control so the two order
-          types read as one choice, not two separate buttons. */}
+      {/* Pickup / Delivery — one choice, not two buttons. */}
       <View style={styles.tabsBar}>
-        <View style={styles.tabs}>
-          <TabButton label={t('otPickup')} active={tab === 'pickup'} onPress={() => { setTab('pickup'); setResolveError(null); }} />
-          <TabButton label={t('otDelivery')} active={tab === 'delivery'} onPress={() => { setTab('delivery'); setResolveError(null); }} />
+        <View style={[columnStyles.column, styles.tabs]}>
+          <SelectableChip
+            label={t('otPickup')}
+            selected={tab === 'pickup'}
+            onPress={() => { setTab('pickup'); setResolveError(null); }}
+            style={styles.tab}
+          />
+          <SelectableChip
+            label={t('otDelivery')}
+            selected={tab === 'delivery'}
+            onPress={() => { setTab('delivery'); setResolveError(null); }}
+            style={styles.tab}
+          />
         </View>
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={colors.purple} /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={color.ember} /></View>
       ) : error ? (
         <View style={styles.center}>
-          <Text style={styles.err}>{error}</Text>
+          <Notice title={error} tone="blocking" style={columnStyles.column} />
           <Button label={t('retry')} onPress={reload} variant="secondary" />
         </View>
       ) : tab === 'pickup' ? (
         <ScrollView contentContainerStyle={styles.list}>
-          <Text style={[styles.sectionTitle, rtlText]}>{t('otPickupBranch')}</Text>
-          {sortedPickup.map((b) => {
-            const open = isBranchOpen(b);
-            const selected = context?.orderType === 'pickup' && context.branchId === b.id;
-            const dist = location ? distanceKm(location, { lat: b.latitude, lng: b.longitude }) : null;
-            return (
-              <Pressable
-                key={b.id}
-                onPress={() => choosePickup(b)}
-                disabled={!open}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: !open, selected }}
-                style={[styles.card, shadow.card, selected && styles.cardSelected, !open && styles.cardDisabled]}
-              >
-                <View style={[styles.cardTop, rtlRow]}>
-                  <Text style={[styles.name, rtlText]}>{pick(b.nameEn, b.nameAr)}</Text>
-                  <OpenClosedBadge open={open} />
-                </View>
-                {pick(b.addressEn, b.addressAr) ? <Text style={[styles.address, rtlText]}>{pick(b.addressEn, b.addressAr)}</Text> : null}
-                {dist != null ? <Text style={[styles.meta, rtlText]}>{dist.toFixed(1)} {t('otKmAway')}</Text> : null}
-              </Pressable>
-            );
-          })}
+          <View style={[columnStyles.column, styles.stack]}>
+            <Text variant="title">{t('otPickupBranch')}</Text>
+            {sortedPickup.map((b) => {
+              const open = isBranchOpen(b);
+              const selected = context?.orderType === 'pickup' && context.branchId === b.id;
+              const dist = location ? distanceKm(location, { lat: b.latitude, lng: b.longitude }) : null;
+              return (
+                <Pressable
+                  key={b.id}
+                  onPress={() => choosePickup(b)}
+                  disabled={!open}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !open, selected }}
+                  style={[styles.card, selected && styles.cardSelected, !open && styles.cardDisabled]}
+                >
+                  <View style={[styles.cardTop, rtlRow]}>
+                    <Text variant="heading" style={styles.name}>{pick(b.nameEn, b.nameAr)}</Text>
+                    <OpenClosedBadge open={open} />
+                  </View>
+                  {pick(b.addressEn, b.addressAr) ? (
+                    <Text variant="caption" tone="secondary">{pick(b.addressEn, b.addressAr)}</Text>
+                  ) : null}
+                  {dist != null ? (
+                    <Text variant="label" tone="secondary">{dist.toFixed(1)} {t('otKmAway')}</Text>
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
       ) : (
         // Delivery tab. KeyboardAvoidingView + a scrollable body keep the
@@ -259,27 +282,39 @@ export function OrderTypeSelectScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="none"
         >
+          <View style={[columnStyles.column, styles.stack]}>
           {!deliveryPossible ? (
-            <View style={styles.notice}><Text style={styles.noticeText}>{t('otNoDeliveryZones')}</Text></View>
+            <Notice title={t('otNoDeliveryZones')} tone="warning" />
           ) : deliveryMode === 'choose' ? (
             <>
-              <Text style={[styles.sectionTitle, rtlText]}>{t('otSavedAddresses')}</Text>
+              <Text variant="title">{t('otSavedAddresses')}</Text>
               {savedAddresses.length === 0 ? (
-                <Text style={[styles.muted, rtlText]}>{t('otNoSaved')}</Text>
+                <Text variant="body" tone="secondary">{t('otNoSaved')}</Text>
               ) : (
                 savedAddresses.map((a) => (
-                  <Pressable key={a.id} onPress={() => chooseSavedAddress(a)} accessibilityRole="button" style={[styles.card, shadow.card]}>
-                    <Text style={[styles.name, rtlText]}>{a.label || t('deliveryAddress')}</Text>
-                    {a.description ? <Text style={[styles.address, rtlText]}>{a.description}</Text> : null}
+                  <Pressable
+                    key={a.id}
+                    onPress={() => chooseSavedAddress(a)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+                  >
+                    <Text variant="heading">{a.label || t('deliveryAddress')}</Text>
+                    {a.description ? (
+                      <Text variant="caption" tone="secondary">{a.description}</Text>
+                    ) : null}
                   </Pressable>
                 ))
               )}
-              {resolveError ? <Text style={styles.err}>{resolveError}</Text> : null}
-              <Button label={t('otAddAddress')} onPress={() => { setResolveError(null); setDeliveryMode('new'); }} variant="secondary" style={{ marginTop: spacing.md }} />
+              {resolveError ? <Notice title={resolveError} tone="blocking" /> : null}
+              <Button
+                label={t('otAddAddress')}
+                onPress={() => { setResolveError(null); setDeliveryMode('new'); }}
+                variant="secondary"
+              />
             </>
           ) : (
             <>
-              <Text style={[styles.sectionTitle, rtlText]}>{t('otAddAddress')}</Text>
+              <Text variant="title">{t('otAddAddress')}</Text>
               <LocationPickerMap
                 lat={mapLat}
                 lng={mapLng}
@@ -296,14 +331,14 @@ export function OrderTypeSelectScreen() {
                 {/* The pin's own address, read-only. Shown so the customer can
                     confirm the map is right without it counting as guidance. */}
                 {resolvedAddress ? (
-                  <Text style={[styles.resolvedAddr, rtlText]} numberOfLines={2}>
+                  <Text variant="caption" tone="tertiary" numberOfLines={2} style={styles.resolvedAddr}>
                     {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
                   </Text>
                 ) : null}
-                <Text style={[styles.label, rtlText, { marginTop: spacing.md }]}>
-                  {descriptionCopy[lang].label}
-                </Text>
-                <TextInput
+                <Field
+                  id="order-type-landmark"
+                  label={descriptionCopy[lang].label}
+                  required
                   value={landmark}
                   onChangeText={setLandmark}
                   onBlur={() => setDescTouched(true)}
@@ -313,22 +348,19 @@ export function OrderTypeSelectScreen() {
                     // already laid out below the fold.
                     scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true });
                   }}
+                  error={descError}
                   placeholder={descriptionCopy[lang].placeholder}
-                  placeholderTextColor={colors.muted}
-                  style={[styles.input, rtlText, descError ? styles.inputError : null]}
-                  multiline
-                  accessibilityLabel={descriptionCopy[lang].label}
                   accessibilityHint={descriptionCopy[lang].placeholder}
+                  multiline
+                  inputStyle={styles.multiline}
                 />
-                {descError ? <Text style={[styles.fieldError, rtlText]}>{descError}</Text> : null}
               </View>
 
               {resolveError ? (
                 <Notice
                   title={resolveError}
                   action={pick('Move the pin to a location we deliver to.', 'حرّك الدبوس إلى موقع نقوم بالتوصيل إليه.')}
-                  rtlText={rtlText}
-                  style={{ marginTop: spacing.md }}
+                  tone="blocking"
                 />
               ) : null}
 
@@ -339,33 +371,42 @@ export function OrderTypeSelectScreen() {
                 // problem on press so the customer is told what is missing
                 // instead of facing a silently dead button.
                 disabled={pickedLat == null || pickedLng == null}
-                variant="danger"
-                style={{ marginTop: spacing.md }}
+                variant="primary"
               />
-              <Button label={t('otSavedAddresses')} onPress={() => { setResolveError(null); setDeliveryMode('choose'); }} variant="ghost" style={{ marginTop: spacing.xs }} />
+              <Button
+                label={t('otSavedAddresses')}
+                onPress={() => { setResolveError(null); setDeliveryMode('choose'); }}
+                variant="ghost"
+              />
             </>
           )}
+          </View>
         </ScrollView>
         </KeyboardAvoidingView>
       )}
 
       {busy ? (
+        // Dark scrim, so the spinner and label are white — the same treatment
+        // as the modals. Ember on a dark scrim would be the one place in the
+        // app where the interactive colour marks something you cannot press.
         <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator size="large" color={colors.purple} />
-          <Text style={styles.overlayText}>{t('otResolving')}</Text>
+          <ActivityIndicator size="large" color={color.onEmber} />
+          <Text variant="heading" tone="onEmber" align="center">{t('otResolving')}</Text>
         </View>
       ) : null}
 
       {/* Cart-conflict confirmation (never silently drops items) */}
       <Modal visible={conflict !== null} transparent animationType="fade" onRequestClose={() => setConflict(null)}>
         <View style={styles.backdrop}>
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + spacing.lg }]}>
-            <Text style={[styles.sheetTitle, rtlText]}>{t('otCartWarnTitle')}</Text>
-            <Text style={[styles.sheetBody, rtlText]}>{t('otCartWarnBody')}</Text>
-            <View style={{ gap: spacing.sm, marginTop: spacing.md }}>
-              <Button label={t('otRemoveContinue')} onPress={removeConflictAndContinue} variant="danger" />
-              <Button label={t('otReviewCart')} onPress={() => { setConflict(null); router.push('/cart'); }} variant="secondary" />
-              <Button label={t('cancel')} onPress={() => setConflict(null)} variant="ghost" />
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + space.s4 }]}>
+            <View style={[columnStyles.column, styles.sheetBody]}>
+              <Text variant="title">{t('otCartWarnTitle')}</Text>
+              <Text variant="body" tone="secondary">{t('otCartWarnBody')}</Text>
+              <View style={styles.sheetActions}>
+                <Button label={t('otRemoveContinue')} onPress={removeConflictAndContinue} variant="danger" />
+                <Button label={t('otReviewCart')} onPress={() => { setConflict(null); router.push('/cart'); }} variant="secondary" />
+                <Button label={t('cancel')} onPress={() => setConflict(null)} variant="ghost" />
+              </View>
             </View>
           </View>
         </View>
@@ -374,62 +415,52 @@ export function OrderTypeSelectScreen() {
   );
 }
 
-function TabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={[styles.tab, active && styles.tabActive]} accessibilityRole="button" accessibilityState={{ selected: active }}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  tabsBar: { padding: spacing.lg, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
-  tabs: {
-    flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.pill,
-    padding: 4, gap: 4,
-  },
-  // Segments keep identical metrics in both states — only fill/color change,
-  // so switching tabs never shifts the layout.
-  tab: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.pill, alignItems: 'center', backgroundColor: 'transparent' },
-  tabActive: { backgroundColor: colors.purple },
-  tabText: { color: colors.text, fontWeight: '700', fontSize: font.md },
-  tabTextActive: { color: colors.white, fontWeight: '800' },
-
+  root: { flex: 1, backgroundColor: color.appBg },
   flex: { flex: 1 },
-  list: { padding: spacing.lg, gap: spacing.md },
+
+  tabsBar: {
+    padding: space.s4, backgroundColor: color.appSurface,
+    borderBottomWidth: 1, borderBottomColor: color.appLine,
+    alignItems: 'center',
+  },
+  // Fixed row direction: the two order types are a set, and mirroring their
+  // order in Arabic gains nothing while making the languages harder to compare.
+  tabs: { flexDirection: 'row', gap: space.s2 },
+  tab: { flex: 1, minHeight: 44, justifyContent: 'center' },
+
+  list: { padding: space.s4, alignItems: 'center' },
   // Extra tail room so the Confirm button clears the keyboard when the
   // description field is focused at the bottom of the form.
-  listKeyboard: { padding: spacing.lg, gap: spacing.md, paddingBottom: 260 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xl },
-  sectionTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text, marginBottom: spacing.xs },
-  muted: { fontSize: font.sm, color: colors.muted },
-  label: { fontSize: font.sm, fontWeight: '800', color: colors.text },
+  listKeyboard: { padding: space.s4, paddingBottom: 260, alignItems: 'center' },
+  stack: { gap: space.s3 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.s3, padding: space.s5 },
 
   card: {
-    backgroundColor: colors.white, borderRadius: radius.lg, borderCurve: 'continuous',
-    padding: spacing.lg, borderWidth: 1.5, borderColor: 'transparent', gap: spacing.xs,
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    padding: space.s4, borderWidth: 1.5, borderColor: color.appLine, gap: space.s1,
   },
-  cardSelected: { borderColor: colors.purple, backgroundColor: colors.purpleBg },
+  cardSelected: { borderColor: color.ember, backgroundColor: color.appSurface2 },
   cardDisabled: { opacity: 0.55 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  name: { fontSize: font.md, fontWeight: '800', color: colors.text, flex: 1, paddingRight: spacing.sm },
-  address: { fontSize: font.sm, color: colors.muted },
-  meta: { fontSize: font.sm, color: colors.text, fontWeight: '700' },
+  pressed: { opacity: 0.9 },
+  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s2 },
+  name: { flex: 1 },
 
-  input: { borderWidth: 1.5, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, minHeight: 64, textAlignVertical: 'top', fontSize: font.md, color: colors.text, backgroundColor: colors.white, marginTop: spacing.xs },
-  inputError: { borderColor: colors.danger },
-  resolvedAddr: { fontSize: font.xs, color: colors.muted, marginTop: spacing.md },
-  fieldError: { color: colors.danger, fontWeight: '700', fontSize: font.sm, marginTop: spacing.xs },
-  notice: { backgroundColor: '#fdeaec', padding: spacing.lg, borderRadius: radius.md },
-  noticeText: { color: colors.red, fontWeight: '700', fontSize: font.sm },
-  err: { color: colors.red, fontWeight: '700', fontSize: font.sm, marginTop: spacing.sm },
+  multiline: { minHeight: 72, paddingTop: space.s3, textAlignVertical: 'top' },
+  resolvedAddr: { marginBottom: space.s2 },
 
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: spacing.md, backgroundColor: 'rgba(246,245,250,0.75)' },
-  overlayText: { color: colors.text, fontWeight: '800', fontSize: font.md },
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center', justifyContent: 'center', gap: space.s3,
+    backgroundColor: color.scrim,
+  },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, padding: spacing.xl },
-  sheetTitle: { fontSize: font.lg, fontWeight: '800', color: colors.text },
-  sheetBody: { fontSize: font.md, color: colors.text, marginTop: spacing.sm, lineHeight: 21 },
+  backdrop: { flex: 1, backgroundColor: color.scrim, justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: color.appSurface,
+    borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+    padding: space.s5, alignItems: 'center',
+  },
+  sheetBody: { gap: space.s2 },
+  sheetActions: { gap: space.s2, marginTop: space.s3 },
 });

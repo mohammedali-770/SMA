@@ -93,6 +93,22 @@ describe('fixture mechanism cannot reach production systems', () => {
     }
   });
 
+  it('every order-type scene injects noDeliveryZones', () => {
+    // OrderTypeSelectScreen is the one fixture-rendered screen that CAN write
+    // (`addresses.create`). With no zones injected, `resolveDeliveryBranch`
+    // returns null for any pin, so `confirmNewAddress` returns at the
+    // "delivery unavailable" branch before it ever reaches the create call.
+    // That is what makes the write unreachable — not the review environment
+    // happening to lack a Maps API key. If a scene is added without the flag,
+    // this fails.
+    const route = readFileSync(join(DEV_DIR, '..', 'app', 'dev-fixture.tsx'), 'utf8');
+    const sceneLines = route.match(/^\s*'order-type-[a-z-]+':\s*\{[^}]*\},$/gm) ?? [];
+    expect(sceneLines.length).toBeGreaterThan(0);
+    for (const line of sceneLines) {
+      expect(line, 'order-type scenes must inject noDeliveryZones').toMatch(/noDeliveryZones:\s*true/);
+    }
+  });
+
   it('the order fixtures render presentational components, never the screens', () => {
     // OrdersScreen and ReceiptScreen call orders.listWithItems / orders.byId on
     // mount, and requestResend is a REAL POS action. Mounting either under a
