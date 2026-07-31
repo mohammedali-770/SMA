@@ -72,34 +72,12 @@ export const STATE_LABELS: Record<OperationsHealthState, { en: string; ar: strin
 };
 
 /**
- * Relative age, coarsest useful unit, localized.
- *
- * `now` is injectable ONLY for testing; production passes nothing and gets
- * Date.now(), exactly as before. An unparseable timestamp reads as an em dash
- * rather than "NaN ago" — a broken reading must not look like a fresh one.
+ * Time formatting is SHARED with Operations Alerts — both panels had a
+ * character-identical copy, and two copies of a staleness threshold is two
+ * places for it to drift. Re-exported so this module stays the one import
+ * site for health view-state.
  */
-export function relativeAge(
-  iso: string | null | undefined,
-  lang: AdminLang,
-  now: number = Date.now(),
-): string {
-  if (!iso) return '—';
-  const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) return '—';
-  const seconds = Math.max(0, Math.floor((now - parsed) / 1000));
-  if (seconds < 60) return lang === 'ar' ? `قبل ${seconds} ث` : `${seconds}s ago`;
-  if (seconds < 3600) return lang === 'ar' ? `قبل ${Math.floor(seconds / 60)} د` : `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return lang === 'ar' ? `قبل ${Math.floor(seconds / 3600)} س` : `${Math.floor(seconds / 3600)}h ago`;
-  return lang === 'ar' ? `قبل ${Math.floor(seconds / 86400)} يوم` : `${Math.floor(seconds / 86400)}d ago`;
-}
-
-/** Absolute timestamp for the hover title. */
-export function exactTime(iso: string | null | undefined, lang: AdminLang): string {
-  if (!iso) return '—';
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '—';
-  return parsed.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-GB');
-}
+export { relativeAge, exactTime } from '../adminTime';
 
 /**
  * Typed reads out of the backend's untyped `details` bag.
