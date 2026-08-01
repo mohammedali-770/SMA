@@ -77,12 +77,13 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
   const { profile } = useAuth();
-  // NOTE: `brand` is deliberately NOT read. It carries `vatPercentage`, but the
-  // VAT row is a label-only note whose copy hardcodes "15%" (see i18n `vat`),
-  // and VAT presentation is frozen for this pass. The old `vatPct` local read
-  // brand.vatPercentage and was never used by anything — removed as dead code.
-  // If VAT ever becomes configurable, the LABEL is what has to change.
-  const { selectedBranch, loyalty, payment, deliveryZones, branchIsOpen } = useCatalog();
+  // `brand.vatPercentage` IS read now. The VAT row is still a label-only note
+  // with no amount — prices are VAT-inclusive, so there is nothing to add — but
+  // the copy used to hardcode "15%" while the rate is admin-configurable, so a
+  // branch on any other rate showed customers a FALSE tax rate. This
+  // interpolates the configured rate into the label and changes nothing about
+  // the calculation, the inclusivity or the totals.
+  const { selectedBranch, loyalty, payment, deliveryZones, branchIsOpen, brand } = useCatalog();
   const cart = useCart();
 
   // Order type + branch are PRESELECTED from the order context (chosen in the
@@ -728,7 +729,9 @@ export function CheckoutScreen() {
               deliveryFee: t('deliveryFee'),
               discount: t('discount'),
               loyaltyDiscount: t('loyaltyDiscount'),
-              vat: t('vat'),
+              // Single substitution at the point of use. The i18n layer has no
+              // interpolation and this PR does not add one for a single string.
+              vat: t('vat').replace('{rate}', String(brand?.vatPercentage ?? 15)),
               total: t('total'),
             }}
             serverNote={`* ${pick('Final amounts are confirmed by the server.', 'يتم تأكيد المبالغ النهائية من الخادم.')}`}

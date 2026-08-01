@@ -32,9 +32,14 @@ export function Price({
   lang?: Lang;
 }) {
   const value = formatAmount(amount);
+  // `num` binds the IBM Plex Mono stack and tabular figures. Applied HERE
+  // rather than left to call sites: money is the most prominent structured
+  // number in the product, and the console had it mono in some tables and
+  // proportional in others depending on who remembered the class. Tabular
+  // figures also stop a column of totals jittering as digits change.
   return (
     <span
-      className={className}
+      className={`num${className ? ` ${className}` : ''}`}
       dir="ltr"
       aria-label={priceAccessibilityLabel(amount, lang, prefix)}
       style={{ unicodeBidi: 'isolate', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: '0.2em' }}

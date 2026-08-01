@@ -103,8 +103,15 @@ export function ReceiptBody({ order }: { order: Order }) {
           {order.discountAmount > 0 ? <ReceiptRow label={t('discount')} amount={order.discountAmount} negative /> : null}
           {order.loyaltyDiscountAmount > 0 ? <ReceiptRow label={t('loyaltyDiscount')} amount={order.loyaltyDiscountAmount} negative /> : null}
           {/* The RECEIPT states the VAT actually charged, so unlike the checkout
-              preview this row carries a real amount. */}
-          <ReceiptRow label={t('vat')} amount={order.vatAmount} muted />
+              preview this row carries a real amount.
+
+              It uses the RATE-FREE label. The checkout label now interpolates
+              the branch's configured rate, but a receipt is a historical
+              document: the order may have been charged at a rate the brand has
+              since changed, and stamping today's rate onto it would replace one
+              false claim with another. The amount is the truth here, and it is
+              already shown. */}
+          <ReceiptRow label={t('vatIncluded')} amount={order.vatAmount} muted />
           <View style={styles.divider} />
           <ReceiptRow label={t('total')} amount={order.total} strong big />
 

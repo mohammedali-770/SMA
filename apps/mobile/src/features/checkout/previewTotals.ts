@@ -60,7 +60,18 @@ export function lineTotal(item: Pick<CartItem, 'unitPrice' | 'quantity'>): numbe
 export function computePreviewTotals(input: PreviewInput): PreviewTotals {
   const subtotal = cartSubtotal(input.items);
   const isDelivery = input.orderType === 'delivery';
-  const deliveryFee = isDelivery ? money(input.deliveryFee) : 0;
+  const itemCount = input.items.reduce((n, it) => n + it.quantity, 0);
+  // An EMPTY cart carries no delivery fee. The preview used to apply it on
+  // order type alone, so an empty delivery checkout read subtotal 0.00,
+  // delivery 15.00, total 15.00 — a payable amount for nothing.
+  //
+  // Fixed HERE rather than by hiding the row, because hiding the row alone
+  // would leave "Total 15.00" with nothing on screen explaining it. This is the
+  // CLIENT preview only: `canSubmitOrder` already refuses at `itemCount === 0`,
+  // so a zero-item cart can never reach `place_order` and the two cannot
+  // disagree in any reachable state. Server calculation, delivery-zone rules
+  // and place-order behaviour are untouched.
+  const deliveryFee = isDelivery && itemCount > 0 ? money(input.deliveryFee) : 0;
 
   // Discounts never exceed the goods value: a coupon plus loyalty must not make
   // the delivery fee free or drive the total negative.
@@ -87,7 +98,7 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
     total,
     belowMinimum,
     missingForMinimum,
-    itemCount: input.items.reduce((n, it) => n + it.quantity, 0),
+    itemCount,
   };
 }
 
