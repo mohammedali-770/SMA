@@ -32,7 +32,7 @@
  * else is quiet until hovered, so at a glance the sidebar answers "where am I"
  * with a single mark rather than twelve competing ones.
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, Menu, X } from 'lucide-react';
 
 import { Text } from '../../../design-system/ui/Text';
@@ -43,13 +43,30 @@ import {
 } from './adminNav';
 
 const COPY = {
-  en: { nav: 'Console sections', menu: 'Menu', close: 'Close menu', open: 'Open menu' },
-  ar: { nav: 'أقسام لوحة التحكم', menu: 'القائمة', close: 'إغلاق القائمة', open: 'فتح القائمة' },
+  en: {
+    nav: 'Console sections', menu: 'Menu', close: 'Close menu', open: 'Open menu',
+    live: (n: number) => `${n} live ${n === 1 ? 'order' : 'orders'}`,
+  },
+  ar: {
+    nav: 'أقسام لوحة التحكم', menu: 'القائمة', close: 'إغلاق القائمة', open: 'فتح القائمة',
+    live: (n: number) => `${n} طلبات مباشرة`,
+  },
 } as const;
 
-/** The Live Orders count, as a pill. Rendered on the item and, when its group
- *  is collapsed, on the group header — so collapsing never hides the count. */
-function CountBadge({ count, onEmber }: { count: number; onEmber: boolean }) {
+/**
+ * The Live Orders count, as a pill. Rendered on the item and, when its group
+ * is collapsed, on the group header — so collapsing never hides the count.
+ *
+ * The digit alone is meaningless to a screen reader: absorbed into the group
+ * header's name it read as "Operations 7", and on the compact trigger it was a
+ * bare "7" with nothing beside it. The visible glyph is therefore hidden from
+ * the accessibility tree and replaced with the same count in words.
+ */
+function CountBadge({ count, srLabel, onEmber }: {
+  count: number;
+  srLabel: string;
+  onEmber: boolean;
+}) {
   return (
     <span
       className={[
@@ -57,9 +74,16 @@ function CountBadge({ count, onEmber }: { count: number; onEmber: boolean }) {
         onEmber ? 'bg-on-ember' : 'bg-ember',
       ].join(' ')}
     >
-      <Text variant="caption" numeric tone={onEmber ? 'ember' : 'onEmber'} as="span">
+      <Text
+        variant="caption"
+        numeric
+        tone={onEmber ? 'ember' : 'onEmber'}
+        as="span"
+        aria-hidden="true"
+      >
         {count}
       </Text>
+      <span className="sr-only">{srLabel}</span>
     </span>
   );
 }
@@ -97,7 +121,9 @@ function NavButton({
         </Text>
       </span>
 
-      {showBadge ? <CountBadge count={liveOrderCount} onEmber={selected} /> : null}
+      {showBadge ? (
+        <CountBadge count={liveOrderCount} srLabel={COPY[lang].live(liveOrderCount)} onEmber={selected} />
+      ) : null}
     </button>
   );
 }
@@ -177,7 +203,9 @@ function NavGroup({
         </span>
 
         <span className="flex shrink-0 items-center gap-1.5">
-          {collapsedCount > 0 ? <CountBadge count={collapsedCount} onEmber={false} /> : null}
+          {collapsedCount > 0 ? (
+            <CountBadge count={collapsedCount} srLabel={COPY[lang].live(collapsedCount)} onEmber={false} />
+          ) : null}
           <ChevronDown
             className={[
               'ds-motion size-4 text-con-text-3 transition-transform duration-150',
@@ -229,6 +257,18 @@ export function AdminSidebar({
   );
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // Focus follows the drawer: into it on open, back to the trigger that opened
+  // it on every close path (pick, Escape, backdrop, X). Without this the drawer
+  // unmounts under the caret and focus falls to <body>, so the next Tab starts
+  // from the top of the document instead of where the operator was.
+  //
+  // Deliberately NOT a focus trap, and deliberately no role="dialog"/aria-modal:
+  // the content behind is not inert, and this repo's ModalShell already states
+  // that claiming modality without real inertness is worse than saying nothing.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeRef = useRef<HTMLButtonElement | null>(null);
+  const everOpened = useRef(false);
+
   // The shell can change the active tab without the sidebar being touched —
   // it resets to Overview when a gated tab's probe comes back missing. Reopen
   // whichever group now holds it. `withActiveGroupExpanded` returns the same
@@ -249,6 +289,16 @@ export function AdminSidebar({
     onSelect(tab);
     setDrawerOpen(false);
   }, [onSelect]);
+
+  useEffect(() => {
+    if (drawerOpen) {
+      everOpened.current = true;
+      closeRef.current?.focus();
+      return;
+    }
+    // Guarded, so a first render does not steal focus from the page.
+    if (everOpened.current) triggerRef.current?.focus();
+  }, [drawerOpen]);
 
   // Escape closes the drawer, the one interaction a keyboard user expects from
   // anything covering the page.
@@ -286,6 +336,7 @@ export function AdminSidebar({
           drawer is not the only way to find out where you are. */}
       <div className="flex items-center gap-2 border-b border-con-line bg-con-surface-2 p-3 lg:hidden">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label={copy.open}
@@ -311,7 +362,9 @@ export function AdminSidebar({
         </Text>
 
         {liveOrderCount > 0 ? (
-          <span className="ms-auto shrink-0"><CountBadge count={liveOrderCount} onEmber={false} /></span>
+          <span className="ms-auto shrink-0">
+            <CountBadge count={liveOrderCount} srLabel={copy.live(liveOrderCount)} onEmber={false} />
+          </span>
         ) : null}
       </div>
 
@@ -334,6 +387,7 @@ export function AdminSidebar({
             <div className="mb-2 flex items-center justify-between gap-2">
               <Text variant="label" tone="secondary" as="span">{copy.menu}</Text>
               <button
+                ref={closeRef}
                 type="button"
                 onClick={() => setDrawerOpen(false)}
                 aria-label={copy.close}

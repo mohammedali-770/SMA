@@ -241,3 +241,54 @@ describe('the drawer and the column are two copies of one tree', () => {
     }
   });
 });
+
+describe('the count is readable, not just visible', () => {
+  it('reads the badge as a count of orders, not a bare digit', () => {
+    // Absorbed into the group header's accessible name, a lone "7" read as
+    // "Operations 7"; on the compact trigger it was a "7" beside nothing.
+    setup({ active: 'stats', liveOrderCount: 7 });
+    expect(within(groupHeader('operations')).getByText('7 live orders')).toBeTruthy();
+  });
+
+  it('uses the singular for one order', () => {
+    setup({ active: 'stats', liveOrderCount: 1 });
+    expect(within(groupHeader('operations')).getByText('1 live order')).toBeTruthy();
+  });
+
+  it('reads it in Arabic too', () => {
+    setup({ active: 'stats', liveOrderCount: 4, lang: 'ar' });
+    expect(screen.getAllByText('4 طلبات مباشرة').length).toBeGreaterThan(0);
+  });
+});
+
+describe('drawer focus', () => {
+  it('moves focus into the drawer on open', () => {
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Close menu');
+  });
+
+  it('returns focus to the trigger when a destination is picked', () => {
+    // Without this the drawer unmounts under the caret, focus falls to <body>,
+    // and the next Tab restarts from the top of the document.
+    setup();
+    const trigger = screen.getByRole('button', { name: /open menu/i });
+    fireEvent.click(trigger);
+    fireEvent.click(within(screen.getAllByRole('navigation')[0]).getByRole('button', { name: /sales overview/i }));
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('returns focus to the trigger on Escape', () => {
+    setup();
+    const trigger = screen.getByRole('button', { name: /open menu/i });
+    fireEvent.click(trigger);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('does not steal focus on first render', () => {
+    setup();
+    expect(document.body.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).toBe(document.body);
+  });
+});

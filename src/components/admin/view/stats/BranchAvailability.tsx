@@ -52,11 +52,19 @@ export function OperationalBranchesCard({
       {/* The whole tile is the control. Its children are spans, not
           paragraphs: a button may only contain phrasing content, and a <p>
           inside one is invalid markup that browsers silently restructure. */}
+      {/* No `aria-label` here, deliberately. An explicit label short-circuits
+          the accessible-name computation before name-from-content, and
+          `role=button` prunes its descendants from the accessibility tree — so
+          labelling this "Show branch availability" made the tile announce ONLY
+          that, and the figures it exists to report ("Operational Branches",
+          "18 / 23", "5 branches closed") were readable nowhere. They were
+          plain paragraphs before this tile became a control. Letting the name
+          come from the contents announces the label, the value, the closure
+          line and the action, in that order; `aria-expanded` carries state. */}
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        aria-label={expanded ? c.hideBreakdown : c.showBreakdown}
         className={[
           'ds-motion flex w-full flex-col rounded-[var(--radius-ds-lg)] p-4 text-start',
           'transition-colors duration-150 hover:bg-con-surface',

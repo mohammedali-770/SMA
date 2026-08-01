@@ -197,8 +197,49 @@ describe('view all branches', () => {
 describe('operational branches breakdown', () => {
   it('is closed until the tile is clicked', () => {
     render(<StatsPanel />);
-    expect(screen.getByRole('button', { name: 'Show branch availability' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /show branch availability/i })).toBeTruthy();
     expect(screen.queryByText('Branch availability')).toBeNull();
+  });
+
+  it('still announces the KPI figures now that the tile is a control', () => {
+    // Making the tile a button silenced it once: an explicit aria-label
+    // short-circuits name-from-content, so the label and both figures were
+    // announced nowhere while remaining visible on screen. The accessible name
+    // must carry the number, not just the action.
+    render(<StatsPanel />);
+    const tile = screen.getByRole('button', { name: /show branch availability/i });
+    const name = tile.textContent ?? '';
+    expect(name).toContain('Operational Branches');
+    expect(name).toContain('11 / 12');
+    expect(name).toContain('1 branches closed');
+    expect(tile.getAttribute('aria-label')).toBeNull();
+  });
+
+  it('lists each branch under the status it is actually in', () => {
+    // A reviewer misread these three columns as cross-wired. Nothing pinned the
+    // name-to-column mapping, so the misreading could not be settled by running
+    // the suite. Now it can.
+    mockContext({
+      branches: [
+        mkBranch(0),
+        mkBranch(1, { deliveryTemporarilyClosed: true }),
+        mkBranch(2, { isActive: false }),
+      ],
+      orders: [],
+    });
+    render(<StatsPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /show branch availability/i }));
+
+    const columnFor = (status: string) => {
+      const pill = screen.getByText(status);
+      return pill.closest('div')?.parentElement as HTMLElement;
+    };
+    expect(within(columnFor('Open')).getByText('Branch 0')).toBeTruthy();
+    expect(within(columnFor('Temporarily unavailable')).getByText('Branch 1')).toBeTruthy();
+    expect(within(columnFor('Closed')).getByText('Branch 2')).toBeTruthy();
+
+    expect(within(columnFor('Open')).queryByText('Branch 2')).toBeNull();
+    expect(within(columnFor('Closed')).queryByText('Branch 0')).toBeNull();
   });
 
   it('opens onto open, temporarily unavailable and closed branches', () => {
@@ -211,7 +252,7 @@ describe('operational branches breakdown', () => {
       orders: [],
     });
     render(<StatsPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Show branch availability' }));
+    fireEvent.click(screen.getByRole('button', { name: /show branch availability/i }));
 
     const panel = within(screen.getByText('Branch availability').parentElement as HTMLElement);
     expect(panel.getByText('Open')).toBeTruthy();
@@ -226,7 +267,7 @@ describe('operational branches breakdown', () => {
       orders: [],
     });
     render(<StatsPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Show branch availability' }));
+    fireEvent.click(screen.getByRole('button', { name: /show branch availability/i }));
 
     expect(screen.getByText('Delivery paused')).toBeTruthy();
     expect(screen.getByText('Closed for maintenance')).toBeTruthy();
@@ -234,7 +275,7 @@ describe('operational branches breakdown', () => {
 
   it('agrees with the KPI it hangs off', () => {
     render(<StatsPanel />);
-    fireEvent.click(screen.getByRole('button', { name: 'Show branch availability' }));
+    fireEvent.click(screen.getByRole('button', { name: /show branch availability/i }));
     // The tile counts 11 of 12 operational; open + temporarily unavailable
     // must be those same 11.
     expect(screen.getByText('11 / 12')).toBeTruthy();
