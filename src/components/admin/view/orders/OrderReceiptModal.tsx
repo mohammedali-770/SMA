@@ -25,6 +25,7 @@ import { paymentDisplayState } from '../../../../lib/payment';
 import type { Branch, Order, OrderStatus } from '../../../../types';
 import { getVATBreakdown } from '../../../../utils/calculations';
 import { Price } from '../../../Price';
+import { ModalShell } from '../shared/ModalShell';
 import { DetailRow } from './DetailRow';
 import { TapPaymentDetails } from './TapPaymentDetails';
 import { paymentTone, syncStateOf, syncTone } from './ordersView';
@@ -74,17 +75,16 @@ export function OrderReceiptModal({
   const hasPhone = !!(order.customerPhone && order.customerPhone.trim());
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/60 p-4">
-      {/* role="dialog" WITHOUT aria-modal: nothing here traps focus or marks the
-          page inert, and claiming modality a screen reader then finds untrue is
-          worse than not claiming it. Focus management would be a behaviour
-          change; this migration does not make one. */}
-      <div
-        role="dialog"
-        aria-label={isRTL ? 'تفاصيل الطلب' : 'Order receipt'}
-        className="w-full max-w-md overflow-hidden rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface"
-        dir={isRTL ? 'rtl' : 'ltr'}
-      >
+    // Shares ModalShell with AdminModal for the focus trap, Escape, focus
+    // restoration and page-inert behaviour, but keeps its own two-line header:
+    // the title here is an order number plus a POS reference, not a string.
+    <ModalShell
+      label={isRTL ? 'تفاصيل الطلب' : 'Order receipt'}
+      isRTL={isRTL}
+      onClose={onClose}
+      className="w-full max-w-md overflow-hidden rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface"
+    >
+      <>
         <div className="flex items-center justify-between gap-2 border-b border-con-line px-5 py-4">
           <div className="min-w-0">
             <Text variant="caption" tone="tertiary" as="p">
@@ -288,7 +288,7 @@ export function OrderReceiptModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </>
+    </ModalShell>
   );
 }

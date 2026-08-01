@@ -198,6 +198,7 @@ const ADMIN_MIGRATED = [
   'src/components/admin/view/adminTime.ts',
   // Shared admin form shell
   'src/components/admin/view/shared/AdminModal.tsx',
+  'src/components/admin/view/shared/ModalShell.tsx',
   'src/components/admin/view/shared/ToggleChip.tsx',
   // Map helpers embedded in the migrated branch and delivery-zone editors.
   // Restyled only — no map behaviour, provider logic or geocoding changed.
