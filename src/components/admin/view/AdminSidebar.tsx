@@ -103,18 +103,25 @@ function NavButton({
 }
 
 function NavGroup({
-  group, active, expanded, lang, liveOrderCount, onToggle, onSelect,
+  group, active, expanded, lang, liveOrderCount, surface, onToggle, onSelect,
 }: {
   group: ResolvedNavGroup;
   active: AdminTab;
   expanded: boolean;
   lang: 'en' | 'ar';
   liveOrderCount: number;
+  /**
+   * Which copy of the tree this is. The drawer and the column render the same
+   * groups, and while the drawer is open BOTH are in the DOM — the column is
+   * only hidden by CSS. Without this, every disclosure panel id would exist
+   * twice and each `aria-controls` would point at an ambiguous target.
+   */
+  surface: 'column' | 'drawer';
   onToggle: (id: AdminNavGroupId) => void;
   onSelect: (tab: AdminTab) => void;
 }) {
   const { id, icon: Icon, en, ar, collapsible, items } = group;
-  const panelId = `admin-nav-group-${id}`;
+  const panelId = `admin-nav-${surface}-group-${id}`;
 
   // A pinned group is a plain list with no header — Overview is one item, and
   // wrapping it in a disclosure would be chrome around a single button.
@@ -255,7 +262,7 @@ export function AdminSidebar({
   const activeItem = groups.flatMap((g) => g.items).find((item) => item.tab === active);
   const activeLabel = activeItem ? (lang === 'ar' ? activeItem.ar : activeItem.en) : copy.menu;
 
-  const tree = (
+  const tree = (surface: 'column' | 'drawer') => (
     <div className="flex flex-col gap-2">
       {groups.map((group) => (
         <NavGroup
@@ -265,6 +272,7 @@ export function AdminSidebar({
           expanded={expanded.has(group.id)}
           lang={lang}
           liveOrderCount={liveOrderCount}
+          surface={surface}
           onToggle={toggleGroup}
           onSelect={select}
         />
@@ -338,7 +346,7 @@ export function AdminSidebar({
                 <X className="size-4" aria-hidden="true" />
               </button>
             </div>
-            {tree}
+            {tree('drawer')}
           </nav>
         </div>
       ) : null}
@@ -351,7 +359,7 @@ export function AdminSidebar({
           'border-e border-con-line bg-con-surface-2 lg:block',
         ].join(' ')}
       >
-        {tree}
+        {tree('column')}
       </nav>
     </>
   );

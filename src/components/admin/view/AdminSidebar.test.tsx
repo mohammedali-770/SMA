@@ -50,7 +50,7 @@ const column = () => within(navColumn());
  * header's accessible name additionally absorbs its count badge.
  */
 function groupHeader(id: string): HTMLElement {
-  const el = navColumn().querySelector<HTMLElement>(`[aria-controls="admin-nav-group-${id}"]`);
+  const el = navColumn().querySelector<HTMLElement>(`[aria-controls="admin-nav-column-group-${id}"]`);
   if (!el) throw new Error(`no disclosure header for group "${id}"`);
   return el;
 }
@@ -215,5 +215,29 @@ describe('compact drawer', () => {
   it('names the current page on the trigger, so the drawer is not the only way to tell', () => {
     setup({ active: 'reports' });
     expect(screen.getByTestId('admin-nav-current').textContent).toBe('Financial Reports');
+  });
+});
+
+describe('the drawer and the column are two copies of one tree', () => {
+  it('does not duplicate a disclosure panel id while both are mounted', () => {
+    // The column is only HIDDEN below `lg`, never unmounted, so with the
+    // drawer open every group is rendered twice. Sharing one id would make
+    // each aria-controls ambiguous and the document invalid.
+    setup();
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
+
+    const ids = Array.from(document.querySelectorAll('[id^="admin-nav-"]')).map((el) => el.id);
+    expect(ids.length).toBe(new Set(ids).size);
+  });
+
+  it('points every aria-controls at exactly one element', () => {
+    setup({ active: 'reports' });
+    fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
+
+    for (const el of Array.from(document.querySelectorAll('[aria-controls]'))) {
+      const target = el.getAttribute('aria-controls') as string;
+      if (el.getAttribute('aria-expanded') !== 'true') continue;
+      expect(document.querySelectorAll(`[id="${target}"]`)).toHaveLength(1);
+    }
   });
 });
