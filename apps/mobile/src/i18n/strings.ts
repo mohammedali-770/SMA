@@ -244,6 +244,9 @@ export const STRINGS = {
     addrLoading: 'Loading your addresses',
     addrSetAsDefault: 'Set as my default address',
     addrContextReset: 'You were ordering to this address. Choose delivery or pickup again to continue.',
+    addrRetry: 'Try again',
+    addrNotFound: 'This address is no longer saved',
+    addrNotFoundSub: 'It may have been deleted. Your other addresses are safe.',
 
     // WhatsApp phone verification
     verifyPhoneTitle: 'Verify phone number',
@@ -571,6 +574,9 @@ export const STRINGS = {
     addrLoading: 'جارٍ تحميل عناوينك',
     addrSetAsDefault: 'اجعله عنواني الافتراضي',
     addrContextReset: 'كنت تطلب إلى هذا العنوان. اختر التوصيل أو الاستلام مرة أخرى للمتابعة.',
+    addrRetry: 'حاول مرة أخرى',
+    addrNotFound: 'لم يعد هذا العنوان محفوظاً',
+    addrNotFoundSub: 'ربما تم حذفه. بقية عناوينك محفوظة.',
 
     // التحقق من الجوال عبر واتساب
     verifyPhoneTitle: 'التحقق من رقم الجوال',

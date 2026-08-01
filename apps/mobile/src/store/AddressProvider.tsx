@@ -22,7 +22,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 
 import { useAuth } from './AuthProvider';
 import {
-  applyAddressEvent, EMPTY_ADDRESS_BOOK, NEW_ADDRESS,
+  addressRetryDelayMs, applyAddressEvent, EMPTY_ADDRESS_BOOK, NEW_ADDRESS,
   type AddressBookState, type AddressBookStatus,
 } from './addressBook';
 import { addressErrorCopy, addressErrorMessage, type AddressInput } from '../services/addressPayload';
@@ -60,9 +60,19 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AddressBookState>(EMPTY_ADDRESS_BOOK);
   const mounted = useRef(true);
 
-  // Epoch counter: a load started for one user must not land after a sign-out or
-  // a user switch and repopulate the book with the previous customer's addresses.
+  // Epoch counter: a request started for one user must not land after a sign-out
+  // or a user switch and repopulate the book with the previous customer's
+  // addresses. Bumped on sign-out and on every new load cycle, and checked by
+  // BOTH the loader and the write wrappers before they touch state.
   const loadSeq = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearRetry = useCallback(() => {
+    if (retryTimer.current !== null) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+  }, []);
 
   // `lang` is read inside callbacks that must not be rebuilt on every render;
   // a ref keeps the latest value without making every consumer re-render when
@@ -75,88 +85,127 @@ export function AddressProvider({ children }: { children: React.ReactNode }) {
     setState((prev) => applyAddressEvent(prev, event));
   }, []);
 
+  /**
+   * One load cycle. The first attempt is awaited; a transient failure keeps the
+   * last known list and retries on a short bounded schedule in the background.
+   *
+   * The retry is not belt-and-braces. This provider is mounted at the app root
+   * and never remounts, so the book is fetched once per signed-in session —
+   * without a retry, one failed `listMine()` on a flaky cold start left the
+   * customer with no saved addresses for the whole process, and they would
+   * re-drop a pin at an address they had already saved. The per-screen fetches
+   * this replaced used to self-heal on remount; a shared book must heal itself.
+   */
   const load = useCallback(async () => {
+    clearRetry();
     const seq = ++loadSeq.current;
-    dispatch({ type: 'load_start' });
-    try {
-      const rows = await addressApi.listMine();
+    const attempt = async (n: number): Promise<void> => {
       if (!mounted.current || seq !== loadSeq.current) return;
-      dispatch({ type: 'load_success', addresses: rows.map(mapAddress) });
-    } catch (err) {
-      if (!mounted.current || seq !== loadSeq.current) return;
-      // A failed refresh keeps the last known list (see the reducer) so a bad
-      // request cannot send a customer with saved addresses back to the gate.
-      dispatch({ type: 'load_failure', message: addressErrorCopy[langRef.current].loadFailed });
-      void err;
-    }
-  }, [dispatch]);
+      dispatch({ type: 'load_start' });
+      try {
+        const rows = await addressApi.listMine();
+        if (!mounted.current || seq !== loadSeq.current) return;
+        dispatch({ type: 'load_success', addresses: rows.map(mapAddress) });
+      } catch {
+        if (!mounted.current || seq !== loadSeq.current) return;
+        // A failed refresh keeps the last known list (see the reducer) so a bad
+        // request cannot send a customer with saved addresses back to the gate.
+        dispatch({ type: 'load_failure', message: addressErrorCopy[langRef.current].loadFailed });
+        const delay = addressRetryDelayMs(n);
+        if (delay !== null) {
+          retryTimer.current = setTimeout(() => { void attempt(n + 1); }, delay);
+        }
+        // Schedule exhausted → stop. The Saved-addresses screen offers an
+        // explicit retry, and the next sign-in starts a fresh cycle.
+      }
+    };
+    await attempt(1);
+  }, [clearRetry, dispatch]);
 
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
+    return () => { mounted.current = false; clearRetry(); };
+  }, [clearRetry]);
 
   // Load on sign-in, clear on sign-out, reload on a user switch. Keyed on
   // `userId` so a token refresh for the same customer does not refetch.
   useEffect(() => {
     if (authStatus === 'loading') return;
     if (authStatus === 'signed_out' || !userId) {
-      loadSeq.current += 1; // cancel any in-flight load
+      loadSeq.current += 1; // cancel any in-flight load OR write
+      clearRetry();
       dispatch({ type: 'signed_out' });
       return;
     }
     void load();
-  }, [authStatus, userId, load, dispatch]);
+  }, [authStatus, userId, load, dispatch, clearRetry]);
 
   /**
    * Run one write, keeping the book and the error state in step.
    *
-   * Re-throws on failure so the calling screen can stay on the form, while the
-   * book still records the customer-facing message. Swallowing here would let a
-   * screen navigate away from a save that did not happen.
+   * EPOCH-GUARDED like `load`. Without this, a write issued just before sign-out
+   * could resolve afterwards and dispatch `upserted` into the cleared book —
+   * putting the previous customer's address (their home, with its landmark)
+   * back on screen for the next account to see on a shared phone. The write
+   * itself is always safe (RLS scopes it and `create` stamps `customer_id` from
+   * the live session); it is the local state that must not be resurrected.
+   *
+   * `apply` runs only while the epoch still holds. Failures re-throw so the
+   * calling screen stays on its form rather than navigating away from a save
+   * that did not happen.
    */
-  const mutate = useCallback(async <T,>(id: string, run: () => Promise<T>): Promise<T> => {
+  const mutate = useCallback(async <T,>(
+    id: string,
+    run: () => Promise<T>,
+    apply: (result: T) => void,
+  ): Promise<T> => {
+    const seq = loadSeq.current;
     dispatch({ type: 'mutation_start', id });
     try {
-      return await run();
+      const result = await run();
+      if (mounted.current && seq === loadSeq.current) apply(result);
+      return result;
     } catch (err) {
-      dispatch({ type: 'mutation_failure', message: addressErrorMessage(err, langRef.current) });
+      if (mounted.current && seq === loadSeq.current) {
+        dispatch({ type: 'mutation_failure', message: addressErrorMessage(err, langRef.current) });
+      }
       throw err;
     }
   }, [dispatch]);
 
   const create = useCallback(async (input: AddressInput): Promise<SavedAddress> => {
-    return mutate(NEW_ADDRESS, async () => {
-      const address = mapAddress(await addressApi.create(input));
-      dispatch({ type: 'upserted', address });
-      return address;
-    });
+    return mutate(
+      NEW_ADDRESS,
+      async () => mapAddress(await addressApi.create(input)),
+      (address) => dispatch({ type: 'upserted', address }),
+    );
   }, [mutate, dispatch]);
 
   const update = useCallback(async (id: string, patch: Partial<AddressInput>): Promise<SavedAddress> => {
-    return mutate(id, async () => {
-      const address = mapAddress(await addressApi.update(id, patch));
-      dispatch({ type: 'upserted', address });
-      return address;
-    });
+    return mutate(
+      id,
+      async () => mapAddress(await addressApi.update(id, patch)),
+      (address) => dispatch({ type: 'upserted', address }),
+    );
   }, [mutate, dispatch]);
 
   const remove = useCallback(async (id: string): Promise<void> => {
-    await mutate(id, async () => {
-      await addressApi.remove(id);
-      dispatch({ type: 'removed', id });
-    });
+    await mutate(
+      id,
+      async () => { await addressApi.remove(id); },
+      () => dispatch({ type: 'removed', id }),
+    );
   }, [mutate, dispatch]);
 
   const setDefault = useCallback(async (id: string): Promise<SavedAddress> => {
-    return mutate(id, async () => {
+    return mutate(
+      id,
       // The database clears the previous default; the reducer mirrors that
       // locally so the list never shows two "Default" badges while the write
       // settles.
-      const address = mapAddress(await addressApi.setDefault(id));
-      dispatch({ type: 'upserted', address });
-      return address;
-    });
+      async () => mapAddress(await addressApi.setDefault(id)),
+      (address) => dispatch({ type: 'upserted', address }),
+    );
   }, [mutate, dispatch]);
 
   const clearError = useCallback(() => dispatch({ type: 'error_cleared' }), [dispatch]);

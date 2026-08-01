@@ -107,10 +107,13 @@ interface CodedError {
  * back to the message text, because a few transport paths lose the code.
  *
  * `in_use` is the one customers hit by accident: `checkout_sessions.address_id`
- * references `addresses(id)` with no ON DELETE action, so an address attached to
- * an unfinished payment session cannot be deleted. Saying "used by a payment in
- * progress" is the difference between a customer waiting and a customer
- * assuming the app is broken.
+ * references `addresses(id)` with no ON DELETE action, and session rows are
+ * kept (finalization only flips their status), so an address that has ever been
+ * used for an online checkout cannot be deleted until that changes server-side.
+ * The copy is deliberately honest about that — it offers editing, which the FK
+ * does not block, and does NOT promise that retrying will work, because it
+ * won't. Relaxing the FK is a payment-area schema change (frozen, CLAUDE.md §6)
+ * and is the owner's call.
  */
 export function classifyAddressError(err: unknown): AddressProblem {
   const e = (err ?? {}) as CodedError;
@@ -136,7 +139,7 @@ export function classifyAddressError(err: unknown): AddressProblem {
 export const addressErrorCopy = {
   en: {
     not_signed_in: 'Sign in again to manage your addresses',
-    in_use: 'This address is used by a payment in progress. Try again shortly.',
+    in_use: "This address is linked to a payment and can't be deleted. You can still edit it.",
     not_found: "That address is no longer saved",
     invalid_description: 'Add a nearby landmark so the driver can find you',
     network: "We couldn't reach the server. Check your connection and try again.",
@@ -145,7 +148,7 @@ export const addressErrorCopy = {
   },
   ar: {
     not_signed_in: 'سجّل الدخول مرة أخرى لإدارة عناوينك',
-    in_use: 'هذا العنوان مرتبط بعملية دفع جارية. حاول بعد قليل.',
+    in_use: 'هذا العنوان مرتبط بعملية دفع ولا يمكن حذفه. لا يزال بإمكانك تعديله.',
     not_found: 'لم يعد هذا العنوان محفوظاً',
     invalid_description: 'أضف أقرب معلم حتى يتمكن المندوب من الوصول إليك',
     network: 'تعذّر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.',

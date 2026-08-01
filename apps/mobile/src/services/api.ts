@@ -384,9 +384,11 @@ export const addresses = {
    *
    * `orders.address_id` is ON DELETE SET NULL and every order carries its own
    * `address_snapshot`, so past orders keep the address they were delivered to.
-   * `checkout_sessions.address_id` has no ON DELETE action, so an address tied to
-   * an unfinished payment session raises 23503 — surfaced to the customer as
-   * "used by a payment in progress" (see classifyAddressError).
+   * `checkout_sessions.address_id` has no ON DELETE action and session rows are
+   * kept after finalization, so an address that has ever backed an online
+   * checkout raises 23503 here — surfaced honestly as "linked to a payment,
+   * can't be deleted, editing still works" (see classifyAddressError). Fixing
+   * that for real means relaxing the FK, which is payment-area schema (frozen).
    */
   async remove(id: string): Promise<void> {
     const res = await supabase.from('addresses').delete().eq('id', id);

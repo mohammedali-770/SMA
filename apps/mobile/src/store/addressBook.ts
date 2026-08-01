@@ -177,6 +177,49 @@ export function contextNeedsReset(
   return context.addressId === changedId;
 }
 
+/**
+ * True when an edit actually staled the copy the order context is holding.
+ *
+ * `contextNeedsReset` answers "is this the address I am ordering to"; this
+ * answers "did anything the context CACHED change". The context caches branch,
+ * addressId, coordinates and the landmark — not the label and not `isDefault`.
+ * Without this second question, promoting the address you are currently
+ * ordering to from the editor threw the customer back through the blocking
+ * order-type gate, while the identical promotion from the list did nothing at
+ * all. One action, two outcomes, neither of them necessary.
+ */
+export function patchStalesOrderContext(patch: {
+  latitude?: unknown;
+  longitude?: unknown;
+  description?: unknown;
+}): boolean {
+  return patch.latitude !== undefined
+    || patch.longitude !== undefined
+    || patch.description !== undefined;
+}
+
+/**
+ * Backoff for a failed address-book load, in milliseconds; `null` ends the
+ * schedule.
+ *
+ * The book is fetched ONCE per signed-in session — the provider lives at the
+ * app root and never remounts — so without this a single failed `listMine()` on
+ * a flaky cold start left the customer with no saved addresses for the rest of
+ * the process. They would then re-drop a pin at an address they had already
+ * saved, creating a duplicate. Per-screen fetches used to self-heal on remount;
+ * a shared book has to heal itself.
+ *
+ * Same shape and reasoning as `profileRetryDelayMs` in profileCache.ts: short,
+ * bounded, and finished rather than infinite — a customer who is genuinely
+ * offline should not have a request loop running behind the app.
+ */
+export const ADDRESS_RETRY_DELAYS_MS = [1_000, 3_000, 8_000] as const;
+
+export function addressRetryDelayMs(attempt: number): number | null {
+  if (attempt < 1) return null;
+  return ADDRESS_RETRY_DELAYS_MS[attempt - 1] ?? null;
+}
+
 /** The address a screen is editing, or null when the id is unknown/new. */
 export function findAddress(
   addresses: SavedAddress[],

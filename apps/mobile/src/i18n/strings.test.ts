@@ -53,7 +53,8 @@ describe('profile address management copy', () => {
     'addrTitle', 'addrManage', 'addrManageHint', 'addrAdd', 'addrEditTitle', 'addrNewTitle',
     'addrEmptyTitle', 'addrEmptySub', 'addrDefault', 'addrSetDefault', 'addrEdit', 'addrDelete',
     'addrDeleteTitle', 'addrDeleteBody', 'addrSave', 'addrSaved', 'addrDeleted', 'addrUnnamed',
-    'addrLoading', 'addrSetAsDefault', 'addrContextReset',
+    'addrLoading', 'addrSetAsDefault', 'addrContextReset', 'addrRetry', 'addrNotFound',
+    'addrNotFoundSub',
   ] as const;
 
   it('exists in both languages', () => {

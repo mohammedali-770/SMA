@@ -21,13 +21,13 @@
  * would write the OLD landmark back over the one just saved.
  */
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Header } from '../../components/Header';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { Screen } from '../../components/Screen';
-import { LoadingView } from '../../components/StateViews';
+import { EmptyView, LoadingView } from '../../components/StateViews';
 import { color, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
 import { SelectableChip } from '../../design-system/ui/Chip';
@@ -40,7 +40,9 @@ import {
   type AddressFormValues,
 } from './addressForm';
 import { descriptionCopy } from '../order/locationDescription';
-import { contextNeedsReset, findAddress, NEW_ADDRESS, shouldBecomeDefault } from '../../store/addressBook';
+import {
+  contextNeedsReset, findAddress, NEW_ADDRESS, patchStalesOrderContext, shouldBecomeDefault,
+} from '../../store/addressBook';
 import { useI18n } from '../../i18n/I18nProvider';
 import { mapConfig } from '../../lib/map';
 import { useAddressBook, useOrderContext } from '../../store';
@@ -53,6 +55,12 @@ export function AddressEditScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : NEW_ADDRESS;
   const book = useAddressBook();
+
+  // `book.error` is one app-wide field that nothing on a navigation path clears,
+  // so a delete that failed on the list screen would otherwise render here as a
+  // red blocking alert about an address this form is not even editing.
+  const { clearError } = book;
+  useEffect(() => { clearError(); }, [clearError]);
 
   const existing = findAddress(book.addresses, id);
   const creating = id === NEW_ADDRESS;
@@ -67,6 +75,26 @@ export function AddressEditScreen() {
       <Screen background={color.appBg}>
         <Header title={t('addrEditTitle')} showBack safeTop />
         <LoadingView label={t('addrLoading')} />
+      </Screen>
+    );
+  }
+
+  // The book has settled and this id is not in it — the address was deleted, or
+  // the URL is stale (these routes also ship in the web build, where Back/
+  // Forward and a refresh can replay a dead address id). Say so. Falling
+  // through to the form would present a blank "New address" titled as an edit,
+  // and a save would silently create a second address instead of changing the
+  // one asked for.
+  if (!creating && !existing) {
+    return (
+      <Screen background={color.appBg}>
+        <Header title={t('addrEditTitle')} showBack safeTop />
+        <EmptyView
+          title={t('addrNotFound')}
+          subtitle={t('addrNotFoundSub')}
+          actionLabel={t('addrTitle')}
+          onAction={() => router.replace('/profile/addresses')}
+        />
       </Screen>
     );
   }
@@ -122,7 +150,14 @@ function AddressEditForm({ existing }: { existing: SavedAddress | null }) {
         // could fail for no reason. Leaving the screen is still correct.
         if (Object.keys(patch).length > 0) {
           await book.update(existing.id, patch);
-          if (contextNeedsReset(orderCtx.context, existing.id)) orderCtx.clear();
+          // Reset only when the copy the context CACHED actually went stale
+          // (pin or landmark). Renaming or promoting the address you are
+          // currently ordering to must not bounce you through the blocking
+          // gate — the list's "Make default" doesn't, and the two surfaces
+          // must agree.
+          if (patchStalesOrderContext(patch) && contextNeedsReset(orderCtx.context, existing.id)) {
+            orderCtx.clear();
+          }
         }
       }
       router.back();

@@ -6,8 +6,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  applyAddressEvent, contextNeedsReset, EMPTY_ADDRESS_BOOK, findAddress, NEW_ADDRESS,
-  preselectAddress, shouldBecomeDefault, type AddressBookState,
+  ADDRESS_RETRY_DELAYS_MS, addressRetryDelayMs, applyAddressEvent, contextNeedsReset,
+  EMPTY_ADDRESS_BOOK, findAddress, NEW_ADDRESS, patchStalesOrderContext, preselectAddress,
+  shouldBecomeDefault, type AddressBookState,
 } from './addressBook';
 import type { SavedAddress } from '../types/models';
 
@@ -250,6 +251,43 @@ describe('contextNeedsReset', () => {
 
   it('is false for a delivery context with no address id', () => {
     expect(contextNeedsReset({ orderType: 'delivery', addressId: null }, 'a1')).toBe(false);
+  });
+});
+
+describe('patchStalesOrderContext', () => {
+  it('a moved pin stales the cached copy', () => {
+    expect(patchStalesOrderContext({ latitude: 24.8 })).toBe(true);
+    expect(patchStalesOrderContext({ longitude: 46.7 })).toBe(true);
+  });
+
+  it('an edited landmark stales the cached copy', () => {
+    expect(patchStalesOrderContext({ description: 'white tower, entrance C' })).toBe(true);
+  });
+
+  it('renaming or promoting does NOT stale it — the context caches neither', () => {
+    // Promoting the address you are ordering to must not bounce you through the
+    // blocking gate; the list's "Make default" never did, and the editor's save
+    // must agree with it.
+    expect(patchStalesOrderContext({})).toBe(false);
+    expect(patchStalesOrderContext({ label: 'Home' } as Record<string, unknown>)).toBe(false);
+    expect(patchStalesOrderContext({ isDefault: true } as Record<string, unknown>)).toBe(false);
+    expect(patchStalesOrderContext({ nationalShortAddress: 'RRBB1234' } as Record<string, unknown>)).toBe(false);
+  });
+});
+
+describe('addressRetryDelayMs', () => {
+  it('walks the bounded schedule and then stops', () => {
+    expect(addressRetryDelayMs(1)).toBe(ADDRESS_RETRY_DELAYS_MS[0]);
+    expect(addressRetryDelayMs(2)).toBe(ADDRESS_RETRY_DELAYS_MS[1]);
+    expect(addressRetryDelayMs(3)).toBe(ADDRESS_RETRY_DELAYS_MS[2]);
+    // Finished, not infinite: a customer who is genuinely offline should not
+    // have a request loop running behind the app.
+    expect(addressRetryDelayMs(4)).toBeNull();
+  });
+
+  it('rejects nonsense attempts', () => {
+    expect(addressRetryDelayMs(0)).toBeNull();
+    expect(addressRetryDelayMs(-1)).toBeNull();
   });
 });
 
