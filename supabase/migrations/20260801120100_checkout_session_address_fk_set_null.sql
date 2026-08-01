@@ -55,13 +55,35 @@
 -- any session that already produced an order — is safe, and those are the ones
 -- customers actually accumulate.
 --
+-- KNOWN LIMITATION, STATED ON PURPOSE
+-- The guard lifts when a checkout is consumed. Nothing in this schema ever
+-- writes status='cancelled' — it exists in the CHECK constraint and nowhere
+-- else — and no reaper cancels or removes a dead session. So an ABANDONED or
+-- declined online checkout leaves a row in 'pending_payment'/'expired' with
+-- order_id NULL indefinitely, and the address behind it stays undeletable by
+-- the customer.
+--
+-- That is a strict improvement, not the old bug: before this migration EVERY
+-- session blocked the delete forever, including the successful ones customers
+-- actually accumulate. It is left rather than narrowed because every available
+-- narrowing (an age bound, or requiring an open payment attempt) reopens the
+-- captured-payment-with-no-order hole above — finalize_checkout_session accepts
+-- an 'expired' session with no time bound, by explicit design. Closing this
+-- properly needs a session-cancellation transition, which is payment state
+-- machine work and the owner's call (CLAUDE.md §6).
+--
+-- Two things already work in the meantime: the customer can EDIT the stuck
+-- address (the guard is delete-only), and a server-side delete is exempt, so
+-- support can remove it. The app copy names exactly those two routes and does
+-- not promise a lift the customer may be unable to cause.
+--
 -- SCOPE
 -- One constraint's delete behaviour, plus one BEFORE DELETE guard on
--- public.addresses. The referenced table (public.addresses) and column (id) are
--- preserved, as are MATCH type, ON UPDATE behaviour, deferrability and the
--- constraint name. No session row is read for update, written, deleted or
--- re-priced. No payment function, policy, grant, provider setting, snapshot,
--- retry or refund path is touched.
+-- public.addresses and an index supporting both. The referenced table
+-- (public.addresses) and column (id) are preserved, as are MATCH type, ON
+-- UPDATE behaviour, deferrability and the constraint name. No session row is
+-- read for update, written, deleted or re-priced. No payment function, policy,
+-- grant, provider setting, snapshot, retry or refund path is touched.
 --
 -- IDEMPOTENT AND SAFE ON BOTH A CLEAN AND AN EXISTING DATABASE
 --   * absent table            -> skipped with a notice (nothing to alter);
@@ -238,7 +260,9 @@ begin
         errcode = '55006',
         message = 'This address is used by a checkout that has not finished.',
         detail  = 'A checkout session still references this address and can still become an order; removing it now could capture a payment that cannot be turned into an order.',
-        hint    = 'The address becomes deletable once that checkout completes or is cancelled.';
+        -- Deliberately not "…or is cancelled": nothing in this schema ever
+        -- writes status='cancelled'. See the KNOWN LIMITATION in the header.
+        hint    = 'The address becomes deletable once that checkout is consumed. A server-side delete (support) is exempt from this guard.';
   end if;
 
   return old;
@@ -255,7 +279,15 @@ create trigger trg_addresses_guard_live_checkout
   for each row
   execute function public.guard_address_delete_live_checkout();
 
+-- Both the guard's EXISTS and PostgreSQL's own SET NULL referential action look
+-- up checkout_sessions BY address_id, which had no index — every address delete
+-- scanned the table twice. Additive and idempotent.
+create index if not exists checkout_sessions_address_idx
+  on public.checkout_sessions (address_id)
+  where address_id is not null;
+
 -- Rollback (restores the original blocking behaviour)
+-- drop index if exists public.checkout_sessions_address_idx;
 -- drop trigger if exists trg_addresses_guard_live_checkout on public.addresses;
 -- drop function if exists public.guard_address_delete_live_checkout();
 -- alter table public.checkout_sessions drop constraint checkout_sessions_address_id_fkey;

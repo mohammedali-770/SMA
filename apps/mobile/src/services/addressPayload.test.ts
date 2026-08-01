@@ -180,9 +180,24 @@ describe('classifyAddressError', () => {
     }
   });
 
-  it('the live-checkout message promises recovery, because the guard really does lift', () => {
-    expect(addressErrorCopy.en.checkout_in_progress).toMatch(/once that order finishes/i);
-    expect(addressErrorCopy.ar.checkout_in_progress).toMatch(/بعد اكتمال/);
+  it('the live-checkout message offers only routes that actually exist', () => {
+    // The guard lifts when the checkout COMPLETES, but nothing in the schema
+    // cancels a session, so an abandoned online checkout never completes on its
+    // own. The copy must not promise a lift the customer cannot cause; it names
+    // finishing the checkout and contacting support (server-side deletes are
+    // exempt from the guard), both of which work.
+    expect(addressErrorCopy.en.checkout_in_progress).toMatch(/contact us/i);
+    expect(addressErrorCopy.ar.checkout_in_progress).toMatch(/تواصل معنا/);
+  });
+
+  it('no address message promises that merely waiting will fix it', () => {
+    // "Try again shortly" on a condition that never clears is how a customer
+    // ends up retrying a button forever.
+    for (const lang of ['en', 'ar'] as const) {
+      for (const key of Object.keys(addressErrorCopy[lang]) as (keyof typeof addressErrorCopy.en)[]) {
+        expect(addressErrorCopy[lang][key]).not.toMatch(/shortly|later|بعد قليل|لاحقاً/i);
+      }
+    }
   });
 
   it('recognises the mandatory-landmark trigger by message when the code is lost', () => {

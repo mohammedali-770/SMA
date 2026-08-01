@@ -95,8 +95,17 @@ export type AddressProblem =
    *
    * Raised as SQLSTATE 55006 by trg_addresses_guard_live_checkout. Deleting the
    * address in that window could leave a captured payment with no order it can
-   * be turned into, so the guard refuses — and unlike the old FK refusal this
-   * one really does clear itself once that checkout completes.
+   * be turned into, so the guard refuses.
+   *
+   * The copy deliberately does NOT say "try again once that order finishes".
+   * The refusal does lift when the checkout completes — but nothing in the
+   * schema ever cancels a session, so an ABANDONED or declined online checkout
+   * leaves one sitting in `pending_payment`/`expired` indefinitely, and for that
+   * address the lift never comes on its own. Naming a completion the customer
+   * may never be able to cause would be the same false promise the old
+   * "try again shortly" copy made. It names the two things that DO work:
+   * finishing the checkout, and asking support (server-side deletes are exempt
+   * from the guard).
    */
   | 'checkout_in_progress'
   /**
@@ -166,7 +175,7 @@ export function classifyAddressError(err: unknown): AddressProblem {
 export const addressErrorCopy = {
   en: {
     not_signed_in: 'Sign in again to manage your addresses',
-    checkout_in_progress: "An order you started still uses this address. You can remove it once that order finishes.",
+    checkout_in_progress: "A checkout you started still uses this address. Complete that checkout, or contact us to remove it.",
     constrained: "We couldn't remove that address. Please try again, or contact us if it keeps happening.",
     not_found: "That address is no longer saved",
     invalid_description: 'Add a nearby landmark so the driver can find you',
@@ -176,7 +185,7 @@ export const addressErrorCopy = {
   },
   ar: {
     not_signed_in: 'سجّل الدخول مرة أخرى لإدارة عناوينك',
-    checkout_in_progress: 'هناك طلب بدأته ما زال يستخدم هذا العنوان. يمكنك حذفه بعد اكتمال ذلك الطلب.',
+    checkout_in_progress: 'هناك عملية شراء بدأتها ما زالت تستخدم هذا العنوان. أكمل تلك العملية، أو تواصل معنا لحذفه.',
     constrained: 'تعذّر حذف هذا العنوان. حاول مرة أخرى، أو تواصل معنا إذا تكرر الأمر.',
     not_found: 'لم يعد هذا العنوان محفوظاً',
     invalid_description: 'أضف أقرب معلم حتى يتمكن المندوب من الوصول إليك',

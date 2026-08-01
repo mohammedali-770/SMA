@@ -185,6 +185,11 @@ begin
      and tgrelid = 'public.addresses'::regclass and not tgisinternal;
   if v_n <> 1 then raise exception 'CASE 1 FAILED: guard trigger not bound to public.addresses'; end if;
 
+  -- The lookup index both the guard and the SET NULL action depend on.
+  select count(*) into v_n from pg_indexes
+   where schemaname = 'public' and indexname = 'checkout_sessions_address_idx';
+  if v_n <> 1 then raise exception 'CASE 1 FAILED: address_id lookup index missing'; end if;
+
   raise notice 'CASE 1 ok: FK is ON DELETE SET NULL, other properties preserved, guard bound';
 end $$;
 
@@ -379,8 +384,12 @@ begin
 end $$;
 
 -- Case 6: the refusal LIFTS once the session can no longer become an order.
---         This is what makes the customer-facing message ("you can remove it
---         once that order finishes") true rather than a polite dead end.
+--         Note what this does and does not establish: a checkout that COMPLETES
+--         frees the address, which is the common path. Nothing in the schema
+--         ever writes status='cancelled', so an ABANDONED checkout never
+--         reaches this transition on its own — the documented limitation in the
+--         migration header, and the reason the app copy offers "complete that
+--         checkout, or contact us" rather than "try again later".
 do $$
 declare
   v_cust uuid := current_setting('sma.cust_a')::uuid;
