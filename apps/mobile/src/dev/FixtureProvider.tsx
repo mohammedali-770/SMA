@@ -19,16 +19,19 @@
 import React, { useMemo } from 'react';
 
 import {
+  AddressBookContext,
   AuthContext,
   CartContext,
   CatalogContext,
   OrderCtx,
+  type AddressBookValue,
   type AuthValue,
   type CartValue,
   type CatalogValue,
   type OrderContextValue,
 } from '../store';
 import {
+  FIXTURE_ADDRESS,
   FIXTURE_BRAND_SETTINGS,
   FIXTURE_BRANCH,
   FIXTURE_BRANCH_DELIVERY_OFF,
@@ -52,6 +55,15 @@ import {
 
 const noop = () => {};
 
+/**
+ * Every fixture write path. Rejects rather than resolving so a reviewer can
+ * never mistake "the fixture swallowed it" for "it saved" — and so the screens'
+ * failure states are what the preview actually exercises.
+ */
+const fixtureWriteBlocked = async (): Promise<never> => {
+  throw new Error('Fixture provider is read-only.');
+};
+
 export interface FixtureOptions {
   /** Render the catalog in its loading state. */
   loading?: boolean;
@@ -73,6 +85,8 @@ export interface FixtureOptions {
   deliveryClosed?: boolean;
   /** Signed in but the profile carries no name — Profile's fallback state. */
   noProfileName?: boolean;
+  /** No saved addresses — the address book's empty state. */
+  emptyAddresses?: boolean;
   /**
    * Inject NO delivery zones. On the order-type gate this makes
    * `resolveDeliveryBranch` return null for every pin, so `confirmNewAddress`
@@ -204,13 +218,35 @@ function FixtureProviderInner({
     [options.noProfileName],
   );
 
+  // Saved addresses. Every mutator REJECTS rather than resolving: the fixture
+  // must never write, and a silent no-op would let a reviewer believe an address
+  // had been saved. `emptyAddresses` drives the empty-state review.
+  const addressBook = useMemo(
+    () =>
+      ({
+        addresses: options.emptyAddresses ? [] : [FIXTURE_ADDRESS],
+        status: 'ready',
+        error: null,
+        pending: null,
+        reload: noop,
+        clearError: noop,
+        create: fixtureWriteBlocked,
+        update: fixtureWriteBlocked,
+        remove: fixtureWriteBlocked,
+        setDefault: fixtureWriteBlocked,
+      }) as unknown as AddressBookValue,
+    [options.emptyAddresses],
+  );
+
   return (
     <AuthContext.Provider value={auth}>
-      <CatalogContext.Provider value={catalog}>
-        <OrderCtx.Provider value={orderContext}>
-          <CartContext.Provider value={cart}>{children}</CartContext.Provider>
-        </OrderCtx.Provider>
-      </CatalogContext.Provider>
+      <AddressBookContext.Provider value={addressBook}>
+        <CatalogContext.Provider value={catalog}>
+          <OrderCtx.Provider value={orderContext}>
+            <CartContext.Provider value={cart}>{children}</CartContext.Provider>
+          </OrderCtx.Provider>
+        </CatalogContext.Provider>
+      </AddressBookContext.Provider>
     </AuthContext.Provider>
   );
 }

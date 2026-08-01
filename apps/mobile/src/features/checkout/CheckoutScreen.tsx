@@ -28,15 +28,15 @@ import { checkDescription, descriptionCopy, descriptionMessage } from '../order/
 import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
-import { addresses, checkout, coupons, orders, payments } from '../../services/api';
-import { mapAddress } from '../../lib/mappers';
+import { checkout, coupons, orders, payments } from '../../services/api';
+import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
   availableMethods, checkoutBlocked, onlineUnavailableCashOn, resolveDefaultMethod,
   type PaymentMethod,
 } from '../../lib/payment';
 import { pointInPolygon } from '../../lib/geo';
-import { useAuth, useCart, useCatalog, useOrderContext } from '../../store';
+import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
@@ -93,7 +93,11 @@ export function CheckoutScreen() {
   const orderType: OrderType | null = orderCtx.context?.orderType ?? null;
   const [showTypeChange, setShowTypeChange] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(resolveDefaultMethod(payment));
-  const [addressList, setAddressList] = useState<SavedAddress[]>([]);
+  // The SHARED address book, not a private copy. This screen stays mounted while
+  // the customer edits addresses in Profile, so a local fetched-once list would
+  // keep offering an address that has since been edited or deleted.
+  const addressBook = useAddressBook();
+  const addressList = addressBook.addresses;
   const [addressId, setAddressId] = useState<string | null>(null);
   // Map-picked delivery location (null until the customer confirms one).
   const [pickedLat, setPickedLat] = useState<number | null>(null);
@@ -158,25 +162,37 @@ export function CheckoutScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payment.onlineEnabled, payment.cashEnabled, payment.defaultMethod]);
 
+  // Preselect ONCE, as soon as the shared book has settled. The rule is
+  // unchanged — the address carried in the order context wins, then the
+  // customer's default, then the first saved row — but it now lives in
+  // `preselectAddress` so the order-type gate cannot drift from it.
+  //
+  // The guard is a ref rather than a dependency list: the book updates whenever
+  // an address is edited anywhere in the app, and re-running this would yank the
+  // customer's chosen pin back to their default mid-checkout.
+  const preselected = useRef(false);
   useEffect(() => {
-    addresses.listMine()
-      .then((rows) => {
-        const mapped = rows.map(mapAddress);
-        setAddressList(mapped);
-        // Preselect the address chosen in the order context (delivery), falling
-        // back to the customer's default.
-        const ctxId = orderCtx.context?.orderType === 'delivery' ? orderCtx.context.addressId : null;
-        const def = (ctxId ? mapped.find((a) => a.id === ctxId) : undefined) ?? mapped.find((a) => a.isDefault) ?? mapped[0];
-        if (def && Number.isFinite(def.lat) && Number.isFinite(def.lng)) {
-          setAddressId(def.id);
-          setPickedLat(def.lat);
-          setPickedLng(def.lng);
-        }
-      })
-      .catch(() => setAddressList([]));
-    // Runs once on mount; the order context is read for the initial preselection only.
+    if (preselected.current) return;
+    if (addressBook.status === 'idle' || addressBook.status === 'loading') return;
+    preselected.current = true;
+    const ctxId = orderCtx.context?.orderType === 'delivery' ? orderCtx.context.addressId : null;
+    const def = preselectAddress(addressList, ctxId);
+    if (def) {
+      setAddressId(def.id);
+      setPickedLat(def.lat);
+      setPickedLng(def.lng);
+    }
+    // The order context is read for the initial preselection only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [addressBook.status, addressList]);
+
+  // The selected address disappearing (deleted from Profile while Checkout was
+  // mounted) must not leave a dangling id that place_order would reject. The
+  // pin the customer can see stays where it is; only the saved-address link is
+  // dropped, so the order proceeds as a map-picked location.
+  useEffect(() => {
+    if (addressId && !addressList.some((a) => a.id === addressId)) setAddressId(null);
+  }, [addressId, addressList]);
 
   // On entry, resolve any payment interrupted by an app kill / cold start BEFORE
   // the customer can act. A captured charge routes to its receipt; an unresolved
@@ -422,11 +438,13 @@ export function CheckoutScreen() {
           deliveryAddressId = saved.id;
         } else if (saved && saved.lat === pickedLat && saved.lng === pickedLng) {
           // Same pin, edited landmark — update in place rather than creating a
-          // near-duplicate address for the customer.
-          const updated = await addresses.update(saved.id, { description: desc.value });
+          // near-duplicate address for the customer. Routed through the shared
+          // book (same `addresses.update` call underneath) so Profile and the
+          // order-type gate see the new landmark without a refetch.
+          const updated = await addressBook.update(saved.id, { description: desc.value });
           deliveryAddressId = updated.id;
         } else {
-          const created = await addresses.create({
+          const created = await addressBook.create({
             label: (addrLabel.trim() || desc.value).slice(0, 60),
             description: desc.value,
             latitude: pickedLat,

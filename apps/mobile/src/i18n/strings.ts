@@ -140,7 +140,7 @@ export const STRINGS = {
     delivery: 'Delivery',
     pickup: 'Self-Pickup',
     deliveryAddress: 'Delivery address',
-    noSavedAddress: 'No saved address. Add one in the web app for delivery, or choose pickup.',
+    noSavedAddress: 'No saved address. Add one under Profile for delivery, or choose pickup.',
     couponTitle: 'Promo code',
     couponPlaceholder: 'Enter promo code',
     applyCoupon: 'Apply',
@@ -217,6 +217,33 @@ export const STRINGS = {
     signOut: 'Sign out',
     phone: 'Phone',
     role: 'Role',
+
+    // profile → saved addresses
+    // Field labels, validation messages and failure copy live beside their
+    // validators (features/profile/addressForm.ts, services/addressPayload.ts)
+    // because the vitest suite must import them and cannot load React Native.
+    // Only the screen chrome is here.
+    addrTitle: 'My addresses',
+    addrManage: 'Saved addresses',
+    addrManageHint: 'Delivery locations you have saved',
+    addrAdd: 'Add address',
+    addrEditTitle: 'Edit address',
+    addrNewTitle: 'New address',
+    addrEmptyTitle: 'No saved addresses yet',
+    addrEmptySub: 'Save one and checkout will already know where to deliver.',
+    addrDefault: 'Default',
+    addrSetDefault: 'Make default',
+    addrEdit: 'Edit',
+    addrDelete: 'Delete',
+    addrDeleteTitle: 'Delete this address?',
+    addrDeleteBody: 'It is removed from your saved addresses. Orders already placed keep the address they were delivered to.',
+    addrSave: 'Save address',
+    addrSaved: 'Address saved',
+    addrDeleted: 'Address deleted',
+    addrUnnamed: 'Saved address',
+    addrLoading: 'Loading your addresses',
+    addrSetAsDefault: 'Set as my default address',
+    addrContextReset: 'You were ordering to this address. Choose delivery or pickup again to continue.',
 
     // WhatsApp phone verification
     verifyPhoneTitle: 'Verify phone number',
@@ -453,7 +480,7 @@ export const STRINGS = {
     delivery: 'توصيل',
     pickup: 'استلام من الفرع',
     deliveryAddress: 'عنوان التوصيل',
-    noSavedAddress: 'لا يوجد عنوان محفوظ. أضف عنواناً من تطبيق الويب للتوصيل، أو اختر الاستلام.',
+    noSavedAddress: 'لا يوجد عنوان محفوظ. أضف عنواناً من صفحة الحساب للتوصيل، أو اختر الاستلام.',
     couponTitle: 'رمز الخصم',
     couponPlaceholder: 'أدخل رمز الخصم',
     applyCoupon: 'تطبيق',
@@ -521,6 +548,29 @@ export const STRINGS = {
     signOut: 'تسجيل الخروج',
     phone: 'الجوال',
     role: 'الصلاحية',
+
+    // الحساب ← العناوين المحفوظة
+    addrTitle: 'عناويني',
+    addrManage: 'العناوين المحفوظة',
+    addrManageHint: 'مواقع التوصيل التي حفظتها',
+    addrAdd: 'إضافة عنوان',
+    addrEditTitle: 'تعديل العنوان',
+    addrNewTitle: 'عنوان جديد',
+    addrEmptyTitle: 'لا توجد عناوين محفوظة بعد',
+    addrEmptySub: 'احفظ عنواناً وسيعرف إتمام الطلب وجهة التوصيل مباشرة.',
+    addrDefault: 'الافتراضي',
+    addrSetDefault: 'اجعله الافتراضي',
+    addrEdit: 'تعديل',
+    addrDelete: 'حذف',
+    addrDeleteTitle: 'حذف هذا العنوان؟',
+    addrDeleteBody: 'سيُحذف من عناوينك المحفوظة. الطلبات السابقة تحتفظ بالعنوان الذي وصلت إليه.',
+    addrSave: 'حفظ العنوان',
+    addrSaved: 'تم حفظ العنوان',
+    addrDeleted: 'تم حذف العنوان',
+    addrUnnamed: 'عنوان محفوظ',
+    addrLoading: 'جارٍ تحميل عناوينك',
+    addrSetAsDefault: 'اجعله عنواني الافتراضي',
+    addrContextReset: 'كنت تطلب إلى هذا العنوان. اختر التوصيل أو الاستلام مرة أخرى للمتابعة.',
 
     // التحقق من الجوال عبر واتساب
     verifyPhoneTitle: 'التحقق من رقم الجوال',

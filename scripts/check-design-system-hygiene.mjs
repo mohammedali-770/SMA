@@ -329,6 +329,11 @@ const MIGRATED_SURFACES = [
   // Surface 6 - Order Type Selection + legacy removal
   'apps/mobile/src/features/order/OrderTypeSelectScreen.tsx',
   'apps/mobile/src/design-system/ui/ContentColumn.tsx',
+  // Surface 7 - Profile name editing + address management
+  'apps/mobile/src/features/profile/EditableName.tsx',
+  'apps/mobile/src/features/profile/AddressListScreen.tsx',
+  'apps/mobile/src/features/profile/AddressEditScreen.tsx',
+  'apps/mobile/src/features/profile/view/AddressCard.tsx',
 ];
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;

@@ -5,12 +5,14 @@
  */
 import React from 'react';
 
+import { AddressProvider } from './AddressProvider';
 import { AuthProvider } from './AuthProvider';
 import { CatalogProvider } from './CatalogProvider';
 import { OrderContextProvider } from './OrderContextProvider';
 import { CartProvider } from './CartProvider';
 
 export { useAuth } from './AuthProvider';
+export { useAddressBook } from './AddressProvider';
 export { useCatalog } from './CatalogProvider';
 export { useOrderContext } from './OrderContextProvider';
 export { useCart } from './CartProvider';
@@ -20,6 +22,7 @@ export { useCart } from './CartProvider';
 // deterministic mock state without duplicating any provider logic. Production
 // code must keep using the hooks above.
 export { AuthContext, type AuthValue } from './AuthProvider';
+export { AddressBookContext, type AddressBookValue } from './AddressProvider';
 export { CatalogContext, type CatalogValue } from './CatalogProvider';
 export { CartContext, type CartValue } from './CartProvider';
 export { OrderCtx, type OrderContextValue } from './OrderContextProvider';
@@ -28,13 +31,19 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   // OrderContext sits inside Catalog (it validates against branches/zones and
   // mirrors the selected branch) and above Cart (cart validation reads the
   // selected context/branch).
+  //
+  // AddressProvider sits directly inside Auth: it needs the session to know
+  // whose book to load and when to drop it, and nothing below it needs to exist
+  // for it to work.
   return (
     <AuthProvider>
-      <CatalogProvider>
-        <OrderContextProvider>
-          <CartProvider>{children}</CartProvider>
-        </OrderContextProvider>
-      </CatalogProvider>
+      <AddressProvider>
+        <CatalogProvider>
+          <OrderContextProvider>
+            <CartProvider>{children}</CartProvider>
+          </OrderContextProvider>
+        </CatalogProvider>
+      </AddressProvider>
     </AuthProvider>
   );
 }
