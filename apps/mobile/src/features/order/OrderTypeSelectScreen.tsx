@@ -38,11 +38,10 @@ import { Notice } from '../../design-system/ui/Notice';
 import { Text } from '../../design-system/ui/Text';
 import { checkDescription, descriptionCopy, descriptionMessage } from './locationDescription';
 import { useI18n } from '../../i18n/I18nProvider';
-import { addresses } from '../../services/api';
-import { mapAddress } from '../../lib/mappers';
+import { shouldBecomeDefault } from '../../store/addressBook';
 import { mapConfig } from '../../lib/map';
 import { distanceKm, type GeoPoint } from '../../lib/geo';
-import { useCart, useCatalog, useOrderContext } from '../../store';
+import { useAddressBook, useCart, useCatalog, useOrderContext } from '../../store';
 import { isBranchOpen, pickupBranches, resolveDeliveryBranch } from './orderContext';
 import { validateCartForBranch } from './cartValidation';
 import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/models';
@@ -58,7 +57,10 @@ export function OrderTypeSelectScreen() {
 
   const [tab, setTab] = useState<OrderType>(context?.orderType ?? 'pickup');
   const [location, setLocation] = useState<GeoPoint | null>(null);
-  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([]);
+  // The SHARED address book, not a private copy — an address added or deleted in
+  // Profile is reflected here without this blocking gate being remounted.
+  const addressBook = useAddressBook();
+  const savedAddresses = addressBook.addresses;
   const [deliveryMode, setDeliveryMode] = useState<'choose' | 'new'>('choose');
   const [pickedLat, setPickedLat] = useState<number | null>(null);
   const [pickedLng, setPickedLng] = useState<number | null>(null);
@@ -77,13 +79,6 @@ export function OrderTypeSelectScreen() {
   // Y offset of the description block inside the scroll view, so a validation
   // failure can bring the field (and its message) above the keyboard.
   const descOffsetRef = useRef(0);
-
-  // Load the customer's saved addresses once.
-  useEffect(() => {
-    addresses.listMine()
-      .then((rows) => setSavedAddresses(rows.map(mapAddress)))
-      .catch(() => setSavedAddresses([]));
-  }, []);
 
   // Ask for location only when the Pickup tab is opened (optional — the list
   // still works without it, just unsorted).
@@ -170,12 +165,14 @@ export function OrderTypeSelectScreen() {
     if (!branch) { setResolveError(t('otDeliveryUnavailable')); return; }
     setResolveError(null);
     runSelection(branch.id, async () => {
-      const created = await addresses.create({
+      // Routed through the shared book (same `addresses.create` underneath) so
+      // Profile and Checkout see the new address without a refetch.
+      const created = await addressBook.create({
         label: desc.value.slice(0, 60),
         description: desc.value,
         latitude: pickedLat,
         longitude: pickedLng,
-        isDefault: savedAddresses.length === 0,
+        isDefault: shouldBecomeDefault(savedAddresses),
       });
       // Carried into Checkout through the order context, so the customer never
       // retypes it and Checkout never creates an address without one.

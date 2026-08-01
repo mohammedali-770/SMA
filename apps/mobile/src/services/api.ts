@@ -16,6 +16,9 @@
 import { readLoginFlag, type WhatsAppLoginAvailability } from '../features/auth/loginAvailability';
 import { CUSTOMER_ORDER_SELECT } from '../lib/orderSelect';
 import { supabase } from '../lib/supabase';
+import {
+  isEmptyPatch, requireCustomerId, toAddressInsert, toAddressPatch, type AddressInput,
+} from './addressPayload';
 import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
@@ -25,6 +28,26 @@ import type {
 /** Return the data or throw the PostgREST error (never a silent null). */
 function ok<T>(res: { data: T | null; error: { message: string } | null }): T {
   if (res.error) throw new Error(res.error.message);
+  return res.data as T;
+}
+
+/**
+ * A PostgREST error as an Error that KEEPS its SQLSTATE.
+ *
+ * `ok()` throws away everything but the message, which is fine for reads but not
+ * for the address writes: telling a foreign-key violation (the address is tied
+ * to a payment in progress) apart from a generic failure is the difference
+ * between a useful message and "something went wrong". See classifyAddressError.
+ */
+function codedError(error: { message: string; code?: string }): Error {
+  const e = new Error(error.message) as Error & { code?: string };
+  if (error.code) e.code = error.code;
+  return e;
+}
+
+/** ok(), preserving the SQLSTATE. */
+function okCoded<T>(res: { data: T | null; error: { message: string; code?: string } | null }): T {
+  if (res.error) throw codedError(res.error);
   return res.data as T;
 }
 
@@ -326,42 +349,87 @@ export const coupons = {
 
 // ---------------------------------------------------------------------------
 // Addresses (customer-owned, RLS-isolated)
+//
+// The payload/ownership/error rules live in services/addressPayload.ts, which is
+// framework-free so the vitest suite can exercise them; this module is only the
+// Supabase plumbing around them.
 // ---------------------------------------------------------------------------
-export interface AddressInput {
-  label?: string | null;
-  description?: string | null;
-  nationalShortAddress?: string | null;
-  latitude: number;
-  longitude: number;
-  isDefault?: boolean;
-}
+export type { AddressInput } from './addressPayload';
+
 export const addresses = {
   listMine: async () => ok<DbAddress[]>(await supabase.from('addresses').select('*').order('created_at')),
   /** Create an address for the signed-in customer (RLS forces customer_id). The
    *  map picker writes the coordinates place_order validates against zones. */
   async create(input: AddressInput): Promise<DbAddress> {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('You must be signed in to save an address.');
-    return ok<DbAddress>(await supabase.from('addresses').insert({
-      customer_id: user.id,
-      label: input.label ?? null,
-      description: input.description ?? null,
-      national_short_address: input.nationalShortAddress ?? null,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      is_default: input.isDefault ?? false,
-    }).select('*').single());
+    // Stamped from the live session, never from the caller.
+    const customerId = requireCustomerId(user?.id);
+    return okCoded<DbAddress>(
+      await supabase.from('addresses').insert(toAddressInsert(input, customerId)).select('*').single(),
+    );
   },
   /** Update an existing address (RLS scopes it to the owner). */
   async update(id: string, patch: Partial<AddressInput>): Promise<DbAddress> {
-    const row: Record<string, unknown> = {};
-    if (patch.label !== undefined) row.label = patch.label;
-    if (patch.description !== undefined) row.description = patch.description;
-    if (patch.nationalShortAddress !== undefined) row.national_short_address = patch.nationalShortAddress;
-    if (patch.latitude !== undefined) row.latitude = patch.latitude;
-    if (patch.longitude !== undefined) row.longitude = patch.longitude;
-    if (patch.isDefault !== undefined) row.is_default = patch.isDefault;
-    return ok<DbAddress>(await supabase.from('addresses').update(row).eq('id', id).select('*').single());
+    const row = toAddressPatch(patch);
+    if (isEmptyPatch(row)) {
+      // Nothing changed. PostgREST rejects an empty body, and issuing the write
+      // anyway would surface a confusing error for a no-op save.
+      return okCoded<DbAddress>(await supabase.from('addresses').select('*').eq('id', id).single());
+    }
+    return okCoded<DbAddress>(await supabase.from('addresses').update(row).eq('id', id).select('*').single());
+  },
+  /**
+   * Delete an address. RLS scopes it to the owner, so an id belonging to another
+   * customer deletes nothing rather than erroring.
+   *
+   * Both tables that reference an address are ON DELETE SET NULL — `orders`
+   * since 20260707120500 and `checkout_sessions` since 20260801120100 — and
+   * each keeps its own snapshot of the address it was priced against, so a
+   * delete costs the customer no history and changes no order or payment. A
+   * residual 23503 is therefore an unexpected constraint rather than a
+   * documented dead end; see classifyAddressError.
+   */
+  async remove(id: string): Promise<void> {
+    const res = await supabase.from('addresses').delete().eq('id', id);
+    if (res.error) throw codedError(res.error);
+  },
+  /**
+   * Make one address the customer's default.
+   *
+   * A single write: the database clears the previous default (see the
+   * address_single_default migration). Doing it client-side would mean two
+   * round-trips with a window in which the customer has two defaults or none.
+   */
+  async setDefault(id: string): Promise<DbAddress> {
+    return okCoded<DbAddress>(
+      await supabase.from('addresses').update({ is_default: true }).eq('id', id).select('*').single(),
+    );
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Profile (self-service writes)
+// ---------------------------------------------------------------------------
+export const profile = {
+  /**
+   * Update the signed-in customer's name.
+   *
+   * Authorization is entirely server-side and already existed before this call
+   * did: `profiles` grants UPDATE on (full_name, phone_number, email) to
+   * `authenticated` only, and the `profiles_update_own_or_admin` policy scopes it
+   * to `id = auth.uid()`. The `.eq('id', user.id)` here is a guard against an
+   * accidental table-wide update, not the authorization itself — a forged id
+   * simply matches no row the policy allows.
+   *
+   * Only `full_name` is writable through this path. Phone number is owned by the
+   * verification flow and role is not customer-writable at all.
+   */
+  async updateName(fullName: string): Promise<DbProfile> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be signed in to update your profile.');
+    return okCoded<DbProfile>(
+      await supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id).select('*').single(),
+    );
   },
 };
 

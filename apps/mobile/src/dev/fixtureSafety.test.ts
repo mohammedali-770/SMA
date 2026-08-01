@@ -73,10 +73,25 @@ describe('fixture mechanism cannot reach production systems', () => {
     // The provider supplies handlers to the real contexts; each must be inert.
     expect(src).toMatch(/const noop = \(\) => \{\};/);
     // No handler may be anything other than `noop` or a pure lookup.
-    const handlerAssignments = src.match(/^\s+(addItem|removeLine|incrementLine|decrementLine|clear|setContext|refresh|selectBranch|reload|setNotes):\s*(.+),$/gm) ?? [];
+    const handlerAssignments = src.match(/^\s+(addItem|removeLine|incrementLine|decrementLine|clear|clearError|setContext|refresh|selectBranch|reload|setNotes):\s*(.+),$/gm) ?? [];
     expect(handlerAssignments.length).toBeGreaterThan(0);
     for (const line of handlerAssignments) {
       expect(line.trim()).toMatch(/:\s*noop,$/);
+    }
+  });
+
+  it('every fixture WRITE rejects rather than resolving', () => {
+    // The address book is the one fixture context with a promise-returning
+    // write surface. `noop` is wrong here: a mutator that resolves lets a
+    // reviewer believe an address was saved, and hides the screens' failure
+    // states — which are the states worth reviewing. It must reject.
+    const src = read('FixtureProvider.tsx');
+    expect(src).toMatch(/const fixtureWriteBlocked\s*=\s*async\s*\(\)[^=]*=>\s*\{\s*throw new Error/);
+
+    const writeAssignments = src.match(/^\s+(create|update|remove|setDefault):\s*(.+),$/gm) ?? [];
+    expect(writeAssignments.length).toBe(4);
+    for (const line of writeAssignments) {
+      expect(line.trim()).toMatch(/:\s*fixtureWriteBlocked,$/);
     }
   });
 

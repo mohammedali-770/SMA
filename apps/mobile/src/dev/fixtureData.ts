@@ -23,6 +23,7 @@ import type {
   DeliveryZone,
   LoyaltySettings,
   Product,
+  SavedAddress,
   UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from '../lib/payment';
@@ -228,6 +229,21 @@ export const FIXTURE_PAYMENT_NONE = fixture<PaymentMethodSettings>({
 });
 
 /** Signed-in customer. */
+/**
+ * One saved address, at the fixture delivery pin so the address editor's map
+ * opens somewhere meaningful. It is the default, which is what the list's
+ * "Default" badge and the absent "Make default" action are reviewed against.
+ */
+export const FIXTURE_ADDRESS = fixture<SavedAddress>({
+  id: 'ad-fixture-1',
+  label: 'Home',
+  description: 'Al Nargis, King Abdulaziz Rd — blue villa gate beside the pharmacy',
+  nationalShortAddress: 'RRBB1234',
+  lat: FIXTURE_DELIVERY_POINT.lat,
+  lng: FIXTURE_DELIVERY_POINT.lng,
+  isDefault: true,
+});
+
 export const FIXTURE_PROFILE = fixture<UserProfile>({
   id: 'pr-fixture-1',
   fullName: 'Nora Al Otaibi',

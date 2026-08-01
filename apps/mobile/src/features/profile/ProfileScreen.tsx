@@ -1,10 +1,10 @@
 /**
  * Profile: identity from `profiles`, loyalty balance, language toggle, sign out.
  *
- * Name editing and address management do NOT exist here — the web app still
- * owns those flows. They are tracked as feature work, not as part of the design
- * migration: both would need new profile writes and address CRUD, and this pass
- * adds no API calls. See the issue linked from docs/BUTTON_FIELD_INVENTORY.md.
+ * Name editing lives in `EditableName` and saved addresses behind the row below;
+ * both write through the paths the rest of the app already uses (`profiles.full_name`
+ * via AuthProvider's refresh, and the shared address book), so nothing here owns
+ * a second copy of either.
  */
 import { router } from 'expo-router';
 import React from 'react';
@@ -16,15 +16,17 @@ import { color, radius, space } from '../../design-system/generated/tokens';
 import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
+import { EditableName } from './EditableName';
 import { NotificationSettings } from '../notifications/NotificationSettings';
 import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { VerifyPhoneWhatsApp } from './VerifyPhoneWhatsApp';
 import { useI18n } from '../../i18n/I18nProvider';
-import { useAuth } from '../../store';
+import { useAddressBook, useAuth } from '../../store';
 
 export function ProfileScreen() {
   const { t, pick, lang, setLang, rtlRow } = useI18n();
   const { profile, signOut } = useAuth();
+  const addressBook = useAddressBook();
 
   const onSignOut = async () => {
     // Silence this device BEFORE the JWT disappears — on a shared phone the
@@ -35,8 +37,9 @@ export function ProfileScreen() {
     router.replace('/(auth)/login');
   };
 
-  const displayName = profile?.fullName || t('guest');
-  const initials = displayName.trim().charAt(0).toUpperCase();
+  // Saved-address count, straight from the shared book, so the row reflects a
+  // deletion made on the addresses screen the moment the customer comes back.
+  const addressCount = addressBook.addresses.length;
 
   return (
     <Screen background={color.appBg}>
@@ -44,17 +47,7 @@ export function ProfileScreen() {
         <View style={[columnStyles.column, styles.column]}>
         <Text variant="display">{t('profile')}</Text>
 
-        <View style={[styles.card, styles.identity, rtlRow]}>
-          <View style={styles.avatar}>
-            <Text variant="title" tone="onEmber">{initials}</Text>
-          </View>
-          <View style={styles.identityBody}>
-            <Text variant="heading" numberOfLines={1}>{displayName}</Text>
-            {profile?.email ? (
-              <Text variant="caption" tone="secondary" numberOfLines={1}>{profile.email}</Text>
-            ) : null}
-          </View>
-        </View>
+        <EditableName />
 
         {/* Loyalty — the one place a saffron accent earns its keep: a reward is
             neither a warning nor an action. */}
@@ -70,6 +63,25 @@ export function ProfileScreen() {
           <DetailRow label={t('phone')} value={profile?.phoneNumber || '—'} />
           <DetailRow label={t('role')} value={profile?.role ?? '—'} last />
         </View>
+
+        {/* Saved addresses (signed-in only — the book is per-customer). */}
+        {profile ? (
+          <Pressable
+            style={({ pressed }) => [styles.card, styles.legalRow, rtlRow, pressed && styles.pressed]}
+            onPress={() => router.push('/profile/addresses')}
+            accessibilityRole="button"
+            accessibilityLabel={t('addrManage')}
+            accessibilityHint={t('addrManageHint')}
+          >
+            <View style={styles.addressLabel}>
+              <Text variant="body">{t('addrManage')}</Text>
+              <Text variant="caption" tone="secondary">
+                {addressCount === 0 ? t('addrEmptyTitle') : `${addressCount}`}
+              </Text>
+            </View>
+            <Text variant="title" tone="ember">{lang === 'ar' ? '‹' : '›'}</Text>
+          </Pressable>
+        ) : null}
 
         {/* WhatsApp phone verification (signed-in only) */}
         {profile ? <VerifyPhoneWhatsApp /> : null}
@@ -159,12 +171,7 @@ const styles = StyleSheet.create({
   },
   pressed: { opacity: 0.9 },
 
-  identity: { flexDirection: 'row', alignItems: 'center', gap: space.s3 },
-  identityBody: { flex: 1, gap: 2 },
-  avatar: {
-    width: 56, height: 56, borderRadius: 28,
-    backgroundColor: color.ember, alignItems: 'center', justifyContent: 'center',
-  },
+  addressLabel: { flexShrink: 1, gap: 2 },
 
   loyalty: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

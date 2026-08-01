@@ -73,6 +73,9 @@ function RootLayout() {
               <Stack.Screen name="legal/[type]" />
               <Stack.Screen name="receipt/[id]" options={{ gestureEnabled: false }} />
               <Stack.Screen name="account/delete" />
+              {/* Saved addresses, reached from the Profile tab. */}
+              <Stack.Screen name="profile/addresses" />
+              <Stack.Screen name="profile/address/[id]" />
             </Stack>
           </SplashGate>
         </AppStoreProvider>
