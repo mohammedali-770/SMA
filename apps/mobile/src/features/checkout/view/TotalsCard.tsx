@@ -6,8 +6,13 @@
  * the card rather than an optional nicety.
  *
  * VAT is a NOTE, not an amount: prices are VAT-inclusive, so there is no line
- * to add. It renders as a label with no figure, exactly as before — the label
- * string itself carries "(15%, included)".
+ * to add. It renders as a label with no figure, and the label carries the rate
+ * — the CONFIGURED `brand.vatPercentage`, interpolated by the caller. It used
+ * to hardcode 15%, which stated a false rate for any branch on another.
+ *
+ * The delivery-fee row shows 0.00 for an EMPTY cart rather than the branch fee.
+ * That is decided upstream in `computePreviewTotals`, not hidden here: hiding
+ * the row alone would have left the total unexplained.
  *
  * Discount rows are mint and carry an explicit minus, so a reduction can never
  * be misread as a charge.

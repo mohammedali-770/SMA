@@ -76,11 +76,31 @@ describe('computePreviewTotals — quantity changes move every dependent number'
   });
 
   it('is empty and blocked when the last line is removed at zero', () => {
+    // An EMPTY delivery cart carries NO fee. This used to read subtotal 0,
+    // delivery 10, total 10 — a payable amount for nothing. Submission was
+    // already blocked by itemCount, so nobody was ever charged; the preview was
+    // simply telling the customer they owed something.
     const r = computePreviewTotals({ ...base, items: [] });
     expect(r.subtotal).toBe(0);
     expect(r.itemCount).toBe(0);
-    expect(r.total).toBe(10); // fee only; submission is blocked by itemCount
+    expect(r.deliveryFee).toBe(0);
+    expect(r.total).toBe(0);
     expect(r.belowMinimum).toBe(true);
+  });
+
+  it('applies the delivery fee again as soon as one item is added back', () => {
+    // The fee is suppressed by an EMPTY cart, not removed. Without this,
+    // "no fee when empty" could be implemented as "no fee" and still pass.
+    const r = computePreviewTotals({ ...base, items: [line(20, 1)] });
+    expect(r.itemCount).toBe(1);
+    expect(r.deliveryFee).toBe(10);
+    expect(r.total).toBe(30);
+  });
+
+  it('charges no fee for an empty PICKUP cart either', () => {
+    const r = computePreviewTotals({ ...base, items: [], orderType: 'pickup' });
+    expect(r.deliveryFee).toBe(0);
+    expect(r.total).toBe(0);
   });
 
   it('sums multiple lines with different modifier sets independently', () => {
