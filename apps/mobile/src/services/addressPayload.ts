@@ -91,6 +91,15 @@ export function isEmptyPatch(row: Record<string, unknown>): boolean {
 export type AddressProblem =
   | 'not_signed_in'
   /**
+   * A checkout that can still become an order references this address.
+   *
+   * Raised as SQLSTATE 55006 by trg_addresses_guard_live_checkout. Deleting the
+   * address in that window could leave a captured payment with no order it can
+   * be turned into, so the guard refuses — and unlike the old FK refusal this
+   * one really does clear itself once that checkout completes.
+   */
+  | 'checkout_in_progress'
+  /**
    * A foreign key still points at this address.
    *
    * This is NO LONGER an expected outcome. It used to be: `checkout_sessions`
@@ -133,6 +142,11 @@ export function classifyAddressError(err: unknown): AddressProblem {
   const code = typeof e.code === 'string' ? e.code : '';
   const message = typeof e.message === 'string' ? e.message.toLowerCase() : '';
 
+  // Checked before the generic FK case: the guard is deliberately a distinct
+  // SQLSTATE precisely so it does not read as an unexpected constraint.
+  if (code === '55006' || /checkout that has not finished/.test(message)) {
+    return 'checkout_in_progress';
+  }
   if (code === '23503' || /violates foreign key constraint/.test(message)) return 'constrained';
   if (code === '23514' || code === '23502' || /location description|landmark/.test(message)) {
     return 'invalid_description';
@@ -152,6 +166,7 @@ export function classifyAddressError(err: unknown): AddressProblem {
 export const addressErrorCopy = {
   en: {
     not_signed_in: 'Sign in again to manage your addresses',
+    checkout_in_progress: "An order you started still uses this address. You can remove it once that order finishes.",
     constrained: "We couldn't remove that address. Please try again, or contact us if it keeps happening.",
     not_found: "That address is no longer saved",
     invalid_description: 'Add a nearby landmark so the driver can find you',
@@ -161,6 +176,7 @@ export const addressErrorCopy = {
   },
   ar: {
     not_signed_in: 'سجّل الدخول مرة أخرى لإدارة عناوينك',
+    checkout_in_progress: 'هناك طلب بدأته ما زال يستخدم هذا العنوان. يمكنك حذفه بعد اكتمال ذلك الطلب.',
     constrained: 'تعذّر حذف هذا العنوان. حاول مرة أخرى، أو تواصل معنا إذا تكرر الأمر.',
     not_found: 'لم يعد هذا العنوان محفوظاً',
     invalid_description: 'أضف أقرب معلم حتى يتمكن المندوب من الوصول إليك',

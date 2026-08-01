@@ -140,6 +140,25 @@ describe('classifyAddressError', () => {
     expect(classifyAddressError({ code: 'PGRST116', message: '' })).toBe('not_found');
   });
 
+  it('recognises the live-checkout guard by its dedicated SQLSTATE', () => {
+    // trg_addresses_guard_live_checkout raises 55006 while a checkout session
+    // could still turn the address into an order. Deleting then would leave a
+    // captured payment with no order it could become.
+    expect(classifyAddressError({ code: '55006', message: '' })).toBe('checkout_in_progress');
+  });
+
+  it('recognises the live-checkout guard by message when the code is lost', () => {
+    expect(classifyAddressError(new Error('This address is used by a checkout that has not finished.')))
+      .toBe('checkout_in_progress');
+  });
+
+  it('does NOT confuse the live-checkout guard with a generic FK refusal', () => {
+    // The two must stay distinguishable: one is self-resolving and the message
+    // says so; the other is a surprise.
+    expect(classifyAddressError({ code: '55006', message: '' }))
+      .not.toBe(classifyAddressError({ code: '23503', message: '' }));
+  });
+
   it('classifies an UNEXPECTED foreign-key refusal as a generic constraint failure', () => {
     // The one customers used to hit — checkout_sessions.address_id with no ON
     // DELETE action — is fixed at the schema level by migration 20260801120100,
@@ -152,13 +171,18 @@ describe('classifyAddressError', () => {
 
   it('no longer tells the customer a delete is permanently impossible', () => {
     // The old copy said the address was "linked to a payment" and could not be
-    // deleted. After 20260801120100 that is false, and a message that tells a
-    // customer to stop trying is worse than one that tells them to retry.
+    // deleted, which was true only because of the FK that 20260801120100
+    // relaxes. Neither remaining message may claim a permanent dead end.
     for (const lang of ['en', 'ar'] as const) {
-      const msg = addressErrorCopy[lang].constrained;
-      expect(msg).not.toMatch(/payment|دفع/i);
-      expect(msg).not.toMatch(/can't be deleted|cannot be deleted|لا يمكن حذفه/i);
+      for (const key of ['constrained', 'checkout_in_progress'] as const) {
+        expect(addressErrorCopy[lang][key]).not.toMatch(/can't be deleted|cannot be deleted|لا يمكن حذفه/i);
+      }
     }
+  });
+
+  it('the live-checkout message promises recovery, because the guard really does lift', () => {
+    expect(addressErrorCopy.en.checkout_in_progress).toMatch(/once that order finishes/i);
+    expect(addressErrorCopy.ar.checkout_in_progress).toMatch(/بعد اكتمال/);
   });
 
   it('recognises the mandatory-landmark trigger by message when the code is lost', () => {
@@ -194,7 +218,8 @@ describe('addressErrorMessage', () => {
 
   it('has copy for every problem, in both languages', () => {
     const problems = [
-      'not_signed_in', 'constrained', 'not_found', 'invalid_description', 'network', 'unknown',
+      'not_signed_in', 'checkout_in_progress', 'constrained', 'not_found', 'invalid_description',
+      'network', 'unknown',
     ] as const;
     for (const lang of ['en', 'ar'] as const) {
       for (const p of problems) {

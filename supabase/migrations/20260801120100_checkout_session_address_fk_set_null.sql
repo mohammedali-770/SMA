@@ -24,8 +24,8 @@
 --     is the server-trusted quote and is NOT touched here.
 --   * insert_order_from_snapshot reads the address from the SNAPSHOT, not from
 --     this column — `nullif(p_snapshot->>'address_id','')::uuid`
---     (20260712160000:340, 20260712170000:73). Nulling the column therefore
---     cannot change which address an order is created against, nor any amount.
+--     (20260712170000:73). Nulling the column therefore cannot change which
+--     address an order is created against, nor any amount.
 --   * finalize_checkout_session, tap_begin_session_attempt, payment-verify and
 --     payment-webhook never read `checkout_sessions.address_id` at all.
 --
@@ -34,12 +34,34 @@
 -- convenience pointer to the (now absent) address row becomes NULL — exactly
 -- what `orders.address_id` already does.
 --
+-- ...BUT THE OLD FK WAS ALSO DOING A SECOND JOB, BY ACCIDENT
+-- `insert_order_from_snapshot` takes the address id OUT of the snapshot and
+-- INSERTS it into `public.orders.address_id`, which is itself a live FK to
+-- `public.addresses(id)`. ON DELETE SET NULL governs deleting the PARENT; it
+-- does not let you INSERT a reference to a row that is already gone. So if an
+-- address were deleted while a checkout session could still be finalized, a
+-- later capture would run finalize_checkout_session -> insert_order_from_snapshot
+-- -> 23503 on orders_address_id_fkey. finalize has no exception handler and
+-- deliberately still accepts an 'expired' (unconsumed) session, so that failure
+-- would repeat on every retry and every duplicate webhook: money captured, no
+-- order, permanently. The blocking FK this migration relaxes was the only thing
+-- preventing that sequence.
+--
+-- Relaxing the constraint therefore requires putting that one guarantee back
+-- explicitly, and ONLY that one — hence the trigger in section 4. It refuses a
+-- delete exactly while a session could still turn into an order, which is the
+-- set finalize_checkout_session accepts: order_id IS NULL AND status IN
+-- ('pending_payment','expired'). Every other session — consumed, cancelled, or
+-- any session that already produced an order — is safe, and those are the ones
+-- customers actually accumulate.
+--
 -- SCOPE
--- ONE constraint, delete-behaviour only. The referenced table
--- (public.addresses) and column (id) are preserved, as are MATCH type, ON
--- UPDATE behaviour, deferrability and the constraint name. No session row is
--- read, written, deleted or re-priced. No function, policy, grant, trigger or
--- payment provider setting is touched.
+-- One constraint's delete behaviour, plus one BEFORE DELETE guard on
+-- public.addresses. The referenced table (public.addresses) and column (id) are
+-- preserved, as are MATCH type, ON UPDATE behaviour, deferrability and the
+-- constraint name. No session row is read for update, written, deleted or
+-- re-priced. No payment function, policy, grant, provider setting, snapshot,
+-- retry or refund path is touched.
 --
 -- IDEMPOTENT AND SAFE ON BOTH A CLEAN AND AN EXISTING DATABASE
 --   * absent table            -> skipped with a notice (nothing to alter);
@@ -158,10 +180,84 @@ begin
   raise notice 'checkout_sessions.% is now ON DELETE SET NULL', v_conname;
 end $$;
 
-comment on column public.checkout_sessions.address_id is
-  'Convenience pointer to the address this session was priced for. NULLed if the customer later deletes that address; the authoritative copy lives in snapshot->address_snapshot, which insert_order_from_snapshot reads.';
+-- Guarded the same way as the DO block above: on a database without the table
+-- this migration is a no-op, and a bare COMMENT ON would turn that documented
+-- skip into a hard failure.
+do $$
+begin
+  if to_regclass('public.checkout_sessions') is null then
+    return;
+  end if;
+  execute $c$comment on column public.checkout_sessions.address_id is 'Convenience pointer to the address this session was priced for. NULLed if the customer later deletes that address; the authoritative copy lives in snapshot->address_snapshot, which insert_order_from_snapshot reads.'$c$;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 4. Put back the ONE guarantee the blocking FK was providing by accident:
+--    an address may not vanish while a checkout session could still turn it
+--    into an order.
+--
+--    Without this, relaxing the FK above would trade a delete-button error for
+--    a captured payment that can never become an order. See the header.
+--
+--    The predicate is exactly finalize_checkout_session's own gate
+--    (20260712170000:340-346): it refuses anything except 'pending_payment' and
+--    'expired', and returns the existing order when order_id is already set. So
+--    a session outside that set can never reach insert_order_from_snapshot, and
+--    the address behind it is safe to delete.
+-- ---------------------------------------------------------------------------
+create or replace function public.guard_address_delete_live_checkout()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  -- SCOPE: the customer's own delete button, which is a direct PostgREST DELETE
+  -- running as `authenticated`.
+  --
+  -- Server-side paths are exempt on purpose, and account deletion is the reason
+  -- it MUST be this way round: anonymize_account_data removes the customer's
+  -- addresses (20260715120000:264) BEFORE their checkout sessions (:270), so a
+  -- blanket guard would refuse the address delete and break account deletion
+  -- outright. It is also unnecessary there — that path deletes the sessions too,
+  -- so no finalize can survive to reference the address.
+  if current_user <> 'authenticated' then
+    return old;
+  end if;
+
+  if exists (
+    select 1
+      from public.checkout_sessions cs
+     where cs.address_id = old.id
+       and cs.order_id is null
+       and cs.status in ('pending_payment', 'expired')
+  ) then
+    -- 55006 object_in_use, NOT 23503: this is a live, self-resolving condition
+    -- and the app must be able to tell it apart from an unexpected constraint.
+    raise exception
+      using
+        errcode = '55006',
+        message = 'This address is used by a checkout that has not finished.',
+        detail  = 'A checkout session still references this address and can still become an order; removing it now could capture a payment that cannot be turned into an order.',
+        hint    = 'The address becomes deletable once that checkout completes or is cancelled.';
+  end if;
+
+  return old;
+end;
+$$;
+
+comment on function public.guard_address_delete_live_checkout() is
+  'BEFORE DELETE guard on public.addresses: refuses a customer delete while an unconsumed, still-finalizable checkout session references the address, so a captured payment can never fail to become an order. Server-side paths (e.g. account anonymisation, which deletes sessions too) are exempt.';
+
+drop trigger if exists trg_addresses_guard_live_checkout on public.addresses;
+
+create trigger trg_addresses_guard_live_checkout
+  before delete on public.addresses
+  for each row
+  execute function public.guard_address_delete_live_checkout();
 
 -- Rollback (restores the original blocking behaviour)
+-- drop trigger if exists trg_addresses_guard_live_checkout on public.addresses;
+-- drop function if exists public.guard_address_delete_live_checkout();
 -- alter table public.checkout_sessions drop constraint checkout_sessions_address_id_fkey;
 -- alter table public.checkout_sessions
 --   add constraint checkout_sessions_address_id_fkey
