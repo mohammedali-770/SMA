@@ -1,23 +1,204 @@
 /**
  * Console navigation — PRESENTATION ONLY.
  *
- * Renders `visibleNav()` and reports which tab was clicked. It decides nothing
- * about visibility: three tabs are capability-gated behind runtime probes, and
- * that lives with the probes in AdminDashboard.
+ * Renders `resolveNavGroups()` and reports which tab was clicked. It decides
+ * nothing about visibility: three tabs are capability-gated behind runtime
+ * probes, and that lives with the probes in AdminDashboard. Tabs, routes and
+ * panels are untouched — this file changes how twelve destinations are
+ * PRESENTED, not what they are.
  *
- * Responsive by structure rather than by breakpoint guesswork: a horizontal
- * scrolling strip on narrow widths, a fixed column from `md` up. That is the
- * shape the console already had — the change is that twelve copies of the
- * class list became one.
+ * Twelve flat buttons is past the point where a list is scanned rather than
+ * read, so they are grouped and the groups collapse. Two rules keep that from
+ * hiding things:
+ *
+ *   Overview is never collapsible. It is the landing tab and the place the
+ *   shell returns you to when a gated tab disappears, so it stays one click
+ *   away at all times.
+ *
+ *   The group holding the active tab is always expanded, including when the
+ *   shell moves you somewhere on its own. You can never be on a page the
+ *   sidebar is hiding.
+ *
+ * Responsive by structure: a compact drawer below `lg` — one trigger showing
+ * where you are, opening a full navigation over the content — and a fixed
+ * column from `lg` up. The old horizontal scrolling strip is gone; it was the
+ * reason the console scrolled sideways on a tablet.
+ *
+ * RTL comes from logical properties (`border-e`, `start-0`, `text-start`)
+ * rather than a mirrored stylesheet, so Arabic anchors the drawer to the right
+ * edge and English to the left with no branching.
  *
  * The selected tab fills with ember, the one interactive colour. Everything
  * else is quiet until hovered, so at a glance the sidebar answers "where am I"
  * with a single mark rather than twelve competing ones.
  */
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 
 import { Text } from '../../../design-system/ui/Text';
-import { visibleNav, type AdminTab, type GatedVisibility } from './adminNav';
+import {
+  initialExpandedGroups, resolveNavGroups, withActiveGroupExpanded,
+  type AdminNavGroupId, type AdminNavItem, type AdminTab, type GatedVisibility,
+  type ResolvedNavGroup,
+} from './adminNav';
+
+const COPY = {
+  en: { nav: 'Console sections', menu: 'Menu', close: 'Close menu', open: 'Open menu' },
+  ar: { nav: 'أقسام لوحة التحكم', menu: 'القائمة', close: 'إغلاق القائمة', open: 'فتح القائمة' },
+} as const;
+
+/** The Live Orders count, as a pill. Rendered on the item and, when its group
+ *  is collapsed, on the group header — so collapsing never hides the count. */
+function CountBadge({ count, onEmber }: { count: number; onEmber: boolean }) {
+  return (
+    <span
+      className={[
+        'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5',
+        onEmber ? 'bg-on-ember' : 'bg-ember',
+      ].join(' ')}
+    >
+      <Text variant="caption" numeric tone={onEmber ? 'ember' : 'onEmber'} as="span">
+        {count}
+      </Text>
+    </span>
+  );
+}
+
+function NavButton({
+  item, selected, lang, liveOrderCount, indented, onSelect,
+}: {
+  item: AdminNavItem;
+  selected: boolean;
+  lang: 'en' | 'ar';
+  liveOrderCount: number;
+  indented: boolean;
+  onSelect: (tab: AdminTab) => void;
+}) {
+  const { tab, icon: Icon, en, ar } = item;
+  const showBadge = tab === 'orders' && liveOrderCount > 0;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(tab)}
+      aria-current={selected ? 'page' : undefined}
+      className={[
+        'ds-motion flex min-h-11 w-full items-center justify-between gap-2 text-start',
+        'rounded-[var(--radius-ds-md)] px-3 py-2.5 transition-colors duration-150',
+        'focus-visible:outline-2 focus-visible:outline-offset-2',
+        indented ? 'ps-6' : '',
+        selected ? 'bg-ember' : 'text-con-text hover:bg-con-surface',
+      ].filter(Boolean).join(' ')}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <Icon className="size-4 shrink-0" aria-hidden="true" />
+        <Text variant="label" tone={selected ? 'onEmber' : 'primary'} as="span" className="truncate">
+          {lang === 'ar' ? ar : en}
+        </Text>
+      </span>
+
+      {showBadge ? <CountBadge count={liveOrderCount} onEmber={selected} /> : null}
+    </button>
+  );
+}
+
+function NavGroup({
+  group, active, expanded, lang, liveOrderCount, onToggle, onSelect,
+}: {
+  group: ResolvedNavGroup;
+  active: AdminTab;
+  expanded: boolean;
+  lang: 'en' | 'ar';
+  liveOrderCount: number;
+  onToggle: (id: AdminNavGroupId) => void;
+  onSelect: (tab: AdminTab) => void;
+}) {
+  const { id, icon: Icon, en, ar, collapsible, items } = group;
+  const panelId = `admin-nav-group-${id}`;
+
+  // A pinned group is a plain list with no header — Overview is one item, and
+  // wrapping it in a disclosure would be chrome around a single button.
+  if (!collapsible) {
+    return (
+      <div className="flex flex-col gap-1">
+        {items.map((item) => (
+          <NavButton
+            key={item.tab}
+            item={item}
+            selected={active === item.tab}
+            lang={lang}
+            liveOrderCount={liveOrderCount}
+            indented={false}
+            onSelect={onSelect}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const holdsActive = items.some((item) => item.tab === active);
+  // Collapsed groups still have to answer "is anything waiting for me?".
+  const collapsedCount = !expanded && items.some((item) => item.tab === 'orders')
+    ? liveOrderCount
+    : 0;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className={[
+          'ds-motion flex min-h-11 w-full items-center justify-between gap-2 text-start',
+          'rounded-[var(--radius-ds-md)] px-3 py-2.5 transition-colors duration-150',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 hover:bg-con-surface',
+        ].join(' ')}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon className="size-4 shrink-0 text-con-text-3" aria-hidden="true" />
+          {/* Not `label`: a group is a heading for the items under it, and
+              reading identically to them is what made the flat list hard to
+              scan in the first place. */}
+          <Text variant="caption" tone="tertiary" as="span" className="truncate uppercase tracking-wide">
+            {lang === 'ar' ? ar : en}
+          </Text>
+          {/* A dot marks the group you are inside while it is collapsed. */}
+          {holdsActive && !expanded ? (
+            <span className="size-1.5 shrink-0 rounded-full bg-ember" aria-hidden="true" />
+          ) : null}
+        </span>
+
+        <span className="flex shrink-0 items-center gap-1.5">
+          {collapsedCount > 0 ? <CountBadge count={collapsedCount} onEmber={false} /> : null}
+          <ChevronDown
+            className={[
+              'ds-motion size-4 text-con-text-3 transition-transform duration-150',
+              expanded ? 'rotate-180' : '',
+            ].filter(Boolean).join(' ')}
+            aria-hidden="true"
+          />
+        </span>
+      </button>
+
+      {expanded ? (
+        <div id={panelId} className="flex flex-col gap-1">
+          {items.map((item) => (
+            <NavButton
+              key={item.tab}
+              item={item}
+              selected={active === item.tab}
+              lang={lang}
+              liveOrderCount={liveOrderCount}
+              indented
+              onSelect={onSelect}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export function AdminSidebar({
   active,
@@ -33,55 +214,145 @@ export function AdminSidebar({
   /** Active-order count; renders as a badge on Live Orders when non-zero. */
   liveOrderCount: number;
 }) {
+  const copy = COPY[lang];
+  const groups = resolveNavGroups(visibility);
+
+  const [expanded, setExpanded] = useState<ReadonlySet<AdminNavGroupId>>(
+    () => initialExpandedGroups(active),
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // The shell can change the active tab without the sidebar being touched —
+  // it resets to Overview when a gated tab's probe comes back missing. Reopen
+  // whichever group now holds it. `withActiveGroupExpanded` returns the same
+  // set when nothing changed, so this settles immediately.
+  useEffect(() => {
+    setExpanded((current) => withActiveGroupExpanded(current, active));
+  }, [active]);
+
+  const toggleGroup = useCallback((id: AdminNavGroupId) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }, []);
+
+  const select = useCallback((tab: AdminTab) => {
+    onSelect(tab);
+    setDrawerOpen(false);
+  }, [onSelect]);
+
+  // Escape closes the drawer, the one interaction a keyboard user expects from
+  // anything covering the page.
+  useEffect(() => {
+    if (!drawerOpen) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
+
+  const activeItem = groups.flatMap((g) => g.items).find((item) => item.tab === active);
+  const activeLabel = activeItem ? (lang === 'ar' ? activeItem.ar : activeItem.en) : copy.menu;
+
+  const tree = (
+    <div className="flex flex-col gap-2">
+      {groups.map((group) => (
+        <NavGroup
+          key={group.id}
+          group={group}
+          active={active}
+          expanded={expanded.has(group.id)}
+          lang={lang}
+          liveOrderCount={liveOrderCount}
+          onToggle={toggleGroup}
+          onSelect={select}
+        />
+      ))}
+    </div>
+  );
+
   return (
-    <nav
-      aria-label={lang === 'ar' ? 'أقسام لوحة التحكم' : 'Console sections'}
-      className={[
-        'flex w-full shrink-0 flex-row gap-1 overflow-x-auto p-3',
-        'border-b border-con-line bg-con-surface-2',
-        'md:w-[228px] md:flex-col md:overflow-x-visible md:border-b-0 md:border-e',
-      ].join(' ')}
-    >
-      {visibleNav(visibility).map(({ tab, icon: Icon, en, ar }) => {
-        const selected = active === tab;
-        const showBadge = tab === 'orders' && liveOrderCount > 0;
-        return (
+    <>
+      {/* Compact trigger — tablet and narrower. Names the current page so the
+          drawer is not the only way to find out where you are. */}
+      <div className="flex items-center gap-2 border-b border-con-line bg-con-surface-2 p-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label={copy.open}
+          aria-expanded={drawerOpen}
+          className={[
+            'ds-motion flex min-h-11 items-center gap-2 rounded-[var(--radius-ds-md)]',
+            'border border-con-line px-3 py-2.5 transition-colors duration-150',
+            'hover:bg-con-surface focus-visible:outline-2 focus-visible:outline-offset-2',
+          ].join(' ')}
+        >
+          <Menu className="size-4 shrink-0" aria-hidden="true" />
+          <Text variant="label" as="span">{copy.menu}</Text>
+        </button>
+
+        <Text
+          variant="label"
+          tone="secondary"
+          as="span"
+          className="truncate"
+          data-testid="admin-nav-current"
+        >
+          {activeLabel}
+        </Text>
+
+        {liveOrderCount > 0 ? (
+          <span className="ms-auto shrink-0"><CountBadge count={liveOrderCount} onEmber={false} /></span>
+        ) : null}
+      </div>
+
+      {drawerOpen ? (
+        <div className="fixed inset-0 z-40 lg:hidden">
           <button
-            key={tab}
             type="button"
-            onClick={() => onSelect(tab)}
-            aria-current={selected ? 'page' : undefined}
+            aria-label={copy.close}
+            onClick={() => setDrawerOpen(false)}
+            className="absolute inset-0 size-full bg-brand-ink/60"
+          />
+          {/* `start-0` anchors to the left in LTR and the right in RTL. */}
+          <nav
+            aria-label={copy.nav}
             className={[
-              'ds-motion flex min-h-11 w-full items-center justify-between gap-2 whitespace-nowrap',
-              'rounded-[var(--radius-ds-md)] px-3 py-2.5 transition-colors duration-150',
-              'focus-visible:outline-2 focus-visible:outline-offset-2',
-              selected ? 'bg-ember' : 'text-con-text hover:bg-con-surface',
+              'absolute bottom-0 start-0 top-0 flex w-[264px] max-w-[85vw] flex-col',
+              'overflow-y-auto border-e border-con-line bg-con-surface-2 p-3',
             ].join(' ')}
           >
-            <span className="flex items-center gap-2">
-              <Icon className="size-4 shrink-0" aria-hidden="true" />
-              <Text variant="label" tone={selected ? 'onEmber' : 'primary'} as="span">
-                {lang === 'ar' ? ar : en}
-              </Text>
-            </span>
-
-            {showBadge ? (
-              // The count is a structured number, so it renders mono like every
-              // other figure in the product.
-              <span
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <Text variant="label" tone="secondary" as="span">{copy.menu}</Text>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label={copy.close}
                 className={[
-                  'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5',
-                  selected ? 'bg-on-ember' : 'bg-ember',
+                  'ds-motion flex size-9 items-center justify-center rounded-[var(--radius-ds-md)]',
+                  'transition-colors duration-150 hover:bg-con-surface',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2',
                 ].join(' ')}
               >
-                <Text variant="caption" numeric tone={selected ? 'ember' : 'onEmber'} as="span">
-                  {liveOrderCount}
-                </Text>
-              </span>
-            ) : null}
-          </button>
-        );
-      })}
-    </nav>
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </div>
+            {tree}
+          </nav>
+        </div>
+      ) : null}
+
+      {/* Fixed column — desktop. */}
+      <nav
+        aria-label={copy.nav}
+        className={[
+          'hidden w-[228px] shrink-0 overflow-y-auto p-3',
+          'border-e border-con-line bg-con-surface-2 lg:block',
+        ].join(' ')}
+      >
+        {tree}
+      </nav>
+    </>
   );
 }

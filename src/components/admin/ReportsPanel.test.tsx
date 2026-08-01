@@ -157,7 +157,13 @@ describe('stats derivations', () => {
     });
     render(<StatsPanel />);
     expect(screen.getByText('Active')).toBeTruthy();
-    expect(screen.getByText(/^1$/)).toBeTruthy();
+    // Anchored to the orders tile rather than matched as "some element whose
+    // text is exactly 1". The panel legitimately renders other bare digits —
+    // rank positions in the branch chart, counts in the availability
+    // breakdown — and a global /^1$/ silently asserts whichever of them the
+    // query happens to reach first.
+    const ordersTile = screen.getByText('Total Active Orders').parentElement;
+    expect(ordersTile?.textContent).toContain('1 Active');
     expect(screen.getByText('2 delivered or cancelled')).toBeTruthy();
   });
 
