@@ -46,10 +46,23 @@ export const color = {
   appSurface3: '#FCE1C9',
   appLine: '#F0E3D4',
 
-  /** Ink — the brand violet lives in the type. */
+  /**
+   * Ink — the brand violet lives in the type.
+   *
+   * THE THIRD LEVEL IS NARROW, AND THAT IS ARITHMETIC RATHER THAN TASTE. On a
+   * ground this light, WCAG AA for normal text caps a passing ink at ~0.154
+   * relative luminance; `*Text2` already sits at 0.136. That leaves a band of
+   * ~0.018 for a third level. `*Text3` is placed at the LIGHTEST point in that
+   * band, so it is as distinct from `*Text2` as an accessible ink can be here.
+   *
+   * It was `#9C93AB`, which measured 2.33–2.93:1 — below AA on every ground it
+   * is used on, at the 11.5px caption size it is mostly used at. See
+   * `contrastContract.test.ts`, which pins the ratios so a tint change cannot
+   * quietly push it back under.
+   */
   appText: '#241436',
   appText2: '#6E6280',
-  appText3: '#9C93AB',
+  appText3: '#746886',
 
   /** Admin console surfaces — same warmth, denser scale. */
   conBg: '#F6F2EC',
@@ -58,7 +71,8 @@ export const color = {
   conLine: '#E8DFD4',
   conText: '#241436',
   conText2: '#6E6280',
-  conText3: '#9C93AB',
+  /** Same value and same reasoning as `appText3` above. */
+  conText3: '#746886',
 
   /** Semantic — identical meaning in both products. */
   mint: '#12A150',
@@ -87,10 +101,15 @@ export const color = {
   onEmber: '#FFFFFF',
   disabledBg: '#EFE6DC',
   /**
-   * Disabled label. NOT the tertiary ink (#9C93AB) — measured on a rendered
-   * login screen that was ~2.2:1 against `disabledBg` and effectively
-   * unreadable. A disabled control still has to be legible: the user must be
-   * able to read what they cannot yet press. This is ~4.9:1, which clears AA.
+   * Disabled label. Set here DELIBERATELY and independently of the tertiary
+   * ink: it was once the old `#9C93AB`, measured on a rendered login screen at
+   * ~2.2:1 against `disabledBg` and effectively unreadable. A disabled control
+   * still has to be legible — the user must be able to read what they cannot
+   * yet press. This is 4.57:1 against `disabledBg`, which clears AA.
+   *
+   * Do NOT re-point this at `*Text3`. The two now measure similarly, which is
+   * exactly the coincidence that would make aliasing them look harmless and
+   * then break the next time either moves.
    */
   disabledFg: '#6E6280',
 

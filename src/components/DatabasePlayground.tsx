@@ -39,7 +39,7 @@ export const DatabasePlayground: React.FC = () => {
           <Database className="w-5 h-5 text-ember animate-pulse" />
           <div>
             <h2 className="text-sm font-black text-white tracking-wide">SUPABASE DATABASE CONSOLE (EMULATED)</h2>
-            <p className="text-[10px] text-con-text-3 mt-0.5">Connected Schema: postgresql://postgres:spicymeal-db@localhost:5432/main</p>
+            <p className="text-[10px] text-con-surface-2/60 mt-0.5">Connected Schema: postgresql://postgres:spicymeal-db@localhost:5432/main</p>
           </div>
         </div>
 
@@ -48,13 +48,13 @@ export const DatabasePlayground: React.FC = () => {
           <div className="flex bg-brand-ink border border-con-line rounded-lg p-0.5">
             <button 
               onClick={() => setViewMode('table')}
-              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'table' ? 'bg-ember text-white' : 'text-con-text-3'}`}
+              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'table' ? 'bg-ember text-white' : 'text-con-surface-2/60'}`}
             >
               TABLE VIEW
             </button>
             <button 
               onClick={() => setViewMode('json')}
-              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'json' ? 'bg-ember text-white' : 'text-con-text-3'}`}
+              className={`px-3 py-1 rounded font-black text-[10px] ${viewMode === 'json' ? 'bg-ember text-white' : 'text-con-surface-2/60'}`}
             >
               RAW JSON
             </button>
@@ -66,11 +66,11 @@ export const DatabasePlayground: React.FC = () => {
       </div>
 
       {/* RLS warning information row */}
-      <div className="mt-3 bg-brand-ink/40 border border-con-line/80 rounded-xl p-3 flex items-start gap-2.5 text-[10px] text-con-text-3">
+      <div className="mt-3 bg-brand-ink/40 border border-con-line/80 rounded-xl p-3 flex items-start gap-2.5 text-[10px] text-con-surface-2/60">
         <KeyRound className="w-4 h-4 text-ember flex-shrink-0 mt-0.5" />
         <div className="leading-normal">
           <span className="font-bold text-white">Row Level Security (RLS) policies are active on this schema:</span>
-          <p className="text-con-text-3 mt-0.5">
+          <p className="text-con-surface-2/60 mt-0.5">
             - <code className="text-ember font-black">branches</code>, <code className="text-ember font-black">products</code>: READ is granted publicly to everyone; UPDATE is restricted to <code className="text-saffron">role = 'admin'</code>.<br/>
             - <code className="text-ember font-black">orders</code>, <code className="text-ember font-black">addresses</code>: Select is isolated by <code className="text-saffron">auth.uid() = customer_id</code>. Admin bypassing overrides RLS.
           </p>
@@ -96,7 +96,7 @@ export const DatabasePlayground: React.FC = () => {
               className={`w-full text-left flex justify-between items-center text-[11px] py-2 px-3 rounded-lg border transition-all ${
                 activeTable === table.key 
                   ? 'bg-ember/20 border-primary text-white font-black' 
-                  : 'bg-brand-ink/40 border-con-line/50 text-con-text-3 hover:bg-brand-ink/80 hover:text-white'
+                  : 'bg-brand-ink/40 border-con-line/50 text-con-surface-2/60 hover:bg-brand-ink/80 hover:text-white'
               }`}
             >
               <span>{table.label}</span>
@@ -116,8 +116,8 @@ export const DatabasePlayground: React.FC = () => {
                   [EMPTY TABLE - NO RECORDS AVAILABLE]
                 </div>
               ) : (
-                <table className="w-full text-[10.5px] text-con-text-3 text-left">
-                  <thead className="bg-brand-ink/80 border-b border-con-line text-con-text-3 uppercase font-black tracking-wide text-[9.5px]">
+                <table className="w-full text-[10.5px] text-con-surface-2/60 text-left">
+                  <thead className="bg-brand-ink/80 border-b border-con-line text-con-surface-2/60 uppercase font-black tracking-wide text-[9.5px]">
                     {activeTable === 'branches' && (
                       <tr>
                         <th className="px-3 py-2.5">ID</th>
@@ -199,7 +199,7 @@ export const DatabasePlayground: React.FC = () => {
                           <>
                             <td className="px-3 py-2.5 text-ember font-black truncate max-w-[80px]">{row.id}</td>
                             <td className="px-3 py-2.5 font-bold text-white truncate max-w-[120px]">{row.nameEn}</td>
-                            <td className="px-3 py-2.5 text-con-text-3 truncate max-w-[100px]">{row.categoryId}</td>
+                            <td className="px-3 py-2.5 text-con-surface-2/60 truncate max-w-[100px]">{row.categoryId}</td>
                             <td className="px-3 py-2.5 text-ember font-black"><Price amount={row.price} /></td>
                             <td className="px-3 py-2.5">{row.calories} kcal</td>
                           </>

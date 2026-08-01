@@ -54,7 +54,12 @@
   --color-con-line: #E8DFD4;
   --color-con-text: #241436;
   --color-con-text-2: #6E6280;
-  --color-con-text-3: #9C93AB;
+  /* Was #9C93AB, which measured 2.33-2.93:1 -- below WCAG AA on every ground it
+     is used on, at the 11.5px caption size it is mostly used at. This value
+     mirrors `conText3` in design-system/tokens.ts; contrastContract.test.ts
+     asserts the two agree, because this file is hand-maintained and the sync
+     script does not reach it. */
+  --color-con-text-3: #746886;
 
   --color-app-bg: #FFF7EF;
   --color-app-surface-2: #FFF0E1;
@@ -82,10 +87,12 @@
   --color-mint-line: #B7E3C9;
 
   --color-disabled-bg: #EFE6DC;
-  /* NOT the tertiary ink (#9C93AB): measured at ~2.2:1 against --color-disabled-bg
-     and effectively unreadable. This mirrors the fix already made in
-     design-system/tokens.ts for the mobile app, where the web CSS had drifted
-     behind. ~4.9:1, which clears AA. A disabled control still has to be legible. */
+  /* Set independently of the tertiary ink. It was once the old #9C93AB, which
+     measured ~2.2:1 against --color-disabled-bg and was effectively unreadable.
+     4.57:1 now, which clears AA -- a disabled control still has to be legible.
+     Do NOT re-point this at --color-con-text-3: the two happen to measure
+     similarly, which is the coincidence that would make aliasing them look
+     harmless and then break the next time either moves. */
   --color-disabled-fg: #6E6280;
 
   --radius-ds-sm: 8px;
