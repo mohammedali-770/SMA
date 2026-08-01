@@ -134,19 +134,31 @@ describe('toAddressPatch', () => {
 
 describe('classifyAddressError', () => {
   it('reads the SQLSTATE when it survived', () => {
-    expect(classifyAddressError({ code: '23503', message: '' })).toBe('in_use');
+    expect(classifyAddressError({ code: '23503', message: '' })).toBe('constrained');
     expect(classifyAddressError({ code: '23514', message: '' })).toBe('invalid_description');
     expect(classifyAddressError({ code: '42501', message: '' })).toBe('not_signed_in');
     expect(classifyAddressError({ code: 'PGRST116', message: '' })).toBe('not_found');
   });
 
-  it('recognises the delete blocked by an unfinished checkout session', () => {
-    // checkout_sessions.address_id references addresses(id) with no ON DELETE
-    // action, so this is the one a customer can hit by accident.
+  it('classifies an UNEXPECTED foreign-key refusal as a generic constraint failure', () => {
+    // The one customers used to hit — checkout_sessions.address_id with no ON
+    // DELETE action — is fixed at the schema level by migration 20260801120100,
+    // so a 23503 here is now a surprise, not a documented dead end.
     expect(classifyAddressError(new Error(
       'update or delete on table "addresses" violates foreign key constraint '
-      + '"checkout_sessions_address_id_fkey" on table "checkout_sessions"',
-    ))).toBe('in_use');
+      + '"some_future_table_address_id_fkey" on table "some_future_table"',
+    ))).toBe('constrained');
+  });
+
+  it('no longer tells the customer a delete is permanently impossible', () => {
+    // The old copy said the address was "linked to a payment" and could not be
+    // deleted. After 20260801120100 that is false, and a message that tells a
+    // customer to stop trying is worse than one that tells them to retry.
+    for (const lang of ['en', 'ar'] as const) {
+      const msg = addressErrorCopy[lang].constrained;
+      expect(msg).not.toMatch(/payment|دفع/i);
+      expect(msg).not.toMatch(/can't be deleted|cannot be deleted|لا يمكن حذفه/i);
+    }
   });
 
   it('recognises the mandatory-landmark trigger by message when the code is lost', () => {
@@ -176,13 +188,13 @@ describe('addressErrorMessage', () => {
   it('never returns a raw provider string to the customer', () => {
     const raw = 'update or delete on table "addresses" violates foreign key constraint';
     const msg = addressErrorMessage(new Error(raw), 'en');
-    expect(msg).toBe(addressErrorCopy.en.in_use);
+    expect(msg).toBe(addressErrorCopy.en.constrained);
     expect(msg).not.toContain('foreign key');
   });
 
   it('has copy for every problem, in both languages', () => {
     const problems = [
-      'not_signed_in', 'in_use', 'not_found', 'invalid_description', 'network', 'unknown',
+      'not_signed_in', 'constrained', 'not_found', 'invalid_description', 'network', 'unknown',
     ] as const;
     for (const lang of ['en', 'ar'] as const) {
       for (const p of problems) {

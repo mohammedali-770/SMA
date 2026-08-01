@@ -90,7 +90,24 @@ export function isEmptyPatch(row: Record<string, unknown>): boolean {
 
 export type AddressProblem =
   | 'not_signed_in'
-  | 'in_use'
+  /**
+   * A foreign key still points at this address.
+   *
+   * This is NO LONGER an expected outcome. It used to be: `checkout_sessions`
+   * referenced `addresses(id)` with no ON DELETE action and session rows are
+   * kept forever, so any address that had ever backed an online checkout was
+   * undeletable for the life of the account, and the copy said so. Migration
+   * 20260801120100 makes that FK ON DELETE SET NULL, matching `orders`, so the
+   * one case customers actually hit is gone.
+   *
+   * The state is kept because an unexpected reference is still possible — a
+   * future table, or this migration not yet being applied to the environment
+   * the app is talking to. The copy therefore no longer claims the address is
+   * permanently undeletable, and no longer claims that waiting will fix it. It
+   * says what is true of a constraint we did not anticipate: it could not be
+   * removed right now, and support can find out why.
+   */
+  | 'constrained'
   | 'not_found'
   | 'invalid_description'
   | 'network'
@@ -106,21 +123,17 @@ interface CodedError {
  * copy for. Reads the SQLSTATE when `services/api.ts` preserved it and falls
  * back to the message text, because a few transport paths lose the code.
  *
- * `in_use` is the one customers hit by accident: `checkout_sessions.address_id`
- * references `addresses(id)` with no ON DELETE action, and session rows are
- * kept (finalization only flips their status), so an address that has ever been
- * used for an online checkout cannot be deleted until that changes server-side.
- * The copy is deliberately honest about that — it offers editing, which the FK
- * does not block, and does NOT promise that retrying will work, because it
- * won't. Relaxing the FK is a payment-area schema change (frozen, CLAUDE.md §6)
- * and is the owner's call.
+ * `constrained` is the residual foreign-key case. The one customers used to hit
+ * — an address that had ever backed an online checkout — is fixed at the schema
+ * level by migration 20260801120100, so this is now a genuine surprise rather
+ * than a documented dead end, and the copy is written accordingly.
  */
 export function classifyAddressError(err: unknown): AddressProblem {
   const e = (err ?? {}) as CodedError;
   const code = typeof e.code === 'string' ? e.code : '';
   const message = typeof e.message === 'string' ? e.message.toLowerCase() : '';
 
-  if (code === '23503' || /violates foreign key constraint/.test(message)) return 'in_use';
+  if (code === '23503' || /violates foreign key constraint/.test(message)) return 'constrained';
   if (code === '23514' || code === '23502' || /location description|landmark/.test(message)) {
     return 'invalid_description';
   }
@@ -139,7 +152,7 @@ export function classifyAddressError(err: unknown): AddressProblem {
 export const addressErrorCopy = {
   en: {
     not_signed_in: 'Sign in again to manage your addresses',
-    in_use: "This address is linked to a payment and can't be deleted. You can still edit it.",
+    constrained: "We couldn't remove that address. Please try again, or contact us if it keeps happening.",
     not_found: "That address is no longer saved",
     invalid_description: 'Add a nearby landmark so the driver can find you',
     network: "We couldn't reach the server. Check your connection and try again.",
@@ -148,7 +161,7 @@ export const addressErrorCopy = {
   },
   ar: {
     not_signed_in: 'سجّل الدخول مرة أخرى لإدارة عناوينك',
-    in_use: 'هذا العنوان مرتبط بعملية دفع ولا يمكن حذفه. لا يزال بإمكانك تعديله.',
+    constrained: 'تعذّر حذف هذا العنوان. حاول مرة أخرى، أو تواصل معنا إذا تكرر الأمر.',
     not_found: 'لم يعد هذا العنوان محفوظاً',
     invalid_description: 'أضف أقرب معلم حتى يتمكن المندوب من الوصول إليك',
     network: 'تعذّر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.',

@@ -382,13 +382,12 @@ export const addresses = {
    * Delete an address. RLS scopes it to the owner, so an id belonging to another
    * customer deletes nothing rather than erroring.
    *
-   * `orders.address_id` is ON DELETE SET NULL and every order carries its own
-   * `address_snapshot`, so past orders keep the address they were delivered to.
-   * `checkout_sessions.address_id` has no ON DELETE action and session rows are
-   * kept after finalization, so an address that has ever backed an online
-   * checkout raises 23503 here — surfaced honestly as "linked to a payment,
-   * can't be deleted, editing still works" (see classifyAddressError). Fixing
-   * that for real means relaxing the FK, which is payment-area schema (frozen).
+   * Both tables that reference an address are ON DELETE SET NULL — `orders`
+   * since 20260707120500 and `checkout_sessions` since 20260801120100 — and
+   * each keeps its own snapshot of the address it was priced against, so a
+   * delete costs the customer no history and changes no order or payment. A
+   * residual 23503 is therefore an unexpected constraint rather than a
+   * documented dead end; see classifyAddressError.
    */
   async remove(id: string): Promise<void> {
     const res = await supabase.from('addresses').delete().eq('id', id);
