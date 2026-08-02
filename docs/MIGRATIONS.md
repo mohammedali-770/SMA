@@ -10,15 +10,35 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-07-29, every repository migration is applied to Production.
-There are no unapplied migration files.**
+**As of 2026-08-01 there are TWO unapplied repository migrations (class E).**
+Both landed with PR #142 and neither has been applied to any environment. The
+run-book for applying them is
+[`MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`](MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md).
+
+| Repository file | Class | Status |
+| --- | --- | --- |
+| `20260801120000_address_single_default` | E | **unapplied** |
+| `20260801120100_checkout_session_address_fk_set_null` | E | **unapplied** |
+
+Their SQL suites (`supabase/tests/address_single_default_test.sql`,
+`supabase/tests/checkout_session_address_fk_test.sql`) have **never been
+executed** — the sessions that wrote them had no Docker and no local Postgres.
+Running them on a PG16 harness is a hard gate before applying (run-book Step 0).
+
+Until they are applied, a customer cannot delete a saved address that has ever
+backed an online checkout: `checkout_sessions.address_id` still references
+`addresses(id)` with no `ON DELETE` action and session rows are never removed.
 
 - Repository migration files (default branch `claude/project-build-ie4b56`,
-  head `e36fff1`): **61**
+  head `e3130a2`): **63**
 - Live `schema_migrations` rows: **62**
-- Unapplied repository files: **0** (class E is now empty — see §4)
+- Unapplied repository files: **2** (class E — see the table above and §4)
 - Latest live version: **`20260729112238`**
   (`caller_can_read_order_anon_revoke`; repository version `20260729091000`)
+
+Everything below this section describes the state **as of 2026-07-29**, when
+class E was last empty. It remains accurate for every migration applied up to
+that point.
 
 The 61 / 62 difference is the long-standing **history** divergence, not a
 *schema* divergence: three live-only F-class history rows carry no repository
