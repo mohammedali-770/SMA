@@ -32,10 +32,14 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-000000000c01', 'cust@x'),
   ('00000000-0000-0000-0000-000000000c02', 'other@x');
 
+-- handle_new_user() already created these profiles from the auth.users insert
+-- above, so this sets the role and details rather than inserting fresh rows.
 insert into public.profiles (id, role, full_name, phone_number) values
   ('00000000-0000-0000-0000-000000000a01', 'admin',    'Admin',  '+966500000001'),
   ('00000000-0000-0000-0000-000000000c01', 'customer', 'Cust',   '+966500000002'),
-  ('00000000-0000-0000-0000-000000000c02', 'customer', 'Other',  '+966500000003');
+  ('00000000-0000-0000-0000-000000000c02', 'customer', 'Other',  '+966500000003')
+on conflict (id) do update set role = excluded.role,
+  full_name = excluded.full_name, phone_number = excluded.phone_number;
 
 insert into public.branches (id, name_en, name_ar) values
   ('00000000-0000-0000-0000-000000000b01', 'Main', 'الرئيسي'),

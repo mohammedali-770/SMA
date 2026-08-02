@@ -69,10 +69,17 @@ declare
   v_ord uuid := gen_random_uuid();
   v_num text;
 begin
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_cust), (v_other), (v_staff)
+  on conflict (id) do nothing;
   insert into public.profiles (id, full_name, phone_number, role)
     values (v_cust, 'Cust', '+966500000031', 'customer'),
            (v_other, 'Other', '+966500000032', 'customer'),
-           (v_staff, 'Staff', '+966500000033', 'admin');
+           (v_staff, 'Staff', '+966500000033', 'admin')
+  on conflict (id) do update set full_name = excluded.full_name,
+    phone_number = excluded.phone_number, role = excluded.role;
 
   insert into public.orders (id, customer_id, branch_id, order_type, subtotal, total,
                              payment_method, payment_status,
@@ -369,8 +376,15 @@ declare
   v_k     text;
 begin
   set local session_replication_role = replica;
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
   insert into public.profiles (id, full_name, phone_number, role, loyalty_points)
-    values (v_cust, 'Wrapper', '+966500000034', 'customer', 0);
+    values (v_cust, 'Wrapper', '+966500000034', 'customer', 0)
+  on conflict (id) do update set full_name = excluded.full_name,
+    phone_number = excluded.phone_number, role = excluded.role,
+    loyalty_points = excluded.loyalty_points;
   insert into public.branches (id, name_en, name_ar, address_en, address_ar, phone,
                                latitude, longitude, delivery_fee, min_delivery_order, is_active)
     values (v_branch, 'B', 'ب', 'A', 'ع', '+966500000000', 24.7, 46.7, 15, 40, true);

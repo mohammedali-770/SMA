@@ -22,21 +22,10 @@
 # its own branch row and references it, so orders_branch_id_fkey is satisfied
 # by a branch that actually exists. Fixed, not quarantined.
 
-# --- Insert a profile without the auth.users row it references ---------------
-# public.profiles.id is `references auth.users(id) on delete cascade`, so a
-# profile cannot exist without its auth user. Fix: create the auth.users row
-# first (the handle_new_user trigger then creates the profile — see the note on
-# discounts_campaigns below).
-loyalty_reason_history_safe_test.sql
-loyalty_reason_no_order_number_test.sql
-order_read_contracts_test.sql
-order_confirmation_state_machine_test.sql
-
-# --- Insert auth.users AND profiles, colliding with handle_new_user ----------
-# `on_auth_user_created` already inserts the profile, so the suite's own insert
-# hits profiles_pkey. Fix: drop the explicit profile insert, or make it an
-# UPDATE / ON CONFLICT DO UPDATE.
-discounts_campaigns_test.sql
+# The profile-fixture suites were here. Each now creates the auth.users row
+# before the profile (profiles.id references auth.users(id)) and upserts the
+# profile, because handle_new_user() has already created it from that insert.
+# Fixed, not quarantined.
 
 # --- Genuine assertion failures, worth investigating on their own merits -----
 

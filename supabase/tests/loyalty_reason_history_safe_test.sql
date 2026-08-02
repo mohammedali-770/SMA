@@ -24,6 +24,10 @@ $$;
 create or replace function pg_temp.mk_profile() returns uuid language plpgsql as $$
 declare v_id uuid := gen_random_uuid();
 begin
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_id) on conflict (id) do nothing;
   insert into public.profiles (id) values (v_id) on conflict (id) do nothing;
   return v_id;
 end $$;
