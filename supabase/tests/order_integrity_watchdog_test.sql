@@ -14,6 +14,16 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 select set_config('test.is_admin', 'true', true);
 select set_config('test.auth_uid', '', true);
 
@@ -41,7 +51,7 @@ begin
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
      status, payment_status, lazywait_sync_state, lazywait_ref, paid_at, sync_next_attempt_at,
      created_at, updated_at, sync_blocked_reason, customer_name, customer_phone)
-  values (v_id, p_num, gen_random_uuid(), p_type::public.order_type, p_total, p_total,
+  values (v_id, p_num, 'b0000000-0000-0000-0000-0000000000ff', p_type::public.order_type, p_total, p_total,
      p_status::public.order_status, p_pay::public.payment_status, p_state, p_ref, p_paid_at, p_next,
      coalesce(p_created, now()), coalesce(p_created, now()), p_blocked, p_name, p_phone);
   set local session_replication_role = origin;

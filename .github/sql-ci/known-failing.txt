@@ -18,18 +18,9 @@
 #
 # Format: one filename per line. `#` comments and blank lines ignored.
 
-# --- Insert an order with a branch_id that cannot exist ----------------------
-# Each does `insert into public.orders (…, branch_id, …) values (…,
-# gen_random_uuid(), …)`. `orders_branch_id_fkey` references public.branches,
-# so a random uuid can never satisfy it. These cannot pass against the current
-# schema under any harness; the fix is to use a seeded branch id
-# (supabase/seed.sql provides b0000000-0000-0000-0000-000000000001).
-lazywait_confirmation_lifecycle_test.sql
-lazywait_fencing_test.sql
-lazywait_presend_concurrency_test.sql
-lazywait_requeue_test.sql
-order_integrity_watchdog_test.sql
-tap_reference_order_opaque_test.sql
+# The six "branch_id => gen_random_uuid()" suites were here. Each now inserts
+# its own branch row and references it, so orders_branch_id_fkey is satisfied
+# by a branch that actually exists. Fixed, not quarantined.
 
 # --- Insert a profile without the auth.users row it references ---------------
 # public.profiles.id is `references auth.users(id) on delete cascade`, so a

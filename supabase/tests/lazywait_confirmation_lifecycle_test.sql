@@ -14,13 +14,23 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 -- Case 1: the deadline trigger stamps a 10-minute window the first time an order
 --         becomes 'pending' on INSERT (cash pickup).
 do $$
 declare v_id uuid := gen_random_uuid(); v_st timestamptz; v_dl timestamptz;
 begin
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, payment_method)
-    values (v_id, 'LC-1', gen_random_uuid(), 'pickup', 10, 10, 'cash');
+    values (v_id, 'LC-1', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 10, 10, 'cash');
   select pos_sync_started_at, pos_sync_deadline_at into v_st, v_dl from public.orders where id = v_id;
   if v_st is null or v_dl is null then raise exception 'CASE 1 FAILED: window not stamped on insert'; end if;
   if v_dl - v_st <> interval '10 minutes' then raise exception 'CASE 1 FAILED: window <> 10 minutes'; end if;
@@ -33,7 +43,7 @@ do $$
 declare v_id uuid := gen_random_uuid(); v_st timestamptz; v_st2 timestamptz;
 begin
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (v_id, 'LC-2', gen_random_uuid(), 'pickup', 10, 10, 'online', 'pending');
+    values (v_id, 'LC-2', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 10, 10, 'online', 'pending');
   if (select pos_sync_started_at from public.orders where id = v_id) is not null then
     raise exception 'CASE 2 FAILED: awaiting_payment must have no window';
   end if;
@@ -54,8 +64,8 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at, pos_create_attempted_at) values
-    (v_ok,  'LC-3a', gen_random_uuid(),'pickup',10,10,'pending', now()-interval '1s', now()-interval '1m', now()+interval '9m', now()),
-    (v_late,'LC-3b', gen_random_uuid(),'pickup',10,10,'pending', now()-interval '1s', now()-interval '11m', now()-interval '1m', now());
+    (v_ok,  'LC-3a', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending', now()-interval '1s', now()-interval '1m', now()+interval '9m', now()),
+    (v_late,'LC-3b', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending', now()-interval '1s', now()-interval '11m', now()-interval '1m', now());
   set local session_replication_role = origin;
   select count(*) into n from public.claim_lazywait_sync_batch(10) where id in (v_ok, v_late);
   if n <> 1 then raise exception 'CASE 3 FAILED: expected exactly 1 in-budget claim, got %', n; end if;
@@ -74,7 +84,7 @@ declare v_id uuid := gen_random_uuid(); n int;
 begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
-    values (v_id, 'LC-4', gen_random_uuid(), 'pickup', 10, 10, 'syncing');
+    values (v_id, 'LC-4', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 10, 10, 'syncing');
   set local session_replication_role = origin;
   perform public.record_lazywait_sync(v_id,
     jsonb_build_object('lazywait_sync_state','confirmation_required',
@@ -118,10 +128,10 @@ begin
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, pos_create_attempted_at, pos_sync_started_at, pos_sync_deadline_at,
     sync_attempt_count, updated_at) values
-    (v_ref, 'LC-5a', gen_random_uuid(),'pickup',10,10,'syncing','REF_X', now()-interval '20m', now()-interval '25m', now()+interval '5m', 1, now()-interval '20m'),
-    (v_amb, 'LC-5b', gen_random_uuid(),'pickup',10,10,'syncing', null,   now()-interval '20m', now()-interval '25m', now()+interval '5m', 1, now()-interval '20m'),
-    (v_safe,'LC-5c', gen_random_uuid(),'pickup',10,10,'syncing', null,   null,                 now()-interval '2m',  now()+interval '8m', 1, now()-interval '20m'),
-    (v_dl,  'LC-5d', gen_random_uuid(),'pickup',10,10,'failed',  null,   null,                 now()-interval '11m', now()-interval '1m', 2, now()-interval '20m');
+    (v_ref, 'LC-5a', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing','REF_X', now()-interval '20m', now()-interval '25m', now()+interval '5m', 1, now()-interval '20m'),
+    (v_amb, 'LC-5b', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing', null,   now()-interval '20m', now()-interval '25m', now()+interval '5m', 1, now()-interval '20m'),
+    (v_safe,'LC-5c', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing', null,   null,                 now()-interval '2m',  now()+interval '8m', 1, now()-interval '20m'),
+    (v_dl,  'LC-5d', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed',  null,   null,                 now()-interval '11m', now()-interval '1m', 2, now()-interval '20m');
   set local session_replication_role = origin;
 
   v_res := public.reap_stale_lazywait_syncs(10, 5);
@@ -198,11 +208,11 @@ declare
 begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
-  values (v_null,'PCG-1',gen_random_uuid(),'pickup',10,10,'pending'),
-         (v_ws,  'PCG-2',gen_random_uuid(),'pickup',10,10,'pending'),
-         (v_uni, 'PCG-3',gen_random_uuid(),'pickup',10,10,'pending'),
-         (v_ok,  'PCG-4',gen_random_uuid(),'pickup',10,10,'pending'),
-         (v_corr,'PCG-5',gen_random_uuid(),'pickup',10,10,'pending');
+  values (v_null,'PCG-1','b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending'),
+         (v_ws,  'PCG-2','b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending'),
+         (v_uni, 'PCG-3','b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending'),
+         (v_ok,  'PCG-4','b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending'),
+         (v_corr,'PCG-5','b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending');
   set local session_replication_role = origin;
 
   -- (1) synced + NULL ref -> suppressed.

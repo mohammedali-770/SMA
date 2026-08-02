@@ -15,6 +15,16 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 -- The generated shape of the internal id, matched as a VALUE not a column name,
 -- so any writer that concatenates it into free text is caught.
 create or replace function pg_temp.has_sm_number(p text)
@@ -36,7 +46,7 @@ end $$;
 -- Case 1: a NEW attempt stores an opaque ORD-… reference, never the SM-… number.
 do $$
 declare
-  v_branch uuid := gen_random_uuid();
+  v_branch uuid := 'b0000000-0000-0000-0000-0000000000ff';
   v_order  uuid;
   v_num    text;
   v_ref    text;
@@ -71,7 +81,7 @@ declare
   v_n int;
 begin
   insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
     returning id into v_order;
   perform public.tap_begin_payment_attempt(v_order, 'test', 30);
 
@@ -95,7 +105,7 @@ declare
   v_ref1 text; v_ref2 text; v_reused boolean; v_n int;
 begin
   insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
     returning id into v_order;
 
   select reference_order into v_ref1 from public.tap_begin_payment_attempt(v_order, 'test', 30);
@@ -122,7 +132,7 @@ declare
   v_ref text;
 begin
   insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
     returning id into v_order;
 
   -- Simulate a row written by the old definition.
@@ -188,7 +198,7 @@ declare
   v_reused boolean;
 begin
   insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
     returning id into v_order;
 
   select reference_order, reference_transaction into v_ord1, v_txn1
@@ -232,7 +242,7 @@ declare
   v_ord text; v_txn text;
 begin
   insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-    values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+    values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
     returning id into v_order;
   select reference_order, reference_transaction into v_ord, v_txn
     from public.tap_begin_payment_attempt(v_order, 'test', 30);
@@ -264,7 +274,7 @@ declare
 begin
   for i in 1..200 loop
     insert into public.orders (branch_id, order_type, subtotal, total, payment_method, payment_status)
-      values (gen_random_uuid(), 'pickup', 50, 50, 'online', 'pending')
+      values ('b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'pending')
       returning id into v_order;
     select reference_order into v_ord from public.tap_begin_payment_attempt(v_order, 'test', 30);
 
