@@ -191,8 +191,10 @@ begin
   -- at; replication_role=replica turns the FK triggers off for the insert
   -- itself, exactly as the other fixtures in this suite do.
   set local session_replication_role = replica;
-  insert into public.orders (id, customer_id, branch_id, order_type, subtotal, total)
-    values (v_order, v_p, 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 12, 12);
+  -- order_number is NOT NULL and its trigger is disabled by
+  -- replication_role=replica, so supply one explicitly.
+  insert into public.orders (id, customer_id, order_number, branch_id, order_type, subtotal, total)
+    values (v_order, v_p, 'SM-2026-000111', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 12, 12);
   set local session_replication_role = origin;
 
   insert into public.loyalty_transactions (profile_id, order_id, type, points, balance_after, reason)

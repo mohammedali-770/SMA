@@ -154,6 +154,23 @@ grant execute on function auth.uid(), auth.jwt(), auth.role(), auth.email()
 grant select, insert, update, delete on auth.users to authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
+-- 4b. The supabase_realtime publication.
+--
+--    Supabase ships this publication (initially empty) and migrations add
+--    tables to it. 20260707121100_realtime_orders guards on its existence and
+--    is a documented no-op without it — but order_read_contracts CASE 11
+--    verifies the publication's contents, and treats its absence as a failed
+--    precondition rather than a skip. Creating it empty lets the chain populate
+--    it exactly as it does on Supabase.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- 5. cron — a RECORDING stub, not a scheduler.
 --
 --    Column names match pg_cron's real catalog (jobid / jobname / schedule /
