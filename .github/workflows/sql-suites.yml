@@ -1,0 +1,95 @@
+name: SQL suites
+
+# The 26 suites under supabase/tests/ ran in NO CI job. They were written,
+# reviewed and merged without ever executing — including the two guarding the
+# still-unapplied address-deletion migrations. This makes "run the harness" a
+# build gate instead of something a human has to remember.
+#
+# Read-only with respect to everything that matters: the database is a
+# throwaway container, `net.http_post` is a recording stub so no HTTP leaves
+# the runner, and `cron.schedule` records a row rather than scheduling
+# anything. No production credential is used and none is needed.
+
+on:
+  push:
+    branches: [claude/project-build-ie4b56]
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/tests/**'
+      - '.github/sql-ci/**'
+      - '.github/workflows/sql-suites.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sql-suites-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suites:
+    name: Migration chain + SQL suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        # PostGIS, not plain postgres: the delivery-zone migration creates real
+        # `extensions.geometry(MultiPolygon, 4326)` columns and calls ST_Covers
+        # / ST_MakeValid / ST_GeomFromGeoJSON. Those cannot be stubbed. pgcrypto
+        # ships with this image too; pg_cron and pg_net do not, and are shimmed
+        # (see .github/sql-ci/bootstrap.sql).
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Install psql client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql --version
+
+      - name: Install pg_cron / pg_net CI stubs into the server
+        # `create extension if not exists pg_cron` skips only when the extension
+        # is already CREATED — not when it is unavailable — so the control files
+        # have to exist server-side or the chain dies on the first scheduler
+        # migration. The scripts are empty; bootstrap.sql provides the API.
+        run: |
+          CID=$(docker ps --filter "ancestor=postgis/postgis:16-3.4" --format '{{.ID}}' | head -1)
+          if [ -z "$CID" ]; then echo "could not find the postgres service container"; exit 1; fi
+          echo "service container: $CID"
+          SHARE=$(docker exec "$CID" pg_config --sharedir)
+          echo "extension dir: $SHARE/extension"
+          for f in .github/sql-ci/extensions/*; do
+            docker cp "$f" "$CID:$SHARE/extension/$(basename "$f")"
+            echo "  installed $(basename "$f")"
+          done
+
+      - name: Replay the chain and run every suite
+        run: |
+          chmod +x .github/sql-ci/run.sh
+          .github/sql-ci/run.sh

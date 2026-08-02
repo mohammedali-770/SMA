@@ -4,3 +4,10 @@
 # for Windows developers. GitHub Actions' setup-node is unaffected (Linux
 # runners always see LF), so this is purely a local-developer guard.
 .nvmrc text eol=lf
+
+# Same reasoning for shell scripts: CI executes .github/sql-ci/run.sh on a
+# Linux runner, and a CRLF checkout committed from Windows would fail at the
+# shebang with "bad interpreter: /usr/bin/env bash^M" — a confusing failure a
+# long way from its cause. Git's autocrlf already normalises on commit; this
+# makes it explicit rather than dependent on each contributor's config.
+*.sh text eol=lf

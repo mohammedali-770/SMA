@@ -1,0 +1,10 @@
+# CI stub for pg_net.
+#
+# The real extension is not available in the PostGIS image, and CI does not
+# need it to RUN — only to exist, so that the chain's
+# `create extension if not exists pg_net` succeeds. The API surface the
+# migrations actually call is created as ordinary objects by bootstrap.sql,
+# which runs first. This script is intentionally empty.
+comment = 'CI stub — API provided by .github/sql-ci/bootstrap.sql'
+default_version = '1.0'
+relocatable = true
