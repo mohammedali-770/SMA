@@ -15,6 +15,12 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on: orders.branch_id is a real FK.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 create or replace function pg_temp.has_sm_number(p text)
 returns boolean language sql immutable as $$
   select p is not null and p ~ 'SM-[0-9]{4}-[0-9]{4,}';
@@ -181,6 +187,14 @@ declare
   v_n int;
   v_sum int;
 begin
+  -- loyalty_transactions.order_id is a real FK. Create the order it points
+  -- at; replication_role=replica turns the FK triggers off for the insert
+  -- itself, exactly as the other fixtures in this suite do.
+  set local session_replication_role = replica;
+  insert into public.orders (id, customer_id, branch_id, order_type, subtotal, total)
+    values (v_order, v_p, 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 12, 12);
+  set local session_replication_role = origin;
+
   insert into public.loyalty_transactions (profile_id, order_id, type, points, balance_after, reason)
     values (v_p, v_order, 'earn', 12, 12, 'Earned on order SM-2026-000111');
 

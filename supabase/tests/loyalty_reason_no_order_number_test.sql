@@ -22,6 +22,12 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on: orders.branch_id is a real FK.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 select set_config('test.is_admin', 'true', true);
 select set_config('test.auth_uid', '', true);
 
@@ -53,9 +59,14 @@ declare
   v_ord  uuid := gen_random_uuid();
   v_reason text;
 begin
+  -- The loyalty inserts below run with FK triggers ON, so the customer needs
+  -- a real profile. profiles.id references auth.users(id); handle_new_user()
+  -- creates the profile from this insert.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
+
   set local session_replication_role = replica;
   insert into public.orders (id, customer_id, order_number, branch_id, order_type, subtotal, total)
-    values (v_ord, v_cust, 'SM-2026-000777', gen_random_uuid(), 'pickup', 50, 50);
+    values (v_ord, v_cust, 'SM-2026-000777', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50);
   set local session_replication_role = origin;
 
   -- Simulate exactly what place_order writes today.

@@ -81,6 +81,9 @@ begin
   on conflict (id) do update set full_name = excluded.full_name,
     phone_number = excluded.phone_number, role = excluded.role;
 
+  -- orders.branch_id is a real FK; v_branch had no row behind it.
+  insert into public.branches (id, name_en, name_ar)
+  values (v_branch, 'Contract Branch', 'فرع العقود') on conflict (id) do nothing;
   insert into public.orders (id, customer_id, branch_id, order_type, subtotal, total,
                              payment_method, payment_status,
                              pos_create_attempt_token, notes, customer_phone)
