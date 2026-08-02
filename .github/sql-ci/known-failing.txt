@@ -49,12 +49,11 @@ discounts_campaigns_test.sql
 
 # --- Genuine assertion failures, worth investigating on their own merits -----
 
-# CASE 1 FAILED: tab/newline-only accepted.
-# The suite asserts a description of only tabs/newlines is REJECTED, and the
-# check constraint accepts it. Either the constraint's whitespace handling is
-# weaker than intended or the assertion is wrong — this one may be a real
-# product bug, and it is the most interesting entry in this file.
-require_address_description_test.sql
+# require_address_description_test.sql was here. It was right: btrim's default
+# character set is a space and ONLY a space, so a landmark of tabs and
+# newlines measured 5 characters and qualified. Fixed by migration
+# 20260802120000_address_description_trim_all_whitespace.sql, so the suite is
+# no longer quarantined.
 
 # expected exactly 5 cron jobs total, found 6.
 # The chain schedules six jobs on a clean database. Either a job the suite does
