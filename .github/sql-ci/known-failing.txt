@@ -25,7 +25,22 @@
 # The profile-fixture suites were here. Each now creates the auth.users row
 # before the profile (profiles.id references auth.users(id)) and upserts the
 # profile, because handle_new_user() has already created it from that insert.
-# Fixed, not quarantined.
+# discounts_campaigns and order_confirmation_state_machine now PASS.
+#
+# These three still fail, one FK layer deeper. Fixing the profile fixture only
+# revealed the next missing row — the suites stop at their first error, so each
+# gap hides the one behind it. All three are the same class of defect (a
+# fixture that never created a row the schema requires) and none needs a
+# product decision; they just need another pass of the same archaeology.
+#
+#   loyalty_transactions.profile_id -> profiles: transactions inserted near the
+#   top of the file for a profile the file never creates.
+loyalty_reason_no_order_number_test.sql
+#   loyalty_transactions.order_id -> orders: a transaction linked to an order
+#   that does not exist.
+loyalty_reason_history_safe_test.sql
+#   orders.branch_id -> branches: the fixture's v_branch is never inserted.
+order_read_contracts_test.sql
 
 # --- Genuine assertion failures, worth investigating on their own merits -----
 
