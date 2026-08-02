@@ -150,7 +150,9 @@ export const AdminDashboard: React.FC = () => {
         />
       )}
 
-      <div className="flex flex-1 flex-col md:flex-row">
+      {/* `lg` is where the sidebar becomes a column; below it the nav is a
+          compact drawer, so the shell stacks. */}
+      <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
         <AdminSidebar
           active={activeTab}
           onSelect={setActiveTab}
@@ -159,8 +161,11 @@ export const AdminDashboard: React.FC = () => {
           liveOrderCount={activeOrdersCount}
         />
 
-        {/* Dynamic Tab Viewport container */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Dynamic Tab Viewport container.
+            `min-w-0` is what stops a wide child (a table, a chart) from forcing
+            the whole console to scroll sideways: a flex item defaults to
+            min-width:auto and refuses to shrink below its content. */}
+        <div className="min-w-0 flex-1 overflow-y-auto p-4">
           
           {/* TAB 1: SALES OVERVIEW & KPIs */}
           {activeTab === 'stats' && <StatsPanel />}
