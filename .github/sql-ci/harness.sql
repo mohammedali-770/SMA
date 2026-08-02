@@ -50,7 +50,14 @@ $$;
 -- is_staff() are left exactly as the chain defines them. Both derive from this
 -- function, so overriding it keeps their real logic under test.
 --
--- The override applies only when `test.auth_uid` is set. That matters: a suite
+-- The override applies when ANY of the three test GUCs is set — not just
+-- `test.auth_uid`. Several suites (lazywait_reap, lazywait_requeue, the
+-- operations ones) set only `test.is_admin`/`test.is_staff` and never bind a
+-- uid at all; keying solely on the uid left those callers falling through to
+-- the profiles lookup, where they were nobody, and every admin-gated RPC
+-- refused them.
+--
+-- The override is exclusive rather than a fallback. That matters: a suite
 -- that sets `test.is_admin = 'false'` means "treat this caller as a plain
 -- customer", and falling through to the profiles lookup could hand back
 -- 'admin' anyway if that row happened to be an admin — silently inverting what
@@ -62,7 +69,9 @@ returns public.user_role
 language sql stable security definer set search_path = public
 as $$
   select case
-    when nullif(current_setting('test.auth_uid', true), '') is not null then
+    when nullif(current_setting('test.auth_uid', true), '') is not null
+      or nullif(current_setting('test.is_admin', true), '') is not null
+      or nullif(current_setting('test.is_staff', true), '') is not null then
       case
         when coalesce(nullif(current_setting('test.is_admin', true), '')::boolean, false)
           then 'admin'::public.user_role

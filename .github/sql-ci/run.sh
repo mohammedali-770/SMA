@@ -112,6 +112,16 @@ psql_on "$TEMPLATE_DB" -f "$HERE/harness.sql"
 ok "harness.sql"
 
 # ---------------------------------------------------------------------------
+step "Seed"
+# The repository's OWN seed, the one `supabase db reset` runs. Suites reference
+# its fixed branch ids (b0000000-…-0001) directly, so without it a third of
+# them fail on orders_branch_id_fkey for a reason that has nothing to do with
+# what they are testing. It seeds catalog and coupons only — deliberately no
+# auth users, which is why suites that need a customer create their own.
+psql_on "$TEMPLATE_DB" -f "$ROOT/supabase/seed.sql"
+ok "supabase/seed.sql"
+
+# ---------------------------------------------------------------------------
 step "SQL suites"
 suite_total=0
 suite_failed=0

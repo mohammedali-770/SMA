@@ -315,6 +315,12 @@ create table if not exists vault.secrets (
   created_at  timestamptz not null default now()
 );
 
+-- `decrypted_secret` is a CAST, not a bare column reference, and that is
+-- load-bearing: a view whose target list is only simple column references is
+-- auto-updatable, so `update vault.decrypted_secrets set decrypted_secret=…`
+-- would silently succeed. Real Vault refuses it, and
+-- lazywait_sync_scheduler_test asserts the refusal. An expression makes that
+-- column non-updatable, so the UPDATE errors as it should.
 create or replace view vault.decrypted_secrets as
-  select id, name, secret, secret as decrypted_secret, description, created_at
+  select id, name, secret, (secret)::text as decrypted_secret, description, created_at
     from vault.secrets;
