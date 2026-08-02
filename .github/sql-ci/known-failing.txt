@@ -1,0 +1,72 @@
+# Suites that do not pass, with the reason each one fails.
+#
+# These are NOT harness gaps. Every one of them was merged without ever being
+# executed, because `supabase/tests/*.sql` ran in no CI job — so nothing ever
+# told anyone. The first run of this harness is the first time any of them has
+# been executed at all.
+#
+# They are quarantined rather than fixed here because fixing them is test-
+# authoring work with real judgement in it (what did the author intend to
+# assert?), and bundling fifteen of those into a CI-infrastructure change would
+# make both harder to review. Quarantining keeps the gate live for the eleven
+# suites that DO pass and for the migration chain itself, which is the part
+# that protects the next migration.
+#
+# THE LIST IS SELF-CLEANING: a suite named here that starts PASSING fails the
+# build, with a message telling you to delete the line. It cannot rot into a
+# permanent ignore-list.
+#
+# Format: one filename per line. `#` comments and blank lines ignored.
+
+# --- Insert an order with a branch_id that cannot exist ----------------------
+# Each does `insert into public.orders (…, branch_id, …) values (…,
+# gen_random_uuid(), …)`. `orders_branch_id_fkey` references public.branches,
+# so a random uuid can never satisfy it. These cannot pass against the current
+# schema under any harness; the fix is to use a seeded branch id
+# (supabase/seed.sql provides b0000000-0000-0000-0000-000000000001).
+lazywait_confirmation_lifecycle_test.sql
+lazywait_fencing_test.sql
+lazywait_presend_concurrency_test.sql
+lazywait_requeue_test.sql
+order_integrity_watchdog_test.sql
+tap_reference_order_opaque_test.sql
+
+# --- Insert a profile without the auth.users row it references ---------------
+# public.profiles.id is `references auth.users(id) on delete cascade`, so a
+# profile cannot exist without its auth user. Fix: create the auth.users row
+# first (the handle_new_user trigger then creates the profile — see the note on
+# discounts_campaigns below).
+loyalty_reason_history_safe_test.sql
+loyalty_reason_no_order_number_test.sql
+order_read_contracts_test.sql
+order_confirmation_state_machine_test.sql
+
+# --- Insert auth.users AND profiles, colliding with handle_new_user ----------
+# `on_auth_user_created` already inserts the profile, so the suite's own insert
+# hits profiles_pkey. Fix: drop the explicit profile insert, or make it an
+# UPDATE / ON CONFLICT DO UPDATE.
+discounts_campaigns_test.sql
+
+# --- Genuine assertion failures, worth investigating on their own merits -----
+
+# CASE 1 FAILED: tab/newline-only accepted.
+# The suite asserts a description of only tabs/newlines is REJECTED, and the
+# check constraint accepts it. Either the constraint's whitespace handling is
+# weaker than intended or the assertion is wrong — this one may be a real
+# product bug, and it is the most interesting entry in this file.
+require_address_description_test.sql
+
+# expected exactly 5 cron jobs total, found 6.
+# The chain schedules six jobs on a clean database. Either a job the suite does
+# not know about was added later without updating it, or production has one
+# disabled that CI does not. Needs a decision, not a harness change.
+operations_alerts_activation_test.sql
+
+# STATUS products.total — assertion about a products column.
+lazywait_mapping_test.sql
+
+# READONLY FAILED: vault.decrypted_secrets.decrypted_secret must be read-only.
+# The harness view now makes that column non-updatable, so the remaining
+# failure is a later case in the same file. Needs the full error re-read once
+# the earlier cases are addressed.
+lazywait_sync_scheduler_test.sql

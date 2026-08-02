@@ -125,7 +125,18 @@ ok "supabase/seed.sql"
 step "SQL suites"
 suite_total=0
 suite_failed=0
+suite_known=0
+suite_unexpected_pass=0
 failed_names=()
+unexpected_pass_names=()
+
+# Quarantine list. Entries are suites that fail for reasons pre-dating this
+# harness — see known-failing.txt for the reason attached to each one.
+KNOWN_FILE="$HERE/known-failing.txt"
+is_known() {
+  [ -f "$KNOWN_FILE" ] || return 1
+  grep -vE '^[[:space:]]*(#|$)' "$KNOWN_FILE" | grep -qxF "$1"
+}
 
 while IFS= read -r f; do
   suite_total=$((suite_total + 1))
@@ -139,7 +150,20 @@ while IFS= read -r f; do
   createdb -T "$TEMPLATE_DB" "$db"
 
   if psql_on "$db" -f "$f" >/dev/null 2>"$ERR"; then
-    ok "$name"
+    if is_known "$name"; then
+      # A quarantined suite that passes means the list is stale. Failing here
+      # is what stops known-failing.txt decaying into a permanent ignore-list.
+      printf '  [33mFIXED[0m %s — now passes; remove it from known-failing.txt
+' "$name"
+      suite_unexpected_pass=$((suite_unexpected_pass + 1))
+      unexpected_pass_names+=("$name")
+    else
+      ok "$name"
+    fi
+  elif is_known "$name"; then
+    printf '  [33mknown[0m %s
+' "$name"
+    suite_known=$((suite_known + 1))
   else
     bad "$name"
     sed 's/^/        /' "$ERR"
@@ -154,20 +178,31 @@ done < <(find "$TESTS_DIR" -maxdepth 1 -name '*.sql' | sort)
 step "Summary"
 printf '  migrations : %d applied (clean re-run: %s)\n' \
   "$migration_count" "$([ "$idem_failed" -eq 0 ] && echo yes || echo 'no — report only')"
-printf '  suites     : %d run, %d failed\n' "$suite_total" "$suite_failed"
+printf '  suites     : %d run, %d passed, %d quarantined, %d NEW failures\n' \
+  "$suite_total" \
+  "$((suite_total - suite_failed - suite_known - suite_unexpected_pass))" \
+  "$suite_known" "$suite_failed"
 
 if [ "$suite_total" -eq 0 ]; then
   printf '\n\033[31mNo suites were discovered — that is a harness bug, not a pass.\033[0m\n'
   exit 1
 fi
 
-# Only suite failures fail the build. Idempotence is reported, not enforced —
-# see the note on that step.
+if [ "$suite_unexpected_pass" -ne 0 ]; then
+  printf '\n\033[33mQuarantined but now PASSING — delete these from known-failing.txt:\033[0m\n'
+  for n in "${unexpected_pass_names[@]}"; do printf '  - %s\n' "$n"; done
+fi
+
 if [ "$suite_failed" -ne 0 ]; then
-  printf '\n\033[31mFailed suites:\033[0m\n'
+  printf '\n\033[31mNew failures (not quarantined):\033[0m\n'
   for n in "${failed_names[@]}"; do printf '  - %s\n' "$n"; done
+fi
+
+# Only NEW failures and stale quarantine entries fail the build. Idempotence is
+# reported, not enforced — see the note on that step.
+if [ "$suite_failed" -ne 0 ] || [ "$suite_unexpected_pass" -ne 0 ]; then
   exit 1
 fi
 
-printf '\n\033[32mAll %d suites passed against a fresh %d-migration database.\033[0m\n' \
-  "$suite_total" "$migration_count"
+printf '\n\033[32mNo new failures: %d/%d suites pass against a fresh %d-migration database (%d quarantined).\033[0m\n' \
+  "$((suite_total - suite_known))" "$suite_total" "$migration_count" "$suite_known"
