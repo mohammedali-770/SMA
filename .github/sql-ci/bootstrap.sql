@@ -255,7 +255,49 @@ end $$;
 grant usage on schema net to postgres, service_role;
 
 -- ---------------------------------------------------------------------------
--- 7. vault — referenced when the chain reads integration secrets.
+-- 7. storage — the banner-images bucket and the objects table its RLS
+--    policies attach to.
+--
+--    `20260712130000_homepage_banners.sql` inserts a bucket row (with an
+--    ON CONFLICT (id) DO UPDATE, so `id` must genuinely be the primary key)
+--    and creates four policies on storage.objects referencing `bucket_id`.
+--    Only what those statements touch is recreated here.
+-- ---------------------------------------------------------------------------
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  owner              uuid,
+  public             boolean not null default false,
+  avif_autodetection boolean not null default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[],
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
+);
+
+create table if not exists storage.objects (
+  id               uuid primary key default gen_random_uuid(),
+  bucket_id        text references storage.buckets (id),
+  name             text,
+  owner            uuid,
+  metadata         jsonb,
+  path_tokens      text[],
+  created_at       timestamptz not null default now(),
+  updated_at       timestamptz not null default now(),
+  last_accessed_at timestamptz not null default now()
+);
+
+-- The chain creates policies on this table; without RLS enabled they would be
+-- inert, and a suite asserting that a policy DENIES something would pass for
+-- the wrong reason.
+alter table storage.objects enable row level security;
+
+grant usage on schema storage to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- 8. vault — referenced when the chain reads integration secrets.
 -- ---------------------------------------------------------------------------
 create table if not exists vault.secrets (
   id          uuid primary key default gen_random_uuid(),
