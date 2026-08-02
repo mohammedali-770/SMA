@@ -59,6 +59,14 @@ create schema if not exists net;
 grant usage on schema extensions to anon, authenticated, service_role;
 grant usage on schema auth        to anon, authenticated, service_role;
 
+-- pgcrypto must live in `extensions`, as it does on Supabase: the account-
+-- deletion scheduler calls `extensions.digest(...)` fully qualified. Creating
+-- it here rather than letting the chain's own
+-- `create extension if not exists pgcrypto;` place it in `public` — that form
+-- then becomes a no-op, because CREATE EXTENSION IF NOT EXISTS keys on the
+-- extension existing at all, not on which schema it landed in.
+create extension if not exists pgcrypto with schema extensions;
+
 -- ---------------------------------------------------------------------------
 -- 3. auth.users — only the columns the chain reads.
 --
