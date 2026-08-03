@@ -46,8 +46,37 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
+      # A production build without SENTRY_AUTH_TOKEN succeeds and ships — it just
+      # uploads no source maps, so every crash in that release arrives as
+      # unsymbolicated minified frames and is effectively undiagnosable. The
+      # Expo config plugin drops itself when the token is absent (app.config.js)
+      # and warns; a warning in a --no-wait cloud build is a warning nobody reads.
+      #
+      # Fail the PRODUCTION profile loudly instead. preview/development builds are
+      # deliberately unaffected: they set SENTRY_DISABLE_AUTO_UPLOAD=true in
+      # eas.json and are not expected to symbolicate.
+      #
+      # The secret is read via env, never interpolated into the script, so its
+      # value cannot reach the log.
+      - name: Preflight — a production build must be able to symbolicate
+        if: ${{ (inputs.profile || 'preview') == 'production' }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SENTRY_AUTH_TOKEN:-}" ]; then
+            echo "::error::SENTRY_AUTH_TOKEN is not set, so this production build would ship without source maps and every crash report would be unreadable. Add it under Settings -> Secrets and variables -> Actions (see issue #81 and docs/SENTRY_OBSERVABILITY.md), or run the preview profile instead."
+            exit 1
+          fi
+          echo "SENTRY_AUTH_TOKEN present — source maps will upload."
+
       - name: Install dependencies
         run: npm ci
 
+      # NOTE: a `mobile-build-*` tag push has no `inputs`, so it falls through to
+      # the `preview` profile — an INTERNAL APK, not a submittable production
+      # build. Tagging is therefore not a release. Use the Actions tab and pick
+      # `production` explicitly. Left as-is rather than silently changing what a
+      # tag does, because that would alter release behaviour without approval.
       - name: Submit EAS build
         run: eas build --platform "${{ inputs.platform || 'android' }}" --profile "${{ inputs.profile || 'preview' }}" --non-interactive --no-wait
