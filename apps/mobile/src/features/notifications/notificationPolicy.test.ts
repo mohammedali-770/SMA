@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan, NOTIFICATION_FALLBACK_ROUTE,
-  notificationResponseKey, resolveNotificationRoute, shouldHandleResponse, toggleRequiresPermission,
+  notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute, shouldHandleResponse,
+  toggleRequiresPermission,
 } from './notificationPolicy';
 
 const OID = 'a1b2c3d4-0000-4000-8000-000000000001';
@@ -73,5 +74,36 @@ describe('device preference defaults + lifecycle', () => {
     expect(toggleRequiresPermission(off, { orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
     expect(toggleRequiresPermission({ orderUpdatesEnabled: true, promosEnabled: false }, { orderUpdatesEnabled: true, promosEnabled: true })).toBe(false);
     expect(toggleRequiresPermission({ orderUpdatesEnabled: true, promosEnabled: true }, off)).toBe(false);
+  });
+});
+
+/**
+ * Deliberate tripwire, not a behavioural assertion.
+ *
+ * The push stack is dormant by policy (CLAUDE.md §7): the `push`/`expo`
+ * integration row is disabled and no credentials exist, so nothing can deliver a
+ * notification. While that holds, the app must never ask for OS notification
+ * permission — an iOS denial is sticky (`canAskAgain: false`), so a prompt today
+ * permanently costs us the customer's opt-in for whenever push actually ships,
+ * and a declared-but-undeliverable capability is a store-review question we
+ * cannot answer.
+ *
+ * This test exists so that flipping the constant cannot be a silent one-liner.
+ * Whoever changes it has to come here and read the list below.
+ */
+describe('push dormancy (CLAUDE.md §7)', () => {
+  it('keeps the client push gate closed', () => {
+    // Enabling push is NOT just this constant. All of these move in one change:
+    //   1. PUSH_CLIENT_ENABLED -> true
+    //   2. the `push`/`expo` integration row enabled server-side, with real
+    //      credentials configured
+    //   3. the `expo-notifications` plugin restored in apps/mobile/app.json, so
+    //      the iOS push entitlement and the Android channel exist in the binary
+    //   4. explicit owner approval — CLAUDE.md §5 lists enabling push and
+    //      configuring push credentials as owner-approval-gated
+    // Steps 1 and 3 together are what stops the app declaring a capability it
+    // cannot honour; without step 2 the toggle would grant permission and then
+    // silently never deliver anything.
+    expect(PUSH_CLIENT_ENABLED).toBe(false);
   });
 });

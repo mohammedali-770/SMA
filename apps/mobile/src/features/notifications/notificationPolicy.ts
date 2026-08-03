@@ -12,6 +12,28 @@
  *    order-content, or payment data (the server enforces this too).
  */
 
+/**
+ * Master client-side gate for the push stack.
+ *
+ * The push stack is deliberately dormant (CLAUDE.md §7): the `push`/`expo`
+ * integration row is disabled, no credentials are configured, and nothing
+ * server-side can deliver a notification. While that is true the app must not
+ * ask a customer for OS notification permission — a permission prompt for a
+ * capability that cannot deliver is a store-review question we would fail to
+ * answer, and a denial is sticky (`canAskAgain: false`), so it also poisons the
+ * prompt for whenever push does ship.
+ *
+ * This is a build-time constant rather than a read of the server flag on
+ * purpose: `integration_settings` is fully revoked from the API, so the client
+ * cannot see the real row, and a network-dependent gate would fail open on a
+ * timeout — exactly the wrong direction for this decision.
+ *
+ * To enable push, this flips to `true` in the SAME change that enables the
+ * server integration row and restores the `expo-notifications` plugin in
+ * apps/mobile/app.json — all three, or none.
+ */
+export const PUSH_CLIENT_ENABLED = false;
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Default landing when a payload is missing/unknown/invalid. */
