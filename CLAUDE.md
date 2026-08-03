@@ -95,7 +95,47 @@ through the owner-approved `apply_migration` workflow documented in
 - fails closed on malformed input, unknown branch state or an unverifiable
   project root.
 
-The hook is defense-in-depth for agent sessions only. The authoritative,
-non-bypassable control is a server-side GitHub Ruleset / branch protection,
-which the owner manages in GitHub settings. Do not weaken, bypass or remove
-the hook or these rules without explicit owner approval.
+### The server-side control does NOT exist yet — read this
+
+This section previously stated that "the authoritative, non-bypassable control
+is a server-side GitHub Ruleset / branch protection, which the owner manages in
+GitHub settings." **That is not true today, and believing it is dangerous.**
+
+Verified 2026-08-03 against `mohammedali-770/SMA`:
+
+```
+GET /repos/mohammedali-770/SMA/rulesets                       -> HTTP 403
+GET /repos/.../branches/claude%2Fproject-build-ie4b56/protection -> HTTP 403
+    "Upgrade to GitHub Pro or make this repository public to enable this feature."
+```
+
+The repository is **private on a free plan**, where rulesets and branch
+protection are unavailable. Consequences, stated plainly:
+
+- **No status check can ever be marked "required."** CI can fail and the merge
+  button stays green.
+- **Nothing server-side prevents a direct push to a protected branch.** The
+  PreToolUse hook above binds *agent sessions in this repository only*. It does
+  not constrain a human with a terminal, a different clone, the GitHub web UI,
+  or any other tool.
+- The hook is therefore **the only enforcement that exists**, not
+  defense-in-depth behind a stronger control.
+
+Until this is resolved, the protections in this document are upheld by
+**convention and review**, not by the platform. That makes §1–§5 more important,
+not less.
+
+**To close the gap**, the owner picks one:
+
+1. Upgrade to GitHub Pro (or Team) and create a ruleset on
+   `claude/project-build-ie4b56` and `main` requiring a pull request and the
+   `Design system` + `Production gates` checks. Cheapest real fix.
+2. Make the repository public — rulesets become available free. Consider the
+   disclosure implications first; the tree carries no secrets, but it does carry
+   the production project ref and full schema.
+3. Accept manual review as the control, and **leave this section as written** so
+   nobody is misled about what is enforcing what.
+
+Do not weaken, bypass or remove the hook or these rules without explicit owner
+approval. If the server-side control is later enabled, update this section —
+an asserted-but-absent control is worse than a documented gap.
