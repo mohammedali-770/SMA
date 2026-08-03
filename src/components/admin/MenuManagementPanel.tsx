@@ -85,6 +85,9 @@ export const MenuManagementPanel: React.FC = () => {
   const [rawCsvText, setRawCsvText] = useState('');
   const [csvResult, setCsvResult] = useState<{ categories: Category[]; products: Product[]; errors: string[] } | null>(null);
   const [csvMsg, setCsvMsg] = useState('');
+  // The import writes one row per product and is not idempotent, so a second
+  // click while the first is in flight would duplicate the whole menu.
+  const [csvCommitting, setCsvCommitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Handles saving a category
@@ -186,18 +189,50 @@ export const MenuManagementPanel: React.FC = () => {
     }
   };
 
-  const handleCommitCSV = () => {
+  // The import is NOT transactional: products are inserted one row at a time, so
+  // a failure part-way through leaves the earlier rows live. This used to fire
+  // and forget, then unconditionally alert "Successfully loaded N products" and
+  // clear the parsed result — so a total failure and a half-written menu both
+  // looked like a clean success, and the parsed CSV needed to retry was gone.
+  // Await the real outcome, report what actually landed, and keep the parsed
+  // result on any non-clean path so the admin can inspect or retry.
+  const handleCommitCSV = async () => {
     if (isAccountant || !csvResult || csvResult.products.length === 0) return;
-    bulkUploadMenu(csvResult.categories, csvResult.products);
+    if (csvCommitting) return; // guard the double-click; the write is not idempotent
+    setCsvCommitting(true);
+    try {
+      const result = await bulkUploadMenu(csvResult.categories, csvResult.products);
+      const skippedNote = result.skipped > 0
+        ? (adminLang === 'en'
+          ? ` ${result.skipped} product(s) were skipped because their category could not be matched.`
+          : ` تم تخطي ${result.skipped} منتج لعدم إمكانية مطابقة تصنيفها.`)
+        : '';
 
-    alert(adminLang === 'en'
-      ? `Successfully loaded ${csvResult.products.length} products to the active menu database!`
-      : `تم إدراج ${csvResult.products.length} وجبات بنجاح في منيو المطعم!`);
+      if (!result.success) {
+        // count > 0 here means the menu is now partially imported. Say so plainly:
+        // the admin has to reconcile it, and re-running would duplicate those rows.
+        alert(adminLang === 'en'
+          ? `Import failed after writing ${result.count} of ${csvResult.products.length} products. `
+            + `The menu is now partially imported — review the products list before retrying, `
+            + `because re-running will insert the first ${result.count} again.${skippedNote}`
+          : `فشل الاستيراد بعد إدراج ${result.count} من ${csvResult.products.length} منتج. `
+            + `المنيو الآن مستورد جزئياً — راجع قائمة المنتجات قبل إعادة المحاولة، `
+            + `لأن إعادة التشغيل ستدرج أول ${result.count} مرة أخرى.${skippedNote}`);
+        setCsvMsg(adminLang === 'en' ? 'Import failed. See the message above.' : 'فشل الاستيراد. انظر الرسالة أعلاه.');
+        return; // keep rawCsvText and csvResult so the admin can inspect or retry
+      }
 
-    setRawCsvText('');
-    setCsvResult(null);
-    setCsvMsg('');
-    setMenuSubTab('products');
+      alert(adminLang === 'en'
+        ? `Successfully loaded ${result.count} products to the active menu database!${skippedNote}`
+        : `تم إدراج ${result.count} وجبات بنجاح في منيو المطعم!${skippedNote}`);
+
+      setRawCsvText('');
+      setCsvResult(null);
+      setCsvMsg('');
+      setMenuSubTab('products');
+    } finally {
+      setCsvCommitting(false);
+    }
   };
 
   // Drag and drop CSV file parsing simulation
@@ -473,9 +508,11 @@ export const MenuManagementPanel: React.FC = () => {
                 </div>
 
                 <Button
-                  label={t.commit_btn}
+                  label={csvCommitting
+                    ? (adminLang === 'en' ? 'Importing…' : '...جاري الاستيراد')
+                    : t.commit_btn}
                   onClick={handleCommitCSV}
-                  disabled={isAccountant || csvResult.products.length === 0}
+                  disabled={isAccountant || csvResult.products.length === 0 || csvCommitting}
                   className="w-full"
                 />
               </div>

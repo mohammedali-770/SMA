@@ -164,9 +164,16 @@ export const SettingsPanel: React.FC = () => {
                   {/* SUB-TAB 1: BRAND & VAT */}
                   {settingsSubTab === 'brand' && (
                     <div className="space-y-4">
-                      <div className="border-b border-con-line pb-2 flex justify-between items-center">
+                      {/*
+                        A "ZATCA Active" status pill used to sit here. Nothing is
+                        active: there is no ZATCA/Fatoora integration, no invoice
+                        sequence and no seller VAT registration number anywhere in
+                        the system. A green-lit status badge for an integration
+                        that does not exist is worse than no badge, so it is gone
+                        rather than reworded.
+                      */}
+                      <div className="border-b border-con-line pb-2">
                         <span className="font-black text-con-text text-xs uppercase">{isRTL ? 'تخصيص الهوية وشروط الاستخدام والضريبة' : 'Brand Corporate Design & VAT Rules'}</span>
-                        <span className="text-[9px] bg-info-tint text-ember px-2 py-0.5 rounded font-black">{isRTL ? 'الوعاء الضريبي المعتمد' : 'ZATCA Active'}</span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

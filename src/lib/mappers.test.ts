@@ -95,6 +95,42 @@ describe('order mapper', () => {
     expect(o.items).toHaveLength(1);
     expect(o.items[0].price).toBe(34);
     expect(o.items[0].selectedModifiers[0].nameEn).toBe('Volcano');
+    expect(o.notes).toBeUndefined(); // null note -> absent, not the string "null"
+  });
+
+  /**
+   * `notes` is the customer's free-text instruction — allergies, door codes.
+   * The column and the staff RPC projection both always carried it, but the
+   * mapper dropped it, so nothing downstream could render it. These pin the
+   * mapping and the trim, because the receipt modal decides whether to show the
+   * highlighted note panel purely on this value being present.
+   */
+  function orderRowWithNotes(notes: unknown) {
+    return {
+      id: 'o1', order_number: 'SM-2026-000002', customer_id: 'u1',
+      customer_name: 'Ali', customer_phone: '+966', branch_id: 'b1',
+      branch_name_en: 'Olaya', branch_name_ar: 'العليا', status: 'received', order_type: 'pickup',
+      subtotal: 10, delivery_fee: 0, discount_amount: 0, loyalty_discount_amount: 0,
+      vat_amount: 1.3, total: 10, payment_status: 'paid', payment_method: 'cash',
+      coupon_code: null, notes, created_at: '2026-07-07T00:00:00Z',
+      sync_status: 'synced', address_snapshot: null, order_items: [],
+    } as unknown as DbOrderWithItems;
+  }
+
+  it('carries the customer note through so staff can read it', () => {
+    const o = mapOrder(orderRowWithNotes('SEVERE NUT ALLERGY'));
+    expect(o.notes).toBe('SEVERE NUT ALLERGY');
+  });
+
+  it('trims a whitespace-only note to undefined so no empty note panel renders', () => {
+    // An empty highlighted panel reads as a real instruction the reader failed to
+    // parse, which is worse than showing nothing.
+    expect(mapOrder(orderRowWithNotes('   \n  ')).notes).toBeUndefined();
+  });
+
+  it('trims surrounding whitespace but preserves the note body verbatim', () => {
+    const o = mapOrder(orderRowWithNotes('  no onions\nring twice  '));
+    expect(o.notes).toBe('no onions\nring twice');
   });
 });
 
