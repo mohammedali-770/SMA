@@ -18,6 +18,7 @@ import {
   ADMIN_NAV, ADMIN_NAV_GROUPS, groupIdForTab, initialExpandedGroups, resolveNavGroups,
   visibleNav, withActiveGroupExpanded,
   type AdminNavGroup, type AdminNavGroupId, type AdminTab, type GatedVisibility,
+  parseTabFromHash, tabToHash,
 } from './adminNav';
 
 const ALL_VISIBLE: GatedVisibility = { health: true, alerts: true, integrity: true };
@@ -170,5 +171,47 @@ describe('the active tab is never hidden', () => {
     // that calls this.
     const expanded = new Set<AdminNavGroupId>(['finance']);
     expect(withActiveGroupExpanded(expanded, 'reports')).toBe(expanded);
+  });
+});
+
+/**
+ * The console kept the active tab in component state only, so a refresh, a
+ * crash-recovery remount, or signing back in always landed on Stats — even if
+ * the operator had been watching Live Orders during a rush.
+ *
+ * The hash is user-editable and can be a stale bookmark, so parsing must never
+ * produce a tab that does not exist.
+ */
+describe('parseTabFromHash', () => {
+  it('reads a real tab, with or without the leading #', () => {
+    expect(parseTabFromHash('#orders')).toBe('orders');
+    expect(parseTabFromHash('orders')).toBe('orders');
+  });
+
+  it('is case- and whitespace-tolerant', () => {
+    expect(parseTabFromHash('#Orders')).toBe('orders');
+    expect(parseTabFromHash('#  REPORTS  ')).toBe('reports');
+  });
+
+  it('returns null for anything that is not a real tab', () => {
+    // The caller decides the fallback; a removed tab in an old bookmark must not
+    // render a blank console.
+    expect(parseTabFromHash('#nope')).toBeNull();
+    expect(parseTabFromHash('#')).toBeNull();
+    expect(parseTabFromHash('')).toBeNull();
+    expect(parseTabFromHash(undefined)).toBeNull();
+    expect(parseTabFromHash(null)).toBeNull();
+  });
+
+  it('cannot be tricked into returning a non-tab value', () => {
+    expect(parseTabFromHash('#__proto__')).toBeNull();
+    expect(parseTabFromHash('#constructor')).toBeNull();
+    expect(parseTabFromHash('#toString')).toBeNull();
+  });
+
+  it('round-trips every tab in the nav', () => {
+    for (const item of ADMIN_NAV) {
+      expect(parseTabFromHash(tabToHash(item.tab))).toBe(item.tab);
+    }
   });
 });

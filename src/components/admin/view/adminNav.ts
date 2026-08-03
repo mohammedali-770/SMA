@@ -196,3 +196,37 @@ export function initialExpandedGroups(
 ): ReadonlySet<AdminNavGroupId> {
   return withActiveGroupExpanded(new Set<AdminNavGroupId>(), activeTab, groups);
 }
+
+// ---------------------------------------------------------------------------
+// Tab <-> URL hash
+//
+// The console kept the active tab in component state only, so a refresh, a
+// crash-recovery remount, or signing back in always landed on Stats — even if
+// the operator had been watching Live Orders during a rush. It also meant a tab
+// could not be linked to or bookmarked, and the browser Back button walked out
+// of the console entirely instead of to the previous tab.
+//
+// The hash is used rather than a path so this never interacts with the SPA
+// rewrites in vercel.json (which also route `/app`), and needs no router.
+// ---------------------------------------------------------------------------
+
+/** Every tab that exists, derived from the nav so the two cannot drift. */
+const KNOWN_TABS: ReadonlySet<string> = new Set(ADMIN_NAV.map((i) => i.tab));
+
+/**
+ * The tab named by a URL hash, or null when it names nothing real.
+ *
+ * Returns null — rather than a default — so the caller decides the fallback.
+ * Anything unrecognised is null: a hash is user-editable, and a stale bookmark
+ * pointing at a removed tab must not render a blank console.
+ */
+export function parseTabFromHash(hash: string | undefined | null): AdminTab | null {
+  if (typeof hash !== 'string') return null;
+  const raw = hash.replace(/^#/, '').trim().toLowerCase();
+  return KNOWN_TABS.has(raw) ? (raw as AdminTab) : null;
+}
+
+/** The hash for a tab, including the leading '#'. */
+export function tabToHash(tab: AdminTab): string {
+  return `#${tab}`;
+}
