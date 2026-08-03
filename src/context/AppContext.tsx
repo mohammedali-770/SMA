@@ -793,14 +793,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // ---- Order status (admin only; RLS enforces) -----------------------------
+  /**
+   * Advance one order's status.
+   *
+   * This used to await an UNBOUNDED `refreshOrders()` afterwards — re-downloading
+   * every order ever placed, with its items and modifiers, on every single status
+   * click. During a lunch rush that is the same full-table read repeated once per
+   * ticket per staff member, and it is the first thing in the console that breaks
+   * as order volume grows. It also meant the status pill did not move until that
+   * whole round-trip finished, which reads as an unresponsive button and invites
+   * a second click.
+   *
+   * Now: update the row locally first so the UI responds immediately, then
+   * reconcile with the BOUNDED recent-orders poll, which merges the authoritative
+   * server row by id. If the order is older than that window, the optimistic
+   * value stands — the server already accepted the change, and
+   * `admin_set_order_status` stores exactly the status it was given.
+   *
+   * On failure the optimistic change is rolled back to the status the row
+   * actually had, so a rejected transition cannot leave the console displaying a
+   * state the database never reached.
+   */
   const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     const target = orders.find(o => o.id === orderId);
     if (!target || !canTransitionOrder(target.status, status)) return;
+    const previousStatus = target.status;
+
+    setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status } : o)));
+
     void (async () => {
       try {
         await ordersApi.setStatus(orderId, status);
-        await refreshOrders();
+        await pollRecentOrders();
       } catch (e) {
+        setOrders(prev => prev.map(o => (o.id === orderId ? { ...o, status: previousStatus } : o)));
         setWriteError(e instanceof Error ? e.message : String(e));
       }
     })();
