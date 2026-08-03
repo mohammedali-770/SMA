@@ -223,6 +223,7 @@ Documentation debt:
 | `docs/ROLLBACK.md` | Getting back to a known-good state, per surface |
 | `docs/BACKUP_RECOVERY.md` | Backup/PITR state (**UNVERIFIED**) and the restore drill |
 | `docs/DEPENDENCY_ADVISORIES.md` | The audit gate and its standing exceptions |
+| `docs/OWNER_ACTIONS.md` | **Everything blocked on the owner**, ordered by risk |
 | `SECURITY.md` | How to report a vulnerability to us |
 | `README.md` / `README_MOBILE.md` | General app documentation |
 
