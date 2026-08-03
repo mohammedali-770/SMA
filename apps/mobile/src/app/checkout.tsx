@@ -1,7 +1,12 @@
 import React from 'react';
 
+import { AuthGate } from '../components/AuthGate';
 import { CheckoutScreen } from '../features/checkout/CheckoutScreen';
 
 export default function CheckoutRoute() {
-  return <CheckoutScreen />;
+  return (
+    <AuthGate>
+      <CheckoutScreen />
+    </AuthGate>
+  );
 }
