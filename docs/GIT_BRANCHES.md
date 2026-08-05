@@ -37,8 +37,10 @@ Branch count is a symptom. The queue is the thing that blocks production.
 Deleting the 45 finished branches takes the repository from 60 to 15, of which
 13 are real work.
 
-**Branch deletion is a destructive GitHub operation and requires explicit owner
-approval under `CLAUDE.md` §5. Nothing in this document has been deleted.**
+**Status: the owner approved the deletion on 2026-08-05, but it could not be
+performed from the agent session — ref deletion is refused with `HTTP 403` by
+that session's policy while ordinary pushes succeed. Nothing has been deleted.
+§9 has the ready-to-run command and the restore SHAs.**
 
 ---
 
@@ -222,3 +224,126 @@ The script classifies every remote branch as merged / stale / active. With the
 GitHub CLI (`gh`) authenticated it reads the pull-request record and detects
 squash-merges (§3b); without `gh` it falls back to ancestry only and says so —
 in that mode it will under-report merged branches, never over-report them.
+
+---
+
+## 9. Appendix — deleting the 45 finished branches
+
+The owner approved deleting the 41 merged branches (§3) and the 4 dead
+orphans (§4) on 2026-08-05. **The deletion could not be performed from the
+agent session**: ref deletion is refused with `HTTP 403` by the session's
+egress/credential policy, while ordinary pushes from the same session
+succeed. This is a policy denial, not a repository problem, and it must not
+be routed around.
+
+Run this once from a normal local clone with push rights. It is a single
+command; every name is listed literally so nothing can be expanded wrongly:
+
+```bash
+git push origin --delete \
+  agent/delete-branches-dashboard \
+  agent/delete-branches-dashboard-copy \
+  chore/eas-status-7725c5de \
+  chore/eas-status-map-preview-build \
+  chore/standardize-node-22 \
+  claude/fix-sentry-gate-verification-commands \
+  claude/mobile-sentry-conditional-plugin \
+  claude/mobile-sentry-upload-graceful-degradation \
+  claude/pendev-redesign-prompt-r2cnl1 \
+  claude/record-sentry-gate-verification \
+  claude/spicy-meal-apk-build-nioaew \
+  docs/address-delete-migration-runbook \
+  docs/reconcile-ops-health-migration-ledger \
+  feat/admin-dashboard-navigation \
+  feat/button-field-migration \
+  feat/checkout-address-ux \
+  feat/design-system-ember-on-cream \
+  feat/discounts-campaigns \
+  feat/ds-admin-catalog \
+  feat/ds-admin-final \
+  feat/ds-admin-operations \
+  feat/ds-admin-primitives \
+  feat/ds-admin-shell-ops \
+  feat/ds-auth-surface \
+  feat/ds-checkout-payment-surface \
+  feat/ds-checkout-payment-ui \
+  feat/ds-home-menu-surface \
+  feat/ds-modal-focus \
+  feat/ds-order-type-legacy-removal \
+  feat/ds-orders-profile \
+  feat/ds-product-cart-surface \
+  feat/lazywait-api-v2 \
+  feat/mobile-profile-management \
+  feat/order-confirmation-state-machine \
+  feat/order-read-contracts \
+  feat/otp-autofill \
+  feat/price-component-migration \
+  feat/whatsapp-only-saudi-login \
+  fix/checkout-money-display \
+  fix/ds-muted-text-contrast \
+  fix/eas-status-poller-project-dir \
+  fix/hook-node-json-parser \
+  fix/lazywait-lifecycle-test-case7 \
+  fix/mobile-map-google-config \
+  fix/refund-worker-scheduler
+```
+
+Then prune the stale remote-tracking refs in every other clone:
+
+```bash
+git fetch origin --prune
+```
+
+### Restore points
+
+Branch tips as of 2026-08-05, before deletion. Any branch can be restored
+with `git push origin <sha>:refs/heads/<branch>`. GitHub also keeps deleted
+refs restorable from the pull request page for a period after deletion.
+
+| Tip SHA | Branch |
+| --- | --- |
+| `dcf87a551db1185897cf25da7174da34e4c6eeb3` | `agent/delete-branches-dashboard` |
+| `5e311aaa1fab743a8f263bd8ca1550d4c0fd5e0f` | `agent/delete-branches-dashboard-copy` |
+| `bf2b19e26b1f460e2a2214b241fcee563fe2c321` | `chore/eas-status-7725c5de` |
+| `7f0e4be920622fa9c4df0c1f8d9f1500faca84d9` | `chore/eas-status-map-preview-build` |
+| `bc8106f71904d91beccbea6d495385b95feaf5d3` | `chore/standardize-node-22` |
+| `110250970d0ed96283994cfc27127b0fc70679ae` | `claude/fix-sentry-gate-verification-commands` |
+| `2e82287a6c698f6458aaa545015c0685a3ab1428` | `claude/mobile-sentry-conditional-plugin` |
+| `98ba167649cb1e172b2b832654e4df9b4853592f` | `claude/mobile-sentry-upload-graceful-degradation` |
+| `6453806f53bd4555980e65e5618cfefdffba2da7` | `claude/pendev-redesign-prompt-r2cnl1` |
+| `4469f218c562c4a48ed10d386db2a3e906b1c5aa` | `claude/record-sentry-gate-verification` |
+| `3777a10223d6e23d41e707a7c7f1a9229b61f13c` | `claude/spicy-meal-apk-build-nioaew` |
+| `875b64fac564b067f77d5013157b5103949eb02c` | `docs/address-delete-migration-runbook` |
+| `6468734fca287de88e3e872b7a3ba7faaca5fe66` | `docs/reconcile-ops-health-migration-ledger` |
+| `9b0dcd8496d761d74f1d4b5cbf5d626340a07c76` | `feat/admin-dashboard-navigation` |
+| `e9c437ef0cef91d4e828a2ef5920292addbcba95` | `feat/button-field-migration` |
+| `aea28b0ba6899f8e5c0232d2f1555ebac8d22210` | `feat/checkout-address-ux` |
+| `2d01c0b49011bbb8059ae5cb9476608b44e51aa9` | `feat/design-system-ember-on-cream` |
+| `39f926b1751a8746a042eff937e0c8e7221afd5e` | `feat/discounts-campaigns` |
+| `c522e51d43a418c3c9aac6f9f408137b30f5cee2` | `feat/ds-admin-catalog` |
+| `f95951711c28f494d48129eadf3577d9ded0be5b` | `feat/ds-admin-final` |
+| `961b1ddd36de98e1581c0e7f249572709c5184bd` | `feat/ds-admin-operations` |
+| `2fb149883fd73811f75d23e7e7b007c02f9bec17` | `feat/ds-admin-primitives` |
+| `642743830a3b8fa53439d27e97e8469c79e7f1e6` | `feat/ds-admin-shell-ops` |
+| `4b0f59a6606e687d1afb36e326afb3cde2811695` | `feat/ds-auth-surface` |
+| `4371e1f828afc295c1752030716ae6cc124fff19` | `feat/ds-checkout-payment-surface` |
+| `b7469fed17f740e4d7e47670925ded6e682cf96a` | `feat/ds-checkout-payment-ui` |
+| `1e2b81bf3aa18377045f13050bd3be0d6d4efe15` | `feat/ds-home-menu-surface` |
+| `8c4ec1f810b4a2dd4cb0d9fce80f47faab80894d` | `feat/ds-modal-focus` |
+| `b62ffcfb6d286145e86f44cf0cb9d0539e1c0c03` | `feat/ds-order-type-legacy-removal` |
+| `192843fb35a975160314fb39c67a4cb3e20c8530` | `feat/ds-orders-profile` |
+| `b91dc06c29163dda127757ccef29fde9fae2e3dc` | `feat/ds-product-cart-surface` |
+| `e0ecf47553b5406289ff6546a3f49df54040f331` | `feat/lazywait-api-v2` |
+| `e80b71a35ab016fa943837c1a37cfa66da31df5d` | `feat/mobile-profile-management` |
+| `f9191827a17b9a1e6fc466733183bbefd30bcdc3` | `feat/order-confirmation-state-machine` |
+| `194628c99125fd30ce6ef62adc9e3b5a2ee0cf88` | `feat/order-read-contracts` |
+| `adf2d85fe64461e2bda4ce874aa4a0bcb67c3807` | `feat/otp-autofill` |
+| `21f180e5cbfd2334d6024193590f031178365eb2` | `feat/price-component-migration` |
+| `537213b6fca31bbaeb66e105a127c7c07fcb92bc` | `feat/whatsapp-only-saudi-login` |
+| `1ddd21750d7fc06b14e58c3541ef4cd773bbaafe` | `fix/checkout-money-display` |
+| `d1b762b2d8f45e13d1d113b0eacd0e938d74b790` | `fix/ds-muted-text-contrast` |
+| `61c32381941e75546e7042e9a6a0aa310c785d83` | `fix/eas-status-poller-project-dir` |
+| `ac2f3f8a5b9e11e8c286706e40778e35d2238e3a` | `fix/hook-node-json-parser` |
+| `a6511403f8e9019e12f920720aa08a62ef4c92b7` | `fix/lazywait-lifecycle-test-case7` |
+| `33838b3eb60a5c26dd4768df22c97656cb47c043` | `fix/mobile-map-google-config` |
+| `a497c432a0150d576759a5de385f06c41d60051a` | `fix/refund-worker-scheduler` |
