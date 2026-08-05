@@ -1,39 +1,105 @@
 name: Deploy Supabase Functions
 
-# Deploys the payment Edge Functions from this repo to the Supabase project.
-# (retry marker: 2)
-# REQUIRES a SUPABASE_ACCESS_TOKEN repo secret (Supabase dashboard → Account →
-# Access Tokens → generate; then GitHub repo → Settings → Secrets → Actions).
+# Deploys Supabase Edge Functions to the production project.
 #
-# Migrations are NOT run here (they are applied separately) — this only deploys
-# functions, so it can never touch the database schema.
+# ─────────────────────────────────────────────────────────────────────────────
+# THIS WORKFLOW DEPLOYS TO PRODUCTION. Read before changing it.
 #
-# Trigger from the Actions tab ("Run workflow"). Defaults to the payment set.
+# It used to carry a `push:` trigger with NO `branches:` filter:
+#
+#     push:
+#       paths:
+#         - '.github/workflows/deploy-functions.yml'
+#
+# Combined with a hardcoded production PROJECT_REF and a default function list
+# of exactly the four payment functions that CLAUDE.md §6 FREEZES, that meant
+# **any push, on any branch, that touched this file deployed frozen payment
+# functions to production** — no pull request, no review, no approval. On a push
+# event `inputs.functions` is empty, so the old script fell through to the
+# payment set. The trigger was not hypothetical: run #4 fired from an unrelated
+# feature branch on 2026-07-13. It never actually deployed only because
+# SUPABASE_ACCESS_TOKEN has never existed, so all four of its runs died at the
+# CLI with "Access token not provided".
+#
+# The trigger is gone. Deploys are deliberate only: Actions tab → Run workflow.
+# See docs/OWNER_ACTIONS.md §0/§1.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Deploying an Edge Function requires explicit owner approval every time
+# (CLAUDE.md §5), and the payment functions are frozen on top of that (§6).
+# Nothing here grants that approval; the guards below only make it hard to
+# deploy by accident.
+#
+# Migrations are NOT run here — this only deploys functions, so it can never
+# touch the database schema.
 
 on:
   workflow_dispatch:
     inputs:
       functions:
-        description: "Space-separated function names, or 'all' for the payment set"
+        description: "Space-separated function names. 'all' = the four FROZEN payment functions (CLAUDE.md §6)."
         type: string
-        default: "payment-initiate payment-verify payment-webhook payment-return"
-  # Also runs when this workflow file itself changes, so the payment functions can
-  # be (re)deployed by touching it — used because workflow_dispatch via the API
-  # requires the workflow to live on the default branch. Requires SUPABASE_ACCESS_TOKEN.
-  push:
-    paths:
-      - '.github/workflows/deploy-functions.yml'
+        required: true
+        # Deliberately EMPTY. It used to default to the payment set, so opening
+        # the dialog and pressing Run deployed frozen payment code. The run now
+        # fails unless the operator names what they are deploying.
+        default: ""
+      confirm:
+        description: "Type DEPLOY to confirm you have explicit owner approval for this deploy."
+        type: string
+        required: true
+        default: ""
+
+# Least privilege: only read the checkout. Declared explicitly rather than
+# inheriting the repository default, which may be read-write.
+permissions:
+  contents: read
 
 env:
-  SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
   PROJECT_REF: wxfmmnihidsdyemasstf
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Only ever deploy code that is on the production branch. A dispatch against
+    # a feature branch is skipped rather than shipping unreviewed code.
+    if: github.ref == 'refs/heads/claude/project-build-ie4b56'
+
+    # Requires a GitHub Environment named "production" with the owner as a
+    # required reviewer: the job then PAUSES for approval before it can deploy.
+    # Create it at Settings → Environments → New environment.
+    #
+    # NOTE: required reviewers on environments need GitHub Pro/Team. On the
+    # current free private plan this line is inert — it does NOT gate anything
+    # yet (see CLAUDE.md → Enforcement, and docs/OWNER_ACTIONS.md §3.1). It is
+    # declared now so the protection applies the moment the plan changes.
+    environment: production
+
     steps:
+      - name: Confirm this deploy was asked for
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          FNS: ${{ inputs.functions }}
+        run: |
+          set -euo pipefail
+          if [ "${CONFIRM}" != "DEPLOY" ]; then
+            echo "::error::Confirmation not given. Re-run and type DEPLOY in the confirm field. Deploying an Edge Function needs explicit owner approval (CLAUDE.md §5); the payment functions are additionally frozen (§6)."
+            exit 1
+          fi
+          if [ -z "${FNS// /}" ]; then
+            echo "::error::No functions named. Pass a space-separated list, or 'all' for the four frozen payment functions. There is deliberately no default."
+            exit 1
+          fi
+          echo "Confirmed. Requested: ${FNS}"
+
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pinned to a commit SHA, not a floating tag: a tag can be repointed,
+        # and this job deploys to production.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -41,16 +107,36 @@ jobs:
           version: latest
 
       - name: Deploy functions
+        env:
+          # Scoped to this step rather than the whole workflow, so no other step
+          # can read the token.
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          FNS_INPUT: ${{ inputs.functions }}
         run: |
           set -euo pipefail
-          FNS="${{ inputs.functions }}"
-          if [ "$FNS" = "all" ] || [ -z "$FNS" ]; then
-            FNS="payment-initiate payment-verify payment-webhook payment-return"
+
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set, so nothing can be deployed. Read docs/OWNER_ACTIONS.md §0 BEFORE adding it."
+            exit 1
           fi
+
+          FNS="$FNS_INPUT"
+          if [ "$FNS" = "all" ]; then
+            FNS="payment-initiate payment-verify payment-webhook payment-return"
+            echo "::warning::Deploying the FROZEN payment set (CLAUDE.md §6). This needs its own explicit owner approval."
+          fi
+
           for fn in $FNS; do
-            # payment-webhook (called by Tap) and payment-return (browser GET) have
-            # no Supabase JWT, so they must deploy with --no-verify-jwt. All others
-            # keep JWT verification ON.
+            # Reject anything that is not a real function directory in this
+            # checkout, so a typo cannot be sent to the Supabase CLI.
+            if [ ! -f "supabase/functions/${fn}/index.ts" ]; then
+              echo "::error::No such function in this checkout: supabase/functions/${fn}/index.ts"
+              exit 1
+            fi
+            # payment-webhook (called by Tap) and payment-return (browser GET)
+            # have no Supabase JWT, so they must deploy with --no-verify-jwt. All
+            # others keep JWT verification ON. supabase/config.toml is the source
+            # of truth for each function's setting.
             case "$fn" in
               payment-webhook|payment-return) FLAGS="--no-verify-jwt" ;;
               *) FLAGS="" ;;
