@@ -5,43 +5,50 @@
 > `docs/BRANCH_DELETION.md`, Branch Management in the admin console). Nothing
 > here relates to restaurant branches.
 
-> Audited **2026-08-05** against the default branch
-> `claude/project-build-ie4b56` @ `9032dfa` and the GitHub pull-request record.
-> Every one of the 60 remote branches that existed at audit time is classified
-> below exactly once — the classification was verified to be complete and
-> non-overlapping.
+> Originally audited **2026-08-05** at default-branch head `9032dfa`, when 60
+> remote branches existed and 13 pull requests were open. **Refreshed the same
+> day at head `6ca180f`, after the entire queue was merged.** §§1–5 record the
+> state as audited (they are the reasoning, and the merge order is worth
+> keeping); §2 and §9 carry the current numbers.
 
 ---
 
 ## 1. Why this document exists
 
 The repository had accumulated **60 remote branches**. Only **13** of them were
-live work; the other 47 were finished, superseded or dead. That ratio makes it
-impossible to see what is actually in flight, and it was hiding the real
-problem: a **13-deep queue of unmerged pull requests**, several of which are
+live work; the other 47 were finished, superseded or dead. That ratio made it
+impossible to see what was actually in flight, and it was hiding the real
+problem: a **13-deep queue of unmerged pull requests**, several of which were
 production-readiness gates.
 
-Branch count is a symptom. The queue is the thing that blocks production.
+Branch count was a symptom. The queue was the thing blocking production.
 
-## 2. Summary
+**That queue is now empty** — all 12 remaining PRs merged on 2026-08-05 in the
+order recorded in §5, and #111 was closed. The lesson stands: read §7 before the
+next batch of work, because nothing stops this recurring except deleting a head
+branch when its PR merges.
+
+## 2. Summary — current, at head `6ca180f`
 
 | Class | Count | Action |
 | --- | --- | --- |
-| Merged — work is in the default branch | 41 | Safe to delete |
-| Dead orphans — no PR, superseded or one-shot | 4 | Safe to delete |
-| Open pull requests — live work | 12 | Keep; work the queue (§5) |
+| Finished — merged, squash-merged, or dead orphans | 57 | **Safe to delete** (§9) |
 | `claude/pen-dev-guidelines-review-6dz4sr` — PR #111 closed, branch kept | 1 | Keep for re-extraction (§5c) |
+| `claude/organize-project-branches-m7uun2` — merged, kept only as the live working branch | 1 | Safe to delete; see §9 |
 | `main` — stale, unrelated history | 1 | Leave in place (§6) |
 | `claude/project-build-ie4b56` — default/production | 1 | Protected |
-| **Total** | **60** | |
+| **Total** | **61** | |
 
-Deleting the 45 finished branches takes the repository from 60 to 15: the 12
-open pull requests, the retained #111 branch, `main`, and the default branch.
+Open pull requests: **0**.
 
-**Status: the owner approved the deletion on 2026-08-05, but it could not be
-performed from the agent session — ref deletion is refused with `HTTP 403` by
-that session's policy while ordinary pushes succeed. Nothing has been deleted.
-§9 has the ready-to-run command and the restore SHAs.**
+Deleting the 57 takes the repository from 61 to 4.
+
+**Status: the owner approved the deletion, but it could not be performed from
+the agent session.** `git push --delete` is refused with `HTTP 403` by that
+session's policy while ordinary pushes from the same session succeed — re-probed
+after the queue was merged, still refused — and the GitHub MCP server exposes no
+ref-deletion tool. **Nothing has been deleted.** §9 has the ready-to-run command
+and every restore SHA.
 
 ---
 
@@ -121,13 +128,18 @@ No pull request was ever opened for these, and none carries work worth keeping.
 | `chore/eas-status-map-preview-build` | Same, for a build from 2026-07-24 |
 | `claude/pendev-redesign-prompt-r2cnl1` | A one-file redesign brief, superseded by PR #111 — which is itself superseded (§5c) |
 
-## 5. Open pull requests — the real queue (12 open, 1 closed)
+## 5. The pull-request queue — ALL MERGED 2026-08-05
 
-### 5a. Ready to merge, near-zero collision (10)
+> **Historical record.** All 12 open PRs were merged on 2026-08-05, in exactly
+> the order below, and #111 was closed. Every predicted collision resolved as
+> described: no conflicts, no rework. Kept because the ordering method — merge
+> the collision hub before its dependents — is the reusable part.
 
-These ten are small (1–10 files each) and touch almost entirely disjoint files.
-The suggested order resolves the only three overlaps, so each PR merges into a
-tree that already contains what it depends on.
+### 5a. Merged in this order, near-zero collision (10)
+
+These ten were small (1–10 files each) and touched almost entirely disjoint
+files. The order resolves the only two overlaps, so each PR merged into a tree
+that already contained what it depended on.
 
 | Order | PR | Branch | Files | What it does |
 | --- | --- | --- | --- | --- |
@@ -159,9 +171,12 @@ Merging in the order above means at most a trivial rebase, and only for #153,
 | #145 | `ci/sql-suite-postgres` | default branch |
 | #146 | `fix/address-description-whitespace` | **`ci/sql-suite-postgres`**, not the default branch |
 
-#146 targets #145's branch, so **#145 must merge first**. If #145 is closed
-without merging, #146 must be re-based onto the default branch or it will
-silently carry #145's changes into a merge.
+#146 targeted #145's branch, so **#145 had to merge first**. Because branch
+deletion is blocked, GitHub did not auto-retarget #146 when #145 merged — it
+still pointed at `ci/sql-suite-postgres`, and merging it as-is would have merged
+into that branch rather than into production. **#146 was explicitly retargeted
+to the default branch before merging.** Watch for this on any stacked pair while
+deletion stays blocked.
 
 ### 5c. Superseded — CLOSED 2026-08-05 (1)
 
@@ -243,17 +258,22 @@ because the cost of a false "safe to delete" is losing live work.
 
 ---
 
-## 9. Appendix — deleting the 45 finished branches
+## 9. Appendix — deleting the 57 finished branches
 
-The owner approved deleting the 41 merged branches (§3) and the 4 dead
-orphans (§4) on 2026-08-05. **The deletion could not be performed from the
-agent session**: ref deletion is refused with `HTTP 403` by the session's
-egress/credential policy, while ordinary pushes from the same session
-succeed. This is a policy denial, not a repository problem, and it must not
-be routed around.
+> **Refreshed 2026-08-05 against default-branch head `6ca180f`**, after the
+> whole pull-request queue was merged. This supersedes the earlier 45-branch
+> list: everything on it is still here, plus the branches merged since.
 
-Run this once from a normal local clone with push rights. It is a single
-command; every name is listed literally so nothing can be expanded wrongly:
+The owner approved this deletion. **It still could not be performed from the
+agent session**: `git push --delete` is refused with `HTTP 403` by that
+session's egress/credential policy, while ordinary pushes from the same session
+succeed. Re-probed on 2026-08-05 after the queue was merged — still refused. The
+GitHub MCP server exposes no ref-deletion tool either (it can create a branch,
+not delete one). This is a policy denial and is reported rather than routed
+around.
+
+Run this once from a normal local clone with push rights. Every name is listed
+literally so nothing can be expanded wrongly:
 
 ```bash
 git push origin --delete \
@@ -261,7 +281,11 @@ git push origin --delete \
   agent/delete-branches-dashboard-copy \
   chore/eas-status-7725c5de \
   chore/eas-status-map-preview-build \
+  chore/mobile-store-readiness \
+  chore/release-discipline \
   chore/standardize-node-22 \
+  ci/production-readiness-gates \
+  ci/sql-suite-postgres \
   claude/fix-sentry-gate-verification-commands \
   claude/mobile-sentry-conditional-plugin \
   claude/mobile-sentry-upload-graceful-degradation \
@@ -269,10 +293,14 @@ git push origin --delete \
   claude/record-sentry-gate-verification \
   claude/spicy-meal-apk-build-nioaew \
   docs/address-delete-migration-runbook \
+  docs/incident-readiness \
   docs/reconcile-ops-health-migration-ledger \
+  docs/staff-operations \
   feat/admin-dashboard-navigation \
+  feat/admin-ux-resilience \
   feat/button-field-migration \
   feat/checkout-address-ux \
+  feat/delivery-map-link \
   feat/design-system-ember-on-cream \
   feat/discounts-campaigns \
   feat/ds-admin-catalog \
@@ -295,26 +323,39 @@ git push origin --delete \
   feat/otp-autofill \
   feat/price-component-migration \
   feat/whatsapp-only-saudi-login \
+  fix/address-description-whitespace \
   fix/checkout-money-display \
+  fix/customer-app-guards-and-locale \
   fix/ds-muted-text-contrast \
   fix/eas-status-poller-project-dir \
   fix/hook-node-json-parser \
   fix/lazywait-lifecycle-test-case7 \
   fix/mobile-map-google-config \
-  fix/refund-worker-scheduler
+  fix/order-integrity-and-false-claims \
+  fix/refund-worker-scheduler \
+  perf/admin-order-feed
 ```
 
-Then prune the stale remote-tracking refs in every other clone:
+Then prune stale remote-tracking refs in every other clone:
 
 ```bash
 git fetch origin --prune
 ```
 
+### What is deliberately NOT in that list
+
+| Branch | Why it stays |
+| --- | --- |
+| `claude/project-build-ie4b56` | The default / production branch. |
+| `main` | Protected, and a dead unrelated-history snapshot (§6). |
+| `claude/pen-dev-guidelines-review-6dz4sr` | PR #111 was closed, not merged. The branch is kept so the WCAG AA work can be re-extracted (§5c). |
+| `claude/organize-project-branches-m7uun2` | This session's working branch. It IS fully merged and is safe to delete — excluded only to avoid deleting a branch mid-session. Add it to the list if you want a clean sweep; its tip is `(see git)`. |
+
 ### Restore points
 
-Branch tips as of 2026-08-05, before deletion. Any branch can be restored
-with `git push origin <sha>:refs/heads/<branch>`. GitHub also keeps deleted
-refs restorable from the pull request page for a period after deletion.
+Branch tips as of 2026-08-05, before deletion. Restore any with
+`git push origin <sha>:refs/heads/<branch>`. GitHub also keeps a deleted ref
+restorable from its pull request page for a period afterwards.
 
 | Tip SHA | Branch |
 | --- | --- |
@@ -322,7 +363,11 @@ refs restorable from the pull request page for a period after deletion.
 | `5e311aaa1fab743a8f263bd8ca1550d4c0fd5e0f` | `agent/delete-branches-dashboard-copy` |
 | `bf2b19e26b1f460e2a2214b241fcee563fe2c321` | `chore/eas-status-7725c5de` |
 | `7f0e4be920622fa9c4df0c1f8d9f1500faca84d9` | `chore/eas-status-map-preview-build` |
+| `d4bfdec8b8f660ac69d5e6f230eadc0ab7896314` | `chore/mobile-store-readiness` |
+| `9364f3b87e6bec51bb55128209e7e662cb4220fe` | `chore/release-discipline` |
 | `bc8106f71904d91beccbea6d495385b95feaf5d3` | `chore/standardize-node-22` |
+| `586ca6bdae5a50719a5bb419895572606d29e652` | `ci/production-readiness-gates` |
+| `8bd8caea462509ec38e2d2c0959320c9e68d3fdc` | `ci/sql-suite-postgres` |
 | `110250970d0ed96283994cfc27127b0fc70679ae` | `claude/fix-sentry-gate-verification-commands` |
 | `2e82287a6c698f6458aaa545015c0685a3ab1428` | `claude/mobile-sentry-conditional-plugin` |
 | `98ba167649cb1e172b2b832654e4df9b4853592f` | `claude/mobile-sentry-upload-graceful-degradation` |
@@ -330,10 +375,14 @@ refs restorable from the pull request page for a period after deletion.
 | `4469f218c562c4a48ed10d386db2a3e906b1c5aa` | `claude/record-sentry-gate-verification` |
 | `3777a10223d6e23d41e707a7c7f1a9229b61f13c` | `claude/spicy-meal-apk-build-nioaew` |
 | `875b64fac564b067f77d5013157b5103949eb02c` | `docs/address-delete-migration-runbook` |
+| `9eab7509598d51a9ab363ebe33950d877cce55b0` | `docs/incident-readiness` |
 | `6468734fca287de88e3e872b7a3ba7faaca5fe66` | `docs/reconcile-ops-health-migration-ledger` |
+| `bab00ff439257fde66f7a030cc0a759745119a7b` | `docs/staff-operations` |
 | `9b0dcd8496d761d74f1d4b5cbf5d626340a07c76` | `feat/admin-dashboard-navigation` |
+| `f85d38407ef40f0f512b51967cc2019ab45e1b34` | `feat/admin-ux-resilience` |
 | `e9c437ef0cef91d4e828a2ef5920292addbcba95` | `feat/button-field-migration` |
 | `aea28b0ba6899f8e5c0232d2f1555ebac8d22210` | `feat/checkout-address-ux` |
+| `9bedf981c133a76e41e46898d8dec8280780e4fd` | `feat/delivery-map-link` |
 | `2d01c0b49011bbb8059ae5cb9476608b44e51aa9` | `feat/design-system-ember-on-cream` |
 | `39f926b1751a8746a042eff937e0c8e7221afd5e` | `feat/discounts-campaigns` |
 | `c522e51d43a418c3c9aac6f9f408137b30f5cee2` | `feat/ds-admin-catalog` |
@@ -356,10 +405,14 @@ refs restorable from the pull request page for a period after deletion.
 | `adf2d85fe64461e2bda4ce874aa4a0bcb67c3807` | `feat/otp-autofill` |
 | `21f180e5cbfd2334d6024193590f031178365eb2` | `feat/price-component-migration` |
 | `537213b6fca31bbaeb66e105a127c7c07fcb92bc` | `feat/whatsapp-only-saudi-login` |
+| `e595642ebe097b261bcce27564cc7add595d06fb` | `fix/address-description-whitespace` |
 | `1ddd21750d7fc06b14e58c3541ef4cd773bbaafe` | `fix/checkout-money-display` |
+| `594937ca1e1f718c310549a4583b8f124efa6381` | `fix/customer-app-guards-and-locale` |
 | `d1b762b2d8f45e13d1d113b0eacd0e938d74b790` | `fix/ds-muted-text-contrast` |
 | `61c32381941e75546e7042e9a6a0aa310c785d83` | `fix/eas-status-poller-project-dir` |
 | `ac2f3f8a5b9e11e8c286706e40778e35d2238e3a` | `fix/hook-node-json-parser` |
 | `a6511403f8e9019e12f920720aa08a62ef4c92b7` | `fix/lazywait-lifecycle-test-case7` |
 | `33838b3eb60a5c26dd4768df22c97656cb47c043` | `fix/mobile-map-google-config` |
+| `b5e08cb98d6a4d17009263d77d311b3b0602ac27` | `fix/order-integrity-and-false-claims` |
 | `a497c432a0150d576759a5de385f06c41d60051a` | `fix/refund-worker-scheduler` |
+| `94b25ad9a74f17095b2611657f55a5ae70ea6b4d` | `perf/admin-order-feed` |
