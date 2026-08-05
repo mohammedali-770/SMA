@@ -15,7 +15,7 @@ import * as Device from 'expo-device';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
 import {
-  deviceShouldStayActive, toggleRequiresPermission, type DevicePrefs,
+  deviceShouldStayActive, PUSH_CLIENT_ENABLED, toggleRequiresPermission, type DevicePrefs,
 } from './notificationPolicy';
 import {
   deactivateThisDeviceStrict, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
@@ -24,7 +24,21 @@ import { color, radius, space } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import type { DbPushDevice } from '../../types/db';
 
+/**
+ * Gate wrapper. Push is dormant (see PUSH_CLIENT_ENABLED), so the card — and
+ * therefore the toggle that triggers the OS permission prompt — must not be
+ * reachable. Kept as a hook-free wrapper around the real card rather than an
+ * early return inside it, so the conditional never sits above a hook call.
+ *
+ * The implementation below is intentionally left whole: enabling push should be
+ * a one-line flip plus the server row and the app.json plugin, not a rewrite.
+ */
 export function NotificationSettings() {
+  if (!PUSH_CLIENT_ENABLED) return null;
+  return <NotificationSettingsCard />;
+}
+
+function NotificationSettingsCard() {
   const { t, lang, rtlRow } = useI18n();
   const { userId } = useAuth();
   const [device, setDevice] = useState<DbPushDevice | null>(null);
