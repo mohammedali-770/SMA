@@ -22,8 +22,9 @@ from upstream Expo packages that have no non-breaking fix (§3). Gating at
 moderate would fail every PR on something this repository cannot fix, and a gate
 that is always red is a gate everybody learns to ignore.
 
-**Both trees are currently clean at `high`.** Any high/critical advisory that
-appears from now on is new, and CI will block it.
+**Both trees are currently clean at `high`** — re-verified 2026-08-05, after the
+`undici` fix in §4.3. Any high/critical advisory that appears from now on is
+new, and CI will block it.
 
 ## 2. Why `npm audit fix` is not the default remedy here
 
@@ -37,7 +38,7 @@ Prefer, in order:
 
 1. **A targeted `overrides` entry** in the affected `package.json`, when the
    vulnerable package appears once in the tree and the fix stays within the same
-   major. This is what the two entries below do.
+   major. This is what the resolved entries in §4 do.
 2. **A real dependency upgrade**, when the direct dependency has a fixed
    release — with the app built and smoke-tested afterwards.
 3. **`npm audit fix`**, only when the resulting lockfile diff is small enough to
@@ -92,6 +93,31 @@ both trees at 5.0.7, transitively.
 
 Both packages appeared exactly once in each tree and both bumps stay within the
 same major, so no dependent's API expectations changed.
+
+### 4.3 `undici` — five advisories at 7.28.0 — HIGH (web tree)
+
+Response desynchronization via the retry interceptor (GHSA-8xcm-r25x-g524),
+cross-user information disclosure and a parse-time crash via degenerate private
+cache directives (GHSA-4cwx-7wf7-3272), CRLF injection via a blob-like body
+`type` (GHSA-m8rv-5g2x-5cg5), cross-user disclosure via whitespace around equals
+in `Cache-Control` (GHSA-jr45-8vmc-qm54), and cookie-attribute injection
+(GHSA-v3r7-h72x-cjcm).
+
+**This is the first advisory the gate from PR #147 caught on its own.** It did
+not exist when that gate was written; it appeared in the advisory feed
+afterwards and blocked the next PR, which is precisely the behaviour §1
+promises.
+
+- Web tree: `overrides` entry in the root `package.json` → `^7.29.0`.
+- Mobile tree: not present.
+
+Reachability: `undici` enters this tree **once**, via `jsdom`, which is a
+`devDependency` used only for the vitest jsdom environment. It is never bundled
+and never reaches a customer — so the practical exposure was test tooling, not
+production. It was still fixed rather than excepted: the bump stays inside major
+7 (7.28.0 → 7.29.0), the lockfile diff is three lines, and `npm ci`, `npm run
+lint` and the full 1628-test suite all pass on it. An exception would have cost
+more to justify than the fix cost to apply.
 
 ## 5. Adding an exception
 
