@@ -1,0 +1,6 @@
+-- CI stub for pg_cron. Intentionally creates NOTHING.
+--
+-- Extension scripts are executed by the server, not by psql, so this file
+-- must contain only SQL — no backslash meta-commands. The API surface the
+-- migration chain calls is created as ordinary objects by bootstrap.sql,
+-- which runs before the chain. See pg_cron.control.
