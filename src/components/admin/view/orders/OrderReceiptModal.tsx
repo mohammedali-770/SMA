@@ -14,7 +14,7 @@
  * the question staff actually ask when a ticket does not print.
  */
 import React from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 
 import { canTransitionOrder } from '../../../../context/AppContext';
 import { Card } from '../../../../design-system/ui/Card';
@@ -22,6 +22,7 @@ import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
 import { useDsFontClass } from '../../../../design-system/ui/useDsLang';
 import { orderDisplayNumber } from '../../../../lib/mappers';
+import { mapsUrlFor } from '../../../../lib/maps';
 import { paymentDisplayState } from '../../../../lib/payment';
 import type { Branch, Order, OrderStatus } from '../../../../types';
 import { getVATBreakdown } from '../../../../utils/calculations';
@@ -74,6 +75,9 @@ export function OrderReceiptModal({
   const sync = syncStateOf(order);
   const branchMapped = !!branches.find((b) => b.id === order.branchId)?.lazywaitBranchId;
   const hasPhone = !!(order.customerPhone && order.customerPhone.trim());
+  // null when the stored coordinates are unusable, which is what suppresses the
+  // link rather than rendering one that points nowhere useful.
+  const mapsUrl = order.address ? mapsUrlFor(order.address.lat, order.address.lng) : null;
 
   return (
     // Shares ModalShell with AdminModal for the focus trap, Escape, focus
@@ -170,13 +174,41 @@ export function OrderReceiptModal({
             </DetailRow>
             {order.address && (
               <div className="border-t border-con-line pt-2">
-                <Text variant="caption" tone="tertiary" as="p">Delivery Short Address:</Text>
+                <Text variant="caption" tone="tertiary" as="p">
+                  {isRTL ? 'العنوان الوطني المختصر:' : 'Delivery Short Address:'}
+                </Text>
                 <Text variant="label" as="p" className="mt-1">
                   {order.address.label} • {order.address.description}
                 </Text>
                 <Text variant="label" tone="ember" numeric as="p">
                   {order.address.nationalShortAddress}
                 </Text>
+                {/*
+                  Delivery orders never reach the POS and there is no driver or
+                  dispatch feature, so every delivery is coordinated by a human
+                  reading this address off the screen. A tappable link is the
+                  difference between reading coordinates aloud down a phone and
+                  opening the destination directly.
+
+                  Rendered only when the stored coordinates are actually usable —
+                  mapsUrlFor rejects (0,0) and any non-finite value, so a failed
+                  geocode shows nothing rather than a link to the Atlantic.
+                */}
+                {mapsUrl && (
+                  <a
+                    href={mapsUrl}
+                    target="_blank"
+                    // noopener/noreferrer: this opens a third-party origin in a new
+                    // tab from an authenticated staff console.
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex min-h-9 items-center gap-1 text-ember underline"
+                  >
+                    <MapPin className="size-4 shrink-0" aria-hidden="true" />
+                    <Text variant="label" tone="ember" as="span">
+                      {isRTL ? 'افتح في الخرائط' : 'Open in Maps'}
+                    </Text>
+                  </a>
+                )}
               </div>
             )}
           </div>
