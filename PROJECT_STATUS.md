@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-07-29 (default-branch head `1a69416`).
+> Last updated: 2026-08-05 (default-branch head `9032dfa`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -43,6 +43,12 @@ apps/mobile/            Expo app (customer iOS/Android/web)
 src/                    Admin console (Vite): components/, context/, lib/
   components/AdminDashboard.tsx + components/admin/  staff panels
   lib/                  API/capability/business-logic modules (unit-tested)
+design-system/          "Ember on Cream" shared source of truth: tokens.ts,
+                        money.ts, buttonState.ts, fieldState.ts. Synced into
+                        the two apps by scripts/sync-design-system.mjs; CI
+                        enforces it (npm run design-system:check).
+scripts/                sync-design-system.mjs, check-design-system-hygiene.mjs,
+                        branch-audit.sh (git branch classifier)
 supabase/
   migrations/           Migration files (see docs/MIGRATIONS.md — the ledger)
   functions/            Edge Functions (payment, lazywait-sync, OTP, …)
@@ -173,20 +179,34 @@ question that must be resolved before the worker is ever re-enabled:
 
 Open issues:
 
-- **Issue #81 (open)** — create the `SENTRY_AUTH_TOKEN` secret in EAS *and*
-  Vercel so release builds upload source maps. Builds succeed without it on
-  both surfaces; production stack traces are simply **unsymbolicated** until it
-  exists. **No code change is needed** — both gates are conditional
-  (`apps/mobile/app.config.js` for mobile, `vite.config.ts` for web) and start
-  uploading automatically once the token is present. The token is a real
-  secret: never commit it, never put it in `EXPO_PUBLIC_*`/`VITE_*`. See
-  `docs/SENTRY_OBSERVABILITY.md`.
 - **Issue #102 (open)** — set the Vercel **Production Branch** to
   `claude/project-build-ie4b56` and trigger a fresh Production redeploy. While it
   is unset, the default branch only deploys as a Preview and `/` and `/app/`
   serve byte-identical HTML, so the customer Expo web app is not actually being
   served in production. Owner action only (Vercel dashboard) — see
   `docs/DEPLOY.md`.
+
+  **This is the single largest open production-readiness gap** — it is the one
+  item that means the customer app is not truly live.
+
+Closed since the last update:
+
+- **Issue #81 (closed 2026-07-29, completed)** — the `SENTRY_AUTH_TOKEN`
+  source-map secret. Both upload gates are conditional
+  (`apps/mobile/app.config.js`, `vite.config.ts`) and activate on their own once
+  the token is present; no code change was required.
+
+### Open pull-request queue — 13 PRs
+
+Thirteen pull requests are open against the default branch, several of them
+production-readiness gates (CI gates #147, release discipline #152, mobile
+store readiness #149, route guards #151). They are small and, in the order
+given, almost collision-free.
+
+**`docs/GIT_BRANCHES.md` is authoritative** for the queue: it lists every PR,
+the recommended merge order, the three file collisions, the one stacked pair
+(#146 sits on #145, not on the default branch) and the one superseded PR
+recommended for closure (#111). Read it before merging anything.
 
 Needs an owner decision:
 
@@ -211,6 +231,7 @@ Documentation debt:
 | Doc | Owns |
 | --- | --- |
 | `CLAUDE.md` | Change-control rules for ALL agent/automated work (§7 below) |
+| `docs/GIT_BRANCHES.md` | Git branch inventory, the open-PR merge order, branch hygiene |
 | `docs/MIGRATIONS.md` | Migration ledger + the only allowed Production schema workflow |
 | `docs/PAYMENT_POSTPONEMENT.md` | The payment/refund freeze: scope, live state, resume checklist |
 | `docs/DEPLOY.md` | Vercel deployment, Production Branch, env vars, verification |
@@ -229,7 +250,9 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
    (`claude/project-build-ie4b56` = production default, and `main`).
    Every change: fresh branch off the default branch → PR → explicit owner
    approval → merge. A PreToolUse hook additionally blocks agent sessions
-   from editing on a protected checkout.
+   from editing on a protected checkout. **Delete the head branch when a PR
+   merges** — see `docs/GIT_BRANCHES.md` §7 for why (60 branches accumulated,
+   47 of them finished).
 2. **Payment/Tap area is FROZEN and payment work is POSTPONED** — no changes
    without separate explicit owner approval, and none at all until a gateway
    provider is selected (`docs/PAYMENT_POSTPONEMENT.md`).
@@ -249,6 +272,14 @@ These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
 
 | PR | What | Merge |
 | --- | --- | --- |
+| #144 | Run-book for the two unapplied address-deletion migrations | `9032dfa` |
+| #143 | Admin dashboard navigation + branch overview reorganized | `e3130a2` |
+| #142 | Customer profile address and name management (mobile) | `d2bf2ea` |
+| #141 | Money display: configured VAT rate, mono price digits, delivery fee | `8faaca5` |
+| #140 | Accessible focus management in the console modals | `7979129` |
+| #139 | Muted ink raised to WCAG AA | `76887b2` |
+| #118–#136 | **"Ember on Cream" design system** — tokens, self-hosted fonts, shared Price/Button/Field, then a surface-by-surface migration of the customer app and the entire admin console, ending in the removal of all legacy mobile UI | `271cc22`…`e5b1c72` |
+| #120 | Repository standardized on Node 22 via `.nvmrc` | `e5458984` |
 | #116 | Corrected the source-map gate verification commands | `1a69416` |
 | #115 | Conditional Sentry source-map gate on mobile (`app.config.js`) | `537d345` |
 | #114 | Production EAS builds no longer fail on the missing Sentry token | `bff19ff` |
@@ -265,9 +296,18 @@ Production version.
 
 ## 9. Test & quality snapshot
 
-- Root vitest: **764** tests recorded at the 2026-07-24 validation
-  (`docs/MIGRATIONS.md` §18). The suite was **not** re-run for the 2026-07-29
-  changes — run `npm test` for the current figure before relying on it.
+- Root vitest: **1605 tests across 107 files, all passing** — re-run and
+  verified 2026-08-05 at head `9032dfa`. `npm run lint` (root `tsc --noEmit`)
+  is clean. (The previously recorded figure of 764 was from 2026-07-24 and is
+  superseded.)
+
+  > **`npm test` requires `apps/mobile` dependencies to be installed.** Root
+  > vitest deliberately includes the framework-free `apps/mobile` tests, and
+  > `apps/mobile/tsconfig.json` extends `expo/tsconfig.base`. Without
+  > `npm --prefix apps/mobile ci`, 44 of the 107 test files fail to load with
+  > `failed to resolve "extends":"expo/tsconfig.base"`. That is a missing
+  > install, not a broken test — run both installs from §4 before trusting a
+  > red suite.
 - **Sentry source-map gate (`apps/mobile/app.config.js`, #115) — VERIFIED
   2026-07-29.** Both checks in `docs/SENTRY_OBSERVABILITY.md` →
   "Verifying the source-map gate" pass: direct evaluation returns **4** plugins
