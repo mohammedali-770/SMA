@@ -240,7 +240,18 @@ Documentation debt:
 | `docs/DISCOUNTS_CAMPAIGNS.md` | Campaigns schema, what is live, open business questions |
 | `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook + the source-map gate |
 | `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
+| `docs/INCIDENT_RESPONSE.md` | What to do when it breaks — **and why nothing pages you** |
+| `docs/ROLLBACK.md` | Getting back to a known-good state, per surface |
+| `docs/BACKUP_RECOVERY.md` | Backup/PITR state (**UNVERIFIED**) and the restore drill |
+| `docs/DEPENDENCY_ADVISORIES.md` | The audit gate and its standing exceptions |
+| `docs/OWNER_ACTIONS.md` | **Everything blocked on the owner**, ordered by risk |
+| `SECURITY.md` | How to report a vulnerability to us |
 | `README.md` / `README_MOBILE.md` | General app documentation |
+
+> ⚠️ **Two of these describe gaps, not capabilities.** `docs/BACKUP_RECOVERY.md`
+> records that no backup has been verified and no restore has ever been drilled;
+> `docs/INCIDENT_RESPONSE.md` §1 records that no alert can currently reach a
+> human. Read both before assuming this system is operationally covered.
 
 ## 7. Rules that must never be broken
 
