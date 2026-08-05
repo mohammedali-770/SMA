@@ -45,5 +45,9 @@
     "typescript": "~5.8.2",
     "vite": "^6.2.3",
     "vitest": "^4.1.10"
+  },
+  "//overrides": "Transitive-only security patch. undici reaches this tree once, as a dependency of jsdom, which is a devDependency used only for the vitest jsdom environment — it is never bundled or shipped. The bump stays within the same major (7.28.0 -> 7.29.0), so no dependent's API expectations change. Pinned surgically rather than via `npm audit fix`, per docs/DEPENDENCY_ADVISORIES.md §2.",
+  "overrides": {
+    "undici": "^7.29.0"
   }
 }

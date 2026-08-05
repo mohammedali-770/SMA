@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-05 (default-branch head `9032dfa`).
+> Last updated: 2026-08-05 (default-branch head `160401d`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -113,10 +113,46 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**62** live `schema_migrations` rows; **61** repository migration files;
-**zero unapplied**. Latest live version `20260729112238`. Ten migrations were
+**62** live `schema_migrations` rows; **64** repository migration files;
+**THREE unapplied**. Latest live version `20260729112238`. Ten migrations were
 applied on 2026-07-29, eight of them closing a Production incident in which the
 deployed frontend was running eight migrations ahead of the database.
+
+The live figures above were re-verified against Production on 2026-08-05 with a
+read-only `list_migrations`: 62 rows, latest still `20260729112238`. Nothing has
+been applied since 2026-07-29.
+
+#### The three unapplied migrations
+
+| File | From | Status |
+| --- | --- | --- |
+| `20260801120000_address_single_default.sql` | PR #142 | Not applied |
+| `20260801120100_checkout_session_address_fk_set_null.sql` | PR #142 | Not applied |
+| `20260802120000_address_description_trim_all_whitespace.sql` | PR #146 | Not applied |
+
+The first two have a run-book: `docs/MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`.
+
+The third closes a live defect and is worth understanding before it is applied:
+`address_description_is_usable` trims with single-argument `btrim`, which strips
+**only spaces**, so a delivery-address landmark consisting of tabs and newlines
+still satisfies the courier-landmark rule today. The order reaches the branch
+and the courier gets a pin and nothing else — the exact outcome the original
+migration was written to prevent. The fix is strictly narrowing: every value
+accepted after it was accepted before.
+
+> ⚠️ **Merging a migration file does not apply it.** All three are in the
+> default branch and none is in Production. Applying them is a separate,
+> explicitly owner-approved `apply_migration` step (§7 rule 4).
+
+> **Do not reconcile the ledger by comparing filename version prefixes to
+> `schema_migrations.version` — they do not match.** Repository filenames carry
+> their own timestamps (e.g. `20260707120000_extensions_enums_helpers.sql` is
+> live as version `20260708062345`), and three older files map to differently
+> named rows: `place_order`, `loyalty` and `order_idempotency` were consolidated
+> into `order_idempotency_and_place_order` and `harden_trigger_functions`, and
+> `checkout_sessions` was applied as three rows. Mapping is **by name, through
+> `docs/MIGRATIONS.md`** — that is what the ledger is for, and a naive version
+> diff reports ~54 false "unapplied" migrations.
 
 `docs/MIGRATIONS.md` is the authoritative ledger — read it before touching
 anything database-related. Live schema changes go ONLY through the
