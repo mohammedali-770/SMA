@@ -225,14 +225,23 @@ decision, not part of routine cleanup.
 The 60-branch pile-up was caused by nothing deleting branches after merge.
 These four rules keep it from recurring:
 
-1. **Delete the branch when the PR merges.** Enable *Settings → General →
-   Automatically delete head branches*. This single setting prevents the entire
-   §3 category (41 of the 47 stale branches) from ever accumulating again.
-2. **One PR per branch, and keep it small.** The ten PRs in §5a average six
-   files and barely collide. #111 is 274 files and collides with everything.
+1. ✅ **Delete the branch when the PR merges.** *Settings → General →
+   Automatically delete head branches* was **enabled by the owner on
+   2026-08-05**. This single setting prevents the entire §3 category (41 of the
+   57 finished branches) from ever accumulating again — the root cause is
+   closed.
+
+   > It is **forward-looking only.** Auto-delete fires on a PR *merge* event, so
+   > it cleans up every future branch and touches none of the existing 57: their
+   > pull requests merged before the setting existed, so no event will ever fire
+   > for them. They still need the one-time sweep in §9.
+2. **One PR per branch, and keep it small.** The ten PRs in §5a averaged six
+   files and barely collided. #111 was 274 files and collided with everything.
    Size is what determines whether a queue can be worked at all.
-3. **Do not stack PRs unless you must.** #146-on-#145 is manageable because it
-   is documented here; an undocumented stack merges silently and wrongly.
+3. **Do not stack PRs unless you must.** #146-on-#145 was manageable only
+   because it is documented here — and it still needed a manual retarget when
+   #145 merged (§5b). An undocumented stack merges silently into the wrong
+   branch.
 4. **Re-audit before starting a new batch of work** with
    `scripts/branch-audit.sh`.
 
