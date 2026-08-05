@@ -29,13 +29,14 @@ Branch count is a symptom. The queue is the thing that blocks production.
 | --- | --- | --- |
 | Merged — work is in the default branch | 41 | Safe to delete |
 | Dead orphans — no PR, superseded or one-shot | 4 | Safe to delete |
-| Open pull requests — live work | 13 | Keep; work the queue (§5) |
+| Open pull requests — live work | 12 | Keep; work the queue (§5) |
+| `claude/pen-dev-guidelines-review-6dz4sr` — PR #111 closed, branch kept | 1 | Keep for re-extraction (§5c) |
 | `main` — stale, unrelated history | 1 | Leave in place (§6) |
 | `claude/project-build-ie4b56` — default/production | 1 | Protected |
 | **Total** | **60** | |
 
-Deleting the 45 finished branches takes the repository from 60 to 15, of which
-13 are real work.
+Deleting the 45 finished branches takes the repository from 60 to 15: the 12
+open pull requests, the retained #111 branch, `main`, and the default branch.
 
 **Status: the owner approved the deletion on 2026-08-05, but it could not be
 performed from the agent session — ref deletion is refused with `HTTP 403` by
@@ -120,7 +121,7 @@ No pull request was ever opened for these, and none carries work worth keeping.
 | `chore/eas-status-map-preview-build` | Same, for a build from 2026-07-24 |
 | `claude/pendev-redesign-prompt-r2cnl1` | A one-file redesign brief, superseded by PR #111 — which is itself superseded (§5c) |
 
-## 5. Open pull requests — the real queue (13)
+## 5. Open pull requests — the real queue (12 open, 1 closed)
 
 ### 5a. Ready to merge, near-zero collision (10)
 
@@ -162,7 +163,7 @@ Merging in the order above means at most a trivial rebase, and only for #153,
 without merging, #146 must be re-based onto the default branch or it will
 silently carry #145's changes into a merge.
 
-### 5c. Superseded — recommend closing (1)
+### 5c. Superseded — CLOSED 2026-08-05 (1)
 
 | PR | Branch | Size |
 | --- | --- | --- |
@@ -181,10 +182,16 @@ and `NotificationSettings.tsx`, all of which other open PRs also change. It
 additionally commits 71 screenshot PNGs and a `design/__pycache__` directory,
 which do not belong in the repository.
 
-**Recommendation: close #111 without merging** and delete the branch. Anything
-still wanted from it (the WCAG AA corrections are the strongest candidate)
-should be re-extracted as a small PR against the current design system. Reopen
-this decision only with the owner.
+**#111 was closed without merging on 2026-08-05 with owner approval**, and the
+closing comment on the PR records why.
+
+**The branch `claude/pen-dev-guidelines-review-6dz4sr` was deliberately kept**
+— it is not in the §9 delete list, so nothing from this work is lost. The
+strongest candidate for re-extraction is the WCAG AA work (status-colour
+corrections, the danger/brand-red split, the unreadable dark-panel fix), which
+should return as a small PR against the current design system rather than as a
+wholesale redesign. Do not carry over the 71 screenshot PNGs or the
+`design/__pycache__` directory.
 
 ## 6. `main` — leave it alone
 
