@@ -113,36 +113,40 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**62** live `schema_migrations` rows; **64** repository migration files;
-**THREE unapplied**. Latest live version `20260729112238`. Ten migrations were
-applied on 2026-07-29, eight of them closing a Production incident in which the
-deployed frontend was running eight migrations ahead of the database.
+**65** live `schema_migrations` rows; **64** repository migration files;
+**zero unapplied**. Latest live version `20260805061955`.
 
-The live figures above were re-verified against Production on 2026-08-05 with a
-read-only `list_migrations`: 62 rows, latest still `20260729112238`. Nothing has
-been applied since 2026-07-29.
+Three migrations were applied on **2026-08-05** with explicit owner approval,
+through the MCP `apply_migration` workflow — one call per file, in filename
+order, following `docs/MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`:
 
-#### The three unapplied migrations
-
-| File | From | Status |
+| File | From | Applied version |
 | --- | --- | --- |
-| `20260801120000_address_single_default.sql` | PR #142 | Not applied |
-| `20260801120100_checkout_session_address_fk_set_null.sql` | PR #142 | Not applied |
-| `20260802120000_address_description_trim_all_whitespace.sql` | PR #146 | Not applied |
+| `20260801120000_address_single_default.sql` | PR #142 | `20260805061621` |
+| `20260801120100_checkout_session_address_fk_set_null.sql` | PR #142 | `20260805061912` |
+| `20260802120000_address_description_trim_all_whitespace.sql` | PR #146 | `20260805061955` |
 
-The first two have a run-book: `docs/MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`.
+Together these make one default address per customer a server-enforced
+invariant, let a customer delete an address that has backed an online checkout
+(with a guard so a captured payment can never fail to become an order), and
+close a live defect where a landmark of only tabs and newlines satisfied the
+courier-landmark rule.
 
-The third closes a live defect and is worth understanding before it is applied:
-`address_description_is_usable` trims with single-argument `btrim`, which strips
-**only spaces**, so a delivery-address landmark consisting of tabs and newlines
-still satisfies the courier-landmark rule today. The order reaches the branch
-and the courier gets a pin and nothing else — the exact outcome the original
-migration was written to prevent. The fix is strictly narrowing: every value
-accepted after it was accepted before.
+The checkout-session snapshot fingerprint was **identical before and after**
+(`0bffc7257feb7ff29731ec6ac35247fd`), so no session row was written or
+re-priced. Advisors report zero ERROR on both Security and Performance. The full
+pre-live and verification record is in `docs/MIGRATIONS.md` §1.
 
-> ⚠️ **Merging a migration file does not apply it.** All three are in the
-> default branch and none is in Production. Applying them is a separate,
-> explicitly owner-approved `apply_migration` step (§7 rule 4).
+> ⚠️ **Two follow-ups remain.** The application smoke test (run-book Step 4.5 —
+> add/promote an address and the three delete cases, in the app as a real
+> customer) has **not** been done and needs a device. Version alignment
+> (run-book Step 3) was deliberately skipped: it is a separate live history
+> write needing its own explicit owner approval, and skipping it just leaves a
+> class-B entry, which is what most of the ledger already looks like.
+
+Earlier context, still accurate: ten migrations were applied on 2026-07-29,
+eight of them closing a Production incident in which the deployed frontend was
+running eight migrations ahead of the database.
 
 > **Do not reconcile the ledger by comparing filename version prefixes to
 > `schema_migrations.version` — they do not match.** Repository filenames carry
