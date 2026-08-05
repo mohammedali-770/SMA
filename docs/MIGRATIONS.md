@@ -10,41 +10,86 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-01 there are TWO unapplied repository migrations (class E).**
-Both landed with PR #142 and neither has been applied to any environment. The
-run-book for applying them is
-[`MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`](MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md).
+**As of 2026-08-05 class E is empty: every repository migration is applied to
+Production.** The three files that were unapplied — two from PR #142, one from
+PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
+`apply_migration` workflow, one call per file, in filename order.
 
-| Repository file | Class | Status |
+| Repository file | Applied version | Result |
 | --- | --- | --- |
-| `20260801120000_address_single_default` | E | **unapplied** |
-| `20260801120100_checkout_session_address_fk_set_null` | E | **unapplied** |
-
-Their SQL suites (`supabase/tests/address_single_default_test.sql`,
-`supabase/tests/checkout_session_address_fk_test.sql`) have **never been
-executed** — the sessions that wrote them had no Docker and no local Postgres.
-Running them on a PG16 harness is a hard gate before applying (run-book Step 0).
-
-Until they are applied, a customer cannot delete a saved address that has ever
-backed an online checkout: `checkout_sessions.address_id` still references
-`addresses(id)` with no `ON DELETE` action and session rows are never removed.
+| `20260801120000_address_single_default` | `20260805061621` | applied |
+| `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
+| `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
 - Repository migration files (default branch `claude/project-build-ie4b56`,
-  head `e3130a2`): **63**
-- Live `schema_migrations` rows: **62**
-- Unapplied repository files: **2** (class E — see the table above and §4)
-- Latest live version: **`20260729112238`**
-  (`caller_can_read_order_anon_revoke`; repository version `20260729091000`)
+  head `41a19dd`): **64**
+- Live `schema_migrations` rows: **65**
+- Unapplied repository files: **0**
+- Latest live version: **`20260805061955`**
+  (`address_description_trim_all_whitespace`; repository version `20260802120000`)
 
-Everything below this section describes the state **as of 2026-07-29**, when
-class E was last empty. It remains accurate for every migration applied up to
-that point.
-
-The 61 / 62 difference is the long-standing **history** divergence, not a
+The 64 / 65 difference is the long-standing **history** divergence, not a
 *schema* divergence: three live-only F-class history rows carry no repository
 file, and two H-class repository files (`place_order`, `loyalty`) were
-superseded by later consolidated migrations. The full class-by-class algebra is
-in §4 and the row-by-row mapping in §5.
+superseded by later consolidated migrations. 64 files − 2 H-class + 3 F-class =
+65 rows. The full class-by-class algebra is in §4 and the row-by-row mapping in
+§5.
+
+> **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
+> `apply_migration` stamped apply-time versions that differ from the repository
+> filenames, so these three are class **B**, which is what most of the ledger
+> already looks like. Aligning them is a separate live history write needing its
+> own explicit owner approval.
+
+### The 2026-08-05 application
+
+Pre-live gate (§9-B), recorded before applying:
+
+| Check | Value |
+| --- | --- |
+| FK `checkout_sessions_address_id_fkey` | `confdeltype='a'` (NO ACTION) — not yet applied |
+| `confupdtype` / `confmatchtype` / deferrable | `a` / `s` / false — to be preserved verbatim |
+| `checkout_sessions.address_id` NOT NULL | false — the DROP NOT NULL branch does not run |
+| Customers holding >1 default address | **0** — migration 1's normalisation UPDATE touched no rows |
+| Sessions / snapshot fingerprint | 6 / `0bffc7257feb7ff29731ec6ac35247fd` |
+| Sessions the new guard would block | **0** |
+| Ledger before | 62 rows, latest `20260729112238` |
+
+Verification (§9-E), after applying:
+
+- **Snapshot fingerprint unchanged: `0bffc7257feb7ff29731ec6ac35247fd`.** This is
+  the check that matters — no checkout session row was read for update, written
+  or re-priced.
+- FK now `confdeltype='n'` (SET NULL) with `confupdtype='a'`, `confmatchtype='s'`,
+  not deferrable, same constraint name, still referencing `addresses(id)` — every
+  property other than ON DELETE reproduced verbatim.
+- `enforce_single_default_address()`, `guard_address_delete_live_checkout()`,
+  triggers `trg_addresses_single_default` and `trg_addresses_guard_live_checkout`,
+  and indexes `addresses_one_default_per_customer` and
+  `checkout_sessions_address_idx` all present.
+- Customers with multiple defaults: 0.
+- `address_description_is_usable` behaviour re-checked in Production, including
+  the assertion that had never run:
+  `address_description_is_usable(E'\t\n  \t')` is now **false**. Narrowing
+  confirmed — real AR/EN landmarks and the 5- and 500-character boundaries are
+  still accepted, 501 still rejected.
+- Advisors: **zero ERROR** on both Security and Performance. The only lint naming
+  a new object is INFO `unused_index` on `checkout_sessions_address_idx`, which
+  is expected for an index created to support a delete path that has not yet run.
+
+**Run-book Step 0 was satisfied by CI, not by the local harness it describes.**
+Since PR #145 the `SQL suites` workflow replays the entire migration chain onto a
+throwaway PostGIS Postgres and runs all 26 suites against a fresh clone. All
+three suites for these migrations (`address_single_default_test.sql`,
+`checkout_session_address_fk_test.sql`, `require_address_description_test.sql`)
+are present, none is quarantined in `.github/sql-ci/known-failing.txt`, and that
+job is green on the merged head. That is a stronger gate than the manual
+procedure the run-book was written against, because it runs on every push.
+
+**Still outstanding: the application smoke test** (run-book Step 4.5). Adding two
+addresses and promoting one, and the three delete cases, must be exercised in the
+mobile app as a real customer. That needs a device and a signed-in account and has
+**not** been done.
 
 ### Ten migrations were applied on 2026-07-29
 

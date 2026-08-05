@@ -1,13 +1,31 @@
 # Run-book — applying the two address-deletion migrations
 
-> **Status: NOT APPLIED anywhere.** Both files are merged to the default branch
-> and applied to no environment. Nothing in this document has been executed.
+> **Status: APPLIED to Production on 2026-08-05**, with explicit owner approval,
+> together with the later `20260802120000_address_description_trim_all_whitespace`
+> (PR #146), which this run-book predates. Applied versions and the full
+> pre-live/verification record are in [`MIGRATIONS.md`](MIGRATIONS.md) §1.
 >
-> This is an *owner-executed* run-book. It exists because the agent sessions
-> that wrote these migrations can neither run the SQL harness (no Docker, no
-> local Postgres) nor reach `apply_migration`. Every command below is for a
-> human with production access to run, in order, stopping at the first
-> surprise.
+> **Two steps below were NOT executed** and remain open:
+>
+> - **Step 3 (version alignment)** — deliberately skipped. It is a separate live
+>   history write needing its own explicit owner approval, and skipping it leaves
+>   a class-B entry, which is what most of the ledger already looks like.
+> - **Step 4.5 (application smoke test)** — not done. It needs the mobile app,
+>   a device and a signed-in customer.
+>
+> **Step 0 was satisfied by CI rather than by the local harness described below.**
+> Since PR #145 the `SQL suites` workflow replays the whole migration chain onto
+> a throwaway PostGIS Postgres and runs all 26 suites against a fresh clone. All
+> three relevant suites are present, none quarantined, and the job is green on
+> the merged head — a stronger gate than this manual procedure, because it runs
+> on every push.
+>
+> This was written as an *owner-executed* run-book, because the sessions that
+> wrote these migrations could neither run the SQL harness (no Docker, no local
+> Postgres) nor reach `apply_migration`. That is no longer true of every session:
+> the application was performed through the Supabase MCP `apply_migration` tool,
+> following the steps below in order. **Keep the retained steps runnable by a
+> human** — the approval requirement in §2 is unchanged either way.
 
 Migrations covered, in apply order:
 
