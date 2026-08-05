@@ -229,8 +229,17 @@ scripts/branch-audit.sh
 
 The script classifies every remote branch as merged / stale / active. With the
 GitHub CLI (`gh`) authenticated it reads the pull-request record and detects
-squash-merges (§3b); without `gh` it falls back to ancestry only and says so —
-in that mode it will under-report merged branches, never over-report them.
+squash-merges (§3b); without `gh` it falls back to ancestry only and says so.
+
+A branch name on its own is never treated as evidence of a merge — names get
+reused, and a reused name would otherwise inherit an old PR's verdict and be
+reported as safe to delete while holding live work. The script therefore calls
+a branch merged only when its **current tip equals the head SHA the merged PR
+recorded**, and never while the branch has an **open PR**. A branch that has
+moved on since its merge falls through to ACTIVE.
+
+Every mode under-reports merged branches rather than over-reporting them,
+because the cost of a false "safe to delete" is losing live work.
 
 ---
 

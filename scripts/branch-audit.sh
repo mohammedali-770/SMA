@@ -12,8 +12,11 @@
 #
 # With the GitHub CLI (gh) authenticated the audit reads the pull-request
 # record, which is the only way to detect squash- and rebase-merged branches
-# (git reports those as unmerged). Without gh it falls back to ancestry alone
-# and says so — that mode under-reports merged branches, never over-reports.
+# (git reports those as unmerged). A branch is only called merged when its
+# current tip equals the head SHA the merged PR recorded, and never while it
+# has an open PR. Without gh it falls back to ancestry alone and says so.
+# Every mode under-reports merged branches rather than over-reporting them,
+# because the cost of a false "safe to delete" is losing live work.
 
 set -euo pipefail
 
@@ -46,12 +49,23 @@ git rev-parse --verify --quiet "$DEF" >/dev/null || {
 }
 
 # ---------------------------------------------------------------- PR record --
-# merged_prs: newline-separated "<branch>" that has at least one merged PR.
-merged_prs=""
+# A branch name alone is NOT sufficient evidence that a branch is merged: names
+# get reused, and a reused name would otherwise inherit an old PR's "merged"
+# verdict and be reported as safe to delete while holding live work. So we match
+# the branch's current tip against the merged PR's recorded head SHA, and treat
+# any branch with an OPEN PR as active regardless of older merged PRs.
+#
+# merged_pairs: newline-separated "<branch> <head-sha>" for every merged PR.
+# open_heads:   newline-separated "<branch>" for every open PR.
+merged_pairs=""
+open_heads=""
 HAVE_GH=0
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   HAVE_GH=1
-  merged_prs=$(gh pr list --state merged --limit 500 \
+  merged_pairs=$(gh pr list --state merged --limit 500 \
+                   --json headRefName,headRefOid \
+                   --jq '.[] | .headRefName + " " + .headRefOid' 2>/dev/null || true)
+  open_heads=$(gh pr list --state open --limit 200 \
                  --json headRefName --jq '.[].headRefName' 2>/dev/null || true)
 fi
 
@@ -80,9 +94,20 @@ while read -r ref; do
 
   # Squash/rebase merges rewrite commits, so ancestry misses them. Only the
   # PR record can tell us; without gh we must not guess.
-  if [ "$HAVE_GH" -eq 1 ] && grep -qxF "$branch" <<<"$merged_prs"; then
-    squashed+=("$branch")
-    continue
+  if [ "$HAVE_GH" -eq 1 ]; then
+    # An open PR means live work, whatever an older merged PR did with the name.
+    if grep -qxF "$branch" <<<"$open_heads"; then
+      active+=("$branch")
+      continue
+    fi
+    # Require the tip to be exactly what was merged. If the branch has moved on
+    # since — reused name, or new commits pushed after the merge — it falls
+    # through to ACTIVE, which is the safe direction to be wrong in.
+    tip=$(git rev-parse "$ref")
+    if grep -qxF "$branch $tip" <<<"$merged_pairs"; then
+      squashed+=("$branch")
+      continue
+    fi
   fi
 
   active+=("$branch")
