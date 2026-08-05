@@ -87,7 +87,7 @@ export function OrderReceiptModal({
       label={isRTL ? 'تفاصيل الطلب' : 'Order receipt'}
       isRTL={isRTL}
       onClose={onClose}
-      className="w-full max-w-md overflow-hidden rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface"
+      className="print-area w-full max-w-md overflow-hidden rounded-[var(--radius-ds-lg)] border border-con-line bg-con-surface"
     >
       <>
         <div className="flex items-center justify-between gap-2 border-b border-con-line px-5 py-4">
@@ -108,7 +108,7 @@ export function OrderReceiptModal({
             type="button"
             onClick={onClose}
             aria-label={isRTL ? 'إغلاق' : 'Close'}
-            className="ds-motion inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-con-line bg-con-surface-2 transition-colors duration-150 hover:bg-con-surface focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="print-hide ds-motion inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-con-line bg-con-surface-2 transition-colors duration-150 hover:bg-con-surface focus-visible:outline-2 focus-visible:outline-offset-2"
           >
             <Text variant="label" tone="secondary" as="span">✕</Text>
           </button>
@@ -144,12 +144,19 @@ export function OrderReceiptModal({
             <Text variant="caption" tone="tertiary" as="p">
               {isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}
             </Text>
+            {/* A <select> prints as an empty box in most browsers, so on paper the
+                status is rendered as plain text instead. The control is hidden
+                rather than the whole block, because the ticket still has to say
+                what state the order is in. */}
+            <Text variant="label" as="p" className="print-only">
+              {STATUS_OPTIONS.find((o) => o.value === order.status)?.label ?? order.status}
+            </Text>
             <select
               disabled={isAccountant}
               value={order.status}
               onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
               aria-label={isRTL ? 'حالة الطلب' : 'Order status'}
-              className={`ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${family}`}
+              className={`print-hide ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${family}`}
             >
               {STATUS_OPTIONS.map((o) => (
                 <option

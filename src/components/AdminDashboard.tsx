@@ -10,8 +10,9 @@ import { Notice } from '../design-system/ui/Notice';
 import { AdminHeader } from './admin/view/AdminHeader';
 import { AdminSidebar } from './admin/view/AdminSidebar';
 import { NewOrderAlertBar } from './admin/view/NewOrderAlertBar';
-import type { AdminTab } from './admin/view/adminNav';
+import { parseTabFromHash, tabToHash, type AdminTab } from './admin/view/adminNav';
 import { useApp } from '../context/AppContext';
+import { useOnline } from '../lib/useOnline';
 import { orderIntegrity } from '../lib/api';
 import { operationsHealth } from '../lib/operationsHealthApi';
 import { operationsAlerts } from '../lib/operationsAlertsApi';
@@ -42,10 +43,42 @@ export const AdminDashboard: React.FC = () => {
     ordersLiveMode, ordersLastUpdated,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<AdminTab>('stats');
+  // Seeded from the URL hash so a refresh, a crash-recovery remount or signing
+  // back in returns to the tab the operator was on — previously every one of
+  // those dropped them on Stats, including mid-rush from Live Orders. Lazy
+  // initialiser: the hash is read once, not on every render.
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    () => parseTabFromHash(typeof window === 'undefined' ? null : window.location.hash) ?? 'stats',
+  );
+
+  // Keep the hash in step with the tab, and follow Back/Forward. replaceState
+  // rather than pushState: each tab click should not become a history entry the
+  // operator has to click Back through, but the address stays linkable and
+  // survives a reload.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const want = tabToHash(activeTab);
+    if (window.location.hash !== want) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${want}`);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onHashChange = () => {
+      const next = parseTabFromHash(window.location.hash);
+      // Ignore an unrecognised hash rather than resetting the console: it may be
+      // a stale bookmark or a hand-edited URL, and silently jumping to Stats
+      // mid-task is worse than staying put.
+      if (next) setActiveTab(next);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
 
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
+  const online = useOnline();
   const isAccountant = currentUser.role === 'accountant';
   const canTriage = canTriageRole(currentUser.role);
 
@@ -139,6 +172,22 @@ export const AdminDashboard: React.FC = () => {
         liveMode={ordersLiveMode}
         lastUpdated={ordersLastUpdated}
       />
+
+      {/* Offline: the most useful thing the console can say when the branch wifi
+          drops, because a stale order list and a broken app look identical.
+          Blocking, not a warning — every number on screen is now untrustworthy,
+          and the instruction that matters is "do not reload", since reloading on
+          a dead connection trades a stale-but-useful screen for a blank one. */}
+      {!online && (
+        <Notice
+          title={isRTL ? 'لا يوجد اتصال بالإنترنت' : 'No internet connection'}
+          action={isRTL
+            ? 'ما تراه هنا قد يكون قديماً، ولن تصل الطلبات الجديدة ولن تُحفظ أي تغييرات. لا تُعد تحميل الصفحة — انتظر عودة الاتصال.'
+            : 'What you see may be out of date. New orders will not arrive and changes will not save. Do not reload the page — wait for the connection to return.'}
+          tone="blocking"
+          className="rounded-none border-x-0 border-t-0"
+        />
+      )}
 
       {/* Accountant guard: a warning, not an error — the console still works,
           this role simply cannot act on orders. */}

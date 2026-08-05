@@ -181,3 +181,68 @@ body {
 .text-\[9px\]   { font-size: 12px !important; }
 .text-\[9\.5px\] { font-size: 12px !important; }
 .text-\[10px\]  { font-size: 13px !important; }
+
+/* ---------------------------------------------------------------------------
+   Print — the kitchen/delivery ticket.
+
+   Delivery orders never reach the POS and there is no dispatch feature, so a
+   branch that wants a paper ticket has only Ctrl+P. Printing the console as-is
+   produced the whole shell — sidebar, header, nav, the dimmed backdrop — across
+   several pages, with the receipt itself somewhere in the middle.
+
+   The visibility approach (rather than display:none on siblings) is deliberate:
+   the modal is nested deep in the layout, so hiding its ancestors would hide it
+   too. `visibility` is inherited and can be re-enabled on a descendant, which
+   display cannot.
+   --------------------------------------------------------------------------- */
+/* Rendered only on paper (see .print-only in the print block below). */
+.print-only { display: none; }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .print-only { display: block !important; }
+
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+
+  /* Lift the receipt out of the modal's centred, fixed backdrop and onto the
+     page origin, so it prints from the top of the sheet rather than wherever it
+     happened to be floating. */
+  .print-area {
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* The receipt body scrolls on screen (max-h-[480px]); on paper it must flow. */
+  .print-area .overflow-y-auto {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* Controls that mean nothing on paper: the close button and the status
+     <select> (which most browsers print as an empty box). The status is
+     re-rendered as plain text via .print-only, so the ticket still states it. */
+  .print-hide {
+    display: none !important;
+  }
+
+  /* Force the backdrop tint off so the sheet is not a grey rectangle. */
+  .bg-brand-ink\/60 {
+    background: none !important;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}
