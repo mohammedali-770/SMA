@@ -1,3 +1,13 @@
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 -- ============================================================================
 -- TRUE cross-session concurrency test for the pre-send validation
 -- (validate_pos_sync_notification_before_send) — proves it LOCKS the order row
@@ -29,7 +39,7 @@ delete from public.notification_log where order_id = '00000000-0000-0000-0000-00
 delete from public.orders            where id       = '00000000-0000-0000-0000-0000000000c1';
 insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
   lazywait_sync_state, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at)
-  values ('00000000-0000-0000-0000-0000000000c1', 'PC-1', gen_random_uuid(), 'pickup', 10, 10,
+  values ('00000000-0000-0000-0000-0000000000c1', 'PC-1', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 10, 10,
           'failed', now() + interval '2 minutes', now() - interval '1 minute', now() + interval '9 minutes');
 insert into public.notification_log (kind, order_id, status, send_status, claim_token)
   values ('pos_sync', '00000000-0000-0000-0000-0000000000c1', 'pos_retrying', 'processing', 'OWNER');

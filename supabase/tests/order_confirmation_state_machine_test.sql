@@ -23,6 +23,13 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on: orders.branch_id is a real FK. These cases
+-- are about confirmation / refund state, not about which branch.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 select set_config('test.is_admin', 'true', true);
 select set_config('test.auth_uid', '', true);
 
@@ -204,6 +211,9 @@ declare
   v_state text;
   i integer;
 begin
+  -- orders.customer_id references profiles(id), which references
+  -- auth.users(id). Create the auth user; handle_new_user() makes the profile.
+  insert into auth.users (id) values (v_owner) on conflict (id) do nothing;
   -- FK checks are disabled for the fixture inserts (throwaway DB), so the orders
   -- can carry synthetic customer/branch ids without seeding profiles or branches.
   set local session_replication_role = replica;
@@ -211,11 +221,11 @@ begin
     subtotal, total, payment_method, payment_status, lazywait_sync_state,
     lazywait_ref, pos_create_attempted_at, pos_sync_started_at, pos_sync_deadline_at,
     pos_customer_retry_count) values
-    (v_ok,      v_owner, 'CS-1', gen_random_uuid(), 'pickup', 50, 50, 'online', 'paid',
+    (v_ok,      v_owner, 'CS-1', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'paid',
      'dead_letter', null, null, now()-interval '11m', now()-interval '1m', 0),
-    (v_amb,     v_owner, 'CS-2', gen_random_uuid(), 'pickup', 50, 50, 'online', 'paid',
+    (v_amb,     v_owner, 'CS-2', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'paid',
      'confirmation_required', null, now()-interval '5m', now()-interval '11m', now()-interval '1m', 0),
-    (v_notmine, v_other, 'CS-3', gen_random_uuid(), 'pickup', 50, 50, 'online', 'paid',
+    (v_notmine, v_other, 'CS-3', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50, 'online', 'paid',
      'dead_letter', null, null, now()-interval '11m', now()-interval '1m', 0);
   set local session_replication_role = origin;
 
@@ -299,16 +309,19 @@ declare
   v_deliv uuid := gen_random_uuid();   -- no POS channel -> NEVER refunded
   v_state text; n integer;
 begin
+  -- orders.customer_id references profiles(id), which references
+  -- auth.users(id). Create the auth user; handle_new_user() makes the profile.
+  insert into auth.users (id) values (v_owner) on conflict (id) do nothing;
   set local session_replication_role = replica;
   insert into public.orders (id, customer_id, order_number, branch_id, order_type,
     subtotal, total, payment_method, payment_status, lazywait_sync_state,
     lazywait_ref, sync_blocked_reason, pos_create_attempted_at, pos_customer_retry_count) values
-    (v_paid,  v_owner,'RF-1',gen_random_uuid(),'pickup',50,50,'online','paid','failed',null,null,null,3),
-    (v_amb,   v_owner,'RF-2',gen_random_uuid(),'pickup',50,50,'online','paid','failed',null,null,null,3),
-    (v_marked,v_owner,'RF-3',gen_random_uuid(),'pickup',50,50,'online','paid','failed',null,null,null,3),
-    (v_ref,   v_owner,'RF-4',gen_random_uuid(),'pickup',50,50,'online','paid','failed',null,null,null,3),
-    (v_cash,  v_owner,'RF-5',gen_random_uuid(),'pickup',50,50,'cash','pending','failed',null,null,null,3),
-    (v_deliv, v_owner,'RF-6',gen_random_uuid(),'delivery',50,50,'online','paid','failed',null,null,null,3);
+    (v_paid,  v_owner,'RF-1','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'online','paid','failed',null,null,null,3),
+    (v_amb,   v_owner,'RF-2','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'online','paid','failed',null,null,null,3),
+    (v_marked,v_owner,'RF-3','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'online','paid','failed',null,null,null,3),
+    (v_ref,   v_owner,'RF-4','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'online','paid','failed',null,null,null,3),
+    (v_cash,  v_owner,'RF-5','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'cash','pending','failed',null,null,null,3),
+    (v_deliv, v_owner,'RF-6','b0000000-0000-0000-0000-0000000000ff','delivery',50,50,'online','paid','failed',null,null,null,3);
   set local session_replication_role = origin;
 
   -- Drive each row to its terminal shape through a NORMAL update, so the
@@ -359,14 +372,17 @@ declare
   v_claim record;
   v_state text; n integer; okflag boolean;
 begin
+  -- orders.customer_id references profiles(id), which references
+  -- auth.users(id). Create the auth user; handle_new_user() makes the profile.
+  insert into auth.users (id) values (v_owner) on conflict (id) do nothing;
   set local session_replication_role = replica;
   insert into public.orders (id, customer_id, order_number, branch_id, order_type,
     subtotal, total, payment_method, payment_status, lazywait_sync_state,
     pos_customer_retry_count) values
-    (v_o1, v_owner,'RW-1',gen_random_uuid(),'pickup',50,50,'online','paid','failed',3),
+    (v_o1, v_owner,'RW-1','b0000000-0000-0000-0000-0000000000ff','pickup',50,50,'online','paid','failed',3),
     -- v_o2 starts BELOW the budget so it does not enroll yet: exactly one refund
     -- is queued at a time, making every claim in this block deterministic.
-    (v_o2, v_owner,'RW-2',gen_random_uuid(),'pickup',80,80,'online','paid','failed',0);
+    (v_o2, v_owner,'RW-2','b0000000-0000-0000-0000-0000000000ff','pickup',80,80,'online','paid','failed',0);
   set local session_replication_role = origin;
   update public.orders set lazywait_sync_state = 'dead_letter' where id in (v_o1, v_o2);
 

@@ -22,6 +22,12 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on: orders.branch_id is a real FK.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 select set_config('test.is_admin', 'true', true);
 select set_config('test.auth_uid', '', true);
 
@@ -53,9 +59,14 @@ declare
   v_ord  uuid := gen_random_uuid();
   v_reason text;
 begin
+  -- The loyalty inserts below run with FK triggers ON, so the customer needs
+  -- a real profile. profiles.id references auth.users(id); handle_new_user()
+  -- creates the profile from this insert.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
+
   set local session_replication_role = replica;
   insert into public.orders (id, customer_id, order_number, branch_id, order_type, subtotal, total)
-    values (v_ord, v_cust, 'SM-2026-000777', gen_random_uuid(), 'pickup', 50, 50);
+    values (v_ord, v_cust, 'SM-2026-000777', 'b0000000-0000-0000-0000-0000000000ff', 'pickup', 50, 50);
   set local session_replication_role = origin;
 
   -- Simulate exactly what place_order writes today.
@@ -111,8 +122,15 @@ declare
   n integer; v_bad integer; v_pts integer; v_bal integer;
 begin
   set local session_replication_role = replica;
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
   insert into public.profiles (id, full_name, phone_number, role, loyalty_points)
-    values (v_cust, 'Test Customer', '+966500000009', 'customer', 0);
+    values (v_cust, 'Test Customer', '+966500000009', 'customer', 0)
+  on conflict (id) do update set full_name = excluded.full_name,
+    phone_number = excluded.phone_number, role = excluded.role,
+    loyalty_points = excluded.loyalty_points;
   insert into public.branches (id, name_en, name_ar, address_en, address_ar, phone,
                                latitude, longitude, delivery_fee, min_delivery_order, is_active)
     values (v_branch,'B','ب','A','ع','+966500000000',24.7,46.7,15,40,true);
@@ -174,7 +192,13 @@ do $$
 declare v_cust uuid := gen_random_uuid(); v_reason text;
 begin
   set local session_replication_role = replica;
-  insert into public.profiles (id, role, loyalty_points) values (v_cust, 'customer', 0);
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
+  insert into public.profiles (id, role, loyalty_points) values (v_cust, 'customer', 0)
+  on conflict (id) do update set role = excluded.role,
+    loyalty_points = excluded.loyalty_points;
   set local session_replication_role = origin;
 
   insert into public.loyalty_transactions
@@ -293,6 +317,10 @@ declare
   v_points integer;
   v_bal    integer;
 begin
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_p) on conflict (id) do nothing;
   insert into public.profiles (id) values (v_p) on conflict (id) do nothing;
 
   -- A pre-rule row, written with the trigger disabled so it is stored verbatim.
@@ -358,8 +386,15 @@ declare
   v_reason text; n integer;
 begin
   set local session_replication_role = replica;
+  -- profiles.id references auth.users(id), so the auth user must exist first;
+  -- handle_new_user() then creates the profile row, which is why the insert
+  -- below upserts rather than plain-inserts.
+  insert into auth.users (id) values (v_cust) on conflict (id) do nothing;
   insert into public.profiles (id, full_name, phone_number, role, loyalty_points)
-    values (v_cust, 'C', '+966500000021', 'customer', 0);
+    values (v_cust, 'C', '+966500000021', 'customer', 0)
+  on conflict (id) do update set full_name = excluded.full_name,
+    phone_number = excluded.phone_number, role = excluded.role,
+    loyalty_points = excluded.loyalty_points;
   insert into public.branches (id,name_en,name_ar,address_en,address_ar,phone,
                                latitude,longitude,delivery_fee,min_delivery_order,is_active)
     values (v_branch,'B','ب','A','ع','+966500000000',24.7,46.7,15,40,true);

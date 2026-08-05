@@ -16,6 +16,16 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 -- ---- begin_lazywait_create_attempt (Findings 1 & 2) ------------------------
 do $$
 declare
@@ -25,10 +35,10 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, pos_sync_started_at, pos_sync_deadline_at) values
-    (v_ok,     'F-1', gen_random_uuid(),'pickup',10,10,'syncing', null, now()-interval '1m', now()+interval '9m'),
-    (v_late,   'F-2', gen_random_uuid(),'pickup',10,10,'syncing', null, now()-interval '11m', now()-interval '1m'),
-    (v_ref,    'F-3', gen_random_uuid(),'pickup',10,10,'syncing', 'REF', now()-interval '1m', now()+interval '9m'),
-    (v_pending,'F-4', gen_random_uuid(),'pickup',10,10,'pending', null, now()-interval '1m', now()+interval '9m');
+    (v_ok,     'F-1', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing', null, now()-interval '1m', now()+interval '9m'),
+    (v_late,   'F-2', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing', null, now()-interval '11m', now()-interval '1m'),
+    (v_ref,    'F-3', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing', 'REF', now()-interval '1m', now()+interval '9m'),
+    (v_pending,'F-4', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'pending', null, now()-interval '1m', now()+interval '9m');
   set local session_replication_role = origin;
 
   -- ready_to_send durably stamps the marker + token.
@@ -78,7 +88,7 @@ declare v_oid uuid := gen_random_uuid(); r1 text; r2 text;
 begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total, lazywait_sync_state)
-    values (v_oid, 'F-5', gen_random_uuid(),'pickup',10,10,'confirmation_required');
+    values (v_oid, 'F-5', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'confirmation_required');
   set local session_replication_role = origin;
   -- Worker enqueued the dedup event as 'pending'.
   insert into public.notification_log (kind, order_id, status, send_status)
@@ -117,7 +127,7 @@ begin
   -- so 'pos_retrying' matches the authoritative state.
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at)
-    values (v_oid, 'F-6', gen_random_uuid(),'pickup',10,10,'failed', now()+interval '2m', now()-interval '1m', now()+interval '9m');
+    values (v_oid, 'F-6', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed', now()+interval '2m', now()-interval '1m', now()+interval '9m');
   set local session_replication_role = origin;
   insert into public.notification_log (kind, order_id, status, send_status)
     values ('pos_sync', v_oid, 'pos_retrying', 'pending');
@@ -152,9 +162,9 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, first_pos_sync_failure_at) values
-    (v_sync,  'F-7', gen_random_uuid(),'pickup',10,10,'synced', 'REF7', now()-interval '5m'),
-    (v_conf,  'F-8', gen_random_uuid(),'pickup',10,10,'confirmation_required', null, now()-interval '5m'),
-    (v_noref, 'F-9', gen_random_uuid(),'pickup',10,10,'failed', null, now()-interval '5m');
+    (v_sync,  'F-7', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REF7', now()-interval '5m'),
+    (v_conf,  'F-8', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'confirmation_required', null, now()-interval '5m'),
+    (v_noref, 'F-9', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed', null, now()-interval '5m');
   set local session_replication_role = origin;
 
   -- (1) No enqueued event -> 'no_event', and NOTHING is inserted (consume-only).
@@ -224,12 +234,12 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, sync_next_attempt_at, pos_sync_started_at, pos_sync_deadline_at) values
-    (v_retry, 'V-1', gen_random_uuid(),'pickup',10,10,'failed', null, now()+interval '2m', now()-interval '1m', now()+interval '9m'),
-    (v_conf,  'V-2', gen_random_uuid(),'pickup',10,10,'synced', 'REFV2', null, null, null),
-    (v_noref, 'V-3', gen_random_uuid(),'pickup',10,10,'synced', 'REFV3', null, null, null),
-    (v_cr,    'V-4', gen_random_uuid(),'pickup',10,10,'confirmation_required', null, null, null, null),
-    (v_fail,  'V-5', gen_random_uuid(),'pickup',10,10,'dead_letter', null, null, null, null),
-    (v_tok,   'V-6', gen_random_uuid(),'pickup',10,10,'synced', 'REFV6', null, null, null);
+    (v_retry, 'V-1', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed', null, now()+interval '2m', now()-interval '1m', now()+interval '9m'),
+    (v_conf,  'V-2', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REFV2', null, null, null),
+    (v_noref, 'V-3', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REFV3', null, null, null),
+    (v_cr,    'V-4', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'confirmation_required', null, null, null, null),
+    (v_fail,  'V-5', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'dead_letter', null, null, null, null),
+    (v_tok,   'V-6', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REFV6', null, null, null);
   set local session_replication_role = origin;
 
   -- (1) pos_retrying claimed while retryable, order SYNCS before send -> superseded.
@@ -340,9 +350,9 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref) values
-    (v_ws,   'F-WS1', gen_random_uuid(),'pickup',10,10,'synced', '   '),
-    (v_lose, 'F-WS2', gen_random_uuid(),'pickup',10,10,'synced', 'REFWS2'),
-    (v_ok,   'F-WS3', gen_random_uuid(),'pickup',10,10,'synced', 'REFWS3');
+    (v_ws,   'F-WS1', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', '   '),
+    (v_lose, 'F-WS2', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REFWS2'),
+    (v_ok,   'F-WS3', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', 'REFWS3');
   set local session_replication_role = origin;
 
   -- CLAIM: a pending pos_confirmed whose order is synced but ref is whitespace-only
@@ -419,12 +429,12 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, pos_sync_started_at, pos_sync_deadline_at) values
-    (v_use,  'B-1', gen_random_uuid(),'pickup',10,10,'syncing','REFB',    now()-interval '1m', now()+interval '9m'),
-    (v_emp,  'B-2', gen_random_uuid(),'pickup',10,10,'syncing','',        now()-interval '1m', now()+interval '9m'),
-    (v_ws,   'B-3', gen_random_uuid(),'pickup',10,10,'syncing','   ',     now()-interval '1m', now()+interval '9m'),
-    (v_uni,  'B-4', gen_random_uuid(),'pickup',10,10,'syncing',chr(160),  now()-interval '1m', now()+interval '9m'),
-    (v_sync, 'B-5', gen_random_uuid(),'pickup',10,10,'synced', null,      now()-interval '1m', now()+interval '9m'),
-    (v_ok,   'B-6', gen_random_uuid(),'pickup',10,10,'syncing',null,      now()-interval '1m', now()+interval '9m');
+    (v_use,  'B-1', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing','REFB',    now()-interval '1m', now()+interval '9m'),
+    (v_emp,  'B-2', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing','',        now()-interval '1m', now()+interval '9m'),
+    (v_ws,   'B-3', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing','   ',     now()-interval '1m', now()+interval '9m'),
+    (v_uni,  'B-4', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing',chr(160),  now()-interval '1m', now()+interval '9m'),
+    (v_sync, 'B-5', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'synced', null,      now()-interval '1m', now()+interval '9m'),
+    (v_ok,   'B-6', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'syncing',null,      now()-interval '1m', now()+interval '9m');
   set local session_replication_role = origin;
 
   if public.begin_lazywait_create_attempt(v_use,  'tU')  <> 'already_synced' then

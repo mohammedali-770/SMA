@@ -18,43 +18,27 @@
 #
 # Format: one filename per line. `#` comments and blank lines ignored.
 
-# --- Insert an order with a branch_id that cannot exist ----------------------
-# Each does `insert into public.orders (…, branch_id, …) values (…,
-# gen_random_uuid(), …)`. `orders_branch_id_fkey` references public.branches,
-# so a random uuid can never satisfy it. These cannot pass against the current
-# schema under any harness; the fix is to use a seeded branch id
-# (supabase/seed.sql provides b0000000-0000-0000-0000-000000000001).
-lazywait_confirmation_lifecycle_test.sql
-lazywait_fencing_test.sql
-lazywait_presend_concurrency_test.sql
-lazywait_requeue_test.sql
-order_integrity_watchdog_test.sql
-tap_reference_order_opaque_test.sql
+# The six "branch_id => gen_random_uuid()" suites were here. Each now inserts
+# its own branch row and references it, so orders_branch_id_fkey is satisfied
+# by a branch that actually exists. Fixed, not quarantined.
 
-# --- Insert a profile without the auth.users row it references ---------------
-# public.profiles.id is `references auth.users(id) on delete cascade`, so a
-# profile cannot exist without its auth user. Fix: create the auth.users row
-# first (the handle_new_user trigger then creates the profile — see the note on
-# discounts_campaigns below).
-loyalty_reason_history_safe_test.sql
-loyalty_reason_no_order_number_test.sql
-order_read_contracts_test.sql
-order_confirmation_state_machine_test.sql
-
-# --- Insert auth.users AND profiles, colliding with handle_new_user ----------
-# `on_auth_user_created` already inserts the profile, so the suite's own insert
-# hits profiles_pkey. Fix: drop the explicit profile insert, or make it an
-# UPDATE / ON CONFLICT DO UPDATE.
-discounts_campaigns_test.sql
+# The profile-fixture suites were here. Each now creates the auth.users row
+# before the profile (profiles.id references auth.users(id)) and upserts the
+# profile, because handle_new_user() has already created it from that insert.
+# discounts_campaigns and order_confirmation_state_machine now PASS.
+#
+# discounts_campaigns, order_confirmation_state_machine, loyalty_reason_*
+# and order_read_contracts all pass now. The last three needed one more
+# fixture row each: a branch behind v_branch, an order behind the loyalty
+# transaction, and an auth user behind the customer.
 
 # --- Genuine assertion failures, worth investigating on their own merits -----
 
-# CASE 1 FAILED: tab/newline-only accepted.
-# The suite asserts a description of only tabs/newlines is REJECTED, and the
-# check constraint accepts it. Either the constraint's whitespace handling is
-# weaker than intended or the assertion is wrong — this one may be a real
-# product bug, and it is the most interesting entry in this file.
-require_address_description_test.sql
+# require_address_description_test.sql was here. It was right: btrim's default
+# character set is a space and ONLY a space, so a landmark of tabs and
+# newlines measured 5 characters and qualified. Fixed by migration
+# 20260802120000_address_description_trim_all_whitespace.sql, so the suite is
+# no longer quarantined.
 
 # expected exactly 5 cron jobs total, found 6.
 # The chain schedules six jobs on a clean database. Either a job the suite does

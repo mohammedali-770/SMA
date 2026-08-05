@@ -12,6 +12,16 @@
 -- ============================================================================
 begin;
 
+
+-- A branch to hang test orders on. `orders.branch_id` is a real FK to
+-- public.branches, and every case below cares about sync / payment / integrity
+-- state rather than about WHICH branch, so one fixed row serves all of them.
+-- Self-contained on purpose: not the seed's branch, so the suite does not
+-- depend on supabase/seed.sql having been loaded.
+insert into public.branches (id, name_en, name_ar)
+values ('b0000000-0000-0000-0000-0000000000ff', 'Suite Branch', 'فرع الاختبار')
+on conflict (id) do nothing;
+
 select set_config('test.is_admin', 'true', true);
 
 -- Helper: assert requeue is REJECTED with the given reason code AND the order's
@@ -97,15 +107,15 @@ begin
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, lazywait_ref, sync_attempt_count, pos_create_attempted_at,
     pos_sync_started_at, pos_sync_deadline_at) values
-    (v_exp, 'RQ-1', gen_random_uuid(),'pickup',10,10,'failed',      null,  2, null, now()-interval '11m', now()-interval '1m'),
-    (v_dl,  'RQ-2', gen_random_uuid(),'pickup',10,10,'dead_letter', null,  2, null, now()-interval '11m', now()-interval '1m'),
-    (v_cr,  'RQ-3', gen_random_uuid(),'pickup',10,10,'confirmation_required', null, 1, null, now()-interval '3m', now()+interval '7m'),
-    (v_ref, 'RQ-4', gen_random_uuid(),'pickup',10,10,'blocked',     'REFX',1, null, now()-interval '3m', now()+interval '7m'),
-    (v_max, 'RQ-5', gen_random_uuid(),'pickup',10,10,'failed',      null,  5, null, now()-interval '3m', now()+interval '7m'),
-    (v_may, 'RQ-6', gen_random_uuid(),'pickup',10,10,'blocked',     null,  1, now()-interval '2m', now()-interval '3m', now()+interval '7m'),
-    (v_unv, 'RQ-10', gen_random_uuid(),'pickup',10,10,'blocked',    '   ', 1, null, now()-interval '3m', now()+interval '7m'),
-    (v_ok,  'RQ-7', gen_random_uuid(),'pickup',10,10,'blocked',     null,  1, null, now()-interval '3m', now()+interval '7m'),
-    (v_skip,'RQ-8', gen_random_uuid(),'pickup',10,10,'skipped',     null,  0, null, null,               null);
+    (v_exp, 'RQ-1', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed',      null,  2, null, now()-interval '11m', now()-interval '1m'),
+    (v_dl,  'RQ-2', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'dead_letter', null,  2, null, now()-interval '11m', now()-interval '1m'),
+    (v_cr,  'RQ-3', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'confirmation_required', null, 1, null, now()-interval '3m', now()+interval '7m'),
+    (v_ref, 'RQ-4', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'blocked',     'REFX',1, null, now()-interval '3m', now()+interval '7m'),
+    (v_max, 'RQ-5', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'failed',      null,  5, null, now()-interval '3m', now()+interval '7m'),
+    (v_may, 'RQ-6', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'blocked',     null,  1, now()-interval '2m', now()-interval '3m', now()+interval '7m'),
+    (v_unv, 'RQ-10', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'blocked',    '   ', 1, null, now()-interval '3m', now()+interval '7m'),
+    (v_ok,  'RQ-7', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'blocked',     null,  1, null, now()-interval '3m', now()+interval '7m'),
+    (v_skip,'RQ-8', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'skipped',     null,  0, null, null,               null);
   set local session_replication_role = origin;
 
   -- Rejections: no state change, correct reason code (no false success).
@@ -150,7 +160,7 @@ begin
   set local session_replication_role = replica;
   insert into public.orders (id, order_number, branch_id, order_type, subtotal, total,
     lazywait_sync_state, pos_sync_started_at, pos_sync_deadline_at)
-    values (v_id, 'RQ-9', gen_random_uuid(),'pickup',10,10,'blocked', now()-interval '2m', now()+interval '8m');
+    values (v_id, 'RQ-9', 'b0000000-0000-0000-0000-0000000000ff','pickup',10,10,'blocked', now()-interval '2m', now()+interval '8m');
   set local session_replication_role = origin;
   perform set_config('test.is_admin', 'false', true);
   begin
