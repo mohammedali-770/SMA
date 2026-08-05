@@ -1,0 +1,177 @@
+name: Production gates
+
+# Gates that protect what actually reaches customers. Complements, and does not
+# duplicate, the other workflows:
+#
+#   design-system.yml  typecheck (web + mobile), unit tests, token-mirror purity
+#   sql-suites.yml     migration chain + SQL suites          (PR #145)
+#   THIS FILE          production build, Edge Function typecheck, dependency audit
+#
+# Why each job exists — every one closes a gap that was previously ungated:
+#
+#   build           `npm run build` is the exact command Vercel runs. Nothing ran
+#                   it before merge, so a change that compiles under `tsc --noEmit`
+#                   but breaks the Vite build or the Expo web export reached the
+#                   production branch and only failed in Vercel — after merge.
+#
+#   edge-functions  supabase/functions/ is EXCLUDED from the root tsconfig
+#                   ("exclude": ["node_modules", "dist", "supabase/functions"]) and
+#                   has no tsconfig of its own, so ~10k lines of payment, auth,
+#                   POS-sync and account-deletion code were typechecked by nothing.
+#                   Enabling this check found a real pre-existing type error in
+#                   _shared/authHook.ts (WebCrypto importKey), fixed in this PR.
+#
+#   audit           Both trees had accumulated HIGH advisories since the last
+#                   security review recorded "0 vulnerabilities", with nothing
+#                   watching. Gated at `high` so the 12 upstream Expo MODERATE
+#                   advisories (no non-breaking fix available) do not block work.
+#
+# Read-only: this workflow only inspects the checkout. It never comments, pushes,
+# publishes, deploys or touches releases. Declared explicitly rather than
+# inheriting the repository default, which may be read-write.
+
+# Deliberately NOT filtered by base branch. design-system.yml filters on
+# `branches: [claude/project-build-ie4b56, main]`, which means a STACKED pull
+# request (one feature branch based on another, as PR #146 is on PR #145) never
+# runs it and merges having passed no gate at all. These gates run on every pull
+# request regardless of base, so a stack is checked at each link.
+on:
+  pull_request:
+  push:
+    branches: [claude/project-build-ie4b56, main]
+
+permissions:
+  contents: read
+
+# One run per ref: a rapid series of pushes to a PR supersedes itself instead of
+# queueing several full installs of both apps.
+concurrency:
+  group: production-gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The build Vercel actually runs. If this fails, merging breaks the live site.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Production build (Vite + Expo web export)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Actions are pinned to commit SHAs, not floating tags: a tag can be
+      # repointed, and this job runs on pull_request against the default branch.
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --no-audit --no-fund
+
+      # `npm run build` installs apps/mobile itself (npm --prefix apps/mobile ci)
+      # and then runs `vite build` followed by the Expo web export, so this single
+      # step reproduces the Vercel build end to end.
+      #
+      # No Supabase env vars are set on purpose. The build must succeed without
+      # them (it falls back to bundled demo data — see docs/DEPLOY.md), which
+      # keeps this gate secret-free. It therefore verifies that the build
+      # COMPILES, not that production is correctly configured; the missing-env
+      # runtime behaviour is a separate concern tracked in the readiness plan.
+      - name: Build (exactly what Vercel runs)
+        run: npm run build
+
+      - name: Verify both bundles were emitted
+        run: |
+          set -euo pipefail
+          test -f dist/index.html || { echo "::error::admin console bundle missing (dist/index.html)"; exit 1; }
+          test -f dist/app/index.html || { echo "::error::customer web app bundle missing (dist/app/index.html)"; exit 1; }
+          echo "dist/index.html and dist/app/index.html both present"
+
+      # A source map in the shipped output leaks original sources to anyone who
+      # opens devtools. The Sentry upload is token-gated and must delete them.
+      - name: No source maps in the shipped bundle
+        run: |
+          set -euo pipefail
+          MAPS="$(find dist -name '*.map' -type f | head -20)"
+          if [ -n "$MAPS" ]; then
+            echo "::error::source maps present in dist/ — they must not ship"
+            echo "$MAPS"
+            exit 1
+          fi
+          echo "no .map files in dist/"
+
+  # ---------------------------------------------------------------------------
+  # Edge Functions: typechecked by nothing before this job existed.
+  # ---------------------------------------------------------------------------
+  edge-functions:
+    name: Edge Function typecheck (Deno)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          # Pinned rather than floating: a Deno minor bump can change lib types and
+          # turn this gate red on an unrelated PR. Supabase's Edge Runtime tracks
+          # Deno 2.x; bump deliberately and re-run the check when it moves.
+          deno-version: "2.9.4"
+
+      # Checks every deployed entrypoint and, transitively, everything under
+      # _shared/ that the entrypoints import — i.e. exactly the code that ships.
+      #
+      #   --node-modules-dir=none  the repo has a node_modules/ from the web app's
+      #                            npm ci; without this Deno tries to resolve the
+      #                            functions' `npm:` specifiers out of it and fails.
+      #   --no-lock                there is no deno.lock in this repo.
+      #
+      # *.test.ts files are deliberately NOT checked here: they import `vitest` and
+      # use extensionless specifiers, because they run under the root vitest suite
+      # (see vitest.config.ts), not under Deno.
+      - name: Typecheck all Edge Function entrypoints
+        run: deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
+
+  # ---------------------------------------------------------------------------
+  # Dependency advisories in both trees.
+  # ---------------------------------------------------------------------------
+  audit:
+    name: Dependency audit (high+)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      # Audits the lockfiles directly — no install needed, so this job stays fast
+      # and cannot be influenced by install scripts.
+      - name: Audit web dependencies
+        run: npm audit --audit-level=high
+
+      # Gated at `high` because the mobile tree carries 12 MODERATE advisories from
+      # upstream Expo packages with no non-breaking fix available. Failing on those
+      # would block every PR on something this repo cannot fix. See
+      # docs/DEPENDENCY_ADVISORIES.md for the standing exceptions and their review
+      # date — that file is the place to justify anything left unfixed.
+      - name: Audit mobile dependencies
+        run: npm --prefix apps/mobile audit --audit-level=high

@@ -42,8 +42,13 @@ export function bytesToBase64(bytes: ArrayBuffer | Uint8Array): string {
 
 /** HMAC-SHA256(keyBytes, message) → base64. */
 export async function hmacSha256Base64(keyBytes: Uint8Array, message: string): Promise<string> {
+  // Uint8Array is generic over its backing buffer from TS 5.7 on, and WebCrypto's
+  // BufferSource only accepts an ArrayBuffer-backed view — a Uint8Array<ArrayBufferLike>
+  // (potentially SharedArrayBuffer-backed) no longer assigns. Copy into a view that is
+  // statically ArrayBuffer-backed. Runtime behaviour is unchanged; hook keys are tiny.
+  const rawKey = new Uint8Array(keyBytes);
   const key = await crypto.subtle.importKey(
-    'raw', keyBytes, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    'raw', rawKey, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
   );
   const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
   return bytesToBase64(sig);
