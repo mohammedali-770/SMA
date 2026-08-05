@@ -10,40 +10,70 @@
 
 ---
 
-## ⚠️ 0. Read before you add `SUPABASE_ACCESS_TOKEN`
+## ✅ 0. `SUPABASE_ACCESS_TOKEN` — the trap is DISARMED (2026-08-05)
 
-**Adding that secret is currently the single most dangerous action available in
-this repository**, and it looks like routine housekeeping.
+**This section used to say that adding that secret was the single most dangerous
+action available in this repository. That is no longer true.** The workflow was
+hardened on 2026-08-05, with owner approval, before the secret was added — which
+is the order this section demanded.
 
-`.github/workflows/deploy-functions.yml` has a `push:` trigger with **no
-`branches:` filter** (lines 23–25). It is hardcoded to
-`PROJECT_REF: wxfmmnihidsdyemasstf` (production) and defaults to exactly the four
-payment functions that CLAUDE.md §6 **freezes**:
+What the danger was: `.github/workflows/deploy-functions.yml` carried a `push:`
+trigger with **no `branches:` filter**, hardcoded to
+`PROJECT_REF: wxfmmnihidsdyemasstf` (production), defaulting to exactly the four
+payment functions that CLAUDE.md §6 **freezes**. On a `push` event
+`inputs.functions` is empty, so the script fell through to that payment set.
+So **any push, on any branch, touching that file deployed frozen payment
+functions to production** — no PR, no approval, no environment gate.
 
-```yaml
-  push:
-    paths:
-      - '.github/workflows/deploy-functions.yml'
-```
+It was not hypothetical: run **#4 fired from an unrelated feature branch**
+(`claude/debug-tap-test-checkout-x3izo0`) on 2026-07-13. It never actually
+deployed only because `SUPABASE_ACCESS_TOKEN` has never existed — all four of
+its runs died at the CLI with *"Access token not provided"*.
 
-So: **any push, on any branch, that touches that file deploys frozen payment
-functions to production** — no PR, no approval, no environment gate. It has never
-fired successfully only because the secret does not exist. Adding the secret arms
-it.
+**Verified absent immediately before the fix was pushed** (2026-08-05 06:31 UTC):
+a read-only `workflow_dispatch` of `function-drift.yml` reported
+`SUPABASE_ACCESS_TOKEN:` empty and failed with *"SUPABASE_ACCESS_TOKEN is not
+set"*. That is what made pushing the fix safe — the disarm window this section
+described was still open.
 
-Fix the workflow **first**, while the secret is still absent so the triggering
-push fails harmlessly at the deploy step. The patch is in §1.
+**You may now add the secret when you want to.** Doing so no longer arms a
+deploy: the only route into this workflow is a manual `workflow_dispatch`, on the
+production branch, with a typed confirmation (§1). Adding it also makes
+`function-drift.yml` start reporting instead of failing every weekday.
+
+Still true, and unchanged by the fix: **deploying an Edge Function requires your
+explicit approval every time** (CLAUDE.md §5), and the payment functions remain
+**frozen** (§6). The guards make an accidental deploy hard; they do not grant
+approval.
 
 ---
 
-## 1. Harden the deploy workflow — do this first
+## 1. Harden the deploy workflow — DONE (2026-08-05)
 
-**Why it is not already done:** editing that file *is* the trigger. Pushing the
-fix from an agent session would itself be a production payment-function deploy,
-which §5/§6 puts behind your explicit approval. So the patch is written out here
-rather than pushed.
+**Status: applied.** Editing that file *was* its own trigger, which is why this
+was written out as a patch rather than pushed. It was safe to push once the
+secret was confirmed absent (§0), and safe twice over because the pushed commit
+removes the `push:` trigger — GitHub evaluates the workflow file *as it exists in
+the pushed commit*, so no run is created.
 
-Apply on a feature branch, open a PR, merge with your approval:
+What shipped, beyond the patch below:
+
+| Guard | Effect |
+| --- | --- |
+| `push:` trigger removed | The only route in is a manual `workflow_dispatch`. |
+| `if: github.ref == 'refs/heads/claude/project-build-ie4b56'` | A dispatch against a feature branch is skipped, never shipping unreviewed code. |
+| `environment: production` | Pauses for a required reviewer — **inert until GitHub Pro/Team** (§3.1). |
+| `permissions: contents: read` | Least privilege, instead of inheriting a possibly read-write default. |
+| `confirm` input must equal `DEPLOY` | A deliberate typed step, not a click-through. |
+| `functions` default now **empty** | It used to default to the frozen payment set, so opening the dialog and pressing Run deployed frozen payment code. The run now fails unless functions are named. |
+| Token scoped to the deploy step | No other step can read `SUPABASE_ACCESS_TOKEN`. |
+| Function names validated against the checkout | A typo cannot reach the Supabase CLI. |
+| `actions/checkout` pinned to a commit SHA | A floating tag can be repointed; this job deploys to production. |
+
+The last four are additions beyond the patch as originally written. Drop any of
+them if you disagree — the load-bearing ones are the first two.
+
+The original patch, kept for the record:
 
 ```diff
 --- a/.github/workflows/deploy-functions.yml
@@ -86,10 +116,13 @@ Apply on a feature branch, open a PR, merge with your approval:
 Two caveats, so this is not a surprise later:
 
 - **The `environment:` gate needs GitHub Pro/Team** (see §3). On the current free
-  private plan, required reviewers on environments are unavailable — the `if:`
-  branch guard and removing `push:` still work and are worth doing alone.
+  private plan, required reviewers on environments are unavailable, so that line
+  is declared but **inert** — the `if:` branch guard, the removed `push:` trigger
+  and the typed confirmation are what actually protect you today.
 - Removing `push:` means the only way to deploy is the Actions tab
-  (`workflow_dispatch`). That is the intent.
+  (`workflow_dispatch`). That is the intent. Note the workflow can no longer be
+  triggered by touching the file, which was the old workaround for dispatching
+  via the API against a non-default branch.
 
 **Also worth knowing:** the workflow covers 4 of the 21 functions. The other 17
 reach production by hand, and nothing records which commit any deployed function
