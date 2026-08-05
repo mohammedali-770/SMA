@@ -205,4 +205,79 @@ describe('CSV bulk upload', () => {
     expect(screen.queryByRole('button', { name: 'Commit Bulk Upload to Menu' })).toBeNull();
     expect(bulkUploadMenu).not.toHaveBeenCalled();
   });
+
+  /**
+   * The commit used to be fire-and-forget: it called bulkUploadMenu without
+   * awaiting it, then unconditionally alerted "Successfully loaded N products"
+   * using the PARSED count, and cleared the parsed result. A total failure and a
+   * half-written menu were therefore indistinguishable from a clean import, and
+   * the CSV needed to retry had already been discarded.
+   *
+   * The import is not transactional — rows go in one at a time — so the failure
+   * path has to report what actually landed and keep the parsed result.
+   */
+  const HEADER =
+    'category_name_en,category_name_ar,product_name_en,product_name_ar,description_en,description_ar,price_sar,calories,image_url';
+  const TWO_ROWS =
+    `${HEADER}\n`
+    + 'Burgers,برجر,Test Burger,برجر تجريبي,tasty,لذيذ,25.50,600,http://img\n'
+    + 'Burgers,برجر,Second Burger,برجر ثاني,also tasty,لذيذ,30.00,700,http://img2';
+
+  function parseTwoRows() {
+    fireEvent.click(tab('Excel/CSV Bulk Import'));
+    fireEvent.change(screen.getByPlaceholderText(/category_name_en/i), { target: { value: TWO_ROWS } });
+    fireEvent.click(tab('Validate and Parse Spreadsheet'));
+  }
+
+  it('reports the count the server actually wrote, not the parsed count', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // Two rows parsed, but the server reports one written and one skipped.
+    bulkUploadMenu.mockResolvedValue({ success: true, count: 1, skipped: 1 });
+    render(<MenuManagementPanel />);
+    parseTwoRows();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' }));
+    await vi.waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+    const msg = String(alertSpy.mock.calls.at(-1)?.[0]);
+    expect(msg).toContain('1 products');   // what was written
+    expect(msg).not.toContain('2 products'); // NOT what was parsed
+    expect(msg).toMatch(/1 product\(s\) were skipped/);
+  });
+
+  it('does not claim success when the import fails, and keeps the parsed CSV for a retry', async () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // Failed after writing 1 of 2 — a partially imported menu, not a no-op.
+    bulkUploadMenu.mockResolvedValue({ success: false, count: 1, skipped: 0 });
+    render(<MenuManagementPanel />);
+    parseTwoRows();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' }));
+    await vi.waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+    const msg = String(alertSpy.mock.calls.at(-1)?.[0]);
+    expect(msg).toMatch(/failed/i);
+    expect(msg).not.toMatch(/success/i);
+    // Says the menu is now partially imported and that a retry duplicates rows.
+    expect(msg).toMatch(/partially imported/i);
+    expect(msg).toContain('1 of 2');
+
+    // The parsed result survives, so the admin can inspect or retry it.
+    expect(screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' })).toBeTruthy();
+  });
+
+  it('cannot be double-submitted while a commit is in flight', async () => {
+    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // Never settles: the button must be disabled for the whole in-flight window.
+    bulkUploadMenu.mockReturnValue(new Promise(() => {}));
+    render(<MenuManagementPanel />);
+    parseTwoRows();
+
+    const btn = screen.getByRole('button', { name: 'Commit Bulk Upload to Menu' });
+    fireEvent.click(btn);
+
+    await vi.waitFor(() =>
+      expect((screen.getByRole('button', { name: 'Importing…' }) as HTMLButtonElement).disabled).toBe(true));
+    expect(bulkUploadMenu).toHaveBeenCalledTimes(1);
+  });
 });

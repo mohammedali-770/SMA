@@ -28,6 +28,21 @@ import {
 } from '../lib/payment';
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 
+/**
+ * Outcome of a CSV bulk menu import.
+ *
+ * `count` is the number of products actually written, on the success AND failure
+ * paths — the import is not transactional, so a failure with `count > 0` is a
+ * partially-imported menu that a human has to reconcile, not a no-op.
+ * `skipped` counts parsed products whose category could not be resolved to a real
+ * one; they were silently dropped before this was surfaced.
+ */
+export interface BulkUploadResult {
+  success: boolean;
+  count: number;
+  skipped: number;
+}
+
 interface AppContextType {
   // Auth / session (Option A: GoTrue = authentication, profiles.role = authorization)
   authReady: boolean;
@@ -99,7 +114,15 @@ interface AppContextType {
   isProductAvailableInBranch: (productId: string, branchId: string) => boolean;
   updateBranchSettings: (id: string, updates: Partial<Branch>) => void;
   deleteBranch: (id: string) => Promise<void>;
-  bulkUploadMenu: (categories: Category[], products: Product[]) => Promise<{ success: boolean; count: number }>;
+  /**
+   * Bulk-imports parsed CSV categories and products.
+   *
+   * Not atomic: rows are inserted one at a time, so a mid-run failure leaves the
+   * earlier rows written. Callers MUST await this and branch on `success` —
+   * `count` reports what actually reached the database on BOTH paths, so a
+   * failed import with `count > 0` means the menu is now partially imported.
+   */
+  bulkUploadMenu: (categories: Category[], products: Product[]) => Promise<BulkUploadResult>;
 
   // Delivery zones (per-branch coverage polygons). Reads are public (active
   // zones); writes are admin-only via the server RPCs.
@@ -934,7 +957,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // ---- Admin: bulk CSV upload ----------------------------------------------
-  const bulkUploadMenu = async (newCats: Category[], newProds: Product[]): Promise<{ success: boolean; count: number }> => {
+  // Products are inserted one row at a time, so a failure part-way through leaves
+  // the rows before it already written. `count` therefore always reports what
+  // actually reached the database — including on the failure path, where it used
+  // to report 0 and describe a half-imported menu as a no-op. `skipped` counts
+  // parsed products whose category could not be resolved: they are dropped, and
+  // silently dropping a product the admin can see in the preview is its own bug.
+  const bulkUploadMenu = async (newCats: Category[], newProds: Product[]): Promise<BulkUploadResult> => {
+    let count = 0;
+    let skipped = 0;
     try {
       // Insert categories not already present (match by English name), then map
       // the parsed products' category ids to the real inserted category ids.
@@ -949,19 +980,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       );
 
       const parsedCatById = new Map(newCats.map(c => [c.id, c] as [string, Category]));
-      let count = 0;
       for (const p of newProds) {
         const parsedCat = parsedCatById.get(p.categoryId);
         const realCatId = parsedCat ? dbByName.get(parsedCat.nameEn.toLowerCase()) : dbByName.get('');
-        if (!realCatId) continue;
+        if (!realCatId) { skipped++; continue; }
         await adminApi.createProduct(productToDbInsert({ ...p, categoryId: realCatId }, count + 1));
         count++;
       }
       await refreshCatalog();
-      return { success: true, count };
+      return { success: true, count, skipped };
     } catch (e) {
       setWriteError(e instanceof Error ? e.message : String(e));
-      return { success: false, count: 0 };
+      // Rows written before the failure are already live. Re-read the catalog so
+      // the admin sees the real, partially-imported state instead of the stale
+      // pre-import one, then report the true count rather than 0.
+      try { await refreshCatalog(); } catch { /* surfaced via writeError already */ }
+      return { success: false, count, skipped };
     }
   };
 

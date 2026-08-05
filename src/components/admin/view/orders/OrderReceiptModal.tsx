@@ -17,6 +17,7 @@ import React from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 import { canTransitionOrder } from '../../../../context/AppContext';
+import { Card } from '../../../../design-system/ui/Card';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
 import { useDsFontClass } from '../../../../design-system/ui/useDsLang';
@@ -180,8 +181,33 @@ export function OrderReceiptModal({
             )}
           </div>
 
+          {/*
+            The customer's free-text note. `orders.notes` has always existed and
+            admin_list_orders_with_items has always returned it, but it was never
+            mapped into the admin Order type, so nothing displayed it anywhere —
+            and the POS handoff does not carry it either. This modal is therefore
+            the ONLY place this text can reach a human.
+
+            It renders above the items and in the warning tone deliberately: the
+            realistic worst case for this field is an unread allergy.
+          */}
+          {order.notes && (
+            <Card tone="warning" className="px-3 py-2">
+              <Text variant="caption" tone="tertiary" as="p">
+                {isRTL ? 'ملاحظة العميل:' : 'Customer note:'}
+              </Text>
+              {/* whitespace-pre-wrap keeps the customer's own line breaks; break-words
+                  stops a long unbroken string blowing out the modal width. */}
+              <Text variant="label" as="p" className="mt-0.5 whitespace-pre-wrap break-words">
+                {order.notes}
+              </Text>
+            </Card>
+          )}
+
           <div className="space-y-2">
-            <Text variant="caption" tone="tertiary" as="p">Ordered Items:</Text>
+            <Text variant="caption" tone="tertiary" as="p">
+              {isRTL ? ':الأصناف المطلوبة' : 'Ordered Items:'}
+            </Text>
             {order.items.map((item) => (
               <div
                 key={item.id}

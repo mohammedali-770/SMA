@@ -236,6 +236,9 @@ export function mapOrder(o: DbOrderWithItems): Order {
     createdAt: o.created_at,
     address: o.address_snapshot ? mapAddressSnapshot(o.address_snapshot) : undefined,
     items: (o.order_items ?? []).map(mapOrderItem),
+    // Trimmed so a whitespace-only note does not render an empty highlighted
+    // panel that looks like a missing instruction.
+    notes: o.notes?.trim() ? o.notes.trim() : undefined,
   };
 }
 

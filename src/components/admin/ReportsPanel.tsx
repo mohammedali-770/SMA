@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Download } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
@@ -517,18 +517,28 @@ export const ReportsPanel: React.FC = () => {
         </div>
       </Card>
 
+      {/*
+        This card used to assert that the reports were "fully compliant with the
+        ZATCA Saudi Arabia 15% VAT directives". They are not, and nothing in this
+        system issues a tax invoice: there is no invoice sequence, no seller VAT
+        registration number, no e-invoice XML and no QR code anywhere in the
+        schema. Telling staff otherwise is exactly the kind of claim that gets
+        relied on. It is replaced with a factual description of what these
+        figures actually are — a management sales summary — plus the two caveats
+        that materially affect the numbers on screen.
+      */}
       <Card className="flex items-start gap-2">
-        <Check className="mt-0.5 size-4 shrink-0 text-mint" aria-hidden="true" />
+        <Info className="mt-0.5 size-4 shrink-0 text-ink-secondary" aria-hidden="true" />
         <div>
           <Text variant="label" as="p">
             {isRTL
-              ? 'إقرار ومطابقة الهيئة العامة للزكاة والضريبة والجمارك (Saudi VAT Audit Compliance)'
-              : 'ZATCA Tax Invoice Audit Note:'}
+              ? 'ملاحظة: تقرير مبيعات إداري — وليس فاتورة ضريبية'
+              : 'Note: management sales report — not a tax invoice'}
           </Text>
           <Text variant="caption" tone="secondary" as="p" className="mt-0.5 leading-relaxed">
             {isRTL
-              ? 'تعتبر هذه التقارير والتحليلات كشوف مبيعات فورية متوافقة بالكامل مع اللائحة التنفيذية لضريبة القيمة المضافة بالمملكة العربية السعودية بنسبة ١٥٪. جميع الأسعار الظاهرة شاملة الضريبة، ويتم استخلاص الوعاء الضريبي تلقائياً بناءً على العمليات الناجحة.'
-              : 'All generated digital invoices and daily registers are fully compliant with the ZATCA Saudi Arabia 15% VAT directives. Tax components are extracted in real-time from gross sales at standard math: VAT = Total - (Total / 1.15).'}
+              ? 'هذه الأرقام ملخص مبيعات للاستخدام الإداري فقط، ولا تُعد فواتير ضريبية ولا سجلات معتمدة لأغراض الإقرار الضريبي. مبلغ الضريبة معروض هنا محسوباً من الإجمالي بنسبة الضريبة المُعدّة حالياً، وليس بالنسبة التي كانت سارية وقت كل طلب — لذلك فإن تغيير نسبة الضريبة في الإعدادات يغيّر أرقام الفترات السابقة. كما تعتمد التقارير على تحديث حالة الطلب يدوياً من قِبل الموظفين. يُرجى الرجوع إلى المحاسب لأي إقرار ضريبي رسمي.'
+              : 'These figures are a management sales summary for internal use. They are not tax invoices and are not an approved record for VAT filing. The VAT column is derived from each order total using the VAT rate configured right now — not the rate in force when the order was placed — so changing the rate in Settings will change historical periods. Reports also depend on staff updating order status by hand. Use your accountant for any official VAT return.'}
           </Text>
         </div>
       </Card>

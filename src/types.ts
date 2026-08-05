@@ -160,6 +160,14 @@ export interface Order {
   createdAt: string;
   address?: SavedAddress;
   items: OrderItem[];
+  /**
+   * Free-text note the customer attached at checkout — allergies, "no onions",
+   * door codes. The column has always existed and `admin_list_orders_with_items`
+   * has always returned it, but it was never mapped into this type, so no staff
+   * member could read it. The POS handoff does not carry it either, which makes
+   * the dashboard the ONLY place this text can reach a human.
+   */
+  notes?: string;
 }
 
 export interface CartItem {
