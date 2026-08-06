@@ -16,6 +16,7 @@
 import React from 'react';
 import { AlertTriangle, Map as MapIcon, MapPin, Pencil, Trash2 } from 'lucide-react';
 
+import { NumericCommitField } from '../NumericCommitField';
 import { Card } from '../../../../design-system/ui/Card';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
@@ -72,22 +73,6 @@ export function BranchCard({
   const deliveryClosed = branch.deliveryTemporarilyClosed ?? false;
   const hasCoords = Number.isFinite(branch.latitude) && Number.isFinite(branch.longitude)
     && !(branch.latitude === 0 && branch.longitude === 0);
-
-  const numRow = (label: string, value: number | string, onChange: (v: string) => void,
-                  placeholder?: string) => (
-    <div className="flex items-center justify-between gap-2">
-      <Text variant="caption" tone="secondary" as="span">{label}</Text>
-      <input
-        type="number"
-        disabled={isAccountant}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={label}
-        className={NUM_INPUT}
-      />
-    </div>
-  );
 
   return (
     <Card className="space-y-3">
@@ -148,15 +133,39 @@ export function BranchCard({
         />
       </div>
 
+      {/*
+        These three write real operating policy — a delivery fee, an order
+        minimum and a promised ETA — straight to the live database. They commit
+        on blur/Enter, never on keystroke: the previous `parseFloat(v) || 0`
+        onChange persisted `2` while an operator typed `25`, and persisted a
+        genuine 0 SAR fee the moment the field was cleared to retype it.
+        A rejected entry restores the stored value instead of writing.
+      */}
       <div className="space-y-2 border-t border-con-line pt-3">
-        {numRow(t.delivery_fee, branch.deliveryFee,
-          (v) => onUpdate({ deliveryFee: parseFloat(v) || 0 }))}
-        {numRow(isRTL ? 'الحد الأدنى للتوصيل' : 'Delivery minimum order', branch.minDeliveryOrder,
-          (v) => onUpdate({ minDeliveryOrder: parseFloat(v) || 0 }))}
-        {numRow(isRTL ? 'وقت التوصيل التقريبي (دقيقة)' : 'Estimated delivery time (min)',
-          branch.estimatedDeliveryMinutes ?? '',
-          (v) => onUpdate({ estimatedDeliveryMinutes: v === '' ? undefined : (parseInt(v) || 0) }),
-          '—')}
+        <NumericCommitField
+          label={t.delivery_fee}
+          value={branch.deliveryFee}
+          onCommit={(v) => onUpdate({ deliveryFee: v ?? 0 })}
+          disabled={isAccountant}
+          min={0}
+        />
+        <NumericCommitField
+          label={isRTL ? 'الحد الأدنى للتوصيل' : 'Delivery minimum order'}
+          value={branch.minDeliveryOrder}
+          onCommit={(v) => onUpdate({ minDeliveryOrder: v ?? 0 })}
+          disabled={isAccountant}
+          min={0}
+        />
+        <NumericCommitField
+          label={isRTL ? 'وقت التوصيل التقريبي (دقيقة)' : 'Estimated delivery time (min)'}
+          value={branch.estimatedDeliveryMinutes ?? null}
+          onCommit={(v) => onUpdate({ estimatedDeliveryMinutes: v ?? undefined })}
+          disabled={isAccountant}
+          placeholder="—"
+          min={0}
+          integer
+          allowEmpty
+        />
 
         <div className="grid grid-cols-2 gap-1.5 pt-1">
           <ToggleChip

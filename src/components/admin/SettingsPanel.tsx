@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, AlertTriangle, Banknote, Check, CreditCard, Gift, LifeBuoy, MapPin, ShieldCheck, Sliders, Wallet } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ADMIN_LOCALES } from './adminLocales';
+import { NumericCommitField } from './view/NumericCommitField';
 import { Price } from '../Price';
 import { PaymentMethod, availableMethods } from '../../lib/payment';
 import { mapConfig } from '../../lib/map';
@@ -234,14 +235,27 @@ export const SettingsPanel: React.FC = () => {
                           <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">{isRTL ? 'إعدادات ضريبة القيمة المضافة بالمملكة' : 'Saudi Arabia VAT Regulatory Config'}</span>
                           
                           <div className="grid grid-cols-2 gap-3">
+                            {/*
+                              VAT is the tax rate applied to every order total.
+                              It commits on blur/Enter and refuses a blank or
+                              out-of-range entry: the previous
+                              `parseFloat(e.target.value) || 0` persisted a real
+                              0% the moment the field was cleared to retype it,
+                              and receipts recompute tax from the LIVE rate, so
+                              that silently re-split the tax on historical
+                              receipts too. Capped at 100 — a rate above that is
+                              always a typo.
+                            */}
                             <div>
                               <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">{isRTL ? 'نسبة الضريبة المضافة (%)' : 'VAT Percentage'}</label>
-                              <input 
-                                type="number"
+                              <NumericCommitField
+                                label={isRTL ? 'نسبة الضريبة المضافة (%)' : 'VAT Percentage'}
                                 value={brandSettings.vatPercentage}
-                                onChange={(e) => updateBrandSettings({ vatPercentage: parseFloat(e.target.value) || 0 })}
-                                className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+                                onCommit={(v) => { if (v !== null) updateBrandSettings({ vatPercentage: v }); }}
                                 disabled={isAccountant}
+                                min={0}
+                                max={100}
+                                suffix="%"
                               />
                             </div>
 
