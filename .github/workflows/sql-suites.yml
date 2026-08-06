@@ -17,6 +17,11 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/tests/**'
+      # The harness loads this into the template database before every suite
+      # (.github/sql-ci/run.sh, "Seed" step), and a third of the suites depend
+      # on its fixed branch ids. Editing it could break every suite while this
+      # workflow stayed green by never running.
+      - 'supabase/seed.sql'
       - '.github/sql-ci/**'
       - '.github/workflows/sql-suites.yml'
   workflow_dispatch:

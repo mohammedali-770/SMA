@@ -11,9 +11,24 @@ name: Design system
 # Deliberately scoped to what this PR introduced. It does not gate unrelated
 # pre-existing code, so it cannot become a blanket blocker on other work.
 
+# The pull_request trigger is deliberately NOT filtered by base branch.
+#
+# It used to read `pull_request: branches: [claude/project-build-ie4b56, main]`.
+# A `branches:` filter on pull_request matches the BASE branch, so a STACKED pull
+# request — one feature branch based on another, which is how this repository
+# already works (PR #146 was based on PR #145) — matched nothing and merged
+# having run no typecheck and no unit tests at all. That is 1660 tests skipped on
+# the repository's own documented workflow, on exactly the pull requests that are
+# hardest to review.
+#
+# The steps stay here rather than moving into production-gates.yml: both
+# workflows would then have to install BOTH dependency trees, roughly doubling
+# CI time for every pull request to fix a trigger bug.
+#
+# `push:` stays filtered. A push run on every feature branch would double the
+# work for no signal — the pull_request run already covers it.
 on:
   pull_request:
-    branches: [claude/project-build-ie4b56, main]
   push:
     branches: [claude/project-build-ie4b56, main]
 
