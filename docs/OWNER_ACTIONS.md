@@ -194,6 +194,29 @@ rota is perfect. Also decide **what a responder may do without you** — §5 cur
 gates most real fixes behind your approval, so an unreachable owner means an
 unfixable incident.
 
+### 3.5 Disable Vercel auto-deploy so CI can actually gate a release
+
+**Blocked on you; one dashboard toggle. Nothing in the repository can do this.**
+
+Vercel currently builds and deploys **in parallel with** the CI gates, not after
+them. The two never meet: a pull request whose tests fail still produces a
+Preview, and a merge to the default branch deploys to customers regardless of
+whether `Production gates`, `Design system` or `SQL suites` went red. Because
+rulesets are unavailable on this plan (§3.1) **no status check can ever be marked
+required**, so gating the deploy job is the only enforcement that can exist here.
+
+The order matters, and doing it the other way round takes the site down:
+
+1. **First**, in Vercel → Settings → Git, turn off automatic deploys (or set the
+   Ignored Build Step to exit 0 only for the gated path).
+2. **Then** the deploy job can be added to `production-gates.yml` with
+   `needs: [build, edge-functions, audit]` and a `VERCEL_TOKEN`.
+
+Step 2 is written and ready but **deliberately not merged** — adding it while
+auto-deploy is still on would double-deploy every merge, and adding it after
+auto-deploy is off but before the token exists would stop deploying entirely.
+Tell the engineer when step 1 is done.
+
 ### 3.4 Staging environment
 
 Every migration's first execution against a production-shaped database is

@@ -21,18 +21,30 @@ on:
     tags:
       - 'mobile-build-*'
 
+# Least privilege. This job talks to EAS, not to this repository — it never
+# comments, pushes, publishes or touches releases. Declared explicitly rather
+# than inheriting the repository default, which may be read-write.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: apps/mobile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pinned to a commit SHA, matching the other workflows here: a tag can
+        # be repointed, and this job holds EXPO_TOKEN and can start a store build.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # This job never pushes to the repository.
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
           # Already 22; reading the file keeps it that way if the standard moves.

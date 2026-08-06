@@ -2,26 +2,47 @@ name: EAS Build Status (read-only)
 
 # Read-only helper: polls EAS for the status + artifact (APK) URL of an already
 # submitted build and prints them to this job's log. It runs `eas build:view`
-# (a QUERY) — it never starts a build. Triggered only when this file changes, so
-# adding/editing it kicks off exactly one status check. Requires EXPO_TOKEN.
-
+# (a QUERY) — it never starts a build. Requires EXPO_TOKEN.
+#
+# TRIGGER: this used to be
+#
+#     push:
+#       paths:
+#         - '.github/workflows/eas-status.yml'
+#
+# with no `branches:` filter, so ANY push on ANY branch that touched this file
+# ran a job holding EXPO_TOKEN with the repository-default (possibly read-write)
+# GITHUB_TOKEN. That is the same shape as the deploy-functions.yml trigger
+# removed on 2026-08-05 — read-only in what it does, but reachable from an
+# unreviewed branch, which is the part that matters. Editing a file is not a
+# sensible way to ask for a status check. Run it from the Actions tab.
 on:
-  push:
-    paths:
-      - '.github/workflows/eas-status.yml'
+  workflow_dispatch:
+
+# Least privilege: this job only reads the checkout and queries EAS. Declared
+# explicitly rather than inheriting the repository default.
+permissions:
+  contents: read
 
 jobs:
   status:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: apps/mobile
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pinned to a commit SHA, matching the other workflows in this
+        # repository: a tag can be repointed, and this job holds a secret.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # This job never pushes. Leaving the token in .git/config would make
+          # it available to every later step and to anything they invoke.
+          persist-credentials: false
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
           # Was hardcoded to 20, the only workflow left behind the rest of the
