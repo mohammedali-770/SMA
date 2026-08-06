@@ -299,3 +299,74 @@ describe('the migration this depends on', () => {
     expect(screen.getByText(/a truncated report looks correct/i)).toBeTruthy();
   });
 });
+
+describe('an incomplete date range', () => {
+  const clearStart = () => {
+    const input = screen.getByLabelText(/Start Date/i) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '' } });
+  };
+
+  it('does not crash the panel when the start date is cleared', async () => {
+    // The bug: '' fails `reportEndDate < reportStartDate` when it is the START
+    // that was cleared, so the value reached riyadhRangeToUtc and threw
+    // `RangeError: Invalid time value` SYNCHRONOUSLY inside the effect — past
+    // any .catch() — taking the whole reports view down.
+    await renderReports();
+    expect(() => clearStart()).not.toThrow();
+    expect(screen.getByText(/Choose a valid start and end date/i)).toBeTruthy();
+  });
+
+  it('does not query the server for a half-typed range', async () => {
+    await renderReports();
+    listForRangeMock.mockClear();
+    clearStart();
+    expect(listForRangeMock).not.toHaveBeenCalled();
+  });
+
+  it('disables the export, so no CSV can be produced from no range', async () => {
+    await renderReports();
+    clearStart();
+    expect(screen.getByRole('button', { name: /Export Active Audit CSV/i })
+      .hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('changing the range while a fetch is in flight', () => {
+  it('never exports one period\'s money under another period\'s filename', async () => {
+    // The CSV filename is built from the SELECTED dates while the rows came from
+    // the PREVIOUS fetch. On a slow connection that produced an audit export
+    // whose name and contents disagreed — and it looked entirely valid.
+    await renderReports();
+
+    let release: (v: unknown) => void = () => {};
+    listForRangeMock.mockImplementation(() => new Promise((res) => { release = res; }));
+
+    fireEvent.change(screen.getByLabelText(/End Date/i) as HTMLInputElement,
+      { target: { value: riyadhMonthRange().end } });
+    fireEvent.change(screen.getByLabelText(/Start Date/i) as HTMLInputElement,
+      { target: { value: '2026-01-01' } });
+
+    // Mid-flight: the export is unavailable and the stale rows are gone.
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: /Export Active Audit CSV/i }).hasAttribute('disabled'),
+    ).toBe(true));
+    expect(screen.getByText(/Loading orders for this range/i)).toBeTruthy();
+
+    release({ row_count: 0, max_rows: 10000, limit_exceeded: false, orders: [] });
+    await waitFor(() => expect(
+      screen.getByRole('button', { name: /Export Active Audit CSV/i }).hasAttribute('disabled'),
+    ).toBe(false));
+  });
+
+  it('disables the export when the range overflowed the server ceiling', async () => {
+    // Every figure below renders zero in this state. Exporting it would produce
+    // a CSV of zeros that looks like a real, empty period.
+    listForRangeMock.mockResolvedValue({
+      row_count: 12345, max_rows: 10000, limit_exceeded: true, orders: [],
+    });
+    render(<ReportsPanel />);
+    await screen.findByText(/12345 orders, more than the 10000-order limit/);
+    expect(screen.getByRole('button', { name: /Export Active Audit CSV/i })
+      .hasAttribute('disabled')).toBe(true);
+  });
+});

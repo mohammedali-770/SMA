@@ -42,6 +42,36 @@ import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/br
 export const ORDERS_BUMP_FLOOR_MS = 3_000;
 
 /**
+ * Trim a newest-first order list back to the fetch window, WITHOUT evicting work
+ * that is still owed to a customer.
+ *
+ * The live poll merges its recent window into the existing list and never
+ * evicted, so a long shift grew that list without bound. The obvious trim —
+ * `slice(0, limit)` — would undo the server-side fix one level down: the feed
+ * deliberately returns old unsettled orders alongside the recent window
+ * (migration 20260806130000 §3), and those sort to the TAIL of a newest-first
+ * list, so a chronological trim drops exactly the orders the server went out of
+ * its way to include. An order stuck in `preparing` would vanish from the
+ * kitchen's board, and no filter or "show older" control could bring it back,
+ * because it would no longer be in the browser at all.
+ *
+ * So only SETTLED orders are eligible for eviction. Unsettled ones are kept
+ * however old and however many — an unsettled backlog big enough to matter is an
+ * operational emergency the board should be showing, not hiding.
+ *
+ * Order is preserved; this only removes elements.
+ */
+export function trimOrderWindow(orders: Order[], limit: number): Order[] {
+  if (orders.length <= limit) return orders;
+  let settledKept = 0;
+  return orders.filter(o => {
+    if (o.status !== 'delivered' && o.status !== 'cancelled') return true;
+    settledKept += 1;
+    return settledKept <= limit;
+  });
+}
+
+/**
  * Outcome of a CSV bulk menu import.
  *
  * `count` is the number of products actually written, on the success AND failure
@@ -374,11 +404,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Keep newest-first (createdAt is an ISO string, so lexical compare works).
       const merged = [...byId.values()]
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-      // The merge never evicted, so a long shift grew this list without bound as
-      // new orders arrived. Trimming to the same window the fetch uses keeps the
-      // board's memory flat across a whole day without changing what it shows —
-      // it is a newest-first list and the tail is the oldest.
-      return merged.length > ORDERS_POLL_LIMIT ? merged.slice(0, ORDERS_POLL_LIMIT) : merged;
+      // Status-aware, so trimming cannot evict outstanding work — see
+      // `trimOrderWindow`.
+      return trimOrderWindow(merged, ORDERS_POLL_LIMIT);
     });
     setOrdersLastUpdated(Date.now());
   }, []);

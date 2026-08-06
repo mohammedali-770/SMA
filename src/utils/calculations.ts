@@ -124,14 +124,51 @@ const RIYADH_UTC_OFFSET = '+03:00';
  * form collects Riyadh calendar dates.
  */
 export function riyadhDayStartIso(date: string): string {
+  assertCalendarDate(date, 'riyadhDayStartIso');
   return new Date(`${date}T00:00:00${RIYADH_UTC_OFFSET}`).toISOString();
 }
 
 /** The next Riyadh calendar day ("YYYY-MM-DD"), rolling month and year. */
 export function riyadhNextDay(date: string): string {
+  assertCalendarDate(date, 'riyadhNextDay');
   const [year, month, day] = date.split('-').map(Number);
   // Date.UTC normalises an out-of-range day, so day+1 past the month end rolls.
   return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+/** "YYYY-MM-DD", the shape an `<input type="date">` produces when it has a value. */
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether a string is a usable calendar date for the helpers below.
+ *
+ * Exported because callers need to CHECK before converting rather than catch
+ * afterwards: a cleared `<input type="date">` yields `''`, and these helpers are
+ * called synchronously inside effects where a throw takes the panel down instead
+ * of landing in a `.catch()`.
+ */
+export function isCalendarDate(date: string): boolean {
+  if (!CALENDAR_DATE.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  // ROUND-TRIP, not just "does it parse". Date silently ROLLS an impossible day:
+  // '2026-02-30' parses happily and comes back as 2026-03-02, which would move a
+  // report range by two days without telling anyone. Comparing the normalised
+  // value against the input is what catches that.
+  return parsed.toISOString().slice(0, 10) === date;
+}
+
+/**
+ * Fail with a description instead of a bare `RangeError: Invalid time value`.
+ *
+ * `new Date('T00:00:00+03:00').toISOString()` throws that message with no
+ * indication of which input was empty or which helper was called, which is a
+ * miserable thing to find in a production stack trace.
+ */
+function assertCalendarDate(date: string, fn: string): void {
+  if (!isCalendarDate(date)) {
+    throw new Error(`${fn}: expected a YYYY-MM-DD calendar date, received ${JSON.stringify(date)}`);
+  }
 }
 
 /**

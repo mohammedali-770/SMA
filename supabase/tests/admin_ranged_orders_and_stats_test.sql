@@ -385,6 +385,58 @@ begin
   raise notice 'CASE 8 ok: per-branch rollup reconciles with the totals';
 end $$;
 
+-- ---- CASE 9: the bounded live feed never hides outstanding work -------------
+-- Bounding the console fetch introduced a way to lose an order: the p_limit most
+-- RECENT orders drops an older one regardless of status, so an order stuck in
+-- `received` or `preparing` would vanish from the kitchen's board once enough
+-- newer orders existed — unrecoverable, because the row was never fetched.
+-- The window is status-aware: recent PLUS everything unsettled, however old.
+do $$
+declare
+  v_rows      jsonb;
+  v_unsettled integer;
+begin
+  perform set_config('test.is_staff', 'true', true);
+
+  -- A limit of 1 would, chronologically, return only the newest order (the
+  -- delivered 70 at 21:00). The 'received' 25 from 12:00 is older and must come
+  -- back anyway, because it is still owed to a customer.
+  v_rows := public.admin_list_orders_with_items(1);
+
+  if jsonb_array_length(v_rows) <> 2 then
+    raise exception 'FAIL(9): limit 1 returned % orders, expected 2 (newest + the unsettled one)',
+      jsonb_array_length(v_rows);
+  end if;
+
+  select count(*) into v_unsettled
+    from jsonb_array_elements(v_rows) o
+   where o ->> 'status' not in ('delivered', 'cancelled');
+  if v_unsettled <> 1 then
+    raise exception 'FAIL(9): % unsettled orders in the window, expected 1', v_unsettled;
+  end if;
+
+  -- Newest-first ordering is preserved when the two arms are combined.
+  if ((v_rows -> 0 ->> 'created_at')::timestamptz)
+     < ((v_rows -> 1 ->> 'created_at')::timestamptz) then
+    raise exception 'FAIL(9): the combined window is not newest-first';
+  end if;
+
+  -- A null limit is unchanged: still every order.
+  v_rows := public.admin_list_orders_with_items(null);
+  if jsonb_array_length(v_rows) <> 4 then
+    raise exception 'FAIL(9): a null limit returned %, expected all 4', jsonb_array_length(v_rows);
+  end if;
+
+  -- And a limit large enough for everything returns everything exactly once —
+  -- the two arms must not duplicate an order that satisfies both.
+  v_rows := public.admin_list_orders_with_items(100);
+  if jsonb_array_length(v_rows) <> 4 then
+    raise exception 'FAIL(9): limit 100 returned % orders, expected 4 with no duplicates',
+      jsonb_array_length(v_rows);
+  end if;
+  raise notice 'CASE 9 ok: the bounded live feed keeps every unsettled order';
+end $$;
+
 do $$ begin
   raise notice 'admin_ranged_orders_and_stats_test: ALL CASES PASSED';
 end $$;

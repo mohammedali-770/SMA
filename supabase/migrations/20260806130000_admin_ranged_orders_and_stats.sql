@@ -219,9 +219,104 @@ comment on function public.admin_order_stats() is
   'Aggregate order figures for the admin dashboard tiles and per-branch chart (is_staff enforced internally). Constant-size payload. Definitions match the previous in-memory computation exactly, including total_amount spanning every status.';
 
 -- ---------------------------------------------------------------------------
+-- 3. The live board's bounded feed must never hide outstanding work
+-- ---------------------------------------------------------------------------
+-- Bounding the console's fetch (above) introduced a way to lose an order.
+--
+-- `admin_list_orders_with_items(p_limit)` returns the p_limit most RECENT orders
+-- by created_at. Once more than p_limit newer orders exist, an older order is
+-- not fetched at all — regardless of its status. An order stuck in `received`,
+-- `preparing`, `ready` or `out_for_delivery` therefore vanishes from the Live
+-- Orders board, and neither the search box nor the "show older" control can
+-- recover it, because the row was never in the browser. Work still owed to a
+-- customer would silently stop being visible to the kitchen.
+--
+-- That is the precise failure this whole change set exists to avoid, so the
+-- window is made STATUS-AWARE rather than purely chronological: the p_limit most
+-- recent orders, PLUS every order that is not yet settled, however old.
+--
+-- The unsettled arm is deliberately uncapped. Capping it would reintroduce the
+-- same silent drop one level down, and an unsettled backlog large enough to
+-- matter is an operational emergency the board should be showing, not hiding.
+-- In normal operation it is a handful of rows.
+--
+-- `p_limit is null` keeps the original unbounded behaviour exactly, so this is a
+-- widening: every caller sees a superset of what it saw before, never less. The
+-- signature, name, volatility, security and search_path are unchanged, and
+-- migration 20260724200000 is not edited (CLAUDE.md §2.3) — this supersedes it.
+create or replace function public.admin_list_orders_with_items(p_limit integer default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare v_rows jsonb;
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff may list orders' using errcode = '42501';
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) into v_rows from (
+    select
+      o.id, o.order_number, o.customer_id, o.customer_name, o.customer_phone,
+      o.branch_id, o.branch_name_en, o.branch_name_ar,
+      o.status, o.order_type,
+      o.subtotal, o.delivery_fee, o.discount_amount, o.loyalty_discount_amount,
+      o.vat_amount, o.total,
+      o.loyalty_points_earned, o.loyalty_points_redeemed,
+      o.payment_status, o.payment_method, o.payment_provider, o.paid_at,
+      o.coupon_code, o.notes, o.created_at, o.updated_at,
+      o.sync_status, o.lazywait_sync_state, o.lazywait_ref,
+      o.lazywait_order_number, o.lazywait_status,
+      o.sync_attempt_count, o.sync_last_error, o.sync_blocked_reason,
+      o.synced_at, o.first_pos_sync_failure_at, o.sync_next_attempt_at,
+      o.pos_create_attempted_at, o.pos_customer_retry_count,
+      o.pos_confirmation_reason, o.refund_state,
+      o.address_snapshot,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', i.id, 'order_id', i.order_id, 'product_id', i.product_id,
+          'name_en', i.name_en, 'name_ar', i.name_ar,
+          'unit_price', i.unit_price, 'quantity', i.quantity,
+          'line_total', i.line_total,
+          'order_item_modifiers', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'id', m.id, 'order_item_id', m.order_item_id,
+              'modifier_id', m.modifier_id,
+              'name_en', m.name_en, 'name_ar', m.name_ar, 'price', m.price)
+              order by m.id)
+            from public.order_item_modifiers m where m.order_item_id = i.id
+          ), '[]'::jsonb))
+          order by i.id)
+        from public.order_items i where i.order_id = o.id
+      ), '[]'::jsonb) as order_items
+    from public.orders o
+    where p_limit is null
+       -- the recent window …
+       or o.id in (
+            select r.id from public.orders r
+             order by r.created_at desc
+             limit greatest(1, p_limit)
+          )
+       -- … plus everything still owed to a customer, however old.
+       or o.status not in ('delivered', 'cancelled')
+    order by o.created_at desc
+  ) t;
+
+  return v_rows;
+end $$;
+
+comment on function public.admin_list_orders_with_items(integer) is
+  'Staff order feed with items + modifiers (is_staff enforced internally). Explicit column projection; never returns pos_create_attempt_token (20260724200000). Since 20260806130000 the bounded arm is status-aware: the p_limit most recent orders PLUS every unsettled order regardless of age, so bounding the console fetch cannot hide outstanding work from the kitchen.';
+
+-- ---------------------------------------------------------------------------
 -- Rollback
 -- ---------------------------------------------------------------------------
 -- drop function if exists public.admin_list_orders_for_range(timestamptz, timestamptz, uuid, integer);
 -- drop function if exists public.admin_order_stats();
--- Both are additive and unreferenced by anything else in the schema, so dropping
--- them is safe. The console would have to be reverted in the same step.
+-- ...and restore admin_list_orders_with_items from 20260724200000:179-232. Note
+-- that doing so reinstates the hidden-outstanding-order problem above whenever
+-- the caller passes a limit, so prefer fixing forward.
+-- The two added functions are unreferenced by anything else in the schema. The
+-- console would have to be reverted in the same step.

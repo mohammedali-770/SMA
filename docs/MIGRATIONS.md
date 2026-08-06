@@ -1403,6 +1403,31 @@ DEFINER RPC and the range has to be a function parameter. Hence a migration.
    cancelled orders**, because that is what the average-ticket tile has always
    divided by. Changing it would have moved a dashboard number under cover of a
    performance change.
+3. **`admin_list_orders_with_items(p_limit)` is replaced** so its bounded arm is
+   **status-aware**: the `p_limit` most recent orders **plus every unsettled
+   order, however old**. Same name, signature, volatility, security and
+   `search_path`; `20260724200000` is not edited, this supersedes it.
+
+   This closes a hole that bounding the console fetch would otherwise have
+   opened. The original returns the `p_limit` most recent orders by
+   `created_at`, so once more than `p_limit` newer orders existed, an order stuck
+   in `received`, `preparing`, `ready` or `out_for_delivery` was not fetched at
+   all — it vanished from the Live Orders board, and neither the search box nor
+   the "show older" control could recover it, because the row was never in the
+   browser. Work still owed to a customer would silently stop being visible to
+   the kitchen. Raised by automated review on PR #167 and confirmed against the
+   code before fixing.
+
+   The unsettled arm is deliberately **uncapped**: capping it would reintroduce
+   the same silent drop one level down, and an unsettled backlog large enough to
+   matter is an operational emergency the board should be showing. `p_limit is
+   null` keeps the original unbounded behaviour exactly, so this is a widening —
+   every caller sees a superset of what it saw before, never less.
+
+   The client-side trim in `pollRecentOrders` is status-aware for the same
+   reason (`trimOrderWindow`): those old unsettled rows sort to the tail of a
+   newest-first list, so a plain `slice(0, limit)` would have discarded exactly
+   the rows the server went out of its way to include.
 
 Both are `is_staff()`-gated internally, `stable`, `security definer`, with a
 pinned `search_path` — the same contract as `admin_list_orders_with_items`.
@@ -1422,9 +1447,9 @@ could not be replayed. Validated against a local PostgreSQL 16 cluster with the
 minimum schema stubbed:
 
 - migration applied cleanly (exit 0);
-- `supabase/tests/admin_ranged_orders_and_stats_test.sql` — 8 cases — reported
+- `supabase/tests/admin_ranged_orders_and_stats_test.sql` — 9 cases — reported
   `ALL CASES PASSED`;
-- three deliberately broken variants were then applied to clones and the same
+- four deliberately broken variants were then applied to clones and the same
   suite re-run, to prove it is not passing vacuously:
 
   | Mutation | Caught by |
@@ -1432,6 +1457,7 @@ minimum schema stubbed:
   | `created_at <= p_to` (closed interval) | `FAIL(2): row_count is 4, expected 3 — the interval is not half-open` |
   | refusal replaced by `limit v_max_rows` (silent truncation) | `FAIL(4): 3 rows against a ceiling of 2 did not set limit_exceeded` |
   | `customer_name`/`customer_phone`/`notes` added to the projection | `FAIL(6): the report projection exposes customer_name` |
+  | live feed reverted to the chronological-only window | `FAIL(9): limit 1 returned 1 orders, expected 2 (newest + the unsettled one)` |
 
 All scratch databases were dropped and the cluster stopped afterwards. The suite
 also runs unconditionally in the `SQL suites` workflow, which replays the whole
@@ -1466,5 +1492,10 @@ drop function if exists public.admin_list_orders_for_range(timestamptz, timestam
 drop function if exists public.admin_order_stats();
 ```
 
-Both are additive and unreferenced by anything else in the schema. The console
-would have to be reverted in the same step, since it is their only caller.
+…and restore `admin_list_orders_with_items` from `20260724200000:179-232`. Note
+that doing so reinstates the hidden-outstanding-order problem whenever a caller
+passes a limit, so prefer fixing forward.
+
+The two added functions are additive and unreferenced by anything else in the
+schema. The console would have to be reverted in the same step, since it is
+their only caller.

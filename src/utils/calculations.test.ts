@@ -5,6 +5,7 @@ import {
   calculateDistance,
   generateId,
   parseCSVMenu,
+  isCalendarDate,
   riyadhDateOnly,
   riyadhDayStartIso,
   riyadhMonthRange,
@@ -233,5 +234,51 @@ describe('riyadhRangeToUtc', () => {
     // And `toIso` itself is already the next day — the order sitting on it
     // belongs to the NEXT range, counted once rather than twice or never.
     expect(riyadhDateOnly(toIso)).toBe('2026-03-11');
+  });
+});
+
+describe('isCalendarDate — the guard in front of the converters', () => {
+  it('rejects the value a CLEARED date input produces', () => {
+    // This is the whole reason the guard exists. An `<input type="date">` that
+    // the operator clears yields '', and '' silently passes a `end < start`
+    // comparison when it is the START that was cleared.
+    expect(isCalendarDate('')).toBe(false);
+    expect('2026-08-31' < '').toBe(false);   // the comparison that let it through
+  });
+
+  it('rejects partial, malformed and impossible dates', () => {
+    for (const bad of ['2026', '2026-08', '08-31-2026', '2026-8-1', 'today', '2026-13-01']) {
+      expect(isCalendarDate(bad)).toBe(false);
+    }
+  });
+
+  it('rejects a day the month does not have, which Date silently ROLLS', () => {
+    // The trap: `new Date('2026-02-30T00:00:00Z')` does not fail, it returns
+    // 2026-03-02. Accepting it would move a report range two days without
+    // telling anyone, so the guard round-trips rather than only parsing.
+    expect(new Date('2026-02-30T00:00:00Z').toISOString().slice(0, 10)).toBe('2026-03-02');
+    expect(isCalendarDate('2026-02-30')).toBe(false);
+    expect(isCalendarDate('2026-04-31')).toBe(false);
+    expect(isCalendarDate('2027-02-29')).toBe(false);   // not a leap year
+  });
+
+  it('accepts a real calendar date', () => {
+    expect(isCalendarDate('2026-08-31')).toBe(true);
+    expect(isCalendarDate('2028-02-29')).toBe(true);   // leap day
+  });
+});
+
+describe('the converters fail with a description, not RangeError', () => {
+  // Unguarded, `new Date('T00:00:00+03:00').toISOString()` throws
+  // "Invalid time value" — no indication of which input was empty or which
+  // helper was called. That is a miserable thing to find in a stack trace.
+  it('names the function and shows the offending value', () => {
+    expect(() => riyadhDayStartIso('')).toThrow(/riyadhDayStartIso.*received ""/);
+    expect(() => riyadhNextDay('')).toThrow(/riyadhNextDay.*received ""/);
+    expect(() => riyadhRangeToUtc('', '2026-08-31')).toThrow(/expected a YYYY-MM-DD/);
+  });
+
+  it('does not throw RangeError any more', () => {
+    expect(() => riyadhDayStartIso('')).not.toThrow(RangeError);
   });
 });

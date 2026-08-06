@@ -9,7 +9,7 @@ import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import {
-  getVATBreakdown, riyadhDateOnly, riyadhMonthRange, riyadhRangeToUtc,
+  getVATBreakdown, isCalendarDate, riyadhDateOnly, riyadhMonthRange, riyadhRangeToUtc,
 } from '../../utils/calculations';
 import { Price } from '../Price';
 import { isMissingFunctionError, orders as ordersApi } from '../../lib/api';
@@ -82,14 +82,30 @@ export const ReportsPanel: React.FC = () => {
   // reason beats a truncated one that looks complete.
   const [rangeOverflow, setRangeOverflow] = useState<{ rows: number; max: number } | null>(null);
 
+  // A range is only a query once BOTH ends are real calendar dates and they are
+  // the right way round. A cleared `<input type="date">` yields '', and '' fails
+  // `reportEndDate < reportStartDate` when it is the START that was cleared —
+  // which used to reach `riyadhRangeToUtc` and throw `RangeError: Invalid time
+  // value` synchronously inside the effect, past any `.catch()`, taking the whole
+  // panel down rather than showing an incomplete-range state.
+  const rangeIsComplete =
+    isCalendarDate(reportStartDate) && isCalendarDate(reportEndDate)
+    && reportStartDate <= reportEndDate;
+
   useEffect(() => {
-    // An end date before the start date is a half-typed range, not a query.
-    if (reportEndDate < reportStartDate) {
+    if (!rangeIsComplete) {
       setRangeOrders([]); setRangeOverflow(null); setRangeError(null); setRangeLoading(false);
       return;
     }
     let cancelled = false;
     setRangeLoading(true);
+    // Drop the previous window's rows BEFORE awaiting the new one. Keeping them
+    // would leave every figure on this page showing one period's money under
+    // another period's date labels for the length of the request — and the CSV
+    // export names its file after the selected dates, so a click during that
+    // window produced an audit export whose filename and contents disagreed.
+    setRangeOrders([]);
+    setRangeOverflow(null);
     const { fromIso, toIso } = riyadhRangeToUtc(reportStartDate, reportEndDate);
     ordersApi.listForRange(fromIso, toIso, reportBranchId === 'all' ? null : reportBranchId)
       .then(res => {
@@ -112,7 +128,11 @@ export const ReportsPanel: React.FC = () => {
       })
       .finally(() => { if (!cancelled) setRangeLoading(false); });
     return () => { cancelled = true; };
-  }, [reportStartDate, reportEndDate, reportBranchId]);
+  }, [rangeIsComplete, reportStartDate, reportEndDate, reportBranchId]);
+
+  // The export is only meaningful when the figures on screen are the figures for
+  // the range named in the filename.
+  const exportDisabled = !rangeIsComplete || rangeLoading || rangeError !== null || rangeOverflow !== null;
 
   const filteredOrders = rangeOrders;
   const deliveredOrders = useMemo(
@@ -299,6 +319,7 @@ export const ReportsPanel: React.FC = () => {
           label={isRTL ? 'تصدير التقرير كـ Excel/CSV' : 'Export Active Audit CSV'}
           onClick={triggerCSVExport}
           variant="secondary"
+          disabled={exportDisabled}
           leading={<Download className="size-3.5" aria-hidden="true" />}
         />
       </div>
@@ -384,6 +405,16 @@ export const ReportsPanel: React.FC = () => {
         <Card>
           <Text variant="body" tone="tertiary" as="p">
             {isRTL ? 'جارٍ تحميل طلبات هذه الفترة…' : 'Loading orders for this range…'}
+          </Text>
+        </Card>
+      ) : null}
+
+      {!rangeIsComplete ? (
+        <Card>
+          <Text variant="body" tone="warning" as="p">
+            {isRTL
+              ? 'اختر تاريخ بداية وتاريخ نهاية صالحين (البداية قبل النهاية) لعرض التقرير.'
+              : 'Choose a valid start and end date, with the start on or before the end, to run the report.'}
           </Text>
         </Card>
       ) : null}
