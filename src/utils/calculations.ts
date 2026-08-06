@@ -109,6 +109,48 @@ export function riyadhMonthRange(now: Date = new Date()): { start: string; end: 
 }
 
 /**
+ * Saudi Arabia is UTC+3 year-round — it has no daylight saving — so a Riyadh
+ * calendar day maps to a fixed UTC instant with no seasonal correction. Written
+ * as a literal offset rather than derived from `Intl`, because the derivation
+ * would only ever return this value and the constant is checkable by eye.
+ */
+const RIYADH_UTC_OFFSET = '+03:00';
+
+/**
+ * The UTC instant at which a Riyadh calendar day ("YYYY-MM-DD") begins.
+ *
+ * The inverse of `riyadhDateOnly`, and the reason the reports can now filter
+ * server-side: the database stores `created_at` as an instant, while the report
+ * form collects Riyadh calendar dates.
+ */
+export function riyadhDayStartIso(date: string): string {
+  return new Date(`${date}T00:00:00${RIYADH_UTC_OFFSET}`).toISOString();
+}
+
+/** The next Riyadh calendar day ("YYYY-MM-DD"), rolling month and year. */
+export function riyadhNextDay(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  // Date.UTC normalises an out-of-range day, so day+1 past the month end rolls.
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+/**
+ * A Riyadh calendar date range as the HALF-OPEN UTC instant window
+ * `[from, to)` the ranged order feed expects.
+ *
+ * Half-open, and the upper bound is the start of the day AFTER `end`, so an
+ * order placed at 23:59:59.7 Riyadh on the last day is included while one at
+ * 00:00:00.0 the next day is not. A closed `<= end 23:59:59` bound would drop
+ * the first and, at the next range's lower edge, count the second twice.
+ */
+export function riyadhRangeToUtc(start: string, end: string): { fromIso: string; toIso: string } {
+  return {
+    fromIso: riyadhDayStartIso(start),
+    toIso: riyadhDayStartIso(riyadhNextDay(end)),
+  };
+}
+
+/**
  * Creates a sample CSV data URL for menu import.
  */
 export function getCSVTemplateData(): string {

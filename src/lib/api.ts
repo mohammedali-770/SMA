@@ -118,6 +118,69 @@ export type LazywaitSyncState =
   | 'pending' | 'syncing' | 'synced' | 'failed' | 'blocked' | 'dead_letter' | 'skipped'
   | 'awaiting_payment' | 'confirmation_required';
 
+// ---- Ranged report feed ----------------------------------------------------
+/**
+ * One order line item as the REPORT feed returns it. Deliberately narrower than
+ * `DbOrderItem`: no id, no order_id and no modifiers, because the reports
+ * aggregate by product and never render a line.
+ */
+export interface DbReportOrderItem {
+  product_id: string | null;
+  name_en: string; name_ar: string;
+  unit_price: number; quantity: number;
+}
+/**
+ * One order as the REPORT feed returns it (`admin_list_orders_for_range`).
+ *
+ * NOT a subset of `DbOrder` by accident — the missing fields are the point.
+ * There is no customer_name, customer_phone, customer_id, notes or
+ * address_snapshot here because running a financial report has no business
+ * pulling customer PII into a browser.
+ */
+export interface DbReportOrder {
+  id: string; order_number: string;
+  branch_id: string; branch_name_en: string | null; branch_name_ar: string | null;
+  status: OrderStatus; order_type: OrderType;
+  subtotal: number; delivery_fee: number; discount_amount: number;
+  loyalty_discount_amount: number; vat_amount: number; total: number;
+  coupon_code: string | null; created_at: string;
+  sync_status: DbSyncStatus;
+  lazywait_sync_state?: LazywaitSyncState | null;
+  lazywait_ref?: string | null; lazywait_order_number?: string | null;
+  sync_last_error?: string | null; sync_blocked_reason?: string | null;
+  order_items: DbReportOrderItem[];
+}
+/**
+ * The report-feed envelope. `limit_exceeded` means the window held more orders
+ * than `max_rows` and the server returned NONE of them — `orders` is empty and
+ * `row_count` is the true size, so the console can say how far over it is.
+ */
+export interface AdminOrderRange {
+  row_count: number;
+  max_rows: number;
+  limit_exceeded: boolean;
+  orders: DbReportOrder[];
+}
+
+// ---- Aggregate dashboard stats ---------------------------------------------
+export interface AdminBranchStats {
+  branch_id: string;
+  sales: number;
+  order_count: number;
+}
+/**
+ * Server-side equivalents of the sums StatsPanel used to compute over the whole
+ * in-memory order list. `total_amount` spans EVERY status, including cancelled,
+ * because that is what the average-ticket tile has always divided by.
+ */
+export interface AdminOrderStats {
+  total_orders: number;
+  total_amount: number;
+  delivered_revenue: number;
+  active_orders: number;
+  branches: AdminBranchStats[];
+}
+
 // ---- Lazywait catalog mapping ---------------------------------------------
 /** Reference-only price snapshot chosen from a Lazywait item's price list. */
 export interface LazywaitPriceRef {
@@ -187,6 +250,22 @@ export interface DbCoupon {
   id: string; code: string; type: 'percentage' | 'fixed'; value: number;
   is_active: boolean; min_order_amount: number; max_discount_amount: number | null;
   usage_limit: number | null; usage_count: number;
+}
+
+/**
+ * Whether an error is PostgREST failing to find an RPC, rather than the RPC
+ * failing.
+ *
+ * These two are worth telling apart in the UI. A missing function means a
+ * migration in the repository has not been applied to this project yet — an
+ * operational state with a known fix — whereas anything else is a real fault.
+ * Raw, it surfaces as "Could not find the function public.x in the schema
+ * cache", which reads to an operator as a bug.
+ */
+export function isMissingFunctionError(e: unknown): boolean {
+  const message = e instanceof Error ? e.message : String(e);
+  return /could not find the function/i.test(message)
+    || /PGRST202/.test(message);
 }
 
 /** Small wrapper so callers get a value or a thrown Error (never a silent null). */
@@ -612,14 +691,40 @@ export const orders = {
    * (is_staff enforced), returning the staff column set with items embedded. It
    * never returns pos_create_attempt_token. Uses the staff member's own JWT.
    *
-   * UNBOUNDED by default so the reports (which filter in memory) see every order;
-   * pass `limit` ONLY for the admin live poll, which keeps its frequent refetch
-   * bounded and merges its recent window back into the full in-memory list.
+   * ALWAYS pass a limit. The unbounded arm still exists server-side, but no
+   * console surface calls it any more: the reports fetch their own date range
+   * through `listForRange` and the dashboard tiles read `stats`, so nothing
+   * needs the whole table in memory. Leaving `limit` off re-creates the
+   * every-order-on-every-sign-in download this replaced.
    */
   adminListWithItems: async (limit?: number) =>
     ok<DbOrderWithItems[]>(
       await supabase.rpc('admin_list_orders_with_items', { p_limit: limit ?? null }),
     ),
+  /**
+   * Report feed for one half-open `[from, to)` window, optionally one branch.
+   *
+   * Separate from the live feed on purpose. Its projection carries no customer
+   * name, phone, notes, address snapshot or item modifiers — the reports read
+   * none of them — so a financial report is both a much smaller payload and no
+   * longer a reason for customer PII to reach the browser.
+   *
+   * Returns an ENVELOPE. When the window holds more than `max_rows` orders the
+   * server returns NONE of them and sets `limit_exceeded`, rather than the first
+   * N: a truncated financial report is a wrong number that looks right.
+   */
+  listForRange: async (fromIso: string, toIso: string, branchId?: string | null) =>
+    ok<AdminOrderRange>(
+      await supabase.rpc('admin_list_orders_for_range', {
+        p_from: fromIso, p_to: toIso, p_branch: branchId ?? null,
+      }),
+    ),
+  /**
+   * Aggregate order figures for the dashboard tiles and the per-branch chart.
+   * Constant-size payload — the client no longer sums the whole table to render
+   * four numbers.
+   */
+  stats: async () => ok<AdminOrderStats>(await supabase.rpc('admin_order_stats')),
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
   itemModifiers: async (orderItemId: string) =>

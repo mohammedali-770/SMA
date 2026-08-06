@@ -29,8 +29,36 @@ export const ONLINE_GUARDED_STATUSES: OrderStatus[] = [
 
 /** The status filter tabs, in the order an order actually moves through them. */
 export const ORDER_FILTERS = [
-  'all', 'received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled',
+  'all', 'active', 'received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled',
 ] as const;
+
+/**
+ * Statuses 'active' matches: everything still owed to a customer.
+ *
+ * The complement of `delivered` and `cancelled`, and deliberately expressed that
+ * way in `matchesOrderFilter` rather than as a list — a status added to the
+ * workflow later is outstanding work by default, and a filter that silently
+ * omitted it would hide real orders from the kitchen.
+ */
+export const SETTLED_STATUSES: readonly string[] = ['delivered', 'cancelled'];
+
+/**
+ * What Live Orders opens on.
+ *
+ * It used to open on 'all', which on a busy day meant the outstanding orders
+ * were below a screen of history. Every other filter, including 'all', is still
+ * one click away on the same chip row.
+ */
+export const DEFAULT_ORDER_FILTER = 'active';
+
+/**
+ * Rows the table renders at a time, extended by the "show older" control.
+ *
+ * The table previously rendered every matching order. With the board's fetch
+ * bounded at ORDERS_POLL_LIMIT (500) that is a 500-row DOM build on each render,
+ * for rows nobody scrolls to.
+ */
+export const LIVE_ORDERS_PAGE = 50;
 
 /** Rows requested from the confirmation-required queue. */
 export const POS_VERIFY_LIMIT = 10;
@@ -132,7 +160,11 @@ export function matchesOrderSearch(o: OrderSearchable, query: string): boolean {
 
 /** Whether a row survives the status tab. */
 export function matchesOrderFilter(status: string, filter: string): boolean {
-  return filter === 'all' || status === filter;
+  if (filter === 'all') return true;
+  // Complement, not an allow-list: a status added to the workflow later counts
+  // as outstanding work until it is explicitly settled.
+  if (filter === 'active') return !SETTLED_STATUSES.includes(status);
+  return status === filter;
 }
 
 /**

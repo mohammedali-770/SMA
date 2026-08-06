@@ -29,6 +29,19 @@ import {
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 
 /**
+ * Minimum gap between two event-driven order refetches, in ms.
+ *
+ * The realtime channel fires on every `order_change_events` row, which means
+ * every order placed and every status advance. During a rush that is a steady
+ * stream, and the previous 500ms debounce turned it into roughly two full
+ * refetches per second. This is a floor, not a debounce: bursts collapse into
+ * one refetch per window however many events arrive.
+ *
+ * Exported so a test can assert the floor rather than re-typing the number.
+ */
+export const ORDERS_BUMP_FLOOR_MS = 3_000;
+
+/**
  * Outcome of a CSV bulk menu import.
  *
  * `count` is the number of products actually written, on the success AND failure
@@ -322,14 +335,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ---- Data loading --------------------------------------------------------
   /**
-   * Full orders load (UNBOUNDED) — used after placing / advancing an order and on
-   * the initial load. The reports read the whole in-memory `orders` list, so this
-   * must fetch every order, not a capped window.
+   * Orders load — used after placing / advancing an order and on the initial
+   * load. BOUNDED to the most recent `ORDERS_POLL_LIMIT` orders.
+   *
+   * This used to be unbounded, and had to be: ReportsPanel and StatsPanel both
+   * read the whole in-memory list, so capping the fetch would have silently
+   * truncated the financial reports. It downloaded EVERY order, with every line
+   * item and every modifier, on every staff sign-in.
+   *
+   * Both readers now fetch what they need themselves — ReportsPanel through
+   * `ordersApi.listForRange` for its selected window, StatsPanel through
+   * `ordersApi.stats` for the aggregate — so nothing left in this list needs to
+   * be complete. What reads it now is the live board, which only ever showed
+   * recent work anyway.
    */
   const refreshOrders = useCallback(async () => {
     const rows = currentUserRef.current.role === 'customer'
-      ? await ordersApi.listWithItems()
-      : await ordersApi.adminListWithItems();
+      ? await ordersApi.listWithItems(ORDERS_POLL_LIMIT)
+      : await ordersApi.adminListWithItems(ORDERS_POLL_LIMIT);
     setOrders(rows.map(mapOrder));
     setOrdersLastUpdated(Date.now());
   }, []);
@@ -349,7 +372,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const byId = new Map<string, Order>(prev.map(o => [o.id, o] as [string, Order]));
       for (const o of fresh) byId.set(o.id, o);
       // Keep newest-first (createdAt is an ISO string, so lexical compare works).
-      return [...byId.values()].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+      const merged = [...byId.values()]
+        .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
+      // The merge never evicted, so a long shift grew this list without bound as
+      // new orders arrived. Trimming to the same window the fetch uses keeps the
+      // board's memory flat across a whole day without changing what it shows —
+      // it is a newest-first list and the tail is the oldest.
+      return merged.length > ORDERS_POLL_LIMIT ? merged.slice(0, ORDERS_POLL_LIMIT) : merged;
     });
     setOrdersLastUpdated(Date.now());
   }, []);
@@ -510,12 +539,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try { await pollRecentOrders(); } catch { /* transient; keep the loop alive */ }
       finally {
         refreshing = false;
-        if (pending && !disposed) { pending = false; void doRefresh(); }  // trailing run
+        // Trailing run for an event that arrived mid-refresh, routed back
+        // through `bump()` so it respects the throttle floor instead of firing
+        // a second fetch immediately.
+        if (pending && !disposed) { pending = false; bump(); }
       }
     };
-    const bump = () => {                     // coalesce event bursts into one refetch
-      if (debounceT) return;
-      debounceT = setTimeout(() => { debounceT = null; void doRefresh(); }, 500);
+    // Event-driven refetch, THROTTLED to a floor rather than debounced by 500ms.
+    //
+    // Every order INSERT and every status advance writes an `order_change_events`
+    // row, so a lunch rush is a steady stream of events. A 500ms debounce turned
+    // that into roughly two full order refetches per second, each one a bounded
+    // but not small payload. The floor makes the worst case one refetch per
+    // ORDERS_BUMP_FLOOR_MS regardless of event rate.
+    //
+    // The trailing run is KEPT (the plan for this change proposed dropping it —
+    // that was wrong). An event arriving mid-refresh may describe an order the
+    // in-flight query has already passed; without a trailing run that order sits
+    // invisible until the 60s backstop. Instead the trailing run is scheduled at
+    // the remaining floor rather than fired immediately, so it costs at most one
+    // extra fetch per window while still never dropping the last event.
+    let lastRefreshAt = 0;
+    const bump = () => {
+      if (debounceT) return;                 // a run is already scheduled
+      const wait = Math.max(0, ORDERS_BUMP_FLOOR_MS - (Date.now() - lastRefreshAt));
+      debounceT = setTimeout(() => {
+        debounceT = null;
+        lastRefreshAt = Date.now();
+        void doRefresh();
+      }, wait);
     };
     const startFastPoll = () => {
       if (fastPoll) return;
@@ -790,9 +842,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       idempotencyKeyRef.current = null; // success → the next checkout gets a fresh key
       // The RPC returns the order row without its items; refetch (with items) so
       // the receipt renders the full breakdown recomputed by the server.
+      //
+      // Bounded, like every other order fetch now. This one was the last
+      // unbounded call left: placing an order re-downloaded the entire table to
+      // read back the ONE order that had just been created, which is a payload
+      // proportional to the whole business on the slowest step of checkout. The
+      // order just placed is by definition the newest, so it is in the window.
       const rows = currentUser.role === 'customer'
-        ? await ordersApi.listWithItems()
-        : await ordersApi.adminListWithItems();
+        ? await ordersApi.listWithItems(ORDERS_POLL_LIMIT)
+        : await ordersApi.adminListWithItems(ORDERS_POLL_LIMIT);
       const mapped = rows.map(mapOrder);
       setOrders(mapped);
       const full = mapped.find(o => o.id === created.id);

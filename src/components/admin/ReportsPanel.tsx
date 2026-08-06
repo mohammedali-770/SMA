@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Download, Info } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
@@ -8,9 +8,12 @@ import { Field } from '../../design-system/ui/Field';
 import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
-import { getVATBreakdown, riyadhDateOnly, riyadhMonthRange } from '../../utils/calculations';
+import {
+  getVATBreakdown, riyadhDateOnly, riyadhMonthRange, riyadhRangeToUtc,
+} from '../../utils/calculations';
 import { Price } from '../Price';
-import { buildCouponUsage, lazywaitRefOf } from '../../lib/reports';
+import { isMissingFunctionError, orders as ordersApi } from '../../lib/api';
+import { buildCouponUsage, lazywaitRefOf, mapReportOrder, type ReportOrder } from '../../lib/reports';
 import { ADMIN_LOCALES } from './adminLocales';
 
 const SELECT = [
@@ -42,7 +45,7 @@ const SYNC_TONE: Record<string, PillTone> = {
  * English-language operator read "تمت المزامنة" in the log column.
  */
 export const ReportsPanel: React.FC = () => {
-  const { orders, branches, brandSettings, products, categories, adminLang } = useApp();
+  const { branches, brandSettings, products, categories, adminLang } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const family = useDsFontClass();
@@ -54,14 +57,68 @@ export const ReportsPanel: React.FC = () => {
   const [reportStartDate, setReportStartDate] = useState<string>(defaultRange.start);
   const [reportEndDate, setReportEndDate] = useState<string>(defaultRange.end);
 
-  // 1. Filtered orders for reporting (delivered within date range and branch)
-  const filteredOrders = orders.filter(o => {
-    if (reportBranchId !== 'all' && o.branchId !== reportBranchId) return false;
-    const oDate = riyadhDateOnly(o.createdAt);
-    return oDate >= reportStartDate && oDate <= reportEndDate;
-  });
+  // 1. Orders for reporting.
+  //
+  // These used to be filtered out of `useApp().orders`, which is why that list
+  // had to hold every order ever placed — the console downloaded the whole
+  // table on every staff sign-in so that this filter could run in memory. The
+  // range and the branch are now the server's job: `admin_list_orders_for_range`
+  // returns exactly this window and nothing else.
+  //
+  // The filter predicates are gone rather than moved, because the server applies
+  // both. The Riyadh calendar dates are converted to the half-open UTC instant
+  // window the feed expects; `riyadhDateOnly` stays for the per-day grouping
+  // below, which still has to bucket by Riyadh calendar day.
+  const [rangeOrders, setRangeOrders] = useState<ReportOrder[]>([]);
+  const [rangeLoading, setRangeLoading] = useState(true);
+  // Stored as a KIND, formatted at render. Holding a formatted string here
+  // would capture `isRTL` in the effect's closure, so switching the console's
+  // language would leave the message in the previous one until the next fetch.
+  const [rangeError, setRangeError] =
+    useState<{ kind: 'missing-migration' } | { kind: 'other'; message: string } | null>(null);
+  // Set when the window holds more orders than the server will return at once.
+  // The server sends NONE in that case rather than the first N, so the reports
+  // below render empty and this banner explains why — an empty report with a
+  // reason beats a truncated one that looks complete.
+  const [rangeOverflow, setRangeOverflow] = useState<{ rows: number; max: number } | null>(null);
 
-  const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered');
+  useEffect(() => {
+    // An end date before the start date is a half-typed range, not a query.
+    if (reportEndDate < reportStartDate) {
+      setRangeOrders([]); setRangeOverflow(null); setRangeError(null); setRangeLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRangeLoading(true);
+    const { fromIso, toIso } = riyadhRangeToUtc(reportStartDate, reportEndDate);
+    ordersApi.listForRange(fromIso, toIso, reportBranchId === 'all' ? null : reportBranchId)
+      .then(res => {
+        if (cancelled) return;
+        setRangeOrders(res.orders.map(mapReportOrder));
+        setRangeOverflow(res.limit_exceeded ? { rows: res.row_count, max: res.max_rows } : null);
+        setRangeError(null);
+      })
+      .catch(e => {
+        if (cancelled) return;
+        setRangeOrders([]);
+        setRangeOverflow(null);
+        // A missing function is a migration that has not been applied to this
+        // project yet, not a fault. Telling them apart turns "Could not find the
+        // function public.admin_list_orders_for_range in the schema cache" into
+        // something an operator can act on.
+        setRangeError(isMissingFunctionError(e)
+          ? { kind: 'missing-migration' }
+          : { kind: 'other', message: e instanceof Error ? e.message : String(e) });
+      })
+      .finally(() => { if (!cancelled) setRangeLoading(false); });
+    return () => { cancelled = true; };
+  }, [reportStartDate, reportEndDate, reportBranchId]);
+
+  const filteredOrders = rangeOrders;
+  const deliveredOrders = useMemo(
+    () => filteredOrders.filter(o => o.status === 'delivered'),
+    [filteredOrders],
+  );
 
   // 2. Aggregations
   const repGrossSales = deliveredOrders.reduce((sum, o) => sum + o.total, 0);
@@ -290,6 +347,46 @@ export const ReportsPanel: React.FC = () => {
           </select>
         </label>
       </Card>
+
+      {/* The three states this panel can now be in that it could not before, when
+          it filtered a list the app already held. Each SAYS what it is: a report
+          rendering zeros for an unstated reason is the failure mode to avoid. */}
+      {rangeError ? (
+        <Card>
+          <Text variant="body" tone="danger" as="p">
+            {rangeError.kind === 'missing-migration'
+              ? (isRTL
+                ? 'تتطلب التقارير ترحيل قاعدة بيانات لم يُطبَّق بعد على هذا المشروع (admin_list_orders_for_range).'
+                : 'Reports require a database migration that has not been applied to this project yet (admin_list_orders_for_range).')
+              : (isRTL
+                ? `تعذّر تحميل طلبات هذه الفترة: ${rangeError.message}`
+                : `Could not load orders for this range: ${rangeError.message}`)}
+          </Text>
+        </Card>
+      ) : null}
+
+      {rangeOverflow ? (
+        <Card>
+          <Text variant="body" tone="warning" as="p">
+            {isRTL
+              ? `تحتوي هذه الفترة على ${rangeOverflow.rows} طلبًا، وهو أكثر من الحد الأقصى ${rangeOverflow.max} طلب للتقرير الواحد. لم تُحمَّل أي بيانات — يرجى تضييق الفترة أو اختيار فرع واحد.`
+              : `This range holds ${rangeOverflow.rows} orders, more than the ${rangeOverflow.max}-order limit for a single report.`}
+          </Text>
+          <Text variant="caption" tone="tertiary" as="p" className="mt-1">
+            {isRTL
+              ? 'لم تُعرض نتائج جزئية عمدًا، لأن تقريرًا مبتورًا يبدو صحيحًا.'
+              : 'No partial results were loaded — deliberately, because a truncated report looks correct. Narrow the date range or pick a single branch.'}
+          </Text>
+        </Card>
+      ) : null}
+
+      {rangeLoading ? (
+        <Card>
+          <Text variant="body" tone="tertiary" as="p">
+            {isRTL ? 'جارٍ تحميل طلبات هذه الفترة…' : 'Loading orders for this range…'}
+          </Text>
+        </Card>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
         <Card>

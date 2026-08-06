@@ -63,14 +63,35 @@ function round2(value: number): number {
  * of motion that reads as live data when it is really just sort instability.
  */
 export function buildBranchSalesRows(branches: Branch[], orders: Order[]): BranchSalesRow[] {
-  const totals = new Map<string, { sales: number; orderCount: number }>();
+  const totals = new Map<string, BranchTotals>();
   for (const order of orders) {
     const bucket = totals.get(order.branchId) ?? { sales: 0, orderCount: 0 };
     bucket.sales += order.total;
     bucket.orderCount += 1;
     totals.set(order.branchId, bucket);
   }
+  return buildBranchSalesRowsFromTotals(branches, totals);
+}
 
+/** Per-branch sums, however they were obtained. */
+export interface BranchTotals {
+  sales: number;
+  orderCount: number;
+}
+
+/**
+ * The same rows, built from totals the SERVER aggregated.
+ *
+ * `buildBranchSalesRows` above sums the in-memory order list, which required the
+ * console to hold every order that had ever been placed. `admin_order_stats`
+ * returns those sums directly, so the panel calls this instead. The ranking,
+ * tie-break, rounding and status derivation are shared — the only difference is
+ * where the two numbers came from.
+ */
+export function buildBranchSalesRowsFromTotals(
+  branches: Branch[],
+  totals: Map<string, BranchTotals>,
+): BranchSalesRow[] {
   return branches
     .map((branch) => {
       const { sales, orderCount } = totals.get(branch.id) ?? { sales: 0, orderCount: 0 };

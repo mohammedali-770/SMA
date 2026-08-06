@@ -5,7 +5,11 @@ import {
   calculateDistance,
   generateId,
   parseCSVMenu,
+  riyadhDateOnly,
+  riyadhDayStartIso,
   riyadhMonthRange,
+  riyadhNextDay,
+  riyadhRangeToUtc,
 } from './calculations';
 import { Category } from '../types';
 
@@ -173,5 +177,61 @@ describe('parseCSVMenu', () => {
     const { products, errors } = parseCSVMenu(csv, []);
     expect(products).toHaveLength(0);
     expect(errors.some(e => /missing required fields/i.test(e))).toBe(true);
+  });
+});
+
+describe('riyadhDayStartIso', () => {
+  it('maps a Riyadh calendar day to the UTC instant it begins at', () => {
+    // Riyadh is UTC+3 with no daylight saving, so midnight local is 21:00 the
+    // previous day in UTC — the whole reason the reports could not simply
+    // compare date strings server-side.
+    expect(riyadhDayStartIso('2026-03-10')).toBe('2026-03-09T21:00:00.000Z');
+  });
+
+  it('is the exact inverse of riyadhDateOnly at the boundary', () => {
+    const startOfDay = riyadhDayStartIso('2026-03-10');
+    expect(riyadhDateOnly(startOfDay)).toBe('2026-03-10');
+    // One millisecond earlier is still the previous Riyadh day.
+    expect(riyadhDateOnly(new Date(Date.parse(startOfDay) - 1).toISOString())).toBe('2026-03-09');
+  });
+
+  it('does not shift across the northern summer (Saudi has no DST)', () => {
+    expect(riyadhDayStartIso('2026-07-10')).toBe('2026-07-09T21:00:00.000Z');
+    expect(riyadhDayStartIso('2026-01-10')).toBe('2026-01-09T21:00:00.000Z');
+  });
+});
+
+describe('riyadhNextDay', () => {
+  it('rolls the month', () => {
+    expect(riyadhNextDay('2026-03-31')).toBe('2026-04-01');
+  });
+
+  it('rolls the year', () => {
+    expect(riyadhNextDay('2026-12-31')).toBe('2027-01-01');
+  });
+
+  it('handles February in a leap year', () => {
+    expect(riyadhNextDay('2028-02-28')).toBe('2028-02-29');
+  });
+});
+
+describe('riyadhRangeToUtc', () => {
+  it('produces a HALF-OPEN window ending at the start of the day AFTER end', () => {
+    expect(riyadhRangeToUtc('2026-03-01', '2026-03-31')).toEqual({
+      fromIso: '2026-02-28T21:00:00.000Z',
+      toIso: '2026-03-31T21:00:00.000Z',
+    });
+  });
+
+  it('includes the last instant of the end day and excludes the next one', () => {
+    const { fromIso, toIso } = riyadhRangeToUtc('2026-03-10', '2026-03-10');
+    // 23:59:59.999 Riyadh on the 10th.
+    const lastInstant = new Date(Date.parse(toIso) - 1).toISOString();
+    expect(riyadhDateOnly(lastInstant)).toBe('2026-03-10');
+    // A single-day range is exactly 24 hours wide.
+    expect(Date.parse(toIso) - Date.parse(fromIso)).toBe(24 * 60 * 60 * 1000);
+    // And `toIso` itself is already the next day — the order sitting on it
+    // belongs to the NEXT range, counted once rather than twice or never.
+    expect(riyadhDateOnly(toIso)).toBe('2026-03-11');
   });
 });

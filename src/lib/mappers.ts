@@ -167,7 +167,7 @@ function mapAddressSnapshot(snap: Record<string, unknown>): SavedAddress {
 // Orders
 // ---------------------------------------------------------------------------
 /** DB sync_status enum -> the app's SyncStatus labels. */
-function mapSyncStatus(s: DbSyncStatus): SyncStatus {
+export function mapSyncStatus(s: DbSyncStatus): SyncStatus {
   switch (s) {
     case 'syncing': return 'pending_sync';
     case 'failed': return 'sync_failed';
