@@ -217,19 +217,34 @@ Functions remain intact. Full record, including the open double-refund design
 question that must be resolved before the worker is ever re-enabled:
 `docs/PAYMENT_POSTPONEMENT.md`.
 
-Open issues:
-
-- **Issue #102 (open)** — set the Vercel **Production Branch** to
-  `claude/project-build-ie4b56` and trigger a fresh Production redeploy. While it
-  is unset, the default branch only deploys as a Preview and `/` and `/app/`
-  serve byte-identical HTML, so the customer Expo web app is not actually being
-  served in production. Owner action only (Vercel dashboard) — see
-  `docs/DEPLOY.md`.
-
-  **This is the single largest open production-readiness gap** — it is the one
-  item that means the customer app is not truly live.
+Open issues: **none.**
 
 Closed since the last update:
+
+- **Issue #102 (closed 2026-08-05)** — the Vercel **Production Branch** was
+  unset, so the default branch only ever deployed as a **Preview**. Production
+  was serving a build roughly two days stale: fifteen merged pull requests,
+  including the customer-note fix and the removal of the false ZATCA compliance
+  claims, were not reaching customers.
+
+  Two steps were needed, and the second is the one that is easy to miss: set the
+  branch (**Settings → Environments → Production** — Vercel moved it out of
+  Settings → Git), **and then promote**. A deployment's environment is fixed when
+  it is created, so every existing build stays a Preview forever; promoting the
+  newest one is what creates the first Production deployment and moves the alias.
+
+  Verified live: the deployed admin chunk contains `Live Orders`,
+  `Customer note:`, `No internet connection`, `Open in Maps`,
+  `management sales summary`, `partially imported` and `Importing`, and the three
+  false ZATCA strings are gone. The customer app's Expo entry bundle changed,
+  carries #151's `(auth)/login` route guard and no longer references
+  `expo-notifications` (#149). All six security headers intact.
+
+  > The old verification in `docs/DEPLOY.md` (`/` and `/app/` byte-identical)
+  > **passed throughout this outage.** It only catches the catch-all-rewrite
+  > failure, not a stale or unpromoted deployment. `docs/DEPLOY.md` now documents
+  > three checks: the `age` header, the Preview/Production badge in the
+  > Deployments list, and grepping the deployed bundle for a known-recent string.
 
 - **Issue #81 (closed 2026-07-29, completed)** — the `SENTRY_AUTH_TOKEN`
   source-map secret. Both upload gates are conditional
