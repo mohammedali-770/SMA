@@ -10,8 +10,9 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-05 class E is empty: every repository migration is applied to
-Production.** The three files that were unapplied — two from PR #142, one from
+**As of 2026-08-06 exactly one repository migration is unapplied:**
+`20260806120000_erasure_phone_normalization` (§22). Everything else is live.
+The three files that were unapplied before it — two from PR #142, one from
 PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file, in filename order.
 
@@ -21,19 +22,21 @@ PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
 | `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
-- Repository migration files (default branch `claude/project-build-ie4b56`,
-  head `41a19dd`): **64**
+- Repository migration files (default branch `claude/project-build-ie4b56`): **65**
 - Live `schema_migrations` rows: **65**
-- Unapplied repository files: **0**
+- Unapplied repository files: **1**
+  (`20260806120000_erasure_phone_normalization` — class **E**, see §22)
 - Latest live version: **`20260805061955`**
   (`address_description_trim_all_whitespace`; repository version `20260802120000`)
 
-The 64 / 65 difference is the long-standing **history** divergence, not a
-*schema* divergence: three live-only F-class history rows carry no repository
-file, and two H-class repository files (`place_order`, `loyalty`) were
-superseded by later consolidated migrations. 64 files − 2 H-class + 3 F-class =
-65 rows. The full class-by-class algebra is in §4 and the row-by-row mapping in
-§5.
+Counting only the 64 **applied** files, the 64 / 65 difference is the
+long-standing **history** divergence, not a *schema* divergence: three live-only
+F-class history rows carry no repository file, and two H-class repository files
+(`place_order`, `loyalty`) were superseded by later consolidated migrations.
+64 files − 2 H-class + 3 F-class = 65 rows. The full class-by-class algebra is in
+§4 and the row-by-row mapping in §5. The 65th file is the unapplied one above,
+which contributes no live row until it is applied — so the equal totals are a
+coincidence of arithmetic, not evidence of alignment.
 
 > **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
 > `apply_migration` stamped apply-time versions that differ from the repository
@@ -222,7 +225,7 @@ fields byte-identical before/after, fingerprint-verified).
 | B. `SAME_CONTENT_DIFFERENT_VERSION` | **48** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** (`20260806120000_erasure_phone_normalization`, §22) |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
 | H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
 
@@ -243,7 +246,10 @@ notes.
 > true totals to the **61 repository / 62 live** authoritative production totals
 > carried at the top of §1.
 >
-> **Class E is now empty.** Every repository migration is applied. The
+> **Class E holds exactly one row**, added 2026-08-06:
+> `20260806120000_erasure_phone_normalization` (§22), which is written, tested
+> and merged but **not applied** — applying it needs its own explicit owner
+> approval. Class E was empty from 2026-08-05 until then. The
 > operations-automation cron-health migration
 > `20260723140000_operations_automation_cron_health` — the last remaining
 > class-E row, recorded as repository-only in every earlier revision of this
@@ -1230,3 +1236,112 @@ means for migrations.
 The five operational crons — `account-deletion-processor`, `lazywait-sync`,
 `order-integrity-watchdog`, `operations-alerts-evaluator`,
 `operations-digest-generator` — are **unaffected and remain active**.
+
+---
+
+## 22. PENDING migration: erasure phone normalization (class E, NOT applied)
+
+`supabase/migrations/20260806120000_erasure_phone_normalization.sql` is the only
+repository migration that is **not** in Production. It is merged to the default
+branch so the repository chain is correct for any rebuilt environment (§11), and
+it will stay class **E** until the owner explicitly approves an
+`apply_migration` run for it. Nothing in this section has been executed against
+Production.
+
+### What it fixes
+
+`anonymize_account_data` read the customer's phone from
+`public.profiles.phone_number` and compared it raw against `phone_e164`:
+
+```sql
+select phone_number into v_phone from public.profiles where id = p_user_id;
+delete from public.otp_challenges       where phone_e164 = v_phone;
+delete from public.whatsapp_message_logs where phone_e164 = v_phone;
+```
+
+Those columns are not in the same format. `profiles.phone_number` is copied
+verbatim from `auth.users.phone` by `handle_new_user` and
+`handle_auth_user_phone_confirmed`, and GoTrue stores that value **without** a
+leading `+`. `phone_e164` is written by `normalizeSaudiPhoneE164` in
+`supabase/functions/_shared/whatsapp.ts`, which always emits `+966…`. So for any
+profile whose phone came from the auth trigger, both deletes matched zero rows.
+
+The summary then reported `'phone_purged', (v_phone is not null and btrim(v_phone) <> '')`
+— true whenever a phone *string* existed, not when anything was deleted. That
+value is written into `account_deletion_requests.retention_summary`, so the
+compliance record asserted a purge that had not occurred.
+
+### Production measurement (2026-08-06, shape only)
+
+Read with a format-only query — counts of values matching `'+%'`, no phone
+values selected:
+
+| Column | Rows carrying a leading `+` |
+| --- | --- |
+| `auth.users.phone` | 0 of 1 |
+| `otp_challenges.phone_e164` | 3 of 3 |
+| `profiles.phone_number` | mixed — 1 of 2 |
+
+Of the 2 profiles holding a phone, **1** matched an OTP row under the old raw
+comparison and **2** match after normalization. Half the affected profiles would
+have kept their OTP and WhatsApp records through an erasure.
+
+### What the migration changes
+
+1. Adds `public.normalize_ksa_e164(text)` — a SQL mirror of
+   `normalizeSaudiPhoneE164`, returning `+9665XXXXXXXX` or `null`. Execute is
+   granted to `service_role` only.
+2. `anonymize_account_data` now sources the phone from `auth.users.phone`
+   (authoritative, not customer-writable), falls back to the profile only if
+   that is absent, and normalizes **both sides** of each delete predicate.
+3. `phone_purged` is replaced by `phone_purge_attempted`. The two row counts the
+   function already returned (`otp_challenges_purged`, `whatsapp_logs_purged`)
+   are the honest record. No consumer of `phone_purged` exists anywhere in the
+   repository, so the rename breaks nothing.
+4. `revoke update (phone_number) on public.profiles from authenticated` — the
+   grant from `20260707120100:82` let a customer point the value the erasure
+   keys on at another customer's number. Neither app writes it directly.
+
+### Safety
+
+- Strictly additive plus one narrowing revoke. No table, column or constraint is
+  altered; no existing row is modified.
+- `create or replace function` preserves name, signature, volatility and
+  `search_path`, so the account-deletion worker keeps calling it unchanged, and
+  no applied migration is edited.
+- Idempotent — re-running is a no-op.
+- The behavioural change deletes **more** rows during an erasure, never fewer.
+
+### Pre-apply validation (repository harness, 2026-08-06)
+
+Docker was unavailable and PostGIS is not installed locally, so the full chain
+could not be replayed. Validated instead against a local PostgreSQL 16 cluster
+with the minimum schema stubbed:
+
+- migration applied cleanly (exit 0);
+- `supabase/tests/erasure_phone_normalization_test.sql` — 6 cases plus 15
+  normalizer assertions — reported `ALL CASES PASSED`;
+- the original `anonymize_account_data` body was then restored and the same
+  suite re-run, which **failed** with
+  `FAIL(1): otp_challenges survived erasure for a plus-less profile phone (1 left)`,
+  confirming the suite actually pins the defect rather than passing vacuously.
+
+Both scratch databases were dropped and the cluster stopped afterwards. The
+suite also runs unconditionally in the `SQL suites` workflow, which replays the
+whole chain on `postgis/postgis:16-3.4`.
+
+### When it is applied
+
+Follow §9 exactly: pre-live gate, one `apply_migration` call, then verification.
+After applying, move this section's classification from **E** to **B**, record
+the stamped apply-time version, and update the counts in §1 and §4.
+
+### Rollback
+
+```sql
+grant update (phone_number) on public.profiles to authenticated;
+```
+
+…and restore the previous `anonymize_account_data` body from
+`20260715120000_account_deletion.sql:228-295`. Doing so reinstates the silent
+skip and the false `phone_purged` claim, so prefer fixing forward.
