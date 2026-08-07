@@ -409,6 +409,42 @@ deploy either, so nothing would reach customers at all.
 (§3.1). It is skipped on every pull request by design, and a required check has
 no business gating on a job that intentionally does not run.
 
+### 3.6 Should cancelling an order take its loyalty points back?
+
+**Found 2026-08-07 by auditing the never-exercised post-`received` path.** Full
+evidence in `PROJECT_STATUS.md`; the short version:
+
+Loyalty points are credited when an order is **placed**, not when it is
+delivered. Nothing takes them back when it is cancelled — there is no cancel
+function, only `admin_set_order_status(id, 'cancelled')`, a bare `UPDATE` with
+no validation and no state machine behind it. On Production today, **3 cancelled
+orders carry 41 earned points, with zero reversal rows**, and those points are
+in a live customer balance.
+
+At current settings a point is SAR 0.10, so a cancelled order permanently grants
+about **10% of its value as store credit**. Today that is SAR 4.10 of test data,
+and only an admin can cancel — so this is an accounting inaccuracy rather than
+something a customer can exploit.
+
+**Why this needs you and not just a patch:** whether a cancellation claws points
+back is a policy question with a customer-goodwill cost, and the answer differs
+by *who* cancelled. *Options:* (a) reverse points on any cancellation — cleanest
+ledger, but punishes the customer when **the branch** cancels; (b) reverse only
+when the customer is at fault, which needs a cancellation-reason field that does
+not exist yet; (c) leave as-is and accept the leak. **Recommendation: (a) now**,
+because it is a contained migration and the current data is negligible, then (b)
+later if refusal reasons are ever captured.
+
+Whichever you pick, the underlying gap is worth closing separately: give
+`admin_set_order_status` a real transition check server-side, mirroring the one
+the admin console already enforces client-side. **This is a schema change and
+therefore blocked on your approval** (CLAUDE.md §5) — nothing has been applied.
+
+**One sequencing warning:** do not ship a customer-facing "cancel my order"
+button before this is fixed. Today cancellation is admin-only, which is the only
+reason the leak is bounded; a self-service cancel would turn it into a discount
+generator.
+
 ### 3.4 Staging environment
 
 Every migration's first execution against a production-shaped database is
