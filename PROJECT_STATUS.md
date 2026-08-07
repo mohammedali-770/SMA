@@ -75,6 +75,14 @@ The default branch **is** production. Everything below is deployed and active:
 - **Operations Health Center**: staff RPC `operations_health_summary()`
   (SECURITY DEFINER, staff-gated with 42501) + admin panel, now monitoring a
   5-job allowlist (three critical crons + the two internal automation crons).
+  **Nine cards since 2026-08-07**: the eight subsystem cards plus `order_flow`,
+  which watches the business outcome — orders arriving in the last 60 minutes
+  against the same rolling window shifted back whole weeks over the previous 8.
+  It is in the critical set but fails quiet, reporting `idle` (never `failing`)
+  while no branch is open or the baseline has fewer than 3 comparable weeks, so
+  it currently reads `idle` on Production and moves no existing number. A
+  severity-aware health badge surfaces `failing` / `degraded` /
+  `configuration_error` in the admin sidebar, outside the Operations tab.
 - **Smart Operations Alerts + Daily Digest** (live and ACTIVE):
   evaluator cron `operations-alerts-evaluator` every 5 min, digest cron
   `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
@@ -113,15 +121,17 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**68** live `schema_migrations` rows; **66** repository migration files;
-**zero unapplied**. Latest live version `20260807140206`.
+**69** live `schema_migrations` rows; **67** repository migration files;
+**zero unapplied**. Latest live version `20260807152347`.
 
-Two migrations were applied on **2026-08-07** with explicit owner approval —
+Three migrations were applied on **2026-08-07** with explicit owner approval —
 `erasure_phone_normalization` (live `20260807140050`) and
-`admin_ranged_orders_and_stats` (live `20260807140206`). Full pre-live gate and
-verification in `docs/MIGRATIONS.md` §24.
+`admin_ranged_orders_and_stats` (live `20260807140206`), both recorded in
+`docs/MIGRATIONS.md` §24, then `order_flow_health_card` (live `20260807152347`)
+in §25. The third was applied verbatim, with the stored migration text proven
+byte-identical to the merged repository file.
 
-The 68 / 66 gap is history, not schema: **five** live-only rows carry no
+The 69 / 67 gap is history, not schema: **five** live-only rows carry no
 repository file (one of them a `select 1;` connectivity probe) and **three**
 repository files were superseded by consolidated migrations. Full classification,
 recomputed from live data on 2026-08-07 and reconciling both sides exactly, in
