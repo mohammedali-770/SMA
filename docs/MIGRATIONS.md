@@ -2193,13 +2193,36 @@ volume that does not exist yet. §25's closing note applies unchanged.
 > Two things surfaced while checking this, neither part of this migration and
 > both worth someone's attention:
 >
-> * **The newest order is 2026-08-01** — six days before this apply. Combined
->   with 21 of 24 orders still sitting in `received`, that is an operational
->   signal this ledger is not the right place to chase, but it should not go
->   unrecorded.
-> * **`open_branches` counts `branches.is_active`**, which is a configuration
->   flag rather than a trading-hours state. The card's "no branch open → idle"
->   arm therefore does not actually suppress it outside opening hours; only the
->   baseline gate does. That is a real difference between what the card's comment
->   claims and what it does, and it deserves its own look once the baseline is
->   warm enough for the arm to matter.
+> * **~~The newest order is 2026-08-01, an operational signal~~ — that reading
+>   was WRONG, corrected 2026-08-07.** It looked at the newest timestamp without
+>   the denominator. The full picture: 24 orders all time, **2 distinct
+>   customers**, 5 profiles, 6 checkout sessions, **every order still
+>   `payment_status = 'pending'`** and **none ever `delivered`**. There was never
+>   an order flow to stop, so the quiet period is not a regression — this is
+>   pre-launch test traffic. The real finding is the stronger one: **the order
+>   lifecycle has never completed once in production.** See `PROJECT_STATUS.md`
+>   → "Production reality check".
+> * **`open_branches` counts `branches.is_active`**, a configuration flag rather
+>   than a trading-hours state. Checked against the live schema on 2026-08-07:
+>   `public.branches` has `is_active`, `delivery_enabled`, `pickup_enabled` and
+>   `delivery_temporarily_closed` — and **no opening-hours data of any kind**.
+>   So the card cannot know trading hours, and its "no branch open → idle" arm
+>   fires only if every branch is deactivated, which is a config action rather
+>   than a nightly event.
+>
+>   The card is nonetheless **not** wrong to be quiet at night. The protection
+>   comes from the **minimum-sample arm, `baseline_samples < 3`**: at 04:00 the
+>   historical 04:00 windows are equally empty, the `where c > 0` filter drops
+>   them all, and the sample count is 0.
+>
+>   **A first attempt at this correction named the `baseline < 1` arm instead,
+>   and that was also wrong** — caught in review on PR #176. That arm is
+>   *unreachable*. The same `where c > 0` filter means every counted sample is
+>   at least 1, so a non-empty baseline always averages >= 1; and an empty one is
+>   already caught by the sample-count arm above it. An exhaustive search over
+>   all 65,536 combinations of the eight weekly window counts reaches it zero
+>   times. It is harmless dead code, but it should not be described as a guard.
+>
+>   Correcting the in-body comment would mean re-emitting a 1000-line function,
+>   which is not worth it for a comment — recorded here and in the card's test
+>   suite, where someone reasoning about the arms will look.

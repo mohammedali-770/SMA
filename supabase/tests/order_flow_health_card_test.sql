@@ -204,8 +204,30 @@ begin
 end $$;
 
 -- ---- CASE 6: nothing open -> idle, however bad the numbers look ------------
--- Zero orders while every branch is closed is the CORRECT reading. This is the
--- arm that stops the card firing every night after closing time.
+-- Zero orders while every branch is closed is the CORRECT reading.
+--
+-- CORRECTION (2026-08-07): this comment used to claim this is "the arm that
+-- stops the card firing every night after closing time". It is not, and the
+-- distinction matters if you are reasoning about false alarms.
+-- `open_branches` counts `branches.is_active`, a configuration flag — the schema
+-- carries NO opening-hours data at all — so this arm fires only when every
+-- branch is deactivated, which is an admin action, not a nightly event.
+--
+-- What actually keeps the card quiet overnight is the MINIMUM-SAMPLE arm,
+-- `baseline_samples < 3`. At 04:00 the historical 04:00 windows are equally
+-- empty, every `c` is 0, the `where c > 0` filter drops them all, and the
+-- sample count is 0 — so that arm returns `idle` before anything else is
+-- considered.
+--
+-- It is NOT the `baseline < 1` arm, which is unreachable: the same `where c > 0`
+-- filter means every counted sample is at least 1, so a non-empty baseline
+-- always averages >= 1, and an empty one has already been caught by the
+-- sample-count arm above. Verified by exhaustive search over the 8 weekly
+-- window counts — no combination reaches it. Harmless dead code, but it should
+-- not be described as a guard that does something.
+--
+-- This case still pins real and useful behaviour; it just is not the
+-- night-time guard.
 do $$
 declare v_state text; v_card jsonb;
 begin
