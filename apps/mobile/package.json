@@ -48,9 +48,10 @@
     "@types/react": "~19.2.2",
     "typescript": "~6.0.3"
   },
-  "//overrides": "Transitive-only security patches. Both packages appear exactly once in this tree and both bumps stay within the same major, so no dependent's API expectations change. Plain `npm audit fix` here re-resolves ~95 packages (the whole Expo CLI toolchain, RN codegen, Sentry) — far too much churn for a store-bound app, so the two advisories are pinned surgically instead. The 12 remaining moderate advisories are upstream Expo issues with no non-breaking fix; see docs/DEPENDENCY_ADVISORIES.md.",
+  "//overrides": "Transitive-only security patches. Each package appears exactly once in this tree and every bump stays within the same major, so no dependent's API expectations change. Plain `npm audit fix` here re-resolves ~95 packages (the whole Expo CLI toolchain, RN codegen, Sentry) — far too much churn for a store-bound app, so the advisories are pinned surgically instead. js-yaml reaches this tree only via expo -> @expo/cli -> @expo/xcpretty, an Xcode log formatter that runs on a macOS build host and is never bundled into the app; 4.3.1 is the patched release inside xcpretty's own `^4.1.0` range, so it is the smallest fix that closes GHSA-5p4m-2wfm-xmqj. The remaining moderate advisories are upstream Expo issues with no non-breaking fix; see docs/DEPENDENCY_ADVISORIES.md.",
   "overrides": {
     "postcss": "^8.5.25",
-    "brace-expansion": "^5.0.9"
+    "brace-expansion": "^5.0.9",
+    "js-yaml": "^4.3.1"
   }
 }
