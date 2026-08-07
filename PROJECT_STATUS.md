@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-07 (default-branch head `aae7cee`).
+> Last updated: 2026-08-07 (default-branch head `1ea366d`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -192,6 +192,79 @@ actually gate reaching customers are the store-submission ones: legal documents
 
 One data oddity worth a look, not urgent: one order carries
 `payment_method = NULL` while the other 23 are `cash` (20) or `online` (3).
+
+### The post-`received` path has no server-side state machine
+
+Because no order has ever moved past `received`, the whole lifecycle beyond it
+is unexercised code. Auditing it on 2026-08-07 produced one confirmed defect and
+several negative results worth recording so nobody re-investigates them.
+
+**`orders.status` has exactly one writer, and it validates nothing.**
+`public.admin_set_order_status` (`20260724200000_order_read_contracts.sql:255`)
+is a bare `update public.orders set status = p_status, updated_at = now()`. Any
+status to any status — `delivered` back to `received`, `cancelled` forward to
+`delivered`. Every other `update public.orders` in the chain touches
+`payment_status`, `lazywait_*`, `sync_*` or `refund_state`, never `status`. No
+trigger on the table enforces an order-status state machine either.
+
+A state machine **does** exist — `ORDER_STATUS_TRANSITIONS` in
+`src/context/AppContext.tsx:236-241`, with `canTransitionOrder` unit-tested in
+`AppContext.test.ts` — but it lives in the admin console only. It constrains the
+UI, not the database, so any authenticated admin calling the RPC directly
+bypasses it. The function is `is_admin()`-gated, so this is not a privilege
+issue; it is an unguarded write.
+
+**Confirmed consequence: a cancelled order's loyalty movement is never
+reversed — in either direction.** Placement settles the balance in one
+statement, `greatest(0, balance - points_redeemed + points_earned)`, inside
+`place_customer_order`; `loyalty_awarded_at` is only ever set in that `insert`,
+never on a transition. There is no cancel function at all — cancelling *is*
+`admin_set_order_status(id, 'cancelled')`, the bare `UPDATE` above — so **both**
+halves are stranded: earned points stay credited (the business loses), and
+redeemed points are never given back (**the customer** loses, having paid points
+for an order they never received).
+
+Verified against Production on 2026-08-07 (read-only, counts only):
+
+| | Orders | Points earned | `earn` ledger rows | Reversal rows |
+| --- | --- | --- | --- | --- |
+| `received` | 21 | 1456 (−500 redeemed) | 20 | — |
+| `cancelled` | **3** | **41** | **3** | **0** |
+
+All three cancelled orders are stamped `loyalty_awarded_at`. Both profiles'
+stored `profiles.loyalty_points` reconcile exactly to their ledger sums, so this
+is not balance drift — it is the designed behaviour. One customer's 755-point
+balance includes **41 points earned on orders that were cancelled**.
+
+The customer-facing half has **not** bitten yet: all 500 redeemed points belong
+to `received` orders, and no cancelled order has redeemed any. It will bite the
+first time someone redeems and then cancels.
+
+At live settings (`points_per_riyal = 1`, `discount_per_point = 0.10`) a point is
+SAR 0.10 of discount, so a cancelled order permanently grants roughly **10% of
+its value as store credit**. Today that is SAR 4.10 of test data.
+
+**Severity, stated honestly, and it differs per half.** The *earned* half is an
+accounting inaccuracy, not an abuse vector: there is no customer-facing cancel
+anywhere in the mobile app — only display strings and fixtures — so a customer
+cannot mint credit on demand, and cancellation requires an admin. It becomes a
+real leak only at volume, or if a customer-facing cancel is ever added; adding
+one *before* fixing this would turn it into a self-service discount generator.
+
+The *redeemed* half is worse in kind though not yet in size: it takes something
+from a customer and does not give it back. It is unexposed today only because
+the one order that redeemed points was not cancelled — that is luck, not a
+control.
+
+**Negative results — investigated, no defect found.** Nothing assigns
+`loyalty_awarded_at` outside the placement `insert`, so the double-award risk on
+a repeated `delivered` transition does not exist. And `emit_order_change_event`
+only inserts `(order_id, event)` into `public.order_change_events` — a staff-only
+realtime signal with no PII, pruned after a day — so a backwards status change
+has no customer-visible notification consequence.
+
+The fix is a product decision, not just a patch: see `docs/OWNER_ACTIONS.md`
+§3.6.
 
 ### Active scheduled jobs (pg_cron)
 

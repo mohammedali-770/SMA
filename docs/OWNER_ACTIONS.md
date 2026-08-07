@@ -409,6 +409,77 @@ deploy either, so nothing would reach customers at all.
 (§3.1). It is skipped on every pull request by design, and a required check has
 no business gating on a job that intentionally does not run.
 
+### 3.6 Should cancelling an order take its loyalty points back?
+
+**Found 2026-08-07 by auditing the never-exercised post-`received` path.** Full
+evidence in `PROJECT_STATUS.md`; the short version:
+
+Placing an order moves the loyalty balance **in both directions at once**
+(`20260710120100_place_order_delivery_zone.sql:312-326`):
+
+```
+loyalty_points := greatest(0, balance - points_redeemed + points_earned)
+```
+
+Cancelling reverses **neither**. There is no cancel function — only
+`admin_set_order_status(id, 'cancelled')`, a bare `UPDATE` with no validation and
+no state machine behind it — so both halves are stranded:
+
+| Half | Effect at placement | On cancellation today | Who loses |
+| --- | --- | --- | --- |
+| Earned | balance **+** ~10% of order value | kept | the business |
+| Redeemed | balance **−** points spent | not restored | **the customer** |
+
+On Production today the two halves are not equally exposed. **3 cancelled orders
+carry 41 earned points with zero reversal rows**, and those points sit in a live
+customer balance. **No cancelled order has redeemed any points** (all 500
+redeemed points belong to `received` orders), so the customer-facing half has not
+bitten yet — but it is the half that charges a real customer for an order they
+never received, and it will bite the first time someone redeems and then
+cancels.
+
+At current settings a point is SAR 0.10, so a cancelled order permanently grants
+about **10% of its value as store credit**. Today that is SAR 4.10 of test data,
+and only an admin can cancel — so this is an accounting inaccuracy rather than
+something a customer can exploit.
+
+**Why this needs you and not just a patch:** whether a cancellation claws earned
+points back is a policy question with a customer-goodwill cost, and the answer
+differs by *who* cancelled. *Options:* (a) reverse earned points on any
+cancellation — cleanest ledger, but punishes the customer when **the branch**
+cancels; (b) reverse only when the customer is at fault, which needs a
+cancellation-reason field that does not exist yet; (c) leave as-is and accept the
+leak. **Recommendation: (a) now**, because the current data is negligible, then
+(b) later if refusal reasons are ever captured.
+
+**Restoring redeemed points is not one of the options — it is required under all
+three.** Keeping a customer's spent points on a cancelled order is a defect
+whatever the earn policy is.
+
+**Two things make this less contained than "just reverse the rows", and whoever
+writes the migration must decide them explicitly:**
+
+1. **Balances cannot go negative.** The same `greatest(0, …)` clamp applies on the
+   way back, so reversing points a customer has **already spent** silently
+   under-reverses and leaves `loyalty_transactions.balance_after` no longer
+   reconciling to `profiles.loyalty_points`. That reconciliation currently holds
+   exactly, and it is worth keeping — it is what proved this finding was designed
+   behaviour and not drift. Either allow the clamp and write a compensating
+   ledger row that records the shortfall, or refuse to reverse below zero and
+   flag the order for manual review.
+2. **Order the two reversals** so the intermediate state cannot clamp: restore
+   redeemed points *before* removing earned ones.
+
+Whichever you pick, the underlying gap is worth closing separately: give
+`admin_set_order_status` a real transition check server-side, mirroring the one
+the admin console already enforces client-side. **This is a schema change and
+therefore blocked on your approval** (CLAUDE.md §5) — nothing has been applied.
+
+**One sequencing warning:** do not ship a customer-facing "cancel my order"
+button before this is fixed. Today cancellation is admin-only, which is the only
+reason the leak is bounded; a self-service cancel would turn it into a discount
+generator.
+
 ### 3.4 Staging environment
 
 Every migration's first execution against a production-shaped database is
