@@ -259,6 +259,82 @@ granted to `anon` with a public read policy, `20260707120200`). It hits the
 **Supabase** origin rather than the Vercel domain, so if you want to tell "site
 down" apart from "data down", run one probe against each.
 
+#### Verified against Production, 2026-08-07
+
+Both claims above were checked rather than reasoned about, because a probe
+configured from a wrong spec is a monitor that reports green forever.
+
+**Probe A — data.** `GET /rest/v1/branches?select=id&limit=1`
+
+| Request | Result |
+| --- | --- |
+| with the legacy `anon` key | **200**, body `[{"id":"b0000000-…-0002"}]`, ~1.0 s |
+| with the modern `sb_publishable_…` key | **200**, identical body |
+| with **no** `apikey` header | **401** `No API key found in request` |
+
+The 401 is the important row: it proves the probe exercises PostgREST and
+auth, so a green result means something. Either key works — use the publishable
+one.
+
+**Probe B — site.** `/` is a false-green target, confirmed, and **worse than
+§3.2 originally implied**:
+
+| Path | Result |
+| --- | --- |
+| `/` | 200 `text/html` |
+| `/app/` | 200 `text/html` |
+| `/this-path-does-not-exist-20191` | 200 `text/html` |
+| `/assets/index-C01JC8iy.js` (real) | 200 `application/javascript` |
+| `/assets/definitely-not-real.js` (fake) | **200 `text/html`** |
+
+The catch-all rewrite swallows even a missing file under `/assets/`, so **no
+path on that origin returns a non-200 for a content problem.** Status-code
+monitoring of the Vercel domain can therefore only ever catch a *total* outage —
+DNS, edge, or Vercel itself. That is still worth having, but be clear about what
+it does not cover: it cannot detect a stale deploy or a broken build, which is
+precisely the failure `docs/DEPLOY.md` records having missed for two days.
+
+**Probe C — staleness. This one is automatable, and it closes the real gap.**
+
+An earlier revision of this section said catching a stale deploy "needs a
+content assertion against a known-recent string, which changes every release" and
+so "stays the manual check in `docs/DEPLOY.md`, not something a prober can do
+unattended". **That was wrong**, and wrong in the direction that preserves the
+very gap this section exists to close. Caught in review on PR #179.
+
+Every Vite build embeds the deploy commit SHA: `vite.config.ts` aliases
+`VERCEL_GIT_COMMIT_SHA` into `import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA` at
+build time. It is therefore a literal string in the shipped bundle, and nothing
+about it needs a human.
+
+Verified against Production on 2026-08-07:
+
+```
+GET /                                  -> extract /assets/index-<hash>.js
+GET /assets/index-C01JC8iy.js          -> exactly one /[0-9a-f]{40}/ match:
+                                          1efab8dba099fba311763550f6eea1fb3496b90f
+default-branch head at that moment:       1efab8dba099fba311763550f6eea1fb3496b90f
+```
+
+One match, and it resolved to a real commit — the merge of PR #178, minutes
+earlier. So the check is: **deployed SHA == default-branch head**, and a
+mismatch persisting beyond one deploy window means the alias is stuck on an old
+build. That is exactly the failure `docs/DEPLOY.md` records having missed for two
+days, and it is detectable unattended.
+
+Two ways to run it, and the choice is yours because they cost differently:
+
+- **An external prober that supports a content assertion** — two requests and a
+  string compare. No CI minutes, but it needs the expected SHA from somewhere.
+- **A scheduled GitHub Actions job** — has the expected SHA for free
+  (`github.sha` on the default branch) and needs no external service, but it
+  consumes Actions minutes on every run. Not built here: a recurring workflow is
+  a standing cost, and that is your call rather than something to add unasked.
+
+**Summary.** Probe A carries real signal about the data path. Probe B on `/` is
+a liveness check only. **Probe C is the one that would have caught issue #102**,
+and it needs no human.
+
 ### 3.3 Who gets woken at 02:00, and on what channel?
 
 The alert-dispatcher work is pointless without an answer. **Recommendation:** name
