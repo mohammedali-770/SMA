@@ -30,9 +30,16 @@ release, and mobile store submissions as the heavier ceremony.
 | `SQL suites` | migration chain + SQL suites (PR #145) |
 | Vercel Preview | the preview deployment actually built |
 
-⚠️ **None of these is enforceable today.** Rulesets return HTTP 403 on this plan
-(CLAUDE.md → Enforcement), so a red check does not block the merge button.
-**Someone has to look.** That is the control until the plan changes.
+⚠️ **None of these blocks a merge today** — but the reason changed on
+2026-08-07. Rulesets are no longer unavailable: the plan was upgraded to Pro and
+a ruleset IS active on the default branch (it enforces pull requests, linear
+history and review-thread resolution). What it does **not** yet include is
+`required_status_checks`, so a red — or entirely absent — check still leaves the
+merge button green. **Someone has to look.**
+
+That is one settings change away from being enforced; see
+`docs/OWNER_ACTIONS.md` §3.1. Note that even a required check would not gate the
+*deployment* while Vercel auto-deploy is on (§3.5).
 
 ## 2. Does this need owner approval?
 

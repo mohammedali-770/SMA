@@ -95,47 +95,53 @@ through the owner-approved `apply_migration` workflow documented in
 - fails closed on malformed input, unknown branch state or an unverifiable
   project root.
 
-### The server-side control does NOT exist yet — read this
+### A server-side control now EXISTS — but it does not gate CI. Read this
 
-This section previously stated that "the authoritative, non-bypassable control
-is a server-side GitHub Ruleset / branch protection, which the owner manages in
-GitHub settings." **That is not true today, and believing it is dangerous.**
+**Superseded 2026-08-07.** Until then this section recorded that rulesets were
+unavailable (`GET /rulesets` → HTTP 403, "Upgrade to GitHub Pro or make this
+repository public"), because the repository was private on a free plan. The
+owner has since upgraded to **GitHub Pro**, and a ruleset on the default branch
+is now active. The old text is gone rather than annotated, because a stale claim
+about what is enforcing what is exactly what this section warns against — but the
+correction runs in **both** directions, and half the old warning still stands.
 
-Verified 2026-08-03 against `mohammedali-770/SMA`:
+**Directly observed enforcing merges in this repository** (each surfaced as
+`405 Repository rule violations found` on a merge attempt):
 
-```
-GET /repos/mohammedali-770/SMA/rulesets                       -> HTTP 403
-GET /repos/.../branches/claude%2Fproject-build-ie4b56/protection -> HTTP 403
-    "Upgrade to GitHub Pro or make this repository public to enable this feature."
-```
+| Rule | Evidence |
+| --- | --- |
+| `pull_request` required | merges go through PRs; direct-merge paths refused |
+| `required_linear_history` | `405 "Merge commits are not allowed"`, even though repository settings permit them — so squash or rebase only |
+| `required_review_thread_resolution` | `405 "A conversation must be resolved before this pull request can be merged"` |
+| `deletion`, `non_fast_forward` | configured on the protected refs |
 
-The repository is **private on a free plan**, where rulesets and branch
-protection are unavailable. Consequences, stated plainly:
+**What is still NOT enforced, and this is the part that matters:**
 
-- **No status check can ever be marked "required."** CI can fail and the merge
-  button stays green.
-- **Nothing server-side prevents a direct push to a protected branch.** The
-  PreToolUse hook above binds *agent sessions in this repository only*. It does
-  not constrain a human with a terminal, a different clone, the GitHub web UI,
-  or any other tool.
-- The hook is therefore **the only enforcement that exists**, not
-  defense-in-depth behind a stronger control.
+- **No status check is required.** A pull request merged cleanly while its head
+  commit carried *no completed CI runs at all*; the only violation the API
+  returned was thread resolution. **CI can be red, or absent entirely, and the
+  merge still goes through.** This is inferred from observed merge behaviour
+  rather than read from the ruleset API — the agent tooling here cannot read
+  `/rulesets` — so treat it as strong evidence, not proof, and confirm in
+  **Settings → Rules** before relying on either answer.
+- **Vercel deploys in parallel with CI, not after it.** Even a required check
+  would not gate the deployment while auto-deploy is on
+  (`docs/OWNER_ACTIONS.md` §3.5).
 
-Until this is resolved, the protections in this document are upheld by
-**convention and review**, not by the platform. That makes §1–§5 more important,
-not less.
+So the picture is now: **the shape of the workflow is enforced by the platform;
+the quality of what flows through it is not.** Nothing stops a red build
+reaching customers. The PreToolUse hook above still binds *agent sessions in
+this repository only* — never a human with a terminal, a different clone, or the
+GitHub web UI — so §1–§5 remain upheld by convention and review for everything
+the ruleset does not cover.
 
-**To close the gap**, the owner picks one:
-
-1. Upgrade to GitHub Pro (or Team) and create a ruleset on
-   `claude/project-build-ie4b56` and `main` requiring a pull request and the
-   `Design system` + `Production gates` checks. Cheapest real fix.
-2. Make the repository public — rulesets become available free. Consider the
-   disclosure implications first; the tree carries no secrets, but it does carry
-   the production project ref and full schema.
-3. Accept manual review as the control, and **leave this section as written** so
-   nobody is misled about what is enforcing what.
+**To close the remaining gap**, add `required_status_checks` to the existing
+ruleset naming `Design system` and `Production gates` (and `Migration chain +
+SQL suites` for schema changes). That is one settings change and it converts CI
+from advisory to binding.
 
 Do not weaken, bypass or remove the hook or these rules without explicit owner
-approval. If the server-side control is later enabled, update this section —
-an asserted-but-absent control is worse than a documented gap.
+approval. Keep this section honest in both directions: if a control is added,
+say so; if one is removed or found not to apply, say that too. An
+asserted-but-absent control is worse than a documented gap — and so is a
+documented gap that has quietly been closed.
