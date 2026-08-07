@@ -480,7 +480,7 @@ button before this is fixed. Today cancellation is admin-only, which is the only
 reason the leak is bounded; a self-service cancel would turn it into a discount
 generator.
 
-### 3.7 Two active branches have no POS mapping — orders there vanish silently
+### 3.7 Two active branches have no POS mapping — orders there never reach the kitchen
 
 **Found 2026-08-07 (read-only). Full evidence in `PROJECT_STATUS.md`.** Two
 separable pieces, one of which you can fix today without any code.
@@ -496,9 +496,21 @@ separable pieces, one of which you can fix today without any code.
 
 An order placed at either unmapped branch is blocked by the sync worker on its
 first look, with `sync_blocked_reason = 'missing_branch_mapping'` and **no
-retry**. It never reaches the POS, the kitchen never sees it, and the customer is
-told nothing — their order simply sits at `received`. This already happened to
-**three cash orders on 2026-07-23/24**, which are still stranded.
+automatic retry**. It never reaches the POS and the kitchen never sees it. This
+already happened to **three cash orders on 2026-07-23/24**, which are still
+stranded.
+
+The customer *is* told: those orders derive
+`unpaid_branch_failed_retry_available`, so the receipt reads *"We could not send
+your order to the branch"* and offers a **Resend order** button, three attempts.
+**But the resend cannot succeed while the mapping is missing** — it clears the
+block and requeues, and the worker re-reads the same absent
+`lazywait_branch_id`. Each press burns one attempt against something only you
+can fix; after the third, a cash order is terminal at `unpaid_final_failure`,
+with no refund path because nothing was paid.
+
+So the customer sees a recovery button that cannot work, and **nobody on your
+side is told at all** — which is why this sat broken for two weeks.
 
 Both unmapped branches carry seed UUIDs (`b0000000-…-0001` / `-0002`) — they are
 **seed fixtures that were never deactivated**. So the choice is: give each a real
@@ -509,9 +521,13 @@ safer default — an unmapped active branch is an order-loss trap.
 *Either way this is a live Supabase write, so per CLAUDE.md §5 I have not made
 it.* Say the word and I will, or do it in the admin console.
 
-The three already-stranded orders can be recovered by requeuing them once a
-mapping exists — but check first whether those customers were served at the
-counter anyway, because requeuing pushes them to the POS as new tickets.
+**Order of operations matters.** Fix the mapping *first*; only then requeue the
+three stranded orders (admin requeue, or the customer's own resend — both work
+once a mapping exists, and neither works before). Requeuing first just consumes
+attempts.
+
+Before requeuing at all, check whether those customers were served at the counter
+anyway — requeuing pushes them to the POS as new tickets.
 
 #### (b) The detection gap — needs a schema change, so needs your approval
 
@@ -535,8 +551,8 @@ incident count. **Nothing measures "orders that will never reach the kitchen."**
 `blocked`/`dead_letter` past a short grace period **regardless of
 `payment_status`**, excluding the deliberate `delivery_schema_unconfirmed` block
 the way `PAID_ORDER_NOT_SYNCED` already does. This is the single highest-value
-gap found so far, because it is the failure mode where a **paying customer gets
-no food and no one finds out**.
+gap found so far: the customer-facing path already tells the customer, so the
+**only** party left uninformed is the one who can actually fix it.
 
 This is the general lesson from both §3.6 and here, worth stating once: the
 integrity and reporting layers were written around online payment, and the

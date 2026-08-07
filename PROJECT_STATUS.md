@@ -193,7 +193,7 @@ actually gate reaching customers are the store-submission ones: legal documents
 One data oddity worth a look, not urgent: one order carries
 `payment_method = NULL` while the other 23 are `cash` (20) or `online` (3).
 
-### Orders can silently never reach the kitchen, and both health cards stay green
+### Orders can never reach the kitchen, invisibly to operators, with a remedy that cannot work
 
 Found 2026-08-07, read-only against Production. This is the same root cause as
 the payment-metric correction above — **the integrity rules were designed around
@@ -203,9 +203,26 @@ consequence rather than a reporting one.
 **Three orders are stranded right now.** Three cash pickup orders blocked with
 `sync_blocked_reason = 'missing_branch_mapping'` on 2026-07-23/24, at
 `sync_attempt_count = 0` — the sync worker looked once, found the branch had no
-`lazywait_branch_id`, and blocked them permanently without retry. They are still
-`status = 'received'`. The POS never received them, so the kitchen never saw
-them, and the customer was told nothing.
+`lazywait_branch_id`, and blocked them permanently without automatic retry. They
+are still `status = 'received'`. The POS never received them, so the kitchen
+never saw them.
+
+**The customer is told. The operator is not — and the remedy the customer is
+offered cannot succeed.** All three orders derive
+`customer_order_state = 'unpaid_branch_failed_retry_available'` (verified live),
+so the receipt says *"We could not send your order to the branch"* and offers a
+**Resend order** action, up to `customer_pos_resend_limit()` = 3 attempts.
+
+But `request_customer_pos_resend` clears `sync_blocked_reason` and requeues to
+`pending`; the worker then re-reads the same still-absent `lazywait_branch_id`
+and blocks again. So each press burns one of three attempts against a condition
+only the owner can fix. After the third, a cash order lands in
+`unpaid_final_failure` — terminal, and with no refund path, because nothing was
+ever paid.
+
+That is the accurate shape of this defect, and it is worse than a silent
+failure in one specific way: the customer is handed a button that looks like
+recovery and structurally is not.
 
 **Nothing detected it, and it is structural, not a misconfiguration.** Of the
 eleven watchdog rules, exactly one can see `lazywait_sync_state = 'blocked'`:
@@ -236,6 +253,10 @@ correct about what they measure — which is the point:
 Nothing measures "orders that will never reach the kitchen." Two things that
 look like they do report green.
 
+The detection gap is about **operators**, not customers — the customer-facing
+path above works as designed. Nobody on the business side is told that a branch
+is dropping every order, which is why the mapping stayed broken for two weeks.
+
 **This will recur: 2 of the 4 active branches have no POS mapping.**
 
 | Active branch | `lazywait_branch_id` | Orders |
@@ -251,9 +272,11 @@ the stranding exactly. The branch that produced the three blocked orders,
 `Chicken Ali 1`, holds 19 of the 24 orders and is now inactive, which is the only
 reason this is not currently ongoing.
 
-**Recovery exists but is manual.** The requeue path resets
-`blocked → pending`, so a stranded order can be recovered once a mapping is
-added — but nothing tells anyone to look, which is the actual defect.
+**Recovery works, but only in the right order.** Both the customer resend and the
+admin requeue reset `blocked → pending`, and both succeed **once a mapping
+exists**. Before that they only consume the customer's three attempts. So the
+sequence matters: fix the mapping first, then requeue. The defect is that
+nothing tells an operator the mapping is missing.
 
 Owner actions in `docs/OWNER_ACTIONS.md` §3.7. The two halves are independent:
 mapping the branches is a data fix and needs no code; closing the detection gap
