@@ -88,13 +88,14 @@ The default branch **is** production. Everything below is deployed and active:
   `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
   AR/EN digests, alerts inbox in the admin dashboard. **External dispatch is
   disabled by design** — alerts/digests are internal (in-dashboard) only.
-  **Gap, fix written but NOT APPLIED:** `operations_alerts_derive` has no
-  `order_flow` arm, so the `order_flow` health card raises no alert row — it
-  shows `failing` on the health card and the sidebar badge while the alerts
-  inbox stays silent. Migration `20260807170000_order_flow_alert_condition`
-  adds `order_flow:health` (critical on `failing`, warning on
-  `degraded`/`unavailable`, nothing on `idle`), but it is **unapplied**, so the
-  gap is still live in Production (`docs/MIGRATIONS.md` §25, §26).
+  Since 2026-08-07 `operations_alerts_derive` carries an `order_flow` arm
+  (live `20260807172027`): `order_flow:health` at critical on `failing`, warning
+  on `degraded`/`unavailable`, and nothing at all on `idle`. The bilingual
+  renderer names it `تدفق الطلبات` / `Order Flow` in outbox rows. **It cannot
+  fire on today's data** — checked across every evaluation instant, not inferred
+  from one: the best achievable `baseline_samples` is 2 against a required 3, so
+  there is no hour of the week at which the card leaves `idle`
+  (`docs/MIGRATIONS.md` §26).
 - **Order confirmation state machine** — one authoritative customer-visible
   order state, server-counted manual resends, and refund *enrolment*. Refund
   *processing* is not running (§5).
@@ -128,19 +129,18 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**69** live `schema_migrations` rows; **68** repository migration files; **one
-unapplied** — `20260807170000_order_flow_alert_condition`, which closes the
-order-flow alert gap and awaits owner approval to apply
-(`docs/MIGRATIONS.md` §26). Latest live version `20260807152347`.
+**70** live `schema_migrations` rows; **68** repository migration files;
+**zero unapplied**. Latest live version `20260807172027`.
 
-Three migrations were applied on **2026-08-07** with explicit owner approval —
+Four migrations were applied on **2026-08-07** with explicit owner approval —
 `erasure_phone_normalization` (live `20260807140050`) and
 `admin_ranged_orders_and_stats` (live `20260807140206`), both recorded in
 `docs/MIGRATIONS.md` §24, then `order_flow_health_card` (live `20260807152347`)
-in §25. The third was applied verbatim, with the stored migration text proven
-byte-identical to the merged repository file.
+in §25 and `order_flow_alert_condition` (live `20260807172027`) in §26. The last
+two were applied verbatim, with the stored migration text proven byte-identical
+to the merged repository file in each case.
 
-The 69 / 67 gap is history, not schema: **five** live-only rows carry no
+The 70 / 68 gap is history, not schema: **five** live-only rows carry no
 repository file (one of them a `select 1;` connectivity probe) and **three**
 repository files were superseded by consolidated migrations. Full classification,
 recomputed from live data on 2026-08-07 and reconciling both sides exactly, in
