@@ -10,20 +10,33 @@ name: SQL suites
 # the runner, and `cron.schedule` records a row rather than scheduling
 # anything. No production credential is used and none is needed.
 
+# WHY THERE IS NO `paths:` FILTER ON `pull_request` ANY MORE
+#
+# There used to be one, and it meant this workflow simply did not start on a
+# docs-only or frontend-only PR. That is efficient, but it makes the check
+# IMPOSSIBLE TO REQUIRE: a required status check is unconditional, so a
+# required context that never reports leaves the PR waiting forever on a run
+# that will not happen. PRs #171, #173 and #174 all merged with no SQL check at
+# all — correct behaviour under the old shape, and exactly why schema PRs could
+# never be gated.
+#
+# The filter now lives at the JOB level instead:
+#
+#   changes  — always runs, decides whether SQL-relevant paths were touched
+#   suites   — the expensive PostGIS replay; runs only when they were
+#   gate     — always runs and always reports; THIS is the context to require
+#
+# The saving is preserved: on a docs-only PR the PostGIS service never starts
+# and `suites` is skipped. The cost added is two small jobs on every PR.
+#
+# `gate` is deliberately a SEPARATE name rather than a rename of `suites`. A
+# required check called "Migration chain + SQL suites" that goes green in five
+# seconds without replaying anything would be a check that lies, which is worse
+# than no check.
 on:
   push:
     branches: [claude/project-build-ie4b56]
   pull_request:
-    paths:
-      - 'supabase/migrations/**'
-      - 'supabase/tests/**'
-      # The harness loads this into the template database before every suite
-      # (.github/sql-ci/run.sh, "Seed" step), and a third of the suites depend
-      # on its fixed branch ids. Editing it could break every suite while this
-      # workflow stayed green by never running.
-      - 'supabase/seed.sql'
-      - '.github/sql-ci/**'
-      - '.github/workflows/sql-suites.yml'
   workflow_dispatch:
 
 permissions:
@@ -34,8 +47,72 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Decide whether the suites must run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      relevant: ${{ steps.decide.outputs.relevant }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # Depth 2 is enough. For a pull_request, actions/checkout checks out
+          # refs/pull/N/merge, whose FIRST parent is the base branch tip, so
+          # HEAD^1..HEAD is exactly this PR's net change. No full history, no
+          # extra fetch.
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Decide
+        id: decide
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          # push and workflow_dispatch always run the suites, matching the
+          # behaviour before this job existed.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "event is $EVENT_NAME — running the suites"
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Fail SAFE, not fast: if the diff cannot be computed for any reason,
+          # run the suites. A missing decision must never silently skip the
+          # only job that replays the migration chain.
+          if ! git rev-parse -q --verify 'HEAD^1' >/dev/null 2>&1; then
+            echo "no first parent (unexpected checkout shape) — running the suites"
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! changed=$(git diff --name-only 'HEAD^1' HEAD 2>/dev/null); then
+            echo "could not diff against the base — running the suites"
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed files:"
+          printf '%s\n' "$changed" | sed 's/^/  /'
+
+          # Same set the workflow-level `paths:` filter used to carry. seed.sql
+          # is included because .github/sql-ci/run.sh loads it into the template
+          # database before every suite and a third of the suites depend on its
+          # fixed branch ids — editing it could break every suite while this
+          # workflow stayed green by never running.
+          if printf '%s\n' "$changed" | grep -qE '^(supabase/(migrations|tests)/|supabase/seed\.sql$|\.github/sql-ci/|\.github/workflows/sql-suites\.yml$)'; then
+            echo "SQL-relevant paths changed — running the suites"
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no SQL-relevant paths changed — skipping the suites"
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
   suites:
     name: Migration chain + SQL suites
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -98,3 +175,51 @@ jobs:
         run: |
           chmod +x .github/sql-ci/run.sh
           .github/sql-ci/run.sh
+
+  # THE REQUIRABLE CONTEXT. Reports on every pull request, whatever the paths,
+  # so it can be added to the branch ruleset's required_status_checks.
+  #
+  # `if: always()` is what makes it report even when `suites` is skipped — the
+  # default would skip this job too, which would recreate the very problem it
+  # exists to solve.
+  gate:
+    name: SQL suites gate
+    needs: [changes, suites]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the suites to have passed, or to have been unnecessary
+        env:
+          RELEVANT: ${{ needs.changes.outputs.relevant }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SUITES_RESULT: ${{ needs.suites.result }}
+        run: |
+          set -euo pipefail
+          echo "changes: $CHANGES_RESULT (relevant=$RELEVANT)"
+          echo "suites : $SUITES_RESULT"
+
+          # FAIL CLOSED. Every arm below that is not a proven pass is a fail —
+          # a gate that goes green when it does not know is not a gate.
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::the path decision did not complete ($CHANGES_RESULT), so it is unknown whether the suites were needed"
+            exit 1
+          fi
+
+          if [ "$SUITES_RESULT" = "success" ]; then
+            echo "the suites ran and passed"
+            exit 0
+          fi
+
+          if [ "$SUITES_RESULT" = "skipped" ] && [ "$RELEVANT" = "false" ]; then
+            echo "no SQL-relevant path changed, so the suites were correctly not run"
+            exit 0
+          fi
+
+          if [ "$SUITES_RESULT" = "skipped" ]; then
+            echo "::error::the suites were skipped even though SQL-relevant paths changed"
+            exit 1
+          fi
+
+          echo "::error::the suites did not pass ($SUITES_RESULT)"
+          exit 1
