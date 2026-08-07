@@ -24,7 +24,7 @@ export const ALERTS_LIST_LIMIT = 200;
 export const DIGEST_HISTORY_LIMIT = 30;
 
 export const SUBSYSTEMS = [
-  'platform', 'lazywait', 'order_integrity', 'account_deletion',
+  'platform', 'lazywait', 'order_integrity', 'order_flow', 'account_deletion',
   'database_jobs', 'payment', 'push', 'email', 'otp',
 ];
 
@@ -32,6 +32,7 @@ const SUBSYSTEM_TEXT: Record<string, { en: string; ar: string }> = {
   platform: { en: 'Platform', ar: 'المنصة' },
   lazywait: { en: 'Lazywait Sync', ar: 'مزامنة Lazywait' },
   order_integrity: { en: 'Order Integrity', ar: 'سلامة الطلبات' },
+  order_flow: { en: 'Order Flow', ar: 'تدفق الطلبات' },
   account_deletion: { en: 'Account Deletion', ar: 'حذف الحسابات' },
   database_jobs: { en: 'Scheduled Jobs', ar: 'المهام المجدولة' },
   payment: { en: 'Payment / Tap', ar: 'الدفع / Tap' },

@@ -10,11 +10,15 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-07 class E is empty again: every repository migration is applied
-to Production.** Three files were applied on 2026-08-07 with explicit owner
-approval, via the MCP `apply_migration` workflow, one call per file. The first
-two came from PR #166 and PR #167 (§24); the third from PR #169, corrected by
-PR #170 before it was applied (§25).
+**Class E holds exactly one file: `20260807170000_order_flow_alert_condition`
+(§26), which is merged but NOT applied.** It closes the alert-engine gap
+recorded in §25 and needs explicit owner approval to apply, like every other
+production change. Everything else in the repository is applied.
+
+Three files were applied on 2026-08-07 with explicit owner approval, via the MCP
+`apply_migration` workflow, one call per file. The first two came from PR #166
+and PR #167 (§24); the third from PR #169, corrected by PR #170 before it was
+applied (§25).
 
 | Repository file | Applied version | skel | Result |
 | --- | --- | --- | --- |
@@ -31,18 +35,18 @@ were applied on 2026-08-05, the same way.
 | `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
-- Repository migration files (default branch `claude/project-build-ie4b56`,
-  head `ff1eff0`): **67**
+- Repository migration files (default branch `claude/project-build-ie4b56`): **68**
 - Live `schema_migrations` rows: **69**
-- Unapplied repository files: **0**
+- Unapplied repository files: **1** — `20260807170000_order_flow_alert_condition` (§26)
 - Latest live version: **`20260807152347`**
   (`order_flow_health_card`; repository version `20260807150000`)
 
-The 67 / 69 difference is the long-standing **history** divergence, not a
-*schema* divergence: **five** live-only F-class rows carry no repository file,
-and **three** H-class repository files (`place_order`, `loyalty`,
-`order_idempotency`) were superseded by later consolidated migrations.
-`67 files − 3 H-class + 5 F-class = 69 rows`. §4 carries the full
+The 68 / 69 difference is the long-standing **history** divergence plus the one
+pending file, not a *schema* divergence: **five** live-only F-class rows carry no
+repository file, **three** H-class repository files (`place_order`, `loyalty`,
+`order_idempotency`) were superseded by later consolidated migrations, and
+**one** E-class file is not applied yet.
+`68 files − 1 E-class − 3 H-class + 5 F-class = 69 rows`. §4 carries the full
 class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
 both sides exactly; §5 maps a subset of the rows.
 
@@ -250,20 +254,28 @@ and the repository file's `skel` fingerprint against the live row's.
 | B. `SAME_CONTENT_DIFFERENT_VERSION` | **53** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **5** |
 | H. `SUPERSEDED` (repository side) | **3** |
 
 **Both sides reconcile exactly, with no residue:**
 
 ```
-repository:  A 8 + B 53 + C 3 + H 3 = 67 files
-live      :  A 8 + B 53 + C 3 + F 5 = 69 rows
+repository:  A 8 + B 53 + C 3 + E 1 + H 3 = 68 files
+live      :  A 8 + B 53 + C 3         + F 5 = 69 rows
 ```
 
-B moved from 52 to 53 on 2026-08-07 when `20260807150000_order_flow_health_card`
-was applied as live `20260807152347` (§25). It is the only change to this table
-since it was recomputed; A, C, D, E, F and H are all unmoved.
+E contributes to the repository side only, which is what "unapplied" means.
+
+Two movements since this table was recomputed, both on 2026-08-07:
+
+- **B 52 → 53**, when `20260807150000_order_flow_health_card` was applied as
+  live `20260807152347` (§25).
+- **E 0 → 1**, when `20260807170000_order_flow_alert_condition` merged without
+  being applied (§26). It returns to 0 and moves B to 54 when that file is
+  applied with owner approval.
+
+A, C, D, F and H are unmoved.
 
 **Two corrections to numbers this ledger had carried for a long time**, both
 found by recomputing rather than by re-reading:
@@ -304,7 +316,7 @@ notes.
 > and its own 61/62 totals remain as written — treat §4 as authoritative for
 > counts and §5 as the detailed mapping of the rows it covers.
 >
-> **Class E is empty again as of 2026-08-07.** It briefly held the two rows added
+> **Class E was briefly empty on 2026-08-07 and now holds one file again.** It held the two rows added
 > 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
 > `20260806130000_admin_ranged_orders_and_stats` (§23) — which were applied on
 > 2026-08-07 with explicit owner approval and are now class **B** (§24). It then
@@ -401,13 +413,14 @@ account-deletion migrations, the three applied 2026-08-05, the three applied
 2026-08-07, and the `noop` probe.
 
 **§4 is authoritative for totals** and reconciles the full set exactly:
-`A 8 + B 53 + C 3 + H 3 = 67` repository files, `A 8 + B 53 + C 3 + F 5 = 69`
+`A 8 + B 53 + C 3 + E 1 + H 3 = 68` repository files, `A 8 + B 53 + C 3 + F 5 = 69`
 live rows. The per-row table above has deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §4.
 
-**There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
-F-class rows carry no repository file. This is a history divergence, not drift.
+**One repository-only/UNAPPLIED file exists** — `20260807170000_order_flow_alert_condition`
+(§26), merged but not applied. The live-only F-class rows carry no repository
+file; that part is a history divergence, not drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -417,17 +430,17 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**59 repository files** (67 − 8) unapplied and attempt to replay them against
+**60 repository files** (68 − 8) unapplied and attempt to replay them against
 production — even though **every one of them is in fact already applied**.
 Eight shared versions do **not** make `db push` any safer; the permanent
-production prohibition stands, because 59 repository versions still do not
+production prohibition stands, because 60 repository versions still do not
 match live history, content boundaries differ for consolidated/split
 migrations, and replaying historical migrations against a live database remains
 unsafe regardless.
 
 > The count grows with every migration applied through `apply_migration`, since
 > each one stamps a fresh apply-time version. It was 53 against 61 files, then
-> 58 against 66; it is now **59 against 67**. `db push` gets *more* dangerous
+> 58 against 66; it is now **60 against 68**. `db push` gets *more* dangerous
 > over time, not less.
 
 Risks:
@@ -1881,10 +1894,12 @@ a separate live history write needing its own explicit owner approval, and class
 
 ### Still outstanding
 
-- **The `orders:flow` fingerprint in `operations_alerts_derive` was not added —
-  and this is a live monitoring gap, not a dormant one.** The alert engine
-  derives its own fingerprints independently of the snapshot, so an `order_flow`
-  card reading `failing` or `degraded` produces **no alert row at all**.
+- **The order-flow alert condition is written but NOT YET APPLIED, so the gap is
+  still live in Production.** Migration `20260807170000_order_flow_alert_condition`
+  adds it (§26). Until an owner-approved apply lands, everything below still
+  describes the running system. The alert engine derives its own fingerprints
+  independently of the snapshot, so an `order_flow` card reading `failing` or
+  `degraded` produces **no alert row at all**.
 
   An earlier revision of this bullet said the function's "only consumer — the
   external alert dispatcher — is dormant by design". **That was wrong**, and it
@@ -1929,3 +1944,119 @@ a separate live history write needing its own explicit owner approval, and class
   What remains true either way: with 24 orders in total and `baseline_samples`
   at 0, the console does not yet have the coverage this migration was written to
   provide. The mechanism is in place; the data is not.
+
+## 26. Pending migration: order-flow alert condition (class E — NOT APPLIED)
+
+| | |
+| --- | --- |
+| Repository file | `20260807170000_order_flow_alert_condition.sql` |
+| Class | **E** (`REPOSITORY_ONLY_UNAPPLIED`) |
+| Live version | none — **not applied** |
+| Closes | the §25 "still outstanding" gap |
+| Approval to apply | **not yet given.** Owner approval is required (CLAUDE.md §5) |
+
+> **Class E is no longer empty**, and §1, §4 and §6 were updated to say so the
+> moment this file merged rather than at apply time. "Unapplied" is a fact about
+> the repository, not the database, so deferring it would have left the ledger
+> asserting "zero unapplied" while an unapplied file sat in the tree — the exact
+> kind of confidently-wrong statement §25 was written to stop repeating.
+>
+> The algebra still reconciles because E contributes to the repository side only:
+> `A 8 + B 53 + C 3 + E 1 + H 3 = 68 files` against
+> `A 8 + B 53 + C 3 + F 5 = 69 rows`. Applying this file moves E to 0 and B to
+> 54: the file total stays at **68**, and the row total rises to **70** because
+> the apply stamps a fresh history row. Both sides still reconcile
+> (`8+54+3+0+3 = 68`, `8+54+3+5 = 70`), which is the check that the counts are
+> right in both states.
+
+### What it does
+
+§25 recorded that `operations_alerts_derive` had no arm for `order_flow`, so the
+card could read `failing` in the Operations Health Center and light the sidebar
+badge while the alerts inbox stayed silent. This adds the missing arm.
+
+| Card state | `condition_code` | severity |
+| --- | --- | --- |
+| `failing` | `flow_stopped` | **critical** |
+| `degraded` | `flow_below_baseline` | warning |
+| `unavailable` | `unavailable` | warning |
+| `idle`, `healthy` | *nothing at all* | — |
+
+**`idle` producing nothing is the point.** It is the card's fail-quiet state — no
+branch open, or fewer than its minimum comparable weeks of history. Alerting on
+it would fire every night after closing time and right through the warm-up,
+which is precisely how a monitor teaches people to mute it.
+
+**One fingerprint, `order_flow:health`, across all three alertable states.** This
+function's stated contract is that a fingerprint is a stable condition
+*identity*, so a shortfall that worsens into a full stop **escalates the same
+alert** rather than recovering one identity and opening another. Per-state
+fingerprints would shred the incident's timeline exactly when someone is reading
+it.
+
+The mute override (`system_rule_overrides.order_flow.muted`) works for free: the
+arm sits inside the generic per-card guard at the top of the loop.
+
+> **Naming — this is NOT `orders:flow`.** §25 and earlier notes used that
+> shorthand. It does not match the convention every other fingerprint in this
+> function follows, which is `<snapshot card id>:<condition>` — `lazywait:sync_health`,
+> `payment:configuration`, `account_deletion:manual_review_backlog`. The card id
+> is `order_flow`, and the alert row's `subsystem` must equal it so the inbox
+> filter and the mute override agree. Hence `order_flow:health`. The shorthand
+> was never a requirement, only my own loose phrasing carried forward.
+
+### How the body was produced
+
+The function is 280 lines and had to be re-emitted whole. It was **not**
+hand-transcribed — that is exactly the failure mode §24 recorded and §25 was
+written to avoid. The body was extracted programmatically from
+`20260723140000_operations_automation_cron_health.sql:881-1160`, the arm inserted
+at a single anchor, and the result diffed against the original:
+
+```
+0 lines removed · 36 lines added · one hunk (158a159,194)
+```
+
+A **pure insertion**. No pre-existing line changed, so no other subsystem's
+conditions could have shifted.
+
+### Verification
+
+Nine of the ten new cases in `supabase/tests/order_flow_alert_condition_test.sql`
+were executed locally against a scratch PostgreSQL 16 database carrying the real
+`operations_alerts_sanitize_evidence` / `safe_int` / `safe_bool` helpers; case 9
+needs the full schema and runs in CI.
+
+**Every case was mutation-tested**, because a suite that cannot fail proves
+nothing:
+
+| Mutation | Result |
+| --- | --- |
+| `idle` added to the alerting states | fails `FAIL(1)` |
+| severity hard-coded to `critical` | fails `FAIL(4)` |
+| the arm disabled (`if false`) | fails `FAIL(3)` |
+| a `customer_id` leaked into evidence | fails `FAIL(8)` |
+| per-state fingerprints | fails `FAIL(3)` |
+| **`degraded` alone given its own fingerprint** | fails `FAIL(6)` |
+
+The last row exists because the blunt per-state mutation tripped case 3 first,
+which left case 6 — the escalation-identity property, the whole reason for a
+single fingerprint — **unproven**. A narrower mutation that keeps cases 3 and 4
+passing was written specifically to exercise it, and it fails there as intended.
+
+Frontend: `order_flow` gained EN/AR labels and a filter entry in
+`alertsView.ts`; without them the inbox would attribute its alerts to the raw id
+`order_flow` and the filter dropdown could not isolate the one card that watches
+the business outcome. That test was mutation-checked too — deleting the label
+makes it fail with `expected 'order_flow' to be 'Order Flow'`.
+
+Full local run before pushing: `tsc --noEmit` clean, 1705 unit tests pass across
+111 files, design-system sync and hygiene clean.
+
+### Applying it
+
+Ordinary §9 run-book, no special handling: `create or replace` only, zero write
+statements, one function replaced in place, and the rollback is re-applying the
+prior body (any open `order_flow:health` alert is then recovered by the
+evaluator's normal resolution pass, so no manual cleanup). It needs explicit
+owner approval like every other production apply.
