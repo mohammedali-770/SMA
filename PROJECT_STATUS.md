@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-07 (default-branch head `7126670`).
+> Last updated: 2026-08-07 (default-branch head `aae7cee`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -68,10 +68,14 @@ The default branch **is** production. Everything below is deployed and active:
 - **Ordering + checkout + Tap payments** are deployed and functional, but
   **"customers order and pay today" was not true and has been removed.**
   Measured against Production on 2026-08-07: 24 orders, **2 distinct
-  customers**, 5 profiles, 6 checkout sessions, and **every single order still
-  `payment_status = 'pending'`**. Not one order has ever been paid, and not one
-  has ever reached `delivered` — the 24 are 21 `received` and 3 `cancelled`.
-  Newest order 2026-08-01; newest OTP challenge 2026-07-21.
+  customers**, 5 profiles, 6 checkout sessions. **Not one order has ever reached
+  `delivered`** — the 24 are 21 `received` and 3 `cancelled`. Newest order
+  2026-08-01; newest OTP challenge 2026-07-21.
+
+  (Every order is also `payment_status = 'pending'`, but that is **not** the
+  signal it looks like: for the 20 cash orders `pending` is the correct terminal
+  state by design. `status` is the lifecycle indicator — see the correction in
+  "Production reality check".)
 
   This is **pre-launch test traffic, not trade.** The distinction matters for
   every priority below: the risk today is not losing a book of business, it is
