@@ -11,14 +11,16 @@
 ## 1. Purpose and production status
 
 **As of 2026-08-07 class E is empty again: every repository migration is applied
-to Production.** The two files from PR #167 and PR #166 were applied on
-2026-08-07 with explicit owner approval, via the MCP `apply_migration` workflow,
-one call per file, in filename order. Full record in §24.
+to Production.** Three files were applied on 2026-08-07 with explicit owner
+approval, via the MCP `apply_migration` workflow, one call per file. The first
+two came from PR #166 and PR #167 (§24); the third from PR #169, corrected by
+PR #170 before it was applied (§25).
 
 | Repository file | Applied version | skel | Result |
 | --- | --- | --- | --- |
 | `20260806120000_erasure_phone_normalization` | `20260807140050` | `8759892535b7` | applied |
 | `20260806130000_admin_ranged_orders_and_stats` | `20260807140206` | `a92bb07e58c7` | applied |
+| `20260807150000_order_flow_health_card` | `20260807152347` | `f4df8ad27e85` | applied |
 
 The three files unapplied before them — two from PR #142, one from PR #146 —
 were applied on 2026-08-05, the same way.
@@ -30,17 +32,17 @@ were applied on 2026-08-05, the same way.
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
 - Repository migration files (default branch `claude/project-build-ie4b56`,
-  head `29cfb3a`): **66**
-- Live `schema_migrations` rows: **68**
+  head `ff1eff0`): **67**
+- Live `schema_migrations` rows: **69**
 - Unapplied repository files: **0**
-- Latest live version: **`20260807140206`**
-  (`admin_ranged_orders_and_stats`; repository version `20260806130000`)
+- Latest live version: **`20260807152347`**
+  (`order_flow_health_card`; repository version `20260807150000`)
 
-The 66 / 68 difference is the long-standing **history** divergence, not a
+The 67 / 69 difference is the long-standing **history** divergence, not a
 *schema* divergence: **five** live-only F-class rows carry no repository file,
 and **three** H-class repository files (`place_order`, `loyalty`,
 `order_idempotency`) were superseded by later consolidated migrations.
-`66 files − 3 H-class + 5 F-class = 68 rows`. §4 carries the full
+`67 files − 3 H-class + 5 F-class = 69 rows`. §4 carries the full
 class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
 both sides exactly; §5 maps a subset of the rows.
 
@@ -236,8 +238,8 @@ fields byte-identical before/after, fingerprint-verified).
 
 ## 4. Classification summary
 
-**Recomputed from live data on 2026-08-07 and now covering ALL 66 repository
-files and ALL 68 live rows** — previous revisions of this table were scoped to a
+**Recomputed from live data on 2026-08-07 and now covering ALL 67 repository
+files and ALL 69 live rows** — previous revisions of this table were scoped to a
 56-file subset and, separately, undercounted two classes. Method: match by
 `name`, then compare the repository filename version against the live `version`,
 and the repository file's `skel` fingerprint against the live row's.
@@ -245,7 +247,7 @@ and the repository file's `skel` fingerprint against the live row's.
 | primary classification | count |
 |---|---|
 | A. `EXACT_MATCH` (version + name + content) | **8** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **52** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **53** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
 | E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
@@ -255,9 +257,13 @@ and the repository file's `skel` fingerprint against the live row's.
 **Both sides reconcile exactly, with no residue:**
 
 ```
-repository:  A 8 + B 52 + C 3 + H 3 = 66 files
-live      :  A 8 + B 52 + C 3 + F 5 = 68 rows
+repository:  A 8 + B 53 + C 3 + H 3 = 67 files
+live      :  A 8 + B 53 + C 3 + F 5 = 69 rows
 ```
+
+B moved from 52 to 53 on 2026-08-07 when `20260807150000_order_flow_health_card`
+was applied as live `20260807152347` (§25). It is the only change to this table
+since it was recomputed; A, C, D, E, F and H are all unmoved.
 
 **Two corrections to numbers this ledger had carried for a long time**, both
 found by recomputing rather than by re-reading:
@@ -301,7 +307,9 @@ notes.
 > **Class E is empty again as of 2026-08-07.** It briefly held the two rows added
 > 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
 > `20260806130000_admin_ranged_orders_and_stats` (§23) — which were applied on
-> 2026-08-07 with explicit owner approval and are now class **B** (§24). The
+> 2026-08-07 with explicit owner approval and are now class **B** (§24). It then
+> briefly held `20260807150000_order_flow_health_card`, merged the same day and
+> applied a few hours later, also class **B** (§25). The
 > operations-automation cron-health migration
 > `20260723140000_operations_automation_cron_health` — the last remaining
 > class-E row, recorded as repository-only in every earlier revision of this
@@ -389,11 +397,11 @@ production.
 
 Reconciliation check: the rows above detail **56 repository / 57 live** rows.
 That is a **subset**, not the whole picture — it predates the five
-account-deletion migrations, the three applied 2026-08-05, the two applied
+account-deletion migrations, the three applied 2026-08-05, the three applied
 2026-08-07, and the `noop` probe.
 
 **§4 is authoritative for totals** and reconciles the full set exactly:
-`A 8 + B 52 + C 3 + H 3 = 66` repository files, `A 8 + B 52 + C 3 + F 5 = 68`
+`A 8 + B 53 + C 3 + H 3 = 67` repository files, `A 8 + B 53 + C 3 + F 5 = 69`
 live rows. The per-row table above has deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §4.
@@ -409,17 +417,18 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**58 repository files** (66 − 8) unapplied and attempt to replay them against
+**59 repository files** (67 − 8) unapplied and attempt to replay them against
 production — even though **every one of them is in fact already applied**.
 Eight shared versions do **not** make `db push` any safer; the permanent
-production prohibition stands, because 58 repository versions still do not
+production prohibition stands, because 59 repository versions still do not
 match live history, content boundaries differ for consolidated/split
 migrations, and replaying historical migrations against a live database remains
 unsafe regardless.
 
 > The count grows with every migration applied through `apply_migration`, since
-> each one stamps a fresh apply-time version. It was 53 against 61 files; it is
-> 58 against 66. `db push` gets *more* dangerous over time, not less.
+> each one stamps a fresh apply-time version. It was 53 against 61 files, then
+> 58 against 66; it is now **59 against 67**. `db push` gets *more* dangerous
+> over time, not less.
 
 Risks:
 
@@ -1704,3 +1713,219 @@ Applying these fixed the *schema*. Two things they do not do:
   needs its own owner approval and its own ledger entry.
 - **The Reports/dashboard outage window closed** the moment §23 applied; no
   further action needed there.
+
+## 25. Applied migration: order-flow health card (applied 2026-08-07, class B)
+
+| | |
+| --- | --- |
+| Repository file | `20260807150000_order_flow_health_card.sql` (1062 lines) |
+| Live version | `20260807152347`, name `order_flow_health_card` |
+| Class | **B** (`SAME_CONTENT_DIFFERENT_VERSION`) |
+| skel (repo = live) | `f4df8ad27e85` |
+| From | PR #169, corrected by PR #170 (`ff1eff0`) before applying |
+| Approval | explicit owner instruction, "merge it once green and apply the migration" |
+
+### What it adds
+
+`operations_health_snapshot_internal` had eight cards and every one watched a
+**subsystem** — POS sync, the deletion cron, payment-record consistency,
+scheduled jobs. None watched the thing those subsystems exist to produce. So the
+console could not see its worst realistic outage: checkout breaks, orders go to
+zero, and every card stays green because no subsystem is broken.
+
+Two objects:
+
+1. `operations_health_overall_state(text,text,text,text,text)` — a five-argument
+   **overload**. The four-argument function is untouched and still resolves for
+   every existing caller; arity disambiguates.
+2. An `order_flow` card in the snapshot, in the **critical** set alongside
+   `lazywait` / `order_integrity` / `account_deletion` / `database_jobs`.
+
+The card compares orders in the last 60 minutes against the **same rolling
+60-minute window shifted back whole weeks**, over the previous 8 weeks. Whole-week
+offsets preserve weekday and time of day for free, and Saudi Arabia has no
+daylight saving, so the card performs no timezone conversion and no clock-hour
+bucketing at all. A week with no orders in that window is not counted as a
+sample, so the mean is over weeks that actually traded.
+
+It fails quiet by design: no open branch, fewer than 3 comparable weeks, or a
+baseline below 1 all report `idle`, never `failing`.
+`operations_health_overall_state` has no `idle` arm, so `idle` falls through to
+`healthy` and a warming-up baseline cannot flip the platform red.
+
+### §9-C1 was met this time
+
+**The `apply_migration` call carried the repository file verbatim** — the
+deviation recorded in §24 was not repeated. This is provable rather than
+asserted, and by a stronger test than §24's:
+
+| Fingerprint | Repository file | Live `schema_migrations` row |
+| --- | --- | --- |
+| `skel` | `f4df8ad27e85` | `f4df8ad27e85` |
+| raw md5 | `be18c54752657305e88554cc7448b539` | — |
+| raw md5, trailing newline stripped | `c3b6060a729e914f13867a7ad77ee4cd` | `c3b6060a729e914f13867a7ad77ee4cd` |
+
+`skel` proves the executable SQL is identical. The **raw** md5 match proves the
+stored text is byte-for-byte identical to the merged file, comments and all —
+the only difference being the file's final newline, which the platform trims.
+Nothing was condensed, reworded or dropped on the way in.
+
+### A defect fixed before applying, not after (PR #170)
+
+While transcribing the file for the apply, the `comment on function` statement
+at its foot was found still describing the card's **first draft**: "a trailing
+same-weekday-same-hour baseline over the previous 8 weeks (Riyadh local)".
+Review had already replaced that design. Commit `03cdae5` corrected the file
+header and the in-body comment and missed this third copy.
+
+That copy is the one that is **executed**. It lands in `pg_description` and is
+what an operator sees from `\df+`, with no code beside it to contradict it.
+Applying the file as merged would have written into Production a description
+saying the card buckets by weekday and clock hour in Riyadh local time, when it
+does neither — sending anyone debugging a surprising `degraded` reading to look
+for hour boundaries that do not exist.
+
+It was fixed in PR #170 and merged **before** the apply, so the repository and
+the live database agree from the first write rather than after a correction.
+The fix moved both fingerprints (`skel` `905c8df44c72` → `f4df8ad27e85`), which
+is expected: the text sits inside an executed statement, not in a `--` comment.
+
+### Pre-live gate (§9-B), recorded before applying
+
+| Check | Value |
+| --- | --- |
+| Repository base | `ff1eff0` (default branch, post-#170) |
+| Live rows before | **68**, latest `20260807140206` |
+| `operations_health_overall_state` overloads | **1** — the 4-arg only |
+| 5-arg overload | **absent** |
+| Snapshot contains `order_flow` | **false** |
+| Snapshot source md5 | `9cdd8f41532e1c37ca4319b16de519d4` |
+| Cards / `overall_state` | 8 / `healthy`, 0 critical, 0 warning |
+| `public` function count | **124** |
+| Row counts | orders 24 · branches 23 · open branches 4 |
+
+Recoverability was established before the call rather than assumed: the file
+contains **zero write statements**, uses `create or replace` throughout, and
+wraps the new block in its own `begin … exception when others`, so a bad
+transcription would have been re-appliable rather than destructive.
+
+> **A gate check that was wrong, and how it was caught.** The first overload
+> query tested `pg_get_function_identity_arguments(oid) = 'text, text, text,
+> text'` and returned **0** for both arities — reported as "both absent", which
+> would have been alarming. That function includes *parameter names*, so the
+> equality could never match. Re-running by argument list showed the 4-arg
+> overload present exactly as expected. Recorded because a gate check that
+> silently under-reports is worse than no check.
+
+### Verification (§9-E), after applying
+
+**The card exists and reads correctly.**
+
+| | |
+| --- | --- |
+| Cards | 8 → **9**; `order_flow` present |
+| `critical_systems` | gained `order_flow`, kept all four pre-existing members |
+| `order_flow` state | **`idle`** |
+| `baseline_ready` / `baseline_samples` | `false` / `0` (minimum 3) |
+| `open_branches` / `orders_in_window` | 4 / 0 |
+| `safe_error_code` | **null** — the exception arm was not taken |
+
+**`idle` here is the designed answer, not a null result.** Four branches are
+open and zero orders arrived in the last hour, which is exactly the shape of the
+outage this card exists to catch — but `baseline_samples` is **0** against a
+required **3** (24 orders exist in total), so the card correctly declines to
+call it. It will start producing signal once real volume exists. Reporting
+`failing` today would have been the wrong answer, loudly.
+
+**`idle` is inert, as promised.** `overall_state` is still `healthy`, with 0
+critical and 0 warning attention items and an empty `attention` array — the new
+card changed no existing number.
+
+**Both overloads are present and correct.**
+
+| nargs | volatility | secdef | `search_path` | ACL |
+| --- | --- | --- | --- | --- |
+| 4 | immutable | false | `public` | `postgres=X`, `service_role=X` |
+| 5 | immutable | false | `public` | `postgres=X`, `service_role=X` |
+
+The 4-arg behaviour is unchanged (`healthy`/`failing`/`degraded` on the same
+inputs as before). The 5-arg resolves `idle → healthy`, `failing → failing`,
+`degraded → degraded`, `configuration_error → configuration_error`. Neither is
+executable by `anon` or `authenticated`.
+
+**Objects — exactly one addition.** `public` function count **124 → 125**, the
+five-argument overload. `operations_health_snapshot_internal` was replaced in
+place, same signature, same `security definer`, same `service_role`-only grant.
+
+**Data — untouched.** The migration is DDL-only and every count is identical
+before and after: orders 24 · branches 23 · open branches 4.
+
+**The stored description is now correct** — `obj_description` returns the
+corrected text describing the rolling shifted-week baseline, with no mention of
+weekday-hour bucketing or Riyadh local time.
+
+**Advisors (§9-E4).** 66 security lints (46 + 6 `WARN`
+`*_security_definer_function_executable`, 1 `WARN`
+`auth_leaked_password_protection`, 13 `INFO`) and 79 performance lints — **0
+`ERROR` in either**. Exactly one names an `operations_health*` object:
+`operations_health_summary()`, the staff-facing wrapper that is deliberately
+`authenticated`-callable with `is_staff()` enforced in its body. It pre-dates
+this change. `operations_health_snapshot_internal` does not appear, because it
+is `service_role`-only, and neither does the new overload. **No advisory is
+attributable to this apply.**
+
+**History (§9-E2/E3).** Live rows **68 → 69**; latest version
+`20260807152347`. Version alignment (§9-D) was **deliberately not performed** —
+a separate live history write needing its own explicit owner approval, and class
+**B** is this repository's normal steady state.
+
+### Still outstanding
+
+- **The `orders:flow` fingerprint in `operations_alerts_derive` was not added —
+  and this is a live monitoring gap, not a dormant one.** The alert engine
+  derives its own fingerprints independently of the snapshot, so an `order_flow`
+  card reading `failing` or `degraded` produces **no alert row at all**.
+
+  An earlier revision of this bullet said the function's "only consumer — the
+  external alert dispatcher — is dormant by design". **That was wrong**, and it
+  understated the gap. `operations_alerts_derive` is called by
+  `operations_alerts_evaluate`
+  (`20260723090000_smart_operations_alerts_digest.sql:1614`), which the **active**
+  `operations-alerts-evaluator` cron runs every five minutes and which writes
+  rows into `public.operations_alert_state` — the internal alerts inbox in the
+  admin dashboard. That path is live today. External dispatch is a separate,
+  later stage and is the part that is disabled by design; its being off does not
+  make the omission harmless.
+
+  So the console gets the *card* but not the *alert*: `order_flow` will show
+  `failing` in the Operations Health Center and in the sidebar badge, while the
+  alerts inbox stays silent. Wiring it up means re-emitting a second ~275-line
+  function and is deferred deliberately — but it is deferred work with a real
+  consequence, not a no-op. Raised by automated review on PR #171.
+
+  Confirmed against Production on 2026-08-07, not inferred from the source:
+
+  | Check | Value |
+  | --- | --- |
+  | `operations-alerts-evaluator` | **active**, `*/5 * * * *`, `select public.operations_alerts_evaluate();` |
+  | Its last three runs | all `succeeded`, most recent `15:30:00Z` |
+  | `operations_alert_state` | 2 rows, 0 open — the table is live and has been written |
+  | Live `operations_alerts_derive` mentions `order_flow` | **false** |
+  | Live fingerprint prefixes | `account_deletion`, `database_jobs`, `lazywait`, `order_integrity`, `payment`, `platform`, `push` — **no `orders`** |
+- **§5 was not re-derived.** Consistent with §24, the row-by-row mapping in §5
+  keeps its own totals; §4 is authoritative for counts.
+- **The card needs 3 comparable weeks, not 8.** `v_of_min_samples` is **3**;
+  the `generate_series(1, 8)` is the lookback *horizon*, not the requirement. A
+  sample is a weekly-offset window that contained at least one order, so the
+  card can begin firing once the same hour-of-week has traded on 3 of the
+  previous 8 occurrences — roughly three weeks after orders start flowing at
+  that hour, not eight.
+
+  An earlier revision of this bullet said "roughly 8 weeks of order history",
+  which overstated the warm-up by about five weeks and would have given
+  operators the wrong expectation for when to start trusting the card. Also
+  raised by automated review on PR #171.
+
+  What remains true either way: with 24 orders in total and `baseline_samples`
+  at 0, the console does not yet have the coverage this migration was written to
+  provide. The mechanism is in place; the data is not.
