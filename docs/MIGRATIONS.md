@@ -1832,8 +1832,8 @@ transcription would have been re-appliable rather than destructive.
 
 **`idle` here is the designed answer, not a null result.** Four branches are
 open and zero orders arrived in the last hour, which is exactly the shape of the
-outage this card exists to catch — but there is nowhere near 8 weeks of
-comparable history (24 orders exist in total), so the card correctly declines to
+outage this card exists to catch — but `baseline_samples` is **0** against a
+required **3** (24 orders exist in total), so the card correctly declines to
 call it. It will start producing signal once real volume exists. Reporting
 `failing` today would have been the wrong answer, loudly.
 
@@ -1881,15 +1881,51 @@ a separate live history write needing its own explicit owner approval, and class
 
 ### Still outstanding
 
-- **The `orders:flow` fingerprint in `operations_alerts_derive` was not added.**
-  The alert engine derives its own fingerprints independently of the snapshot,
-  so the new card does not automatically produce an alert row. Wiring it up
-  means re-emitting a second ~275-line function, and its only consumer — the
-  external alert dispatcher — is dormant by design. Deferred deliberately, not
-  overlooked.
+- **The `orders:flow` fingerprint in `operations_alerts_derive` was not added —
+  and this is a live monitoring gap, not a dormant one.** The alert engine
+  derives its own fingerprints independently of the snapshot, so an `order_flow`
+  card reading `failing` or `degraded` produces **no alert row at all**.
+
+  An earlier revision of this bullet said the function's "only consumer — the
+  external alert dispatcher — is dormant by design". **That was wrong**, and it
+  understated the gap. `operations_alerts_derive` is called by
+  `operations_alerts_evaluate`
+  (`20260723090000_smart_operations_alerts_digest.sql:1614`), which the **active**
+  `operations-alerts-evaluator` cron runs every five minutes and which writes
+  rows into `public.operations_alert_state` — the internal alerts inbox in the
+  admin dashboard. That path is live today. External dispatch is a separate,
+  later stage and is the part that is disabled by design; its being off does not
+  make the omission harmless.
+
+  So the console gets the *card* but not the *alert*: `order_flow` will show
+  `failing` in the Operations Health Center and in the sidebar badge, while the
+  alerts inbox stays silent. Wiring it up means re-emitting a second ~275-line
+  function and is deferred deliberately — but it is deferred work with a real
+  consequence, not a no-op. Raised by automated review on PR #171.
+
+  Confirmed against Production on 2026-08-07, not inferred from the source:
+
+  | Check | Value |
+  | --- | --- |
+  | `operations-alerts-evaluator` | **active**, `*/5 * * * *`, `select public.operations_alerts_evaluate();` |
+  | Its last three runs | all `succeeded`, most recent `15:30:00Z` |
+  | `operations_alert_state` | 2 rows, 0 open — the table is live and has been written |
+  | Live `operations_alerts_derive` mentions `order_flow` | **false** |
+  | Live fingerprint prefixes | `account_deletion`, `database_jobs`, `lazywait`, `order_integrity`, `payment`, `platform`, `push` — **no `orders`** |
 - **§5 was not re-derived.** Consistent with §24, the row-by-row mapping in §5
   keeps its own totals; §4 is authoritative for counts.
-- **The card cannot fire until roughly 8 weeks of order history exists.** Until
-  then it reports `idle` in every condition. That is correct behaviour, but it
-  does mean the console does not yet have the coverage this migration was
-  written to provide — the mechanism is in place, the data is not.
+- **The card needs 3 comparable weeks, not 8.** `v_of_min_samples` is **3**;
+  the `generate_series(1, 8)` is the lookback *horizon*, not the requirement. A
+  sample is a weekly-offset window that contained at least one order, so the
+  card can begin firing once the same hour-of-week has traded on 3 of the
+  previous 8 occurrences — roughly three weeks after orders start flowing at
+  that hour, not eight.
+
+  An earlier revision of this bullet said "roughly 8 weeks of order history",
+  which overstated the warm-up by about five weeks and would have given
+  operators the wrong expectation for when to start trusting the card. Also
+  raised by automated review on PR #171.
+
+  What remains true either way: with 24 orders in total and `baseline_samples`
+  at 0, the console does not yet have the coverage this migration was written to
+  provide. The mechanism is in place; the data is not.

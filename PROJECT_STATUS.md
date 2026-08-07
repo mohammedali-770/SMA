@@ -88,6 +88,10 @@ The default branch **is** production. Everything below is deployed and active:
   `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
   AR/EN digests, alerts inbox in the admin dashboard. **External dispatch is
   disabled by design** — alerts/digests are internal (in-dashboard) only.
+  **Gap:** `operations_alerts_derive` has no `orders:flow` fingerprint, so the
+  `order_flow` health card raises no alert row. It will show `failing` on the
+  health card and the sidebar badge while the alerts inbox stays silent
+  (`docs/MIGRATIONS.md` §25).
 - **Order confirmation state machine** — one authoritative customer-visible
   order state, server-counted manual resends, and refund *enrolment*. Refund
   *processing* is not running (§5).
