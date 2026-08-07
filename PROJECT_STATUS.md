@@ -113,8 +113,19 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**65** live `schema_migrations` rows; **64** repository migration files;
-**zero unapplied**. Latest live version `20260805061955`.
+**68** live `schema_migrations` rows; **66** repository migration files;
+**zero unapplied**. Latest live version `20260807140206`.
+
+Two migrations were applied on **2026-08-07** with explicit owner approval —
+`erasure_phone_normalization` (live `20260807140050`) and
+`admin_ranged_orders_and_stats` (live `20260807140206`). Full pre-live gate and
+verification in `docs/MIGRATIONS.md` §24.
+
+The 68 / 66 gap is history, not schema: **five** live-only rows carry no
+repository file (one of them a `select 1;` connectivity probe) and **three**
+repository files were superseded by consolidated migrations. Full classification,
+recomputed from live data on 2026-08-07 and reconciling both sides exactly, in
+`docs/MIGRATIONS.md` §4.
 
 Three migrations were applied on **2026-08-05** with explicit owner approval,
 through the MCP `apply_migration` workflow — one call per file, in filename

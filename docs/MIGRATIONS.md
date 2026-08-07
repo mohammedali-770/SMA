@@ -10,12 +10,18 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-06 two repository migrations are unapplied:**
-`20260806120000_erasure_phone_normalization` (§22) and
-`20260806130000_admin_ranged_orders_and_stats` (§23). Everything else is live.
-The three files that were unapplied before them — two from PR #142, one from
-PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
-`apply_migration` workflow, one call per file, in filename order.
+**As of 2026-08-07 class E is empty again: every repository migration is applied
+to Production.** The two files from PR #167 and PR #166 were applied on
+2026-08-07 with explicit owner approval, via the MCP `apply_migration` workflow,
+one call per file, in filename order. Full record in §24.
+
+| Repository file | Applied version | skel | Result |
+| --- | --- | --- | --- |
+| `20260806120000_erasure_phone_normalization` | `20260807140050` | `8759892535b7` | applied |
+| `20260806130000_admin_ranged_orders_and_stats` | `20260807140206` | `a92bb07e58c7` | applied |
+
+The three files unapplied before them — two from PR #142, one from PR #146 —
+were applied on 2026-08-05, the same way.
 
 | Repository file | Applied version | Result |
 | --- | --- | --- |
@@ -23,21 +29,31 @@ PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
 | `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
-- Repository migration files (default branch `claude/project-build-ie4b56`): **66**
-- Live `schema_migrations` rows: **65**
-- Unapplied repository files: **2**
-  - `20260806120000_erasure_phone_normalization` — class **E**, §22
-  - `20260806130000_admin_ranged_orders_and_stats` — class **E**, §23
-- Latest live version: **`20260805061955`**
-  (`address_description_trim_all_whitespace`; repository version `20260802120000`)
+- Repository migration files (default branch `claude/project-build-ie4b56`,
+  head `29cfb3a`): **66**
+- Live `schema_migrations` rows: **68**
+- Unapplied repository files: **0**
+- Latest live version: **`20260807140206`**
+  (`admin_ranged_orders_and_stats`; repository version `20260806130000`)
 
-Counting only the 64 **applied** files, the 64 / 65 difference is the
-long-standing **history** divergence, not a *schema* divergence: three live-only
-F-class history rows carry no repository file, and two H-class repository files
-(`place_order`, `loyalty`) were superseded by later consolidated migrations.
-64 files − 2 H-class + 3 F-class = 65 rows. The full class-by-class algebra is in
-§4 and the row-by-row mapping in §5. The remaining two files are the unapplied
-ones above, which contribute no live row until they are applied.
+The 66 / 68 difference is the long-standing **history** divergence, not a
+*schema* divergence: **five** live-only F-class rows carry no repository file,
+and **three** H-class repository files (`place_order`, `loyalty`,
+`order_idempotency`) were superseded by later consolidated migrations.
+`66 files − 3 H-class + 5 F-class = 68 rows`. §4 carries the full
+class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
+both sides exactly; §5 maps a subset of the rows.
+
+> **One of those five F-class rows was discovered during the 2026-08-07 pre-live
+> gate and had never been recorded here:** version `20260806045142`, name `noop`, whose
+> entire content is `select 1;`. It is a connectivity probe, not a schema change
+> — it creates, alters and drops nothing, and the schema is identical with or
+> without it. It is documented rather than removed, because deleting a live
+> history row is a destructive write needing its own approval and would buy
+> nothing. Its presence is why the live count read 66 rather than the 65 this
+> ledger previously asserted. Recomputing §4 while chasing it also turned up two
+> further miscounts this document had carried for a long time — H was 2 and is
+> 3, F was 3 and is 5. Both are recorded in §4.
 
 > **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
 > `apply_migration` stamped apply-time versions that differ from the repository
@@ -220,15 +236,52 @@ fields byte-identical before/after, fingerprint-verified).
 
 ## 4. Classification summary
 
+**Recomputed from live data on 2026-08-07 and now covering ALL 66 repository
+files and ALL 68 live rows** — previous revisions of this table were scoped to a
+56-file subset and, separately, undercounted two classes. Method: match by
+`name`, then compare the repository filename version against the live `version`,
+and the repository file's `skel` fingerprint against the live row's.
+
 | primary classification | count |
 |---|---|
-| A. `EXACT_MATCH` (version + name + content) | **3** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **48** |
+| A. `EXACT_MATCH` (version + name + content) | **8** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **52** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **2** (§22, §23) |
-| F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
-| H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
+| F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **5** |
+| H. `SUPERSEDED` (repository side) | **3** |
+
+**Both sides reconcile exactly, with no residue:**
+
+```
+repository:  A 8 + B 52 + C 3 + H 3 = 66 files
+live      :  A 8 + B 52 + C 3 + F 5 = 68 rows
+```
+
+**Two corrections to numbers this ledger had carried for a long time**, both
+found by recomputing rather than by re-reading:
+
+- **H was 2, is 3.** The repository-only files are `place_order`, `loyalty` and
+  — previously unlisted — `order_idempotency`. All three were superseded by
+  consolidations applied live.
+- **F was 3, is 5.** The live-only rows are
+  `order_idempotency_and_place_order` (the consolidation of two of the H files),
+  `checkout_sessions_fix_payment_status_cast`, `checkout_sessions_zero_total`,
+  `harden_trigger_functions`, and `noop` (§1).
+
+**A is 8, not 3.** The five account-deletion migrations
+(`account_deletion`, `account_deletion_lock`, and the three
+`account_deletion_scheduler_*`) were applied from their repository filenames, so
+their live versions equal their repository versions — verified against
+`schema_migrations` on 2026-08-07. Earlier revisions listed them as "applied and
+live but not yet itemized"; they are itemized now. The other three are
+`support_contact`, `push_notifications` and
+`trigger_function_execute_hardening`.
+
+**C is unchanged at 3** — `checkout_sessions`, `homepage_banners`,
+`loyalty_audit` — the same three names the original audit identified,
+independently reconfirmed by fingerprint.
 
 Classifications can overlap semantically in the detailed mapping (e.g. a
 live-only row whose content was later consolidated into a repository file is
@@ -236,22 +289,19 @@ both "live-only" and "superseded-by-consolidation"); **each ledger entry below
 carries exactly one primary classification**, with overlaps explained in its
 notes.
 
-> **Scope of these counts.** The table above itemizes the **56 repository / 57
-> live** rows detailed in §5 (rows 1–56, through
-> `20260729091000_caller_can_read_order_anon_revoke`). Its per-class algebra is
-> internally consistent: repository side 3 A + 48 B + 3 C + 2 H = **56 files**;
-> live side 3 A + 48 B + 3 C + 3 F = **57 rows** (F is live-only, and the 2 H
-> repository files are superseded consolidations of live-only history). The
-> **five account-deletion migrations** now live in Production (§1) are applied
-> and live but **not yet itemized** here; adding them to both sides brings the
-> true totals to the **61 repository / 62 live** authoritative production totals
-> carried at the top of §1.
+> **Superseded scope note.** Revisions of this document before 2026-08-07
+> carried a note here restricting the table to the 56 repository / 57 live rows
+> itemized in §5 (rows 1–56), with the five account-deletion migrations
+> described as "applied and live but not yet itemized". That scoping is gone:
+> the table above covers every file and every row, and §5's row-by-row mapping
+> is now a *subset* of it rather than its definition. §5 has not been re-derived
+> and its own 61/62 totals remain as written — treat §4 as authoritative for
+> counts and §5 as the detailed mapping of the rows it covers.
 >
-> **Class E holds two rows**, both added 2026-08-06:
-> `20260806120000_erasure_phone_normalization` (§22) and
-> `20260806130000_admin_ranged_orders_and_stats` (§23). Both are written, tested
-> and merged but **not applied** — each needs its own explicit owner approval.
-> Class E was empty from 2026-08-05 until then. The
+> **Class E is empty again as of 2026-08-07.** It briefly held the two rows added
+> 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
+> `20260806130000_admin_ranged_orders_and_stats` (§23) — which were applied on
+> 2026-08-07 with explicit owner approval and are now class **B** (§24). The
 > operations-automation cron-health migration
 > `20260723140000_operations_automation_cron_health` — the last remaining
 > class-E row, recorded as repository-only in every earlier revision of this
@@ -337,14 +387,19 @@ production.
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
 | 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). **Current latest live version** |
 
-Reconciliation check: the rows above detail **56 repository** rows
-(3×A + 48×B + 3×C + 2×H) and **57 live** rows (3×A + 48×B + 3×C + 3×F).
-Adding the five applied-but-not-yet-itemized account-deletion migrations
-(§1, §4 note) — present on both sides — yields the current production totals of
-**61 repository / 62 live** recorded in §1 (56 + 5 repository; 57 + 5 live).
-**There is no repository-only/UNAPPLIED file**; the pre-existing live-only
-F-class history rows carry no repository file. This is a history divergence,
-not new drift.
+Reconciliation check: the rows above detail **56 repository / 57 live** rows.
+That is a **subset**, not the whole picture — it predates the five
+account-deletion migrations, the three applied 2026-08-05, the two applied
+2026-08-07, and the `noop` probe.
+
+**§4 is authoritative for totals** and reconciles the full set exactly:
+`A 8 + B 52 + C 3 + H 3 = 66` repository files, `A 8 + B 52 + C 3 + F 5 = 68`
+live rows. The per-row table above has deliberately **not** been re-derived —
+doing so is a mechanical expansion with no new information, and the counts it
+would produce are already stated in §4.
+
+**There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
+F-class rows carry no repository file. This is a history divergence, not drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -354,13 +409,19 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**53 repository files** (61 − 8) unapplied and attempt to replay them against
+**58 repository files** (66 − 8) unapplied and attempt to replay them against
 production — even though **every one of them is in fact already applied**.
 Eight shared versions do **not** make `db push` any safer; the permanent
-production prohibition stands, because 53 repository versions still do not
+production prohibition stands, because 58 repository versions still do not
 match live history, content boundaries differ for consolidated/split
 migrations, and replaying historical migrations against a live database remains
-unsafe regardless. Risks:
+unsafe regardless.
+
+> The count grows with every migration applied through `apply_migration`, since
+> each one stamps a fresh apply-time version. It was 53 against 61 files; it is
+> 58 against 66. `db push` gets *more* dangerous over time, not less.
+
+Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
@@ -1241,14 +1302,13 @@ The five operational crons — `account-deletion-processor`, `lazywait-sync`,
 
 ---
 
-## 22. PENDING migration: erasure phone normalization (class E, NOT applied)
+## 22. Applied migration: erasure phone normalization (applied 2026-08-07, class B)
 
-`supabase/migrations/20260806120000_erasure_phone_normalization.sql` is the only
-repository migration that is **not** in Production. It is merged to the default
-branch so the repository chain is correct for any rebuilt environment (§11), and
-it will stay class **E** until the owner explicitly approves an
-`apply_migration` run for it. Nothing in this section has been executed against
-Production.
+`supabase/migrations/20260806120000_erasure_phone_normalization.sql` was applied
+to Production on **2026-08-07** with explicit owner approval → live version
+**`20260807140050`**, class **B**. Content fingerprint `skel = 8759892535b7`,
+verified identical to the repository file. The application record, pre-live gate
+and verification are in §24.
 
 ### What it fixes
 
@@ -1332,11 +1392,10 @@ Both scratch databases were dropped and the cluster stopped afterwards. The
 suite also runs unconditionally in the `SQL suites` workflow, which replays the
 whole chain on `postgis/postgis:16-3.4`.
 
-### When it is applied
+### Applied
 
-Follow §9 exactly: pre-live gate, one `apply_migration` call, then verification.
-After applying, move this section's classification from **E** to **B**, record
-the stamped apply-time version, and update the counts in §1 and §4.
+Done 2026-08-07 per §9 — pre-live gate, one `apply_migration` call, verification.
+See §24.
 
 ### Rollback
 
@@ -1350,13 +1409,13 @@ skip and the false `phone_purged` claim, so prefer fixing forward.
 
 ---
 
-## 23. PENDING migration: bounded admin order reads (class E, NOT applied)
+## 23. Applied migration: bounded admin order reads (applied 2026-08-07, class B)
 
-`supabase/migrations/20260806130000_admin_ranged_orders_and_stats.sql` is the
-second of the two repository migrations not in Production. Like §22 it is merged
-so the chain is correct for a rebuilt environment (§11), and stays class **E**
-until the owner approves an `apply_migration` run. Nothing here has been
-executed against Production.
+`supabase/migrations/20260806130000_admin_ranged_orders_and_stats.sql` was
+applied to Production on **2026-08-07** with explicit owner approval → live
+version **`20260807140206`**, class **B**. Content fingerprint
+`skel = a92bb07e58c7`, verified identical to the repository file. The application
+record, pre-live gate and verification are in §24.
 
 ### Why it exists
 
@@ -1463,27 +1522,25 @@ All scratch databases were dropped and the cluster stopped afterwards. The suite
 also runs unconditionally in the `SQL suites` workflow, which replays the whole
 chain on `postgis/postgis:16-3.4`.
 
-### The console half is live on merge; the server half is not
+### The console half was live on merge; the server half followed ~20 minutes later
 
-This is the one asymmetry worth stating plainly. The client changes ship with
-the merge, and until this migration is applied **both new RPCs will 404** for the
-console:
+**Resolved 2026-08-07.** Recorded because the window was real and will recur on
+any future PR that pairs a client change with an unapplied migration. Between
+the merge of PR #167 and the apply, **both new RPCs 404'd** for the console:
 
 - `ReportsPanel` renders its "Could not load orders for this range" card;
 - `StatsPanel` renders "Could not load order statistics" and its tiles read zero.
 
-Live Orders is unaffected — it uses the existing bounded feed. So the reports and
-the dashboard tiles are DOWN between merge and apply, visibly and with a stated
-reason rather than silently wrong. Apply promptly, or hold the merge until the
-apply is approved.
+Live Orders was unaffected — it uses the existing bounded feed. So the reports
+and the dashboard tiles were DOWN between merge and apply, visibly and with a
+stated reason rather than silently wrong, which is the behaviour the client half
+was built to have. **The lesson for next time: approve the apply alongside the
+merge, or hold the merge until the apply is approved.**
 
-### When it is applied
+### Applied
 
-Follow §9: pre-live gate, one `apply_migration` call, then verification. Confirm
-afterwards that the reports and dashboard load, and that the figures match what
-they showed before (the aggregate definitions are unchanged, so they must).
-Then move this section from class **E** to **B**, record the stamped apply-time
-version, and update the counts in §1 and §4.
+Done 2026-08-07 per §9 — pre-live gate, one `apply_migration` call, verification.
+See §24.
 
 ### Rollback
 
@@ -1499,3 +1556,151 @@ passes a limit, so prefer fixing forward.
 The two added functions are additive and unreferenced by anything else in the
 schema. The console would have to be reverted in the same step, since it is
 their only caller.
+
+---
+
+## 24. The 2026-08-07 application (§22 + §23)
+
+Both remaining class-E migrations were applied to Production on **2026-08-07**
+with explicit owner approval ("apply both migrations"), following §9: pre-live
+gate (§9-B), one `apply_migration` call per file in filename order, then
+verification (§9-E). No `db push`, no batch replay, no unrelated SQL.
+
+> ### ⚠️ Deviation from §9-C1 — recorded, not approved in advance
+>
+> **§9-C1 requires applying "exactly the reviewed migration content — nothing
+> added, nothing removed." That was met for §22 and NOT met for §23.**
+>
+> The §23 `apply_migration` call replaced roughly 60 lines of reviewed header
+> comment with a condensed header pointing at the repository file and at §23.
+> The executable SQL is identical — see the fingerprint note below — but a
+> matching `skel` fingerprint demonstrates *semantic* equivalence, which is a
+> weaker claim than §9-C1 makes. **This section must not be read as full §9
+> compliance.**
+>
+> **Provenance:** the condensation was the applying agent's own editorial choice
+> while composing the call. It was **not** requested by the owner, **not**
+> raised as an exception beforehand, and **not** separately approved. The owner
+> approved *applying the two migrations*, not altering their text.
+>
+> **Consequence:** the live `schema_migrations` row for
+> `admin_ranged_orders_and_stats` no longer carries the rationale the repository
+> file carries. Anyone auditing from the database alone gets the SQL without the
+> "why". The repository file remains the complete record, and §23 above restates
+> the reasoning in full, so nothing is lost — but it is lost *from the live
+> row*, and that is the deviation.
+>
+> **Rule for next time:** paste the migration file verbatim. If it is too long
+> for one call, that is a reason to split the migration, not to edit its text on
+> the way in. Raised by automated review on PR #168.
+
+| Repository file | Live version | skel (repo = live) | Class |
+| --- | --- | --- | --- |
+| `20260806120000_erasure_phone_normalization` | `20260807140050` | `8759892535b7` | B |
+| `20260806130000_admin_ranged_orders_and_stats` | `20260807140206` | `a92bb07e58c7` | B |
+
+Repository files were confirmed byte-identical to the merged default branch
+(`29cfb3a`) by SHA-256 before applying.
+
+> **What the fingerprint does and does not prove.** `skel` strips `--` comments,
+> whitespace and semicolons before hashing, so repo `a92bb07e58c7` = live
+> `a92bb07e58c7` proves the **executable SQL is identical** — no statement was
+> added, removed or altered. It says nothing about the comment text, which is
+> exactly where §23 deviates. The fingerprint is therefore evidence that the
+> deviation is *harmless to the schema*, not evidence that §9-C1 was satisfied.
+
+### Pre-live gate (§9-B), recorded before applying
+
+| Check | Value |
+| --- | --- |
+| Repository base | `29cfb3a` (default branch, post-#167) |
+| Live rows before | **66**, latest `20260806045142` (`noop`) |
+| `normalize_ksa_e164` exists | **false** — not already applied |
+| `anonymize_account_data` body | md5 `9252ceb2e42ca3d7830bd3166af56cb2`, returns `phone_purged` |
+| `authenticated` UPDATE on `profiles.phone_number` | **true** — the grant to be revoked |
+| `admin_list_orders_for_range` exists | **false** |
+| `admin_order_stats` exists | **false** |
+| `admin_list_orders_with_items` body | md5 `3e89a4565e2082905a5b3c16b5751d91`, **not** status-aware |
+| Row counts | orders 24 · order_items 27 · profiles 5 · otp_challenges 3 · whatsapp_logs 17 · deletion_requests 1 · branches 23 |
+| `public` function count / digest | 121 / `042db5c27f0521d21d222ceb49ae3440` |
+| `profiles` column-grant digest | `8248af3b497675a1a86d7d685aeffa48` |
+
+Rollback SQL for both is in each migration file's trailing `Rollback` block.
+
+### Verification (§9-E), after applying
+
+**Objects — exactly the three promised additions, nothing else.**
+`public` function count **121 → 124**: `normalize_ksa_e164`,
+`admin_list_orders_for_range`, `admin_order_stats`. `anonymize_account_data` and
+`admin_list_orders_with_items` were replaced in place, same signatures.
+
+**Data — untouched.** Both migrations are DDL-only, and every row count is
+identical before and after: orders 24 · order_items 27 · profiles 5 ·
+otp_challenges 3 · whatsapp_logs 17 · deletion_requests 1 · branches 23.
+
+**The `phone_purged` → `phone_purge_attempted` rename is real.** A naive
+substring test reported the old name still present; the precise test shows it
+appears **once, in an explanatory comment line**, and is not a returned key:
+
+```
+returns_old_key       false
+returns_new_key       true
+lines_mentioning_old  "-- Was `phone_purged`, which reported true whenever a phone STRING existed"
+```
+
+**The revoke is exactly one privilege.** `authenticated` retains `SELECT` on
+`profiles.phone_number` (the app displays it) and `UPDATE` on `full_name` and
+`email`; it has **lost** `UPDATE` on `phone_number`. `anon` holds no column
+privilege on `profiles` at all. Grant digest `8248af3b…` → `7e673440…`,
+accounted for entirely by that one revoke.
+
+**The normalizer behaves as its suite proved.** `966555000001`, `+966555000001`
+and `0555000001` all → `+966555000001`; `+14155550100` and `''` → `null`.
+Execute is `service_role` only — `anon` and `authenticated` both denied.
+
+**The staff gate fires.** With no staff identity, `admin_order_stats`,
+`admin_list_orders_for_range` and `admin_list_orders_with_items` all raise
+`42501`.
+
+**The status-aware window measurably changes what the board sees.** Against live
+data, replicating the new predicate at `p_limit = 1`: the old chronological
+window returns **1** order, the new one returns **21** — 20 orders the old
+window would have dropped, every one of them `received`. At the console's actual
+`ORDERS_POLL_LIMIT` of 500 the practical difference is currently nil (24 orders
+total), but the mechanism is confirmed on real rows rather than only in the
+suite.
+
+> **Operational observation, not a migration finding:** 21 of 24 Production
+> orders sit in `received`. Whether that is seeded/test data or a real backlog is
+> outside this ledger's scope, but it is exactly what the order-flow health card
+> is meant to surface, and it is worth resolving before launch.
+
+**Advisors (§9-E4).** 66 security advisories: 53 `WARN`, 13 `INFO`, **0
+`ERROR`**. Three name objects from this change, all
+`authenticated_security_definer_function_executable` — the deliberate,
+pre-existing pattern this repository uses for staff RPCs (46 instances):
+`SECURITY DEFINER` granted to `authenticated`, with `is_staff()` enforced inside
+the function body. `admin_list_orders_with_items` already carried this warning
+before the change; the two genuinely new ones are `admin_list_orders_for_range`
+and `admin_order_stats`. **Neither `normalize_ksa_e164` nor
+`anonymize_account_data` appears at all**, because both are `service_role`-only.
+No new `anon`-executable function was introduced — all six in that category
+pre-date this change.
+
+**History (§9-E2/E3).** Live rows **66 → 68**; latest version
+`20260807140206`. Version alignment (§9-D) was **deliberately not performed** —
+it is a separate live history write needing its own explicit owner approval, and
+class **B** is this repository's normal steady state.
+
+### Still outstanding
+
+Applying these fixed the *schema*. Two things they do not do:
+
+- **Historical `retention_summary` rows are not corrected.** Any
+  `account_deletion_requests` row written before 2026-08-07 still carries the
+  old `phone_purged` claim, and where that claim was false the underlying
+  `otp_challenges` / `whatsapp_message_logs` rows may still exist. Re-running
+  erasure for affected users would purge them — that is a **data** change and
+  needs its own owner approval and its own ledger entry.
+- **The Reports/dashboard outage window closed** the moment §23 applied; no
+  further action needed there.
