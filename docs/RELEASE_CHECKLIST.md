@@ -37,9 +37,14 @@ history and review-thread resolution). What it does **not** yet include is
 `required_status_checks`, so a red — or entirely absent — check still leaves the
 merge button green. **Someone has to look.**
 
-That is one settings change away from being enforced; see
-`docs/OWNER_ACTIONS.md` §3.1. Note that even a required check would not gate the
-*deployment* while Vercel auto-deploy is on (§3.5).
+Making them binding is a settings change, not a code change — but the names in
+the table above are **workflow** names, and a required check is matched by the
+**check-run** name. `docs/OWNER_ACTIONS.md` §3.1 lists the four contexts that can
+safely be required, and explains why `Migration chain + SQL suites` cannot be one
+of them yet (it is path-filtered, so it never runs on a docs-only PR).
+
+Note that even a required check would not gate the *deployment* while Vercel
+auto-deploy is on (§3.5).
 
 ## 2. Does this need owner approval?
 

@@ -175,8 +175,15 @@ schedules it **active**.
 ### 3.1 ✅ GitHub plan — DONE (2026-08-07), but one setting is still missing
 
 **You upgraded to Pro, and a ruleset on the default branch is now active.** That
-closes the original item: rulesets and branch protection are available, and the
-`environment:` approval gate in §1 is no longer inert.
+closes the original item: rulesets and branch protection are available.
+
+> The `environment: production` gate in §1 is **not** automatically live as a
+> result. The upgrade makes required reviewers *possible*; it does not create
+> the environment. `deploy-functions.yml` still needs a GitHub Environment named
+> `production` with you as a required reviewer, created at **Settings →
+> Environments → New environment**. Until that exists the `environment:` line
+> deploys without pausing — see the workflow's own comment at
+> `.github/workflows/deploy-functions.yml:70-78`.
 
 Observed enforcing merges during the 2026-08-07 session, each as a
 `405 Repository rule violations found`: `pull_request` required,
@@ -193,11 +200,29 @@ refused), `required_review_thread_resolution`, plus `deletion` and
 >
 > This is inferred from observed merge behaviour, not read from `/rulesets`
 > (the agent tooling cannot read that endpoint). **Please confirm in Settings →
-> Rules**, then add `required_status_checks` naming `Design system` and
-> `Production gates`, plus `Migration chain + SQL suites` for schema changes.
+> Rules** before relying on either answer.
 
-One settings change, and it converts CI from advisory to binding. Note it still
-does not gate the *deployment* — that needs §3.5.
+When you add `required_status_checks`, name the **check contexts**, not the
+workflows — a required name that never reports is permanently pending and blocks
+every merge:
+
+| Require | Do NOT require |
+| --- | --- |
+| `design-system` | ~~`Design system`~~ — that is the workflow's display name |
+| `Production build (Vite + Expo web export)` | ~~`Production gates`~~ — **no such check exists**; that workflow emits three separately-named jobs |
+| `Edge Function typecheck (Deno)` | ~~`Migration chain + SQL suites`~~ — see below |
+| `Dependency audit (high+)` | |
+
+**`Migration chain + SQL suites` must stay out of the required set for now.**
+`sql-suites.yml` filters its `pull_request` trigger to `supabase/**` and
+`.github/sql-ci/**`, so it does not run on docs-only or frontend-only PRs — PRs
+#171, #173 and #174 all merged without it. A required check is unconditional, so
+requiring it would strand every non-schema PR on a run that never starts. To
+require it, first add an always-run gate job that `needs:` the conditional one.
+
+That is still a settings change, not a code change, and it converts the other
+four from advisory to binding. It does **not** gate the *deployment* — that
+needs §3.5.
 
 ### 3.2 External uptime monitoring
 

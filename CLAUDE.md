@@ -136,9 +136,29 @@ GitHub web UI — so §1–§5 remain upheld by convention and review for everyt
 the ruleset does not cover.
 
 **To close the remaining gap**, add `required_status_checks` to the existing
-ruleset naming `Design system` and `Production gates` (and `Migration chain +
-SQL suites` for schema changes). That is one settings change and it converts CI
-from advisory to binding.
+ruleset — but name the **check contexts**, not the workflows. A required check
+is matched by the name of the emitted check run, and a name that never reports
+is *permanently pending*, which blocks every merge instead of gating one:
+
+| Require this | Emitted by |
+| --- | --- |
+| `design-system` | `design-system.yml` (job key; the job sets no `name:`) |
+| `Production build (Vite + Expo web export)` | `production-gates.yml` |
+| `Edge Function typecheck (Deno)` | `production-gates.yml` |
+| `Dependency audit (high+)` | `production-gates.yml` |
+
+There is **no aggregate `Production gates` check** — that workflow emits the
+three jobs above and nothing else. `Design system` (spaced, capitalised) is the
+workflow's display name, not its context.
+
+**Do NOT require `Migration chain + SQL suites`.** `sql-suites.yml` filters its
+`pull_request` trigger to `supabase/**` and `.github/sql-ci/**`, so it never
+starts on a docs-only or frontend-only PR. Required checks are unconditional, so
+requiring it would leave those PRs waiting forever on a run that will not
+happen. To require it, first give it a path-independent job that always reports
+(the usual shape is an always-run gate job that `needs:` the conditional one);
+until then, keep it out of the required set — the schema PRs that matter still
+run it, and a human still has to look.
 
 Do not weaken, bypass or remove the hook or these rules without explicit owner
 approval. Keep this section honest in both directions: if a control is added,
