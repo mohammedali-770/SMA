@@ -180,10 +180,30 @@ choice — CLAUDE.md has been corrected to describe reality either way.
 ### 3.2 External uptime monitoring
 
 Nothing checks that the site is up, and the internal health monitor runs inside
-the system it monitors. **Recommendation: any third-party prober on `/` and
-`/app`, alerting to a phone.** ~30 minutes, independent of every freeze, and it
-closes the "total outage produces no signal" gap that no amount of internal
-instrumentation can.
+the system it monitors. **Recommendation: any third-party prober alerting to a
+phone.** ~30 minutes, independent of every freeze, and it closes the "total
+outage produces no signal" gap that no amount of internal instrumentation can.
+
+**Point it at the Supabase REST origin, not at `/` or `/app`:**
+
+```
+https://<project>.supabase.co/rest/v1/branches?select=id&limit=1
+header: apikey: <anon key>
+expect: HTTP 200 and a JSON array
+```
+
+`/` is a **false-green** target. `vercel.json` ends its rewrites with a
+catch-all (`"source": "/(.*)", "destination": "/index.html"`), so any path that
+is not a static asset returns `index.html` with HTTP 200 — including while the
+database is unreachable, the anon key has been revoked, or the deployment is
+days stale. `docs/DEPLOY.md` records a case where the `/` check passed while
+production served a two-day-old build.
+
+`/rest/v1/branches` is the cheapest request that exercises the parts that
+actually break: PostgREST, anon-key auth, and a real table read (`branches` is
+granted to `anon` with a public read policy, `20260707120200`). It hits the
+**Supabase** origin rather than the Vercel domain, so if you want to tell "site
+down" apart from "data down", run one probe against each.
 
 ### 3.3 Who gets woken at 02:00, and on what channel?
 

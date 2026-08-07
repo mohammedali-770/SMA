@@ -17,7 +17,10 @@ import { orderIntegrity } from '../lib/api';
 import { operationsHealth } from '../lib/operationsHealthApi';
 import { operationsAlerts } from '../lib/operationsAlertsApi';
 import { WatchdogCapability, watchdogTabVisible } from '../lib/orderIntegrityCapability';
-import { OperationsHealthCapability, operationsHealthTabVisible } from '../lib/operationsHealthCapability';
+import {
+  OperationsHealthCapability, deriveHealthBadge, operationsHealthTabVisible,
+} from '../lib/operationsHealthCapability';
+import type { OperationsHealthSummary } from '../lib/operationsHealthApi';
 import { OperationsAlertsCapability, operationsAlertsTabVisible } from '../lib/operationsAlertsCapability';
 import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
@@ -101,14 +104,27 @@ export const AdminDashboard: React.FC = () => {
   // Hide the tab only for a confirmed missing RPC. Network/auth/dependency errors
   // stay visible so operators receive a truthful, fail-visible error state.
   const [healthCap, setHealthCap] = useState<OperationsHealthCapability | 'loading'>('loading');
+  // The probe fetches a full summary and used to discard it. It now returns the
+  // payload as well, which is what lets the sidebar show operational trouble to
+  // an operator who is looking at some OTHER tab — previously the only way to
+  // learn the platform was unhealthy was to go and open the health tab.
+  const [healthSummary, setHealthSummary] = useState<OperationsHealthSummary | null>(null);
   useEffect(() => {
     let alive = true;
     operationsHealth.probeAvailability()
-      .then((cap) => { if (alive) setHealthCap(cap); })
+      .then((probe) => {
+        if (!alive) return;
+        setHealthCap(probe.capability);
+        setHealthSummary(probe.summary);
+      })
       .catch(() => { if (alive) setHealthCap('unknown'); });
     return () => { alive = false; };
   }, []);
   const healthVisible = operationsHealthTabVisible(healthCap);
+
+  // Which states earn a badge lives in `deriveHealthBadge`, not here — it is a
+  // judgement call and belongs somewhere a test can reach it.
+  const healthAlert = deriveHealthBadge(healthSummary, healthVisible);
 
   // Operations Alerts follows the same fail-visible capability pattern: the tab
   // hides only when the probe confirms its RPC is missing (pre-migration deploy).
@@ -208,6 +224,7 @@ export const AdminDashboard: React.FC = () => {
           visibility={{ health: healthVisible, alerts: alertsVisible, integrity: watchdogVisible }}
           lang={adminLang}
           liveOrderCount={activeOrdersCount}
+          healthAlert={healthAlert}
         />
 
         {/* Dynamic Tab Viewport container.

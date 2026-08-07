@@ -29,9 +29,23 @@ Until an external prober and an alert dispatcher exist, incident response starts
 with a **human noticing** — a customer complaint, a branch phoning in, or someone
 opening the dashboard.
 
-> The highest-value change available is external uptime monitoring hitting `/`
-> and `/app` and alerting to a phone. It is independent of every code freeze and
-> takes about half an hour.
+> The highest-value change available is external uptime monitoring alerting to a
+> phone. It is independent of every code freeze and takes about half an hour.
+>
+> **Point it at `https://<project>.supabase.co/rest/v1/branches?select=id&limit=1`
+> (with the `apikey` header), NOT at `/` or `/app`.** `vercel.json` ends its
+> rewrites with a catch-all — `"source": "/(.*)", "destination": "/index.html"` —
+> so *any* path Vercel does not resolve to a static asset returns `index.html`
+> with **HTTP 200**. A probe on `/` therefore goes green whenever the CDN can
+> serve one static file, which it can while the database is unreachable, the
+> anon key is revoked, or the build is two days stale. `docs/DEPLOY.md` already
+> records a case where exactly that happened.
+>
+> `/rest/v1/branches` is the cheapest request that actually proves the stack:
+> it crosses PostgREST, authenticates the anon key, and reads a real table
+> (`branches` is granted to `anon` with a public read policy, `20260707120200`).
+> Note it hits the **Supabase** origin, not the Vercel domain — so pair it with
+> one probe on each if you want to distinguish "site down" from "data down".
 
 ---
 
@@ -93,8 +107,30 @@ because most order behaviour is server-authoritative.
 | Online payments failing | Disable the online payment method; cash keeps working | Admin → Settings → Payments |
 | One branch swamped or closed | Deactivate the branch | Admin → Branches |
 | A menu item wrong or unavailable | Deactivate the product | Admin → Menu |
-| A coupon over-redeeming | Deactivate the coupon | Admin → Coupons |
+| A coupon over-redeeming | Set `is_active = false` on the coupon | **Supabase dashboard — there is no admin screen for this.** See the note below the table |
 | POS integration misbehaving | Check the Lazywait integration state before disabling — orders may then need manual entry at the branch | Admin → Operations |
+
+> **The coupon lever is the one row here that breaks this section's promise.**
+> Every other lever is a control in the admin console that a manager can reach
+> from a phone at 02:00. This one is not: **there is no Coupons tab.** The
+> console's tab list is a closed union in
+> `src/components/admin/view/adminNav.ts` and coupons are absent from it — the
+> only coupon surface anywhere in the console is the read-only "Coupon Usage"
+> report, which cannot deactivate anything.
+>
+> Deactivating a coupon today means running
+> `update public.coupons set is_active = false where code = '<CODE>';`
+> in the Supabase SQL editor. That is a narrower audience than the rest of this
+> table assumes: it needs Supabase project access *and* an account with
+> `profiles.role = 'admin'` (the `coupons_admin_all` policy, `20260707120400`).
+> A branch manager cannot do it.
+>
+> **This is a known gap, not a documentation error.** The client-side CRUD
+> already exists — `list`, `create`, `update` and `remove` on the `coupons`
+> export in `src/lib/api.ts` — and is currently unreferenced; only `validate`
+> is wired up, on the customer checkout path. Building a Coupons panel is
+> therefore mostly wiring, and it would move this row back in line with the
+> rest of the table.
 
 ⚠️ Before disabling the POS integration, confirm the branch can take orders
 another way. A silently disabled integration is worse than a visibly broken one.
