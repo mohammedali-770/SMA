@@ -130,16 +130,18 @@ was built from. See `docs/ROLLBACK.md` §2.
 
 ---
 
-## 2. Four questions only the dashboards can answer
+## 2. Dashboard questions — 2 of 4 answered
 
-Nothing in the repository can answer these, and the readiness plan cannot be
-sequenced honestly without them. Please answer and commit the values into the
-files named.
+Nothing in the repository can answer the remaining two, and the readiness plan
+cannot be sequenced honestly without them. Please answer and commit the values
+into the files named. **2.2 and 2.3 are now closed** (struck through below);
+**2.1 and 2.4 are still open**, and 2.1 is the most important line in this
+document.
 
 | # | Question | Where | Record in |
 | --- | --- | --- | --- |
 | 2.1 | Is **PITR** enabled on `wxfmmnihidsdyemasstf`? What is the retention window? | Supabase → Settings → Database → Backups | `docs/BACKUP_RECOVERY.md` §1 |
-| 2.2 | Is the **Vercel Production Branch** set to `claude/project-build-ie4b56`? | Vercel → Settings → Git | `docs/DEPLOY.md` |
+| ~~2.2~~ | ~~Is the **Vercel Production Branch** set?~~ **ANSWERED 2026-08-05** — set and promoted, verified against the deployed bundle (issue #102). | — | `docs/DEPLOY.md` |
 | 2.3 | Is **`payment-refund-worker`** still `active = false`? | Supabase SQL: `select jobname, active from cron.job;` | `docs/MIGRATIONS.md` §21 |
 | 2.4 | What **Node version** does Vercel build with? | Vercel → Settings → General | `docs/NODE_VERSION.md` |
 
@@ -148,11 +150,17 @@ honest statement is that we do not know we could recover this business's order,
 payment and customer data. If the project is on the Free plan there is no PITR at
 all, and enabling it is the highest-value spend in the whole plan.
 
-**2.2 explains issue #102.** If the Production Branch is unset, merging does not
-release and rolling back a commit does not un-deploy — "the default branch is
-production" is simply false, and every deployment assumption downstream is wrong.
+**2.2 is answered and closed.** It was the cause of issue #102: with the
+Production Branch unset, the default branch only ever deployed as a *Preview*, so
+merging did not release and rolling back a commit did not un-deploy. It was set
+and the newest deployment promoted on 2026-08-05, then verified by grepping the
+deployed bundle. Kept here struck through rather than deleted, because the
+failure mode — "the default branch is production" being quietly false — is worth
+recognising if it ever recurs.
 
-**2.3 guards a live financial landmine.** The refund stack is applied to
+**2.3 is answered as of 2026-08-07** — `payment-refund-worker` is confirmed
+`active = false` in `cron.job`, alongside the five active jobs. Re-check it after
+any environment rebuild, because **2.3 guards a live financial landmine.** The refund stack is applied to
 production and the cron row exists at `*/5`; it is held off by a manual
 `cron.alter_job(active := false)` set **outside** the migration chain. Behind that
 flag is a confirmed defect — the worker re-POSTs a brand-new refund on every
@@ -164,18 +172,57 @@ schedules it **active**.
 
 ## 3. Decisions with a cost
 
-### 3.1 GitHub plan — CLAUDE.md documents a control that does not exist
+### 3.1 ✅ GitHub plan — DONE (2026-08-07), but one setting is still missing
 
-Verified: `GET /rulesets` and `GET /branches/.../protection` both return **HTTP
-403 — "Upgrade to GitHub Pro or make this repository public."** So no status check
-can ever be *required*, and nothing server-side stops a direct push to a protected
-branch. The agent hook is the only enforcement, and it binds agent sessions in
-this repo only.
+**You upgraded to Pro, and a ruleset on the default branch is now active.** That
+closes the original item: rulesets and branch protection are available.
 
-*Options:* upgrade to Pro/Team · make the repo public · accept manual review.
-**Recommendation: upgrade.** It is the cheapest line item here and it also unlocks
-the `environment:` approval gate in §1. If you decline, that is a legitimate
-choice — CLAUDE.md has been corrected to describe reality either way.
+> The `environment: production` gate in §1 is **not** automatically live as a
+> result. The upgrade makes required reviewers *possible*; it does not create
+> the environment. `deploy-functions.yml` still needs a GitHub Environment named
+> `production` with you as a required reviewer, created at **Settings →
+> Environments → New environment**. Until that exists the `environment:` line
+> deploys without pausing — see the workflow's own comment at
+> `.github/workflows/deploy-functions.yml:70-78`.
+
+Observed enforcing merges during the 2026-08-07 session, each as a
+`405 Repository rule violations found`: `pull_request` required,
+`required_linear_history` (squash or rebase only — plain merge commits are
+refused), `required_review_thread_resolution`, plus `deletion` and
+`non_fast_forward` on the protected refs.
+
+**What is still open, and it is the half that gates quality:**
+
+> **No status check is required.** A pull request merged while its head commit
+> carried *no completed CI runs at all*, and the only violation the API returned
+> was thread resolution. CI can be red — or absent — and the merge still goes
+> through.
+>
+> This is inferred from observed merge behaviour, not read from `/rulesets`
+> (the agent tooling cannot read that endpoint). **Please confirm in Settings →
+> Rules** before relying on either answer.
+
+When you add `required_status_checks`, name the **check contexts**, not the
+workflows — a required name that never reports is permanently pending and blocks
+every merge:
+
+| Require | Do NOT require |
+| --- | --- |
+| `design-system` | ~~`Design system`~~ — that is the workflow's display name |
+| `Production build (Vite + Expo web export)` | ~~`Production gates`~~ — **no such check exists**; that workflow emits three separately-named jobs |
+| `Edge Function typecheck (Deno)` | ~~`Migration chain + SQL suites`~~ — see below |
+| `Dependency audit (high+)` | |
+
+**`Migration chain + SQL suites` must stay out of the required set for now.**
+`sql-suites.yml` filters its `pull_request` trigger to `supabase/**` and
+`.github/sql-ci/**`, so it does not run on docs-only or frontend-only PRs — PRs
+#171, #173 and #174 all merged without it. A required check is unconditional, so
+requiring it would strand every non-schema PR on a run that never starts. To
+require it, first add an always-run gate job that `needs:` the conditional one.
+
+That is still a settings change, not a code change, and it converts the other
+four from advisory to binding. It does **not** gate the *deployment* — that
+needs §3.5.
 
 ### 3.2 External uptime monitoring
 
@@ -221,9 +268,13 @@ unfixable incident.
 Vercel currently builds and deploys **in parallel with** the CI gates, not after
 them. The two never meet: a pull request whose tests fail still produces a
 Preview, and a merge to the default branch deploys to customers regardless of
-whether `Production gates`, `Design system` or `SQL suites` went red. Because
-rulesets are unavailable on this plan (§3.1) **no status check can ever be marked
-required**, so gating the deploy job is the only enforcement that can exist here.
+whether `Production gates`, `Design system` or `SQL suites` went red.
+
+This is now independent of §3.1. Even once `required_status_checks` is added to
+the ruleset, a required check gates the **merge**, not the **deploy** — Vercel
+builds from its own webhook and does not consult them. So both changes are
+needed, and this one is the only thing that stops a red build reaching
+customers.
 
 The order matters, and doing it the other way round takes the site down:
 

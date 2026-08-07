@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-05 (default-branch head `160401d`).
+> Last updated: 2026-08-07 (default-branch head `7126670`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -281,17 +281,17 @@ Closed since the last update:
   (`apps/mobile/app.config.js`, `vite.config.ts`) and activate on their own once
   the token is present; no code change was required.
 
-### Open pull-request queue — 13 PRs
+### Open pull-request queue — none
 
-Thirteen pull requests are open against the default branch, several of them
-production-readiness gates (CI gates #147, release discipline #152, mobile
-store readiness #149, route guards #151). They are small and, in the order
-given, almost collision-free.
+**Zero pull requests are open** against the default branch (verified
+2026-08-07). The 13-PR queue this section used to describe — CI gates #147,
+release discipline #152, mobile store readiness #149, route guards #151 and the
+rest — is fully merged, including the stacked pair and the superseded PR that
+`docs/GIT_BRANCHES.md` recommended closing.
 
-**`docs/GIT_BRANCHES.md` is authoritative** for the queue: it lists every PR,
-the recommended merge order, the three file collisions, the one stacked pair
-(#146 sits on #145, not on the default branch) and the one superseded PR
-recommended for closure (#111). Read it before merging anything.
+`docs/GIT_BRANCHES.md` still documents that queue and its merge order. Treat it
+as **history** rather than a work list; check the live PR list before acting on
+anything it says is open.
 
 Needs an owner decision:
 
