@@ -24,9 +24,12 @@
 -- THE BASELINE, AND WHY IT IS NOT A FIXED THRESHOLD
 -- Order volume is strongly weekly-periodic. Friday 21:00 and Tuesday 04:00 are
 -- not comparable, so any fixed "orders per hour" threshold either screams all
--- night or never fires. The card compares the last hour against the SAME
--- weekday and hour over the previous 8 weeks, in Riyadh local time because that
--- is the trading day.
+-- night or never fires. The card compares the last hour against THE SAME
+-- ROLLING HOUR shifted back whole weeks, over the previous 8 weeks.
+--
+-- Whole-week offsets preserve weekday AND time of day for free, and Saudi
+-- Arabia has no daylight saving, so no timezone conversion is needed anywhere
+-- in this card.
 --
 -- This is the FIRST statistical baseline in this schema. Every other threshold
 -- here is a fixed interval against `now()`. That is worth saying out loud,
@@ -705,7 +708,7 @@ begin
   -- console could not previously see: checkout silently broken, orders at
   -- zero, every subsystem reporting healthy because none of them is broken.
   --
-  -- Baselined against the SAME weekday and hour in previous weeks, because
+  -- Baselined against the SAME ROLLING WINDOW shifted back whole weeks, because
   -- order volume is strongly weekly-periodic — Friday 21:00 and Tuesday 04:00
   -- are not comparable, and a flat threshold would either scream all night or
   -- never fire at all. This is the first statistical baseline in this schema;
