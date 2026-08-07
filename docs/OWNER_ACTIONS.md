@@ -206,23 +206,30 @@ When you add `required_status_checks`, name the **check contexts**, not the
 workflows — a required name that never reports is permanently pending and blocks
 every merge:
 
-| Require | Do NOT require |
+| Require these five | Do NOT require |
 | --- | --- |
 | `design-system` | ~~`Design system`~~ — that is the workflow's display name |
 | `Production build (Vite + Expo web export)` | ~~`Production gates`~~ — **no such check exists**; that workflow emits three separately-named jobs |
-| `Edge Function typecheck (Deno)` | ~~`Migration chain + SQL suites`~~ — see below |
+| `Edge Function typecheck (Deno)` | ~~`Migration chain + SQL suites`~~ — path-filtered, see below |
 | `Dependency audit (high+)` | |
+| `SQL suites gate` | |
 
-**`Migration chain + SQL suites` must stay out of the required set for now.**
-`sql-suites.yml` filters its `pull_request` trigger to `supabase/**` and
-`.github/sql-ci/**`, so it does not run on docs-only or frontend-only PRs — PRs
-#171, #173 and #174 all merged without it. A required check is unconditional, so
-requiring it would strand every non-schema PR on a run that never starts. To
-require it, first add an always-run gate job that `needs:` the conditional one.
+**`SQL suites gate` is new, and it is what makes schema PRs gateable.** Until
+2026-08-07 `sql-suites.yml` was filtered by path at the workflow level, so it did
+not start at all on a docs-only PR — PRs #171, #173 and #174 all merged with no
+SQL check. A required check is unconditional, so that shape could never be
+required, and the riskiest changes in the repository were the ones CI could not
+gate.
 
-That is still a settings change, not a code change, and it converts the other
-four from advisory to binding. It does **not** gate the *deployment* — that
-needs §3.5.
+The filter now sits at the job level. `SQL suites gate` reports on every pull
+request and fails closed: it passes when the suites passed, passes when no
+SQL-relevant path changed, and fails on anything else — including a skip that
+should not have happened. The expensive PostGIS replay still only runs when it
+is needed, so the minutes saving is preserved.
+
+Requiring all five is a settings change, not a code change, and it converts CI
+from advisory to binding. It does **not** gate the *deployment* — that needs
+§3.5.
 
 ### 3.2 External uptime monitoring
 

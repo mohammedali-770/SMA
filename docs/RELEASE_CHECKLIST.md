@@ -27,7 +27,7 @@ release, and mobile store submissions as the heavier ceremony.
 | --- | --- |
 | `Design system` | token mirrors, typecheck (both apps), unit tests |
 | `Production gates` | the real Vercel build, Edge Function types, dependency audit |
-| `SQL suites` | migration chain + SQL suites (PR #145) |
+| `SQL suites` | migration chain + SQL suites (PR #145). Two contexts: `Migration chain + SQL suites` does the work and only runs when SQL paths change; `SQL suites gate` reports on **every** PR and is the requirable one |
 | Vercel Preview | the preview deployment actually built |
 
 ⚠️ **None of these blocks a merge today** — but the reason changed on
@@ -39,9 +39,9 @@ merge button green. **Someone has to look.**
 
 Making them binding is a settings change, not a code change — but the names in
 the table above are **workflow** names, and a required check is matched by the
-**check-run** name. `docs/OWNER_ACTIONS.md` §3.1 lists the four contexts that can
-safely be required, and explains why `Migration chain + SQL suites` cannot be one
-of them yet (it is path-filtered, so it never runs on a docs-only PR).
+**check-run** name. `docs/OWNER_ACTIONS.md` §3.1 lists the five contexts to
+require, and why `Migration chain + SQL suites` is not one of them (it is
+path-gated by design; require `SQL suites gate` instead, which always reports).
 
 Note that even a required check would not gate the *deployment* while Vercel
 auto-deploy is on (§3.5).

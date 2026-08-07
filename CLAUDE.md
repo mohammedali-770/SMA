@@ -146,19 +146,23 @@ is *permanently pending*, which blocks every merge instead of gating one:
 | `Production build (Vite + Expo web export)` | `production-gates.yml` |
 | `Edge Function typecheck (Deno)` | `production-gates.yml` |
 | `Dependency audit (high+)` | `production-gates.yml` |
+| `SQL suites gate` | `sql-suites.yml` |
 
 There is **no aggregate `Production gates` check** — that workflow emits the
 three jobs above and nothing else. `Design system` (spaced, capitalised) is the
 workflow's display name, not its context.
 
-**Do NOT require `Migration chain + SQL suites`.** `sql-suites.yml` filters its
-`pull_request` trigger to `supabase/**` and `.github/sql-ci/**`, so it never
-starts on a docs-only or frontend-only PR. Required checks are unconditional, so
-requiring it would leave those PRs waiting forever on a run that will not
-happen. To require it, first give it a path-independent job that always reports
-(the usual shape is an always-run gate job that `needs:` the conditional one);
-until then, keep it out of the required set — the schema PRs that matter still
-run it, and a human still has to look.
+**Require `SQL suites gate`, NOT `Migration chain + SQL suites`.** The heavy job
+keeps that second name and still only runs when SQL-relevant paths change, so it
+does not report on a docs-only PR and can never be required. `SQL suites gate`
+reports on every pull request: it passes when the suites passed, passes when no
+SQL-relevant path changed, and **fails closed** on anything else — including a
+skip that should not have happened, or a path decision that did not complete.
+
+> Before 2026-08-07 `sql-suites.yml` filtered its `pull_request` trigger by
+> path, so it did not start at all on docs-only PRs and nothing about it could
+> be required. The filter moved to the job level and the gate job was added
+> precisely so schema PRs — the riskiest ones — can be gated too.
 
 Do not weaken, bypass or remove the hook or these rules without explicit owner
 approval. Keep this section honest in both directions: if a control is added,
