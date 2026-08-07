@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-07 (default-branch head `1ea366d`).
+> Last updated: 2026-08-07 (default-branch head `98f6c1e`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -192,6 +192,72 @@ actually gate reaching customers are the store-submission ones: legal documents
 
 One data oddity worth a look, not urgent: one order carries
 `payment_method = NULL` while the other 23 are `cash` (20) or `online` (3).
+
+### Orders can silently never reach the kitchen, and both health cards stay green
+
+Found 2026-08-07, read-only against Production. This is the same root cause as
+the payment-metric correction above — **the integrity rules were designed around
+online payment, and the business runs on cash** — but here it has an operational
+consequence rather than a reporting one.
+
+**Three orders are stranded right now.** Three cash pickup orders blocked with
+`sync_blocked_reason = 'missing_branch_mapping'` on 2026-07-23/24, at
+`sync_attempt_count = 0` — the sync worker looked once, found the branch had no
+`lazywait_branch_id`, and blocked them permanently without retry. They are still
+`status = 'received'`. The POS never received them, so the kitchen never saw
+them, and the customer was told nothing.
+
+**Nothing detected it, and it is structural, not a misconfiguration.** Of the
+eleven watchdog rules, exactly one can see `lazywait_sync_state = 'blocked'`:
+
+| Rule | Covers `blocked`? | Why not |
+| --- | --- | --- |
+| `PAID_ORDER_NOT_SYNCED` | **yes** | …but requires `payment_status = 'paid'` and a non-null `paid_at` |
+| `OVERDUE_SYNC_RETRY` | no | matches `pending`/`failed` only |
+| `ABANDONED_AWAITING_PAYMENT` | no | matches `awaiting_payment` only |
+| `PAID_ORDER_DEAD_LETTER` | no | `dead_letter` only, and also `paid`-gated |
+| the other seven | no | payment-record or reference rules |
+
+Cash orders are **never** `paid` — that is by design, per
+`20260709140000_payment_methods.sql`. So the only rule that covers `blocked`
+is unreachable for the 20 of 24 orders that are cash. The watchdog has run
+nearly **12,000 times** since 2026-07-22 (11,985 at the time of writing) and opened **zero** incidents, which is a
+truthful count of a set that structurally cannot contain these orders.
+
+**Both relevant health cards report `healthy` as of 21:00 today**, and both are
+correct about what they measure — which is the point:
+
+- `lazywait` measures the **transport**: cron ticks, HTTP status, and
+  `due_pending_failed_orders`, which counts `pending`/`failed`. `blocked` is
+  neither, so stranded orders cannot appear in the only order count it has.
+- `order_integrity` measures the **watchdog's own** liveness and its open
+  incident counts — zero, per above.
+
+Nothing measures "orders that will never reach the kitchen." Two things that
+look like they do report green.
+
+**This will recur: 2 of the 4 active branches have no POS mapping.**
+
+| Active branch | `lazywait_branch_id` | Orders |
+| --- | --- | --- |
+| Al Jesh | set | 0 |
+| Nasserah | set | 4 |
+| **Jeddah - Corniche** | **absent** | 0 |
+| **Riyadh - Olaya** | **absent** | 1 |
+
+Both unmapped ones carry seed UUIDs (`b0000000-…-0001` / `-0002`) — they are
+**seed fixtures left active in Production**. The next order at either reproduces
+the stranding exactly. The branch that produced the three blocked orders,
+`Chicken Ali 1`, holds 19 of the 24 orders and is now inactive, which is the only
+reason this is not currently ongoing.
+
+**Recovery exists but is manual.** The requeue path resets
+`blocked → pending`, so a stranded order can be recovered once a mapping is
+added — but nothing tells anyone to look, which is the actual defect.
+
+Owner actions in `docs/OWNER_ACTIONS.md` §3.7. The two halves are independent:
+mapping the branches is a data fix and needs no code; closing the detection gap
+is a schema change and needs approval.
 
 ### The post-`received` path has no server-side state machine
 

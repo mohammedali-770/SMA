@@ -480,6 +480,69 @@ button before this is fixed. Today cancellation is admin-only, which is the only
 reason the leak is bounded; a self-service cancel would turn it into a discount
 generator.
 
+### 3.7 Two active branches have no POS mapping — orders there vanish silently
+
+**Found 2026-08-07 (read-only). Full evidence in `PROJECT_STATUS.md`.** Two
+separable pieces, one of which you can fix today without any code.
+
+#### (a) Data fix — yours, no approval needed from me
+
+| Active branch | `lazywait_branch_id` | Orders |
+| --- | --- | --- |
+| Al Jesh | set | 0 |
+| Nasserah | set | 4 |
+| **Jeddah - Corniche** | **absent** | 0 |
+| **Riyadh - Olaya** | **absent** | 1 |
+
+An order placed at either unmapped branch is blocked by the sync worker on its
+first look, with `sync_blocked_reason = 'missing_branch_mapping'` and **no
+retry**. It never reaches the POS, the kitchen never sees it, and the customer is
+told nothing — their order simply sits at `received`. This already happened to
+**three cash orders on 2026-07-23/24**, which are still stranded.
+
+Both unmapped branches carry seed UUIDs (`b0000000-…-0001` / `-0002`) — they are
+**seed fixtures that were never deactivated**. So the choice is: give each a real
+`lazywait_branch_id`, or set `is_active = false` if they are not real branches.
+Deactivating the fixtures is almost certainly the right answer, and it is the
+safer default — an unmapped active branch is an order-loss trap.
+
+*Either way this is a live Supabase write, so per CLAUDE.md §5 I have not made
+it.* Say the word and I will, or do it in the admin console.
+
+The three already-stranded orders can be recovered by requeuing them once a
+mapping exists — but check first whether those customers were served at the
+counter anyway, because requeuing pushes them to the POS as new tickets.
+
+#### (b) The detection gap — needs a schema change, so needs your approval
+
+The stranding was never flagged, and not by accident. Of the eleven watchdog
+rules, only `PAID_ORDER_NOT_SYNCED` covers `lazywait_sync_state = 'blocked'`, and
+it requires `payment_status = 'paid'`. **Cash orders are never `paid`** — that is
+deliberate (`20260709140000_payment_methods.sql`) — so for 20 of the 24 orders
+that rule cannot fire. `OVERDUE_SYNC_RETRY` matches only `pending`/`failed`, and
+`blocked` is neither.
+
+The watchdog has run nearly **12,000 times** since 2026-07-22 (11,985 at the time of writing) and opened **zero**
+incidents. That zero is truthful; the set simply cannot contain these orders.
+
+Meanwhile both health cards read `healthy`, and both are right about what they
+measure: `lazywait` watches the transport (cron ticks, HTTP status,
+`due_pending_failed_orders`, which counts `pending`/`failed` and so excludes
+`blocked`), and `order_integrity` watches the watchdog's own liveness and open
+incident count. **Nothing measures "orders that will never reach the kitchen."**
+
+*Recommendation:* a rule that fires on any non-cancelled order sitting in
+`blocked`/`dead_letter` past a short grace period **regardless of
+`payment_status`**, excluding the deliberate `delivery_schema_unconfirmed` block
+the way `PAID_ORDER_NOT_SYNCED` already does. This is the single highest-value
+gap found so far, because it is the failure mode where a **paying customer gets
+no food and no one finds out**.
+
+This is the general lesson from both §3.6 and here, worth stating once: the
+integrity and reporting layers were written around online payment, and the
+business runs on cash. Any rule keyed on `payment_status = 'paid'` is, in
+practice, disabled.
+
 ### 3.4 Staging environment
 
 Every migration's first execution against a production-shaped database is
