@@ -137,12 +137,32 @@ business. The data does not support that, and saying so changes what matters.
 | --- | --- |
 | Orders, all time | **24** (21 `received`, 3 `cancelled`) |
 | Orders ever `delivered` | **0** |
-| Orders ever `payment_status = 'paid'` | **0** — all 24 are `pending` |
+| Orders ever `payment_status = 'paid'` | 0 — but see the note below; for cash this is **correct by design**, not a gap |
 | Distinct customers who have ordered | **2** |
 | Profiles | 5 |
 | Checkout sessions | 6 |
 | OTP challenges in the last 7 days | **0** (newest 2026-07-21) |
 | Order spread | **8 distinct order dates**, spanning **24.5 days** (2026-07-08 → 2026-08-01) |
+
+> **Correction (2026-08-07): "0 orders ever paid" is a misleading metric, and it
+> was mine.** An earlier revision of this table listed it as evidence of an
+> incomplete pipeline. It is not, for most of the rows.
+>
+> `20260709140000_payment_methods.sql` is explicit: *"paid is only ever set by
+> the service-role `confirm_order_payment` after a verified **online**
+> payment"*, and `"cash pending"/"unpaid"` are **derived in the UI** from method
+> plus status. `paymentDisplayState({paymentStatus:'pending', paymentMethod:'cash'})`
+> returns `cash_required`, and that is unit-tested.
+>
+> So of the 24: **20 are cash, where `pending` is the correct terminal state** —
+> cash is collected at the counter through the POS, never in the app. 3 are
+> `online` and genuinely never completed payment. 1 predates the
+> `payment_method` column and is null.
+>
+> Chasing "0 paid" would have meant chasing a non-problem **inside the frozen
+> payment/Tap area** (CLAUDE.md §6). **`status` is the real lifecycle indicator,
+> not `payment_status`** — and on that measure the finding stands unchanged: no
+> order has ever reached `delivered`.
 
 **What this does and does not mean.** It does *not* mean something broke: there
 was never a flow to stop, so a quiet period is not a regression. Earlier notes
