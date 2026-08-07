@@ -967,13 +967,13 @@ begin
       'subsystem','operations_automation',
       'severity','warning',
       'count',1
-    ) end)
+    ) end),
     (case when v_of_state in ('failing','degraded') then jsonb_build_object(
       'code','ORDER_FLOW_'||upper(v_of_state),
       'subsystem','order_flow',
       'severity',case when v_of_state = 'failing' then 'critical' else 'warning' end,
       'count',greatest(v_of_open_branches,1)
-    ) end),
+    ) end)
   ) a(item)
   where item is not null;
 
