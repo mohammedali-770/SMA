@@ -391,23 +391,43 @@ publicly readable right now.
 > **Every document has a null `effective_date`.** A policy with no effective date
 > is defective on its face, and the column already exists — it just needs a value.
 
+> **The rights channel is live but dead-ends.** `privacy_policy` enumerates the
+> rights properly — access, correction, deletion, withdrawal of consent,
+> complaint — and routes them: *"To exercise any right, please contact support
+> (see Contact & Support)."* That document then gives, in both languages:
+>
+> - `support@example.com` **(edit in Admin)**
+> - `+966 5X XXX XXXX` **(edit in Admin)**
+> - Hours: **(edit in Admin)**
+>
+> So a customer exercising a data right today reaches nothing, and the
+> instruction to the administrator is itself shipped to customers three times per
+> language. An articulated rights process that dead-ends is worse than none — it
+> creates the expectation and then fails it. Real contact details are a console
+> edit; no counsel required.
+>
+> *(An earlier revision of this section listed the DSAR channel under "needs
+> counsel — not stated anywhere". That was wrong: it is stated, and routed. It
+> is the contact details behind it that are missing. Caught in review on PR
+> #178.)*
+
 #### Part B — needs counsel
 
 Measured gaps, not opinions. Across all nine documents:
 
-| Required element | Present? |
+| Required element | State |
 | --- | --- |
-| Named data controller | **no document names one** |
-| Sentry named as a processor | **no** — yet Sentry is live on all three surfaces (EU host) |
-| Retention periods | only `privacy_policy` and `account_data_deletion` mention retention at all |
-| Payment processor named | `privacy_policy`, `payment_policy`, `cancellation_refund_policy` |
-| POS processor (Lazywait) named | `privacy_policy` only |
-| Lawful basis | not stated anywhere |
-| DSAR channel | not stated anywhere |
+| Named data controller | **absent.** The policy says only `Spicy Meal ("we", "us")` — no legal entity, registration or address |
+| Processor list | **present and substantive** — names Supabase, Tap Payments, Lazywait, Meta/WhatsApp and the SMTP provider |
+| **Sentry as a processor** | **absent from that list**, yet Sentry is live on all three surfaces with an EU host — the one clear omission from an otherwise real list |
+| Lawful basis | **absent as such.** Purposes *are* stated ("Why we collect it": account, orders, loyalty, legal/tax duties); the lawful-basis framing is not |
+| Retention periods | qualitative only — "as long as needed… or as required by law", with **no periods** |
+| Rights + DSAR routing | **present** — see Part A; it is the contact details that fail |
 
-`privacy_policy` is the most complete of the nine (1,871 EN / 1,668 AR
-characters, and the only one naming Lazywait), which makes it the sensible
-starting point — but it still names no controller and no lawful basis.
+`privacy_policy` is much closer to complete than the phrase "placeholder text"
+suggests: 1,871 EN / 1,668 AR characters, a real processor list, and correctly
+enumerated rights. The counsel work is narrower than a rewrite — name the
+controller, add Sentry, state the lawful basis, and put periods on retention.
 
 Blocks store submission: both stores require a **publicly reachable** privacy
 policy URL.
