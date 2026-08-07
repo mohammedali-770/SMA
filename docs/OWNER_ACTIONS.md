@@ -357,14 +357,80 @@ capture time; (c) stay as-is. **Recommendation: ask the accountant (a) first.**
 
 ### 4.2 Legal documents are still seeded placeholder text
 
-Including one that tells a reviewer the app does **not** delete accounts — which
-contradicts the shipped in-app deletion flow, and is the kind of contradiction an
-App Store reviewer opens with. Needs counsel-reviewed AR/EN text naming the
-controller, lawful basis, processors (including Sentry's EU host), retention
-periods and the DSAR channel.
+**Audited against Production on 2026-08-07.** All **nine** rows in
+`public.legal_documents` are untouched seed data: every one is `version 1.0`
+with a **null `effective_date`**, a **null `updated_by`**, and an `updated_at`
+of 2026-07-12. Not one has ever been edited. All are `is_active = true`, and the
+RLS policy grants `anon` read on active rows — so everything below is live and
+publicly readable right now.
+
+#### Part A — needs no lawyer, only a correction
+
+> **`account_data_deletion` is factually wrong about the product**, in both
+> languages:
+>
+> - EN: *"In this version, deletion is handled by our support team; the app does
+>   not delete accounts automatically."*
+> - AR: *"...ولا يحذف التطبيق الحسابات تلقائياً"* — same claim.
+>
+> The app **does** delete accounts automatically: there is an in-app request
+> flow, an `account_deletion_requests` queue and the `account-deletion-processor`
+> cron running every minute. This is a product statement, not legal wording, and
+> it is the single item here that needs no counsel — just an edit in the admin
+> console.
+>
+> It also matters most: Apple reviewers specifically verify account-deletion
+> claims, and a policy contradicting the shipped flow is exactly the
+> contradiction a rejection opens with.
+
+> **The word "placeholder" is shipped to customers.** The same document reads
+> *"within a reasonable period (placeholder: e.g., 30 days)"* in English and
+> *"(قيمة مبدئية: مثلاً ٣٠ يوماً)"* in Arabic. `contact_support` carries similar
+> `e.g.,` stub markers. These are visible in the app today.
+
+> **Every document has a null `effective_date`.** A policy with no effective date
+> is defective on its face, and the column already exists — it just needs a value.
+
+> **The rights channel is live but dead-ends.** `privacy_policy` enumerates the
+> rights properly — access, correction, deletion, withdrawal of consent,
+> complaint — and routes them: *"To exercise any right, please contact support
+> (see Contact & Support)."* That document then gives, in both languages:
+>
+> - `support@example.com` **(edit in Admin)**
+> - `+966 5X XXX XXXX` **(edit in Admin)**
+> - Hours: **(edit in Admin)**
+>
+> So a customer exercising a data right today reaches nothing, and the
+> instruction to the administrator is itself shipped to customers three times per
+> language. An articulated rights process that dead-ends is worse than none — it
+> creates the expectation and then fails it. Real contact details are a console
+> edit; no counsel required.
+>
+> *(An earlier revision of this section listed the DSAR channel under "needs
+> counsel — not stated anywhere". That was wrong: it is stated, and routed. It
+> is the contact details behind it that are missing. Caught in review on PR
+> #178.)*
+
+#### Part B — needs counsel
+
+Measured gaps, not opinions. Across all nine documents:
+
+| Required element | State |
+| --- | --- |
+| Named data controller | **absent.** The policy says only `Spicy Meal ("we", "us")` — no legal entity, registration or address |
+| Processor list | **present and substantive** — names Supabase, Tap Payments, Lazywait, Meta/WhatsApp and the SMTP provider |
+| **Sentry as a processor** | **absent from that list**, yet Sentry is live on all three surfaces with an EU host — the one clear omission from an otherwise real list |
+| Lawful basis | **absent as such.** Purposes *are* stated ("Why we collect it": account, orders, loyalty, legal/tax duties); the lawful-basis framing is not |
+| Retention periods | qualitative only — "as long as needed… or as required by law", with **no periods** |
+| Rights + DSAR routing | **present** — see Part A; it is the contact details that fail |
+
+`privacy_policy` is much closer to complete than the phrase "placeholder text"
+suggests: 1,871 EN / 1,668 AR characters, a real processor list, and correctly
+enumerated rights. The counsel work is narrower than a rewrite — name the
+controller, add Sentry, state the lawful basis, and put periods on retention.
 
 Blocks store submission: both stores require a **publicly reachable** privacy
-policy URL, which also depends on §2.2.
+policy URL.
 
 ### 4.3 Reviewer login
 
