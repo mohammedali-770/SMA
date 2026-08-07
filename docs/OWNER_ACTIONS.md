@@ -259,6 +259,46 @@ granted to `anon` with a public read policy, `20260707120200`). It hits the
 **Supabase** origin rather than the Vercel domain, so if you want to tell "site
 down" apart from "data down", run one probe against each.
 
+#### Verified against Production, 2026-08-07
+
+Both claims above were checked rather than reasoned about, because a probe
+configured from a wrong spec is a monitor that reports green forever.
+
+**Probe A — data.** `GET /rest/v1/branches?select=id&limit=1`
+
+| Request | Result |
+| --- | --- |
+| with the legacy `anon` key | **200**, body `[{"id":"b0000000-…-0002"}]`, ~1.0 s |
+| with the modern `sb_publishable_…` key | **200**, identical body |
+| with **no** `apikey` header | **401** `No API key found in request` |
+
+The 401 is the important row: it proves the probe exercises PostgREST and
+auth, so a green result means something. Either key works — use the publishable
+one.
+
+**Probe B — site.** `/` is a false-green target, confirmed, and **worse than
+§3.2 originally implied**:
+
+| Path | Result |
+| --- | --- |
+| `/` | 200 `text/html` |
+| `/app/` | 200 `text/html` |
+| `/this-path-does-not-exist-20191` | 200 `text/html` |
+| `/assets/index-C01JC8iy.js` (real) | 200 `application/javascript` |
+| `/assets/definitely-not-real.js` (fake) | **200 `text/html`** |
+
+The catch-all rewrite swallows even a missing file under `/assets/`, so **no
+path on that origin returns a non-200 for a content problem.** Status-code
+monitoring of the Vercel domain can therefore only ever catch a *total* outage —
+DNS, edge, or Vercel itself. That is still worth having, but be clear about what
+it does not cover: it cannot detect a stale deploy or a broken build, which is
+precisely the failure `docs/DEPLOY.md` records having missed for two days.
+
+So: **Probe A is the one that carries real signal.** Probe B on `/` is a
+liveness check only. Catching staleness needs a content assertion against a
+known-recent string, which changes every release — that stays the manual check
+in `docs/DEPLOY.md`, not something a prober can do unattended.
+
 ### 3.3 Who gets woken at 02:00, and on what channel?
 
 The alert-dispatcher work is pointless without an answer. **Recommendation:** name
