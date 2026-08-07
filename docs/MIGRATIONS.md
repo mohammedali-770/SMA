@@ -10,21 +10,20 @@
 
 ## 1. Purpose and production status
 
-**Class E holds exactly one file: `20260807170000_order_flow_alert_condition`
-(§26), which is merged but NOT applied.** It closes the alert-engine gap
-recorded in §25 and needs explicit owner approval to apply, like every other
-production change. Everything else in the repository is applied.
+**As of 2026-08-07 class E is empty again: every repository migration is applied
+to Production.**
 
-Three files were applied on 2026-08-07 with explicit owner approval, via the MCP
+Four files were applied on 2026-08-07 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. The first two came from PR #166
 and PR #167 (§24); the third from PR #169, corrected by PR #170 before it was
-applied (§25).
+applied (§25); the fourth from PR #172 (§26).
 
 | Repository file | Applied version | skel | Result |
 | --- | --- | --- | --- |
 | `20260806120000_erasure_phone_normalization` | `20260807140050` | `8759892535b7` | applied |
 | `20260806130000_admin_ranged_orders_and_stats` | `20260807140206` | `a92bb07e58c7` | applied |
 | `20260807150000_order_flow_health_card` | `20260807152347` | `f4df8ad27e85` | applied |
+| `20260807170000_order_flow_alert_condition` | `20260807172027` | `0156c74bbf8d` | applied |
 
 The three files unapplied before them — two from PR #142, one from PR #146 —
 were applied on 2026-08-05, the same way.
@@ -36,17 +35,16 @@ were applied on 2026-08-05, the same way.
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
 - Repository migration files (default branch `claude/project-build-ie4b56`): **68**
-- Live `schema_migrations` rows: **69**
-- Unapplied repository files: **1** — `20260807170000_order_flow_alert_condition` (§26)
-- Latest live version: **`20260807152347`**
-  (`order_flow_health_card`; repository version `20260807150000`)
+- Live `schema_migrations` rows: **70**
+- Unapplied repository files: **0**
+- Latest live version: **`20260807172027`**
+  (`order_flow_alert_condition`; repository version `20260807170000`)
 
-The 68 / 69 difference is the long-standing **history** divergence plus the one
-pending file, not a *schema* divergence: **five** live-only F-class rows carry no
-repository file, **three** H-class repository files (`place_order`, `loyalty`,
-`order_idempotency`) were superseded by later consolidated migrations, and
-**one** E-class file is not applied yet.
-`68 files − 1 E-class − 3 H-class + 5 F-class = 69 rows`. §4 carries the full
+The 68 / 70 difference is the long-standing **history** divergence, not a
+*schema* divergence: **five** live-only F-class rows carry no repository file,
+and **three** H-class repository files (`place_order`, `loyalty`,
+`order_idempotency`) were superseded by later consolidated migrations.
+`68 files − 3 H-class + 5 F-class = 70 rows`. §4 carries the full
 class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
 both sides exactly; §5 maps a subset of the rows.
 
@@ -243,7 +241,7 @@ fields byte-identical before/after, fingerprint-verified).
 ## 4. Classification summary
 
 **Recomputed from live data on 2026-08-07 and now covering ALL 68 repository
-files and ALL 69 live rows** — previous revisions of this table were scoped to a
+files and ALL 70 live rows** — previous revisions of this table were scoped to a
 56-file subset and, separately, undercounted two classes. Method: match by
 `name`, then compare the repository filename version against the live `version`,
 and the repository file's `skel` fingerprint against the live row's.
@@ -251,29 +249,30 @@ and the repository file's `skel` fingerprint against the live row's.
 | primary classification | count |
 |---|---|
 | A. `EXACT_MATCH` (version + name + content) | **8** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **53** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **54** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **5** |
 | H. `SUPERSEDED` (repository side) | **3** |
 
 **Both sides reconcile exactly, with no residue:**
 
 ```
-repository:  A 8 + B 53 + C 3 + E 1 + H 3 = 68 files
-live      :  A 8 + B 53 + C 3         + F 5 = 69 rows
+repository:  A 8 + B 54 + C 3 + H 3 = 68 files
+live      :  A 8 + B 54 + C 3 + F 5 = 70 rows
 ```
 
-E contributes to the repository side only, which is what "unapplied" means.
-
-Two movements since this table was recomputed, both on 2026-08-07:
+Three movements since this table was recomputed, all on 2026-08-07:
 
 - **B 52 → 53**, when `20260807150000_order_flow_health_card` was applied as
   live `20260807152347` (§25).
 - **E 0 → 1**, when `20260807170000_order_flow_alert_condition` merged without
-  being applied (§26). It returns to 0 and moves B to 54 when that file is
-  applied with owner approval.
+  being applied (§26).
+- **E 1 → 0 and B 53 → 54**, when that file was applied as live
+  `20260807172027`. The file total stayed at **68** and the row total rose to
+  **70**, exactly as §26 predicted before the apply — which is the check that
+  the counts were right in both states.
 
 A, C, D, F and H are unmoved.
 
@@ -316,12 +315,12 @@ notes.
 > and its own 61/62 totals remain as written — treat §4 as authoritative for
 > counts and §5 as the detailed mapping of the rows it covers.
 >
-> **Class E was briefly empty on 2026-08-07 and now holds one file again.** It held the two rows added
+> **Class E is empty again as of 2026-08-07.** It held the two rows added
 > 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
-> `20260806130000_admin_ranged_orders_and_stats` (§23) — which were applied on
-> 2026-08-07 with explicit owner approval and are now class **B** (§24). It then
-> briefly held `20260807150000_order_flow_health_card`, merged the same day and
-> applied a few hours later, also class **B** (§25). The
+> `20260806130000_admin_ranged_orders_and_stats` (§23) — applied that day with
+> explicit owner approval and now class **B** (§24); then
+> `20260807150000_order_flow_health_card` (§25); then
+> `20260807170000_order_flow_alert_condition` (§26). All four are class **B**. The
 > operations-automation cron-health migration
 > `20260723140000_operations_automation_cron_health` — the last remaining
 > class-E row, recorded as repository-only in every earlier revision of this
@@ -409,18 +408,17 @@ production.
 
 Reconciliation check: the rows above detail **56 repository / 57 live** rows.
 That is a **subset**, not the whole picture — it predates the five
-account-deletion migrations, the three applied 2026-08-05, the three applied
+account-deletion migrations, the three applied 2026-08-05, the four applied
 2026-08-07, and the `noop` probe.
 
 **§4 is authoritative for totals** and reconciles the full set exactly:
-`A 8 + B 53 + C 3 + E 1 + H 3 = 68` repository files, `A 8 + B 53 + C 3 + F 5 = 69`
+`A 8 + B 54 + C 3 + H 3 = 68` repository files, `A 8 + B 54 + C 3 + F 5 = 70`
 live rows. The per-row table above has deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §4.
 
-**One repository-only/UNAPPLIED file exists** — `20260807170000_order_flow_alert_condition`
-(§26), merged but not applied. The live-only F-class rows carry no repository
-file; that part is a history divergence, not drift.
+**There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
+F-class rows carry no repository file. This is a history divergence, not drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -1894,12 +1892,13 @@ a separate live history write needing its own explicit owner approval, and class
 
 ### Still outstanding
 
-- **The order-flow alert condition is written but NOT YET APPLIED, so the gap is
-  still live in Production.** Migration `20260807170000_order_flow_alert_condition`
-  adds it (§26). Until an owner-approved apply lands, everything below still
-  describes the running system. The alert engine derives its own fingerprints
-  independently of the snapshot, so an `order_flow` card reading `failing` or
-  `degraded` produces **no alert row at all**.
+- **~~The `orders:flow` fingerprint is missing~~ — CLOSED 2026-08-07 by
+  `20260807170000_order_flow_alert_condition` (§26), applied as live
+  `20260807172027`.** The description below is retained because it is what the
+  running system looked like between §25 and §26, and because the reasoning that
+  first got it wrong is worth keeping visible. The alert engine derives its own
+  fingerprints independently of the snapshot, so an `order_flow` card reading
+  `failing` or `degraded` produced **no alert row at all**.
 
   An earlier revision of this bullet said the function's "only consumer — the
   external alert dispatcher — is dormant by design". **That was wrong**, and it
@@ -1945,29 +1944,28 @@ a separate live history write needing its own explicit owner approval, and class
   at 0, the console does not yet have the coverage this migration was written to
   provide. The mechanism is in place; the data is not.
 
-## 26. Pending migration: order-flow alert condition (class E — NOT APPLIED)
+## 26. Applied migration: order-flow alert condition (applied 2026-08-07, class B)
 
 | | |
 | --- | --- |
-| Repository file | `20260807170000_order_flow_alert_condition.sql` |
-| Class | **E** (`REPOSITORY_ONLY_UNAPPLIED`) |
-| Live version | none — **not applied** |
+| Repository file | `20260807170000_order_flow_alert_condition.sql` (504 lines) |
+| Live version | `20260807172027`, name `order_flow_alert_condition` |
+| Class | **B** (`SAME_CONTENT_DIFFERENT_VERSION`) |
+| skel (repo = live) | `0156c74bbf8d` |
+| From | PR #172 (`07f25eb`) |
 | Closes | the §25 "still outstanding" gap |
-| Approval to apply | **not yet given.** Owner approval is required (CLAUDE.md §5) |
+| Approval | explicit owner instruction, "merge it once green and apply the migration" |
 
-> **Class E is no longer empty**, and §1, §4 and §6 were updated to say so the
-> moment this file merged rather than at apply time. "Unapplied" is a fact about
-> the repository, not the database, so deferring it would have left the ledger
-> asserting "zero unapplied" while an unapplied file sat in the tree — the exact
-> kind of confidently-wrong statement §25 was written to stop repeating.
+> **The count prediction was recorded before the apply and held exactly.** While
+> this file was merged-but-unapplied, §1, §4 and §6 said so immediately rather
+> than at apply time — "unapplied" is a fact about the repository, not the
+> database, and deferring it would have left the ledger asserting "zero
+> unapplied" while an unapplied file sat in the tree.
 >
-> The algebra still reconciles because E contributes to the repository side only:
-> `A 8 + B 53 + C 3 + E 1 + H 3 = 68 files` against
-> `A 8 + B 53 + C 3 + F 5 = 69 rows`. Applying this file moves E to 0 and B to
-> 54: the file total stays at **68**, and the row total rises to **70** because
-> the apply stamps a fresh history row. Both sides still reconcile
-> (`8+54+3+0+3 = 68`, `8+54+3+5 = 70`), which is the check that the counts are
-> right in both states.
+> §26 then predicted that applying it would move E to 0 and B to 54, hold the
+> file total at 68, and raise the row total to 70. That is what happened:
+> `8+54+3+3 = 68 files`, `8+54+3+5 = 70 rows`. Reconciling in *both* states is
+> the check that the counts were right in each.
 
 ### What it does
 
@@ -2080,10 +2078,92 @@ makes it fail with `expected 'order_flow' to be 'Order Flow'`.
 Full local run before pushing: `tsc --noEmit` clean, 1705 unit tests pass across
 111 files, design-system sync and hygiene clean.
 
-### Applying it
+### Pre-live gate (§9-B), recorded before applying
 
-Ordinary §9 run-book, no special handling: `create or replace` only, zero write
-statements, one function replaced in place, and the rollback is re-applying the
-prior body (any open `order_flow:health` alert is then recovered by the
-evaluator's normal resolution pass, so no manual cleanup). It needs explicit
-owner approval like every other production apply.
+| Check | Value |
+| --- | --- |
+| Live rows before | **69**, latest `20260807152347` |
+| `operations_alerts_derive` contains `order_flow` | **false** |
+| `derive` source md5 | `ea011fe74126d958ca68ada4fd3e835e` |
+| `render_event` source md5 | `9623c15ffa75d98a89543ad25d9b6312` |
+| **AR render, before** | **`[حرج] order_flow — تنبيه جديد`** |
+| **EN render, before** | **`[CRITICAL] order_flow — Alert opened`** |
+| `public` functions | **125** |
+| `operations_alert_state` | 2 rows, 0 open |
+| `operations_alert_outbox` | **42 rows** |
+| `order_flow` card | `idle` |
+
+Two things in that table are worth keeping. The AR/EN "before" values are the
+defect measured on Production rather than argued from source — the raw id really
+was what the renderer produced. And 42 outbox rows is the evidence that this path
+writes rows in the ordinary course of business, which is what made §25's
+"dormant" description wrong.
+
+The file carries **zero write statements** and is `create or replace` throughout,
+so a bad transcription would have been re-appliable rather than destructive.
+
+### Verification (§9-E), after applying
+
+**The transcription was verbatim, and provably so** — the same test §25 used:
+
+| Fingerprint | Repository file | Live row |
+| --- | --- | --- |
+| `skel` | `0156c74bbf8d` | `0156c74bbf8d` |
+| raw md5, trailing newline stripped | `21755be882e3cbc855df102f0d6c07d0` | `21755be882e3cbc855df102f0d6c07d0` |
+
+**The prediction recorded before the apply held.** The card is `idle`, so the
+arm had to stay silent:
+
+| Check | Before | After |
+| --- | --- | --- |
+| `order_flow` card | `idle` | `idle` |
+| `derive` `order_flow` conditions | — | **0** |
+| `derive` conditions, all subsystems | — | 0 |
+| `operations_alert_state` | 2 rows / 0 open | **2 / 0** |
+| `order_flow` rows in `operations_alert_state` | — | **0** |
+| `operations_alert_outbox` | 42 | **42** |
+| `public` functions | 125 | **125** |
+| orders | 24 | 24 |
+| live rows | 69 | **70** |
+
+The function count is unchanged **because both objects were replaced, not added**
+— which is itself the check that nothing extra was created.
+
+**The rendering defect is fixed on Production**, measured the same way it was
+measured before:
+
+| | Before | After |
+| --- | --- | --- |
+| AR | `[حرج] order_flow — تنبيه جديد` | **`[حرج] تدفق الطلبات — تنبيه جديد`** |
+| EN | `[CRITICAL] order_flow — Alert opened` | **`[CRITICAL] Order Flow — Alert opened`** |
+| Another subsystem | — | `[حرج] مزامنة Lazywait` — unchanged |
+| Unknown subsystem | — | `[WARNING] brand_new_thing` — fallback intact |
+
+**The arm behaves as specified**, exercised against synthetic snapshots on the
+live function: a `failing` card yields `order_flow:health / critical /
+flow_stopped`, and an `idle` card yields nothing at all.
+
+**Contracts preserved.** `derive` is still `stable`, `render_event` still
+`immutable`, neither is `security definer`, both carry `search_path=public`, and
+both ACLs remain `{postgres=X, service_role=X}` — no `anon`, no `authenticated`.
+
+**Advisors.** 66 security lints, the **same count as before the apply**, with
+**0 `ERROR`** and **zero** naming `operations_alerts_derive`,
+`operations_alerts_render_event` or `order_flow`. Nothing is attributable to
+this apply.
+
+**Version alignment (§9-D) was deliberately not performed** — a separate live
+history write needing its own approval, and class **B** is this repository's
+normal steady state.
+
+### What this does and does not deliver
+
+The alert path is now armed end to end: a `failing` order-flow card will raise
+`order_flow:health` at critical severity, the evaluator will persist it to the
+in-dashboard inbox within five minutes, and the outbox rows will name the
+subsystem correctly in both languages.
+
+**It has not fired and cannot yet.** The card needs 3 comparable weeks before it
+leaves `idle`, and Production has 24 orders in total with `baseline_samples` at
+0. So this closes the gap in the *mechanism*; the *coverage* still depends on
+order volume that does not exist yet. §25's closing note applies unchanged.
