@@ -175,10 +175,14 @@ that reading was wrong, and it was wrong because it looked at the newest
 timestamp without looking at the denominator.
 
 What it *does* mean is sharper: **the happy path has never completed once in
-production.** No order has been paid, and none has moved past `received`. Every
-subsystem is deployed, but the thing they exist to produce end-to-end has not
-been observed. That is the largest unproven assumption on the readiness plan,
-and no amount of CI or backup configuration substitutes for it.
+production.** The evidence for that is `status` alone — **no order has ever moved
+past `received`**, so nothing has been prepared, dispatched or delivered. (The
+payment side adds nothing to this conclusion: 20 of the 24 are cash, where
+`pending` is the correct terminal state. Only the 3 `online` orders are genuinely
+unpaid, and those are inside the frozen payment area.) Every subsystem is
+deployed, but the thing they exist to produce end-to-end has not been observed.
+That is the largest unproven assumption on the readiness plan, and no amount of
+CI or backup configuration substitutes for it.
 
 It also re-orders urgency honestly. Point-in-time recovery (`docs/OWNER_ACTIONS.md`
 §2.1) is still the right pre-launch priority, but the data at risk *today* is 2
