@@ -214,11 +214,15 @@ UI, not the database, so any authenticated admin calling the RPC directly
 bypasses it. The function is `is_admin()`-gated, so this is not a privilege
 issue; it is an unguarded write.
 
-**Confirmed consequence: loyalty points survive cancellation.** Points are
-credited at *placement*, inside `place_customer_order` — `loyalty_awarded_at` is
-only ever set in that `insert`, never on a transition — and **nothing reverses
-them**. There is no cancel function at all; cancelling *is*
-`admin_set_order_status(id, 'cancelled')`, the bare `UPDATE` above.
+**Confirmed consequence: a cancelled order's loyalty movement is never
+reversed — in either direction.** Placement settles the balance in one
+statement, `greatest(0, balance - points_redeemed + points_earned)`, inside
+`place_customer_order`; `loyalty_awarded_at` is only ever set in that `insert`,
+never on a transition. There is no cancel function at all — cancelling *is*
+`admin_set_order_status(id, 'cancelled')`, the bare `UPDATE` above — so **both**
+halves are stranded: earned points stay credited (the business loses), and
+redeemed points are never given back (**the customer** loses, having paid points
+for an order they never received).
 
 Verified against Production on 2026-08-07 (read-only, counts only):
 
@@ -232,16 +236,25 @@ stored `profiles.loyalty_points` reconcile exactly to their ledger sums, so this
 is not balance drift — it is the designed behaviour. One customer's 755-point
 balance includes **41 points earned on orders that were cancelled**.
 
+The customer-facing half has **not** bitten yet: all 500 redeemed points belong
+to `received` orders, and no cancelled order has redeemed any. It will bite the
+first time someone redeems and then cancels.
+
 At live settings (`points_per_riyal = 1`, `discount_per_point = 0.10`) a point is
 SAR 0.10 of discount, so a cancelled order permanently grants roughly **10% of
 its value as store credit**. Today that is SAR 4.10 of test data.
 
-**Severity, stated honestly: an accounting inaccuracy, not an abuse vector.**
-There is no customer-facing cancel anywhere in the mobile app — only display
-strings and fixtures — so a customer cannot mint credit on demand. Cancellation
-requires an admin. It becomes a real leak only at volume, or if a customer-facing
-cancel is ever added; adding one *before* fixing this would turn it into a
-self-service discount generator.
+**Severity, stated honestly, and it differs per half.** The *earned* half is an
+accounting inaccuracy, not an abuse vector: there is no customer-facing cancel
+anywhere in the mobile app — only display strings and fixtures — so a customer
+cannot mint credit on demand, and cancellation requires an admin. It becomes a
+real leak only at volume, or if a customer-facing cancel is ever added; adding
+one *before* fixing this would turn it into a self-service discount generator.
+
+The *redeemed* half is worse in kind though not yet in size: it takes something
+from a customer and does not give it back. It is unexposed today only because
+the one order that redeemed points was not cancelled — that is luck, not a
+control.
 
 **Negative results — investigated, no defect found.** Nothing assigns
 `loyalty_awarded_at` outside the placement `insert`, so the double-award risk on
