@@ -178,10 +178,36 @@ export function unavailableOperationsHealthSummary(
   };
 }
 
+/**
+ * What a capability probe learned. The probe has always fetched a full summary
+ * and then thrown the payload away, keeping only the error — so the dashboard
+ * paid for the round trip and got a boolean.
+ *
+ * It now returns the summary too. `summary` is null when the probe failed (the
+ * tab is hidden or the RPC errored), so a caller must handle absence; it is
+ * never a partially-populated object.
+ */
+export interface OperationsHealthProbe {
+  capability: OperationsHealthCapability;
+  summary: OperationsHealthSummary | null;
+}
+
 export const operationsHealth = {
-  async probeAvailability(): Promise<OperationsHealthCapability> {
-    const { error } = await supabase.rpc('operations_health_summary');
-    return classifyOperationsHealthProbe(error);
+  /**
+   * Probe the RPC AND keep what it returned.
+   *
+   * The extra value is free: this is the same request, the same row, the same
+   * latency. Discarding it meant the only way to know whether operations were
+   * healthy was to open the Operations Health tab — so nothing could warn an
+   * operator who was looking at a different tab, which is most of the time.
+   */
+  async probeAvailability(): Promise<OperationsHealthProbe> {
+    const { data, error } = await supabase.rpc('operations_health_summary');
+    const capability = classifyOperationsHealthProbe(error);
+    return {
+      capability,
+      summary: !error && data ? (data as OperationsHealthSummary) : null,
+    };
   },
 
   async summary(): Promise<OperationsHealthSummary> {

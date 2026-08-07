@@ -46,12 +46,38 @@ const COPY = {
   en: {
     nav: 'Console sections', menu: 'Menu', close: 'Close menu', open: 'Open menu',
     live: (n: number) => `${n} live ${n === 1 ? 'order' : 'orders'}`,
+    health: (n: number) => `${n} critical operations ${n === 1 ? 'alert' : 'alerts'}`,
+    healthWarn: (n: number) => `${n} operations ${n === 1 ? 'warning' : 'warnings'}`,
   },
   ar: {
     nav: 'أقسام لوحة التحكم', menu: 'القائمة', close: 'إغلاق القائمة', open: 'فتح القائمة',
     live: (n: number) => `${n} طلبات مباشرة`,
+    health: (n: number) => `${n} تنبيهات تشغيلية حرجة`,
+    healthWarn: (n: number) => `${n} تحذيرات تشغيلية`,
   },
 } as const;
+
+/**
+ * What the sidebar shows about platform health: a state bad enough to warrant
+ * interrupting whatever the operator is doing, and how many critical items are
+ * behind it. `null` means nothing worth a badge — a healthy or idle platform
+ * shows no badge at all, because an always-present badge is furniture.
+ */
+export type HealthAlert = { state: string; severity: 'critical' | 'warning'; count: number } | null;
+
+/**
+ * Label and tone for a health badge, matched to its SEVERITY.
+ *
+ * A `degraded` platform raises WARNING attention items, so calling it "1
+ * critical operations alert" both overstates it and cites a counter that reads
+ * zero. Severity picks the counter upstream; it picks the words and the colour
+ * here.
+ */
+function healthBadgeCopy(alert: NonNullable<HealthAlert>, lang: 'en' | 'ar') {
+  return alert.severity === 'critical'
+    ? { srLabel: COPY[lang].health(alert.count), tone: 'danger' as const }
+    : { srLabel: COPY[lang].healthWarn(alert.count), tone: 'warning' as const };
+}
 
 /**
  * The Live Orders count, as a pill. Rendered on the item and, when its group
@@ -62,22 +88,32 @@ const COPY = {
  * bare "7" with nothing beside it. The visible glyph is therefore hidden from
  * the accessibility tree and replaced with the same count in words.
  */
-function CountBadge({ count, srLabel, onEmber }: {
+function CountBadge({ count, srLabel, onEmber, tone = 'ember' }: {
   count: number;
   srLabel: string;
   onEmber: boolean;
+  /**
+   * `ember` is the brand count (Live Orders). `danger` is trouble — it must not
+   * look like a workload number, because "7 orders waiting" and "7 things are
+   * broken" are not the same message and the operator has to tell them apart at
+   * a glance.
+   */
+  tone?: 'ember' | 'danger' | 'warning';
 }) {
+  const trouble = tone === 'danger' || tone === 'warning';
   return (
     <span
       className={[
         'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5',
-        onEmber ? 'bg-on-ember' : 'bg-ember',
+        tone === 'danger' ? 'bg-danger-ds'
+          : tone === 'warning' ? 'bg-amber-ink'
+          : onEmber ? 'bg-on-ember' : 'bg-ember',
       ].join(' ')}
     >
       <Text
         variant="caption"
         numeric
-        tone={onEmber ? 'ember' : 'onEmber'}
+        tone={trouble ? 'onEmber' : onEmber ? 'ember' : 'onEmber'}
         as="span"
         aria-hidden="true"
       >
@@ -89,17 +125,19 @@ function CountBadge({ count, srLabel, onEmber }: {
 }
 
 function NavButton({
-  item, selected, lang, liveOrderCount, indented, onSelect,
+  item, selected, lang, liveOrderCount, healthAlert, indented, onSelect,
 }: {
   item: AdminNavItem;
   selected: boolean;
   lang: 'en' | 'ar';
   liveOrderCount: number;
+  healthAlert: HealthAlert;
   indented: boolean;
   onSelect: (tab: AdminTab) => void;
 }) {
   const { tab, icon: Icon, en, ar } = item;
   const showBadge = tab === 'orders' && liveOrderCount > 0;
+  const showHealth = tab === 'health' && healthAlert !== null;
 
   return (
     <button
@@ -124,18 +162,27 @@ function NavButton({
       {showBadge ? (
         <CountBadge count={liveOrderCount} srLabel={COPY[lang].live(liveOrderCount)} onEmber={selected} />
       ) : null}
+      {showHealth ? (
+        <CountBadge
+          count={healthAlert.count}
+          srLabel={healthBadgeCopy(healthAlert, lang).srLabel}
+          onEmber={selected}
+          tone={healthBadgeCopy(healthAlert, lang).tone}
+        />
+      ) : null}
     </button>
   );
 }
 
 function NavGroup({
-  group, active, expanded, lang, liveOrderCount, surface, onToggle, onSelect,
+  group, active, expanded, lang, liveOrderCount, healthAlert, surface, onToggle, onSelect,
 }: {
   group: ResolvedNavGroup;
   active: AdminTab;
   expanded: boolean;
   lang: 'en' | 'ar';
   liveOrderCount: number;
+  healthAlert: HealthAlert;
   /**
    * Which copy of the tree this is. The drawer and the column render the same
    * groups, and while the drawer is open BOTH are in the DOM — the column is
@@ -161,6 +208,7 @@ function NavGroup({
             selected={active === item.tab}
             lang={lang}
             liveOrderCount={liveOrderCount}
+            healthAlert={healthAlert}
             indented={false}
             onSelect={onSelect}
           />
@@ -174,6 +222,11 @@ function NavGroup({
   const collapsedCount = !expanded && items.some((item) => item.tab === 'orders')
     ? liveOrderCount
     : 0;
+  // Same reasoning as the live count: collapsing a group must never hide the
+  // fact that something inside it needs attention.
+  const collapsedHealth = !expanded && items.some((item) => item.tab === 'health')
+    ? healthAlert
+    : null;
 
   return (
     <div className="flex flex-col gap-1">
@@ -206,6 +259,14 @@ function NavGroup({
           {collapsedCount > 0 ? (
             <CountBadge count={collapsedCount} srLabel={COPY[lang].live(collapsedCount)} onEmber={false} />
           ) : null}
+          {collapsedHealth ? (
+            <CountBadge
+              count={collapsedHealth.count}
+              srLabel={healthBadgeCopy(collapsedHealth, lang).srLabel}
+              onEmber={false}
+              tone={healthBadgeCopy(collapsedHealth, lang).tone}
+            />
+          ) : null}
           <ChevronDown
             className={[
               'ds-motion size-4 text-con-text-3 transition-transform duration-150',
@@ -225,6 +286,7 @@ function NavGroup({
               selected={active === item.tab}
               lang={lang}
               liveOrderCount={liveOrderCount}
+              healthAlert={healthAlert}
               indented
               onSelect={onSelect}
             />
@@ -241,6 +303,7 @@ export function AdminSidebar({
   visibility,
   lang,
   liveOrderCount,
+  healthAlert = null,
 }: {
   active: AdminTab;
   onSelect: (tab: AdminTab) => void;
@@ -248,6 +311,12 @@ export function AdminSidebar({
   lang: 'en' | 'ar';
   /** Active-order count; renders as a badge on Live Orders when non-zero. */
   liveOrderCount: number;
+  /**
+   * Platform health bad enough to badge. Null when healthy/idle, when the
+   * health tab is hidden, or before the probe resolves — the sidebar never
+   * guesses, it just shows nothing until it knows.
+   */
+  healthAlert?: HealthAlert;
 }) {
   const copy = COPY[lang];
   const groups = resolveNavGroups(visibility);
@@ -322,6 +391,7 @@ export function AdminSidebar({
           expanded={expanded.has(group.id)}
           lang={lang}
           liveOrderCount={liveOrderCount}
+          healthAlert={healthAlert}
           surface={surface}
           onToggle={toggleGroup}
           onSelect={select}
