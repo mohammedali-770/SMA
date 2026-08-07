@@ -65,8 +65,20 @@ vitest.config.ts        Root unit-test config (includes framework-free
 
 The default branch **is** production. Everything below is deployed and active:
 
-- **Ordering + checkout + Tap payments.** Customers order and pay today, but
-  **all payment/refund WORK is postponed** — see §5 and
+- **Ordering + checkout + Tap payments** are deployed and functional, but
+  **"customers order and pay today" was not true and has been removed.**
+  Measured against Production on 2026-08-07: 24 orders, **2 distinct
+  customers**, 5 profiles, 6 checkout sessions, and **every single order still
+  `payment_status = 'pending'`**. Not one order has ever been paid, and not one
+  has ever reached `delivered` — the 24 are 21 `received` and 3 `cancelled`.
+  Newest order 2026-08-01; newest OTP challenge 2026-07-21.
+
+  This is **pre-launch test traffic, not trade.** The distinction matters for
+  every priority below: the risk today is not losing a book of business, it is
+  that **the order lifecycle has never once completed in production**. See
+  "Production reality check" below.
+
+  All payment/refund WORK remains postponed — §5 and
   `docs/PAYMENT_POSTPONEMENT.md`.
 - **Lazywait POS integration**: `lazywait-sync` worker with deadline-bounded
   retries, `confirmation_required` lifecycle state, reaper, and an admin
@@ -115,6 +127,43 @@ The default branch **is** production. Everything below is deployed and active:
 - **Push notifications are DORMANT.** The `push`/`expo` integration row is
   `enabled = false` (set 2026-07-29 with owner approval), with zero credentials
   and zero registered devices. Do not enable it.
+
+### Production reality check (measured 2026-08-07)
+
+Every readiness discussion in this repository has implicitly assumed a running
+business. The data does not support that, and saying so changes what matters.
+
+| Measure | Value |
+| --- | --- |
+| Orders, all time | **24** (21 `received`, 3 `cancelled`) |
+| Orders ever `delivered` | **0** |
+| Orders ever `payment_status = 'paid'` | **0** — all 24 are `pending` |
+| Distinct customers who have ordered | **2** |
+| Profiles | 5 |
+| Checkout sessions | 6 |
+| OTP challenges in the last 7 days | **0** (newest 2026-07-21) |
+| Order spread | 8 days between 2026-07-08 and 2026-08-01 |
+
+**What this does and does not mean.** It does *not* mean something broke: there
+was never a flow to stop, so a quiet period is not a regression. Earlier notes
+in this repository read "no orders since 2026-08-01" as an operational signal;
+that reading was wrong, and it was wrong because it looked at the newest
+timestamp without looking at the denominator.
+
+What it *does* mean is sharper: **the happy path has never completed once in
+production.** No order has been paid, and none has moved past `received`. Every
+subsystem is deployed, but the thing they exist to produce end-to-end has not
+been observed. That is the largest unproven assumption on the readiness plan,
+and no amount of CI or backup configuration substitutes for it.
+
+It also re-orders urgency honestly. Point-in-time recovery (`docs/OWNER_ACTIONS.md`
+§2.1) is still the right pre-launch priority, but the data at risk *today* is 2
+test customers — so it is a launch blocker, not a live emergency. The items that
+actually gate reaching customers are the store-submission ones: legal documents
+(§4.2), a reviewer login (§4.3) and a publicly reachable privacy policy.
+
+One data oddity worth a look, not urgent: one order carries
+`payment_method = NULL` while the other 23 are `cash` (20) or `online` (3).
 
 ### Active scheduled jobs (pg_cron)
 

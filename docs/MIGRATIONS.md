@@ -2193,13 +2193,27 @@ volume that does not exist yet. §25's closing note applies unchanged.
 > Two things surfaced while checking this, neither part of this migration and
 > both worth someone's attention:
 >
-> * **The newest order is 2026-08-01** — six days before this apply. Combined
->   with 21 of 24 orders still sitting in `received`, that is an operational
->   signal this ledger is not the right place to chase, but it should not go
->   unrecorded.
-> * **`open_branches` counts `branches.is_active`**, which is a configuration
->   flag rather than a trading-hours state. The card's "no branch open → idle"
->   arm therefore does not actually suppress it outside opening hours; only the
->   baseline gate does. That is a real difference between what the card's comment
->   claims and what it does, and it deserves its own look once the baseline is
->   warm enough for the arm to matter.
+> * **~~The newest order is 2026-08-01, an operational signal~~ — that reading
+>   was WRONG, corrected 2026-08-07.** It looked at the newest timestamp without
+>   the denominator. The full picture: 24 orders all time, **2 distinct
+>   customers**, 5 profiles, 6 checkout sessions, **every order still
+>   `payment_status = 'pending'`** and **none ever `delivered`**. There was never
+>   an order flow to stop, so the quiet period is not a regression — this is
+>   pre-launch test traffic. The real finding is the stronger one: **the order
+>   lifecycle has never completed once in production.** See `PROJECT_STATUS.md`
+>   → "Production reality check".
+> * **`open_branches` counts `branches.is_active`**, a configuration flag rather
+>   than a trading-hours state. Checked against the live schema on 2026-08-07:
+>   `public.branches` has `is_active`, `delivery_enabled`, `pickup_enabled` and
+>   `delivery_temporarily_closed` — and **no opening-hours data of any kind**.
+>   So the card cannot know trading hours, and its "no branch open → idle" arm
+>   fires only if every branch is deactivated, which is a config action rather
+>   than a nightly event.
+>
+>   The card is nonetheless **not** wrong to be quiet at night: the protection
+>   comes from the `baseline < 1` arm, because a 04:00 window is compared against
+>   04:00 windows from previous weeks, which are equally empty. The behaviour is
+>   right; the *explanation attached to it* names the wrong arm. Correcting the
+>   in-body comment would mean re-emitting a 1000-line function, which is not
+>   worth it for a comment — recorded here instead, and in the card's test suite,
+>   which is where someone reasoning about the arms will look.

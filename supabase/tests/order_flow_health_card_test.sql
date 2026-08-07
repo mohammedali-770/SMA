@@ -204,8 +204,19 @@ begin
 end $$;
 
 -- ---- CASE 6: nothing open -> idle, however bad the numbers look ------------
--- Zero orders while every branch is closed is the CORRECT reading. This is the
--- arm that stops the card firing every night after closing time.
+-- Zero orders while every branch is closed is the CORRECT reading.
+--
+-- CORRECTION (2026-08-07): this comment used to claim this is "the arm that
+-- stops the card firing every night after closing time". It is not, and the
+-- distinction matters if you are reasoning about false alarms.
+-- `open_branches` counts `branches.is_active`, a configuration flag — the schema
+-- carries NO opening-hours data at all — so this arm fires only when every
+-- branch is deactivated, which is an admin action, not a nightly event.
+--
+-- What actually keeps the card quiet overnight is the `baseline < 1` arm: a
+-- 04:00 window is compared against 04:00 windows from previous weeks, which are
+-- equally empty, so there is no shortfall to report. This case still pins real
+-- and useful behaviour; it just is not the night-time guard.
 do $$
 declare v_state text; v_card jsonb;
 begin
