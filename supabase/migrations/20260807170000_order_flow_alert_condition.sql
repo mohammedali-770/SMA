@@ -16,10 +16,16 @@
 -- its being off never made this omission harmless.
 --
 -- WHAT THIS ADDS
--- One `elsif v_id = 'order_flow'` arm, and nothing else. The function body is
--- the 20260723140000 body VERBATIM plus that arm: produced by programmatic
--- insertion and diffed against the original, which reported a PURE INSERTION —
--- 36 lines added, ZERO removed, one hunk. No pre-existing line changed.
+-- Two functions are re-emitted, each the original body VERBATIM plus inserted
+-- lines. Both were produced by programmatic insertion and diffed against the
+-- original, and BOTH diffs reported a PURE INSERTION — no pre-existing line
+-- changed in either, so no other subsystem's behaviour can have shifted.
+--
+--   1. `operations_alerts_derive` — one `elsif v_id = 'order_flow'` arm.
+--      36 lines added, ZERO removed, one hunk.
+--   2. `operations_alerts_render_event` — the subsystem's human name in both
+--      language arms. 2 lines added, ZERO removed. Without this the first real
+--      incident persists an Arabic outbox row reading `order_flow`.
 --
 --   state         -> condition_code          severity
 --   failing       -> flow_stopped            critical
@@ -47,8 +53,9 @@
 -- the inbox filter and the mute override agree. Hence `order_flow:health`.
 --
 -- SAFETY
--- - Additive: one branch in one function. No table, column, policy or grant is
---   altered, and no other subsystem's conditions change.
+-- - Additive: one branch in one function, plus one label per language arm in
+--   another. No table, column, policy or grant is altered, and no other
+--   subsystem's conditions or rendered text change.
 -- - Evidence is counts and flags only, passed through
 --   `operations_alerts_sanitize_evidence`, which keeps scalars and drops objects,
 --   arrays and nulls. No order id, customer or branch identity is carried.
@@ -383,10 +390,115 @@ comment on function public.operations_alerts_derive(jsonb, jsonb) is
   'Deterministic mapping from the authoritative Operations Health snapshot to alertable conditions. Fingerprints are stable condition identities (classification changes escalate/downgrade the same alert instead of churning open/recover); never recomputes health; machine codes and safe aggregates only. Per-job alert severity follows the job''s critical flag (critical application crons -> critical; optional automation crons -> warning). Since 20260807 an order_flow arm emits order_flow:health — failing as critical (flow_stopped), degraded and unavailable as warning — while idle and healthy emit nothing, so the card''s fail-quiet warm-up never raises an alert.';
 
 -- ---------------------------------------------------------------------------
+-- 2. The bilingual event renderer must know the subsystem too
+-- ---------------------------------------------------------------------------
+-- `operations_alerts_evaluate` calls `operations_alerts_outbox_for_event` on
+-- every open / escalate / downgrade / reminder / recover, UNCONDITIONALLY, and
+-- that enqueues a rendered AR and EN row into `public.operations_alert_outbox`.
+-- The renderer maps the subsystem id to a human name with a `case`, falling back
+-- to the raw id.
+--
+-- Without an `order_flow` arm the first real order-flow incident would persist
+-- an Arabic outbox row reading `[حرج] order_flow — تنبيه جديد`: a bare English
+-- identifier dropped into Arabic text, in an Arabic-first product. The English
+-- row would be only slightly better. Adding the card to the frontend label map
+-- does not help here — this rendering happens in the database, before any client
+-- sees it.
+--
+-- Same treatment as section 1: the body is the 20260723090000 body VERBATIM plus
+-- two inserted lines, one per language arm. Diffed against the original and
+-- again a PURE INSERTION — 2 added, 0 removed. Labels match
+-- `src/components/admin/view/alerts/alertsView.ts` exactly, so the inbox and the
+-- outbox call the subsystem the same thing in both languages.
+create or replace function public.operations_alerts_render_event(
+  p_event_type text,
+  p_language text,
+  p_subsystem text,
+  p_condition_code text,
+  p_severity text
+)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public
+as $$
+declare
+  v_sys text;
+  v_event text;
+  v_sev text;
+begin
+  if p_language = 'ar' then
+    v_sys := case p_subsystem
+      when 'platform' then 'المنصة'
+      when 'lazywait' then 'مزامنة Lazywait'
+      when 'order_integrity' then 'سلامة الطلبات'
+      when 'order_flow' then 'تدفق الطلبات'
+      when 'account_deletion' then 'حذف الحسابات'
+      when 'database_jobs' then 'المهام المجدولة'
+      when 'payment' then 'الدفع / Tap'
+      when 'push' then 'الإشعارات الفورية'
+      when 'email' then 'البريد / SMTP'
+      when 'otp' then 'واتساب / رمز التحقق'
+      else left(coalesce(p_subsystem, '?'), 40) end;
+    v_event := case p_event_type
+      when 'opened' then 'تنبيه جديد'
+      when 'escalated' then 'تصعيد تنبيه'
+      when 'downgraded' then 'خفض درجة تنبيه'
+      when 'reminder' then 'تذكير بتنبيه قائم'
+      when 'recovered' then 'تعافي تنبيه'
+      when 'baseline_observed' then 'حالة قائمة عند خط الأساس'
+      else left(coalesce(p_event_type, '?'), 40) end;
+    v_sev := case p_severity
+      when 'critical' then 'حرج' when 'warning' then 'تحذير' else 'معلومة' end;
+    return jsonb_build_object(
+      'subject', '[' || v_sev || '] ' || v_sys || ' — ' || v_event,
+      'body', v_event || ': ' || v_sys || ' — الحالة ' ||
+              left(coalesce(p_condition_code, '?'), 80) || ' (الخطورة: ' || v_sev || ').');
+  end if;
+
+  v_sys := case p_subsystem
+    when 'platform' then 'Platform'
+    when 'lazywait' then 'Lazywait Sync'
+    when 'order_integrity' then 'Order Integrity'
+    when 'order_flow' then 'Order Flow'
+    when 'account_deletion' then 'Account Deletion'
+    when 'database_jobs' then 'Scheduled Jobs'
+    when 'payment' then 'Payment / Tap'
+    when 'push' then 'Push Notifications'
+    when 'email' then 'Email / SMTP'
+    when 'otp' then 'WhatsApp / OTP'
+    else left(coalesce(p_subsystem, '?'), 40) end;
+  v_event := case p_event_type
+    when 'opened' then 'Alert opened'
+    when 'escalated' then 'Alert escalated'
+    when 'downgraded' then 'Alert downgraded'
+    when 'reminder' then 'Alert reminder'
+    when 'recovered' then 'Alert recovered'
+    when 'baseline_observed' then 'Baseline condition observed'
+    else left(coalesce(p_event_type, '?'), 40) end;
+  v_sev := coalesce(p_severity, 'info');
+  return jsonb_build_object(
+    'subject', '[' || upper(v_sev) || '] ' || v_sys || ' — ' || v_event,
+    'body', v_event || ': ' || v_sys || ' condition ' ||
+            left(coalesce(p_condition_code, '?'), 80) || ' (severity: ' || v_sev || ').');
+end;
+$$;
+
+revoke all on function public.operations_alerts_render_event(text, text, text, text, text)
+  from public, anon, authenticated;
+grant execute on function public.operations_alerts_render_event(text, text, text, text, text)
+  to service_role;
+
+-- ---------------------------------------------------------------------------
 -- Rollback
 -- ---------------------------------------------------------------------------
--- Re-apply the operations_alerts_derive body from
--- 20260723140000_operations_automation_cron_health.sql:881-1160 (a follow-up
--- migration, never an edit of an applied file). Any open order_flow:health
--- alert then stops being re-derived and is recovered by the evaluator's normal
--- resolution pass on its next run; no manual cleanup is required.
+-- Re-apply BOTH original bodies as a follow-up migration (never an edit of an
+-- applied file):
+--   * operations_alerts_derive from
+--     20260723140000_operations_automation_cron_health.sql:881-1160
+--   * operations_alerts_render_event from
+--     20260723090000_smart_operations_alerts_digest.sql:1413-1483
+-- Any open order_flow:health alert then stops being re-derived and is recovered
+-- by the evaluator's normal resolution pass on its next run; no manual cleanup
+-- is required. Outbox rows already rendered keep whatever text they were written
+-- with, which is correct — they are a historical record of what was sent.

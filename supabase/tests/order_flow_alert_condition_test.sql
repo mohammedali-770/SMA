@@ -302,6 +302,90 @@ begin
   raise notice 'CASE 10 ok: neighbouring branches still derive (%)', v_fps;
 end $$;
 
+-- ---- CASE 11: the subsystem has a HUMAN NAME in both languages -------------
+-- `operations_alerts_evaluate` calls `operations_alerts_outbox_for_event` on
+-- every open / escalate / downgrade / reminder / recover, unconditionally, and
+-- that enqueues a rendered AR and EN row. The renderer maps the subsystem id to
+-- a name with a `case` that falls back to the RAW ID.
+--
+-- Without an order_flow arm the first real incident persists an Arabic row
+-- reading `[حرج] order_flow — تنبيه جديد` — a bare English identifier dropped
+-- into Arabic text, in an Arabic-first product. Adding the label to the
+-- frontend map does not help: this rendering happens in the database, before
+-- any client sees it. Missed on the first pass here and caught in review.
+do $$
+declare
+  v_ar jsonb;
+  v_en jsonb;
+begin
+  v_ar := public.operations_alerts_render_event('opened', 'ar', 'order_flow', 'flow_stopped', 'critical');
+  v_en := public.operations_alerts_render_event('opened', 'en', 'order_flow', 'flow_stopped', 'critical');
+
+  if (v_ar ->> 'subject') not like '%تدفق الطلبات%' then
+    raise exception 'FAIL(11): the Arabic subject does not name the subsystem: %', v_ar ->> 'subject';
+  end if;
+  if (v_ar ->> 'body') not like '%تدفق الطلبات%' then
+    raise exception 'FAIL(11): the Arabic body does not name the subsystem: %', v_ar ->> 'body';
+  end if;
+  -- The raw id must not survive into either Arabic field.
+  if (v_ar ->> 'subject') like '%order_flow%' or (v_ar ->> 'body') like '%order_flow%' then
+    raise exception 'FAIL(11): the raw id leaked into Arabic text: % / %',
+      v_ar ->> 'subject', v_ar ->> 'body';
+  end if;
+
+  if (v_en ->> 'subject') not like '%Order Flow%' then
+    raise exception 'FAIL(11): the English subject does not name the subsystem: %', v_en ->> 'subject';
+  end if;
+  if (v_en ->> 'subject') like '%order_flow%' then
+    raise exception 'FAIL(11): the raw id leaked into English text: %', v_en ->> 'subject';
+  end if;
+
+  -- A subsystem the renderer genuinely does not know must still fall back
+  -- rather than vanish — that behaviour is deliberate and must not regress.
+  if public.operations_alerts_render_event('opened', 'en', 'brand_new_thing', 'x', 'warning') ->> 'subject'
+     not like '%brand_new_thing%' then
+    raise exception 'FAIL(11): the unknown-subsystem fallback was lost';
+  end if;
+  raise notice 'CASE 11 ok: order_flow renders as تدفق الطلبات / Order Flow, fallback intact';
+end $$;
+
+-- ---- CASE 12: end to end through the outbox --------------------------------
+-- Case 11 tests the renderer directly. This one drives the path the evaluator
+-- actually uses, so a change to how the outbox calls the renderer cannot slip
+-- past.
+do $$
+declare
+  v_event_id uuid;
+  v_alert_id uuid;
+  v_n integer;
+  v_bad integer;
+begin
+  insert into public.operations_alert_state
+    (fingerprint, subsystem, condition_code, severity, status, generation, baseline, safe_evidence)
+  values ('order_flow:health', 'order_flow', 'flow_stopped', 'critical', 'open', 1, false, '{}'::jsonb)
+  returning id into v_alert_id;
+
+  insert into public.operations_alert_events
+    (alert_id, fingerprint, event_type, severity, notification_suppressed, safe_evidence)
+  values (v_alert_id, 'order_flow:health', 'opened', 'critical', false, '{}'::jsonb)
+  returning id into v_event_id;
+
+  v_n := public.operations_alerts_outbox_for_event(
+           v_event_id, 'opened', 'order_flow', 'flow_stopped', 'critical');
+  if v_n < 1 then
+    raise exception 'FAIL(12): the outbox enqueued nothing (%)', v_n;
+  end if;
+
+  select count(*) into v_bad
+    from public.operations_alert_outbox
+   where event_id = v_event_id
+     and (subject_safe like '%order_flow%' or body_safe like '%order_flow%');
+  if v_bad > 0 then
+    raise exception 'FAIL(12): % outbox row(s) carry the raw id instead of a label', v_bad;
+  end if;
+  raise notice 'CASE 12 ok: % outbox row(s), none carrying the raw id', v_n;
+end $$;
+
 do $$ begin
   raise notice 'order_flow_alert_condition_test: ALL CASES PASSED';
 end $$;

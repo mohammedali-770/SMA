@@ -242,7 +242,7 @@ fields byte-identical before/after, fingerprint-verified).
 
 ## 4. Classification summary
 
-**Recomputed from live data on 2026-08-07 and now covering ALL 67 repository
+**Recomputed from live data on 2026-08-07 and now covering ALL 68 repository
 files and ALL 69 live rows** — previous revisions of this table were scoped to a
 56-file subset and, separately, undercounted two classes. Method: match by
 `name`, then compare the repository filename version against the live `version`,
@@ -2005,27 +2005,52 @@ arm sits inside the generic per-card guard at the top of the loop.
 > filter and the mute override agree. Hence `order_flow:health`. The shorthand
 > was never a requirement, only my own loose phrasing carried forward.
 
-### How the body was produced
+### It also teaches the bilingual renderer the subsystem's name
 
-The function is 280 lines and had to be re-emitted whole. It was **not**
-hand-transcribed — that is exactly the failure mode §24 recorded and §25 was
-written to avoid. The body was extracted programmatically from
-`20260723140000_operations_automation_cron_health.sql:881-1160`, the arm inserted
-at a single anchor, and the result diffed against the original:
+Raised by automated review on PR #172, and a real defect in the first draft.
+
+`operations_alerts_evaluate` calls `operations_alerts_outbox_for_event` on every
+open / escalate / downgrade / reminder / recover — **unconditionally** — and that
+enqueues a rendered AR and EN row into `public.operations_alert_outbox`.
+`operations_alerts_render_event` maps the subsystem id to a human name with a
+`case` that falls back to the raw id.
+
+With no `order_flow` arm, the first real incident would have persisted an Arabic
+row reading:
 
 ```
-0 lines removed · 36 lines added · one hunk (158a159,194)
+[حرج] order_flow — تنبيه جديد
 ```
 
-A **pure insertion**. No pre-existing line changed, so no other subsystem's
-conditions could have shifted.
+A bare English identifier dropped into Arabic text, in an Arabic-first product.
+Adding the label to `alertsView.ts` does not help — this rendering happens in the
+database, before any client sees it. The migration now re-emits
+`operations_alerts_render_event` with one line added per language arm, and the
+labels match the frontend map exactly so the inbox and the outbox call the
+subsystem the same thing.
+
+### How both bodies were produced
+
+Between them the two functions are ~350 lines and had to be re-emitted whole.
+Neither was **hand-transcribed** — that is exactly the failure mode §24 recorded
+and §25 was written to avoid. Each body was extracted programmatically, the
+addition inserted at a fixed anchor, and the result diffed against the original:
+
+| Function | Source | Diff |
+| --- | --- | --- |
+| `operations_alerts_derive` | `20260723140000:881-1160` | 0 removed · **36 added** · one hunk |
+| `operations_alerts_render_event` | `20260723090000:1413-1483` | 0 removed · **2 added** · one per language |
+
+**Both are pure insertions.** No pre-existing line changed in either, so no other
+subsystem's conditions or rendered text could have shifted.
 
 ### Verification
 
-Nine of the ten new cases in `supabase/tests/order_flow_alert_condition_test.sql`
+Ten of the twelve cases in `supabase/tests/order_flow_alert_condition_test.sql`
 were executed locally against a scratch PostgreSQL 16 database carrying the real
-`operations_alerts_sanitize_evidence` / `safe_int` / `safe_bool` helpers; case 9
-needs the full schema and runs in CI.
+`operations_alerts_sanitize_evidence` / `safe_int` / `safe_bool` helpers. Case 9
+(derive over the real snapshot) and case 12 (end-to-end through
+`operations_alert_outbox`) need the full schema and run in CI.
 
 **Every case was mutation-tested**, because a suite that cannot fail proves
 nothing:
@@ -2038,6 +2063,8 @@ nothing:
 | a `customer_id` leaked into evidence | fails `FAIL(8)` |
 | per-state fingerprints | fails `FAIL(3)` |
 | **`degraded` alone given its own fingerprint** | fails `FAIL(6)` |
+| the Arabic `order_flow` label removed | fails `FAIL(11)` with `[حرج] order_flow` |
+| the English `order_flow` label removed | fails `FAIL(11)` with `[CRITICAL] order_flow` |
 
 The last row exists because the blunt per-state mutation tripped case 3 first,
 which left case 6 — the escalation-identity property, the whole reason for a
