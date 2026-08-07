@@ -37,19 +37,23 @@ were applied on 2026-08-05, the same way.
   (`admin_ranged_orders_and_stats`; repository version `20260806130000`)
 
 The 66 / 68 difference is the long-standing **history** divergence, not a
-*schema* divergence: **four** live-only F-class history rows carry no repository
-file, and two H-class repository files (`place_order`, `loyalty`) were superseded
-by later consolidated migrations. 66 files − 2 H-class + 4 F-class = 68 rows. The
-full class-by-class algebra is in §4 and the row-by-row mapping in §5.
+*schema* divergence: **five** live-only F-class rows carry no repository file,
+and **three** H-class repository files (`place_order`, `loyalty`,
+`order_idempotency`) were superseded by later consolidated migrations.
+`66 files − 3 H-class + 5 F-class = 68 rows`. §4 carries the full
+class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
+both sides exactly; §5 maps a subset of the rows.
 
-> **The fourth F-class row was discovered during the 2026-08-07 pre-live gate and
-> had never been recorded here:** version `20260806045142`, name `noop`, whose
+> **One of those five F-class rows was discovered during the 2026-08-07 pre-live
+> gate and had never been recorded here:** version `20260806045142`, name `noop`, whose
 > entire content is `select 1;`. It is a connectivity probe, not a schema change
 > — it creates, alters and drops nothing, and the schema is identical with or
 > without it. It is documented rather than removed, because deleting a live
 > history row is a destructive write needing its own approval and would buy
 > nothing. Its presence is why the live count read 66 rather than the 65 this
-> ledger previously asserted.
+> ledger previously asserted. Recomputing §4 while chasing it also turned up two
+> further miscounts this document had carried for a long time — H was 2 and is
+> 3, F was 3 and is 5. Both are recorded in §4.
 
 > **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
 > `apply_migration` stamped apply-time versions that differ from the repository
@@ -232,15 +236,52 @@ fields byte-identical before/after, fingerprint-verified).
 
 ## 4. Classification summary
 
+**Recomputed from live data on 2026-08-07 and now covering ALL 66 repository
+files and ALL 68 live rows** — previous revisions of this table were scoped to a
+56-file subset and, separately, undercounted two classes. Method: match by
+`name`, then compare the repository filename version against the live `version`,
+and the repository file's `skel` fingerprint against the live row's.
+
 | primary classification | count |
 |---|---|
-| A. `EXACT_MATCH` (version + name + content) | **3** |
-| B. `SAME_CONTENT_DIFFERENT_VERSION` | **50** (48 + the two applied 2026-08-07, §24) |
+| A. `EXACT_MATCH` (version + name + content) | **8** |
+| B. `SAME_CONTENT_DIFFERENT_VERSION` | **52** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
 | E. `REPOSITORY_ONLY_UNAPPLIED` | **0** |
-| F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **4** (the third-party `noop` probe included, §1) |
-| H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
+| F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **5** |
+| H. `SUPERSEDED` (repository side) | **3** |
+
+**Both sides reconcile exactly, with no residue:**
+
+```
+repository:  A 8 + B 52 + C 3 + H 3 = 66 files
+live      :  A 8 + B 52 + C 3 + F 5 = 68 rows
+```
+
+**Two corrections to numbers this ledger had carried for a long time**, both
+found by recomputing rather than by re-reading:
+
+- **H was 2, is 3.** The repository-only files are `place_order`, `loyalty` and
+  — previously unlisted — `order_idempotency`. All three were superseded by
+  consolidations applied live.
+- **F was 3, is 5.** The live-only rows are
+  `order_idempotency_and_place_order` (the consolidation of two of the H files),
+  `checkout_sessions_fix_payment_status_cast`, `checkout_sessions_zero_total`,
+  `harden_trigger_functions`, and `noop` (§1).
+
+**A is 8, not 3.** The five account-deletion migrations
+(`account_deletion`, `account_deletion_lock`, and the three
+`account_deletion_scheduler_*`) were applied from their repository filenames, so
+their live versions equal their repository versions — verified against
+`schema_migrations` on 2026-08-07. Earlier revisions listed them as "applied and
+live but not yet itemized"; they are itemized now. The other three are
+`support_contact`, `push_notifications` and
+`trigger_function_execute_hardening`.
+
+**C is unchanged at 3** — `checkout_sessions`, `homepage_banners`,
+`loyalty_audit` — the same three names the original audit identified,
+independently reconfirmed by fingerprint.
 
 Classifications can overlap semantically in the detailed mapping (e.g. a
 live-only row whose content was later consolidated into a repository file is
@@ -248,16 +289,14 @@ both "live-only" and "superseded-by-consolidation"); **each ledger entry below
 carries exactly one primary classification**, with overlaps explained in its
 notes.
 
-> **Scope of these counts.** The table above itemizes the **56 repository / 57
-> live** rows detailed in §5 (rows 1–56, through
-> `20260729091000_caller_can_read_order_anon_revoke`). Its per-class algebra is
-> internally consistent: repository side 3 A + 48 B + 3 C + 2 H = **56 files**;
-> live side 3 A + 48 B + 3 C + 3 F = **57 rows** (F is live-only, and the 2 H
-> repository files are superseded consolidations of live-only history). The
-> **five account-deletion migrations** now live in Production (§1) are applied
-> and live but **not yet itemized** here; adding them to both sides brings the
-> true totals to the **61 repository / 62 live** authoritative production totals
-> carried at the top of §1.
+> **Superseded scope note.** Revisions of this document before 2026-08-07
+> carried a note here restricting the table to the 56 repository / 57 live rows
+> itemized in §5 (rows 1–56), with the five account-deletion migrations
+> described as "applied and live but not yet itemized". That scoping is gone:
+> the table above covers every file and every row, and §5's row-by-row mapping
+> is now a *subset* of it rather than its definition. §5 has not been re-derived
+> and its own 61/62 totals remain as written — treat §4 as authoritative for
+> counts and §5 as the detailed mapping of the rows it covers.
 >
 > **Class E is empty again as of 2026-08-07.** It briefly held the two rows added
 > 2026-08-06 — `20260806120000_erasure_phone_normalization` (§22) and
@@ -348,14 +387,19 @@ production.
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
 | 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). **Current latest live version** |
 
-Reconciliation check: the rows above detail **56 repository** rows
-(3×A + 48×B + 3×C + 2×H) and **57 live** rows (3×A + 48×B + 3×C + 3×F).
-Adding the five applied-but-not-yet-itemized account-deletion migrations
-(§1, §4 note) — present on both sides — yields the current production totals of
-**61 repository / 62 live** recorded in §1 (56 + 5 repository; 57 + 5 live).
-**There is no repository-only/UNAPPLIED file**; the pre-existing live-only
-F-class history rows carry no repository file. This is a history divergence,
-not new drift.
+Reconciliation check: the rows above detail **56 repository / 57 live** rows.
+That is a **subset**, not the whole picture — it predates the five
+account-deletion migrations, the three applied 2026-08-05, the two applied
+2026-08-07, and the `noop` probe.
+
+**§4 is authoritative for totals** and reconciles the full set exactly:
+`A 8 + B 52 + C 3 + H 3 = 66` repository files, `A 8 + B 52 + C 3 + F 5 = 68`
+live rows. The per-row table above has deliberately **not** been re-derived —
+doing so is a mechanical expansion with no new information, and the counts it
+would produce are already stated in §4.
+
+**There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
+F-class rows carry no repository file. This is a history divergence, not drift.
 
 ## 6. Why `db push` is unsafe
 
@@ -365,13 +409,19 @@ the three aligned July-14 migrations (`20260714070000`, `20260714090000`,
 `20260715130000`, `20260716160000`, `20260716170000`, `20260716180000`), whose
 repository filenames were applied under matching version stamps. The Supabase
 CLI compares by **version**, so it would still consider the remaining
-**53 repository files** (61 − 8) unapplied and attempt to replay them against
+**58 repository files** (66 − 8) unapplied and attempt to replay them against
 production — even though **every one of them is in fact already applied**.
 Eight shared versions do **not** make `db push` any safer; the permanent
-production prohibition stands, because 53 repository versions still do not
+production prohibition stands, because 58 repository versions still do not
 match live history, content boundaries differ for consolidated/split
 migrations, and replaying historical migrations against a live database remains
-unsafe regardless. Risks:
+unsafe regardless.
+
+> The count grows with every migration applied through `apply_migration`, since
+> each one stamps a fresh apply-time version. It was 53 against 61 files; it is
+> 58 against 66. `db push` gets *more* dangerous over time, not less.
+
+Risks:
 
 - **historical replay** of the entire schema against a live database;
 - **seed/data re-execution** (integration seeds, settings rows);
@@ -1512,9 +1562,37 @@ their only caller.
 ## 24. The 2026-08-07 application (§22 + §23)
 
 Both remaining class-E migrations were applied to Production on **2026-08-07**
-with explicit owner approval ("apply both migrations"), following §9 exactly:
-pre-live gate, one `apply_migration` call per file in filename order, then
-verification. No `db push`, no batch replay, no unrelated SQL.
+with explicit owner approval ("apply both migrations"), following §9: pre-live
+gate (§9-B), one `apply_migration` call per file in filename order, then
+verification (§9-E). No `db push`, no batch replay, no unrelated SQL.
+
+> ### ⚠️ Deviation from §9-C1 — recorded, not approved in advance
+>
+> **§9-C1 requires applying "exactly the reviewed migration content — nothing
+> added, nothing removed." That was met for §22 and NOT met for §23.**
+>
+> The §23 `apply_migration` call replaced roughly 60 lines of reviewed header
+> comment with a condensed header pointing at the repository file and at §23.
+> The executable SQL is identical — see the fingerprint note below — but a
+> matching `skel` fingerprint demonstrates *semantic* equivalence, which is a
+> weaker claim than §9-C1 makes. **This section must not be read as full §9
+> compliance.**
+>
+> **Provenance:** the condensation was the applying agent's own editorial choice
+> while composing the call. It was **not** requested by the owner, **not**
+> raised as an exception beforehand, and **not** separately approved. The owner
+> approved *applying the two migrations*, not altering their text.
+>
+> **Consequence:** the live `schema_migrations` row for
+> `admin_ranged_orders_and_stats` no longer carries the rationale the repository
+> file carries. Anyone auditing from the database alone gets the SQL without the
+> "why". The repository file remains the complete record, and §23 above restates
+> the reasoning in full, so nothing is lost — but it is lost *from the live
+> row*, and that is the deviation.
+>
+> **Rule for next time:** paste the migration file verbatim. If it is too long
+> for one call, that is a reason to split the migration, not to edit its text on
+> the way in. Raised by automated review on PR #168.
 
 | Repository file | Live version | skel (repo = live) | Class |
 | --- | --- | --- | --- |
@@ -1524,14 +1602,12 @@ verification. No `db push`, no batch replay, no unrelated SQL.
 Repository files were confirmed byte-identical to the merged default branch
 (`29cfb3a`) by SHA-256 before applying.
 
-> **A note on §23's applied text.** The reviewed repository file opens with a
-> ~60-line rationale comment; the applied statement carries a condensed header
-> pointing at the file and at §23 instead. The **executable SQL is identical** —
-> proven by the `skel` fingerprint, which strips comments, whitespace and
-> semicolons before hashing: repo `a92bb07e58c7` = live `a92bb07e58c7`. This is
-> recorded rather than glossed, because "applied exactly the reviewed content"
-> (§9-C1) is a claim the ledger should be able to substantiate, and here the raw
-> byte comparison alone would not have.
+> **What the fingerprint does and does not prove.** `skel` strips `--` comments,
+> whitespace and semicolons before hashing, so repo `a92bb07e58c7` = live
+> `a92bb07e58c7` proves the **executable SQL is identical** — no statement was
+> added, removed or altered. It says nothing about the comment text, which is
+> exactly where §23 deviates. The fingerprint is therefore evidence that the
+> deviation is *harmless to the schema*, not evidence that §9-C1 was satisfied.
 
 ### Pre-live gate (§9-B), recorded before applying
 

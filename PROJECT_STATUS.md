@@ -121,9 +121,11 @@ Two migrations were applied on **2026-08-07** with explicit owner approval —
 `admin_ranged_orders_and_stats` (live `20260807140206`). Full pre-live gate and
 verification in `docs/MIGRATIONS.md` §24.
 
-The 68 / 66 gap is history, not schema: four live-only rows carry no repository
-file (one of them a `select 1;` connectivity probe recorded in §1) and two
-repository files were superseded by consolidated migrations.
+The 68 / 66 gap is history, not schema: **five** live-only rows carry no
+repository file (one of them a `select 1;` connectivity probe) and **three**
+repository files were superseded by consolidated migrations. Full classification,
+recomputed from live data on 2026-08-07 and reconciling both sides exactly, in
+`docs/MIGRATIONS.md` §4.
 
 Three migrations were applied on **2026-08-05** with explicit owner approval,
 through the MCP `apply_migration` workflow — one call per file, in filename
