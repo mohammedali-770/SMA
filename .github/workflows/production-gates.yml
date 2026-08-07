@@ -205,6 +205,12 @@ jobs:
   # take a green CI run on this file as evidence that the deploy path works.
   deploy:
     name: Deploy to Vercel (gated on CI)
+    # `needs:` only reaches jobs in THIS workflow. design-system and the SQL
+    # suites live in their own workflows, so needs: alone would deploy with the
+    # unit tests, the typecheck or the migration chain red — while calling
+    # itself "gated on CI". The cross-workflow half is enforced by the
+    # wait-for-every-gate step below. Both halves are required; neither alone is
+    # sufficient.
     needs: [build, edge-functions, audit]
     if: >-
       github.event_name == 'push' &&
@@ -212,6 +218,9 @@ jobs:
       vars.DEPLOY_GATE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      checks: read
     steps:
       - name: Refuse to run half-configured
         env:
@@ -230,6 +239,71 @@ jobs:
             exit 1
           fi
           echo "all three credentials present"
+
+      # THE CROSS-WORKFLOW GATE. Without this the job's name is a lie: `needs:`
+      # cannot see design-system or the SQL suites, so a red unit-test run or a
+      # broken migration chain would deploy anyway.
+      #
+      # Fails closed in every direction — a missing context, a failed one, a
+      # timeout, or an API error all stop the deploy. The only way through is
+      # every named context reporting success on THIS commit.
+      - name: Wait for every production gate on this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # `Migration chain + SQL suites` is deliberately ABSENT: it is
+          # path-gated and legitimately skipped on a docs-only commit, which is
+          # exactly why `SQL suites gate` exists to report on its behalf.
+          required() {
+            printf '%s\n' \
+              'design-system' \
+              'Production build (Vite + Expo web export)' \
+              'Edge Function typecheck (Deno)' \
+              'Dependency audit (high+)' \
+              'SQL suites gate'
+          }
+
+          deadline=$(( SECONDS + 1500 ))
+          while : ; do
+            if ! body=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+                                 -H "Accept: application/vnd.github+json" \
+                                 "https://api.github.com/repos/$REPO/commits/$SHA/check-runs?per_page=100"); then
+              echo "::error::could not read check runs for $SHA - refusing to deploy"
+              exit 1
+            fi
+
+            npend=0; nfail=0; nmiss=0
+            while IFS= read -r name; do
+              row=$(printf '%s' "$body" | jq -r --arg n "$name" '
+                [ .check_runs[]? | select(.name == $n) ] | sort_by(.started_at) | last
+                | if . == null then "missing|" else (.status + "|" + (.conclusion // "")) end')
+              case "$row" in
+                "missing|")           echo "  never reported: $name"; nmiss=$((nmiss+1)) ;;
+                "completed|success")  ;;
+                "completed|skipped")  echo "  FAILED (skipped): $name"; nfail=$((nfail+1)) ;;
+                completed*)           echo "  FAILED: $name -> ${row#*|}"; nfail=$((nfail+1)) ;;
+                *)                    echo "  still running: $name"; npend=$((npend+1)) ;;
+              esac
+            done < <(required)
+
+            if [ "$nfail" -gt 0 ]; then
+              echo "::error::$nfail gate(s) did not pass on $SHA - refusing to deploy"
+              exit 1
+            fi
+            if [ "$npend" -eq 0 ] && [ "$nmiss" -eq 0 ]; then
+              echo "every required gate is green on $SHA"
+              break
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::timed out waiting for gates on $SHA - refusing to deploy"
+              exit 1
+            fi
+            sleep 20
+          done
 
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

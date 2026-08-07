@@ -283,10 +283,25 @@ builds from its own webhook and does not consult them. So both changes are
 needed, and this one is the only thing that stops a red build reaching
 customers.
 
-**The job now exists.** `production-gates.yml` carries a `deploy` job with
-`needs: [build, edge-functions, audit]`, and it is **inert**: it runs only when
-a repository variable `DEPLOY_GATE_ENABLED` is exactly `true`, which is unset.
-Merging it changed nothing about how the site deploys today.
+**The job now exists.** `production-gates.yml` carries a `deploy` job, and it is
+**inert**: it runs only when a repository variable `DEPLOY_GATE_ENABLED` is
+exactly `true`, which is unset. Merging it changed nothing about how the site
+deploys today.
+
+> **It gates on all five checks, not three.** A first version used only
+> `needs: [build, edge-functions, audit]` — which is what this section used to
+> specify — and that was wrong: `needs:` reaches only jobs in the *same*
+> workflow, so `design-system` (the 1705 unit tests and the typecheck) and
+> `SQL suites gate` (the migration chain) are invisible to it. The job would
+> have deployed with those red while calling itself "gated on CI". Caught in
+> review on PR #177.
+>
+> The cross-workflow half is now enforced by a step that polls the Checks API
+> for this exact commit and requires every one of the five contexts in §3.1 to
+> report success. It fails closed on a failure, a skip, a context that never
+> reports, an API error, or a 25-minute timeout. `Migration chain + SQL suites`
+> is deliberately not in that list — it is path-gated and legitimately skipped,
+> which is precisely why `SQL suites gate` reports on its behalf.
 
 > **Correction.** This section previously said "step 2 is written and ready but
 > deliberately not merged". No such patch existed anywhere in the repository —
