@@ -19,6 +19,7 @@ import {
   shouldLoadSection,
   statusLabel,
   statusTone,
+  SUBSYSTEMS,
   subsystemLabel,
   timelineState,
 } from './alertsView';
@@ -91,6 +92,16 @@ describe('labels keep unknown values visible', () => {
     expect(subsystemLabel('payment', 'en')).toBe('Payment / Tap');
     expect(subsystemLabel('payment', 'ar')).toBe('الدفع / Tap');
     expect(subsystemLabel('brand_new_subsystem', 'en')).toBe('brand_new_subsystem');
+  });
+
+  it('names order_flow in both languages and offers it as a filter', () => {
+    // The alert engine emits subsystem 'order_flow' as of migration
+    // 20260807170000. Without these the inbox would show the raw id, and the
+    // filter dropdown would have no way to isolate the one card that watches
+    // the business outcome.
+    expect(subsystemLabel('order_flow', 'en')).toBe('Order Flow');
+    expect(subsystemLabel('order_flow', 'ar')).toBe('تدفق الطلبات');
+    expect(SUBSYSTEMS).toContain('order_flow');
   });
 
   it('falls back to the raw event type', () => {

@@ -88,10 +88,13 @@ The default branch **is** production. Everything below is deployed and active:
   `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
   AR/EN digests, alerts inbox in the admin dashboard. **External dispatch is
   disabled by design** — alerts/digests are internal (in-dashboard) only.
-  **Gap:** `operations_alerts_derive` has no `orders:flow` fingerprint, so the
-  `order_flow` health card raises no alert row. It will show `failing` on the
-  health card and the sidebar badge while the alerts inbox stays silent
-  (`docs/MIGRATIONS.md` §25).
+  **Gap, fix written but NOT APPLIED:** `operations_alerts_derive` has no
+  `order_flow` arm, so the `order_flow` health card raises no alert row — it
+  shows `failing` on the health card and the sidebar badge while the alerts
+  inbox stays silent. Migration `20260807170000_order_flow_alert_condition`
+  adds `order_flow:health` (critical on `failing`, warning on
+  `degraded`/`unavailable`, nothing on `idle`), but it is **unapplied**, so the
+  gap is still live in Production (`docs/MIGRATIONS.md` §25, §26).
 - **Order confirmation state machine** — one authoritative customer-visible
   order state, server-counted manual resends, and refund *enrolment*. Refund
   *processing* is not running (§5).
@@ -125,8 +128,10 @@ The default branch **is** production. Everything below is deployed and active:
 
 ### Migration state
 
-**69** live `schema_migrations` rows; **67** repository migration files;
-**zero unapplied**. Latest live version `20260807152347`.
+**69** live `schema_migrations` rows; **68** repository migration files; **one
+unapplied** — `20260807170000_order_flow_alert_condition`, which closes the
+order-flow alert gap and awaits owner approval to apply
+(`docs/MIGRATIONS.md` §26). Latest live version `20260807152347`.
 
 Three migrations were applied on **2026-08-07** with explicit owner approval —
 `erasure_phone_normalization` (live `20260807140050`) and
