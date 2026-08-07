@@ -16,8 +16,9 @@
 --   * and when it DOES fire, it must be because branches are open, history
 --     says orders were expected, and none arrived.
 --
--- The baseline is same-weekday + same-hour over the previous 8 weeks in Riyadh
--- local time, so the fixtures below seed orders at exactly `now() - N weeks`.
+-- The baseline is the SAME rolling window shifted back whole weeks, so the
+-- fixtures seed orders inside `(now - N weeks - 60min, now - N weeks]`. Whole
+-- weeks preserve weekday and time of day for free.
 -- ============================================================================
 \set ON_ERROR_STOP on
 begin;
@@ -68,8 +69,10 @@ begin
   raise notice 'FIXTURE ok: % branches were already open', v_open;
 end $$;
 
--- Seeds N orders at `now() - weeks` offset, at the SAME weekday+hour by
--- construction (whole weeks back), so they land in the baseline window.
+-- Seeds N orders inside the comparable window N weeks back. Offset 30 minutes
+-- into the window rather than sitting exactly on its `now() - N weeks` edge:
+-- an assertion that depends on a boundary being inclusive is one refactor away
+-- from a confusing failure.
 create or replace function pg_temp.seed_week(p_weeks integer, p_count integer)
 returns void language plpgsql as $$
 declare c record; i integer;
@@ -79,7 +82,7 @@ begin
     insert into public.orders (customer_id, branch_id, order_type, status,
                                subtotal, total, payment_method, payment_status, created_at)
     values (c.cust, c.branch_a, 'pickup', 'delivered', 10, 10, 'cash', 'pending',
-            now() - make_interval(weeks => p_weeks));
+            now() - make_interval(weeks => p_weeks) - interval '30 minutes');
   end loop;
 end $$;
 
@@ -139,7 +142,7 @@ end $$;
 do $$
 declare v_state text; v_card jsonb;
 begin
-  -- Three comparable weeks, 5 orders each, at this weekday+hour.
+  -- Three comparable weeks, 5 orders each, inside the same rolling window.
   perform pg_temp.seed_week(1, 5);
   perform pg_temp.seed_week(2, 5);
   perform pg_temp.seed_week(3, 5);

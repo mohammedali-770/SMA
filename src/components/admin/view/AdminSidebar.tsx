@@ -47,11 +47,13 @@ const COPY = {
     nav: 'Console sections', menu: 'Menu', close: 'Close menu', open: 'Open menu',
     live: (n: number) => `${n} live ${n === 1 ? 'order' : 'orders'}`,
     health: (n: number) => `${n} critical operations ${n === 1 ? 'alert' : 'alerts'}`,
+    healthWarn: (n: number) => `${n} operations ${n === 1 ? 'warning' : 'warnings'}`,
   },
   ar: {
     nav: 'أقسام لوحة التحكم', menu: 'القائمة', close: 'إغلاق القائمة', open: 'فتح القائمة',
     live: (n: number) => `${n} طلبات مباشرة`,
     health: (n: number) => `${n} تنبيهات تشغيلية حرجة`,
+    healthWarn: (n: number) => `${n} تحذيرات تشغيلية`,
   },
 } as const;
 
@@ -61,7 +63,21 @@ const COPY = {
  * behind it. `null` means nothing worth a badge — a healthy or idle platform
  * shows no badge at all, because an always-present badge is furniture.
  */
-export type HealthAlert = { state: string; count: number } | null;
+export type HealthAlert = { state: string; severity: 'critical' | 'warning'; count: number } | null;
+
+/**
+ * Label and tone for a health badge, matched to its SEVERITY.
+ *
+ * A `degraded` platform raises WARNING attention items, so calling it "1
+ * critical operations alert" both overstates it and cites a counter that reads
+ * zero. Severity picks the counter upstream; it picks the words and the colour
+ * here.
+ */
+function healthBadgeCopy(alert: NonNullable<HealthAlert>, lang: 'en' | 'ar') {
+  return alert.severity === 'critical'
+    ? { srLabel: COPY[lang].health(alert.count), tone: 'danger' as const }
+    : { srLabel: COPY[lang].healthWarn(alert.count), tone: 'warning' as const };
+}
 
 /**
  * The Live Orders count, as a pill. Rendered on the item and, when its group
@@ -82,20 +98,22 @@ function CountBadge({ count, srLabel, onEmber, tone = 'ember' }: {
    * broken" are not the same message and the operator has to tell them apart at
    * a glance.
    */
-  tone?: 'ember' | 'danger';
+  tone?: 'ember' | 'danger' | 'warning';
 }) {
-  const danger = tone === 'danger';
+  const trouble = tone === 'danger' || tone === 'warning';
   return (
     <span
       className={[
         'inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5',
-        danger ? 'bg-danger-ds' : onEmber ? 'bg-on-ember' : 'bg-ember',
+        tone === 'danger' ? 'bg-danger-ds'
+          : tone === 'warning' ? 'bg-amber-ink'
+          : onEmber ? 'bg-on-ember' : 'bg-ember',
       ].join(' ')}
     >
       <Text
         variant="caption"
         numeric
-        tone={danger ? 'onEmber' : onEmber ? 'ember' : 'onEmber'}
+        tone={trouble ? 'onEmber' : onEmber ? 'ember' : 'onEmber'}
         as="span"
         aria-hidden="true"
       >
@@ -147,9 +165,9 @@ function NavButton({
       {showHealth ? (
         <CountBadge
           count={healthAlert.count}
-          srLabel={COPY[lang].health(healthAlert.count)}
+          srLabel={healthBadgeCopy(healthAlert, lang).srLabel}
           onEmber={selected}
-          tone="danger"
+          tone={healthBadgeCopy(healthAlert, lang).tone}
         />
       ) : null}
     </button>
@@ -244,9 +262,9 @@ function NavGroup({
           {collapsedHealth ? (
             <CountBadge
               count={collapsedHealth.count}
-              srLabel={COPY[lang].health(collapsedHealth.count)}
+              srLabel={healthBadgeCopy(collapsedHealth, lang).srLabel}
               onEmber={false}
-              tone="danger"
+              tone={healthBadgeCopy(collapsedHealth, lang).tone}
             />
           ) : null}
           <ChevronDown

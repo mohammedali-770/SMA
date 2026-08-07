@@ -38,6 +38,14 @@ import { OperationsHealthPanel } from './admin/OperationsHealthPanel';
 import { OperationsAlertsPanel } from './admin/OperationsAlertsPanel';
 
 
+/**
+ * How often the sidebar re-reads platform health.
+ *
+ * Matches `OperationsHealthPanel`'s own poll so the badge and the panel cannot
+ * drift far apart, and named so a silent change to either is a visible diff.
+ */
+const HEALTH_BADGE_REFRESH_MS = 60_000;
+
 export const AdminDashboard: React.FC = () => {
   const {
     orders, currentUser,
@@ -111,14 +119,40 @@ export const AdminDashboard: React.FC = () => {
   const [healthSummary, setHealthSummary] = useState<OperationsHealthSummary | null>(null);
   useEffect(() => {
     let alive = true;
-    operationsHealth.probeAvailability()
-      .then((probe) => {
-        if (!alive) return;
-        setHealthCap(probe.capability);
-        setHealthSummary(probe.summary);
-      })
-      .catch(() => { if (alive) setHealthCap('unknown'); });
-    return () => { alive = false; };
+    const read = () => {
+      operationsHealth.probeAvailability()
+        .then((probe) => {
+          if (!alive) return;
+          setHealthCap(probe.capability);
+          setHealthSummary(probe.summary);
+        })
+        .catch(() => { if (alive) setHealthCap('unknown'); });
+    };
+
+    read();
+    // A ONE-SHOT probe would make this badge useless. An operator opens the
+    // console while everything is fine, the platform degrades an hour later,
+    // and the badge never appears — the state was captured at mount and never
+    // revisited. OperationsHealthPanel's own 60s poll cannot cover this: it
+    // holds separate local state and only runs while that tab is mounted,
+    // which is precisely when the operator does not need a badge.
+    //
+    // Matched to that panel's 60s cadence, and skipped while the tab is hidden
+    // for the same reason the order poll skips it — a backgrounded console
+    // should not keep asking.
+    const timer = setInterval(() => {
+      if (!document.hidden) read();
+    }, HEALTH_BADGE_REFRESH_MS);
+    // Catch up immediately when the operator comes back to the tab, rather
+    // than showing them a stale badge for up to a minute.
+    const onVis = () => { if (!document.hidden) read(); };
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      alive = false;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVis);
+    };
   }, []);
   const healthVisible = operationsHealthTabVisible(healthCap);
 

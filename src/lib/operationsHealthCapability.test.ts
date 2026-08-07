@@ -44,41 +44,53 @@ describe('operationsHealthTabVisible', () => {
 });
 
 describe('deriveHealthBadge', () => {
-  const sum = (overall_state: string, critical_attention_count = 0) =>
-    ({ overall_state, critical_attention_count });
+  const sum = (overall_state: string, critical = 0, warning = 0) =>
+    ({ overall_state, critical_attention_count: critical, warning_attention_count: warning });
 
-  it('badges the three states that warrant interrupting someone', () => {
-    for (const state of ['degraded', 'failing', 'configuration_error']) {
-      expect(deriveHealthBadge(sum(state, 3), true)).toEqual({ state, count: 3 });
+  it('reads the CRITICAL counter for failing and configuration_error', () => {
+    for (const state of ['failing', 'configuration_error']) {
+      expect(deriveHealthBadge(sum(state, 3, 9), true))
+        .toEqual({ state, severity: 'critical', count: 3 });
     }
+  });
+
+  it('reads the WARNING counter for degraded', () => {
+    // The bug this pins: a degraded platform raises WARNING attention items, so
+    // its critical_attention_count is 0. Reading the critical counter produced
+    // "1 critical operations alert" for a state that raised no critical item at
+    // all — an invented number and an overstated severity.
+    expect(deriveHealthBadge(sum('degraded', 0, 4), true))
+      .toEqual({ state: 'degraded', severity: 'warning', count: 4 });
+  });
+
+  it('does not collapse several warnings into one', () => {
+    expect(deriveHealthBadge(sum('degraded', 0, 7), true).count).toBe(7);
   });
 
   it('shows NOTHING for a healthy or idle platform', () => {
     // A badge that is always present is furniture — operators stop seeing it,
-    // which is the failure mode this whole card exists to avoid.
-    expect(deriveHealthBadge(sum('healthy', 0), true)).toBeNull();
-    expect(deriveHealthBadge(sum('idle', 0), true)).toBeNull();
+    // which is the failure mode this whole feature exists to avoid.
+    expect(deriveHealthBadge(sum('healthy'), true)).toBeNull();
+    expect(deriveHealthBadge(sum('idle'), true)).toBeNull();
   });
 
   it('shows nothing for an unrecognised state rather than guessing', () => {
-    expect(deriveHealthBadge(sum('something_new', 9), true)).toBeNull();
+    expect(deriveHealthBadge(sum('something_new', 9, 9), true)).toBeNull();
   });
 
   it('shows nothing before the probe resolves, or when the tab is hidden', () => {
     expect(deriveHealthBadge(null, true)).toBeNull();
     expect(deriveHealthBadge(undefined, true)).toBeNull();
+    expect(deriveHealthBadge(sum('failing', 4), true)).not.toBeNull();
     expect(deriveHealthBadge(sum('failing', 4), false)).toBeNull();
   });
 
   it('never renders a zero — a badged state always shows at least 1', () => {
-    // `critical_attention_count` counts itemised attention rows, and a
-    // subsystem can be degraded without producing one. Showing "0" beside a
-    // danger badge contradicts the state that earned it.
-    expect(deriveHealthBadge(sum('degraded', 0), true)).toEqual({ state: 'degraded', count: 1 });
-    expect(deriveHealthBadge({ overall_state: 'failing' }, true)).toEqual({ state: 'failing', count: 1 });
-  });
-
-  it('passes the real count through when there is one', () => {
-    expect(deriveHealthBadge(sum('failing', 12), true)).toEqual({ state: 'failing', count: 12 });
+    // A subsystem can reach a badge-worthy state without producing an itemised
+    // attention row. A badge reading "0" contradicts the state that earned it.
+    expect(deriveHealthBadge(sum('degraded', 0, 0), true))
+      .toEqual({ state: 'degraded', severity: 'warning', count: 1 });
+    expect(deriveHealthBadge({ overall_state: 'failing' }, true))
+      .toEqual({ state: 'failing', severity: 'critical', count: 1 });
   });
 });

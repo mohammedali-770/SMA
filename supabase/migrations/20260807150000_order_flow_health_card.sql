@@ -726,22 +726,43 @@ begin
       from public.orders
      where created_at >= v_generated_at - make_interval(mins => v_of_window_minutes);
 
-    -- Trailing baseline: the same weekday + hour (Riyadh local, since that is
-    -- the trading day) over the previous 8 weeks, excluding the current week.
+    -- Trailing baseline: THE SAME ROLLING WINDOW, shifted back whole weeks.
+    --
+    -- The obvious version of this compares the rolling last-60-minutes against
+    -- historical `date_trunc('hour')` buckets. That is wrong, and wrong in a way
+    -- that fires: at 21:05 it measures 20:05-21:05 and compares it against full
+    -- 21:00-22:00 hours, so at any demand boundary — lunch, dinner, closing —
+    -- the two sides cover materially different trade and the card degrades or
+    -- goes quiet for no real reason.
+    --
+    -- Using the CURRENT clock hour instead is worse still: at 21:05 it would
+    -- compare 5 minutes of orders against a full hour and read as a ~92%
+    -- collapse, every hour, at five past.
+    --
+    -- So each historical sample is the identical construct: the same
+    -- v_of_window_minutes span ending at the same wall-clock instant, k whole
+    -- weeks ago. Whole weeks preserve both weekday and time of day for free,
+    -- and Saudi Arabia has no daylight saving, so there is no offset to correct
+    -- and no timezone conversion is needed here at all.
+    --
+    -- A week with zero orders in that window is NOT a sample. Counting it would
+    -- drag the mean toward zero and quietly disarm the card — the opposite of
+    -- what a baseline is for. `v_of_samples` therefore counts weeks that
+    -- actually traded at this time.
     select avg(c)::numeric, count(*)::integer
       into v_of_baseline, v_of_samples
     from (
-      select date_trunc('hour', o.created_at at time zone 'Asia/Riyadh') as h,
-             count(*) as c
-        from public.orders o
-       where o.created_at <  v_generated_at - interval '6 days'
-         and o.created_at >= v_generated_at - interval '8 weeks'
-         and extract(dow  from o.created_at at time zone 'Asia/Riyadh')
-           = extract(dow  from v_generated_at at time zone 'Asia/Riyadh')
-         and extract(hour from o.created_at at time zone 'Asia/Riyadh')
-           = extract(hour from v_generated_at at time zone 'Asia/Riyadh')
-       group by 1
-    ) s;
+      select (
+        select count(*)
+          from public.orders o
+         where o.created_at >  v_generated_at
+                              - make_interval(weeks => w)
+                              - make_interval(mins => v_of_window_minutes)
+           and o.created_at <= v_generated_at - make_interval(weeks => w)
+      ) as c
+      from generate_series(1, 8) as w
+    ) s
+    where c > 0;
 
     v_of_state := case
       -- Nothing open: zero orders is the CORRECT reading, not an incident.
@@ -869,7 +890,7 @@ begin
       'id','order_flow',
       'critical',true,
       'state',v_of_state,
-      'source','orders_vs_trailing_weekday_hour_baseline',
+      'source','orders_vs_trailing_weekly_window_baseline',
       'details',jsonb_build_object(
         'window_minutes',v_of_window_minutes,
         'orders_in_window',v_of_recent,

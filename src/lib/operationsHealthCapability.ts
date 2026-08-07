@@ -47,28 +47,56 @@ export function operationsHealthTabVisible(
  * hidden altogether — in every one of those cases the console does not know of
  * a problem, and a badge would be asserting one.
  */
-export type HealthBadge = { state: OperationsHealthBadgeState; count: number } | null;
+export type HealthBadge = {
+  state: OperationsHealthBadgeState;
+  /**
+   * Which counter the number came from, and therefore how it must be worded.
+   * A `degraded` platform emits WARNING attention items, so its
+   * `critical_attention_count` is 0 — announcing that as "1 critical alert"
+   * both invents a number and overstates the severity.
+   */
+  severity: 'critical' | 'warning';
+  count: number;
+} | null;
 
 /** The three states bad enough to interrupt someone on another tab. */
 export type OperationsHealthBadgeState = 'degraded' | 'failing' | 'configuration_error';
 
-const BADGE_STATES: readonly string[] = ['degraded', 'failing', 'configuration_error'];
+/** Which counter each badge-worthy state should be read from. */
+const BADGE_SEVERITY: Record<OperationsHealthBadgeState, 'critical' | 'warning'> = {
+  failing: 'critical',
+  configuration_error: 'critical',
+  degraded: 'warning',
+};
+
+export interface HealthBadgeSource {
+  overall_state?: string;
+  critical_attention_count?: number;
+  warning_attention_count?: number;
+}
 
 export function deriveHealthBadge(
-  summary: { overall_state?: string; critical_attention_count?: number } | null | undefined,
+  summary: HealthBadgeSource | null | undefined,
   tabVisible: boolean,
 ): HealthBadge {
   if (!tabVisible || !summary) return null;
 
   const state = summary.overall_state ?? '';
-  if (!BADGE_STATES.includes(state)) return null;
+  if (!(state in BADGE_SEVERITY)) return null;
+  const badgeState = state as OperationsHealthBadgeState;
+  const severity = BADGE_SEVERITY[badgeState];
 
-  // Fall back to 1 rather than 0. `critical_attention_count` counts itemised
-  // attention rows, and a subsystem can be `degraded` without producing one —
-  // rendering "0" or nothing at all would then contradict the state that
-  // earned the badge in the first place.
-  const raw = summary.critical_attention_count;
+  // Read the counter that matches the severity. Reading `critical` for a
+  // degraded platform is how "1 critical operations alert" got announced for a
+  // state that raised no critical item at all.
+  const raw = severity === 'critical'
+    ? summary.critical_attention_count
+    : summary.warning_attention_count;
+
+  // Fall back to 1, not 0. A subsystem can reach a badge-worthy state without
+  // producing an itemised attention row, and a danger badge reading "0"
+  // contradicts the state that earned it.
   const count = typeof raw === 'number' && raw > 0 ? raw : 1;
 
-  return { state: state as OperationsHealthBadgeState, count };
+  return { state: badgeState, severity, count };
 }
