@@ -16,9 +16,11 @@ import { describe, expect, it } from 'vitest';
 
 import type { Branch, Order } from '../../../../types';
 import {
-  DEFAULT_BRANCH_SCOPE, barPercent, branchStatusOf, buildBranchSalesRows, filterBranchRows,
+  DEFAULT_BRANCH_SCOPE, barPercent, branchStatusOf, buildBranchSalesRows,
+  buildBranchSalesRowsFromTotals, filterBranchRows,
   groupByStatus, maxSales, scopeBranchRows, selectBranchView, splitZeroSales,
 } from './branchSales';
+import type { BranchTotals } from './branchSales';
 
 const mkBranch = (over: Partial<Branch> & { id: string }): Branch => ({
   nameEn: `Branch ${over.id}`, nameAr: `فرع ${over.id}`,
@@ -307,5 +309,46 @@ describe('groupByStatus', () => {
     const g = groupByStatus(buildBranchSalesRows(branches, []));
     expect(g.open.length + g.temporarily_unavailable.length)
       .toBe(branches.filter((b) => b.isActive).length);
+  });
+});
+
+describe('buildBranchSalesRowsFromTotals', () => {
+  // StatsPanel now takes these sums from `admin_order_stats` instead of summing
+  // the whole in-memory order list, which is what let the console stop holding
+  // every order ever placed. The two paths must produce identical rows, or the
+  // performance change silently moved a number on the dashboard.
+  const BRANCHES = [mkBranch({ id: 'a' }), mkBranch({ id: 'b' }), mkBranch({ id: 'c' })];
+  const ORDERS = [
+    mkOrder('a', 100, { status: 'delivered' }),
+    mkOrder('a', 50, { status: 'cancelled' }),
+    mkOrder('b', 300, { status: 'preparing' }),
+  ];
+
+  it('produces exactly the rows the in-memory pass produces', () => {
+    const totals = new Map<string, BranchTotals>([
+      ['a', { sales: 150, orderCount: 2 }],
+      ['b', { sales: 300, orderCount: 1 }],
+    ]);
+    expect(buildBranchSalesRowsFromTotals(BRANCHES, totals))
+      .toEqual(buildBranchSalesRows(BRANCHES, ORDERS));
+  });
+
+  it('treats a branch missing from the aggregate as zero, not as absent', () => {
+    // A branch with no orders has no row in the server-side GROUP BY. It must
+    // still appear — the zero-sales branches are counted in the panel, and
+    // dropping them here would change that count.
+    const rows = buildBranchSalesRowsFromTotals(BRANCHES, new Map());
+    expect(rows).toHaveLength(3);
+    expect(rows.every(r => r.sales === 0 && r.orderCount === 0 && r.averageTicket === 0)).toBe(true);
+  });
+
+  it('ignores an aggregate row for a branch that no longer exists', () => {
+    const totals = new Map<string, BranchTotals>([
+      ['a', { sales: 150, orderCount: 2 }],
+      ['deleted-branch', { sales: 999, orderCount: 9 }],
+    ]);
+    const rows = buildBranchSalesRowsFromTotals(BRANCHES, totals);
+    expect(rows).toHaveLength(3);
+    expect(rows.some(r => r.sales === 999)).toBe(false);
   });
 });

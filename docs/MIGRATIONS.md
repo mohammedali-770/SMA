@@ -10,9 +10,10 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-06 exactly one repository migration is unapplied:**
-`20260806120000_erasure_phone_normalization` (§22). Everything else is live.
-The three files that were unapplied before it — two from PR #142, one from
+**As of 2026-08-06 two repository migrations are unapplied:**
+`20260806120000_erasure_phone_normalization` (§22) and
+`20260806130000_admin_ranged_orders_and_stats` (§23). Everything else is live.
+The three files that were unapplied before them — two from PR #142, one from
 PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file, in filename order.
 
@@ -22,10 +23,11 @@ PR #146 — were applied on 2026-08-05 with explicit owner approval, via the MCP
 | `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
 | `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
-- Repository migration files (default branch `claude/project-build-ie4b56`): **65**
+- Repository migration files (default branch `claude/project-build-ie4b56`): **66**
 - Live `schema_migrations` rows: **65**
-- Unapplied repository files: **1**
-  (`20260806120000_erasure_phone_normalization` — class **E**, see §22)
+- Unapplied repository files: **2**
+  - `20260806120000_erasure_phone_normalization` — class **E**, §22
+  - `20260806130000_admin_ranged_orders_and_stats` — class **E**, §23
 - Latest live version: **`20260805061955`**
   (`address_description_trim_all_whitespace`; repository version `20260802120000`)
 
@@ -34,9 +36,8 @@ long-standing **history** divergence, not a *schema* divergence: three live-only
 F-class history rows carry no repository file, and two H-class repository files
 (`place_order`, `loyalty`) were superseded by later consolidated migrations.
 64 files − 2 H-class + 3 F-class = 65 rows. The full class-by-class algebra is in
-§4 and the row-by-row mapping in §5. The 65th file is the unapplied one above,
-which contributes no live row until it is applied — so the equal totals are a
-coincidence of arithmetic, not evidence of alignment.
+§4 and the row-by-row mapping in §5. The remaining two files are the unapplied
+ones above, which contribute no live row until they are applied.
 
 > **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
 > `apply_migration` stamped apply-time versions that differ from the repository
@@ -225,7 +226,7 @@ fields byte-identical before/after, fingerprint-verified).
 | B. `SAME_CONTENT_DIFFERENT_VERSION` | **48** |
 | C. `SAME_NAME_DIFFERENT_CONTENT` | **3** |
 | D. `SAME_VERSION_DIFFERENT_CONTENT` (version collision) | **0** |
-| E. `REPOSITORY_ONLY_UNAPPLIED` | **1** (`20260806120000_erasure_phone_normalization`, §22) |
+| E. `REPOSITORY_ONLY_UNAPPLIED` | **2** (§22, §23) |
 | F. `LIVE_ONLY_MISSING_FROM_REPOSITORY` | **3** |
 | H. `SUPERSEDED` / history-boundary differences (repository side) | **2** |
 
@@ -246,10 +247,11 @@ notes.
 > true totals to the **61 repository / 62 live** authoritative production totals
 > carried at the top of §1.
 >
-> **Class E holds exactly one row**, added 2026-08-06:
-> `20260806120000_erasure_phone_normalization` (§22), which is written, tested
-> and merged but **not applied** — applying it needs its own explicit owner
-> approval. Class E was empty from 2026-08-05 until then. The
+> **Class E holds two rows**, both added 2026-08-06:
+> `20260806120000_erasure_phone_normalization` (§22) and
+> `20260806130000_admin_ranged_orders_and_stats` (§23). Both are written, tested
+> and merged but **not applied** — each needs its own explicit owner approval.
+> Class E was empty from 2026-08-05 until then. The
 > operations-automation cron-health migration
 > `20260723140000_operations_automation_cron_health` — the last remaining
 > class-E row, recorded as repository-only in every earlier revision of this
@@ -1345,3 +1347,155 @@ grant update (phone_number) on public.profiles to authenticated;
 …and restore the previous `anonymize_account_data` body from
 `20260715120000_account_deletion.sql:228-295`. Doing so reinstates the silent
 skip and the false `phone_purged` claim, so prefer fixing forward.
+
+---
+
+## 23. PENDING migration: bounded admin order reads (class E, NOT applied)
+
+`supabase/migrations/20260806130000_admin_ranged_orders_and_stats.sql` is the
+second of the two repository migrations not in Production. Like §22 it is merged
+so the chain is correct for a rebuilt environment (§11), and stays class **E**
+until the owner approves an `apply_migration` run. Nothing here has been
+executed against Production.
+
+### Why it exists
+
+`AppContext.refreshOrders()` called `admin_list_orders_with_items(null)` — the
+UNBOUNDED arm — on every staff sign-in and after every status advance. That
+returns every order in the system with every line item and every modifier as one
+jsonb blob.
+
+It was unbounded because it had to be. Three console surfaces read the whole
+in-memory list: `ReportsPanel` filtered it by date range, `StatsPanel` summed it
+for the four dashboard tiles and the per-branch chart, and `LiveOrdersPanel`
+rendered it. Capping the fetch alone would have silently truncated the financial
+reports, which is worse than being slow, so the two halves had to move together.
+
+At ~300 orders/day the blob passes 100 MB inside a year, re-fetched on every
+sign-in. That is a scheduled outage, not a slow page.
+
+A PostgREST range filter was not an option: staff hold no direct privilege on
+`public.orders` (`20260724200000`), so every staff read goes through a SECURITY
+DEFINER RPC and the range has to be a function parameter. Hence a migration.
+
+### What it adds
+
+1. **`admin_list_orders_for_range(p_from, p_to, p_branch, p_max_rows)`** — the
+   report feed for a half-open `[p_from, p_to)` window, optionally one branch.
+   Returns an envelope `{row_count, max_rows, limit_exceeded, orders}`.
+   - **Half-open** so the caller passes day boundaries without a 23:59:59.999
+     fencepost. An order on the upper bound belongs to the next window, counted
+     once rather than twice or never.
+   - **Refuses rather than truncates.** Above the ceiling it returns NO rows and
+     sets `limit_exceeded`, with the true `row_count` so the console can say how
+     far over the range is. A truncated financial report is a wrong VAT figure
+     that looks right.
+   - `p_max_rows` can only LOWER the ceiling (`least` against a hard 10000), so a
+     caller cannot restore the unbounded fetch. It exists so the refusal branch
+     is testable without seeding ten thousand rows.
+   - **Leaner projection than the live feed**: no customer name, phone or id, no
+     notes, no address snapshot, no item modifiers. The reports read none of
+     them, so running a financial report no longer pulls customer PII into a
+     browser at all.
+2. **`admin_order_stats()`** — the four dashboard tiles and the per-branch chart,
+   aggregated server-side. Constant-size payload. The definitions match the
+   previous in-memory expressions exactly, **including `total_amount` spanning
+   cancelled orders**, because that is what the average-ticket tile has always
+   divided by. Changing it would have moved a dashboard number under cover of a
+   performance change.
+3. **`admin_list_orders_with_items(p_limit)` is replaced** so its bounded arm is
+   **status-aware**: the `p_limit` most recent orders **plus every unsettled
+   order, however old**. Same name, signature, volatility, security and
+   `search_path`; `20260724200000` is not edited, this supersedes it.
+
+   This closes a hole that bounding the console fetch would otherwise have
+   opened. The original returns the `p_limit` most recent orders by
+   `created_at`, so once more than `p_limit` newer orders existed, an order stuck
+   in `received`, `preparing`, `ready` or `out_for_delivery` was not fetched at
+   all — it vanished from the Live Orders board, and neither the search box nor
+   the "show older" control could recover it, because the row was never in the
+   browser. Work still owed to a customer would silently stop being visible to
+   the kitchen. Raised by automated review on PR #167 and confirmed against the
+   code before fixing.
+
+   The unsettled arm is deliberately **uncapped**: capping it would reintroduce
+   the same silent drop one level down, and an unsettled backlog large enough to
+   matter is an operational emergency the board should be showing. `p_limit is
+   null` keeps the original unbounded behaviour exactly, so this is a widening —
+   every caller sees a superset of what it saw before, never less.
+
+   The client-side trim in `pollRecentOrders` is status-aware for the same
+   reason (`trimOrderWindow`): those old unsettled rows sort to the tail of a
+   newest-first list, so a plain `slice(0, limit)` would have discarded exactly
+   the rows the server went out of its way to include.
+
+Both are `is_staff()`-gated internally, `stable`, `security definer`, with a
+pinned `search_path` — the same contract as `admin_list_orders_with_items`.
+
+### Safety
+
+- Purely additive. No table, column, constraint, policy or existing function is
+  altered. `admin_list_orders_with_items` is untouched and still serves the live
+  board.
+- Read-only: both functions are `stable` and contain no write.
+- Idempotent — `create or replace` only.
+
+### Pre-apply validation (repository harness, 2026-08-06)
+
+Docker was unavailable and PostGIS is not installed locally, so the full chain
+could not be replayed. Validated against a local PostgreSQL 16 cluster with the
+minimum schema stubbed:
+
+- migration applied cleanly (exit 0);
+- `supabase/tests/admin_ranged_orders_and_stats_test.sql` — 9 cases — reported
+  `ALL CASES PASSED`;
+- four deliberately broken variants were then applied to clones and the same
+  suite re-run, to prove it is not passing vacuously:
+
+  | Mutation | Caught by |
+  | --- | --- |
+  | `created_at <= p_to` (closed interval) | `FAIL(2): row_count is 4, expected 3 — the interval is not half-open` |
+  | refusal replaced by `limit v_max_rows` (silent truncation) | `FAIL(4): 3 rows against a ceiling of 2 did not set limit_exceeded` |
+  | `customer_name`/`customer_phone`/`notes` added to the projection | `FAIL(6): the report projection exposes customer_name` |
+  | live feed reverted to the chronological-only window | `FAIL(9): limit 1 returned 1 orders, expected 2 (newest + the unsettled one)` |
+
+All scratch databases were dropped and the cluster stopped afterwards. The suite
+also runs unconditionally in the `SQL suites` workflow, which replays the whole
+chain on `postgis/postgis:16-3.4`.
+
+### The console half is live on merge; the server half is not
+
+This is the one asymmetry worth stating plainly. The client changes ship with
+the merge, and until this migration is applied **both new RPCs will 404** for the
+console:
+
+- `ReportsPanel` renders its "Could not load orders for this range" card;
+- `StatsPanel` renders "Could not load order statistics" and its tiles read zero.
+
+Live Orders is unaffected — it uses the existing bounded feed. So the reports and
+the dashboard tiles are DOWN between merge and apply, visibly and with a stated
+reason rather than silently wrong. Apply promptly, or hold the merge until the
+apply is approved.
+
+### When it is applied
+
+Follow §9: pre-live gate, one `apply_migration` call, then verification. Confirm
+afterwards that the reports and dashboard load, and that the figures match what
+they showed before (the aggregate definitions are unchanged, so they must).
+Then move this section from class **E** to **B**, record the stamped apply-time
+version, and update the counts in §1 and §4.
+
+### Rollback
+
+```sql
+drop function if exists public.admin_list_orders_for_range(timestamptz, timestamptz, uuid, integer);
+drop function if exists public.admin_order_stats();
+```
+
+…and restore `admin_list_orders_with_items` from `20260724200000:179-232`. Note
+that doing so reinstates the hidden-outstanding-order problem whenever a caller
+passes a limit, so prefer fixing forward.
+
+The two added functions are additive and unreferenced by anything else in the
+schema. The console would have to be reverted in the same step, since it is
+their only caller.

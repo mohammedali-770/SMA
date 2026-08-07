@@ -109,6 +109,85 @@ export function riyadhMonthRange(now: Date = new Date()): { start: string; end: 
 }
 
 /**
+ * Saudi Arabia is UTC+3 year-round — it has no daylight saving — so a Riyadh
+ * calendar day maps to a fixed UTC instant with no seasonal correction. Written
+ * as a literal offset rather than derived from `Intl`, because the derivation
+ * would only ever return this value and the constant is checkable by eye.
+ */
+const RIYADH_UTC_OFFSET = '+03:00';
+
+/**
+ * The UTC instant at which a Riyadh calendar day ("YYYY-MM-DD") begins.
+ *
+ * The inverse of `riyadhDateOnly`, and the reason the reports can now filter
+ * server-side: the database stores `created_at` as an instant, while the report
+ * form collects Riyadh calendar dates.
+ */
+export function riyadhDayStartIso(date: string): string {
+  assertCalendarDate(date, 'riyadhDayStartIso');
+  return new Date(`${date}T00:00:00${RIYADH_UTC_OFFSET}`).toISOString();
+}
+
+/** The next Riyadh calendar day ("YYYY-MM-DD"), rolling month and year. */
+export function riyadhNextDay(date: string): string {
+  assertCalendarDate(date, 'riyadhNextDay');
+  const [year, month, day] = date.split('-').map(Number);
+  // Date.UTC normalises an out-of-range day, so day+1 past the month end rolls.
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+/** "YYYY-MM-DD", the shape an `<input type="date">` produces when it has a value. */
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Whether a string is a usable calendar date for the helpers below.
+ *
+ * Exported because callers need to CHECK before converting rather than catch
+ * afterwards: a cleared `<input type="date">` yields `''`, and these helpers are
+ * called synchronously inside effects where a throw takes the panel down instead
+ * of landing in a `.catch()`.
+ */
+export function isCalendarDate(date: string): boolean {
+  if (!CALENDAR_DATE.test(date)) return false;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return false;
+  // ROUND-TRIP, not just "does it parse". Date silently ROLLS an impossible day:
+  // '2026-02-30' parses happily and comes back as 2026-03-02, which would move a
+  // report range by two days without telling anyone. Comparing the normalised
+  // value against the input is what catches that.
+  return parsed.toISOString().slice(0, 10) === date;
+}
+
+/**
+ * Fail with a description instead of a bare `RangeError: Invalid time value`.
+ *
+ * `new Date('T00:00:00+03:00').toISOString()` throws that message with no
+ * indication of which input was empty or which helper was called, which is a
+ * miserable thing to find in a production stack trace.
+ */
+function assertCalendarDate(date: string, fn: string): void {
+  if (!isCalendarDate(date)) {
+    throw new Error(`${fn}: expected a YYYY-MM-DD calendar date, received ${JSON.stringify(date)}`);
+  }
+}
+
+/**
+ * A Riyadh calendar date range as the HALF-OPEN UTC instant window
+ * `[from, to)` the ranged order feed expects.
+ *
+ * Half-open, and the upper bound is the start of the day AFTER `end`, so an
+ * order placed at 23:59:59.7 Riyadh on the last day is included while one at
+ * 00:00:00.0 the next day is not. A closed `<= end 23:59:59` bound would drop
+ * the first and, at the next range's lower edge, count the second twice.
+ */
+export function riyadhRangeToUtc(start: string, end: string): { fromIso: string; toIso: string } {
+  return {
+    fromIso: riyadhDayStartIso(start),
+    toIso: riyadhDayStartIso(riyadhNextDay(end)),
+  };
+}
+
+/**
  * Creates a sample CSV data URL for menu import.
  */
 export function getCSVTemplateData(): string {

@@ -231,18 +231,59 @@ describe('the verification queue', () => {
 });
 
 describe('filtering', () => {
+  it('opens on outstanding work, with everything else one click away', async () => {
+    mockContext({
+      orders: [makeOrder(), makeOrder({ id: 'o2', orderNumber: 'SM-1043', status: 'delivered' })],
+    });
+    render(<LiveOrdersPanel />);
+    await screen.findByText('SM-1042');
+
+    // The board defaults to 'active' now. The delivered order is not GONE, it
+    // is behind a chip — which is the distinction that matters, so both halves
+    // are asserted.
+    expect(screen.queryByText('SM-1043')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(screen.getByText('SM-1042')).toBeTruthy();
+    expect(screen.getByText('SM-1043')).toBeTruthy();
+  });
+
   it('the status tabs filter the table', async () => {
     mockContext({
       orders: [makeOrder(), makeOrder({ id: 'o2', orderNumber: 'SM-1043', status: 'delivered' })],
     });
     render(<LiveOrdersPanel />);
     await screen.findByText('SM-1042');
-    expect(screen.getByText('SM-1043')).toBeTruthy();
 
     // By role: 'delivered' is also the text of the status pill in the row.
     fireEvent.click(screen.getByRole('button', { name: 'delivered' }));
     expect(screen.queryByText('SM-1042')).toBeNull();
     expect(screen.getByText('SM-1043')).toBeTruthy();
+  });
+
+  it('caps the rendered rows and reveals the rest on demand', async () => {
+    // 120 active orders: more than one page, fewer than two.
+    mockContext({
+      orders: Array.from({ length: 120 }, (_, i) =>
+        makeOrder({ id: `o${i}`, orderNumber: `SM-2${String(i).padStart(3, '0')}` })),
+    });
+    render(<LiveOrdersPanel />);
+    await screen.findByText('SM-2000');
+
+    // Page one only. Row 51 is not in the DOM at all — that is the point, the
+    // table used to build every matching row on every render.
+    expect(screen.getByText('SM-2049')).toBeTruthy();
+    expect(screen.queryByText('SM-2050')).toBeNull();
+
+    // Nothing is lost: the control says how many are behind it, and reveals them.
+    const older = screen.getByRole('button', { name: /Show older orders \(70 more\)/ });
+    fireEvent.click(older);
+    expect(screen.getByText('SM-2050')).toBeTruthy();
+    expect(screen.queryByText('SM-2100')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /Show older orders \(20 more\)/ }));
+    expect(screen.getByText('SM-2119')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Show older orders/ })).toBeNull();
   });
 
   it('the search box matches the phone by raw digits', async () => {

@@ -119,6 +119,33 @@ production. It was still fixed rather than excepted: the bump stays inside major
 lint` and the full 1628-test suite all pass on it. An exception would have cost
 more to justify than the fix cost to apply.
 
+### 4.4 `js-yaml` — quadratic CPU consumption in `!!omap` (GHSA-5p4m-2wfm-xmqj) — HIGH (mobile tree)
+
+CVE-2026-59870. A crafted `!!omap` node makes resolution quadratic in the number
+of keys, so a small document costs a large amount of CPU — CWE-407, CVSS 7.5.
+The fix was not backported below 4.3.1.
+
+**The second advisory the PR #147 gate has caught on its own**, and like §4.3 it
+appeared in the feed after the gate was written and blocked the next PR. It was
+published while PR #167 was waiting on GitHub Actions billing, so the same
+commit that passed the audit on 2026-08-06 failed it on 2026-08-07 without a
+single line of its own changing.
+
+- Mobile tree: `overrides` entry in `apps/mobile/package.json` → `^4.3.1`.
+- Web tree: not present.
+
+Reachability: `js-yaml` enters this tree **once**, via
+`expo → @expo/cli → @expo/xcpretty`. `@expo/xcpretty` formats Xcode build logs,
+so it runs on a macOS build host, parses output this project produces itself,
+and is never bundled into the app. The practical exposure was a build machine
+spending CPU on its own build output, not a customer-facing path.
+
+Fixed rather than excepted, on the same reasoning as §4.3: `4.3.1` sits inside
+`@expo/xcpretty`'s own declared `^4.1.0` range, so nothing's API expectations
+change; the lockfile diff is three lines; and `npm ci`, both typechecks, the
+full 1697-test suite and the production build all pass on it. `npm audit fix`
+was again avoided — it re-resolves most of the Expo toolchain (§2).
+
 ## 5. Adding an exception
 
 Do not silence an advisory by lowering `--audit-level`, adding `--omit`, or

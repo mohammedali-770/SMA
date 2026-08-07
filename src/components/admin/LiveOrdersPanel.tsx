@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useApp } from '../../context/AppContext';
+import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
@@ -11,7 +12,8 @@ import { OrderReceiptModal } from './view/orders/OrderReceiptModal';
 import { OrdersRequiringVerificationCard } from './view/orders/OrdersRequiringVerificationCard';
 import { OrdersTable } from './view/orders/OrdersTable';
 import {
-  ORDER_FILTERS, matchesOrderFilter, matchesOrderSearch, needsPaymentConfirm,
+  DEFAULT_ORDER_FILTER, LIVE_ORDERS_PAGE, ORDER_FILTERS,
+  matchesOrderFilter, matchesOrderSearch, needsPaymentConfirm,
 } from './view/orders/ordersView';
 
 /**
@@ -36,9 +38,17 @@ export const LiveOrdersPanel: React.FC = () => {
   const family = useDsFontClass();
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
-  const [orderFilter, setOrderFilter] = useState<string>('all');
+  // Defaults to the work that is still outstanding rather than to every order
+  // ever placed. Delivered and cancelled orders are one click away on their own
+  // chips, and 'all' is still the first chip — nothing is hidden, it is just no
+  // longer the thing a busy kitchen has to scroll past.
+  const [orderFilter, setOrderFilter] = useState<string>(DEFAULT_ORDER_FILTER);
   const [orderSearch, setOrderSearch] = useState<string>('');
   const [activeReceiptOrder, setActiveReceiptOrder] = useState<Order | null>(null);
+  // How many rows are currently rendered. Grows a page at a time; resets
+  // whenever the filter or the search changes, so "show older" never carries a
+  // previous query's depth into a new one.
+  const [visibleCount, setVisibleCount] = useState<number>(LIVE_ORDERS_PAGE);
 
   // Show the actual chosen method — Online Payment / Cash on Pickup / Cash on
   // Delivery — never a blanket "Cash on Delivery". Unknown method reads as unset.
@@ -105,8 +115,23 @@ export const LiveOrdersPanel: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter((o) =>
-    matchesOrderSearch(o, orderSearch) && matchesOrderFilter(o.status, orderFilter));
+  // Memoized: this ran on EVERY render, including the ones caused by opening a
+  // receipt or typing a character, and it is a full pass over the order list
+  // with a lower-cased string comparison per row.
+  const filteredOrders = useMemo(
+    () => orders.filter((o) =>
+      matchesOrderSearch(o, orderSearch) && matchesOrderFilter(o.status, orderFilter)),
+    [orders, orderSearch, orderFilter],
+  );
+
+  // The table rendered every matching order, so a filter of 'all' on a busy day
+  // meant hundreds of DOM rows built on each of those renders. Rows beyond the
+  // window are reachable through the control below, not dropped.
+  const visibleOrders = useMemo(
+    () => filteredOrders.slice(0, visibleCount),
+    [filteredOrders, visibleCount],
+  );
+  const hiddenCount = filteredOrders.length - visibleOrders.length;
 
   return (
     <>
@@ -122,7 +147,7 @@ export const LiveOrdersPanel: React.FC = () => {
               <button
                 key={st}
                 type="button"
-                onClick={() => setOrderFilter(st)}
+                onClick={() => { setOrderFilter(st); setVisibleCount(LIVE_ORDERS_PAGE); }}
                 aria-pressed={orderFilter === st}
                 className={[
                   'ds-motion inline-flex min-h-9 items-center rounded-[var(--radius-ds-md)] px-2.5',
@@ -131,7 +156,9 @@ export const LiveOrdersPanel: React.FC = () => {
                 ].join(' ')}
               >
                 <Text variant="caption" tone={orderFilter === st ? 'onEmber' : 'secondary'} as="span">
-                  {st === 'all' ? (isRTL ? 'الكل' : 'All') : st}
+                  {st === 'all' ? (isRTL ? 'الكل' : 'All')
+                    : st === 'active' ? (isRTL ? 'قيد التنفيذ' : 'Active')
+                    : st}
                 </Text>
               </button>
             ))}
@@ -141,7 +168,7 @@ export const LiveOrdersPanel: React.FC = () => {
         <input
           type="text"
           value={orderSearch}
-          onChange={(e) => setOrderSearch(e.target.value)}
+          onChange={(e) => { setOrderSearch(e.target.value); setVisibleCount(LIVE_ORDERS_PAGE); }}
           placeholder={isRTL ? 'ابحث برقم الطلب، اسم العميل، جوال العميل...' : 'Search by order#, client, phone...'}
           aria-label={isRTL ? 'بحث في الطلبات' : 'Search orders'}
           className={`ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-4 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 ${family}`}
@@ -149,7 +176,7 @@ export const LiveOrdersPanel: React.FC = () => {
 
         <Card flush className="overflow-hidden">
           <OrdersTable
-            orders={filteredOrders}
+            orders={visibleOrders}
             adminLang={adminLang}
             paymentBadgeText={paymentBadgeText}
             methodLabelText={methodLabelText}
@@ -157,6 +184,18 @@ export const LiveOrdersPanel: React.FC = () => {
             onView={setActiveReceiptOrder}
           />
         </Card>
+
+        {hiddenCount > 0 ? (
+          <div className="flex justify-center">
+            <Button
+              label={isRTL
+                ? `عرض طلبات أقدم (${hiddenCount} متبقية)`
+                : `Show older orders (${hiddenCount} more)`}
+              onClick={() => setVisibleCount((n) => n + LIVE_ORDERS_PAGE)}
+              variant="secondary"
+            />
+          </div>
+        ) : null}
       </div>
 
       {activeReceiptOrder && (

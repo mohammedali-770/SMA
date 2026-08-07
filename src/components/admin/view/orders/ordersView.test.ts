@@ -10,6 +10,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_ORDER_FILTER,
+  LIVE_ORDERS_PAGE,
   ONLINE_GUARDED_STATUSES,
   ORDER_FILTERS,
   POS_VERIFY_LIMIT,
@@ -183,8 +185,29 @@ describe('matchesOrderFilter', () => {
 
   it('offers every status as a tab, in lifecycle order', () => {
     expect(ORDER_FILTERS).toEqual([
-      'all', 'received', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'cancelled',
+      'all', 'active', 'received', 'preparing', 'ready', 'out_for_delivery',
+      'delivered', 'cancelled',
     ]);
+  });
+
+  it('"active" is the COMPLEMENT of settled, not a list of known statuses', () => {
+    for (const s of ['received', 'preparing', 'ready', 'out_for_delivery']) {
+      expect(matchesOrderFilter(s, 'active')).toBe(true);
+    }
+    expect(matchesOrderFilter('delivered', 'active')).toBe(false);
+    expect(matchesOrderFilter('cancelled', 'active')).toBe(false);
+
+    // The reason it is a complement: a status added to the workflow later is
+    // outstanding work until somebody says otherwise. An allow-list would hide
+    // it from the kitchen on the tab the kitchen actually watches.
+    expect(matchesOrderFilter('awaiting_driver', 'active')).toBe(true);
+  });
+
+  it('the board opens on outstanding work, and the page size is fixed', () => {
+    expect(DEFAULT_ORDER_FILTER).toBe('active');
+    expect(ORDER_FILTERS).toContain(DEFAULT_ORDER_FILTER);
+    // Named so a silent change is a visible diff.
+    expect(LIVE_ORDERS_PAGE).toBe(50);
   });
 });
 

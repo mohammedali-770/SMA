@@ -1,13 +1,14 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { useApp } from '../../context/AppContext';
 import { Card } from '../../design-system/ui/Card';
 import { Text } from '../../design-system/ui/Text';
+import { isMissingFunctionError, orders as ordersApi, type AdminOrderStats } from '../../lib/api';
 import { Price } from '../Price';
 import { ADMIN_LOCALES } from './adminLocales';
 import { BranchAvailabilityPanel, OperationalBranchesCard } from './view/stats/BranchAvailability';
 import { BranchSalesSection } from './view/stats/BranchSalesSection';
-import { buildBranchSalesRows } from './view/stats/branchSales';
+import { buildBranchSalesRowsFromTotals, type BranchTotals } from './view/stats/branchSales';
 
 /**
  * The dashboard's four headline figures and the branch sales section.
@@ -45,30 +46,59 @@ import { buildBranchSalesRows } from './view/stats/branchSales';
  * instead of the literal "SAR" / "ر.س" the design system forbids.
  */
 export const StatsPanel: React.FC = () => {
-  const { orders, branches, adminLang } = useApp();
+  const { branches, adminLang, ordersLastUpdated } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
 
-  const totalRevenue = orders
-    .filter(o => o.status === 'delivered')
-    .reduce((acc, o) => acc + o.total, 0);
-  const activeOrdersCount = orders
-    .filter(o => o.status !== 'delivered' && o.status !== 'cancelled')
-    .length;
-  const averageTicketValue = orders.length > 0
-    ? Number((orders.reduce((acc, o) => acc + o.total, 0) / orders.length).toFixed(2))
+  // These four figures used to be summed from `useApp().orders`, which is why
+  // that list had to hold EVERY order ever placed. They are now aggregated
+  // server-side by `admin_order_stats`, whose definitions match the previous
+  // expressions exactly — including `total_amount` spanning cancelled orders,
+  // which is what the average-ticket tile has always divided by.
+  const [stats, setStats] = useState<AdminOrderStats | null>(null);
+  // A KIND rather than a formatted string — see the same note in ReportsPanel.
+  const [statsError, setStatsError] =
+    useState<{ kind: 'missing-migration' } | { kind: 'other'; message: string } | null>(null);
+
+  // Re-read when the order list changes, so the tiles still move with the live
+  // board. `ordersLastUpdated` is stamped by every refresh and poll.
+  useEffect(() => {
+    let cancelled = false;
+    ordersApi.stats()
+      .then(res => { if (!cancelled) { setStats(res); setStatsError(null); } })
+      .catch(e => {
+        if (cancelled) return;
+        // See ReportsPanel: a missing function is an unapplied migration, which
+        // is a different thing from a broken one.
+        setStatsError(isMissingFunctionError(e)
+          ? { kind: 'missing-migration' }
+          : { kind: 'other', message: e instanceof Error ? e.message : String(e) });
+      });
+    return () => { cancelled = true; };
+  }, [ordersLastUpdated]);
+
+  const totalRevenue = stats?.delivered_revenue ?? 0;
+  const activeOrdersCount = stats?.active_orders ?? 0;
+  const totalOrdersCount = stats?.total_orders ?? 0;
+  const averageTicketValue = stats && stats.total_orders > 0
+    ? Number((stats.total_amount / stats.total_orders).toFixed(2))
     : 0;
   const operationalBranchesCount = branches.filter(b => b.isActive).length;
   const closedBranchesCount = branches.length - operationalBranchesCount;
 
   const [showAvailability, setShowAvailability] = useState(false);
 
-  // One pass over orders for all branches, rather than a full scan per branch
-  // plus a full scan per branch to recompute the maximum — which is what the
-  // inline version did, inside the render loop.
+  // Same rows as before, from server-side sums rather than a client-side pass
+  // over every order. A branch with no orders is absent from the aggregate and
+  // falls back to zero, exactly as an empty bucket did.
   const branchRows = useMemo(
-    () => buildBranchSalesRows(branches, orders),
-    [branches, orders],
+    () => buildBranchSalesRowsFromTotals(
+      branches,
+      new Map<string, BranchTotals>(
+        (stats?.branches ?? []).map(b => [b.branch_id, { sales: b.sales, orderCount: b.order_count }]),
+      ),
+    ),
+    [branches, stats],
   );
 
   return (
@@ -76,6 +106,23 @@ export const StatsPanel: React.FC = () => {
     // across an ultrawide monitor, which is most of where the "empty canvas"
     // around the old chart came from.
     <div className="mx-auto w-full max-w-[1200px] space-y-4">
+      {/* A failed aggregate read must SAY so. Without this the tiles would fall
+          back to their zero defaults and the dashboard would report no revenue
+          and no orders, which reads as a catastrophe rather than a fetch error. */}
+      {statsError ? (
+        <Card>
+          <Text variant="caption" tone="danger" as="p">
+            {statsError.kind === 'missing-migration'
+              ? (isRTL
+                ? 'تتطلب لوحة الإحصاءات ترحيل قاعدة بيانات لم يُطبَّق بعد على هذا المشروع (admin_order_stats).'
+                : 'The dashboard figures require a database migration that has not been applied to this project yet (admin_order_stats).')
+              : (isRTL
+                ? `تعذّر تحميل إحصاءات الطلبات: ${statsError.message}`
+                : `Could not load order statistics: ${statsError.message}`)}
+          </Text>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <Text variant="caption" tone="tertiary" as="p">{t.stats_revenue}</Text>
@@ -92,7 +139,7 @@ export const StatsPanel: React.FC = () => {
             <Text variant="body" tone="secondary" as="span">{isRTL ? 'طلبات قيد المتابعة' : 'Active'}</Text>
           </Text>
           <Text variant="caption" tone="tertiary" as="p" className="mt-1">
-            {orders.length - activeOrdersCount} {isRTL ? 'مسلَّمة أو ملغاة' : 'delivered or cancelled'}
+            {totalOrdersCount - activeOrdersCount} {isRTL ? 'مسلَّمة أو ملغاة' : 'delivered or cancelled'}
           </Text>
         </Card>
 
