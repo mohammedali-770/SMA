@@ -142,7 +142,7 @@ business. The data does not support that, and saying so changes what matters.
 | Profiles | 5 |
 | Checkout sessions | 6 |
 | OTP challenges in the last 7 days | **0** (newest 2026-07-21) |
-| Order spread | 8 days between 2026-07-08 and 2026-08-01 |
+| Order spread | **8 distinct order dates**, spanning **24.5 days** (2026-07-08 → 2026-08-01) |
 
 **What this does and does not mean.** It does *not* mean something broke: there
 was never a flow to stop, so a quiet period is not a regression. Earlier notes

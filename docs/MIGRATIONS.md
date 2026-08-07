@@ -2210,10 +2210,19 @@ volume that does not exist yet. §25's closing note applies unchanged.
 >   fires only if every branch is deactivated, which is a config action rather
 >   than a nightly event.
 >
->   The card is nonetheless **not** wrong to be quiet at night: the protection
->   comes from the `baseline < 1` arm, because a 04:00 window is compared against
->   04:00 windows from previous weeks, which are equally empty. The behaviour is
->   right; the *explanation attached to it* names the wrong arm. Correcting the
->   in-body comment would mean re-emitting a 1000-line function, which is not
->   worth it for a comment — recorded here instead, and in the card's test suite,
->   which is where someone reasoning about the arms will look.
+>   The card is nonetheless **not** wrong to be quiet at night. The protection
+>   comes from the **minimum-sample arm, `baseline_samples < 3`**: at 04:00 the
+>   historical 04:00 windows are equally empty, the `where c > 0` filter drops
+>   them all, and the sample count is 0.
+>
+>   **A first attempt at this correction named the `baseline < 1` arm instead,
+>   and that was also wrong** — caught in review on PR #176. That arm is
+>   *unreachable*. The same `where c > 0` filter means every counted sample is
+>   at least 1, so a non-empty baseline always averages >= 1; and an empty one is
+>   already caught by the sample-count arm above it. An exhaustive search over
+>   all 65,536 combinations of the eight weekly window counts reaches it zero
+>   times. It is harmless dead code, but it should not be described as a guard.
+>
+>   Correcting the in-body comment would mean re-emitting a 1000-line function,
+>   which is not worth it for a comment — recorded here and in the card's test
+>   suite, where someone reasoning about the arms will look.

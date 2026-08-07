@@ -213,10 +213,21 @@ end $$;
 -- carries NO opening-hours data at all — so this arm fires only when every
 -- branch is deactivated, which is an admin action, not a nightly event.
 --
--- What actually keeps the card quiet overnight is the `baseline < 1` arm: a
--- 04:00 window is compared against 04:00 windows from previous weeks, which are
--- equally empty, so there is no shortfall to report. This case still pins real
--- and useful behaviour; it just is not the night-time guard.
+-- What actually keeps the card quiet overnight is the MINIMUM-SAMPLE arm,
+-- `baseline_samples < 3`. At 04:00 the historical 04:00 windows are equally
+-- empty, every `c` is 0, the `where c > 0` filter drops them all, and the
+-- sample count is 0 — so that arm returns `idle` before anything else is
+-- considered.
+--
+-- It is NOT the `baseline < 1` arm, which is unreachable: the same `where c > 0`
+-- filter means every counted sample is at least 1, so a non-empty baseline
+-- always averages >= 1, and an empty one has already been caught by the
+-- sample-count arm above. Verified by exhaustive search over the 8 weekly
+-- window counts — no combination reaches it. Harmless dead code, but it should
+-- not be described as a guard that does something.
+--
+-- This case still pins real and useful behaviour; it just is not the
+-- night-time guard.
 do $$
 declare v_state text; v_card jsonb;
 begin
