@@ -92,8 +92,10 @@ The default branch **is** production. Everything below is deployed and active:
   (live `20260807172027`): `order_flow:health` at critical on `failing`, warning
   on `degraded`/`unavailable`, and nothing at all on `idle`. The bilingual
   renderer names it `تدفق الطلبات` / `Order Flow` in outbox rows. **It cannot
-  fire yet** — the card needs 3 comparable weeks and Production has 24 orders
-  total, so it reads `idle` (`docs/MIGRATIONS.md` §26).
+  fire on today's data** — checked across every evaluation instant, not inferred
+  from one: the best achievable `baseline_samples` is 2 against a required 3, so
+  there is no hour of the week at which the card leaves `idle`
+  (`docs/MIGRATIONS.md` §26).
 - **Order confirmation state machine** — one authoritative customer-visible
   order state, server-counted manual resends, and refund *enrolment*. Refund
   *processing* is not running (§5).

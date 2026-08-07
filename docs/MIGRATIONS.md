@@ -2163,7 +2163,43 @@ The alert path is now armed end to end: a `failing` order-flow card will raise
 in-dashboard inbox within five minutes, and the outbox rows will name the
 subsystem correctly in both languages.
 
-**It has not fired and cannot yet.** The card needs 3 comparable weeks before it
-leaves `idle`, and Production has 24 orders in total with `baseline_samples` at
-0. So this closes the gap in the *mechanism*; the *coverage* still depends on
-order volume that does not exist yet. §25's closing note applies unchanged.
+**It has not fired, and on today's data it cannot — proven rather than inferred.**
+
+An earlier revision of this paragraph argued that from the single
+`baseline_samples = 0` reading taken at the verification instant. That reasoning
+was not sound, and automated review on PR #173 was right to challenge it:
+`operations_health_snapshot_internal` recomputes the sample count for whatever
+window it is called in, so one observation says nothing about the other 167 hours
+of the week. The conclusion happened to survive; the argument did not.
+
+The actual check. An order at time `o` covers weekly-offset sample `w` for every
+evaluation instant `t` in `[o + w weeks, o + w weeks + 60min)`, so the sample
+count can only reach a maximum at some `t = o + w weeks`. Evaluating all 24 × 8
+such candidates against Production's orders:
+
+| | |
+| --- | --- |
+| Orders | **24**, spanning **24.47 days** (2026-07-08 → 2026-08-01), 4 ISO weeks |
+| **Maximum `baseline_samples` at ANY evaluation instant** | **2** |
+| Candidate instants reaching the required 3 | **0** |
+
+So there is no hour of the week at which this card could currently leave `idle`.
+That is a fact about the present data, not a permanent property: it changes the
+moment the same hour-of-week trades in 3 of the previous 8 weeks.
+
+This closes the gap in the **mechanism**. The **coverage** still depends on order
+volume that does not exist yet. §25's closing note applies unchanged.
+
+> Two things surfaced while checking this, neither part of this migration and
+> both worth someone's attention:
+>
+> * **The newest order is 2026-08-01** — six days before this apply. Combined
+>   with 21 of 24 orders still sitting in `received`, that is an operational
+>   signal this ledger is not the right place to chase, but it should not go
+>   unrecorded.
+> * **`open_branches` counts `branches.is_active`**, which is a configuration
+>   flag rather than a trading-hours state. The card's "no branch open → idle"
+>   arm therefore does not actually suppress it outside opening hours; only the
+>   baseline gate does. That is a real difference between what the card's comment
+>   claims and what it does, and it deserves its own look once the baseline is
+>   warm enough for the arm to matter.
