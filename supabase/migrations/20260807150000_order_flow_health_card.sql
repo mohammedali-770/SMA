@@ -1050,7 +1050,7 @@ grant execute on function public.operations_health_snapshot_internal()
   to service_role;
 
 comment on function public.operations_health_snapshot_internal() is
-  'Read-only Operations Health snapshot. Since 20260807 it carries an order_flow card in the critical set: orders in the last hour against a trailing same-weekday-same-hour baseline over the previous 8 weeks (Riyadh local), gated on at least one branch being open and at least 3 comparable weeks of history. Reports idle rather than failing while that baseline is warming up.';
+  'Read-only Operations Health snapshot. Since 20260807 it carries an order_flow card in the critical set: orders in the last 60 minutes against a trailing baseline built from THE SAME ROLLING 60-MINUTE WINDOW shifted back whole weeks, over the previous 8 weeks. Whole-week offsets preserve weekday and time of day, and Saudi Arabia has no daylight saving, so this card performs no timezone conversion and no clock-hour bucketing. A week with no orders in that window is not counted as a sample. Gated on at least one branch being open and at least 3 comparable weeks of history, and reports idle rather than failing while that baseline is warming up.';
 
 -- ---------------------------------------------------------------------------
 -- Rollback
