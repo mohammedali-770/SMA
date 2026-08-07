@@ -376,14 +376,42 @@ begin
     raise exception 'FAIL(12): the outbox enqueued nothing (%)', v_n;
   end if;
 
+  if v_n <> 2 then
+    raise exception 'FAIL(12): expected one row per language, got %', v_n;
+  end if;
+
+  -- Only the HUMAN-FACING fields are checked. `template_data` deliberately
+  -- carries the raw subsystem id as machine data, and must keep doing so — a
+  -- blanket check over the whole row would flag that as a leak and be wrong.
   select count(*) into v_bad
     from public.operations_alert_outbox
-   where event_id = v_event_id
+   where alert_event_id = v_event_id
      and (subject_safe like '%order_flow%' or body_safe like '%order_flow%');
   if v_bad > 0 then
     raise exception 'FAIL(12): % outbox row(s) carry the raw id instead of a label', v_bad;
   end if;
-  raise notice 'CASE 12 ok: % outbox row(s), none carrying the raw id', v_n;
+
+  -- Both languages present, each naming the subsystem in its own script.
+  if not exists (select 1 from public.operations_alert_outbox
+                  where alert_event_id = v_event_id and language = 'ar'
+                    and subject_safe like '%تدفق الطلبات%') then
+    raise exception 'FAIL(12): no Arabic outbox row naming the subsystem';
+  end if;
+  if not exists (select 1 from public.operations_alert_outbox
+                  where alert_event_id = v_event_id and language = 'en'
+                    and subject_safe like '%Order Flow%') then
+    raise exception 'FAIL(12): no English outbox row naming the subsystem';
+  end if;
+
+  -- The machine payload SHOULD still carry the raw id; assert it rather than
+  -- leaving it to chance, since a future "sanitise everything" change could
+  -- silently strip the field the dispatcher will need.
+  if not exists (select 1 from public.operations_alert_outbox
+                  where alert_event_id = v_event_id
+                    and template_data ->> 'subsystem' = 'order_flow') then
+    raise exception 'FAIL(12): template_data lost the machine-readable subsystem';
+  end if;
+  raise notice 'CASE 12 ok: % outbox rows, labels in both scripts, raw id only in template_data', v_n;
 end $$;
 
 do $$ begin
