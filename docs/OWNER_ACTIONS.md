@@ -283,17 +283,40 @@ builds from its own webhook and does not consult them. So both changes are
 needed, and this one is the only thing that stops a red build reaching
 customers.
 
-The order matters, and doing it the other way round takes the site down:
+**The job now exists.** `production-gates.yml` carries a `deploy` job with
+`needs: [build, edge-functions, audit]`, and it is **inert**: it runs only when
+a repository variable `DEPLOY_GATE_ENABLED` is exactly `true`, which is unset.
+Merging it changed nothing about how the site deploys today.
 
-1. **First**, in Vercel → Settings → Git, turn off automatic deploys (or set the
-   Ignored Build Step to exit 0 only for the gated path).
-2. **Then** the deploy job can be added to `production-gates.yml` with
-   `needs: [build, edge-functions, audit]` and a `VERCEL_TOKEN`.
+> **Correction.** This section previously said "step 2 is written and ready but
+> deliberately not merged". No such patch existed anywhere in the repository —
+> only that sentence. Had you flipped the Vercel toggle and said "step 1 done",
+> there would have been nothing to merge, at exactly the moment the site was
+> unprotected. Writing it as a reviewed, version-controlled, switched-off job is
+> the fix.
 
-Step 2 is written and ready but **deliberately not merged** — adding it while
-auto-deploy is still on would double-deploy every merge, and adding it after
-auto-deploy is off but before the token exists would stop deploying entirely.
-Tell the engineer when step 1 is done.
+The order still matters, and doing it the other way round takes the site down:
+
+1. **First**, Vercel → Settings → Git: turn **off** automatic deploys (or set the
+   Ignored Build Step to exit 0 only for the gated path). Enabling the job while
+   auto-deploy is on double-deploys every merge.
+2. **Then** add the credentials — Settings → Secrets: `VERCEL_TOKEN`,
+   `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+3. **Last**, Settings → Variables: `DEPLOY_GATE_ENABLED` = `true`.
+
+The job's first step refuses to run if the variable is set but any secret is
+missing, and says why — that combination means auto-deploy is off and CI cannot
+deploy either, so nothing would reach customers at all.
+
+> ⚠️ **The deploy path is UNVERIFIED.** It has never executed and cannot be,
+> without the token and with auto-deploy still on. A green CI run on the file
+> proves the YAML parses, nothing more. Before step 3, trial it once with
+> `--prod` removed from the final command so it produces a Preview, confirm that
+> deployment serves correctly, and only then switch to production.
+
+**Do not add `Deploy to Vercel (gated on CI)` to the required status checks**
+(§3.1). It is skipped on every pull request by design, and a required check has
+no business gating on a job that intentionally does not run.
 
 ### 3.4 Staging environment
 

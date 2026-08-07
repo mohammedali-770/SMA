@@ -149,7 +149,8 @@ is *permanently pending*, which blocks every merge instead of gating one:
 | `SQL suites gate` | `sql-suites.yml` |
 
 There is **no aggregate `Production gates` check** — that workflow emits the
-three jobs above and nothing else. `Design system` (spaced, capitalised) is the
+three jobs above plus `Deploy to Vercel (gated on CI)`, which is **skipped by
+design** and must NOT be required (`docs/OWNER_ACTIONS.md` §3.5). `Design system` (spaced, capitalised) is the
 workflow's display name, not its context.
 
 **Require `SQL suites gate`, NOT `Migration chain + SQL suites`.** The heavy job

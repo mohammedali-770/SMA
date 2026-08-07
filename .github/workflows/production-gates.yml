@@ -175,3 +175,79 @@ jobs:
       # date — that file is the place to justify anything left unfixed.
       - name: Audit mobile dependencies
         run: npm --prefix apps/mobile audit --audit-level=high
+
+  # ---------------------------------------------------------------------------
+  # THE DEPLOY GATE — INERT BY DEFAULT. Read before enabling.
+  # ---------------------------------------------------------------------------
+  # docs/OWNER_ACTIONS.md §3.5: Vercel currently builds from its own webhook, in
+  # parallel with these gates rather than after them, so a merge reaches
+  # customers whether or not the jobs above went red. A required status check
+  # cannot fix that — it gates the MERGE, not the DEPLOY.
+  #
+  # This job is the fix, and it does nothing until two switches are set:
+  #
+  #   1. Vercel → Settings → Git: turn OFF automatic deploys. MUST BE FIRST.
+  #      Enabling this job while auto-deploy is on double-deploys every merge.
+  #   2. Repository → Settings:
+  #        Variables → DEPLOY_GATE_ENABLED = true
+  #        Secrets   → VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+  #
+  # Until DEPLOY_GATE_ENABLED is exactly 'true' the `if:` below is false and the
+  # job never runs, so merging this file changes nothing about how the site
+  # deploys today. That is deliberate: the alternative was a patch pasted into a
+  # document, which is neither reviewed nor version-controlled, and §3.5
+  # previously claimed such a patch existed when it did not.
+  #
+  # ⚠️ UNVERIFIED. This has never executed — it cannot be, without the token and
+  # with auto-deploy still on. Before flipping DEPLOY_GATE_ENABLED, trial it once
+  # with `--prod` removed from the final step so it produces a Preview, confirm
+  # that deployment serves correctly, and only then switch to production. Do not
+  # take a green CI run on this file as evidence that the deploy path works.
+  deploy:
+    name: Deploy to Vercel (gated on CI)
+    needs: [build, edge-functions, audit]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/claude/project-build-ie4b56' &&
+      vars.DEPLOY_GATE_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Refuse to run half-configured
+        env:
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          ORG: ${{ secrets.VERCEL_ORG_ID }}
+          PROJECT: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "$TOKEN" ]   || missing="$missing VERCEL_TOKEN"
+          [ -n "$ORG" ]     || missing="$missing VERCEL_ORG_ID"
+          [ -n "$PROJECT" ] || missing="$missing VERCEL_PROJECT_ID"
+          if [ -n "$missing" ]; then
+            echo "::error::DEPLOY_GATE_ENABLED is true but these secrets are missing:$missing"
+            echo "::error::With Vercel auto-deploy off and this job unable to run, nothing would deploy. Set them or unset the variable."
+            exit 1
+          fi
+          echo "all three credentials present"
+
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Deploy
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx --yes vercel@latest pull --yes --environment=production --token="$TOKEN"
+          npx --yes vercel@latest build --prod --token="$TOKEN"
+          npx --yes vercel@latest deploy --prebuilt --prod --token="$TOKEN"
