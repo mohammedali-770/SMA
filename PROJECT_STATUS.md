@@ -1,6 +1,6 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-07 (default-branch head `7126670`).
+> Last updated: 2026-08-07 (default-branch head `aae7cee`).
 > Read this first when opening the project in VS Code (or any editor) from a
 > fresh clone. It tells you what this repository is, what is LIVE in
 > production, how to run everything, and which rules must never be broken.
@@ -68,10 +68,14 @@ The default branch **is** production. Everything below is deployed and active:
 - **Ordering + checkout + Tap payments** are deployed and functional, but
   **"customers order and pay today" was not true and has been removed.**
   Measured against Production on 2026-08-07: 24 orders, **2 distinct
-  customers**, 5 profiles, 6 checkout sessions, and **every single order still
-  `payment_status = 'pending'`**. Not one order has ever been paid, and not one
-  has ever reached `delivered` — the 24 are 21 `received` and 3 `cancelled`.
-  Newest order 2026-08-01; newest OTP challenge 2026-07-21.
+  customers**, 5 profiles, 6 checkout sessions. **Not one order has ever reached
+  `delivered`** — the 24 are 21 `received` and 3 `cancelled`. Newest order
+  2026-08-01; newest OTP challenge 2026-07-21.
+
+  (Every order is also `payment_status = 'pending'`, but that is **not** the
+  signal it looks like: for the 20 cash orders `pending` is the correct terminal
+  state by design. `status` is the lifecycle indicator — see the correction in
+  "Production reality check".)
 
   This is **pre-launch test traffic, not trade.** The distinction matters for
   every priority below: the risk today is not losing a book of business, it is
@@ -137,12 +141,32 @@ business. The data does not support that, and saying so changes what matters.
 | --- | --- |
 | Orders, all time | **24** (21 `received`, 3 `cancelled`) |
 | Orders ever `delivered` | **0** |
-| Orders ever `payment_status = 'paid'` | **0** — all 24 are `pending` |
+| Orders ever `payment_status = 'paid'` | 0 — but see the note below; for cash this is **correct by design**, not a gap |
 | Distinct customers who have ordered | **2** |
 | Profiles | 5 |
 | Checkout sessions | 6 |
 | OTP challenges in the last 7 days | **0** (newest 2026-07-21) |
 | Order spread | **8 distinct order dates**, spanning **24.5 days** (2026-07-08 → 2026-08-01) |
+
+> **Correction (2026-08-07): "0 orders ever paid" is a misleading metric, and it
+> was mine.** An earlier revision of this table listed it as evidence of an
+> incomplete pipeline. It is not, for most of the rows.
+>
+> `20260709140000_payment_methods.sql` is explicit: *"paid is only ever set by
+> the service-role `confirm_order_payment` after a verified **online**
+> payment"*, and `"cash pending"/"unpaid"` are **derived in the UI** from method
+> plus status. `paymentDisplayState({paymentStatus:'pending', paymentMethod:'cash'})`
+> returns `cash_required`, and that is unit-tested.
+>
+> So of the 24: **20 are cash, where `pending` is the correct terminal state** —
+> cash is collected at the counter through the POS, never in the app. 3 are
+> `online` and genuinely never completed payment. 1 predates the
+> `payment_method` column and is null.
+>
+> Chasing "0 paid" would have meant chasing a non-problem **inside the frozen
+> payment/Tap area** (CLAUDE.md §6). **`status` is the real lifecycle indicator,
+> not `payment_status`** — and on that measure the finding stands unchanged: no
+> order has ever reached `delivered`.
 
 **What this does and does not mean.** It does *not* mean something broke: there
 was never a flow to stop, so a quiet period is not a regression. Earlier notes
@@ -151,10 +175,14 @@ that reading was wrong, and it was wrong because it looked at the newest
 timestamp without looking at the denominator.
 
 What it *does* mean is sharper: **the happy path has never completed once in
-production.** No order has been paid, and none has moved past `received`. Every
-subsystem is deployed, but the thing they exist to produce end-to-end has not
-been observed. That is the largest unproven assumption on the readiness plan,
-and no amount of CI or backup configuration substitutes for it.
+production.** The evidence for that is `status` alone — **no order has ever moved
+past `received`**, so nothing has been prepared, dispatched or delivered. (The
+payment side adds nothing to this conclusion: 20 of the 24 are cash, where
+`pending` is the correct terminal state. Only the 3 `online` orders are genuinely
+unpaid, and those are inside the frozen payment area.) Every subsystem is
+deployed, but the thing they exist to produce end-to-end has not been observed.
+That is the largest unproven assumption on the readiness plan, and no amount of
+CI or backup configuration substitutes for it.
 
 It also re-orders urgency honestly. Point-in-time recovery (`docs/OWNER_ACTIONS.md`
 §2.1) is still the right pre-launch priority, but the data at risk *today* is 2
