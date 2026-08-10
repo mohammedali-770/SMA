@@ -8,13 +8,16 @@
 -- ============================================================================
 
 create table if not exists public.role_change_audit (
-  id            bigint generated always as identity primary key,
-  target_user_id uuid not null references auth.users(id) on delete restrict,
-  old_role      public.user_role not null,
-  new_role      public.user_role not null,
-  reason        text not null,
-  changed_by    uuid references auth.users(id) on delete set null,
-  changed_at    timestamptz not null default now(),
+  id             bigint generated always as identity primary key,
+  -- SET NULL is deliberate: account deletion must still be able to remove the
+  -- Auth user/profile after a historic role change. old/new role, reason, actor
+  -- and timestamp retain the operational audit without pinning the erased user.
+  target_user_id uuid references auth.users(id) on delete set null,
+  old_role       public.user_role not null,
+  new_role       public.user_role not null,
+  reason         text not null,
+  changed_by     uuid references auth.users(id) on delete set null,
+  changed_at     timestamptz not null default now(),
   check (old_role <> new_role),
   check (length(btrim(reason)) between 3 and 500)
 );
@@ -49,6 +52,7 @@ declare
   v_reason text := btrim(coalesce(p_reason, ''));
   v_admin_count integer;
 begin
+  -- Fast reject before waiting on the serialization lock.
   if not public.is_admin() then
     raise exception 'Only admins may change staff roles' using errcode = '42501';
   end if;
@@ -60,10 +64,16 @@ begin
       using errcode = '22023';
   end if;
 
-  -- Serialize role changes that can affect the last-admin invariant. Without
-  -- this lock two admins could demote each other concurrently after both observe
-  -- count(*) = 2 and leave the system with no administrator.
+  -- Serialize every staff role mutation. This protects both the last-admin
+  -- invariant and offboarding authorization itself. A caller may have been an
+  -- admin when it queued behind this lock but demoted by the transaction ahead
+  -- of it, so authorization MUST be re-read after acquiring the lock.
   perform pg_advisory_xact_lock(hashtext('spicymeal:staff-role-admin-count'));
+
+  if not public.is_admin() then
+    raise exception 'Administrator access was revoked before this change executed'
+      using errcode = '42501';
+  end if;
 
   select * into v_target
     from public.profiles
@@ -113,9 +123,6 @@ revoke all on function public.admin_set_user_role(uuid, public.user_role, text)
 grant execute on function public.admin_set_user_role(uuid, public.user_role, text)
   to authenticated;
 
--- Admin-only staff directory. The ordinary profiles RLS already lets staff read
--- profiles, but this explicit RPC gives a stable least-surface contract for the
--- future Staff panel and avoids a browser depending on table-wide shape.
 create or replace function public.admin_list_staff()
 returns jsonb
 language plpgsql
@@ -143,8 +150,8 @@ revoke all on function public.admin_list_staff() from public, anon;
 grant execute on function public.admin_list_staff() to authenticated;
 
 comment on table public.role_change_audit is
-  'Append-only audit of admin/accountant/customer role changes. Client writes are denied; only admin_set_user_role inserts rows.';
+  'Append-only operational audit of staff role changes. Target/actor Auth FKs use SET NULL so account erasure remains possible; role transition, reason and timestamp remain. Client writes are denied.';
 comment on function public.admin_set_user_role(uuid, public.user_role, text) is
-  'Admin-only audited role grant/revoke with a concurrency-safe last-admin guard. Idempotent same-role calls do not create audit noise.';
+  'Admin-only audited role grant/revoke with serialization, post-lock reauthorization, and a last-admin guard. Same-role calls are idempotent.';
 comment on function public.admin_list_staff() is
   'Admin-only explicit staff directory projection for management UI; returns admin/accountant profiles only.';
