@@ -1,21 +1,24 @@
 -- ============================================================================
--- Spicy Meal — server-side modifier selection contract
+-- Spicy Meal — server-side modifier selection contract for CASH orders
 --
 -- `place_order` validates each supplied modifier belongs to the product and is
 -- active, but historically did not enforce modifier-group min/max/required
--- cardinality or duplicate modifier IDs. A forged client could therefore create
--- an order that the normal UI would never allow (for example, omit the required
--- Heat Level selection or send two Heat Level values where max_select=1).
+-- cardinality or duplicate modifier IDs. A forged cash-order client could
+-- therefore create an order that the normal UI would never allow.
 --
--- This migration adds a DEFERRED constraint check on newly inserted order items
--- and modifier rows. It runs at transaction commit, after `place_order` has
--- inserted the item and all selected modifiers, so a violation rolls back the
--- entire order transaction (including coupon/loyalty side effects) without
--- changing checkout/payment code.
+-- This migration adds a DEFERRED constraint check on newly inserted CASH order
+-- items and modifier rows. It runs at transaction commit, after the order item and
+-- all selected modifiers exist, so a violation rolls back the whole transaction.
+--
+-- IMPORTANT PAYMENT BOUNDARY: online checkout sessions are intentionally NOT
+-- revalidated here. Their authorized snapshot may be finalized only after an
+-- external payment has already been captured; re-checking that snapshot against
+-- mutable live menu data (for example after an admin deactivates a modifier)
+-- could leave a charged customer without an order. The payment/Tap path remains
+-- frozen and unchanged.
 --
 -- INSERT-only on purpose: historical order snapshots must remain readable even
--- if an admin later deactivates/deletes a menu modifier. Menu evolution therefore
--- never retroactively invalidates an old order.
+-- if menu configuration changes later.
 -- ============================================================================
 
 create or replace function public.assert_order_item_modifier_contract(p_order_item_id uuid)
@@ -26,6 +29,7 @@ set search_path = public
 as $$
 declare
   v_product_id uuid;
+  v_payment_method text;
   v_group record;
   v_selected integer;
 begin
@@ -33,12 +37,21 @@ begin
     raise exception 'order item id required' using errcode = '22004';
   end if;
 
-  select oi.product_id into v_product_id
+  select oi.product_id, o.payment_method
+    into v_product_id, v_payment_method
     from public.order_items oi
+    join public.orders o on o.id = oi.order_id
    where oi.id = p_order_item_id;
 
   if not found then
     raise exception 'order item not found' using errcode = 'P0002';
+  end if;
+
+  -- Preserve the already-authorized online checkout snapshot contract. Online
+  -- finalization must not fail after capture merely because mutable catalog data
+  -- changed after the session was created/validated.
+  if v_payment_method is distinct from 'cash' then
+    return;
   end if;
 
   if v_product_id is null then
@@ -116,10 +129,6 @@ as $$
 declare
   v_order_item_id uuid;
 begin
-  -- Do not use a CASE expression here: PL/pgSQL resolves fields on the dynamic
-  -- NEW record even for the non-selected CASE arm, and `order_items` has no
-  -- `order_item_id` column. Separate branches resolve only the field that exists
-  -- on the table that fired the trigger.
   if tg_table_name = 'order_items' then
     v_order_item_id := new.id;
   elsif tg_table_name = 'order_item_modifiers' then
@@ -154,4 +163,4 @@ create constraint trigger validate_new_order_item_modifiers_on_modifier
   for each row execute function public.enforce_new_order_item_modifier_contract();
 
 comment on function public.assert_order_item_modifier_contract(uuid) is
-  'Validates the final modifier selection of a newly-created order item: selected modifiers are unique/active/linked and every linked group satisfies required/min/max cardinality. Called by deferred INSERT-only constraint triggers so violations roll back the order transaction without retroactively validating historical snapshots.';
+  'For newly-created CASH order items only: validates unique/active/linked modifiers and required/min/max group cardinality. Online checkout snapshots are deliberately excluded so post-capture finalization is not revalidated against mutable menu data. Deferred INSERT-only triggers preserve transaction atomicity and historical snapshots (20260810132000).';
