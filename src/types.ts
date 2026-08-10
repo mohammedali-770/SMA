@@ -142,6 +142,9 @@ export interface Order {
   loyaltyDiscountAmount?: number; // value of loyalty points redeemed at checkout
   loyaltyPointsEarned?: number; // points credited by place_order for this order
   loyaltyPointsRedeemed?: number; // points spent on this order
+  /** VAT component persisted by place_order at order time. Historical receipts
+   * must prefer this snapshot over recomputing from today's configured rate. */
+  vatAmount?: number;
   total: number; // subtotal + deliveryFee - discountAmount - loyaltyDiscountAmount
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // how the customer pays: 'online' | 'cash' (admin-configured availability)
