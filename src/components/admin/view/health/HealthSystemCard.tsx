@@ -29,6 +29,13 @@ import {
   type AdminLang, type TargetTab,
 } from './healthView';
 
+/**
+ * This is intentionally a total Record keyed by the wire-level system id. When a
+ * backend card is added, TypeScript now forces this map to be updated before the
+ * frontend can compile. The 20260807 `order_flow` backend rollout was the reason:
+ * the old map lacked it and `text.ar/text.en` could dereference undefined at
+ * runtime as soon as staff opened the Health Center.
+ */
 const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
   en: string; ar: string; descEn: string; descAr: string;
 }> = {
@@ -43,6 +50,12 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
     ar: 'سلامة الطلبات',
     descEn: 'Observe-only order, payment and POS consistency watchdog.',
     descAr: 'مراقبة سلامة الطلبات والدفع ونقاط البيع دون تعديل تلقائي.',
+  },
+  order_flow: {
+    en: 'Order Flow',
+    ar: 'تدفق الطلبات',
+    descEn: 'Recent ordering activity compared with active branches and a trailing same-hour baseline.',
+    descAr: 'نشاط الطلبات الحديث مقارنة بالفروع النشطة وخط أساس لنفس الساعة.',
   },
   account_deletion: {
     en: 'Account Deletion',
@@ -114,6 +127,16 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
         <HealthMetric label={isAr ? 'حرج' : 'Critical'} value={numberValue(d, 'open_critical_count')} />
         <HealthMetric label={isAr ? 'تحذيرات' : 'Warnings'} value={numberValue(d, 'open_warning_count')} />
         <HealthMetric label={isAr ? 'آخر فحص' : 'Last scan'} value={relativeAge(stringValue(d, 'latest_successful_run_at'), lang)} />
+      </>
+    );
+  }
+
+  if (system.id === 'order_flow') {
+    return (
+      <>
+        <HealthMetric label={isAr ? 'طلبات حديثة' : 'Recent orders'} value={numberValue(d, 'recent_order_count')} />
+        <HealthMetric label={isAr ? 'فروع نشطة' : 'Active branches'} value={numberValue(d, 'active_branch_count')} />
+        <HealthMetric label={isAr ? 'متوسط خط الأساس' : 'Baseline avg'} value={numberValue(d, 'baseline_same_hour_avg_orders')} />
       </>
     );
   }
