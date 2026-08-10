@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, CreditCard, MessageSquare, ShieldCheck, Store } from 'lucide-react';
+import { Check, CreditCard, MessageSquare, ShieldCheck, Store, UsersRound } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
@@ -13,19 +13,16 @@ import { WhatsAppOtpPanel } from './WhatsAppOtpPanel';
 import { EmailServerPanel } from './EmailServerPanel';
 import { TapPaymentPanel } from './TapPaymentPanel';
 import { PushToolsPanel } from './PushToolsPanel';
+import { StaffAccessPanel } from './StaffAccessPanel';
 
 /**
- * Admin-only "Integrations" console — split out of Settings because the secure
- * integration slots grew into too many sub-sectors for one scroll. Providers are
- * grouped into sub-tabs (Payments / Messaging & Notifications / POS & Delivery),
- * each pairing the generic secure-config card with its live status/test panel.
- * Secrets are persisted server-side (secret_config) and never read back here.
+ * Admin-only system console for external integrations + staff access.
  *
- * An accountant is BLOCKED here rather than shown a read-only view: the rows
- * carry provider identifiers and endpoint configuration, and there is nothing on
- * this screen a non-admin has a reason to read.
+ * Provider secrets remain server-only. Staff Access is intentionally a sibling
+ * sub-tab rather than part of provider loading: a broken payment/messaging
+ * provider must never prevent an administrator from offboarding staff.
  */
-type IntegrationGroup = 'payments' | 'messaging' | 'pos';
+type IntegrationGroup = 'payments' | 'messaging' | 'pos' | 'staff';
 
 export const IntegrationsPanel: React.FC = () => {
   const {
@@ -43,17 +40,84 @@ export const IntegrationsPanel: React.FC = () => {
     { key: 'payments', icon: CreditCard, label: isRTL ? 'المدفوعات' : 'Payments' },
     { key: 'messaging', icon: MessageSquare, label: isRTL ? 'الرسائل والإشعارات' : 'Messaging & Notifications' },
     { key: 'pos', icon: Store, label: isRTL ? 'الكاشير والتوصيل' : 'POS & Delivery' },
+    { key: 'staff', icon: UsersRound, label: isRTL ? 'صلاحيات الموظفين' : 'Staff Access' },
   ];
+
+  const providerContent = () => {
+    if (integrationsError) {
+      return (
+        <Notice title={integrationsError} tone="blocking">
+          <Button
+            label={isRTL ? 'إعادة المحاولة' : 'Retry'}
+            onClick={() => { void loadIntegrations(); }}
+            variant="secondary"
+          />
+        </Notice>
+      );
+    }
+
+    if (integrationsLoading) {
+      return (
+        <Text variant="body" tone="tertiary" as="p" className="py-8 text-center">
+          {isRTL ? 'جاري التحميل…' : 'Loading…'}
+        </Text>
+      );
+    }
+
+    return (
+      <>
+        <div className="space-y-4">
+          {group === 'payments' && (
+            <>
+              <IntegrationCard providerType="payment" row={rowFor('payment')} disabled={isAccountant} onSave={saveIntegration} />
+              <TapPaymentPanel disabled={isAccountant} />
+            </>
+          )}
+
+          {group === 'messaging' && (
+            <>
+              <IntegrationCard providerType="whatsapp" row={rowFor('whatsapp')} disabled={isAccountant} onSave={saveIntegration} />
+              <WhatsAppOtpPanel disabled={isAccountant} />
+              <IntegrationCard providerType="sms" row={rowFor('sms')} disabled={isAccountant} onSave={saveIntegration} />
+              <IntegrationCard providerType="email" row={rowFor('email')} disabled={isAccountant} onSave={saveIntegration} />
+              <EmailServerPanel disabled={isAccountant} />
+              <IntegrationCard providerType="push" row={rowFor('push')} disabled={isAccountant} onSave={saveIntegration} />
+              <PushToolsPanel disabled={isAccountant} />
+            </>
+          )}
+
+          {group === 'pos' && (
+            <>
+              <IntegrationCard providerType="lazywait" row={rowFor('lazywait')} disabled={isAccountant} onSave={saveIntegration} />
+              <LazywaitPanel disabled={isAccountant} />
+            </>
+          )}
+        </div>
+
+        <Card className="mt-4 flex items-start gap-2">
+          <Check className="mt-0.5 size-4 shrink-0 text-mint" aria-hidden="true" />
+          <div>
+            <Text variant="label" as="p">{isRTL ? 'تخزين آمن' : 'Secure storage'}</Text>
+            <Text variant="caption" tone="secondary" as="p" className="mt-0.5">
+              {isRTL
+                ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. إعدادات الصلاحيات منفصلة عن أسرار التكاملات وتُسجل في سجل تدقيق.'
+                : 'Provider secrets stay server-side and never reach the browser. Staff access is separate from provider secrets and every role change is audited.'}
+            </Text>
+          </div>
+        </Card>
+      </>
+    );
+  };
 
   return (
     <div className="space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="flex items-start justify-between gap-3 border-b border-con-line pb-3">
         <div className="min-w-0">
-          <Text variant="title" as="h3">{isRTL ? 'الربط والتكاملات' : 'Integrations'}</Text>
+          <Text variant="title" as="h3">{isRTL ? 'إدارة النظام والتكاملات' : 'System Integrations & Access'}</Text>
           <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">
             {isRTL
-              ? 'بوابات الدفع والرسائل والإشعارات والربط مع الكاشير والتوصيل — تُحفظ الأسرار في الخادم ولا تصل للمتصفح أبداً'
-              : 'Payment, messaging, notifications & POS — secrets are stored server-side, never sent to the browser'}
+              ? 'بوابات الدفع والرسائل والكاشير وصلاحيات الموظفين — الأسرار والصلاحيات محمية على الخادم'
+              : 'Payment, messaging, POS and staff access — provider secrets and role mutations stay server-controlled'}
           </Text>
         </div>
         <span className="inline-flex shrink-0 items-center gap-1">
@@ -64,21 +128,9 @@ export const IntegrationsPanel: React.FC = () => {
 
       {isAccountant ? (
         <Notice
-          title={isRTL ? 'إعدادات التكامل متاحة للمشرف فقط.' : 'Integration settings are available to admins only.'}
+          title={isRTL ? 'إدارة النظام متاحة للمشرف فقط.' : 'System administration is available to admins only.'}
           tone="warning"
         />
-      ) : integrationsError ? (
-        <Notice title={integrationsError} tone="blocking">
-          <Button
-            label={isRTL ? 'إعادة المحاولة' : 'Retry'}
-            onClick={() => { void loadIntegrations(); }}
-            variant="secondary"
-          />
-        </Notice>
-      ) : integrationsLoading ? (
-        <Text variant="body" tone="tertiary" as="p" className="py-8 text-center">
-          {isRTL ? 'جاري التحميل…' : 'Loading…'}
-        </Text>
       ) : (
         <>
           <div className="flex gap-1.5 overflow-x-auto border-b border-con-line pb-1">
@@ -104,45 +156,9 @@ export const IntegrationsPanel: React.FC = () => {
             })}
           </div>
 
-          <div className="space-y-4">
-            {group === 'payments' && (
-              <>
-                <IntegrationCard providerType="payment" row={rowFor('payment')} disabled={isAccountant} onSave={saveIntegration} />
-                <TapPaymentPanel disabled={isAccountant} />
-              </>
-            )}
-
-            {group === 'messaging' && (
-              <>
-                <IntegrationCard providerType="whatsapp" row={rowFor('whatsapp')} disabled={isAccountant} onSave={saveIntegration} />
-                <WhatsAppOtpPanel disabled={isAccountant} />
-                <IntegrationCard providerType="sms" row={rowFor('sms')} disabled={isAccountant} onSave={saveIntegration} />
-                <IntegrationCard providerType="email" row={rowFor('email')} disabled={isAccountant} onSave={saveIntegration} />
-                <EmailServerPanel disabled={isAccountant} />
-                <IntegrationCard providerType="push" row={rowFor('push')} disabled={isAccountant} onSave={saveIntegration} />
-                <PushToolsPanel disabled={isAccountant} />
-              </>
-            )}
-
-            {group === 'pos' && (
-              <>
-                <IntegrationCard providerType="lazywait" row={rowFor('lazywait')} disabled={isAccountant} onSave={saveIntegration} />
-                <LazywaitPanel disabled={isAccountant} />
-              </>
-            )}
-          </div>
-
-          <Card className="flex items-start gap-2">
-            <Check className="mt-0.5 size-4 shrink-0 text-mint" aria-hidden="true" />
-            <div>
-              <Text variant="label" as="p">{isRTL ? 'تخزين آمن' : 'Secure storage'}</Text>
-              <Text variant="caption" tone="secondary" as="p" className="mt-0.5">
-                {isRTL
-                  ? 'يتم حفظ الأسرار على الخادم فقط ولا تصل للمتصفح. Lazywait ومدفوعات Tap مفعّلة من جهة الخادم (Tap يبقى معطّلاً حتى تُدخل المفاتيح وتفعّله)؛ الرسائل غير مفعّلة بعد.'
-                  : 'Secrets are stored server-side and never reach the browser. Lazywait sync and Tap payments are wired server-side (Tap stays disabled until you enter keys and enable it); SMS is not activated yet.'}
-              </Text>
-            </div>
-          </Card>
+          {group === 'staff'
+            ? <StaffAccessPanel lang={adminLang} currentUserId={currentUser.id} />
+            : providerContent()}
         </>
       )}
     </div>
