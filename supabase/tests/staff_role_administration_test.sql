@@ -20,9 +20,11 @@ begin
   on conflict (id) do update set role=excluded.role, full_name=excluded.full_name;
 end $$;
 
--- Customer cannot grant themselves a role.
+-- Customer cannot grant themselves a role. The SQL CI harness makes
+-- test.is_admin/test.is_staff authoritative whenever test.auth_uid is present.
 select set_config('test.auth_uid','a1000000-0000-0000-0000-000000000003',true);
-select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000003',true);
+select set_config('test.is_admin','false',true);
+select set_config('test.is_staff','false',true);
 set local role authenticated;
 do $$
 begin
@@ -37,7 +39,8 @@ reset role;
 
 -- Admin promotes the customer to accountant and gets one audit row.
 select set_config('test.auth_uid','a1000000-0000-0000-0000-000000000001',true);
-select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
+select set_config('test.is_admin','true',true);
+select set_config('test.is_staff','true',true);
 set local role authenticated;
 do $$
 declare v jsonb; v_count integer;
@@ -102,7 +105,8 @@ reset role;
 
 -- Once not-admin, an accountant cannot read the role-change audit through RLS.
 select set_config('test.auth_uid','a1000000-0000-0000-0000-000000000002',true);
-select set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000002',true);
+select set_config('test.is_admin','false',true);
+select set_config('test.is_staff','true',true);
 set local role authenticated;
 do $$
 begin
