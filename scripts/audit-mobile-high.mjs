@@ -2,18 +2,20 @@
 /**
  * Fail-closed mobile npm audit gate with a tiny, time-bounded exception list.
  *
- * Why this exists:
- * - npm audit currently reports two HIGH image-size infinite-loop advisories.
- * - GitHub's reviewed advisory records say both affect <=2.0.2 and currently
- *   have no patched release (first_patched_version = null).
- * - image-size reaches this project through Metro/Expo's Node build toolchain;
- *   it is not executable code shipped in the customer application bundle.
+ * The only accepted HIGH advisories are two reviewed `image-size` infinite-loop
+ * DoS findings that currently have no patched release. `image-size` reaches SMA
+ * through Metro/Expo's Node build toolchain and is not executable code shipped
+ * in the customer application bundle.
  *
- * This script does NOT lower the audit level or ignore all transitive findings.
- * A high/critical vulnerability passes only when every high-severity path
- * recursively terminates in an explicitly allowlisted advisory. Any new direct
- * advisory, any critical advisory, an unknown path, malformed audit output, or
- * expiry of the exception fails the job.
+ * npm audit v2 models a direct advisory in `via` and propagates its severity up
+ * the reverse dependency graph in `effects`. We therefore validate BOTH sides:
+ *  1. every direct HIGH advisory object must be one of the exact allowlisted
+ *     image-size GHSAs; and
+ *  2. every HIGH vulnerability record must belong to image-size's recursive
+ *     `effects` closure.
+ *
+ * Any critical, any other direct high advisory, any high record outside that
+ * closure, malformed output, or expiry of the exception fails the job.
  */
 import { spawnSync } from 'node:child_process';
 
@@ -56,6 +58,7 @@ if (!report || typeof report !== 'object' || !report.vulnerabilities || !report.
   fail('npm audit JSON is missing expected vulnerabilities/metadata fields');
 }
 
+const vulnerabilities = report.vulnerabilities;
 const counts = report.metadata?.vulnerabilities ?? {};
 const critical = Number(counts.critical ?? 0);
 const high = Number(counts.high ?? 0);
@@ -65,78 +68,61 @@ if (high === 0) {
   process.exit(0);
 }
 
-const vulnerabilities = report.vulnerabilities;
-const memo = new Map();
-
 function ghsaFromUrl(url) {
   const match = String(url ?? '').match(/GHSA-[0-9a-z-]+/i);
   return match?.[0] ?? null;
 }
 
-function pathIsAllowed(name, visiting = new Set()) {
-  if (memo.has(name)) return memo.get(name);
-  if (visiting.has(name)) return false;
-  visiting.add(name);
-
-  const v = vulnerabilities[name];
-  if (!v || !['high', 'critical'].includes(String(v.severity))) {
-    visiting.delete(name);
-    memo.set(name, true);
-    return true;
-  }
-  if (String(v.severity) === 'critical') return false;
-
-  const via = Array.isArray(v.via) ? v.via : [];
-  if (via.length === 0) return false;
-
-  let sawHighCause = false;
-  for (const cause of via) {
-    if (typeof cause === 'string') {
-      const child = vulnerabilities[cause];
-      if (child && ['high', 'critical'].includes(String(child.severity))) {
-        sawHighCause = true;
-        if (!pathIsAllowed(cause, new Set(visiting))) return false;
-      }
-      continue;
-    }
-
-    const severity = String(cause?.severity ?? '').toLowerCase();
-    if (!['high', 'critical'].includes(severity)) continue;
-    sawHighCause = true;
-    if (severity === 'critical') return false;
-
-    const ghsa = ghsaFromUrl(cause?.url);
-    const exception = ghsa ? ALLOWED.get(ghsa) : null;
-    if (!exception || exception.package !== name) return false;
-  }
-
-  visiting.delete(name);
-  memo.set(name, sawHighCause);
-  return sawHighCause;
-}
-
-const highNames = Object.entries(vulnerabilities)
-  .filter(([, v]) => ['high', 'critical'].includes(String(v?.severity)))
-  .map(([name]) => name);
-
-const unapproved = highNames.filter((name) => !pathIsAllowed(name));
-if (unapproved.length > 0) {
-  fail(`unapproved high/critical mobile advisories remain: ${unapproved.join(', ')}`);
-}
-
-// Prove both explicit exceptions are still actually present. If npm's advisory
-// graph changes shape, fail rather than silently treating a stale exception as
-// authority.
+// Validate direct high advisory objects first. A new high advisory on the same
+// package must NOT accidentally inherit the existing exception.
 const observed = new Set();
+const unapprovedDirect = [];
 for (const [name, v] of Object.entries(vulnerabilities)) {
   for (const cause of Array.isArray(v?.via) ? v.via : []) {
     if (typeof cause !== 'object' || cause === null) continue;
+    const severity = String(cause.severity ?? '').toLowerCase();
+    if (!['high', 'critical'].includes(severity)) continue;
+    if (severity === 'critical') {
+      unapprovedDirect.push(`${name}:critical`);
+      continue;
+    }
     const ghsa = ghsaFromUrl(cause.url);
-    if (ghsa && ALLOWED.has(ghsa) && ALLOWED.get(ghsa).package === name) observed.add(ghsa);
+    const exception = ghsa ? ALLOWED.get(ghsa) : null;
+    if (!exception || exception.package !== name) {
+      unapprovedDirect.push(`${name}:${ghsa ?? cause.source ?? 'unknown-advisory'}`);
+      continue;
+    }
+    observed.add(ghsa);
   }
+}
+if (unapprovedDirect.length > 0) {
+  fail(`unapproved direct high/critical mobile advisories remain: ${unapprovedDirect.join(', ')}`);
 }
 for (const ghsa of ALLOWED.keys()) {
   if (!observed.has(ghsa)) fail(`allowlisted advisory ${ghsa} is no longer represented as expected; review the exception`);
+}
+
+// npm audit's `effects` field is the reverse dependency graph. Start at the one
+// accepted vulnerable package and collect every package whose HIGH severity is
+// derived from it. This avoids guessing through mixed-severity `via` arrays.
+const affected = new Set(['image-size']);
+const queue = ['image-size'];
+while (queue.length > 0) {
+  const current = queue.shift();
+  const v = vulnerabilities[current];
+  for (const parent of Array.isArray(v?.effects) ? v.effects : []) {
+    if (affected.has(parent)) continue;
+    affected.add(parent);
+    queue.push(parent);
+  }
+}
+
+const highNames = Object.entries(vulnerabilities)
+  .filter(([, v]) => String(v?.severity) === 'high')
+  .map(([name]) => name);
+const outsideClosure = highNames.filter((name) => !affected.has(name));
+if (outsideClosure.length > 0) {
+  fail(`high mobile vulnerability records exist outside the approved image-size dependency closure: ${outsideClosure.join(', ')}`);
 }
 
 console.log(`mobile dependency audit: ${high} high vulnerability record(s) are entirely attributable to the two reviewed image-size build-tool advisories`);
