@@ -6,9 +6,9 @@ major_version = 15
 
 # ---- Edge Functions ------------------------------------------------------
 # verify_jwt controls whether Supabase requires a valid user JWT to invoke the
-# function. External/scheduled callers (gateway webhooks, sync workers, OTP
-# pre-login) set it false and authenticate by other means (signature / service
-# role); user-initiated functions keep it true.
+# function. External/scheduled callers (gateway webhooks, sync workers, Auth
+# hooks) set it false and authenticate by other means (signature / service role);
+# user-initiated functions keep it true.
 [functions.order-intake]
 verify_jwt = true
 
@@ -35,15 +35,17 @@ verify_jwt = false
 [functions.push-dispatch]
 verify_jwt = false
 
-# WhatsApp OTP (Meta Cloud API). Send/verify are pre-login-capable (false) and
-# rate-limited + generic-response server-side; the webhook is called by Meta and
-# authenticated by the app-secret signature; test-config requires an admin JWT.
+# Legacy custom WhatsApp OTP is used only for ownership verification of the
+# signed-in customer's AUTH-OWNED phone. Both send and verify require a JWT and
+# additionally resolve auth.getUser() + bind the requested phone to user.phone.
+# Real login OTP delivery uses the separate signed Supabase Auth hook below.
 [functions.whatsapp-send-otp]
-verify_jwt = false
+verify_jwt = true
 
 [functions.whatsapp-verify-otp]
-verify_jwt = false
+verify_jwt = true
 
+# Called by Meta; authenticated by the app-secret signature in the function.
 [functions.whatsapp-webhook]
 verify_jwt = false
 

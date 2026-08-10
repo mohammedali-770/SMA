@@ -1,8 +1,8 @@
 // whatsapp-webhook — Meta Cloud API webhook (verify_jwt=false).
 //   GET  : subscription verification (echo hub.challenge when the verify token matches).
 //   POST : message-status callbacks → sanitized rows in whatsapp_message_logs.
-// Verifies the X-Hub-Signature-256 HMAC with the app secret when configured.
-// Returns 200 quickly and never crashes on unknown events.
+// Both paths fail closed when their required secret is absent/mismatched.
+// Returns 200 quickly for valid/unknown Meta events and never logs provider secrets.
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
@@ -34,17 +34,19 @@ Deno.serve(async (req: Request) => {
   // ---- POST: status callbacks ---------------------------------------------
   const raw = await req.text();
 
-  // Verify signature when the app secret is configured.
+  // Signature verification is mandatory. A missing app secret is a
+  // configuration failure, never permission to accept unsigned internet input.
   const appSecret = String((secret as Record<string, unknown>).app_secret ?? '');
-  if (appSecret) {
-    const sigHeader = req.headers.get('x-hub-signature-256') ?? '';
-    const expectedSig = 'sha256=' + await hmacSha256Hex(raw, appSecret);
-    if (!timingSafeEqual(sigHeader, expectedSig)) {
-      return new Response('invalid signature', { status: 401 });
-    }
+  if (!appSecret) {
+    return new Response('webhook not configured', { status: 503 });
+  }
+  const sigHeader = req.headers.get('x-hub-signature-256') ?? '';
+  const expectedSig = 'sha256=' + await hmacSha256Hex(raw, appSecret);
+  if (!timingSafeEqual(sigHeader, expectedSig)) {
+    return new Response('invalid signature', { status: 401 });
   }
 
-  // Best-effort parse + log; never throw back to Meta.
+  // Best-effort parse + log; never throw back to Meta after authentication.
   try {
     const body = JSON.parse(raw);
     const entries = Array.isArray(body?.entry) ? body.entry : [];
@@ -67,7 +69,7 @@ Deno.serve(async (req: Request) => {
         }
       }
     }
-  } catch { /* unknown/unparseable event — accept quietly */ }
+  } catch { /* unknown/unparseable authenticated event — accept quietly */ }
 
   return json({ status: 'ok' }, 200);
 });
