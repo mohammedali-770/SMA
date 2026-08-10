@@ -133,6 +133,13 @@ begin
     else new.order_item_id
   end;
 
+  -- Deferred events survive until constraint time. If the item was inserted and
+  -- then deleted again in the same transaction (for example a transaction that
+  -- aborts/replaces a draft line), there is no committed row left to validate.
+  if not exists (select 1 from public.order_items where id = v_order_item_id) then
+    return null;
+  end if;
+
   perform public.assert_order_item_modifier_contract(v_order_item_id);
   return null;
 end $$;
