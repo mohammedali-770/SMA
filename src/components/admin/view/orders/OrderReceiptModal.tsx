@@ -17,6 +17,7 @@ import React from 'react';
 import { AlertTriangle, MapPin } from 'lucide-react';
 
 import { canTransitionOrder } from '../../../../context/AppContext';
+import { Button } from '../../../../design-system/ui/Button';
 import { Card } from '../../../../design-system/ui/Card';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
@@ -182,13 +183,12 @@ export function OrderReceiptModal({
               ))}
             </select>
             {!isAccountant && canTransitionOrder(order.status, 'cancelled') && (
-              <button
-                type="button"
+              <Button
+                label={isRTL ? 'إلغاء الطلب' : 'Cancel order'}
                 onClick={cancelOrder}
-                className="print-hide ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-danger-line bg-danger-tint px-3 text-[13px] font-bold text-danger transition-colors duration-150 hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2"
-              >
-                {isRTL ? 'إلغاء الطلب' : 'Cancel order'}
-              </button>
+                variant="danger"
+                className="print-hide w-full"
+              />
             )}
           </div>
 
