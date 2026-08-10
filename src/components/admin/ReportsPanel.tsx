@@ -188,7 +188,9 @@ export const ReportsPanel: React.FC = () => {
     // Spreadsheet formula injection: user/admin-controlled names beginning with
     // these characters must be data, not executable spreadsheet formulae.
     if (/^[=+\-@]/.test(s)) s = `'${s}`;
-    return `"${s.replace(/"/g, '""')}"`;
+    // Preserve the established machine contract for simple cells. Quote only
+    // when RFC-style CSV syntax actually requires it; double embedded quotes.
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
   const triggerCSVExport = () => {
