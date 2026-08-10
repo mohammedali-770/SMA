@@ -153,19 +153,21 @@ while IFS= read -r f; do
     if is_known "$name"; then
       # A quarantined suite that passes means the list is stale. Failing here
       # is what stops known-failing.txt decaying into a permanent ignore-list.
-      printf '  [33mFIXED[0m %s — now passes; remove it from known-failing.txt
-' "$name"
+      printf '  \033[33mFIXED\033[0m %s — now passes; remove it from known-failing.txt\n' "$name"
       suite_unexpected_pass=$((suite_unexpected_pass + 1))
       unexpected_pass_names+=("$name")
     else
       ok "$name"
     fi
   elif is_known "$name"; then
-    printf '  [33mknown[0m %s
-' "$name"
+    printf '  \033[33mknown\033[0m %s\n' "$name"
     suite_known=$((suite_known + 1))
   else
     bad "$name"
+    # Surface the exact failing suite in the GitHub check annotation. The full
+    # psql stderr still follows in the job log, but reviewers no longer need to
+    # download/grep the entire Actions log just to learn which contract failed.
+    printf '::error file=supabase/tests/%s::SQL suite failed: %s\n' "$name" "$name"
     sed 's/^/        /' "$ERR"
     suite_failed=$((suite_failed + 1))
     failed_names+=("$name")
