@@ -74,8 +74,6 @@ begin
     raise exception 'CASE 2 FAILED: stranded aggregates incorrect: %', v;
   end if;
 
-  -- The Operations Health core dynamically consumes the same function. Prove
-  -- the defect is visible at the top-level response the dashboard uses.
   h := public.operations_health_snapshot_internal();
   if h->>'overall_state' <> 'failing' then
     raise exception 'CASE 2 FAILED: top-level Operations Health remained %', h->>'overall_state';
@@ -123,6 +121,53 @@ begin
     raise exception 'CASE 3 FAILED: oldest stranded timestamp missing/wrong: %', v->>'oldest_stranded_order_at';
   end if;
   raise notice 'CASE 3 ok: dead-letter counts, cancelled order excluded';
+end $$;
+
+-- Case 4: a warning incident must not mask the independent critical stranded
+-- condition in Smart Operations Alerts. This is a pure synthetic snapshot test:
+-- one warning incident + one stranded order must produce BOTH fingerprints.
+do $$
+declare
+  v_snapshot jsonb;
+  v_derived jsonb;
+  v_incident jsonb;
+  v_stranded_alert jsonb;
+begin
+  v_snapshot := jsonb_build_object(
+    'overall_state', 'failing',
+    'systems', jsonb_build_array(jsonb_build_object(
+      'id', 'order_integrity',
+      'critical', true,
+      'state', 'failing',
+      'source', 'order_integrity_health_summary',
+      'details', jsonb_build_object(
+        'open_critical_count', 0,
+        'open_warning_count', 1,
+        'stranded_order_count', 1,
+        'stranded_missing_mapping_count', 1,
+        'stranded_dead_letter_count', 0,
+        'oldest_stranded_order_at', now() - interval '3 hours'))),
+    'jobs', '[]'::jsonb
+  );
+
+  v_derived := public.operations_alerts_derive(v_snapshot, '{}'::jsonb);
+
+  select value into v_incident
+    from jsonb_array_elements(v_derived)
+   where value->>'fingerprint' = 'order_integrity:incidents'
+   limit 1;
+  select value into v_stranded_alert
+    from jsonb_array_elements(v_derived)
+   where value->>'fingerprint' = 'order_integrity:stranded_orders'
+   limit 1;
+
+  if v_incident is null or v_incident->>'severity' <> 'warning' then
+    raise exception 'CASE 4 FAILED: warning incident condition missing/wrong: %', v_derived;
+  end if;
+  if v_stranded_alert is null or v_stranded_alert->>'severity' <> 'critical' then
+    raise exception 'CASE 4 FAILED: critical stranded condition was masked: %', v_derived;
+  end if;
+  raise notice 'CASE 4 ok: warning incident and critical stranded-order alert coexist';
 end $$;
 
 rollback;
