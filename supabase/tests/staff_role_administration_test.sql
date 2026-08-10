@@ -20,8 +20,7 @@ begin
   on conflict (id) do update set role=excluded.role, full_name=excluded.full_name;
 end $$;
 
--- Customer cannot grant themselves a role. The SQL CI harness makes
--- test.is_admin/test.is_staff authoritative whenever test.auth_uid is present.
+-- Customer cannot grant themselves a role.
 select set_config('test.auth_uid','a1000000-0000-0000-0000-000000000003',true);
 select set_config('test.is_admin','false',true);
 select set_config('test.is_staff','false',true);
@@ -99,6 +98,24 @@ begin
   end if;
   if exists (select 1 from jsonb_array_elements(v) e where e->>'role'='customer') then
     raise exception 'STAFF LIST FAILED: customer leaked into staff directory';
+  end if;
+end $$;
+
+-- Account erasure compatibility: deleting a target Auth user after a role change
+-- must succeed and null the audit FK instead of trapping the deletion processor.
+delete from auth.users where id='a1000000-0000-0000-0000-000000000003';
+do $$
+begin
+  if exists (select 1 from auth.users where id='a1000000-0000-0000-0000-000000000003') then
+    raise exception 'ERASURE FAILED: target Auth user still exists';
+  end if;
+  if not exists (
+    select 1 from public.role_change_audit
+     where old_role='customer' and new_role='accountant'
+       and reason='Finance reporting access'
+       and target_user_id is null
+  ) then
+    raise exception 'ERASURE FAILED: audit target was not anonymized via SET NULL';
   end if;
 end $$;
 reset role;
