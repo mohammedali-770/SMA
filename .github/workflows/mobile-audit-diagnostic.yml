@@ -1,0 +1,54 @@
+name: Mobile audit diagnostic
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/package-lock.json'
+      - '.github/workflows/mobile-audit-diagnostic.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit-diagnostic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Emit high and critical advisory identifiers
+        shell: bash
+        run: |
+          set +e
+          npm --prefix apps/mobile audit --json > "$RUNNER_TEMP/mobile-audit.json"
+          audit_status=$?
+          set -e
+          AUDIT_JSON="$RUNNER_TEMP/mobile-audit.json" node <<'NODE'
+          const fs = require('fs');
+          const p = process.env.AUDIT_JSON;
+          const data = JSON.parse(fs.readFileSync(p, 'utf8'));
+          const esc = (s) => String(s ?? '').replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+          let high = 0;
+          for (const [pkg, v] of Object.entries(data.vulnerabilities ?? {})) {
+            if (!['high', 'critical'].includes(v.severity)) continue;
+            high++;
+            const advisories = (v.via ?? [])
+              .filter((x) => x && typeof x === 'object')
+              .map((x) => `${x.source ?? ''} ${x.title ?? ''} ${x.url ?? ''}`.trim())
+              .join(' | ');
+            const range = v.range ? `range=${v.range}` : '';
+            const fix = v.fixAvailable === false ? 'fixAvailable=false' : `fixAvailable=${JSON.stringify(v.fixAvailable)}`;
+            console.log(`::error file=apps/mobile/package-lock.json,title=${esc(`${pkg} ${v.severity}`)}::${esc(`${advisories} ${range} ${fix}`.trim())}`);
+          }
+          if (high === 0) console.log('No high/critical mobile advisories found.');
+          NODE
+          exit "$audit_status"
