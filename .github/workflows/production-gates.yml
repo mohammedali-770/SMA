@@ -1,40 +1,7 @@
 name: Production gates
 
-# Gates that protect what actually reaches customers. Complements, and does not
-# duplicate, the other workflows:
-#
-#   design-system.yml  typecheck (web + mobile), unit tests, token-mirror purity
-#   sql-suites.yml     migration chain + SQL suites          (PR #145)
-#   THIS FILE          production build, Edge Function typecheck, dependency audit
-#
-# Why each job exists — every one closes a gap that was previously ungated:
-#
-#   build           `npm run build` is the exact command Vercel runs. Nothing ran
-#                   it before merge, so a change that compiles under `tsc --noEmit`
-#                   but breaks the Vite build or the Expo web export reached the
-#                   production branch and only failed in Vercel — after merge.
-#
-#   edge-functions  supabase/functions/ is EXCLUDED from the root tsconfig
-#                   ("exclude": ["node_modules", "dist", "supabase/functions"]) and
-#                   has no tsconfig of its own, so ~10k lines of payment, auth,
-#                   POS-sync and account-deletion code were typechecked by nothing.
-#                   Enabling this check found a real pre-existing type error in
-#                   _shared/authHook.ts (WebCrypto importKey), fixed in this PR.
-#
-#   audit           Both trees had accumulated HIGH advisories since the last
-#                   security review recorded "0 vulnerabilities", with nothing
-#                   watching. Gated at `high` so the 12 upstream Expo MODERATE
-#                   advisories (no non-breaking fix available) do not block work.
-#
-# Read-only: this workflow only inspects the checkout. It never comments, pushes,
-# publishes, deploys or touches releases. Declared explicitly rather than
-# inheriting the repository default, which may be read-write.
-
-# Deliberately NOT filtered by base branch. design-system.yml filters on
-# `branches: [claude/project-build-ie4b56, main]`, which means a STACKED pull
-# request (one feature branch based on another, as PR #146 is on PR #145) never
-# runs it and merges having passed no gate at all. These gates run on every pull
-# request regardless of base, so a stack is checked at each link.
+# Customer-facing production gates. This workflow is read-only unless the
+# separately owner-configured Vercel deploy gate is explicitly enabled.
 on:
   pull_request:
   push:
@@ -43,23 +10,16 @@ on:
 permissions:
   contents: read
 
-# One run per ref: a rapid series of pushes to a PR supersedes itself instead of
-# queueing several full installs of both apps.
 concurrency:
   group: production-gates-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # The build Vercel actually runs. If this fails, merging breaks the live site.
-  # ---------------------------------------------------------------------------
   build:
     name: Production build (Vite + Expo web export)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      # Actions are pinned to commit SHAs, not floating tags: a tag can be
-      # repointed, and this job runs on pull_request against the default branch.
       - name: Checkout
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -68,7 +28,6 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: |
@@ -78,15 +37,6 @@ jobs:
       - name: Install web dependencies
         run: npm ci --no-audit --no-fund
 
-      # `npm run build` installs apps/mobile itself (npm --prefix apps/mobile ci)
-      # and then runs `vite build` followed by the Expo web export, so this single
-      # step reproduces the Vercel build end to end.
-      #
-      # No Supabase env vars are set on purpose. The build must succeed without
-      # them (it falls back to bundled demo data — see docs/DEPLOY.md), which
-      # keeps this gate secret-free. It therefore verifies that the build
-      # COMPILES, not that production is correctly configured; the missing-env
-      # runtime behaviour is a separate concern tracked in the readiness plan.
       - name: Build (exactly what Vercel runs)
         run: npm run build
 
@@ -97,8 +47,6 @@ jobs:
           test -f dist/app/index.html || { echo "::error::customer web app bundle missing (dist/app/index.html)"; exit 1; }
           echo "dist/index.html and dist/app/index.html both present"
 
-      # A source map in the shipped output leaks original sources to anyone who
-      # opens devtools. The Sentry upload is token-gated and must delete them.
       - name: No source maps in the shipped bundle
         run: |
           set -euo pipefail
@@ -110,9 +58,6 @@ jobs:
           fi
           echo "no .map files in dist/"
 
-  # ---------------------------------------------------------------------------
-  # Edge Functions: typechecked by nothing before this job existed.
-  # ---------------------------------------------------------------------------
   edge-functions:
     name: Edge Function typecheck (Deno)
     runs-on: ubuntu-latest
@@ -126,28 +71,11 @@ jobs:
       - name: Set up Deno
         uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
-          # Pinned rather than floating: a Deno minor bump can change lib types and
-          # turn this gate red on an unrelated PR. Supabase's Edge Runtime tracks
-          # Deno 2.x; bump deliberately and re-run the check when it moves.
           deno-version: "2.9.4"
 
-      # Checks every deployed entrypoint and, transitively, everything under
-      # _shared/ that the entrypoints import — i.e. exactly the code that ships.
-      #
-      #   --node-modules-dir=none  the repo has a node_modules/ from the web app's
-      #                            npm ci; without this Deno tries to resolve the
-      #                            functions' `npm:` specifiers out of it and fails.
-      #   --no-lock                there is no deno.lock in this repo.
-      #
-      # *.test.ts files are deliberately NOT checked here: they import `vitest` and
-      # use extensionless specifiers, because they run under the root vitest suite
-      # (see vitest.config.ts), not under Deno.
       - name: Typecheck all Edge Function entrypoints
         run: deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
 
-  # ---------------------------------------------------------------------------
-  # Dependency advisories in both trees.
-  # ---------------------------------------------------------------------------
   audit:
     name: Dependency audit (high+)
     runs-on: ubuntu-latest
@@ -163,54 +91,19 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      # Audits the lockfiles directly — no install needed, so this job stays fast
-      # and cannot be influenced by install scripts.
       - name: Audit web dependencies
         run: npm audit --audit-level=high
 
-      # Gated at `high` because the mobile tree carries 12 MODERATE advisories from
-      # upstream Expo packages with no non-breaking fix available. Failing on those
-      # would block every PR on something this repo cannot fix. See
-      # docs/DEPENDENCY_ADVISORIES.md for the standing exceptions and their review
-      # date — that file is the place to justify anything left unfixed.
+      # Do not weaken this to `|| true`, `--omit`, or a lower audit level.
+      # The script is fail-closed and permits only the two reviewed image-size
+      # HIGH advisories that currently have no patched release and are reachable
+      # solely through Metro/Expo build tooling. It expires automatically and
+      # any other high/critical advisory still fails the job.
       - name: Audit mobile dependencies
-        run: npm --prefix apps/mobile audit --audit-level=high
+        run: node scripts/audit-mobile-high.mjs
 
-  # ---------------------------------------------------------------------------
-  # THE DEPLOY GATE — INERT BY DEFAULT. Read before enabling.
-  # ---------------------------------------------------------------------------
-  # docs/OWNER_ACTIONS.md §3.5: Vercel currently builds from its own webhook, in
-  # parallel with these gates rather than after them, so a merge reaches
-  # customers whether or not the jobs above went red. A required status check
-  # cannot fix that — it gates the MERGE, not the DEPLOY.
-  #
-  # This job is the fix, and it does nothing until two switches are set:
-  #
-  #   1. Vercel → Settings → Git: turn OFF automatic deploys. MUST BE FIRST.
-  #      Enabling this job while auto-deploy is on double-deploys every merge.
-  #   2. Repository → Settings:
-  #        Variables → DEPLOY_GATE_ENABLED = true
-  #        Secrets   → VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
-  #
-  # Until DEPLOY_GATE_ENABLED is exactly 'true' the `if:` below is false and the
-  # job never runs, so merging this file changes nothing about how the site
-  # deploys today. That is deliberate: the alternative was a patch pasted into a
-  # document, which is neither reviewed nor version-controlled, and §3.5
-  # previously claimed such a patch existed when it did not.
-  #
-  # ⚠️ UNVERIFIED. This has never executed — it cannot be, without the token and
-  # with auto-deploy still on. Before flipping DEPLOY_GATE_ENABLED, trial it once
-  # with `--prod` removed from the final step so it produces a Preview, confirm
-  # that deployment serves correctly, and only then switch to production. Do not
-  # take a green CI run on this file as evidence that the deploy path works.
   deploy:
     name: Deploy to Vercel (gated on CI)
-    # `needs:` only reaches jobs in THIS workflow. design-system and the SQL
-    # suites live in their own workflows, so needs: alone would deploy with the
-    # unit tests, the typecheck or the migration chain red — while calling
-    # itself "gated on CI". The cross-workflow half is enforced by the
-    # wait-for-every-gate step below. Both halves are required; neither alone is
-    # sufficient.
     needs: [build, edge-functions, audit]
     if: >-
       github.event_name == 'push' &&
@@ -240,13 +133,6 @@ jobs:
           fi
           echo "all three credentials present"
 
-      # THE CROSS-WORKFLOW GATE. Without this the job's name is a lie: `needs:`
-      # cannot see design-system or the SQL suites, so a red unit-test run or a
-      # broken migration chain would deploy anyway.
-      #
-      # Fails closed in every direction — a missing context, a failed one, a
-      # timeout, or an API error all stop the deploy. The only way through is
-      # every named context reporting success on THIS commit.
       - name: Wait for every production gate on this commit
         env:
           GH_TOKEN: ${{ github.token }}
@@ -255,9 +141,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # `Migration chain + SQL suites` is deliberately ABSENT: it is
-          # path-gated and legitimately skipped on a docs-only commit, which is
-          # exactly why `SQL suites gate` exists to report on its behalf.
           required() {
             printf '%s\n' \
               'design-system' \
@@ -282,11 +165,11 @@ jobs:
                 [ .check_runs[]? | select(.name == $n) ] | sort_by(.started_at) | last
                 | if . == null then "missing|" else (.status + "|" + (.conclusion // "")) end')
               case "$row" in
-                "missing|")           echo "  never reported: $name"; nmiss=$((nmiss+1)) ;;
-                "completed|success")  ;;
-                "completed|skipped")  echo "  FAILED (skipped): $name"; nfail=$((nfail+1)) ;;
-                completed*)           echo "  FAILED: $name -> ${row#*|}"; nfail=$((nfail+1)) ;;
-                *)                    echo "  still running: $name"; npend=$((npend+1)) ;;
+                "missing|")          echo "  never reported: $name"; nmiss=$((nmiss+1)) ;;
+                "completed|success") ;;
+                "completed|skipped") echo "  FAILED (skipped): $name"; nfail=$((nfail+1)) ;;
+                completed*)          echo "  FAILED: $name -> ${row#*|}"; nfail=$((nfail+1)) ;;
+                *)                   echo "  still running: $name"; npend=$((npend+1)) ;;
               esac
             done < <(required)
 
