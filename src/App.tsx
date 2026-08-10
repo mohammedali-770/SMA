@@ -6,11 +6,10 @@
 import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthScreen } from './components/AuthScreen';
+import { StaffMfaGate } from './components/StaffMfaGate';
 import { BrandMark } from './design-system/ui/BrandMark';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
-// The Admin POS panel and the Supabase console are heavy and secondary to the
-// customer mobile app, so they load as separate chunks on demand.
 const AdminDashboard = lazy(() =>
   import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard }))
 );
@@ -18,14 +17,12 @@ const DatabasePlayground = lazy(() =>
   import('./components/DatabasePlayground').then(m => ({ default: m.DatabasePlayground }))
 );
 
-/** Placeholder shown while a lazily-loaded panel's chunk is fetched. */
 const PanelFallback: React.FC = () => (
   <div className="flex-1 border border-con-line bg-con-surface rounded-2xl min-h-[400px] flex items-center justify-center">
     <span className="text-con-text-3 text-sm font-bold animate-pulse">Loading…</span>
   </div>
 );
 
-/** Full-screen centered spinner used while auth/session or data is loading. */
 const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
   <div className="min-h-screen flex flex-col items-center justify-center gap-3 font-sans">
     <Loader2 className="w-8 h-8 text-ember animate-spin" />
@@ -33,7 +30,6 @@ const FullScreenLoader: React.FC<{ label: string }> = ({ label }) => (
   </div>
 );
 
-/** Top brand bar with the signed-in user + a real sign-out. */
 const AppHeader: React.FC = () => {
   const { currentUser, signOut } = useApp();
   const roleLabel = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
@@ -42,16 +38,12 @@ const AppHeader: React.FC = () => {
       <div className="max-w-7xl mx-auto flex justify-between items-center gap-3">
         <div className="flex items-center gap-3">
           <BrandMark className="w-9 h-9 rounded-xl object-contain bg-con-surface border border-con-line" />
-          <div>
-            <h1 className="text-base font-black tracking-tight leading-tight text-ember">SPICY MEAL</h1>
-          </div>
+          <div><h1 className="text-base font-black tracking-tight leading-tight text-ember">SPICY MEAL</h1></div>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
-            <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">
-              {roleLabel}
-            </span>
+            <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
           </div>
           <button
             onClick={() => { void signOut(); }}
@@ -66,7 +58,6 @@ const AppHeader: React.FC = () => {
   );
 };
 
-/** Error card shown if the initial Supabase load fails, with a retry. */
 const DataErrorPanel: React.FC = () => {
   const { dataError, reload } = useApp();
   return (
@@ -84,12 +75,6 @@ const DataErrorPanel: React.FC = () => {
   );
 };
 
-/**
- * Non-fatal write-failure banner. A failed settings/order/loyalty save surfaces
- * here — dismissible, overlaid on the dashboard — instead of replacing the whole
- * screen with DataErrorPanel (which would unmount the console and lose the
- * admin's place and unsaved edits). Full-screen is reserved for initial load.
- */
 const WriteErrorBanner: React.FC = () => {
   const { writeError, dismissWriteError } = useApp();
   if (!writeError) return null;
@@ -101,11 +86,7 @@ const WriteErrorBanner: React.FC = () => {
           <span className="block text-[10px] uppercase tracking-wide text-danger-ds font-black">Save failed</span>
           {writeError}
         </div>
-        <button
-          onClick={dismissWriteError}
-          aria-label="Dismiss"
-          className="flex-shrink-0 text-danger-ds hover:text-danger-ds transition-colors"
-        >
+        <button onClick={dismissWriteError} aria-label="Dismiss" className="flex-shrink-0 text-danger-ds hover:text-danger-ds transition-colors">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -113,12 +94,6 @@ const WriteErrorBanner: React.FC = () => {
   );
 };
 
-/**
- * Customer accounts land in the REAL app, served at /app (the Expo application
- * rendered with React Native Web — single customer UI, no duplicated preview).
- * The Supabase session is shared (same origin + storage key), so the redirect
- * is seamless. A visible link covers any blocked client-side navigation.
- */
 const CustomerApp: React.FC = () => {
   React.useEffect(() => { window.location.replace('/app'); }, []);
   return (
@@ -129,28 +104,20 @@ const CustomerApp: React.FC = () => {
   );
 };
 
-/** The staff console (role = admin or accountant). */
 const StaffApp: React.FC = () => {
   const { currentUser } = useApp();
   const isAdmin = currentUser.role === 'admin';
-  // The emulated Supabase console is a DEV-only aid — Vite statically replaces
-  // import.meta.env.DEV with false in production builds, so it never ships to
-  // the live dashboard (the lazy chunk is tree-shaken away).
   const showDbConsole = isAdmin && import.meta.env.DEV;
   return (
     <main className="flex-grow p-4 md:p-6 max-w-7xl mx-auto w-full space-y-6">
-      <Suspense fallback={<PanelFallback />}>
-        <AdminDashboard />
-      </Suspense>
+      <Suspense fallback={<PanelFallback />}><AdminDashboard /></Suspense>
       {showDbConsole && (
         <div className="flex flex-col">
           <span className="text-xs bg-con-surface/50 backdrop-blur-md text-con-text-2 font-black py-1 px-3 rounded-full border border-white/85 uppercase tracking-widest self-start mb-2.5 flex items-center gap-1 shadow-2xs">
             <Server className="w-3.5 h-3.5 text-ember" />
             <span>Supabase Data Console</span>
           </span>
-          <Suspense fallback={<PanelFallback />}>
-            <DatabasePlayground />
-          </Suspense>
+          <Suspense fallback={<PanelFallback />}><DatabasePlayground /></Suspense>
         </div>
       )}
     </main>
@@ -163,32 +130,39 @@ function AppContent() {
   if (!authReady) return <FullScreenLoader label="Starting…" />;
   if (!isAuthenticated) return <AuthScreen />;
 
+  const staffIdentityKnown = Boolean(currentUser.id) && currentUser.role !== 'customer';
+
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <AppHeader />
       <WriteErrorBanner />
-      {dataError ? (
+      {staffIdentityKnown ? (
+        // Staff bootstrap may legitimately hit AAL1-denied RPCs before this gate
+        // knows the user's role. Do not let that DataError pre-empt MFA: verify
+        // first, then StaffMfaGate.reload() re-runs privileged reads under AAL2.
+        <StaffMfaGate>
+          {dataError ? (
+            <DataErrorPanel />
+          ) : dataLoading ? (
+            <FullScreenLoader label="Loading staff data…" />
+          ) : (
+            <StaffApp />
+          )}
+        </StaffMfaGate>
+      ) : dataError ? (
         <DataErrorPanel />
       ) : dataLoading && !currentUser.id ? (
         <FullScreenLoader label="Loading your account…" />
-      ) : currentUser.role === 'customer' ? (
-        <CustomerApp />
       ) : (
-        <StaffApp />
+        <CustomerApp />
       )}
       <footer className="backdrop-blur-md bg-con-surface/10 text-con-text-2 text-center py-5 border-t border-con-line mt-10 text-xs">
-        <div className="max-w-7xl mx-auto px-6">
-          <span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span>
-        </div>
+        <div className="max-w-7xl mx-auto px-6"><span dir="rtl">© 2026 شركة الطعم الأول للتجارة</span></div>
       </footer>
     </div>
   );
 }
 
 export default function App() {
-  return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
-  );
+  return <AppProvider><AppContent /></AppProvider>;
 }

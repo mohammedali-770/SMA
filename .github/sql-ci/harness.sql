@@ -1,35 +1,15 @@
 -- ---------------------------------------------------------------------------
 -- The test-harness contract the suites were written against.
 --
--- Ten of the twenty-six suites impersonate a caller like this:
---
---     perform set_config('test.auth_uid', p_uid::text, true);
---     perform set_config('test.is_staff', 'false',     true);
---     perform set_config('test.is_admin', 'false',     true);
---     set local role authenticated;
---
--- Nothing in this repository has ever defined `test.auth_uid`, `test.is_admin`
--- or `test.is_staff`. The suites were written against a harness that was never
--- committed — which is the deeper reason they had never run: there was nothing
--- to run them WITH. This file is that missing contract, written down.
---
--- Applied AFTER the migration chain, because it overrides functions the chain
--- creates. Kept separate from bootstrap.sql for exactly that reason: bootstrap
--- is "things Supabase would have provided", this is "things the test suites
--- assume about impersonation".
+-- Ten of the suites impersonate a caller with test.* GUCs. The harness is
+-- applied AFTER the migration chain so it can replace auth/current-user helpers
+-- only inside the throwaway CI database.
 -- ---------------------------------------------------------------------------
 
 \set ON_ERROR_STOP on
 
 -- ---------------------------------------------------------------------------
--- auth.uid() — now three sources, highest priority first.
---
---   1. `test.auth_uid`            (harness impersonation)
---   2. `request.jwt.claim.sub`    (PostgREST flat claim; used by other suites)
---   3. `request.jwt.claims->>sub` (PostgREST JSON claims)
---
--- Both PostgREST forms are kept because different suites in this repository
--- use different ones and both must resolve to the same caller.
+-- auth.uid() — test impersonation first, then the two PostgREST claim shapes.
 -- ---------------------------------------------------------------------------
 create or replace function auth.uid()
 returns uuid
@@ -46,23 +26,7 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
--- current_app_role() — ONE override point, which is why is_admin() and
--- is_staff() are left exactly as the chain defines them. Both derive from this
--- function, so overriding it keeps their real logic under test.
---
--- The override applies when ANY of the three test GUCs is set — not just
--- `test.auth_uid`. Several suites (lazywait_reap, lazywait_requeue, the
--- operations ones) set only `test.is_admin`/`test.is_staff` and never bind a
--- uid at all; keying solely on the uid left those callers falling through to
--- the profiles lookup, where they were nobody, and every admin-gated RPC
--- refused them.
---
--- The override is exclusive rather than a fallback. That matters: a suite
--- that sets `test.is_admin = 'false'` means "treat this caller as a plain
--- customer", and falling through to the profiles lookup could hand back
--- 'admin' anyway if that row happened to be an admin — silently inverting what
--- the suite was asserting. When `test.auth_uid` is absent, behaviour is
--- byte-for-byte the chain's own: look the role up from profiles.
+-- current_app_role() — one role-impersonation override point.
 -- ---------------------------------------------------------------------------
 create or replace function public.current_app_role()
 returns public.user_role
@@ -85,9 +49,26 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------
+-- Staff MFA harness override.
+--
+-- Production `is_admin()` / `is_staff()` now require jwt_has_aal2(). Existing
+-- SQL suites are unit/integration tests for authorization logic and use test.*
+-- role impersonation rather than constructing real MFA JWTs. In this disposable
+-- database only, treat that impersonation as already MFA-complete so those tests
+-- continue exercising the same role contracts. The dedicated staff-MFA suite
+-- tests the pure AAL predicate separately.
+-- ---------------------------------------------------------------------------
+create or replace function public.jwt_has_aal2()
+returns boolean
+language sql stable
+set search_path = public
+as $$
+  select true;
+$$;
+
+-- ---------------------------------------------------------------------------
 -- vault.create_secret / vault.update_secret — the two entry points the suites
--- call. Real Vault encrypts; this stores plaintext in a throwaway container,
--- which is fine and is why nothing real may ever be put in it.
+-- call. Real Vault encrypts; this stores plaintext in a throwaway container.
 -- ---------------------------------------------------------------------------
 create or replace function vault.create_secret(
   new_secret      text,
