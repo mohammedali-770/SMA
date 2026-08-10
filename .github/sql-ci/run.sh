@@ -153,19 +153,19 @@ while IFS= read -r f; do
     if is_known "$name"; then
       # A quarantined suite that passes means the list is stale. Failing here
       # is what stops known-failing.txt decaying into a permanent ignore-list.
-      printf '  [33mFIXED[0m %s — now passes; remove it from known-failing.txt
-' "$name"
+      printf '  \033[33mFIXED\033[0m %s — now passes; remove it from known-failing.txt\n' "$name"
       suite_unexpected_pass=$((suite_unexpected_pass + 1))
       unexpected_pass_names+=("$name")
     else
       ok "$name"
     fi
   elif is_known "$name"; then
-    printf '  [33mknown[0m %s
-' "$name"
+    printf '  \033[33mknown\033[0m %s\n' "$name"
     suite_known=$((suite_known + 1))
   else
     bad "$name"
+    detail="$(tail -n 8 "$ERR" | tr '\n\r' '  ' | sed 's/%/%25/g')"
+    printf '::error file=supabase/tests/%s::SQL suite failed: %s — %s\n' "$name" "$name" "$detail"
     sed 's/^/        /' "$ERR"
     suite_failed=$((suite_failed + 1))
     failed_names+=("$name")
