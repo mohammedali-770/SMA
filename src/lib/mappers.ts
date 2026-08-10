@@ -340,7 +340,11 @@ export function productToDbUpdate(p: Product): Partial<DbProduct> {
     price: p.price,
     calories: p.calories,
     image_url: p.imageUrl,
-    is_active: p.isActive,
+    // Activation is deliberately NOT part of the generic edit contract. The
+    // current product modal has no active/inactive control, so accepting its
+    // reconstructed `isActive` value would let an ordinary text/price edit
+    // silently reactivate a disabled menu item. A future activation control must
+    // use an explicit, auditable path instead of piggybacking on generic edits.
   };
 }
 
