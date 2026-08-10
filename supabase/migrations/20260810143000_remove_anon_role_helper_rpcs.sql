@@ -9,10 +9,17 @@
 --   * inactive rows for authenticated staff only.
 -- Then remove anon access to role helpers. Admin-only policies accidentally
 -- declared TO public are narrowed to authenticated as well.
+--
+-- Re-runnable by design: the SQL CI harness replays the ENTIRE migration chain
+-- as an idempotence report. Earlier catalog migrations recreate the legacy
+-- policies during that replay, so this migration must drop BOTH legacy names and
+-- its own replacement names before recreating the final policy set.
 -- ============================================================================
 
 -- Branches ------------------------------------------------------------------
 drop policy if exists branches_select_public on public.branches;
+drop policy if exists branches_select_active_public on public.branches;
+drop policy if exists branches_select_inactive_staff on public.branches;
 create policy branches_select_active_public
   on public.branches for select to anon, authenticated
   using (is_active);
@@ -22,6 +29,8 @@ create policy branches_select_inactive_staff
 
 -- Categories ----------------------------------------------------------------
 drop policy if exists categories_select_public on public.categories;
+drop policy if exists categories_select_active_public on public.categories;
+drop policy if exists categories_select_inactive_staff on public.categories;
 create policy categories_select_active_public
   on public.categories for select to anon, authenticated
   using (is_active);
@@ -31,6 +40,8 @@ create policy categories_select_inactive_staff
 
 -- Products ------------------------------------------------------------------
 drop policy if exists products_select_public on public.products;
+drop policy if exists products_select_active_public on public.products;
+drop policy if exists products_select_inactive_staff on public.products;
 create policy products_select_active_public
   on public.products for select to anon, authenticated
   using (is_active);
@@ -40,6 +51,8 @@ create policy products_select_inactive_staff
 
 -- Modifiers -----------------------------------------------------------------
 drop policy if exists modifiers_select_public on public.modifiers;
+drop policy if exists modifiers_select_active_public on public.modifiers;
+drop policy if exists modifiers_select_inactive_staff on public.modifiers;
 create policy modifiers_select_active_public
   on public.modifiers for select to anon, authenticated
   using (is_active);
@@ -49,6 +62,8 @@ create policy modifiers_select_inactive_staff
 
 -- Delivery zones ------------------------------------------------------------
 drop policy if exists bdz_select_public on public.branch_delivery_zones;
+drop policy if exists bdz_select_active_public on public.branch_delivery_zones;
+drop policy if exists bdz_select_inactive_staff on public.branch_delivery_zones;
 create policy bdz_select_active_public
   on public.branch_delivery_zones for select to anon, authenticated
   using (is_active);
