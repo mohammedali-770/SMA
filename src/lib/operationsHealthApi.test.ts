@@ -45,8 +45,8 @@ describe('unavailableOperationsHealthSummary', () => {
 
     expect(summary.overall_state).toBe('degraded');
     expect(summary.warning_attention_count).toBe(1);
-    expect(summary.systems_unavailable_count).toBe(8);
-    expect(summary.systems).toHaveLength(8);
+    expect(summary.systems_unavailable_count).toBe(9);
+    expect(summary.systems).toHaveLength(9);
     expect(summary.systems.every((system) => system.state === 'unavailable')).toBe(true);
     // 3 critical application crons + 2 non-critical internal automation crons.
     expect(summary.jobs).toHaveLength(5);
