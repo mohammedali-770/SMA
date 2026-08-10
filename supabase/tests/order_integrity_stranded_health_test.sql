@@ -23,6 +23,11 @@ begin
   end if;
 end $$;
 
+-- These are state-machine fixtures, not orders entering through the application.
+-- Suppress enqueue/status triggers so the exact blocked/dead-letter states under
+-- test survive insertion, matching the established watchdog-suite fixture style.
+set local session_replication_role = replica;
+
 -- Case 1: intentional delivery-schema safety block does NOT count as an outage.
 insert into public.orders (
   id, order_number, branch_id, order_type, subtotal, total,
