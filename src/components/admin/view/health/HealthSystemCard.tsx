@@ -29,6 +29,13 @@ import {
   type AdminLang, type TargetTab,
 } from './healthView';
 
+/**
+ * This is intentionally a total Record keyed by the wire-level system id. When a
+ * backend card is added, TypeScript now forces this map to be updated before the
+ * frontend can compile. The 20260807 `order_flow` backend rollout was the reason:
+ * the old map lacked it and `text.ar/text.en` could dereference undefined at
+ * runtime as soon as staff opened the Health Center.
+ */
 const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
   en: string; ar: string; descEn: string; descAr: string;
 }> = {
@@ -43,6 +50,12 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
     ar: 'سلامة الطلبات',
     descEn: 'Observe-only order, payment and POS consistency watchdog.',
     descAr: 'مراقبة سلامة الطلبات والدفع ونقاط البيع دون تعديل تلقائي.',
+  },
+  order_flow: {
+    en: 'Order Flow',
+    ar: 'تدفق الطلبات',
+    descEn: 'Recent ordering activity compared with active branches and a trailing same-hour baseline.',
+    descAr: 'نشاط الطلبات الحديث مقارنة بالفروع النشطة وخط أساس لنفس الساعة.',
   },
   account_deletion: {
     en: 'Account Deletion',
@@ -118,6 +131,20 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
     );
   }
 
+  if (system.id === 'order_flow') {
+    // These names are the exact wire keys emitted by
+    // 20260807150000_order_flow_health_card.sql. Keep them coupled to the
+    // backend contract; numberValue intentionally returns 0 for a missing key,
+    // which would otherwise make a typo look like a real zero-activity reading.
+    return (
+      <>
+        <HealthMetric label={isAr ? 'طلبات حديثة' : 'Recent orders'} value={numberValue(d, 'orders_in_window')} />
+        <HealthMetric label={isAr ? 'فروع نشطة' : 'Active branches'} value={numberValue(d, 'open_branches')} />
+        <HealthMetric label={isAr ? 'متوسط خط الأساس' : 'Baseline avg'} value={numberValue(d, 'baseline_orders')} />
+      </>
+    );
+  }
+
   if (system.id === 'account_deletion') {
     return (
       <>
@@ -139,10 +166,6 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   }
 
   if (system.id === 'push') {
-    // Two distinct units, shown separately (never summed): actual failed device
-    // deliveries and failed send-lifecycle events. Falls back to the legacy
-    // `failed_sends_24h` alias for deliveries; missing event field reads 0. The
-    // card's state stays backend-authoritative.
     const { failedDeliveries, failedSendEvents } = pushFailureMetrics(d);
     return (
       <>

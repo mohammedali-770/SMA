@@ -18,6 +18,7 @@ export type OperationsHealthState =
 export type OperationsHealthSystemId =
   | 'lazywait'
   | 'order_integrity'
+  | 'order_flow'
   | 'account_deletion'
   | 'payment'
   | 'push'
@@ -110,9 +111,17 @@ export function pushFailureMetrics(
   };
 }
 
+/**
+ * Keep the fallback inventory aligned with every card the backend can return.
+ * `order_flow` became a production card in 20260807170000; omitting it here did
+ * more than make the types stale — HealthSystemCard indexed a total Record by
+ * the new runtime id and dereferenced `undefined`, which could crash the Health
+ * Center while the backend itself was healthy.
+ */
 const SYSTEMS: Array<{ id: OperationsHealthSystemId; critical: boolean }> = [
   { id: 'lazywait', critical: true },
   { id: 'order_integrity', critical: true },
+  { id: 'order_flow', critical: true },
   { id: 'account_deletion', critical: true },
   { id: 'payment', critical: false },
   { id: 'push', critical: false },
@@ -146,7 +155,7 @@ export function unavailableOperationsHealthSummary(
     systems_disabled_count: 0,
     systems_not_configured_count: 0,
     systems_not_monitored_count: 0,
-    critical_systems: ['lazywait', 'order_integrity', 'account_deletion', 'database_jobs'],
+    critical_systems: ['lazywait', 'order_integrity', 'order_flow', 'account_deletion', 'database_jobs'],
     systems: SYSTEMS.map(({ id, critical }) => ({
       id,
       critical,
