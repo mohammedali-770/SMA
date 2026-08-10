@@ -18,8 +18,8 @@
  *      fields, so opening it from the wrong source would show a partial receipt.
  *
  * The app context is mocked (no Supabase, no realtime, no provider tree). The
- * REAL `canTransitionOrder` is kept, because which options the status select
- * offers is part of what is being checked.
+ * REAL `canTransitionOrder` is kept, because which options/actions are offered
+ * is part of what is being checked.
  */
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -91,26 +91,17 @@ const openReceipt = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The queue is empty, so the verification card hides itself and the only
-  // "View Receipt" on screen belongs to the table.
   posConfirmationRequired.mockResolvedValue({ total: 0, items: [] });
   paymentRecord.mockResolvedValue(null);
   mockContext();
 });
 afterEach(() => {
   cleanup();
-  // Undo the window.confirm spies so one test's answer cannot leak into the
-  // next one's "was it even asked?" assertion.
   vi.restoreAllMocks();
 });
 
 describe('permission gate', () => {
   it('an accountant cannot change an order status', async () => {
-    // ANSWER YES to the unpaid-order prompt. Without this the test passes for
-    // the wrong reason: jsdom's window.confirm is unimplemented and returns
-    // undefined, so the payment guard — not the accountant gate — is what stops
-    // the update. Found by deleting the early-return and watching this still
-    // pass.
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     mockContext({ currentUser: { role: 'accountant' } });
     render(<LiveOrdersPanel />);
@@ -118,21 +109,23 @@ describe('permission gate', () => {
 
     const select = screen.getByLabelText('Order status') as HTMLSelectElement;
     expect(select.disabled).toBe(true);
-
-    // The disabled attribute is trivially removed in devtools, so the handler
-    // must refuse too. fireEvent bypasses `disabled`, which is what makes this
-    // assertion meaningful rather than a restatement of the attribute.
     fireEvent.change(select, { target: { value: 'preparing' } });
     expect(updateOrderStatus).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Cancel order' })).toBeNull();
   });
 
-  it('an admin can change an order status', async () => {
+  it('an admin can change an order status and cancel through the dedicated action', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<LiveOrdersPanel />);
     await openReceipt();
 
     const select = screen.getByLabelText('Order status') as HTMLSelectElement;
     expect(select.disabled).toBe(false);
-    fireEvent.change(select, { target: { value: 'cancelled' } });
+    fireEvent.change(select, { target: { value: 'preparing' } });
+    expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'preparing');
+
+    updateOrderStatus.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel order' }));
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'cancelled');
   });
 });
@@ -182,13 +175,13 @@ describe('unpaid-order confirmation', () => {
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'preparing');
   });
 
-  it('does NOT prompt when cancelling an unpaid order', async () => {
+  it('uses only the dedicated cancellation confirmation for an unpaid order', async () => {
     const confirm = confirmWith(true);
     render(<LiveOrdersPanel />);
     await openReceipt();
 
-    fireEvent.change(screen.getByLabelText('Order status'), { target: { value: 'cancelled' } });
-    expect(confirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel order' }));
+    expect(confirm).toHaveBeenCalledTimes(1);
     expect(updateOrderStatus).toHaveBeenCalledWith('o1', 'cancelled');
   });
 });
@@ -212,8 +205,6 @@ describe('the verification queue', () => {
     render(<LiveOrdersPanel />);
     expect(await screen.findByText('Orders Requiring Verification')).toBeTruthy();
 
-    // The queue row carries only safe summary fields. Opening it must resolve
-    // the full order from the realtime list, or the receipt would be partial.
     const buttons = await screen.findAllByText('View Receipt');
     fireEvent.click(buttons[0]);
     const dialog = await screen.findByRole('dialog');
@@ -237,10 +228,6 @@ describe('filtering', () => {
     });
     render(<LiveOrdersPanel />);
     await screen.findByText('SM-1042');
-
-    // The board defaults to 'active' now. The delivered order is not GONE, it
-    // is behind a chip — which is the distinction that matters, so both halves
-    // are asserted.
     expect(screen.queryByText('SM-1043')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'All' }));
@@ -255,14 +242,12 @@ describe('filtering', () => {
     render(<LiveOrdersPanel />);
     await screen.findByText('SM-1042');
 
-    // By role: 'delivered' is also the text of the status pill in the row.
     fireEvent.click(screen.getByRole('button', { name: 'delivered' }));
     expect(screen.queryByText('SM-1042')).toBeNull();
     expect(screen.getByText('SM-1043')).toBeTruthy();
   });
 
   it('caps the rendered rows and reveals the rest on demand', async () => {
-    // 120 active orders: more than one page, fewer than two.
     mockContext({
       orders: Array.from({ length: 120 }, (_, i) =>
         makeOrder({ id: `o${i}`, orderNumber: `SM-2${String(i).padStart(3, '0')}` })),
@@ -270,12 +255,9 @@ describe('filtering', () => {
     render(<LiveOrdersPanel />);
     await screen.findByText('SM-2000');
 
-    // Page one only. Row 51 is not in the DOM at all — that is the point, the
-    // table used to build every matching row on every render.
     expect(screen.getByText('SM-2049')).toBeTruthy();
     expect(screen.queryByText('SM-2050')).toBeNull();
 
-    // Nothing is lost: the control says how many are behind it, and reveals them.
     const older = screen.getByRole('button', { name: /Show older orders \(70 more\)/ });
     fireEvent.click(older);
     expect(screen.getByText('SM-2050')).toBeTruthy();
