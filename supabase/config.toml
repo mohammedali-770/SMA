@@ -35,19 +35,17 @@ verify_jwt = false
 [functions.push-dispatch]
 verify_jwt = false
 
-# Legacy custom WhatsApp OTP is used only for phone verification from the
-# signed-in Profile flow. Real customer login OTP delivery uses the separate
-# Supabase Auth Send SMS hook below, so this send endpoint must require a user
-# JWT and cannot be abused as a public template-sending surface.
+# Legacy custom WhatsApp OTP is used only for ownership verification of the
+# signed-in customer's AUTH-OWNED phone. Both send and verify require a JWT and
+# additionally resolve auth.getUser() + bind the requested phone to user.phone.
+# Real login OTP delivery uses the separate signed Supabase Auth hook below.
 [functions.whatsapp-send-otp]
 verify_jwt = true
 
-# Verification remains on its existing contract in this change; tightening it
-# requires an isolated review of the session/verification semantics.
 [functions.whatsapp-verify-otp]
-verify_jwt = false
+verify_jwt = true
 
-# Called by Meta; authenticated by the app-secret signature.
+# Called by Meta; authenticated by the app-secret signature in the function.
 [functions.whatsapp-webhook]
 verify_jwt = false
 
