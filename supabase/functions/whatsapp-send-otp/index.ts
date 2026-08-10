@@ -1,4 +1,6 @@
-// whatsapp-send-otp — customer OTP send (pre-login capable, verify_jwt=false).
+// whatsapp-send-otp — signed-in customer phone-verification send.
+// Supabase gateway requires a valid user JWT (config.toml verify_jwt=true).
+// REAL login OTP delivery uses auth-send-sms-whatsapp, not this endpoint.
 // Rate-limited + generic responses server-side (anti-enumeration). Never logs
 // the OTP or the WhatsApp token. Returns {status:'disabled'} only for the GLOBAL
 // unconfigured/off state (safe to reveal); otherwise a generic success.
@@ -8,7 +10,6 @@ import { normalizeSaudiPhoneE164 } from '../_shared/whatsapp.ts';
 import { sendOtpViaWhatsApp, type Language } from '../_shared/whatsappSend.ts';
 
 const GENERIC = 'If this phone number is valid, a verification code will be sent.';
-const VALID_PURPOSES = new Set(['login', 'signup', 'phone_verification', 'passwordless_login']);
 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
@@ -22,9 +23,15 @@ Deno.serve(async (req: Request) => {
   let payload: { phone?: string; purpose?: string; language?: string };
   try { payload = await req.json(); } catch { return json({ status: 'ok', message: GENERIC }, 200); }
 
-  // Saudi-only, like login: customer phones are KSA mobiles (+9665XXXXXXXX).
+  // This legacy endpoint no longer accepts login/signup purposes. Those belong
+  // to the Supabase Auth hook, which owns the real login OTP/session lifecycle.
+  const purpose = String(payload.purpose ?? 'phone_verification');
+  if (purpose !== 'phone_verification') {
+    return json({ status: 'ok', message: GENERIC }, 200);
+  }
+
+  // Saudi-only, like the profile verification UI: +9665XXXXXXXX.
   const norm = normalizeSaudiPhoneE164(payload.phone);
-  const purpose = VALID_PURPOSES.has(String(payload.purpose)) ? String(payload.purpose) : 'phone_verification';
   const language: Language = payload.language === 'ar' ? 'ar' : 'en';
 
   // Invalid phone → still generic (don't reveal validity), but nothing is sent.
@@ -36,7 +43,7 @@ Deno.serve(async (req: Request) => {
   const ipHash = ip ? await sha256Hex(ip) : null;
 
   try {
-    const outcome = await sendOtpViaWhatsApp(admin, norm.e164, purpose, language, { ipHash });
+    const outcome = await sendOtpViaWhatsApp(admin, norm.e164, 'phone_verification', language, { ipHash });
     if (outcome === 'disabled') {
       return json({ status: 'disabled', message: 'WhatsApp verification is not available right now.' }, 200);
     }
