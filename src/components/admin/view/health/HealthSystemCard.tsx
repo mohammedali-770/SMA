@@ -132,11 +132,15 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   }
 
   if (system.id === 'order_flow') {
+    // These names are the exact wire keys emitted by
+    // 20260807150000_order_flow_health_card.sql. Keep them coupled to the
+    // backend contract; numberValue intentionally returns 0 for a missing key,
+    // which would otherwise make a typo look like a real zero-activity reading.
     return (
       <>
-        <HealthMetric label={isAr ? 'طلبات حديثة' : 'Recent orders'} value={numberValue(d, 'recent_order_count')} />
-        <HealthMetric label={isAr ? 'فروع نشطة' : 'Active branches'} value={numberValue(d, 'active_branch_count')} />
-        <HealthMetric label={isAr ? 'متوسط خط الأساس' : 'Baseline avg'} value={numberValue(d, 'baseline_same_hour_avg_orders')} />
+        <HealthMetric label={isAr ? 'طلبات حديثة' : 'Recent orders'} value={numberValue(d, 'orders_in_window')} />
+        <HealthMetric label={isAr ? 'فروع نشطة' : 'Active branches'} value={numberValue(d, 'open_branches')} />
+        <HealthMetric label={isAr ? 'متوسط خط الأساس' : 'Baseline avg'} value={numberValue(d, 'baseline_orders')} />
       </>
     );
   }
@@ -162,10 +166,6 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
   }
 
   if (system.id === 'push') {
-    // Two distinct units, shown separately (never summed): actual failed device
-    // deliveries and failed send-lifecycle events. Falls back to the legacy
-    // `failed_sends_24h` alias for deliveries; missing event field reads 0. The
-    // card's state stays backend-authoritative.
     const { failedDeliveries, failedSendEvents } = pushFailureMetrics(d);
     return (
       <>
