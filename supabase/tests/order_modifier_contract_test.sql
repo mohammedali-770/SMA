@@ -1,5 +1,6 @@
 -- ============================================================================
--- New order items must satisfy the server-side modifier contract.
+-- New CASH order items must satisfy the server-side modifier contract.
+-- Online checkout snapshots are deliberately excluded from live revalidation.
 -- ============================================================================
 begin;
 
@@ -37,21 +38,26 @@ values
   ('d0000000-0000-0000-0000-00000000d001', 'e0000000-0000-0000-0000-00000000d002', 1)
 on conflict do nothing;
 
--- Test parent order. Disable ordinary order enqueue/change-event triggers only
--- while seeding this synthetic parent; the modifier contract under test is on
--- order_items/order_item_modifiers and remains enabled below.
+-- Synthetic parent orders. Disable ordinary order enqueue/change-event triggers
+-- only during parent seeding; modifier contract triggers remain enabled below.
 set local session_replication_role = replica;
 insert into public.orders (
   id, order_number, branch_id, order_type, subtotal, total,
-  status, payment_status, lazywait_sync_state
-) values (
-  '10000000-0000-0000-0000-00000000d001', 'MOD-CONTRACT-TEST',
+  status, payment_status, payment_method, lazywait_sync_state
+) values
+(
+  '10000000-0000-0000-0000-00000000d001', 'MOD-CONTRACT-CASH',
   'b0000000-0000-0000-0000-00000000d001', 'pickup', 100, 100,
-  'received', 'pending', 'pending'
+  'received', 'pending', 'cash', 'pending'
+),
+(
+  '10000000-0000-0000-0000-00000000d002', 'MOD-CONTRACT-ONLINE-SNAPSHOT',
+  'b0000000-0000-0000-0000-00000000d001', 'pickup', 20, 20,
+  'received', 'paid', 'online', 'pending'
 );
 set local session_replication_role = origin;
 
--- A valid item: exactly one required Heat Level + one optional active sauce.
+-- Valid cash item: exactly one required Heat Level + one optional active sauce.
 insert into public.order_items (
   id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
 ) values (
@@ -64,23 +70,21 @@ values
   ('11000000-0000-0000-0000-00000000d001', 'f0000000-0000-0000-0000-00000000d003', 'Garlic', 'ثوم', 1);
 select public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d001');
 
--- Missing required selection.
+-- Missing required selection on cash fails.
 insert into public.order_items (
   id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
 ) values (
   '11000000-0000-0000-0000-00000000d002', '10000000-0000-0000-0000-00000000d001',
   'd0000000-0000-0000-0000-00000000d001', 'Required Product', 'منتج إلزامي', 20, 1, 20
 );
-do $$
-begin
+do $$ begin
   begin
     perform public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d002');
     raise exception 'missing required modifier unexpectedly passed';
-  exception when sqlstate '22023' then null;
-  end;
+  exception when sqlstate '22023' then null; end;
 end $$;
 
--- More than max_select=1 in required group.
+-- More than max_select=1 fails.
 insert into public.order_items (
   id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
 ) values (
@@ -91,16 +95,14 @@ insert into public.order_item_modifiers (order_item_id, modifier_id, name_en, na
 values
   ('11000000-0000-0000-0000-00000000d003', 'f0000000-0000-0000-0000-00000000d001', 'Mild', 'خفيف', 0),
   ('11000000-0000-0000-0000-00000000d003', 'f0000000-0000-0000-0000-00000000d002', 'Hot', 'حار', 0);
-do $$
-begin
+do $$ begin
   begin
     perform public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d003');
     raise exception 'max_select violation unexpectedly passed';
-  exception when sqlstate '22023' then null;
-  end;
+  exception when sqlstate '22023' then null; end;
 end $$;
 
--- Duplicate modifier ID cannot be used to inflate price/cardinality.
+-- Duplicate modifier ID fails.
 insert into public.order_items (
   id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
 ) values (
@@ -111,13 +113,11 @@ insert into public.order_item_modifiers (order_item_id, modifier_id, name_en, na
 values
   ('11000000-0000-0000-0000-00000000d004', 'f0000000-0000-0000-0000-00000000d001', 'Mild', 'خفيف', 0),
   ('11000000-0000-0000-0000-00000000d004', 'f0000000-0000-0000-0000-00000000d001', 'Mild', 'خفيف', 0);
-do $$
-begin
+do $$ begin
   begin
     perform public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d004');
     raise exception 'duplicate modifier unexpectedly passed';
-  exception when sqlstate '22023' then null;
-  end;
+  exception when sqlstate '22023' then null; end;
 end $$;
 
 -- Inactive modifier fails even when its group is linked.
@@ -131,17 +131,14 @@ insert into public.order_item_modifiers (order_item_id, modifier_id, name_en, na
 values
   ('11000000-0000-0000-0000-00000000d005', 'f0000000-0000-0000-0000-00000000d001', 'Mild', 'خفيف', 0),
   ('11000000-0000-0000-0000-00000000d005', 'f0000000-0000-0000-0000-00000000d004', 'Ranch', 'رانش', 1);
-do $$
-begin
+do $$ begin
   begin
     perform public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d005');
     raise exception 'inactive modifier unexpectedly passed';
-  exception when sqlstate '22023' then null;
-  end;
+  exception when sqlstate '22023' then null; end;
 end $$;
 
--- Modifier from a group not linked to the product fails. Reuse active Garlic on
--- a product with no linked modifier groups.
+-- Modifier from an unlinked group fails for cash.
 insert into public.order_items (
   id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
 ) values (
@@ -150,14 +147,23 @@ insert into public.order_items (
 );
 insert into public.order_item_modifiers (order_item_id, modifier_id, name_en, name_ar, price)
 values ('11000000-0000-0000-0000-00000000d006', 'f0000000-0000-0000-0000-00000000d003', 'Garlic', 'ثوم', 1);
-do $$
-begin
+do $$ begin
   begin
     perform public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d006');
     raise exception 'unlinked modifier unexpectedly passed';
-  exception when sqlstate '22023' then null;
-  end;
+  exception when sqlstate '22023' then null; end;
 end $$;
+
+-- Critical payment-boundary regression: an already-authorized ONLINE snapshot
+-- with no current required modifier must NOT be revalidated here. Mutable menu
+-- data may have changed after the checkout session was authorized/captured.
+insert into public.order_items (
+  id, order_id, product_id, name_en, name_ar, unit_price, quantity, line_total
+) values (
+  '11000000-0000-0000-0000-00000000d007', '10000000-0000-0000-0000-00000000d002',
+  'd0000000-0000-0000-0000-00000000d001', 'Required Product Snapshot', 'لقطة منتج', 20, 1, 20
+);
+select public.assert_order_item_modifier_contract('11000000-0000-0000-0000-00000000d007');
 
 -- Trigger metadata must remain INSERT-only and deferred on both tables.
 do $$
@@ -165,7 +171,6 @@ declare v_bad integer;
 begin
   select count(*) into v_bad
   from pg_trigger t
-  join pg_class c on c.oid=t.tgrelid
   where t.tgname in ('validate_new_order_item_modifiers_on_item','validate_new_order_item_modifiers_on_modifier')
     and (not t.tgdeferrable or not t.tginitdeferred or (t.tgtype & 4) = 0);
   if v_bad <> 0 then
@@ -173,9 +178,12 @@ begin
   end if;
 end $$;
 
--- Remove intentionally-invalid rows before forcing the deferred valid trigger.
-delete from public.order_item_modifiers where order_item_id <> '11000000-0000-0000-0000-00000000d001';
-delete from public.order_items where id <> '11000000-0000-0000-0000-00000000d001';
+-- Remove intentionally-invalid cash rows. Keep the valid cash row and invalid-by-
+-- live-catalog ONLINE snapshot; forcing deferred constraints must succeed for both.
+delete from public.order_item_modifiers
+ where order_item_id not in ('11000000-0000-0000-0000-00000000d001','11000000-0000-0000-0000-00000000d007');
+delete from public.order_items
+ where id not in ('11000000-0000-0000-0000-00000000d001','11000000-0000-0000-0000-00000000d007');
 set constraints all immediate;
 
 rollback;
