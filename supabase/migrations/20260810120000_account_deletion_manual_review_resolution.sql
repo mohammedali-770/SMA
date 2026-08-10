@@ -106,15 +106,19 @@ begin
     -- Terminal failure deliberately releases the account-deletion lock because
     -- `failed` is not an active status. The customer can make a fresh request
     -- later, but must pass identity re-verification again.
+    --
+    -- IMPORTANT: manual_review_reason is customer-readable on the owner's own
+    -- request row and therefore remains the pre-existing server-generated safe
+    -- reason. The admin's free-text investigation/resolution note belongs only
+    -- in the admin-only audit table below.
     update public.account_deletion_requests
-       set status               = 'failed',
-           next_attempt_at      = null,
-           failure_code         = 'manual_review_resolved_failed',
-           failure_stage        = 'manual_review',
-           manual_review_reason = coalesce(v_note, manual_review_reason),
-           locked_until         = null,
-           lock_token           = null,
-           updated_at           = now()
+       set status          = 'failed',
+           next_attempt_at = null,
+           failure_code    = 'manual_review_resolved_failed',
+           failure_stage   = 'manual_review',
+           locked_until    = null,
+           lock_token      = null,
+           updated_at      = now()
      where id = p_request_id
      returning * into v_row;
   end if;
@@ -145,4 +149,4 @@ grant execute on function public.resolve_account_deletion_request(uuid, text, te
 comment on table public.account_deletion_resolution_audit is
   'Append-only audit of admin decisions that move an account-deletion request out of manual_review. Client writes are denied; only resolve_account_deletion_request inserts rows. Deleting a referenced request is restricted so the audit cannot be silently orphaned.';
 comment on function public.resolve_account_deletion_request(uuid, text, text) is
-  'Admin-only exit from manual_review. retry requeues through the normal processor and resets the failure budget; fail makes the request terminal so the account lock is released and any future request must re-verify identity. Every decision is audited.';
+  'Admin-only exit from manual_review. retry requeues through the normal processor and resets the failure budget; fail makes the request terminal so the account lock is released and any future request must re-verify identity. Customer-visible manual_review_reason remains server-generated; bounded admin free text is stored only in the admin audit table.';
