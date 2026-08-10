@@ -46,6 +46,9 @@ export interface ReportOrder {
   subtotal: number;
   deliveryFee: number;
   discountAmount: number;
+  /** VAT component persisted at order time; never recompute historical VAT from
+   * the app_settings rate that happens to be configured today. */
+  vatAmount: number;
   total: number;
   couponCode?: string;
   createdAt: string;
@@ -70,6 +73,7 @@ export function mapReportOrder(o: DbReportOrder): ReportOrder {
     subtotal: Number(o.subtotal),
     deliveryFee: Number(o.delivery_fee),
     discountAmount: Number(o.discount_amount),
+    vatAmount: Number(o.vat_amount),
     total: Number(o.total),
     couponCode: o.coupon_code ?? undefined,
     createdAt: o.created_at,

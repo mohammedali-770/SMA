@@ -9,7 +9,7 @@ import { StatusPill, type PillTone } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { useDsFontClass } from '../../design-system/ui/useDsLang';
 import {
-  getVATBreakdown, isCalendarDate, riyadhDateOnly, riyadhMonthRange, riyadhRangeToUtc,
+  isCalendarDate, riyadhDateOnly, riyadhMonthRange, riyadhRangeToUtc,
 } from '../../utils/calculations';
 import { Price } from '../Price';
 import { isMissingFunctionError, orders as ordersApi } from '../../lib/api';
@@ -32,62 +32,24 @@ const SYNC_TONE: Record<string, PillTone> = {
   pending_sync: 'warning',
 };
 
-/**
- * Financial reports. Every aggregation, filter and CSV column is unchanged.
- *
- * The CSV headers keep their "(SAR)" suffixes: that file is machine-readable and
- * whoever imports it depends on the exact column names. The on-screen headers
- * drop the suffix, because each cell already renders the SAMA riyal glyph
- * through <Price> and the design system does not spell the currency in letters.
- *
- * One real bug fixed on the way through: the Lazywait audit's "synced" cell
- * rendered ARABIC text in the English branch of its own `isRTL` ternary, so an
- * English-language operator read "تمت المزامنة" in the log column.
- */
+/** Financial reports backed by the bounded server-side ranged order feed. */
 export const ReportsPanel: React.FC = () => {
-  const { branches, brandSettings, products, categories, adminLang } = useApp();
+  const { branches, products, categories, adminLang } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const family = useDsFontClass();
   const [selectedReport, setSelectedReport] = useState<'sales_by_day' | 'sales_by_branch' | 'sales_by_product' | 'coupon_usage' | 'delivery_fees' | 'lazywait_report'>('sales_by_day');
   const [reportBranchId, setReportBranchId] = useState<string>('all');
-  // Default the range to the CURRENT month (Riyadh local), computed once, instead
-  // of a hardcoded window that silently goes stale after July 2026.
   const defaultRange = useMemo(() => riyadhMonthRange(), []);
   const [reportStartDate, setReportStartDate] = useState<string>(defaultRange.start);
   const [reportEndDate, setReportEndDate] = useState<string>(defaultRange.end);
 
-  // 1. Orders for reporting.
-  //
-  // These used to be filtered out of `useApp().orders`, which is why that list
-  // had to hold every order ever placed — the console downloaded the whole
-  // table on every staff sign-in so that this filter could run in memory. The
-  // range and the branch are now the server's job: `admin_list_orders_for_range`
-  // returns exactly this window and nothing else.
-  //
-  // The filter predicates are gone rather than moved, because the server applies
-  // both. The Riyadh calendar dates are converted to the half-open UTC instant
-  // window the feed expects; `riyadhDateOnly` stays for the per-day grouping
-  // below, which still has to bucket by Riyadh calendar day.
   const [rangeOrders, setRangeOrders] = useState<ReportOrder[]>([]);
   const [rangeLoading, setRangeLoading] = useState(true);
-  // Stored as a KIND, formatted at render. Holding a formatted string here
-  // would capture `isRTL` in the effect's closure, so switching the console's
-  // language would leave the message in the previous one until the next fetch.
   const [rangeError, setRangeError] =
     useState<{ kind: 'missing-migration' } | { kind: 'other'; message: string } | null>(null);
-  // Set when the window holds more orders than the server will return at once.
-  // The server sends NONE in that case rather than the first N, so the reports
-  // below render empty and this banner explains why — an empty report with a
-  // reason beats a truncated one that looks complete.
   const [rangeOverflow, setRangeOverflow] = useState<{ rows: number; max: number } | null>(null);
 
-  // A range is only a query once BOTH ends are real calendar dates and they are
-  // the right way round. A cleared `<input type="date">` yields '', and '' fails
-  // `reportEndDate < reportStartDate` when it is the START that was cleared —
-  // which used to reach `riyadhRangeToUtc` and throw `RangeError: Invalid time
-  // value` synchronously inside the effect, past any `.catch()`, taking the whole
-  // panel down rather than showing an incomplete-range state.
   const rangeIsComplete =
     isCalendarDate(reportStartDate) && isCalendarDate(reportEndDate)
     && reportStartDate <= reportEndDate;
@@ -99,11 +61,6 @@ export const ReportsPanel: React.FC = () => {
     }
     let cancelled = false;
     setRangeLoading(true);
-    // Drop the previous window's rows BEFORE awaiting the new one. Keeping them
-    // would leave every figure on this page showing one period's money under
-    // another period's date labels for the length of the request — and the CSV
-    // export names its file after the selected dates, so a click during that
-    // window produced an audit export whose filename and contents disagreed.
     setRangeOrders([]);
     setRangeOverflow(null);
     const { fromIso, toIso } = riyadhRangeToUtc(reportStartDate, reportEndDate);
@@ -118,10 +75,6 @@ export const ReportsPanel: React.FC = () => {
         if (cancelled) return;
         setRangeOrders([]);
         setRangeOverflow(null);
-        // A missing function is a migration that has not been applied to this
-        // project yet, not a fault. Telling them apart turns "Could not find the
-        // function public.admin_list_orders_for_range in the schema cache" into
-        // something an operator can act on.
         setRangeError(isMissingFunctionError(e)
           ? { kind: 'missing-migration' }
           : { kind: 'other', message: e instanceof Error ? e.message : String(e) });
@@ -130,44 +83,37 @@ export const ReportsPanel: React.FC = () => {
     return () => { cancelled = true; };
   }, [rangeIsComplete, reportStartDate, reportEndDate, reportBranchId]);
 
-  // The export is only meaningful when the figures on screen are the figures for
-  // the range named in the filename.
   const exportDisabled = !rangeIsComplete || rangeLoading || rangeError !== null || rangeOverflow !== null;
-
   const filteredOrders = rangeOrders;
   const deliveredOrders = useMemo(
     () => filteredOrders.filter(o => o.status === 'delivered'),
     [filteredOrders],
   );
 
-  // 2. Aggregations
   const repGrossSales = deliveredOrders.reduce((sum, o) => sum + o.total, 0);
   const repDiscounts = deliveredOrders.reduce((sum, o) => sum + Math.max(0, (o.subtotal + o.deliveryFee) - o.total), 0);
   const repDeliveryFees = deliveredOrders.reduce((sum, o) => sum + o.deliveryFee, 0);
   const repOrdersCount = deliveredOrders.length;
 
-  // 3. Sales By Day Memo
+  // The VAT figure is the immutable amount persisted on EACH order. This is a
+  // financial-history boundary: changing app_settings.vat_percentage later must
+  // never rewrite a prior period merely by viewing/exporting it.
   const dayReport = (() => {
     const map: { [date: string]: { subtotal: number; deliveryFee: number; discount: number; total: number; vat: number; ordersCount: number } } = {};
     deliveredOrders.forEach(o => {
       const date = riyadhDateOnly(o.createdAt);
       const disc = Math.max(0, (o.subtotal + o.deliveryFee) - o.total);
-      // Extract VAT from the VAT-inclusive grand total actually charged,
-      // consistent with the customer and admin receipts (not the
-      // pre-discount, delivery-excluded subtotal).
-      const { vatAmount } = getVATBreakdown(o.total, brandSettings?.vatPercentage || 15);
       if (!map[date]) map[date] = { subtotal: 0, deliveryFee: 0, discount: 0, total: 0, vat: 0, ordersCount: 0 };
       map[date].subtotal += o.subtotal;
       map[date].deliveryFee += o.deliveryFee;
       map[date].discount += disc;
       map[date].total += o.total;
-      map[date].vat += vatAmount;
+      map[date].vat += o.vatAmount;
       map[date].ordersCount += 1;
     });
     return Object.keys(map).sort().map(date => ({ date, ...map[date] }));
   })();
 
-  // 4. Sales By Branch Memo
   const branchReport = branches.map(b => {
     const bOrders = deliveredOrders.filter(o => o.branchId === b.id);
     const count = bOrders.length;
@@ -186,7 +132,6 @@ export const ReportsPanel: React.FC = () => {
     };
   });
 
-  // 5. Sales By Product Memo
   const productReport = (() => {
     const map: { [id: string]: { name: string; category: string; qty: number; rev: number } } = {};
     deliveredOrders.forEach(o => {
@@ -204,11 +149,8 @@ export const ReportsPanel: React.FC = () => {
     return Object.keys(map).map(id => ({ id, ...map[id] })).sort((a, b) => b.rev - a.rev);
   })();
 
-  // 6. Coupon Usage Memo — grouped by the order's REAL coupon_code and the
-  // real coupon discount (no inferring codes from discount amounts).
   const couponReport = buildCouponUsage(deliveredOrders);
 
-  // 7. Delivery Fees Memo
   const deliveryReport = branches.map(b => {
     const delOrders = deliveredOrders.filter(o => o.branchId === b.id && o.orderType === 'delivery');
     const count = delOrders.length;
@@ -223,10 +165,6 @@ export const ReportsPanel: React.FC = () => {
     };
   });
 
-  // 8. Lazywait Sync Memo — the POS reference and error come straight from
-  // the order (real lazywait_order_number / lazywait_ref + sync_last_error).
-  // For a not-yet-failed order with no server error we show a neutral,
-  // truthful status label rather than a fabricated failure message.
   const syncStatusLabel = (s: string) =>
     s === 'sync_failed' ? (isRTL ? 'فشلت المزامنة' : 'Sync failed')
     : s === 'pending_sync' ? (isRTL ? 'بانتظار المزامنة' : 'Awaiting sync')
@@ -245,27 +183,36 @@ export const ReportsPanel: React.FC = () => {
     };
   });
 
-  // Handle Export CSV — column names are a MACHINE contract; do not restyle them.
+  const csvCell = (value: unknown): string => {
+    let s = String(value ?? '');
+    // Spreadsheet formula injection: user/admin-controlled names beginning with
+    // these characters must be data, not executable spreadsheet formulae.
+    if (/^[=+\-@]/.test(s)) s = `'${s}`;
+    // Preserve the established machine contract for simple cells. Quote only
+    // when RFC-style CSV syntax actually requires it; double embedded quotes.
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
   const triggerCSVExport = () => {
     let csv = '';
     if (selectedReport === 'sales_by_day') {
       csv = "Date,Orders Count,Subtotal (SAR),Delivery Fees (SAR),Discounts (SAR),Net Sales (SAR),VAT Amount (SAR)\n" +
-        dayReport.map(r => `${r.date},${r.ordersCount},${r.subtotal.toFixed(2)},${r.deliveryFee.toFixed(2)},${r.discount.toFixed(2)},${r.total.toFixed(2)},${r.vat.toFixed(2)}`).join("\n");
+        dayReport.map(r => `${csvCell(r.date)},${r.ordersCount},${r.subtotal.toFixed(2)},${r.deliveryFee.toFixed(2)},${r.discount.toFixed(2)},${r.total.toFixed(2)},${r.vat.toFixed(2)}`).join("\n");
     } else if (selectedReport === 'sales_by_branch') {
       csv = "Branch,Orders Count,Total Revenue (SAR),Delivery Fees (SAR),Average Ticket (SAR),Discounts (SAR)\n" +
-        branchReport.map(r => `"${r.name}",${r.ordersCount},${r.totalRevenue.toFixed(2)},${r.deliveryFees.toFixed(2)},${r.avgTicket.toFixed(2)},${r.discounts.toFixed(2)}`).join("\n");
+        branchReport.map(r => `${csvCell(r.name)},${r.ordersCount},${r.totalRevenue.toFixed(2)},${r.deliveryFees.toFixed(2)},${r.avgTicket.toFixed(2)},${r.discounts.toFixed(2)}`).join("\n");
     } else if (selectedReport === 'sales_by_product') {
       csv = "Product,Category,Quantity Sold,Total Revenue (SAR)\n" +
-        productReport.map(r => `"${r.name}","${r.category}",${r.qty},${r.rev.toFixed(2)}`).join("\n");
+        productReport.map(r => `${csvCell(r.name)},${csvCell(r.category)},${r.qty},${r.rev.toFixed(2)}`).join("\n");
     } else if (selectedReport === 'coupon_usage') {
       csv = "Coupon Code,Usage Count,Total Discounts Saved (SAR)\n" +
-        couponReport.map(r => `${r.code},${r.count},${r.savings.toFixed(2)}`).join("\n");
+        couponReport.map(r => `${csvCell(r.code)},${r.count},${r.savings.toFixed(2)}`).join("\n");
     } else if (selectedReport === 'delivery_fees') {
       csv = "Branch,Delivery Count,Total Delivery Fees Collected (SAR),Average Delivery Fee (SAR)\n" +
-        deliveryReport.map(r => `"${r.name}",${r.deliveryCount},${r.totalFees.toFixed(2)},${r.avgFee.toFixed(2)}`).join("\n");
+        deliveryReport.map(r => `${csvCell(r.name)},${r.deliveryCount},${r.totalFees.toFixed(2)},${r.avgFee.toFixed(2)}`).join("\n");
     } else if (selectedReport === 'lazywait_report') {
       csv = "Order Number,Date,Branch,Total (SAR),Sync Status,Lazywait Reference,Error Log\n" +
-        lazywaitReport.map(r => `${r.orderNumber},${r.date},"${r.branch}",${r.total.toFixed(2)},${r.status},${r.ref || 'N/A'},"${r.error || ''}"`).join("\n");
+        lazywaitReport.map(r => `${csvCell(r.orderNumber)},${csvCell(r.date)},${csvCell(r.branch)},${r.total.toFixed(2)},${csvCell(r.status)},${csvCell(r.ref || 'N/A')},${csvCell(r.error || '')}`).join("\n");
     }
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -276,6 +223,7 @@ export const ReportsPanel: React.FC = () => {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const head = (labels: (readonly [string, string])[]) => (
@@ -311,7 +259,7 @@ export const ReportsPanel: React.FC = () => {
           </Text>
           <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">
             {isRTL
-              ? 'تقارير فورية ودقيقة متوافقة مع متطلبات الهيئة العامة للزكاة والضريبة والجمارك'
+              ? 'تقارير فورية ودقيقة لمراجعة المبيعات الداخلية'
               : 'Realtime financial audits and cashier reconciliation logs'}
           </Text>
         </div>
@@ -369,9 +317,6 @@ export const ReportsPanel: React.FC = () => {
         </label>
       </Card>
 
-      {/* The three states this panel can now be in that it could not before, when
-          it filtered a list the app already held. Each SAYS what it is: a report
-          rendering zeros for an unstated reason is the failure mode to avoid. */}
       {rangeError ? (
         <Card>
           <Text variant="body" tone="danger" as="p">
@@ -426,7 +371,7 @@ export const ReportsPanel: React.FC = () => {
           </Text>
           <Text variant="heading" as="p" className="mt-0.5"><Price amount={repGrossSales} lang={adminLang} /></Text>
           <Text variant="caption" tone="tertiary" as="p">
-            {isRTL ? 'شامل ضريبة القيمة المضافة ١٥٪' : 'Includes 15% VAT'}
+            {isRTL ? 'تشمل مكوّن الضريبة المسجل لكل طلب' : 'Includes each order’s stored VAT component'}
           </Text>
         </Card>
 
@@ -488,7 +433,7 @@ export const ReportsPanel: React.FC = () => {
                 ['fees', isRTL ? 'رسوم التوصيل' : 'Delivery Fees'],
                 ['disc', isRTL ? 'خصومات الكوبونات' : 'Coupons Deduct'],
                 ['net', isRTL ? 'صافي المبيعات (شامل الضريبة)' : 'Net Revenue'],
-                ['vat', isRTL ? 'قيمة الضريبة ١٥٪' : 'VAT (15%)'],
+                ['vat', isRTL ? 'قيمة الضريبة المسجلة' : 'Stored VAT'],
               ] as const)}
               <tbody>
                 {dayReport.length === 0 ? emptyRow(7, isRTL ? 'لا توجد بيانات حركة مبيعات لهذا النطاق الزمني' : 'No sales ledger records for this scope.') : (
@@ -645,16 +590,6 @@ export const ReportsPanel: React.FC = () => {
         </div>
       </Card>
 
-      {/*
-        This card used to assert that the reports were "fully compliant with the
-        ZATCA Saudi Arabia 15% VAT directives". They are not, and nothing in this
-        system issues a tax invoice: there is no invoice sequence, no seller VAT
-        registration number, no e-invoice XML and no QR code anywhere in the
-        schema. Telling staff otherwise is exactly the kind of claim that gets
-        relied on. It is replaced with a factual description of what these
-        figures actually are — a management sales summary — plus the two caveats
-        that materially affect the numbers on screen.
-      */}
       <Card className="flex items-start gap-2">
         <Info className="mt-0.5 size-4 shrink-0 text-ink-secondary" aria-hidden="true" />
         <div>
@@ -665,8 +600,8 @@ export const ReportsPanel: React.FC = () => {
           </Text>
           <Text variant="caption" tone="secondary" as="p" className="mt-0.5 leading-relaxed">
             {isRTL
-              ? 'هذه الأرقام ملخص مبيعات للاستخدام الإداري فقط، ولا تُعد فواتير ضريبية ولا سجلات معتمدة لأغراض الإقرار الضريبي. مبلغ الضريبة معروض هنا محسوباً من الإجمالي بنسبة الضريبة المُعدّة حالياً، وليس بالنسبة التي كانت سارية وقت كل طلب — لذلك فإن تغيير نسبة الضريبة في الإعدادات يغيّر أرقام الفترات السابقة. كما تعتمد التقارير على تحديث حالة الطلب يدوياً من قِبل الموظفين. يُرجى الرجوع إلى المحاسب لأي إقرار ضريبي رسمي.'
-              : 'These figures are a management sales summary for internal use. They are not tax invoices and are not an approved record for VAT filing. The VAT column is derived from each order total using the VAT rate configured right now — not the rate in force when the order was placed — so changing the rate in Settings will change historical periods. Reports also depend on staff updating order status by hand. Use your accountant for any official VAT return.'}
+              ? 'هذه الأرقام ملخص مبيعات للاستخدام الإداري فقط، ولا تُعد فواتير ضريبية ولا سجلات معتمدة لأغراض الإقرار الضريبي. قيمة الضريبة في الفترات السابقة مأخوذة من المبلغ الذي خزّنه الخادم مع كل طلب وقت إنشائه، لذلك لا تتغير السجلات السابقة عند تغيير نسبة الضريبة لاحقاً. كما تعتمد التقارير على تحديث حالة الطلب يدوياً من قِبل الموظفين. يُرجى الرجوع إلى المحاسب لأي إقرار ضريبي رسمي.'
+              : 'These figures are a management sales summary for internal use. They are not tax invoices and are not an approved record for VAT filing. Historical VAT comes from the amount the server stored with each order when it was created, so changing the configured VAT rate later does not rewrite prior periods. Reports also depend on staff updating order status by hand. Use your accountant for any official VAT return.'}
           </Text>
         </div>
       </Card>

@@ -17,6 +17,7 @@ import React from 'react';
 import { AlertTriangle, MapPin } from 'lucide-react';
 
 import { canTransitionOrder } from '../../../../context/AppContext';
+import { Button } from '../../../../design-system/ui/Button';
 import { Card } from '../../../../design-system/ui/Card';
 import { StatusPill } from '../../../../design-system/ui/StatusPill';
 import { Text } from '../../../../design-system/ui/Text';
@@ -32,13 +33,15 @@ import { DetailRow } from './DetailRow';
 import { TapPaymentDetails } from './TapPaymentDetails';
 import { paymentTone, syncStateOf, syncTone } from './ordersView';
 
-const STATUS_OPTIONS: Array<{ value: OrderStatus; label: string }> = [
+// Cancellation is deliberately NOT one of the normal select choices. It has
+// financial side effects (loyalty/coupon compensation) and deserves a distinct,
+// destructive confirmation instead of being one stray select movement away.
+const STATUS_OPTIONS: Array<{ value: Exclude<OrderStatus, 'cancelled'>; label: string }> = [
   { value: 'received', label: 'Received' },
   { value: 'preparing', label: 'Preparing' },
   { value: 'ready', label: 'Ready (POS Buzzer)' },
   { value: 'out_for_delivery', label: 'Out for Delivery' },
   { value: 'delivered', label: 'Delivered' },
-  { value: 'cancelled', label: 'Cancelled' },
 ];
 
 export function OrderReceiptModal({
@@ -78,6 +81,20 @@ export function OrderReceiptModal({
   // null when the stored coordinates are unusable, which is what suppresses the
   // link rather than rendering one that points nowhere useful.
   const mapsUrl = order.address ? mapsUrlFor(order.address.lat, order.address.lng) : null;
+  // Production rows persist vat_amount at order creation. The fallback keeps old
+  // demo/test objects readable, but live historical receipts never depend on the
+  // current VAT setting once vatAmount is present.
+  const vatAmount = order.vatAmount ?? getVATBreakdown(order.total, vatPercentage).vatAmount;
+
+  const cancelOrder = () => {
+    if (isAccountant || !canTransitionOrder(order.status, 'cancelled')) return;
+    const confirmed = window.confirm(
+      isRTL
+        ? 'سيتم إلغاء الطلب وعكس حركة نقاط الولاء واستخدام الكوبون المرتبط به. هل أنت متأكد؟'
+        : 'Cancel this order? Loyalty movements and any consumed coupon usage will be compensated by the server.'
+    );
+    if (confirmed) onStatusChange(order.id, 'cancelled');
+  };
 
   return (
     // Shares ModalShell with AdminModal for the focus trap, Escape, focus
@@ -139,25 +156,22 @@ export function OrderReceiptModal({
           )}
 
           <div className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3">
-            {/* A <p>, not a <label>: the select is named by its aria-label, and
-                a <label> bound to no control is a dead end for a screen reader. */}
             <Text variant="caption" tone="tertiary" as="p">
               {isRTL ? 'تعديل حالة الطلب الحالية:' : 'SET REALTIME ORDER STATUS:'}
             </Text>
-            {/* A <select> prints as an empty box in most browsers, so on paper the
-                status is rendered as plain text instead. The control is hidden
-                rather than the whole block, because the ticket still has to say
-                what state the order is in. */}
             <Text variant="label" as="p" className="print-only">
-              {STATUS_OPTIONS.find((o) => o.value === order.status)?.label ?? order.status}
+              {order.status === 'cancelled'
+                ? (isRTL ? 'ملغي' : 'Cancelled')
+                : STATUS_OPTIONS.find((o) => o.value === order.status)?.label ?? order.status}
             </Text>
             <select
-              disabled={isAccountant}
+              disabled={isAccountant || order.status === 'cancelled'}
               value={order.status}
               onChange={(e) => onStatusChange(order.id, e.target.value as OrderStatus)}
               aria-label={isRTL ? 'حالة الطلب' : 'Order status'}
               className={`print-hide ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 ${family}`}
             >
+              {order.status === 'cancelled' && <option value="cancelled">{isRTL ? 'ملغي' : 'Cancelled'}</option>}
               {STATUS_OPTIONS.map((o) => (
                 <option
                   key={o.value}
@@ -168,6 +182,14 @@ export function OrderReceiptModal({
                 </option>
               ))}
             </select>
+            {!isAccountant && canTransitionOrder(order.status, 'cancelled') && (
+              <Button
+                label={isRTL ? 'إلغاء الطلب' : 'Cancel order'}
+                onClick={cancelOrder}
+                variant="danger"
+                className="print-hide w-full"
+              />
+            )}
           </div>
 
           <div className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 p-3">
@@ -190,23 +212,10 @@ export function OrderReceiptModal({
                 <Text variant="label" tone="ember" numeric as="p">
                   {order.address.nationalShortAddress}
                 </Text>
-                {/*
-                  Delivery orders never reach the POS and there is no driver or
-                  dispatch feature, so every delivery is coordinated by a human
-                  reading this address off the screen. A tappable link is the
-                  difference between reading coordinates aloud down a phone and
-                  opening the destination directly.
-
-                  Rendered only when the stored coordinates are actually usable —
-                  mapsUrlFor rejects (0,0) and any non-finite value, so a failed
-                  geocode shows nothing rather than a link to the Atlantic.
-                */}
                 {mapsUrl && (
                   <a
                     href={mapsUrl}
                     target="_blank"
-                    // noopener/noreferrer: this opens a third-party origin in a new
-                    // tab from an authenticated staff console.
                     rel="noopener noreferrer"
                     className="mt-1 inline-flex min-h-9 items-center gap-1 text-ember underline"
                   >
@@ -220,23 +229,11 @@ export function OrderReceiptModal({
             )}
           </div>
 
-          {/*
-            The customer's free-text note. `orders.notes` has always existed and
-            admin_list_orders_with_items has always returned it, but it was never
-            mapped into the admin Order type, so nothing displayed it anywhere —
-            and the POS handoff does not carry it either. This modal is therefore
-            the ONLY place this text can reach a human.
-
-            It renders above the items and in the warning tone deliberately: the
-            realistic worst case for this field is an unread allergy.
-          */}
           {order.notes && (
             <Card tone="warning" className="px-3 py-2">
               <Text variant="caption" tone="tertiary" as="p">
                 {isRTL ? 'ملاحظة العميل:' : 'Customer note:'}
               </Text>
-              {/* whitespace-pre-wrap keeps the customer's own line breaks; break-words
-                  stops a long unbroken string blowing out the modal width. */}
               <Text variant="label" as="p" className="mt-0.5 whitespace-pre-wrap break-words">
                 {order.notes}
               </Text>
@@ -304,9 +301,9 @@ export function OrderReceiptModal({
           </div>
 
           <div className="rounded-[var(--radius-ds-md)] bg-con-surface-2 p-3">
-            <DetailRow label={`${vatPercentage}% Saudi VAT component`}>
+            <DetailRow label={isRTL ? 'مكوّن ضريبة القيمة المضافة وقت إنشاء الطلب' : 'VAT component recorded at order time'}>
               <Text variant="caption" tone="secondary" as="span">
-                <Price amount={getVATBreakdown(order.total, vatPercentage).vatAmount} lang={adminLang} />
+                <Price amount={vatAmount} lang={adminLang} />
               </Text>
             </DetailRow>
           </div>

@@ -217,6 +217,9 @@ export function mapOrder(o: DbOrderWithItems): Order {
     couponCode: o.coupon_code ?? undefined,
     discountAmount: Number(o.discount_amount),
     loyaltyDiscountAmount: Number(o.loyalty_discount_amount),
+    // Persisted by place_order at the instant the order is priced. Historical
+    // receipts/reports must render this value rather than applying today's rate.
+    vatAmount: Number(o.vat_amount),
     total: Number(o.total),
     loyaltyPointsEarned: o.loyalty_points_earned ?? 0,
     loyaltyPointsRedeemed: o.loyalty_points_redeemed ?? 0,
