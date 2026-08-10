@@ -41,14 +41,10 @@ begin
     raise exception 'order item not found' using errcode = 'P0002';
   end if;
 
-  -- Historical/manual snapshot rows may legitimately have no product FK. There
-  -- is no current menu contract to validate in that case.
   if v_product_id is null then
     return;
   end if;
 
-  -- New order modifier rows must carry a live identity. `place_order` always
-  -- does; null is only expected later if a historical modifier FK is SET NULL.
   if exists (
     select 1 from public.order_item_modifiers oim
      where oim.order_item_id = p_order_item_id
@@ -58,8 +54,6 @@ begin
       using errcode = '22023';
   end if;
 
-  -- A modifier may appear at most once for one order item. Duplicate IDs would
-  -- otherwise inflate both price and group cardinality.
   if exists (
     select oim.modifier_id
       from public.order_item_modifiers oim
@@ -72,9 +66,6 @@ begin
       using errcode = '22023';
   end if;
 
-  -- Every selected modifier must still be active and belong to a group linked
-  -- to this product. This duplicates the current place_order membership check at
-  -- the final DB boundary so alternate trusted writers cannot bypass it either.
   if exists (
     select 1
       from public.order_item_modifiers oim
@@ -88,9 +79,6 @@ begin
       using errcode = '22023';
   end if;
 
-  -- Validate every group linked to the product, not only groups the caller sent.
-  -- is_required=true implies at least one even if a misconfigured row has
-  -- min_select=0; otherwise min_select is authoritative. NULL max means unbound.
   for v_group in
     select g.id, g.min_select, g.max_select, g.is_required
       from public.product_modifier_groups pmg
@@ -128,14 +116,19 @@ as $$
 declare
   v_order_item_id uuid;
 begin
-  v_order_item_id := case
-    when tg_table_name = 'order_items' then new.id
-    else new.order_item_id
-  end;
+  -- Do not use a CASE expression here: PL/pgSQL resolves fields on the dynamic
+  -- NEW record even for the non-selected CASE arm, and `order_items` has no
+  -- `order_item_id` column. Separate branches resolve only the field that exists
+  -- on the table that fired the trigger.
+  if tg_table_name = 'order_items' then
+    v_order_item_id := new.id;
+  elsif tg_table_name = 'order_item_modifiers' then
+    v_order_item_id := new.order_item_id;
+  else
+    raise exception 'Unexpected modifier contract trigger table: %', tg_table_name
+      using errcode = '55000';
+  end if;
 
-  -- Deferred events survive until constraint time. If the item was inserted and
-  -- then deleted again in the same transaction (for example a transaction that
-  -- aborts/replaces a draft line), there is no committed row left to validate.
   if not exists (select 1 from public.order_items where id = v_order_item_id) then
     return null;
   end if;
@@ -148,7 +141,6 @@ revoke all on function public.enforce_new_order_item_modifier_contract()
   from public, anon, authenticated;
 grant execute on function public.enforce_new_order_item_modifier_contract() to service_role;
 
--- Deferred + INSERT-only: see header rationale.
 drop trigger if exists validate_new_order_item_modifiers_on_item on public.order_items;
 create constraint trigger validate_new_order_item_modifiers_on_item
   after insert on public.order_items
