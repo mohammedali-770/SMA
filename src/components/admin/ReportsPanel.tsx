@@ -518,7 +518,7 @@ export const ReportsPanel: React.FC = () => {
                       <td className={TD}><Text variant="caption" numeric as="span">{r.count}</Text></td>
                       <td className={TD}>{money(r.savings, '−')}</td>
                     </tr>
-                  ))}
+                  ))
                 )}
               </tbody>
             </table>
@@ -580,7 +580,7 @@ export const ReportsPanel: React.FC = () => {
                         )}
                       </td>
                     </tr>
-                  ))}
+                  ))
                 )}
               </tbody>
             </table>
