@@ -22,9 +22,10 @@
   `initObservability()`; root component wrapped with `Sentry.wrap`.
 - Coverage: native iOS/Android crashes (release builds), unhandled JS
   errors, unhandled promise rejections, React render errors (root
-  `ObservabilityErrorBoundary` with a bilingual, stack-free fallback),
-  Expo Router navigation spans with **templated** paths (`/product/[id]`,
-  never raw ids), conservative startup/screen tracing.
+  `ObservabilityErrorBoundary` with a bilingual, stack-free fallback), and
+  conservative startup tracing. Expo Router navigation-span instrumentation is
+  intentionally disabled on the Expo SDK 57 / Sentry 7.11 compatibility line
+  and should be restored only after upgrading to a compatible Sentry release.
 - Off by policy: session replay (0/0), screenshots, view hierarchy,
   profiling (0), user-interaction tracing AND interaction breadcrumbs (the
   `Sentry.wrap` touch boundary's `touch` crumbs and every `ui.*` crumb —
