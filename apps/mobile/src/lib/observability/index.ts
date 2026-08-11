@@ -55,6 +55,7 @@ export interface SafeCaptureContext {
 let initialized = false;
 let resolvedEnv: SentryEnvironment = 'development';
 
+
 /** The environment the SDK was initialized with (for the dev test screen). */
 export function observabilityEnvironment(): SentryEnvironment {
   return resolvedEnv;
@@ -112,14 +113,6 @@ export function initObservability(): boolean {
     enableCaptureFailedRequests: false, // no request/response capture
     enableUserInteractionTracing: false, // no user-interaction SPANS; the
     // touch BREADCRUMBS Sentry.wrap emits are dropped in beforeBreadcrumb
-    integrations(defaults) {
-      return [
-        // Expo Router instrumentation: navigation spans + breadcrumbs with
-        // TEMPLATED paths (dynamic segments like [id] are never raw values).
-        ...defaults,
-        Sentry.expoRouterIntegration(),
-      ];
-    },
     beforeSend(event, hint) {
       // Expected, UI-handled failures never become events — even when they
       // escape as unhandled rejections (e.g. an offline fetch).
