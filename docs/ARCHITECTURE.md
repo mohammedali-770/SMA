@@ -230,13 +230,13 @@ performs the admin Vite build and the Expo customer web export, placing the cust
 
 ### Production branch
 
-`claude/project-build-ie4b56` is the default/production branch. As of 2026-08-12 it is also the only remote branch after the historical feature-branch cleanup.
+`claude/project-build-ie4b56` is the default/production branch and the only **long-lived** branch after the historical feature-branch cleanup. Normal development uses short-lived purpose-specific PR branches that are deleted after merge.
 
 ## 13. Database change model
 
 Production database state is not reconstructed by blindly comparing migration filename timestamps.
 
-[`MIGRATIONS.md`](MIGRATIONS.md) is the authoritative migration ledger and apply procedure.
+[`MIGRATIONS.md`](MIGRATIONS.md) remains the migration workflow/history ledger, but its last full live-count reconciliation was 2026-08-07. Aug 10 added further migration files, so use [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §12 before treating the Aug 7 counts as current.
 
 Rules:
 
@@ -251,7 +251,8 @@ Rules:
 - [`../README.md`](../README.md) — project overview.
 - [`README.md`](README.md) — documentation navigation.
 - [`../PROJECT_STATUS.md`](../PROJECT_STATUS.md) — current release/engineering state.
-- [`MIGRATIONS.md`](MIGRATIONS.md) — authoritative DB ledger.
+- [`MIGRATIONS.md`](MIGRATIONS.md) — migration workflow/history ledger.
+- [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) — current owner/live reconciliation gaps.
 - [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) — payment freeze.
 - [`ORDER_CONFIRMATION_FLOW.md`](ORDER_CONFIRMATION_FLOW.md) — customer order confirmation lifecycle.
 - [`OPERATIONS_ALERTS_DIGEST.md`](OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
