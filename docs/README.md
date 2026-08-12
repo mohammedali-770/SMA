@@ -32,14 +32,14 @@ This directory contains both **current operating documentation** and **historica
 | [`DEPLOY.md`](DEPLOY.md) | Vercel deployment behavior and verification |
 | [`ROLLBACK.md`](ROLLBACK.md) | Per-surface rollback/mitigation guidance |
 | [`DEPENDENCY_ADVISORIES.md`](DEPENDENCY_ADVISORIES.md) | Dependency audit policy and reviewed exceptions |
-| [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) | Items that require owner/dashboard/business/legal decisions |
+| [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) | Current owner/dashboard/business/legal decisions and release gates |
 
 ## Database and backend operations
 
 | Document | Scope |
 | --- | --- |
-| [`MIGRATIONS.md`](MIGRATIONS.md) | **Authoritative** production migration ledger and apply workflow |
-| [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md) | Backup/PITR state and restore procedure |
+| [`MIGRATIONS.md`](MIGRATIONS.md) | **Authoritative migration workflow and historical ledger. Live-count reconciliation is currently stale after the Aug 10 migrations; see `OWNER_ACTIONS.md` §12 before using its Aug 7 counts as current.** |
+| [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md) | Backup/PITR state and restore procedure; capability remains unverified until live values/drill are recorded |
 | [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md) | Incident handling and operational limitations |
 | [`OPERATIONS_ALERTS_DIGEST.md`](OPERATIONS_ALERTS_DIGEST.md) | Operations alerts/digest behavior |
 | [`../supabase/functions/README.md`](../supabase/functions/README.md) | Current Edge Function inventory and security boundary |
@@ -70,7 +70,7 @@ These documents are useful evidence, but they should not be treated as active br
 | Document | Status |
 | --- | --- |
 | [`GIT_BRANCHES.md`](GIT_BRANCHES.md) | Current branch policy plus the result of the August 2026 cleanup |
-| [`BRANCH_FEATURE_RETENTION_AUDIT.md`](BRANCH_FEATURE_RETENTION_AUDIT.md) | Final feature-retention evidence used before historical branches were deleted |
+| [`BRANCH_FEATURE_RETENTION_AUDIT.md`](BRANCH_FEATURE_RETENTION_AUDIT.md) | Final feature-retention evidence used before historical branches were deleted; baseline/target branch names inside it are historical audit context |
 | [`BRANCH_DELETION.md`](BRANCH_DELETION.md) | Restaurant-branch deletion behavior, **not** Git branch cleanup |
 
 ## Documentation maintenance rule
@@ -84,7 +84,8 @@ Prefer this ownership model:
 - Mobile/EAS details → `README_MOBILE.md`
 - Architecture/invariants → `docs/ARCHITECTURE.md`
 - Release procedure → `docs/RELEASE_CHECKLIST.md`
-- Database truth → `docs/MIGRATIONS.md`
+- Database migration workflow/history → `docs/MIGRATIONS.md`
+- Current owner/live reconciliation gaps → `docs/OWNER_ACTIONS.md`
 - Payment freeze → `docs/PAYMENT_POSTPONEMENT.md`
 - Git branch state → `docs/GIT_BRANCHES.md`
 - Agent/change-control rules → `CLAUDE.md`
