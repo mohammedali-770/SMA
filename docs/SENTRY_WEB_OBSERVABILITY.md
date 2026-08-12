@@ -19,7 +19,7 @@ The web/admin surfaces use the same Sentry organization/project strategy as mobi
 - DSN is a public ingestion identifier and may be present in browser configuration.
 - `SENTRY_AUTH_TOKEN` is a **server/build secret** used for source-map upload tooling and must never be exposed through `VITE_*` or `EXPO_PUBLIC_*`.
 
-The Aug 11 native release work recorded the EAS production token setup. Vercel remains a separate environment: verify its current `SENTRY_AUTH_TOKEN` before relying on production web symbolication rather than treating a historical setup statement as permanent truth.
+The Aug 11 native release work recorded the EAS production token setup. Vercel remains a separate environment: verify its current `SENTRY_AUTH_TOKEN` before relying on **admin-web** production symbolication rather than treating a historical setup statement as permanent truth.
 
 ## Initialization and release identity
 
@@ -31,18 +31,41 @@ The Aug 11 native release work recorded the EAS production token setup. Vercel r
 
 The source modules/tests are the authority for exact sampling values; do not duplicate a numeric sampling table here that can silently drift from code.
 
-## Source maps
+## Source maps — two separate pipelines
 
-The Vite Sentry plugin is gated by the build-time auth token. When the token is absent the web build can still complete, but source-map upload/symbolication is not complete.
+Do **not** treat the two browser surfaces as having one source-map upload path.
 
-For a production release:
+### Admin web (`/`) — implemented
+
+`vite.config.ts` enables hidden Vite source maps only when `SENTRY_AUTH_TOKEN` exists, runs the official Sentry Vite plugin, uploads the maps, and removes them from the deployed output.
+
+For admin-web production symbolication:
 
 - [ ] Vercel has the current `SENTRY_AUTH_TOKEN` secret (not a browser-visible env variable).
 - [ ] Vite build runs the intended Sentry upload path.
-- [ ] source maps are not published as public assets.
-- [ ] an approved test event resolves to the correct release and readable stack.
+- [ ] Vite source maps are not published as public assets.
+- [ ] an approved **admin-web** test event resolves to the correct release and readable stack.
 
-Do not log the token or put it in `VITE_*`.
+### Expo web (`/app`) — upload path not implemented yet
+
+`apps/mobile/scripts/export-web.js` currently runs:
+
+```text
+expo export --platform web --clear --output-dir ../../dist/app
+```
+
+It injects public release/environment metadata, but it **does not generate/upload a separate Expo-web source-map set to Sentry** and deliberately does not read/forward `SENTRY_AUTH_TOKEN`.
+
+Therefore:
+
+- Expo-web runtime events can still reach Sentry with environment/release/surface metadata;
+- a configured Vercel token and successful Vite upload prove **admin-web** symbolication only;
+- do **not** mark `/app` source-map verification complete until a dedicated Expo-web map generation/upload path is implemented and tested;
+- do not reuse/publish source maps as public assets as a workaround.
+
+This is an observability gap, not a reason to expose the auth token to the customer bundle.
+
+Do not log the token or put it in `VITE_*` / `EXPO_PUBLIC_*`.
 
 ## Privacy model
 
@@ -110,7 +133,8 @@ After an approved web release:
 - [ ] admin events carry `app_surface=admin-web`.
 - [ ] customer web events carry `app_surface=expo-web`.
 - [ ] environments/releases are distinguishable.
-- [ ] approved test event is symbolicated when the upload token is configured.
+- [ ] approved **admin-web** test event is symbolicated when the Vercel upload token is configured.
+- [ ] Expo-web event routing/tags are verified separately; **source-map symbolication remains pending until a dedicated upload path exists**.
 - [ ] sanitized payload contains no customer/payment/auth secrets.
 
 Use `docs/DEPLOY.md` for production-artifact verification; an arbitrary HTTP 200 does not prove the current bundle is served.
@@ -119,7 +143,8 @@ Use `docs/DEPLOY.md` for production-artifact verification; an arbitrary HTTP 200
 
 - `src/lib/observability/` — admin browser implementation.
 - `apps/mobile/src/lib/observability/` — shared/mobile/expo-web implementation.
-- `vite.config.ts` — web source-map/plugin gate.
+- `vite.config.ts` — **admin/Vite** source-map/plugin gate.
+- `apps/mobile/scripts/export-web.js` — Expo web export; currently no separate Sentry map upload.
 - `docs/SENTRY_OBSERVABILITY.md` — native/mobile runbook.
 - `docs/DEPLOY.md` — deployment verification.
 - `docs/RELEASE_CHECKLIST.md` — release gates.
