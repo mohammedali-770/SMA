@@ -1,35 +1,27 @@
-/**
- * Design-system surface (mobile).
- *
- * A flat white panel on the cream ground — no gradient, no drop shadow by
- * default. "Ember on Cream" gets its structure from colour boundaries and
- * hairlines rather than elevation, which is also the only thing that renders
- * identically on iOS, Android and the web export.
- */
+/** Design-system surface (mobile). */
 import React from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { color, radius, space } from '../generated/tokens';
+import { radius, space } from '../generated/tokens';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 export type CardTone = 'surface' | 'warning' | 'danger' | 'info';
 
-const TONE: Record<CardTone, { bg: string; border: string }> = {
-  surface: { bg: color.appSurface, border: color.appLine },
-  warning: { bg: color.warnTint, border: color.warnLine },
-  danger: { bg: color.dangerTint, border: color.dangerLine },
-  info: { bg: color.infoTint, border: color.infoLine },
-};
-
 interface Props {
   tone?: CardTone;
-  /** Removes the border for cards that sit directly on a tinted parent. */
   borderless?: boolean;
   style?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }
 
 export function Card({ tone = 'surface', borderless, style, children }: Props) {
-  const t = TONE[tone];
+  const color = useThemeColors();
+  const t =
+    tone === 'warning' ? { bg: color.warnTint, border: color.warnLine }
+    : tone === 'danger' ? { bg: color.dangerTint, border: color.dangerLine }
+    : tone === 'info' ? { bg: color.infoTint, border: color.infoLine }
+    : { bg: color.appSurface, border: color.appLine };
+
   return (
     <View
       style={[
