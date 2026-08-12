@@ -38,7 +38,8 @@ This directory contains both **current operating documentation** and **historica
 
 | Document | Scope |
 | --- | --- |
-| [`MIGRATIONS.md`](MIGRATIONS.md) | **Authoritative migration workflow and historical ledger. Live-count reconciliation is currently stale after the Aug 10 migrations; see `OWNER_ACTIONS.md` §12 before using its Aug 7 counts as current.** |
+| [`MIGRATION_RECONCILIATION_20260812.md`](MIGRATION_RECONCILIATION_20260812.md) | **Latest read-only Production migration snapshot:** 79 repository files, 85 live history rows, latest `20260810115029`, all 11 post-Aug-7 migration names represented live |
+| [`MIGRATIONS.md`](MIGRATIONS.md) | Historical migration workflow/provenance ledger. Its Aug 7 headline/classification counts are a dated full-fingerprint snapshot; use the reconciliation file above for current counts. |
 | [`BACKUP_RECOVERY.md`](BACKUP_RECOVERY.md) | Backup/PITR state and restore procedure; capability remains unverified until live values/drill are recorded |
 | [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md) | Incident handling and operational limitations |
 | [`OPERATIONS_ALERTS_DIGEST.md`](OPERATIONS_ALERTS_DIGEST.md) | Operations alerts/digest behavior |
@@ -84,8 +85,9 @@ Prefer this ownership model:
 - Mobile/EAS details → `README_MOBILE.md`
 - Architecture/invariants → `docs/ARCHITECTURE.md`
 - Release procedure → `docs/RELEASE_CHECKLIST.md`
+- Current migration counts/status → dated `docs/MIGRATION_RECONCILIATION_*.md`
 - Database migration workflow/history → `docs/MIGRATIONS.md`
-- Current owner/live reconciliation gaps → `docs/OWNER_ACTIONS.md`
+- Current owner/live-dashboard actions → `docs/OWNER_ACTIONS.md`
 - Payment freeze → `docs/PAYMENT_POSTPONEMENT.md`
 - Git branch state → `docs/GIT_BRANCHES.md`
 - Agent/change-control rules → `CLAUDE.md`
