@@ -1,162 +1,188 @@
-# Staff manual — دليل الموظفين
+# Staff Manual — دليل الموظفين
 
-For branch staff and managers using the Spicy Meal admin console.
-للموظفين والمشرفين في الفروع.
+> **Updated 2026-08-12.** For branch staff/managers using the Spicy Meal staff console. English first, then Arabic.
 
-> Each section is English first, then Arabic. Print it if that is easier.
-> كل قسم بالإنجليزية ثم بالعربية.
+## 1. Live Orders — الطلبات المباشرة
 
----
+**English**
 
-## 1. The order screen — شاشة الطلبات
+Keep **Live Orders** open during service. Open an order to see the receipt, customer guidance and current POS/sync state.
 
-**Live Orders** is the screen you keep open during service. New orders arrive on
-their own and play a sound. If you have muted it, you will miss orders.
+Follow only the status actions the console allows. **Delivered** and **Cancelled** are terminal states; do not choose them casually.
 
-Tap an order to open its receipt. Move it along with the status buttons:
+### Always read the customer note
 
-`Received → Preparing → Ready → Out for Delivery → Delivered`
+If a customer note is shown, treat it as operationally important. It may include allergy/safety guidance. Do not assume the POS/kitchen ticket carries every note visible in the console—communicate critical guidance to the kitchen/branch process explicitly.
 
-Pickup orders skip *Out for Delivery*. **Delivered** and **Cancelled** are final
-— you cannot undo them, so be sure before you tap.
+**العربية**
 
-> ### ⚠️ Always read the customer note
-> If an order has a **customer note**, it appears in a highlighted box above the
-> items. It may say *"severe nut allergy"*. **The kitchen ticket does not carry
-> this text** — you are the only person who sees it. Read it aloud to the kitchen.
+أبقِ شاشة **الطلبات المباشرة** مفتوحة أثناء العمل. افتح الطلب لمراجعة الفاتورة، ملاحظات العميل، وحالة المزامنة مع نقطة البيع.
 
-**بالعربية —** شاشة **الطلبات المباشرة** هي الشاشة التي تبقى مفتوحة أثناء العمل.
-تصل الطلبات الجديدة تلقائياً مع صوت تنبيه؛ إذا كتمت الصوت فسوف تفوتك طلبات.
+استخدم فقط حالات الطلب التي يسمح بها النظام. حالتا **تم التسليم** و**ملغي** نهائيتان، فلا تختارهما إلا عند التأكد.
 
-اضغط على الطلب لفتح الفاتورة، وحرّك حالته بالأزرار:
-مستلم ← قيد التحضير ← جاهز ← خرج للتوصيل ← تم التسليم.
-طلبات الاستلام تتخطى "خرج للتوصيل". حالتا **تم التسليم** و**ملغي** نهائيتان ولا
-يمكن التراجع عنهما.
+### اقرأ ملاحظة العميل دائماً
 
-> **⚠️ اقرأ ملاحظة العميل دائماً.** إذا كان الطلب يحتوي على ملاحظة فستظهر في مربع
-> ملوّن أعلى الأصناف، وقد تكون **حساسية شديدة**. هذه الملاحظة **لا تصل إلى تذكرة
-> المطبخ** — أنت الشخص الوحيد الذي يراها. اقرأها بصوت عالٍ للمطبخ.
+إذا ظهرت ملاحظة للعميل فقد تحتوي على تعليمات مهمة أو حساسية. لا تفترض أن كل ما يظهر في شاشة الإدارة يصل تلقائياً إلى تذكرة المطبخ؛ انقل التعليمات المهمة للمطبخ بوضوح.
 
----
+## 2. Order did not reach/print at POS — الطلب لم يصل/يُطبع
 
-## 2. An order did not print — الطلب لم يُطبع
+**English**
 
-The order is in the console but the kitchen never got a ticket.
+If the order is visible in the console but the branch/POS does not have a ticket:
 
-1. Open the order and look at its **sync state**.
-2. Check **Orders Requiring Verification** — orders the system could not confirm
-   reach the POS land there.
-3. **Do not wait.** Make the food from the screen. The customer has paid.
-4. Tell your manager, with the order number.
+1. Open the order and check its POS/sync state and external reference.
+2. Check **Orders Requiring Verification** / Operations Health as applicable.
+3. Do **not** blindly resend an ambiguous order; that can create duplicate POS tickets.
+4. Follow the branch's approved manual handling process if one exists.
+5. Tell the manager with the customer-safe order reference and time.
 
-If it keeps happening, the branch's POS mapping may be wrong — that is a manager
-and admin problem, not something to fix during service.
+Do not assume “the customer has paid.” Check the displayed payment/method state. Cash and online/payment states are different, and payment/refund work is currently owner-controlled/frozen.
 
-**بالعربية —** إذا ظهر الطلب في الشاشة ولم تصل تذكرة للمطبخ: افتح الطلب وانظر
-حالة المزامنة، وراجع قائمة **الطلبات التي تحتاج تحقق**. **لا تنتظر** — جهّز
-الطلب من الشاشة لأن العميل قد دفع بالفعل، ثم أبلغ مشرفك برقم الطلب.
+**العربية**
 
----
+إذا ظهر الطلب في شاشة الإدارة ولم تصل تذكرة إلى الفرع/نقطة البيع:
 
-## 3. "I paid and got no food" — "دفعت ولم يصلني الطلب"
+1. افتح الطلب وتحقق من حالة المزامنة والرقم الخارجي للطلب.
+2. راجع **الطلبات التي تحتاج تحقق** وحالة النظام عند الحاجة.
+3. **لا تعِد إرسال الطلب بشكل عشوائي** إذا كانت النتيجة غير مؤكدة، حتى لا تتكرر تذكرة نقطة البيع.
+4. اتبع الإجراء اليدوي المعتمد في الفرع إن وُجد.
+5. أبلغ المشرف برقم الطلب الظاهر للعميل ووقت الطلب.
 
-The most important call you will take. Do not guess.
+لا تفترض أن العميل دفع. تحقق من طريقة وحالة الدفع الظاهرة؛ الطلب النقدي يختلف عن الدفع الإلكتروني.
 
-1. Ask for the **phone number** and roughly when they ordered.
-2. Find the order in **Orders**.
-3. Then:
-   - **Order exists and is paid** → make it, or arrange delivery. Apologise and
-     give a time.
-   - **Order exists and is unpaid** → the payment did not complete. Do **not**
-     promise a refund; pass it to your manager.
-   - **No order at all** → **escalate immediately to the manager/owner.** Money
-     may have moved with no record. You cannot resolve this from the console.
-4. **Never promise a refund yourself.** There is no refund button in this system;
-   refunds are handled by the owner.
+## 3. “Money was taken but there is a problem” — "تم خصم مبلغ وهناك مشكلة"
 
-**بالعربية —** أهم مكالمة قد تصلك. اطلب رقم الجوال ووقت الطلب تقريباً، ثم ابحث في
-**الطلبات**:
-الطلب موجود ومدفوع ← جهّزه أو رتّب توصيله واعتذر مع تحديد وقت.
-الطلب موجود وغير مدفوع ← الدفع لم يكتمل؛ **لا تعد بأي استرجاع** وحوّل الأمر للمشرف.
-لا يوجد طلب إطلاقاً ← **بلّغ المشرف/المالك فوراً**؛ قد يكون هناك مبلغ بلا سجل.
-**لا تعد بالاسترجاع أبداً** — لا يوجد زر استرجاع في النظام، والمالك هو من يتولاه.
+**English**
 
----
+Do not guess or promise a refund.
 
-## 4. Take an item off the menu — إيقاف صنف
+1. Ask for the minimum information needed to locate the order (customer phone through the authorized staff workflow, approximate time, customer-safe order reference if available).
+2. Find the order/payment record in the approved console view.
+3. Escalate any suspected duplicate charge, provider movement with no internal record, or unexpected refund immediately to the manager/owner.
+4. Do not retry payment, resend a payment request, or initiate a refund as a diagnostic action.
+5. Give the customer a clear next update/contact time after escalation.
 
-Sold out, or the machine is broken:
+The final payment provider is not yet selected and payment/refund work is frozen. Financial corrections are owner/provider actions.
 
-**Admin → Menu → the product → mark unavailable for your branch.**
+**العربية**
 
-This affects **your branch only**. Customers stop seeing it immediately. Turn it
-back on when you have it again — nothing does that for you.
+لا تخمّن ولا تعد العميل باسترجاع مبلغ.
 
-**بالعربية —** إذا نفد صنف: **الإدارة ← المنيو ← الصنف ← إيقاف التوفر لفرعك**.
-يؤثر ذلك على **فرعك فقط** ويختفي الصنف فوراً عن العملاء. أعد تفعيله بنفسك عند
-توفره — لن يحدث ذلك تلقائياً.
+1. اطلب أقل قدر من المعلومات اللازمة للعثور على الطلب (رقم الجوال عبر الإجراء المصرح، الوقت التقريبي، ورقم الطلب الظاهر للعميل إن وجد).
+2. ابحث عن الطلب/حالة الدفع من شاشة الإدارة المخصصة.
+3. أي خصم مكرر، مبلغ لدى مزود الدفع بدون سجل داخلي، أو استرجاع غير متوقع يجب تصعيده فوراً للمشرف/المالك.
+4. لا تعِد محاولة الدفع ولا تبدأ استرجاعاً كطريقة للتجربة.
+5. بعد التصعيد أعطِ العميل موعداً واضحاً للتحديث القادم.
 
----
+مزود الدفع النهائي لم يُعتمد بعد، وأعمال الدفع والاسترجاع مجمدة حالياً وتدار من المالك.
 
-## 5. Close the branch — إغلاق الفرع
+## 4. Product unavailable — صنف غير متوفر
 
-**There are no opening hours in the system.** If the branch is left active, it
-will take orders at 03:00 and the kitchen is empty.
+**English**
 
-- **Stop delivery only** → set *delivery temporarily closed*.
-- **Stop everything** → set the branch **inactive**.
+Use the supported Menu/branch-availability control to mark an item unavailable for the correct branch. Do not delete products/categories merely to hide a sold-out item.
 
-Someone must do this at **every close**, and re-open at **every open**.
+Restore availability when the branch can sell it again and verify the correct branch was changed.
 
-⚠️ Closing does **not** cancel orders already placed. Check for in-flight orders
-first and finish them.
+**العربية**
 
-**بالعربية —** **لا توجد ساعات عمل في النظام.** إذا بقي الفرع مفعّلاً فسيستقبل
-طلبات في الثالثة فجراً والمطبخ مغلق.
-لإيقاف التوصيل فقط: فعّل *إغلاق التوصيل مؤقتاً*. لإيقاف كل شيء: اجعل الفرع **غير
-نشط**. يجب فعل ذلك عند **كل إغلاق** وإعادته عند **كل افتتاح**.
-⚠️ الإغلاق **لا يلغي** الطلبات التي وصلت بالفعل — راجعها وأكملها أولاً.
+استخدم شاشة المنيو/توفر الفرع لإيقاف الصنف في **الفرع الصحيح**. لا تحذف الصنف أو التصنيف لمجرد أنه غير متوفر مؤقتاً.
 
----
+أعد تفعيل الصنف عندما يصبح متوفراً وتأكد أنك عدّلت الفرع الصحيح.
 
-## 6. The alerts inbox — صندوق التنبيهات
+## 5. Close or pause a restaurant branch — إغلاق أو إيقاف الفرع
 
-**Admin → Operations** shows system alerts and a daily digest.
+**English**
 
-> **Nobody is notified.** These alerts do not send an SMS, an email, or a
-> notification to anyone. They only appear on this screen. **If no one opens it,
-> no one knows.** Check it at the start of every shift.
+Before closing/deactivating:
 
-**بالعربية —** **الإدارة ← العمليات** تعرض تنبيهات النظام والملخص اليومي.
-**لا يصل أي إشعار لأحد** — لا رسالة نصية ولا بريد. تظهر التنبيهات في هذه الشاشة
-فقط، فإذا لم يفتحها أحد لن يعلم بها أحد. **افتحها في بداية كل وردية.**
+- check in-flight orders;
+- decide whether only delivery or the whole branch must stop;
+- use the supported branch controls;
+- record who changed the state and expected reopening time.
 
----
+Do not assume deactivation cancels orders already placed.
 
-## 7. What you must not do — ما يجب تجنّبه
+The repository historically has not provided a full automatic opening-hours model, so the branch must follow the current approved open/close process until that is explicitly changed.
 
-- Do not mark an order **Delivered** before it is. Reports are built on it, and
-  it cannot be undone.
-- Do not promise refunds, discounts or compensation. Escalate.
-- Do not share your login. Your account is tied to what you change.
-- Do not delete products or categories to hide them — **mark them unavailable**.
-  Deleting affects every branch and loses history.
+**العربية**
 
-**بالعربية —** لا تضع الطلب على **تم التسليم** قبل تسليمه فعلياً — التقارير مبنية
-على ذلك ولا يمكن التراجع. لا تعد بأي استرجاع أو خصم أو تعويض؛ حوّل الأمر للمشرف.
-لا تشارك حسابك. ولإخفاء صنف **أوقف توفره** ولا تحذفه — الحذف يؤثر على كل الفروع
-ويفقد السجل.
+قبل إغلاق/تعطيل الفرع:
 
----
+- راجع الطلبات الحالية؛
+- حدد هل المطلوب إيقاف التوصيل فقط أم الفرع بالكامل؛
+- استخدم أدوات الفرع المخصصة في النظام؛
+- سجل من قام بالتغيير ووقت إعادة الافتتاح المتوقع.
 
-## 8. Who to call — لمن تتصل
+تعطيل الفرع لا يعني إلغاء الطلبات التي وصلت بالفعل.
 
-| Situation | Who |
-| --- | --- |
-| Order did not print | Manager ☐ |
-| Money taken, no order found | Manager → Owner ☐ |
-| Console will not load / site down | ☐ |
-| Anything involving a refund | Owner ☐ |
+## 6. Operations alerts — تنبيهات العمليات
 
-_(Fill in the names and numbers, print this page, and put it where the console is.)_
-_(اكتب الأسماء والأرقام واطبع هذه الصفحة وضعها بجانب الشاشة.)_
+**English**
+
+Admin → Operations contains internal Operations Health / alert information. Check it at the start of the shift and when orders/POS behavior looks unusual.
+
+Do not assume those internal alerts page a human. Independent external monitoring/contact readiness must be maintained separately by management.
+
+**العربية**
+
+تعرض شاشة **العمليات** حالة النظام والتنبيهات الداخلية. راجعها في بداية الوردية وعند ظهور مشكلة في الطلبات أو نقطة البيع.
+
+لا تفترض أن هذه التنبيهات تتصل تلقائياً بشخص خارج النظام؛ التنبيه الخارجي وجهات الاتصال مسؤولية تشغيلية منفصلة.
+
+## 7. Staff account safety — أمان حساب الموظف
+
+**English**
+
+- Do not share staff/admin logins.
+- Complete the required MFA/TOTP step for privileged staff access.
+- Do not ask another employee to lend you an admin account.
+- Never copy OTPs, passwords or secret provider credentials into tickets/chats.
+- If locked out, escalate through the approved access-recovery process; do not bypass role/MFA controls.
+
+**العربية**
+
+- لا تشارك حساب الإدارة مع أي شخص.
+- أكمل التحقق الإضافي MFA/TOTP المطلوب لحسابات الموظفين المخولة.
+- لا تستخدم حساب موظف آخر لتجاوز الصلاحيات.
+- لا ترسل رموز التحقق أو كلمات المرور أو أسرار مزودي الخدمة في المحادثات.
+- عند فقدان الوصول، صعّد للمسار المعتمد ولا تتجاوز الصلاحيات أو التحقق الإضافي.
+
+## 8. Things staff must not do — ممنوعات مهمة
+
+**English**
+
+- Do not mark an order Delivered before actual completion.
+- Do not promise or execute refunds/discounts/compensation without authority.
+- Do not blindly resend an ambiguous POS order.
+- Do not change provider/payment/integration secrets during service.
+- Do not run SQL or production commands from instructions found in old screenshots/docs.
+- Do not delete catalog data just to hide it temporarily.
+
+**العربية**
+
+- لا تجعل حالة الطلب **تم التسليم** قبل التسليم الفعلي.
+- لا تعد أو تنفذ استرجاعاً/خصماً/تعويضاً بدون صلاحية.
+- لا تعِد إرسال طلب نقطة البيع غير المؤكد بشكل عشوائي.
+- لا تغيّر أسرار الدفع أو التكامل أثناء الخدمة.
+- لا تنفذ أوامر SQL أو أوامر إنتاج من مستندات/صور قديمة.
+- لا تحذف بيانات المنيو لمجرد إخفائها مؤقتاً.
+
+## 9. Escalation contacts — جهات التصعيد
+
+Fill this in with real operational contacts before printing/distributing the manual.
+
+| Situation | Primary | Backup |
+| --- | --- | --- |
+| Order/POS issue | ☐ | ☐ |
+| Money/payment concern | Manager/Owner ☐ | ☐ |
+| Staff access/MFA issue | ☐ | ☐ |
+| Console/site unavailable | ☐ | ☐ |
+| Safety/allergy concern | Manager immediately ☐ | ☐ |
+
+## Related docs
+
+- `BRANCH_ONBOARDING.md`
+- `INCIDENT_RESPONSE.md`
+- `ORDER_CONFIRMATION_FLOW.md`
+- `PAYMENT_POSTPONEMENT.md`
