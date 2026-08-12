@@ -1,175 +1,205 @@
-# Deploying Spicy Meal (web/admin) to Vercel
+# Deploying Spicy Meal Web Surfaces to Vercel
 
-The Vercel site serves **two** applications from one build:
+> **Updated 2026-08-12.** This runbook describes the current two-surface build. It does not document native EAS/store deployment; use `README_MOBILE.md` and `RELEASE_CHECKLIST.md` for that.
 
-| Path | App | Source |
+## 1. What Vercel serves
+
+One repository build produces two web applications:
+
+| Path | Application | Source |
 | --- | --- | --- |
-| `/` | Customer storefront + Admin Dashboard (static Vite SPA) | `src/` |
-| `/app/` | Customer Expo web app | `apps/mobile/`, exported by `expo export --platform web` into `dist/app` |
+| `/` | Staff/admin entry surface | root Vite app under `src/` |
+| `/app/` | Customer web application | Expo/React Native Web export from `apps/mobile/` |
 
-There is **no separate admin URL** — after you sign in at the root, the app
-renders the Admin Dashboard when your `profiles.role` is `admin`/`accountant`
-(see the "Bootstrapping the first admin" section in `supabase/README.md`).
+The customer `/app` surface is the same Expo application used for native development; it is not the historical hand-built emulator.
 
-`npm run build` runs the whole pipeline: `npm --prefix apps/mobile ci` →
-`vite build` → the Expo web export into `dist/app`. The mobile install must come
-first — `vite build` transforms `apps/mobile/src`, whose tsconfig extends
-`expo/tsconfig.base`, so it needs `apps/mobile/node_modules` to already exist.
+The root app determines the signed-in role and exposes the staff/admin experience only through the current server-authorized role/MFA path.
 
-`vercel.json` (repo root) already pins the build settings, an SPA rewrite, and the
-security headers (CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
-`Referrer-Policy`, `Permissions-Policy`) recommended by the security review. The
-CSP is tuned to what the app actually uses: Supabase REST + realtime WebSocket,
-Sentry ingestion, Google Fonts, and `https:`/`data:` images. **No secret is stored
-in this repo.**
+## 2. Build pipeline
 
-## One-time setup (Vercel dashboard)
-
-1. Go to https://vercel.com → **Add New… → Project** → **Import Git Repository**,
-   and pick `mohammedali-770/SMA`. Authorize Vercel for the repo if prompted.
-2. Vercel auto-detects **Vite** (Build = `npm run build`, Output = `dist`). Leave as
-   detected — `vercel.json` also declares them.
-3. **Production Branch** — **Project → Settings → Environments → Production**.
-   Set the tracked branch to the repository's default branch:
-
-   ```text
-   claude/project-build-ie4b56
-   ```
-
-   > 📍 **It is under Environments, not Git.** Vercel moved it: Settings → Git
-   > now holds only the repository connection and commit behaviour, while
-   > branch-to-environment mapping lives under Environments. Earlier revisions of
-   > this document sent readers to Settings → Git, and before that named the
-   > now-retired branch `claude/spicy-meal-security-review-ks5kfs`. Both wrong
-   > instructions are why the setting drifted in the first place.
-
-   > ⚠️ **Setting this does NOT fix existing deployments.** A deployment's
-   > environment is decided **when it is created**, so every deployment built
-   > before the setting took effect stays a **Preview** forever. After changing
-   > it you must either push a new commit, or open **Deployments**, find the
-   > newest build of the default branch and use **⋯ → Promote to Production**.
-   > Promoting is what creates the first Production deployment and moves the
-   > production alias.
-   >
-   > Do **not** push to `main` to force a deployment — `main` is a protected
-   > branch (`CLAUDE.md` §1).
-
-   Every other branch/PR still gets an automatic **Preview** URL.
-
-   **Resolved 2026-08-05 (Issue #102).** The Production Branch was unset, so the
-   default branch only ever deployed as a Preview and production served a build
-   roughly two days stale — fifteen merged pull requests, including the customer
-   -note fix and the removal of false ZATCA compliance claims, were not reaching
-   customers. Fixed by setting the branch **and promoting** the newest build.
-   Verified with §"Verifying what production is actually serving" below.
-4. **Environment Variables** (Project → Settings → Environment Variables) — add
-   these for the **Production** (and Preview) environments:
-
-   | Name | Value | Notes |
-   |---|---|---|
-   | `VITE_SUPABASE_URL` | `https://<your-project-ref>.supabase.co` | from Supabase → Settings → API |
-   | `VITE_SUPABASE_ANON_KEY` | your **anon / public** key | public-safe; RLS is the boundary |
-   | `EXPO_PUBLIC_SUPABASE_URL` | same project URL | consumed by the `/app` customer build |
-   | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | same anon key | consumed by the `/app` customer build |
-   | `EXPO_PUBLIC_MAP_PROVIDER` | `google` | customer map |
-   | `EXPO_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` | browser-restricted Maps key | never commit it |
-   | `EXPO_PUBLIC_MAP_WEBVIEW_BASE_URL` | `https://app.spicymeal.com.sa/app/` | customer map WebView origin |
-
-   > ⚠️ Only the **anon** key. NEVER put the `service_role` key (or any provider
-   > secret) in a `VITE_`- or `EXPO_PUBLIC_`-prefixed variable — those ship to the
-   > browser. The same rule applies to `SENTRY_AUTH_TOKEN` (Issue #81): it is a
-   > build-time secret only, and must never be `VITE_`/`EXPO_PUBLIC_`.
-   > Without the Supabase vars the site builds and runs on **bundled demo data**
-   > (no real login/admin).
-
-5. Click **Deploy**. You'll get a URL like `https://sma-<hash>.vercel.app` (add a
-   custom domain later in Settings → Domains).
-
-## After it's live
-
-1. In **Supabase → Authentication → URL Configuration**, add your Vercel URL to the
-   **Site URL** / **Redirect URLs** so email/password sign-in works from that origin.
-2. Sign up a normal account in the app, then promote it in the Supabase SQL editor:
-   ```sql
-   update public.profiles set role = 'admin' where id = '<auth-user-uuid>';
-   ```
-3. Sign in with that account → the **Admin Dashboard** renders at the site root.
-
-## Verifying what production is actually serving
-
-> ⚠️ **The `/` vs `/app/` check below is necessary but NOT sufficient.** On
-> 2026-08-05 it **passed while production was serving a two-day-old build**. It
-> only detects the catch-all-rewrite failure, not a stale or unpromoted
-> deployment. Treat it as step 1 of 3, never as the answer.
-
-### 1. Both surfaces respond and are distinct
+The repository production build is:
 
 ```bash
-curl -sSI https://app.spicymeal.com.sa/      | head -1
-curl -sSI https://app.spicymeal.com.sa/app/  | head -1
-
-diff <(curl -sS https://app.spicymeal.com.sa/) <(curl -sS https://app.spicymeal.com.sa/app/) >/dev/null \
-  && echo 'FAIL: / and /app/ are identical — the customer app is not being served' \
-  || echo 'OK: distinct documents'
-
-curl -sS https://app.spicymeal.com.sa/app/ | grep -o '/app/_expo/static/js/web/entry-[^"]*\.js'
+npm run build
 ```
 
-### 2. Did the alias actually move? — the `age` header
+The root script intentionally:
 
-A production deployment purges the edge cache. If `age` keeps climbing across a
-deploy, **the alias never moved** and you are looking at an old artifact.
+1. installs the mobile dependency tree;
+2. builds the Vite/admin application;
+3. exports the Expo customer web app into `dist/app`.
+
+Do not reorder the mobile install behind the Vite build: root web source imports/transforms mobile/shared code whose TypeScript config depends on the Expo dependency tree.
+
+Local pre-release check:
 
 ```bash
-curl -sSI https://app.spicymeal.com.sa/ | grep -iE '^age:|x-vercel-cache'
+nvm use
+npm ci
+npm --prefix apps/mobile ci
+npm run build
 ```
 
-`age: 0` right after promoting is what success looks like. `age: 171417`
-(≈47 h) is what Issue #102 looked like.
+## 3. Production branch
 
-Equivalent check in the dashboard, and the fastest tell of all: open
-**Deployments** with *All Environments* selected. **If every row is badged
-`Preview` and there is no `Production` row, nothing has ever been promoted** —
-that is the #102 condition, visible at a glance.
+Vercel Production must track:
 
-### 3. Is it *today's* code? — grep a known-recent string
+```text
+claude/project-build-ie4b56
+```
 
-The only check that actually proves what shipped.
+Historically, issue #102 was caused by an unset Production Branch: the default branch produced Previews while the production alias stayed on an old build. That incident is history, not proof that the setting can never drift again.
+
+Before a major release, verify in the **current Vercel dashboard** that the Production environment still tracks the intended branch and that the deployed Production artifact corresponds to the intended commit.
+
+Do not push to an alternate branch such as the retired `main` name to force a deployment.
+
+## 4. Vercel project configuration
+
+Repository configuration lives in `vercel.json` and the root build scripts. Dashboard configuration should match the repository rather than override it accidentally.
+
+Expected build/output:
+
+```text
+Build command: npm run build
+Output directory: dist
+```
+
+`vercel.json` also defines SPA rewrites and security headers. Review the actual file before changing CSP/headers; do not copy an old list from documentation.
+
+Any Production Vercel settings change requires explicit owner approval.
+
+## 5. Environment variables
+
+Both web surfaces need their public Supabase client configuration at build time.
+
+Typical public variables include:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+EXPO_PUBLIC_SUPABASE_URL
+EXPO_PUBLIC_SUPABASE_ANON_KEY
+```
+
+Map-provider variables depend on the currently selected provider/configuration; use the checked-in `.env.example` files and `docs/MAPS.md` rather than copying a stale key list from this document.
+
+### Secret rule
+
+Never expose a server secret through a browser-prefixed variable:
+
+- no Supabase `service_role` key in `VITE_*` or `EXPO_PUBLIC_*`;
+- no payment/provider secret;
+- no Meta app secret;
+- no SMTP password;
+- no `SENTRY_AUTH_TOKEN` in a client-public variable.
+
+The Supabase anon/publishable key is a client credential by design; RLS/JWT/server authorization remains the security boundary.
+
+## 6. Authentication / staff access after deployment
+
+Do **not** bootstrap staff access with the old direct SQL shortcut that used to live in this runbook.
+
+Current staff access has audited role administration plus an AAL2/TOTP gate. Use the supported admin Staff Access workflow / server-authorized role-administration contracts documented by the current source.
+
+Customer login is the current Supabase Auth + WhatsApp phone flow; do not configure deployment around the old email/password onboarding description.
+
+If an environment has no usable initial administrator, treat bootstrap as a deliberate privileged recovery/setup action and document/approve the exact method rather than adding an ad-hoc SQL promotion command to a general deployment guide.
+
+## 7. Verify the deployment, not only the merge
+
+A successful merge/check does not prove which artifact the production alias serves.
+
+### Surface checks
 
 ```bash
-D=https://app.spicymeal.com.sa
-# a) real chunk names are INSIDE the entry bundle, not in index.html
-ENTRY=$(curl -sS $D/ | grep -oE '/assets/index-[^"]+\.js' | head -1)
-curl -sS "$D$ENTRY" | grep -oE '[A-Za-z0-9_]+-[A-Za-z0-9_-]{8}\.js' | sort -u
+D=https://<production-domain>
 
-# b) fetch the chunk you care about and grep it for something merged recently
-curl -sS "$D/assets/AdminDashboard-<hash>.js" | grep -c 'Customer note:'
+curl -sSI "$D/" | head -1
+curl -sSI "$D/app/" | head -1
 ```
 
-> 🪤 **`vercel.json`'s SPA catch-all returns `index.html` with HTTP 200 for any
-> unknown path.** So a guessed asset URL "succeeds" with a ~545-byte HTML page,
-> and grepping it for JavaScript finds nothing — which reads as "the code is
-> missing" when the URL was simply wrong. Always take chunk names from the
-> deployed entry bundle (step a). Never assume a 200 means the file exists.
+Confirm both routes load the expected distinct applications.
 
-> Production asset hashes legitimately differ from a local `npm run build`,
-> because the real build injects `VITE_*` / `EXPO_PUBLIC_*` values. Hash
-> mismatch is **not** evidence of staleness; a missing string is.
+### Production commit/artifact check
 
-Then check the security headers:
+Use Vercel Deployments to verify:
+
+- there is a **Production** deployment, not only Preview deployments;
+- it came from `claude/project-build-ie4b56`;
+- its commit SHA is the release you intend to serve.
+
+Where the built application embeds the Vercel commit SHA, compare the deployed SHA to the production-branch head. A stale alias should be treated as a release failure.
+
+### Do not trust an arbitrary HTTP 200
+
+The SPA catch-all can return `index.html` with HTTP 200 for an invalid application/asset path. Therefore:
+
+- a 200 at `/` is only liveness evidence;
+- a guessed asset URL returning 200 does not prove the asset exists;
+- use actual asset references from the deployed entry document/bundle;
+- use the deployment/commit SHA as the authoritative staleness check.
+
+### Security headers
+
+Verify the deployed response still includes the security headers defined by the current `vercel.json`:
+
 ```bash
-curl -sSI https://app.spicymeal.com.sa/ | grep -iE 'content-security-policy|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy'
+curl -sSI "$D/" | grep -iE \
+  'content-security-policy|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy'
 ```
-If a browser console shows a CSP violation for a resource the app legitimately needs,
-adjust the matching directive in `vercel.json` and redeploy (validate against the
-live app before tightening further).
 
-Never let an API key or environment-variable **value** appear in deployment logs.
+If a legitimate resource is blocked, change the minimum required directive in `vercel.json`, review it, and redeploy. Do not weaken CSP globally to make a console warning disappear.
 
-## Redeploys
+## 8. Application smoke checks
 
-Any push to the Production Branch auto-builds and redeploys. Preview deployments are
-created for PRs automatically. To change env vars, edit them in the Vercel dashboard
-and redeploy (env is read at build time).
+After an approved web release:
 
-> Vercel production changes require explicit owner approval (`CLAUDE.md` §5).
+- customer `/app` reaches the real Supabase-backed app;
+- WhatsApp/Supabase login flow reaches the expected state;
+- order-type gate and catalog load;
+- admin/staff login reaches the staff MFA/role gate;
+- Live Orders loads;
+- Operations Health does not show a new release-caused failure;
+- Sentry receives expected environment/release metadata under the approved observability test.
+
+Do not perform online-payment/refund tests while the payment freeze is active unless separately approved.
+
+## 9. Auto-deploy versus gated deploy
+
+Repository source contains CI checks and a controlled deployment path, but **the current Vercel auto-deploy/dashboard state cannot be proved from Git source alone**.
+
+If production policy is intended to be “deploy only after all CI checks pass,” verify the current setup against `OWNER_ACTIONS.md` §6 before changing anything:
+
+- Vercel auto-deploy behavior;
+- repository deploy-gate variable/secrets;
+- exact GitHub check-run names;
+- a successful preview/trial of the gated path.
+
+Do not enable a second deploy path while auto-deploy is still active and accidentally double-deploy every merge.
+
+## 10. Environment-variable changes
+
+Vite/Expo public env values are build-time inputs. Changing them requires a new deployment/build to affect the shipped browser bundle.
+
+After changing env values:
+
+1. create/redeploy the intended environment;
+2. verify the deployment used the new configuration without leaking values into logs;
+3. verify the production alias moved to the intended artifact only when approved.
+
+## 11. Rollback
+
+Use `docs/ROLLBACK.md`. The goal is to return to a known reviewed deployment, not to make unreviewed edits directly in the Vercel dashboard under incident pressure.
+
+Database/Edge Function rollback is a separate problem from web artifact rollback; follow the owning runbook and approval boundary.
+
+## 12. Related docs
+
+- `README.md` — current platform overview.
+- `PROJECT_STATUS.md` — current source/release state.
+- `docs/RELEASE_CHECKLIST.md` — release gates.
+- `docs/OWNER_ACTIONS.md` — live dashboard/owner decisions.
+- `docs/MAPS.md` — map provider configuration.
+- `docs/SENTRY_WEB_OBSERVABILITY.md` — web observability.
+- `docs/ROLLBACK.md` — mitigation/rollback.

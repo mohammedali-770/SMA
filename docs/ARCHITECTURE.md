@@ -1,184 +1,260 @@
-# Spicy Meal — Production Architecture (16 branches, high traffic)
+# Spicy Meal — Current Production Architecture
 
-## 1. Topology (text diagram)
+> **Updated 2026-08-12.** This document describes the current repository architecture. Historical prototype/emulator descriptions are obsolete.
 
-```
- ┌──────────────────────┐        ┌──────────────────────┐
- │  Expo mobile app      │        │  Admin dashboard      │
- │  (customer)           │        │  (admin / accountant) │
- │  holds ANON key only  │        │  holds ANON key only  │
- └──────────┬───────────┘        └───────────┬──────────┘
-            │  HTTPS (anon key + user JWT)    │
-            ▼                                 ▼
-      ┌───────────────────────────────────────────────┐
-      │                 SUPABASE                        │
-      │                                                 │
-      │  GoTrue (Auth)   PostgREST (REST + RLS)         │
-      │        │               │                        │
-      │        │               ├── RPCs (source of truth)│
-      │        │               │    place_order,         │
-      │        │               │    validate_coupon,     │
-      │        │               │    adjust_loyalty_points,│
-      │        │               │    list/upsert_integration│
-      │        ▼               ▼                        │
-      │  ┌───────────────────────────────────────────┐  │
-      │  │ Postgres 15/16 + RLS                       │  │
-      │  │  profiles, branches, catalog, orders,      │  │
-      │  │  order_items, coupons, app_settings,       │  │
-      │  │  loyalty_transactions, payment_records,    │  │
-      │  │  integration_settings (secrets), sync_logs │  │
-      │  └───────────────────────────────────────────┘  │
-      │        ▲                          ▲              │
-      │        │ service role (secrets)   │ Realtime     │
-      │  ┌─────┴───────────────────┐      │ (orders)     │
-      │  │ Edge Functions (Deno)    │      │              │
-      │  │  order-intake            │◀─────┘  admin live  │
-      │  │  payment-webhook  ───────┼──▶ confirm_order_payment
-      │  │  lazywait-sync    ───────┼──▶ record_order_sync
-      │  │  push-dispatch           │                     │
-      │  └──────────┬───────────────┘                     │
-      └─────────────┼───────────────────────────────────┘
-                    │ server-side only (secrets never leave here)
-                    ▼
-      Payment gateway · SMS provider · Push provider · Lazywait POS
+## 1. System topology
+
+```text
+┌──────────────────────────────┐          ┌──────────────────────────────┐
+│ Customer application         │          │ Staff / admin console        │
+│ apps/mobile/                 │          │ src/                         │
+│ Expo / React Native          │          │ Vite / React                 │
+│ iOS · Android · /app web     │          │ Vercel site root             │
+└──────────────┬───────────────┘          └──────────────┬───────────────┘
+               │                                        │
+               │ Supabase anon/publishable key + JWT    │
+               └──────────────────┬─────────────────────┘
+                                  ▼
+                    ┌──────────────────────────────┐
+                    │ Supabase                    │
+                    │                             │
+                    │ Auth / GoTrue               │
+                    │ PostgREST + RPC             │
+                    │ Postgres + RLS              │
+                    │ Realtime                    │
+                    │ pg_cron / DB automation     │
+                    │ Edge Functions (Deno)       │
+                    └──────────────┬───────────────┘
+                                   │ server-side only
+                 ┌─────────────────┼──────────────────────┐
+                 ▼                 ▼                      ▼
+          Lazywait POS       Meta / WhatsApp       Other integrations
+                                                    (email, maps, etc.)
+
+          Payment/Tap code remains present but is PROVISIONAL + FROZEN.
+          Push code remains present but DORMANT.
 ```
 
-## 2. What calls what (current)
+The clients do **not** share an in-memory/localStorage database. Supabase is the authoritative backend.
 
-- **App & Admin → PostgREST/RPC/GoTrue** with the anon key + the signed-in
-  user's JWT. RLS is the security boundary. No secret ever reaches a client.
-- **Source of truth = RPCs** — `place_order` computes subtotal, modifiers,
-  delivery fee, coupon, VAT and loyalty **server-side**; coupons via
-  `validate_coupon`; loyalty via `adjust_loyalty_points`; integrations via
-  `list/upsert_integration_settings` (returns `has_secret`, never the secret).
-- **Admin live orders** — Supabase Realtime on `orders` with a 12s polling
-  fallback + 60s backstop (see `AppContext` live-orders effect).
-- **Edge Functions** are the server-side boundary for anything with a secret or
-  an external call. They read secrets from `integration_settings` via the
-  service role and call the service-role-only RPCs (`confirm_order_payment`,
-  `record_order_sync`). None are implemented against a real provider yet.
+## 2. Client surfaces
 
-## 3. Security boundary (invariants)
+### Customer app — `apps/mobile/`
 
-- The Expo app / Admin never call a payment/SMS/push/Lazywait API directly.
-- Secrets live in `integration_settings.secret_config`; the table has **all
-  client grants revoked**. Admin manages it only through admin-only RPCs that
-  return `has_secret` (boolean), never the value. Server code reads the secret
-  via the service role inside Edge Functions.
-- Orders are marked **paid** only by `confirm_order_payment` (service-role only,
-  after a verified webhook, amount must equal the server total). Orders are
-  marked **synced** only by `record_order_sync` (service-role only). Clients
-  cannot execute either.
-- `place_order` is the only order-creation path and rejects unauthenticated
-  callers, closed/unknown branches, unavailable products, invalid modifiers, and
-  below-minimum delivery orders — all server-side.
+One Expo application targets native iOS, native Android and React Native Web.
 
-## 4. Order flow (hardened)
+Key properties:
 
-1. Customer must be authenticated (`auth.uid()` required).
-2. Branch selected manually and must be `is_active` (server re-checks).
-3. Order type (`delivery`/`pickup`) required.
-4. Products re-validated for the branch (`branch_product_availability`).
-5. Prices, modifiers, coupon, VAT and delivery fee **recomputed server-side**.
-6. Payment stays `pending`; nothing is faked. Future: `payment-webhook` →
-   `confirm_order_payment`.
-7. **Idempotency**: an optional `p_idempotency_key` makes a retried checkout
-   return the same order instead of duplicating it (a partial unique index on
-   `orders(customer_id, idempotency_key)` guards the race). The app sends a
-   per-checkout key that resets when the cart changes.
-8. Future hook: `lazywait-sync` / `record_order_sync` push the order to POS.
+- Expo SDK 57 / React Native 0.86.2 / Expo Router.
+- Arabic + English with RTL support.
+- System / Light / Dark runtime appearance.
+- Supabase Auth with WhatsApp delivery for the Saudi-phone login flow.
+- Order-type-first Pickup/Delivery context.
+- Branch-aware catalog, modifiers, banners and availability.
+- Saved-address and map/location workflows.
+- Server-authoritative checkout/order placement.
+- Order history, customer-safe references, confirmation/receipt states and account deletion.
+- Sentry native/JS observability.
 
-## 5. Indexes (rationale)
+The web customer application is an Expo web export of this same codebase, served under `/app`; it is not a separate emulator.
 
-Composite/partial indexes added for the hot paths (`20260707121200_perf_indexes`):
-- `orders(branch_id, created_at desc)` — per-branch board (×16 branches).
-- `orders(status, created_at desc)` — status filter + KPIs.
-- `orders(customer_id, created_at desc)` — customer history + RLS.
-- `orders(created_at) where sync_status in ('not_synced','failed')` — sync queue.
-- `orders(lazywait_order_id) where … not null` — webhook → order mapping.
-- `products(is_active, sort_order)`, `categories(is_active, sort_order)` — menu.
-- Redundant single-column `orders` indexes dropped (they were prefixes of the
-  composites → fewer indexes = cheaper writes on the busiest table).
-- Already optimal (no index added): `branch_product_availability` (PK
-  branch/product), `product_modifier_groups` (PK product/group), `coupons.code`
-  (UNIQUE), `order_items(order_id)`, `loyalty_transactions`.
+### Staff/admin console — `src/`
 
-> On an already-large production table, create new indexes with `CREATE INDEX
-> CONCURRENTLY` (outside a transaction) to avoid a write lock.
+The Vite/React staff surface is separate from the Expo customer app.
 
-## 6. Performance & scalability
+It includes:
 
-- **Catalog caching** — the menu (branches/categories/products/modifiers/
-  availability/settings) changes rarely and is read on every app open. Cache it:
-  client-side with a short TTL (e.g. 5 min) or a CDN/edge cache in front of the
-  read endpoints. Avoid re-fetching the whole catalog per screen. Consider a
-  single `get_menu(branch_id)` RPC later to return the branch-scoped menu in one
-  round trip.
-- **Connection pooling** — use Supabase's **transaction pooler (PgBouncer, port
-  6543)** for serverless/Edge/high-concurrency clients; keep the direct
-  connection (5432) for migrations only.
-- **Realtime** — subscribe only `orders` for staff (already done). Do **not**
-  broadcast catalog or customer tables. Each branch dashboard is one channel;
-  16 branches ≈ tens of channels — well within limits. The polling fallback
-  (12s) caps DB load if Realtime is unavailable.
-- **Compute** — start at Small/Medium; watch CPU + connection count under load
-  and scale compute before adding complexity. Add read replicas only if
-  reporting queries start competing with the live order path.
+- Live Orders and receipt/ticket workflows.
+- Menu/categories/products/modifiers/banners.
+- Branches, delivery zones and availability.
+- Lazywait mapping/catalog administration.
+- Reports and management statistics.
+- Operations Health, Operations Alerts and Order Integrity.
+- Stranded-order visibility and confirmation-required operational review.
+- Staff Access role administration.
+- TOTP/AAL2 staff MFA gate.
+- Integration and legal/settings surfaces.
 
-## 7. Monitoring & reliability
+Staff roles and privileged operations are enforced server-side; hiding a UI control is never the authorization boundary.
 
-- **Order failures** — `place_order` raises typed errors; surface them in the
-  client and log server-side (Supabase logs / `get_logs`).
-- **Payment** — every attempt is a `payment_records` row (`initiated/authorized/
-  paid/failed/refunded`); the admin can list failures.
-- **Lazywait sync** — every attempt is an `integration_sync_logs` row
-  (`success/failed/skipped` + request/response/error); `orders.sync_status`
-  reflects the latest state. Add an admin "failed sync / failed payment" view.
-- **Advisors** — run Supabase `get_advisors` (security + performance) before
-  launch and after each migration.
+## 3. Authorization and trust boundaries
 
-## 8. Load-test plan (before launch)
+### Public/client credentials
 
-- Model 16 branches × peak concurrent customers (e.g. 50–200/branch at rush).
-- Scenarios: browse menu (cached vs uncached), `place_order` throughput +
-  p95 latency, admin boards open with Realtime, coupon spikes, loyalty redeem.
-- Tools: k6 / Artillery against the REST + RPC endpoints with realistic JWTs.
-- Watch: DB CPU, pooler saturation, `place_order` p95, index hit ratio,
-  Realtime channel count, error rate. Tune compute/pooler, then re-test.
+Both clients may hold:
 
-## 9. Deploy & test commands
+- the Supabase project URL;
+- the Supabase anon/publishable key;
+- other credentials explicitly designed to be public client credentials (for example a restricted browser map key, when configured).
+
+These values are not authorization secrets. **RLS, authenticated JWT claims and server-side functions are the security boundary.**
+
+### Server-only credentials
+
+Service-role credentials and third-party provider secrets stay server-side. They must never be exposed through `VITE_*`, `EXPO_PUBLIC_*`, logs, client responses or repository files.
+
+### Staff authorization
+
+Current staff access uses defense in depth:
+
+- application role is stored server-side;
+- privileged database paths use `is_admin()` / `is_staff()`-style server predicates;
+- staff/admin privilege requires AAL2/TOTP where wired by the production hardening migrations;
+- role administration is through audited admin-only RPCs rather than customer-writable profile fields;
+- anonymous role-helper RPC exposure was removed.
+
+## 4. Data and business authority
+
+### Catalog and branch state
+
+Catalog, branch, modifier, availability and delivery-zone data live in Supabase. The clients consume those rows/RPCs and do not own the authoritative state.
+
+### Order placement
+
+The backend owns the final order facts. A client can propose a cart/order request, but the server re-validates the authoritative inputs such as:
+
+- authenticated customer;
+- branch and order type;
+- products and modifier relationships;
+- modifier min/max/required cardinality;
+- branch availability;
+- delivery-zone/address requirements;
+- current prices and monetary calculations;
+- coupon/loyalty constraints that are actually wired into the order path.
+
+Recent production hardening also enforces modifier selection rules at the database boundary so a forged client cannot bypass the UI's required/max-selection rules.
+
+### Order lifecycle
+
+Order status transitions are server-controlled and audited/hardened rather than trusted to arbitrary client updates. Cancellation compensation now handles loyalty/coupon consequences through the server lifecycle path.
+
+Customer-facing order identifiers use safe external/display references and do not expose internal SMA row IDs.
+
+## 5. Lazywait POS integration
+
+Lazywait is an active operational integration with a typed API layer and server-side synchronization.
+
+Key pieces include:
+
+- `lazywait-sync` Edge Function worker;
+- Lazywait webhook handling;
+- catalog/mapping support;
+- deadline/retry/fencing logic for Create Order outcomes;
+- customer-visible confirmation states;
+- `confirmation_required` handling for ambiguous outcomes that must not be blindly resent;
+- admin verification/triage surfaces;
+- Operations Health / stranded-order detection for blocked/dead-letter states.
+
+The system deliberately distinguishes a usable POS reference from an ambiguous/missing reference so it never tells the customer that the restaurant confirmed an order without authoritative evidence.
+
+## 6. WhatsApp authentication/verification
+
+There are intentionally two different WhatsApp-related paths:
+
+1. **Customer login** — Supabase Auth generates/verifies the OTP. The Auth Send-SMS hook calls `auth-send-sms-whatsapp` only to deliver that Auth-generated code over WhatsApp.
+2. **Signed-in profile phone verification** — separate verification functions/challenge data handle phone verification and do not create a Supabase Auth session.
+
+Do not merge these paths as cleanup; they have different trust and session responsibilities.
+
+## 7. Account deletion
+
+The account-deletion stack includes customer request flow, queued processing, server-side anonymization/erasure logic and audited manual-review resolution.
+
+The production hardening includes normalized Saudi phone matching for deletion of phone-keyed OTP/WhatsApp records so erasure does not depend on inconsistent `+966` storage formats.
+
+## 8. Operations and observability
+
+### Database/operations monitoring
+
+The admin system includes:
+
+- Operations Health summary/cards;
+- order-flow health signal;
+- order-integrity health;
+- stranded-order detection;
+- internal Operations Alerts and digest generation;
+- staff-visible health/attention indicators.
+
+These are operational visibility controls, not a substitute for external paging or a completed restore/incident drill. Refer to `INCIDENT_RESPONSE.md` and `BACKUP_RECOVERY.md` for the current operational limitations.
+
+### Sentry
+
+Sentry is wired across native mobile, Expo web and admin web. Release/source-map handling is controlled by the documented Sentry gates and EAS/Vite configuration.
+
+## 9. Payment/refund boundary — frozen
+
+Payment/Tap source, database objects and Edge Functions remain in the repository, but the provider is **not treated as the final product decision**.
+
+The owner decision recorded in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) freezes payment/refund changes while the final gateway is unresolved.
+
+Important consequences:
+
+- Do not use the payment code as a foundation for new work.
+- Do not change/deploy/test payment/refund behavior during ordinary development.
+- Automated refund processing remains disabled.
+- Reopening the area requires a separate provider decision and explicit approval.
+
+Architecture diagrams or README text must not describe the provisional Tap stack as the final gateway.
+
+## 10. Push notifications — dormant
+
+Push-notification source is retained, but the product decision is to keep push dormant unless separately enabled/configured with explicit approval.
+
+Do not infer from the presence of `push-dispatch` or client notification code that push is an active production customer channel.
+
+## 11. Shared design system
+
+`design-system/` is the canonical shared source for Ember-on-Cream tokens/state contracts used by both application surfaces. Generated/mirrored client copies are checked by:
 
 ```bash
-# DB migrations
-# PRODUCTION: `supabase db push` is PERMANENTLY FORBIDDEN for the live
-# project — the reconciliation outcome (see docs/MIGRATIONS.md, the
-# authoritative history ledger) is that live schema_migrations uses
-# different version stamps AND different migration boundaries than the repo
-# files, so `db push` would replay history. Production changes go ONLY
-# through the owner-approved apply_migration workflow in docs/MIGRATIONS.md.
-# NEW/EMPTY environments only (e.g. a fresh staging database):
-supabase db push
-# Edge Functions
-supabase functions deploy order-intake payment-webhook lazywait-sync \
-  push-dispatch
-# Advisors
-#   (MCP) get_advisors type=security ; get_advisors type=performance
-# Frontend build
-npm run lint && npm test && npm run build
+npm run design-system:check
 ```
 
-## 10. Known limitations / decisions still needed
+The runtime theme system supports System/Light/Dark appearance. Mobile includes a palette-binding source scan because direct reads from the canonical light palette can be type-correct while still rendering incorrectly in dark mode.
 
-- No real payment gateway, SMS/OTP, push, or Lazywait Create-Order (awaiting API
-  docs) — only secure architecture + placeholders.
-- The current client is a **web SPA** (mobile emulator), not yet a native Expo
-  app; the security model is identical for a future Expo client (anon key + RLS
-  + Edge Functions for secrets).
-- Realtime authorization on a real Supabase project must be enabled; the polling
-  fallback covers the gap.
+## 12. Build/deployment topology
 
-## 11. Recommended next task
+### Web
 
-Choose the payment provider and implement `payment-webhook` end-to-end
-(signature verification → `confirm_order_payment`), since verified paid ordering
-is the largest remaining gap for going live.
+The root production command:
+
+```bash
+npm run build
+```
+
+performs the admin Vite build and the Expo customer web export, placing the customer SPA under `dist/app` for `/app` routing.
+
+### Native
+
+`apps/mobile/eas.json` defines development, preview and production EAS profiles. Store/native builds are separate release events and require explicit owner approval plus the release checklist.
+
+### Production branch
+
+`claude/project-build-ie4b56` is the default/production branch and the only **long-lived** branch after the historical feature-branch cleanup. Normal development uses short-lived purpose-specific PR branches that are deleted after merge.
+
+## 13. Database change model
+
+Production database state is not reconstructed by blindly comparing migration filename timestamps.
+
+[`MIGRATIONS.md`](MIGRATIONS.md) remains the migration workflow/history ledger, but its last full live-count reconciliation was 2026-08-07. Aug 10 added further migration files, so use [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §12 before treating the Aug 7 counts as current.
+
+Rules:
+
+- forward-only new migration files;
+- never edit an already-applied migration;
+- never run `supabase db push` against production;
+- never run `supabase migration repair` against production;
+- production applies require the approved migration workflow.
+
+## 14. Related documentation
+
+- [`../README.md`](../README.md) — project overview.
+- [`README.md`](README.md) — documentation navigation.
+- [`../PROJECT_STATUS.md`](../PROJECT_STATUS.md) — current release/engineering state.
+- [`MIGRATIONS.md`](MIGRATIONS.md) — migration workflow/history ledger.
+- [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) — current owner/live reconciliation gaps.
+- [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) — payment freeze.
+- [`ORDER_CONFIRMATION_FLOW.md`](ORDER_CONFIRMATION_FLOW.md) — customer order confirmation lifecycle.
+- [`OPERATIONS_ALERTS_DIGEST.md`](OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
+- [`SENTRY_OBSERVABILITY.md`](SENTRY_OBSERVABILITY.md) / [`SENTRY_WEB_OBSERVABILITY.md`](SENTRY_WEB_OBSERVABILITY.md) — observability.
+- [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) — release gates.

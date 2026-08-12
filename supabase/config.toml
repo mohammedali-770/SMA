@@ -6,17 +6,22 @@ major_version = 15
 
 # ---- Edge Functions ------------------------------------------------------
 # verify_jwt controls whether Supabase requires a valid user JWT to invoke the
-# function. External/scheduled callers (gateway webhooks, sync workers, Auth
-# hooks) set it false and authenticate by other means (signature / service role);
-# user-initiated functions keep it true.
+# function. External/scheduled callers (provider webhooks, sync workers, Auth
+# hooks) set it false and authenticate by another explicit mechanism
+# (signature / service role / dedicated secret); user-initiated functions keep
+# it true.
 [functions.order-intake]
 verify_jwt = true
 
-# The signed-in customer starts paying for their own order (Geidea session).
+# PROVISIONAL/FROZEN payment surface. The signed-in customer initiates payment
+# for their own order/session. Current source supports Tap and retains older
+# Geidea scaffold code, but the final provider has not been selected.
 [functions.payment-initiate]
 verify_jwt = true
 
-# Called by Geidea's servers; authenticated by the HMAC callback signature.
+# PROVISIONAL/FROZEN provider webhook surface. No user JWT; provider authenticity
+# is verified inside the function. See docs/PAYMENT_POSTPONEMENT.md before
+# touching any payment function or provider configuration.
 [functions.payment-webhook]
 verify_jwt = false
 
@@ -32,10 +37,11 @@ verify_jwt = true
 [functions.lazywait-webhook]
 verify_jwt = false
 
+# Source retained but product activation is DORMANT/flag-gated.
 [functions.push-dispatch]
 verify_jwt = false
 
-# Legacy custom WhatsApp OTP is used only for ownership verification of the
+# Legacy/custom WhatsApp OTP is used only for ownership verification of the
 # signed-in customer's AUTH-OWNED phone. Both send and verify require a JWT and
 # additionally resolve auth.getUser() + bind the requested phone to user.phone.
 # Real login OTP delivery uses the separate signed Supabase Auth hook below.
@@ -53,8 +59,9 @@ verify_jwt = false
 verify_jwt = true
 
 # Supabase Auth "Send SMS" Hook for REAL customer phone-OTP login. Supabase Auth
-# generates the login OTP and calls this to deliver it over WhatsApp; the call is
-# authenticated by the Standard Webhooks signature (verify_jwt=false, no user JWT).
+# generates the login OTP and calls this only to deliver it over WhatsApp; the
+# call is authenticated by the Standard Webhooks signature (verify_jwt=false,
+# no user JWT).
 [functions.auth-send-sms-whatsapp]
 verify_jwt = false
 
@@ -63,51 +70,47 @@ verify_jwt = false
 [functions.email-test-config]
 verify_jwt = true
 
-# ---- Tap Payments (Hosted Checkout) --------------------------------------
-# The customer verifies their own paid order after returning from Tap. Requires a
-# valid user JWT; retrieves the charge from Tap server-side and confirms only on
-# CAPTURED. The order is read via the user's RLS so they can verify only their own.
+# ---- Provisional payment/refund functions (FROZEN) -----------------------
+# These functions remain in source for the existing checkout stack, but ordinary
+# work must not change/deploy/test them while the final payment provider is
+# unresolved. Authoritative decision: docs/PAYMENT_POSTPONEMENT.md.
+
+# Customer-side Tap verification path. Requires a valid user JWT and reads the
+# customer's own order/session under RLS before server-side provider checks.
 [functions.payment-verify]
 verify_jwt = true
 
-# The HTTPS page Tap redirects the browser to after checkout. Bounces back into
-# the app via the spicymeal:// deep link; marks nothing paid. No JWT (public page).
+# Public HTTPS return page used by the existing Tap checkout path. It does not
+# trust the browser to mark payment state by itself.
 [functions.payment-return]
 verify_jwt = false
 
-# Automatic refund worker for PAID orders that provably never reached the branch.
-# Server/scheduled caller, so no user JWT — but it moves money, so it fails CLOSED
-# behind a REQUIRED constant-time shared secret (secret_config.refund_trigger_secret,
-# header x-refund-secret), exactly like lazywait-sync. It never decides that a
-# refund is owed: enrollment happens in Postgres (order_refund_due), and this
-# function only drains the resulting queue.
+# Refund processor. No user JWT because it is a server/scheduled path; it fails
+# closed behind its dedicated authentication contract. Automated refund
+# scheduling is intentionally disabled while payment/refund work is frozen.
 [functions.payment-refund]
 verify_jwt = false
 
-# Admin-only Tap status + harmless key check + isolated admin TEST checkout
-# (create + Retrieve-Charge verify). Requires a valid admin JWT; reads the secret
-# key server-side and never returns it; never touches orders/payments/Lazywait.
+# Admin-only Tap configuration/diagnostic test surface. Frozen with the rest of
+# the payment area; secret values remain server-side.
 [functions.payment-test-config]
 verify_jwt = true
 
-# The HTTPS page Tap redirects the admin's browser to after the isolated admin
-# TEST checkout. Informational only; marks nothing. No JWT (public page).
+# Public informational return page for the isolated admin Tap test checkout.
 [functions.tap-admin-test-return]
 verify_jwt = false
 
 # ---- Account deletion ----------------------------------------------------
-# Customer requests deletion of their OWN account. Requires a valid user JWT; the
-# user id comes from the JWT (never the body). Sends an OTP to the registered
-# phone and/or re-verifies the password, then idempotently enqueues the request.
+# Customer requests deletion of their OWN account. Requires a valid user JWT;
+# the user identity is derived from Auth, never trusted from an arbitrary body.
 [functions.account-delete-request]
 verify_jwt = true
 
-# Service-role processor for the deletion queue. verify_jwt=false because it is
-# called only by a service-role bearer or an independently authenticated backend.
+# Service-side processor for the deletion queue. verify_jwt=false because it is
+# called only through the backend/service authentication path.
 [functions.account-delete-process]
 verify_jwt = false
 
-# Vault-authenticated cron gateway. It verifies the dedicated scheduler secret
-# in Postgres, then calls account-delete-process with its built-in service role.
+# Vault/dedicated-secret authenticated cron gateway into account-delete-process.
 [functions.account-delete-scheduler]
 verify_jwt = false

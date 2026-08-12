@@ -1,99 +1,188 @@
-# 📱 Spicy Meal - Expo EAS Build Mobile Wrapper
+# 📱 Spicy Meal — Customer Mobile App
 
-This directory is fully configured with a production-grade **Expo Mobile Wrapper** that allows you to bundle and build your responsive Saudi Food Delivery & POS web application into native `.apk`, `.aab` (Android), and `.ipa` (iOS) binaries using **Expo Application Services (EAS Build)**.
+The Spicy Meal customer application is a **real Expo / React Native app** located in [`apps/mobile/`](apps/mobile/). It is no longer a WebView wrapper around the admin website.
 
-The mobile shell wraps the localized web interface in a performance-optimized fullscreen native `WebView` container.
+The same application code targets:
 
----
+- iOS via EAS Build
+- Android via EAS Build
+- Web via React Native Web, exported under `/app`
 
-## ✨ Enterprise-Grade Mobile Features Included
+## Current stack
 
-1. **Android Hardware Back Button Integration**: Intercepts physical back clicks on Android. It navigates backwards through the webview's internal history instead of instantly crashing or quitting the app (the industry standard for polished store wrapper apps).
-2. **Beautiful Custom Native Loader**: While the web page is loading for the first time, users see a polished custom screen with a large glowing Spicy Meal icon 🌶️, brand titles, and a localized Saudi Arabic/English welcome message alongside an activity spinner.
-3. **Smart Offline & Failure State**: If there is no internet connection or if the web service undergoes maintenance (e.g. status code >= 400), a beautiful native fallback screen is shown with a connection check guide and a tap-to-retry mechanism.
-4. **Notch & Safe Area Support**: Fully integrates with native Safe Areas (`react-native-safe-area-context`) to ensure headers and touch elements never overlap with hardware notches, the Dynamic Island (iOS), or home swipe indicators.
-5. **Expo Status Bar Syncing**: Programmatically sets the Android status bar and iOS top bar colors to match our brand deep-violet background (`#422e87`) with high-contrast light labels.
+- Expo SDK 57
+- React Native 0.86.2
+- React 19.2.3
+- Expo Router
+- React Native Web
+- Supabase JS
+- Sentry React Native
+- EAS Build with remote app versioning
 
----
+The static Expo configuration is in [`apps/mobile/app.json`](apps/mobile/app.json), the dynamic Sentry-aware config layer is in `apps/mobile/app.config.js`, and EAS profiles are defined in [`apps/mobile/eas.json`](apps/mobile/eas.json).
 
-## 🛠️ Step-by-Step EAS Build Instructions
+## App identity
 
-To build native applications, you must install the Expo development CLI on your machine and run the cloud-based EAS compiler. Follow these simple steps:
+| Platform | Identifier |
+| --- | --- |
+| Expo project | `spicy-meal` |
+| EAS project ID | `c8422901-b27a-40b3-91c7-b6ce99d97936` |
+| iOS bundle identifier | `com.spicymeal.app` |
+| Android package | `sa.com.spicymeal.app` |
+| Deep-link scheme | `spicymeal://` |
+| Web base URL | `/app` |
 
-### 1. Prerequisite Packages (Native Shell Dependencies)
-Before starting, ensure that these standard Expo wrapper dependencies are populated if you build locally or when initializing. If you run in this directory, install the mobile packages as dev dependencies or move them to a mobile subfolder:
+The app is portrait-only, phone-focused on iOS (`supportsTablet: false`), and declares only foreground location permissions for the delivery-map experience.
+
+## Main customer flows
+
+- WhatsApp/Supabase phone authentication for Saudi mobile numbers.
+- Blocking Pickup / Delivery order-type selection.
+- Branch-aware menu, categories, banners and product modifiers.
+- Cart and quantity management.
+- Saved delivery-address CRUD and default-address management.
+- Map pin/current-location workflow with delivery guidance/landmark validation.
+- Checkout and customer-safe order confirmation/receipt states.
+- Order history.
+- Profile editing and in-app account deletion.
+- Arabic/English and RTL layout.
+- System / Light / Dark appearance.
+- Sentry crash/error observability.
+
+Payment/provider code exists but is deliberately frozen while the final payment gateway decision is pending. Do not change or test payment/refund behavior as part of ordinary mobile work; see [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
+
+Push code is also retained but dormant by product decision.
+
+## Local setup
+
+The repository standard is **Node 22** (`.nvmrc`). From the repository root:
+
 ```bash
-# Add native dependencies
-npm install react-native react-native-webview react-native-safe-area-context expo-status-bar expo-build-properties
-# Add expo build utilities globally
-npm install -g eas-cli
+nvm use
+npm --prefix apps/mobile ci
 ```
 
-### 2. Configure & Log In to Expo (EAS)
-Log in to your Expo account (create one for free at [expo.dev](https://expo.dev)):
+Then run one of:
+
 ```bash
-# Login via terminal
-eas login
+# Expo development server
+npm --prefix apps/mobile start
+
+# Open Android through Expo tooling
+npm --prefix apps/mobile run android
+
+# Open iOS through Expo tooling
+npm --prefix apps/mobile run ios
+
+# Customer app in the browser
+npm --prefix apps/mobile run web
 ```
 
-Once logged in, link this project to your Expo account dashboard:
+The mobile dependency tree is intentionally separate from the root/admin dependency tree. For full repository development, install both:
+
 ```bash
-# This creates/retrieves an Expo Project ID and links it in your configurations
-eas project:init
-```
-*Note: This command will automatically update the `projectId` field inside your `app.json`.*
-
-### 3. Start Local Development (Optional)
-To test the mobile wrapper locally on your physical device (using the Expo Go app) or on an iOS/Android Simulator:
-```bash
-# Launch local developer server
-npx expo start
-```
-- Open **Expo Go** on your iPhone/Android.
-- Scan the QR code displayed in your terminal to see the live app load instantly.
-
----
-
-## 🚀 Running EAS Cloud Builds
-
-With EAS Build, you do not need Xcode (Mac) or Android Studio (Windows) installed on your machine. The builds are compiled securely in the cloud.
-
-### 🍏 Build for Apple iOS
-To compile an App Store ready `.ipa` file or a simulator binary:
-```bash
-# Build for App Store / TestFlight distribution
-eas build --platform ios --profile production
-
-# Build for testing on an iOS Simulator
-eas build --platform ios --profile preview
+npm ci
+npm --prefix apps/mobile ci
 ```
 
-### 🤖 Build for Google Android
-To compile an Android package:
-```bash
-# Build a universal testing .apk file (perfect for instant sharing/sideloading)
-eas build --platform android --profile preview
+## Environment
 
-# Build an App Bundle (.aab) ready to submit to the Google Play Console
-eas build --platform android --profile production
+Local/client environment variables use the `EXPO_PUBLIC_*` namespace. The normal application requires the Supabase project URL and anon/publishable key.
+
+The anon/publishable key is a client credential and **RLS is the security boundary**. Never place the Supabase service-role key, Meta credentials, payment secrets, Sentry auth token or any other server/provider secret in an `EXPO_PUBLIC_*` value.
+
+EAS profile environment values live in `apps/mobile/eas.json` and/or the EAS environment/secret store depending on the variable. Production source-map upload expects `SENTRY_AUTH_TOKEN` in the EAS production environment; that token must never be committed.
+
+## Quality checks
+
+From the repository root:
+
+```bash
+# Mobile TypeScript
+npm --prefix apps/mobile run typecheck
+
+# Root + framework-free mobile unit tests
+npm test
+
+# Shared design-system consistency/hygiene
+npm run design-system:check
+
+# Expo project health
+cd apps/mobile
+npx expo-doctor
+cd ../..
+
+# Full web production export through the root build
+npm run build
 ```
 
----
+The root `npm run build` deliberately installs mobile dependencies first, builds the Vite admin app, then exports the Expo web application into `dist/app`.
 
-## 🌐 Dynamic URL Updates
-To point your mobile app to a different domain (e.g., local staging or a custom branded domain):
-1. Open the `/App.js` file.
-2. Locate the `WEB_APP_URL` variable at the top of the file:
-   ```javascript
-   const WEB_APP_URL = 'https://ais-pre-jpn4zie7guhsch4aclhgog-275700298674.europe-west2.run.app';
-   ```
-3. Change it to your desired web domain, save, and rebuild!
+## EAS build profiles
 
----
+Run EAS commands from `apps/mobile/` (or pass the correct working directory in automation).
 
-## 📦 Directory Structure Mapping
-- `app.json`: Expo application name, bundle identifiers (`com.spicymeal.app`), permissions (Camera, Location, Internet), and adaptive icon themes.
-- `eas.json`: Compiling profile settings (Development, Preview, and Production).
-- `App.js`: Screen loader, offline fallback, back navigation binder, and Webview runner.
-- `metro.config.js`: Module resolution bundler for React Native bundles.
-- `babel.config.js`: Preset configuration for ES6 / TypeScript decorators.
+### Development
+
+`development` creates an internal development-client build.
+
+```bash
+cd apps/mobile
+npx eas-cli build --platform android --profile development
+```
+
+### Preview
+
+`preview` is internal distribution. Android produces an APK for device testing.
+
+```bash
+cd apps/mobile
+npx eas-cli build --platform android --profile preview
+npx eas-cli build --platform ios --profile preview
+```
+
+### Production
+
+`production` uses remote versioning and auto-increment. Android produces an app bundle; iOS produces the store/TestFlight build.
+
+```bash
+cd apps/mobile
+npx eas-cli build --platform android --profile production
+npx eas-cli build --platform ios --profile production
+```
+
+**Starting a production or store build requires explicit owner approval.** Follow [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) rather than treating these commands as routine development commands.
+
+## Web export
+
+The customer web app is the Expo app itself, not a separate emulator:
+
+```bash
+npm --prefix apps/mobile run build:web
+```
+
+The root production build runs this automatically after the Vite admin build. Vercel serves the resulting Expo SPA at `/app`.
+
+## Important configuration files
+
+```text
+apps/mobile/
+  app.json                 Static Expo identity/platform config
+  app.config.js            Dynamic config and Sentry plugin gating
+  eas.json                 development / preview / production profiles
+  package.json             Mobile dependencies and commands
+  metro.config.js          Metro configuration
+  scripts/export-web.js    Production web-export wrapper
+  src/app/                 Expo Router routes
+  src/features/            Customer feature modules
+  src/design-system/       Generated/shared mobile design-system mirror
+  src/theme/               Runtime theme provider and theme guards
+```
+
+## Release state
+
+The current production branch includes the August 12 feature-retention integration. Source-level gates completed before that merge, including TypeScript, tests, design-system checks, Expo checks and web/Vercel build validation.
+
+A fresh physical-device **Build 5** validation is still a distinct release gate; merging source does not substitute for installing and exercising a native build.
+
+For release/build history and operational status, use [`PROJECT_STATUS.md`](PROJECT_STATUS.md), [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) and [`docs/BRANCH_FEATURE_RETENTION_AUDIT.md`](docs/BRANCH_FEATURE_RETENTION_AUDIT.md).

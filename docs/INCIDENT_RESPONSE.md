@@ -1,192 +1,188 @@
-# Incident response
+# Incident Response
 
-> **Read §1 first. The most important fact about this system's incident posture
-> is that nothing in it can notify a human.**
+> **Updated 2026-08-12.** Internal health/alerting exists, but source does not prove that an independent external service can page a human. Treat independent monitoring/contact readiness as unverified until `OWNER_ACTIONS.md` §7 is completed.
 
----
+## 1. Detection reality
 
-## 1. Nothing here will page you
+The system has real internal visibility:
 
-This must be stated plainly because the volume of monitoring in the codebase
-implies otherwise. The Operations Health Center, the Smart Operations Alerts
-engine, the daily digest and the order-integrity watchdog are all real, careful,
-and working — and **none of them can reach a person**.
+- Operations Health;
+- Operations Alerts / digest;
+- Order Integrity;
+- stranded-order / confirmation-required signals;
+- Sentry across the client surfaces.
 
-- External dispatch is disabled *by design*: `external_dispatch_enabled`
-  defaults false, the settings RPC hard-raises on any attempt to enable it, and
-  a CHECK constraint makes a "sent" row impossible.
-- Nothing consumes `operations_alert_outbox`. There is no dispatcher.
-- There is **no uptime or synthetic monitoring** of any kind.
-- Sentry ingests errors from the three client surfaces but **not from any of the
-  21 Edge Functions** — the entire server-side order and payment path is dark.
+These controls do **not** by themselves prove independent outage paging. They run in or around the system being observed and may be unavailable during a total platform outage.
 
-**Therefore: detection latency equals the time until a staff member happens to
-open the admin console.** Overnight, that is until morning. The health monitor
-also runs *inside* the system it monitors, so a total outage produces no signal
-at all — the dashboard that would tell you is part of what is down.
+Therefore:
 
-Until an external prober and an alert dispatcher exist, incident response starts
-with a **human noticing** — a customer complaint, a branch phoning in, or someone
-opening the dashboard.
+- never assume an internal dashboard will wake someone;
+- maintain an independent liveness/data-path monitor if approved/configured;
+- keep primary/secondary responder contacts documented;
+- record how an incident was actually detected.
 
-> The highest-value change available is external uptime monitoring alerting to a
-> phone. It is independent of every code freeze and takes about half an hour.
->
-> **Point it at `https://<project>.supabase.co/rest/v1/branches?select=id&limit=1`
-> (with the `apikey` header), NOT at `/` or `/app`.** `vercel.json` ends its
-> rewrites with a catch-all — `"source": "/(.*)", "destination": "/index.html"` —
-> so *any* path Vercel does not resolve to a static asset returns `index.html`
-> with **HTTP 200**. A probe on `/` therefore goes green whenever the CDN can
-> serve one static file, which it can while the database is unreachable, the
-> anon key is revoked, or the build is two days stale. `docs/DEPLOY.md` already
-> records a case where exactly that happened.
->
-> `/rest/v1/branches` is the cheapest request that actually proves the stack:
-> it crosses PostgREST, authenticates the anon key, and reads a real table
-> (`branches` is granted to `anon` with a public read policy, `20260707120200`).
-> Note it hits the **Supabase** origin, not the Vercel domain — so pair it with
-> one probe on each if you want to distinguish "site down" from "data down".
+## 2. Incident roles — owner must fill/maintain
 
----
-
-## 2. Roles — TO BE FILLED IN BY THE OWNER
-
-An escalation policy with no names is not a policy.
-
-| Role | Who | Contact | Backup |
+| Role | Name | Contact/channel | Backup |
 | --- | --- | --- | --- |
 | Primary responder | ☐ | | |
-| Secondary / escalation | ☐ | | |
-| Owner (approves prod actions) | ☐ | | |
+| Secondary responder | ☐ | | |
+| Owner / Production approval authority | ☐ | | |
 | Restore authority | ☐ | | |
+| Customer/branch communications | ☐ | | |
 
-**This matters more here than in most projects**, because CLAUDE.md §5 gates
-migrations, Edge Function deploys, payment work and Vercel production changes
-behind *explicit owner approval*. If the owner is unreachable at 02:00, the
-responder cannot legitimately perform most fixes. Decide in advance what a
-responder may do unilaterally during a live incident, and write it here.
-
----
+The repository requires explicit approval for many Production actions. Decide in advance what responders may do during a live emergency if the owner is unreachable; do not invent that authority at 02:00.
 
 ## 3. Severity
 
-| Sev | Means | Examples | Response |
+| Severity | Meaning | Examples | Target response |
 | --- | --- | --- | --- |
-| **1** | Money or safety. Customers charged wrongly, or an order defect that could harm someone. | Double charges, refunds firing repeatedly, allergy note lost end-to-end | Immediately; wake the owner |
-| **2** | Customers cannot order. | Site down, checkout broken, OTP not sending, all orders failing to reach the POS | Within the hour |
-| **3** | Degraded but ordering works. | POS sync backlog, admin console slow, one branch misconfigured | Same day |
-| **4** | Cosmetic or internal. | Wrong label, report formatting | Normal PR flow |
-
----
+| **SEV-1** | Money, security, safety or destructive data risk | suspected double charge, unintended refund processing, privilege leak, customer safety instruction lost | immediate escalation |
+| **SEV-2** | Customers broadly cannot order/use the service | authentication outage, all checkout/orders fail, POS path broadly stopped | urgent, within the hour |
+| **SEV-3** | Partial/degraded operation | one branch/mapping issue, delayed POS sync, admin-only degradation | same day |
+| **SEV-4** | Cosmetic/internal | label/layout/report formatting | normal PR flow |
 
 ## 4. First 15 minutes
 
-1. **Write down the start time and what you observed.** Everything else is
-   easier with this.
-2. **Scope it.** Customer app, admin console, both? One branch or all? Ordering
-   or just reporting?
-3. **Check the platforms before the code** —
-   <https://status.supabase.com>, <https://www.vercel-status.com>. If a provider
-   is down, your job is customer communication, not debugging.
-4. **Check what changed.** `git log --oneline origin/claude/project-build-ie4b56 -10`,
-   the Vercel deployment list, and `docs/MIGRATIONS.md` for a recent apply.
-5. **Decide: mitigate or diagnose.** For Sev 1–2, mitigate first. Diagnosis with
-   customers affected is a luxury.
-6. **Escalate if it is Sev 1**, or if it is Sev 2 and you cannot mitigate within
-   15 minutes.
+1. Record start time, reporter and exact symptom.
+2. Scope the affected surface: customer native, `/app`, admin, Supabase, Lazywait, WhatsApp, one branch or all branches.
+3. Check provider/platform status externally before assuming the code is at fault.
+4. Check the intended production commit/deployment and recent PR/migration activity.
+5. Check internal Operations Health / Order Integrity / relevant Sentry signals if those systems are reachable.
+6. Decide whether immediate mitigation is safer than continued diagnosis.
+7. Escalate SEV-1 immediately; escalate unresolved SEV-2 quickly.
 
----
+Do not make a speculative Production database/provider change merely to “see if it fixes it.”
 
-## 5. Levers that do not need a deploy
+## 5. Safe mitigation hierarchy
 
-These are the fastest tools available and none of them requires a code release,
-because most order behaviour is server-authoritative.
+Prefer the least invasive supported control:
 
-| Symptom | Lever | Where |
-| --- | --- | --- |
-| Online payments failing | Disable the online payment method; cash keeps working | Admin → Settings → Payments |
-| One branch swamped or closed | Deactivate the branch | Admin → Branches |
-| A menu item wrong or unavailable | Deactivate the product | Admin → Menu |
-| A coupon over-redeeming | Set `is_active = false` on the coupon | **Supabase dashboard — there is no admin screen for this.** See the note below the table |
-| POS integration misbehaving | Check the Lazywait integration state before disabling — orders may then need manual entry at the branch | Admin → Operations |
+1. **Supported admin setting/control** designed for the operation.
+2. **Revert/rollback to a known reviewed web artifact** if the release itself is clearly bad.
+3. **Disable an affected product/branch/integration through a supported admin control** only after understanding operational consequences.
+4. **Privileged Production write/deploy/migration** only with the required explicit approval and a precise, auditable plan.
 
-> **The coupon lever is the one row here that breaks this section's promise.**
-> Every other lever is a control in the admin console that a manager can reach
-> from a phone at 02:00. This one is not: **there is no Coupons tab.** The
-> console's tab list is a closed union in
-> `src/components/admin/view/adminNav.ts` and coupons are absent from it — the
-> only coupon surface anywhere in the console is the read-only "Coupon Usage"
-> report, which cannot deactivate anything.
->
-> Deactivating a coupon today means running
-> `update public.coupons set is_active = false where code = '<CODE>';`
-> in the Supabase SQL editor. That is a narrower audience than the rest of this
-> table assumes: it needs Supabase project access *and* an account with
-> `profiles.role = 'admin'` (the `coupons_admin_all` policy, `20260707120400`).
-> A branch manager cannot do it.
->
-> **This is a known gap, not a documentation error.** The client-side CRUD
-> already exists — `list`, `create`, `update` and `remove` on the `coupons`
-> export in `src/lib/api.ts` — and is currently unreferenced; only `validate`
-> is wired up, on the customer checkout path. Building a Coupons panel is
-> therefore mostly wiring, and it would move this row back in line with the
-> rest of the table.
+Do not normalize emergency SQL-editor edits into a general runbook. If a required lever exists only as a Production database write, treat that as both an approval-gated action and a product/operations gap to fix afterward.
 
-⚠️ Before disabling the POS integration, confirm the branch can take orders
-another way. A silently disabled integration is worse than a visibly broken one.
+## 6. Branch / catalog / POS incidents
 
----
+### One restaurant branch is unavailable
 
-## 6. "My money was taken and I got no food"
+Use the supported branch controls to stop accepting orders only after confirming the intended scope (pickup/delivery/entire branch). Record who changed it and when it should be restored.
 
-The single most likely serious customer report. Do not improvise this.
+### Product/menu problem
 
-1. Get the customer's **phone number** and the approximate time.
-2. Admin → Live Orders / Orders — find the order.
-3. Establish which of these it is:
-   - **Order exists, `payment_status = paid`, POS sync failed.** The kitchen
-     never saw it. Phone the branch and place it manually. Check Orders Requiring
-     Verification.
-   - **Order exists, unpaid.** The charge did not complete on our side. Verify
-     against the payment provider before promising anything.
-   - **No order exists at all.** This is the serious case: money may have moved
-     with no record here. Escalate to the owner immediately. Nothing currently
-     reconciles the provider's ledger against `orders`, so this **cannot be
-     resolved from the dashboard**.
-4. Refunds: there is **no manual or partial refund path in the product**, and
-   payment work is frozen (CLAUDE.md §6). A refund today is an owner action
-   through the provider, recorded manually.
-5. Whatever the outcome, tell the customer a specific next step and a time.
+Use the supported catalog/product controls. Avoid bulk or direct SQL unless the supported UI/API is unavailable and the owner explicitly approves the exact fallback.
 
----
+### Lazywait / POS sync problem
 
-## 7. Communication
+Before disabling any integration:
 
-There is no status page and no customer notification channel. During a
-customer-visible incident:
+- determine whether the issue is one branch/mapping or system-wide;
+- inspect confirmation-required/stranded/order-integrity state;
+- check whether the branch has an agreed manual order-handling fallback;
+- avoid blind Create Order resends after ambiguous outcomes.
 
-- Decide who talks to customers, and say the same thing on every channel.
-- Tell the branches — they will be taking the phone calls.
-- Prefer "we are working on it, try again in an hour" over silence. Do not give
-  a fix time you are not confident in.
+The Lazywait lifecycle deliberately prevents ambiguous automatic resends because they can duplicate POS tickets.
 
----
+## 7. Payment/refund incidents while payment work is frozen
 
-## 8. Afterwards
+The final payment provider has not been selected and payment/refund work remains frozen.
 
-Within two working days, write a short note in the repo covering: what happened,
-when it started, how it was detected (**and how long that took**), what fixed it,
-and what would have caught it earlier.
+If a customer reports a money movement:
 
-Blameless and brief. The detection-latency number is the most valuable line —
-it is the argument for the monitoring this system still lacks.
+1. Locate the corresponding checkout/order/payment record if present.
+2. Record the customer-safe reference, time and provider-visible reference without copying secret/full payment payloads into tickets/chat.
+3. Do **not** trigger a new payment/refund/retry as a diagnostic step.
+4. Verify the provider side through the approved owner/provider process.
+5. Escalate any “provider movement with no internal record,” duplicate charge, or unexpected refund as SEV-1.
+6. Any manual provider refund/financial correction is an explicit owner action and must be recorded.
 
----
+The refund worker is intended to remain disabled while the freeze is active. After a restore/rebuild, re-verify `payment-refund-worker` before traffic resumes (`BACKUP_RECOVERY.md`).
 
-## 9. Related
+## 8. Authentication / staff access incidents
 
-- `docs/ROLLBACK.md` — getting back to a known-good deploy
-- `docs/BACKUP_RECOVERY.md` — data loss (read its status warning)
-- `docs/OPERATIONS_HEALTH_CENTER.md` — what the dashboard shows
-- `docs/OPERATIONS_ALERTS_DIGEST.md` — the alert engine and why it stays internal
-- `docs/ORDER_INTEGRITY_WATCHDOG.md` — order-integrity triage
+Customer login currently depends on Supabase Auth plus WhatsApp OTP delivery.
+
+Investigate separately:
+
+- Supabase Auth/session issue;
+- Auth Send-SMS hook issue;
+- Meta/WhatsApp delivery issue;
+- customer input/rate-limit outcome.
+
+Staff access also has role and AAL2/TOTP gates. Do not bypass them by directly changing a user's role or weakening MFA as a routine incident workaround.
+
+A true lockout recovery requires a separately approved privileged procedure.
+
+## 9. Suspected data-loss incident
+
+1. Stop destructive activity first.
+2. Do not run `supabase migration repair` or a blind `db push`.
+3. Preserve evidence: deployment/commit, timestamp, affected tables/IDs/counts.
+4. Read `BACKUP_RECOVERY.md` before any restore decision.
+5. Confirm current backup/PITR availability live; source documentation is not proof.
+6. Restore/drill against a disposable environment unless this is an approved real recovery.
+7. If Production is rebuilt/restored, verify dangerous manually-disabled automation before reopening traffic.
+
+## 10. Security incident
+
+For suspected credential leakage, privilege escalation or malicious access:
+
+- stop exposing/using the affected credential/channel;
+- rotate/revoke through the owning provider/dashboard as appropriate;
+- preserve audit evidence;
+- do not paste secrets into GitHub, chat or Sentry while investigating;
+- verify RLS/staff authorization boundaries after containment;
+- follow the project's security reporting/contact policy in `SECURITY.md` where applicable.
+
+## 11. Deployment incident
+
+If the symptom began after a web release:
+
+- verify the production alias actually serves the expected commit;
+- distinguish Vercel artifact failure from Supabase/provider failure;
+- roll back to a known reviewed artifact when mitigation is safer than diagnosis;
+- do not “fix forward” directly on the production branch.
+
+See `DEPLOY.md` and `ROLLBACK.md`.
+
+A 200 response from the SPA root is not enough to prove the correct/current build is served.
+
+## 12. Communications
+
+For a customer-visible incident:
+
+- assign one person to coordinate the message;
+- notify affected branches/operations;
+- state observed impact and next update time, not an unverified root cause;
+- avoid promising a refund/fix time that has not been approved/confirmed;
+- keep customer PII out of broad incident channels.
+
+## 13. After the incident
+
+Within two working days, record:
+
+- start/end time;
+- customer/operational impact;
+- detection method and detection latency;
+- root cause and contributing conditions;
+- mitigation/recovery steps;
+- any manual Production/dashboard changes;
+- what would have prevented/detected it earlier;
+- owner/action items with named responsibility.
+
+Keep it concise and evidence-based.
+
+## 14. Related docs
+
+- `docs/OWNER_ACTIONS.md` — unresolved owner/live-setting decisions.
+- `docs/ROLLBACK.md` — deployment mitigation.
+- `docs/BACKUP_RECOVERY.md` — recovery capability/drill.
+- `docs/RELEASE_CHECKLIST.md` — pre-release gates.
+- `docs/OPERATIONS_ALERTS_DIGEST.md` — internal alert behavior.
+- `docs/ORDER_CONFIRMATION_FLOW.md` — customer/POS lifecycle.
+- `docs/PAYMENT_POSTPONEMENT.md` — payment/refund freeze.
+- `docs/SENTRY_OBSERVABILITY.md` — mobile observability.
+- `docs/SENTRY_WEB_OBSERVABILITY.md` — web observability.
