@@ -1,191 +1,159 @@
-# Rollback — getting back to a known-good state
+# Rollback and Mitigation
 
-> **Status: written, only partly rehearsed.** Every procedure below is derived
-> from the repository and the platform's documented behaviour. The ones marked
-> **UNREHEARSED** have never been executed against this project. Rehearse them
-> before you need them — the first time you run a rollback should not be during
-> an incident.
+> **Updated 2026-08-12.** Rollback differs by surface. Use the smallest safe mechanism, preserve auditability, and do not bypass owner/production controls because the word “rollback” sounds safer than “deploy.”
 
-The three deployable surfaces fail and recover independently. Identify which one
-is broken before doing anything, because the fast path for one is unavailable for
-another.
+## 1. First identify the failing surface
 
-| Surface | Rolls back in | Mechanism |
-| --- | --- | --- |
-| Admin console + customer web (`/` and `/app`) | ~30 seconds | Vercel Instant Rollback |
-| Edge Functions | minutes | Redeploy the previous source |
-| Mobile app (iOS/Android) | **days** | App store review — there is no OTA channel |
-| Database schema | **no automated path** | See §4 and `docs/MIGRATIONS.md` |
+| Surface | Primary mitigation |
+| --- | --- |
+| Admin + customer web (`/` and `/app`) | point Vercel Production back to a known reviewed artifact, then revert through a PR |
+| Edge Function | redeploy a known reviewed prior source through the controlled owner-approved workflow |
+| Native iOS/Android | halt rollout / submit a fixed build; there is no instant JS OTA path in the current architecture |
+| Database schema | forward corrective migration or approved data restore; no `down` migration path |
+| Live provider/config | use the supported control or separately approved dashboard/provider action |
 
----
+Before rollback, verify the problem is not a provider outage or dashboard/env change unrelated to the code release.
 
-## 0. First: is it actually a deploy?
+## 2. Web/admin fast mitigation
 
-Before rolling anything back, rule out the cheaper explanations. A rollback that
-does not address the cause costs you the ability to diagnose it.
+Both browser surfaces are one Vercel project/build.
 
-1. **Is Supabase up?** <https://status.supabase.com> — if the database or Auth is
-   down, rolling back the frontend changes nothing.
-2. **Is it a config change rather than a code change?** Vercel environment
-   variables are read at **build time** (`docs/DEPLOY.md`). Changing one in the
-   dashboard does nothing until a redeploy — and rolling back to a deployment
-   built with the *old* variables will silently restore the old values too.
-3. **Did a migration land recently?** Check `docs/MIGRATIONS.md`. A frontend
-   rollback against a migrated database can be worse than the bug.
-4. **What changed?** `git log --oneline origin/claude/project-build-ie4b56 -10`.
+If a newly deployed artifact is clearly responsible:
 
----
+1. Vercel → Deployments.
+2. Select the last **known reviewed good** Production artifact.
+3. Use the current Vercel rollback/promote mechanism to repoint Production.
+4. Verify the Production alias now serves that artifact/commit.
+5. Open a normal revert/fix PR so the production branch returns to the intended source state.
 
-## 1. Web — admin console and customer app
+Do not leave Production permanently serving an artifact that differs from the production branch without documenting that emergency state.
 
-Both surfaces are one Vercel project: the root Vite build serves the admin
-console, and the Expo web export is served at `/app`.
+### Source revert
 
-### Fast path — Instant Rollback (~30s, no build)
+Create a fresh branch from the current production branch and revert/fix there. Open a PR; do not push the revert directly to production.
 
-1. Vercel dashboard → the project → **Deployments**.
-2. Find the last deployment known good (check the commit message and timestamp).
-3. **⋯ → Instant Rollback** (older UI: **Promote to Production**).
-4. Verify — see §5.
+A source revert can be unsafe if the database or provider configuration has already moved forward. Check schema/config compatibility before reverting client code.
 
-Instant Rollback re-points the production alias at an already-built artifact. It
-does not rebuild, so it is fast and cannot fail on a build error.
+## 3. Edge Function rollback
 
-> ⚠️ **The rolled-back artifact carries the environment variables it was built
-> with.** If the incident was caused by an env-var change, Instant Rollback also
-> reverts to the old values — usually what you want, but be deliberate about it.
-> If you changed an env var *and* need the new code, you must redeploy, not roll
-> back.
+Edge Function rollback is itself a **Production deployment**.
 
-### Slow path — revert the commit
+Do not use the old direct CLI pattern from historical docs as the normal response path.
 
-When the bad change must leave the branch (not just production):
+Safe approach:
 
-```bash
-git fetch origin
-git checkout -b fix/revert-<what> origin/claude/project-build-ie4b56
-git revert --no-edit <bad-sha>
-git push -u origin fix/revert-<what>
-gh pr create --base claude/project-build-ie4b56
-```
+1. Identify the last reviewed commit whose function behavior is known good.
+2. Prepare the intended function source on a fresh branch/PR or, during an explicitly approved emergency, identify the exact prior source to redeploy.
+3. Verify `supabase/config.toml` invocation/auth settings for that function.
+4. Obtain the required explicit owner approval.
+5. Use the controlled deployment workflow with the exact function name(s).
+6. Verify behavior and logs/health after deployment.
+7. Record the deployed source commit/version as incident evidence.
 
-Then get owner approval and merge. This rebuilds, so it takes as long as a normal
-deploy and *can* fail. Use Instant Rollback first to stop the bleeding, then
-revert properly.
+### Payment functions
 
-> ⚠️ **Known issue (#102): production may not track the default branch.** If the
-> Vercel Production Branch is unset, merging does not deploy and rolling back a
-> commit does not un-deploy. Confirm the Production Branch is
-> `claude/project-build-ie4b56` before relying on any of this.
+Payment/refund functions remain frozen. An incident does **not** automatically authorize changing or redeploying them. Any payment/refund rollback needs a separate explicit exception/decision.
 
----
+## 4. Native mobile rollback
 
-## 2. Edge Functions
+The current mobile architecture does not provide a general-purpose EAS Update/OTA rollback channel.
 
-**UNREHEARSED.** There is no version history in the Supabase Functions UI to roll
-back to — recovery means redeploying the previous source.
+For a bad store/native build:
 
-```bash
-git checkout <last-good-sha> -- supabase/functions/<name>
-supabase functions deploy <name> --project-ref wxfmmnihidsdyemasstf
-```
+- pause a staged/phased rollout where the store supports it;
+- submit an approved fixed build;
+- use server-side supported controls only when they are safe for both old and new clients;
+- never make a breaking backend change solely to rescue the newest client while older installed versions still exist.
 
-Note the JWT flag: `payment-webhook` and `payment-return` deploy with
-`--no-verify-jwt`; every other function keeps verification on. Deploying one of
-those two *without* the flag silently breaks it — the caller has no Supabase JWT.
-`supabase/config.toml` is the source of truth for each function's setting.
+A native dependency/framework crash requires a new compatible native build; a Vercel rollback cannot change an installed iOS/Android binary.
 
-⚠️ Deploying an Edge Function is **owner-approval-gated** (CLAUDE.md §5), and the
-payment functions are **frozen** (§6). During an incident, ask — do not assume
-the incident is its own approval.
+Starting a new EAS/store build requires explicit owner approval.
 
-⚠️ There is currently **no record of which commit each deployed function was
-built from**. Determining "the last good version" means reading git history and
-inferring. Fixing that (a deployed-function manifest) is tracked in the
-readiness plan.
+## 5. Database rollback model
 
----
+There is no automatic schema rollback/down path.
 
-## 3. Mobile app — there is no fast rollback
+Production database changes are forward-only:
 
-**This is the gap to understand before launch.** The app has no `expo-updates` /
-EAS Update channel, so a JavaScript regression cannot be pushed to devices. The
-only routes are:
+- never edit an applied migration;
+- never run `supabase db push` against production;
+- never run `supabase migration repair` to force history alignment;
+- create a new corrective migration and apply it only through the approved process.
 
-1. **Submit a fixed build** and request expedited review (Apple: hours to days;
-   Google: hours). This is the real path.
-2. **Halt the rollout** — Google Play staged rollout can be paused; App Store
-   phased release can be paused. This stops *new* installs. It does **not** fix
-   users who already updated.
-3. **Remove the app from sale** — only for something catastrophic (data loss,
-   payment defect). It does not touch installed copies.
+If the problem is **data loss/corruption**, a corrective DDL migration may not recover data. Follow `BACKUP_RECOVERY.md` and verify actual backup/PITR availability before promising recovery.
 
-**Mitigations that do not need a store cycle**, because the server is the lever:
+`docs/MIGRATIONS.md` contains the migration workflow/history, but its Aug 7 live-count snapshot needs the reconciliation recorded in `OWNER_ACTIONS.md` §12 before those counts are treated as current.
 
-- Most order-flow behaviour is server-authoritative. Disabling a payment method,
-  deactivating a branch, or turning off a coupon changes app behaviour instantly
-  via the database, with no client release.
-- If the app is broken against the current backend, prefer making the **backend
-  tolerate the old client** over shipping a client fix. Old clients never fully
-  disappear regardless.
+## 6. Configuration rollback
 
-Adopting EAS Update, plus a server-driven minimum-supported-version gate, is the
-structural fix and is tracked in the readiness plan.
+Many incidents are configuration rather than source:
 
----
+- Vercel env variables;
+- integration settings;
+- branch/catalog controls;
+- provider dashboards;
+- scheduled jobs;
+- staff roles/MFA;
+- EAS secrets/credentials.
 
-## 4. Database — there is no rollback
+Rollback/change only the specific setting you understand and are authorized to change. Record old/new value **without copying secret material**.
 
-Migrations are applied forward only, through the owner-approved `apply_migration`
-workflow. `supabase db push` and `supabase migration repair` are permanently
-forbidden against production (CLAUDE.md §8).
+Do not use a direct SQL mutation as a generic “fast rollback” when a supported audited path exists.
 
-Recovery from a bad migration is a **forward** migration that undoes the change,
-authored and approved like any other. There is no `down` step.
+## 7. Payment/refund safety
 
-This makes the pre-apply gate the real control. See `docs/MIGRATIONS.md`, which
-is the authoritative ledger and records the gate for every applied migration.
+While payment work is frozen:
 
-⚠️ If the bad migration destroyed or corrupted data, a forward migration cannot
-help you — that is a restore, and restore procedure/PITR state is documented in
-`docs/BACKUP_RECOVERY.md`. Read that file's status warning.
+- do not use a payment/refund transaction as a rollback smoke test;
+- keep `payment-refund-worker` disabled;
+- after any environment restore/rebuild, re-verify its cron state before traffic;
+- financial/provider correction is an explicit owner action.
 
----
+## 8. Verify the rollback/mitigation
 
-## 5. Verify the rollback actually took
+Verification must prove the actual affected path, not only that a dashboard became green.
 
-Do not close an incident on the deployment dashboard turning green.
+### Web
 
-```bash
-# Security headers still present (they live in vercel.json, so a rollback to a
-# commit predating them silently drops the CSP)
-curl -sSI https://<production-domain>/ | grep -iE \
-  'content-security-policy|strict-transport|x-frame|x-content-type|referrer-policy|permissions-policy'
+- Production alias serves the intended artifact/commit.
+- `/` and `/app` load the expected distinct applications.
+- security headers remain present.
+- customer/staff auth reaches the expected role/MFA flow.
 
-# Both surfaces actually serve
-curl -sS -o /dev/null -w '%{http_code}\n' https://<production-domain>/
-curl -sS -o /dev/null -w '%{http_code}\n' https://<production-domain>/app
-```
+### Backend
 
-Then, in a private window:
+- affected RPC/function returns expected result;
+- RLS/authorization boundary still holds;
+- Operations Health / relevant integrity signals do not show a new failure;
+- no unexpected provider side effect was triggered.
 
-1. Sign in as a customer and load the menu — proves Supabase env vars survived
-   the rollback. **If the menu shows bundled demo data, the env vars are missing
-   from the rolled-back build** (`docs/DEPLOY.md`).
-2. Place a **cash pickup** order end to end. Do not test with an online payment
-   during an incident.
-3. Sign in as staff and confirm the order appears in Live Orders.
-4. Open Operations Health Center and confirm no new alerts.
+### Native
 
----
+- fixed build installs/cold-launches on a physical device;
+- native-only path that failed is explicitly re-tested.
 
-## 6. After
+### Database
 
-- Write down what broke, what you did, and how long it took. Even three lines in
-  the PR is better than nothing — it is the only input to making the next one
-  faster.
-- If a rollback path in this file turned out to be wrong or slower than stated,
-  **fix this file in the same PR as the code fix.** A runbook nobody corrects
-  after using it decays into fiction.
-- If the cause was a missing gate, add the gate — see
-  `.github/workflows/production-gates.yml`.
+- intended object/data state is verified read-only;
+- migration ledger/status docs are updated after any approved live migration action;
+- no hidden cron/provider action was activated by a rebuild.
+
+## 9. After the immediate incident
+
+Once customer impact is stopped:
+
+1. bring production source/config back to a documented state;
+2. open/finalize the corrective PR if the first action was an artifact-level emergency rollback;
+3. document any manual dashboard/provider change;
+4. add a regression test/guard when possible;
+5. update `INCIDENT_RESPONSE.md` / relevant runbook if the actual recovery path differed from documentation.
+
+## 10. Related docs
+
+- `docs/INCIDENT_RESPONSE.md`
+- `docs/DEPLOY.md`
+- `docs/BACKUP_RECOVERY.md`
+- `docs/MIGRATIONS.md`
+- `docs/OWNER_ACTIONS.md`
+- `docs/RELEASE_CHECKLIST.md`
+- `docs/PAYMENT_POSTPONEMENT.md`
