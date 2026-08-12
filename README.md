@@ -126,7 +126,9 @@ npm run design-system:check
 npm run build
 ```
 
-Additional SQL and Edge Function checks run in CI. Production database changes must follow the approved migration workflow; note that the detailed Aug 7 live-count reconciliation in [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) is now a dated snapshot after later Aug 10 migration files were added. See [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §12 before using those counts as current.
+Additional SQL and Edge Function checks run in CI. Production database changes must follow the approved migration workflow.
+
+**Migration status verified read-only on 2026-08-12:** the repository contains **79 migration files**, Production contains **85 migration-history rows**, the latest live version is **`20260810115029`**, and all 11 migration names added after the Aug 7 snapshot are represented live. See [`docs/MIGRATION_RECONCILIATION_20260812.md`](docs/MIGRATION_RECONCILIATION_20260812.md). The large historical [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) remains the workflow/provenance ledger; its Aug 7 headline counts are historical.
 
 ## Repository layout
 
@@ -163,8 +165,9 @@ Start with [`docs/README.md`](docs/README.md). The most important documents are:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current system architecture.
 - [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) — release gates and verification.
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — Vercel/deployment behavior.
-- [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) — migration workflow/history ledger; live-count reconciliation last completed Aug 7.
-- [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) — current owner/live-dashboard decisions, including migration reconciliation.
+- [`docs/MIGRATION_RECONCILIATION_20260812.md`](docs/MIGRATION_RECONCILIATION_20260812.md) — latest read-only Production migration snapshot.
+- [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) — historical migration workflow/provenance ledger.
+- [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) — current owner/live-dashboard decisions.
 - [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md) — payment/refund freeze.
 - [`docs/BRANCH_FEATURE_RETENTION_AUDIT.md`](docs/BRANCH_FEATURE_RETENTION_AUDIT.md) — final feature-retention evidence from the branch cleanup.
 
