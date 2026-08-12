@@ -82,7 +82,9 @@ Push source remains in the repository, but the product decision keeps it dormant
 
 Production schema changes go only through the owner-approved migration workflow documented in `docs/MIGRATIONS.md`.
 
-Important current documentation state: `docs/MIGRATIONS.md` contains the authoritative workflow/history, but its last complete live-count reconciliation is dated 2026-08-07. Later Aug 10 migrations mean those old counts must not be treated as current until the read-only reconciliation in `docs/OWNER_ACTIONS.md` §12 is completed.
+Current read-only migration snapshot (2026-08-12): **79 repository migration files / 85 live migration-history rows**, latest live version **`20260810115029`**, with all 11 source migration names added after the Aug 7 ledger snapshot represented in live Production history. Evidence: `docs/MIGRATION_RECONCILIATION_20260812.md`.
+
+The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
 Never apply/repair anything merely to make history counts match.
 
