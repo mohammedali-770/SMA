@@ -1,580 +1,266 @@
 # Spicy Meal (SMA) — Project Status & Developer Onboarding
 
-> Last updated: 2026-08-07 (default-branch head `1ea366d`).
-> Read this first when opening the project in VS Code (or any editor) from a
-> fresh clone. It tells you what this repository is, what is LIVE in
-> production, how to run everything, and which rules must never be broken.
-
----
+> **Source state updated: 2026-08-12**  
+> Production/default branch at the start of this documentation refresh: `af3611445d08f5f30c0a284d494f0b23ab713876` (PR #200).  
+> This document describes the **current source/release state**. Older production-data counts from August 7 were point-in-time audit evidence and are not repeated here as if they were still live measurements.
 
 ## 1. What this project is
 
-**Spicy Meal** is a Saudi fast-food ordering platform (Arabic-first, RTL,
-English supported) for شركة الطعم الأول للتجارة (First Taste Trading Company).
-One repository contains three user-facing apps and the backend definition:
+Spicy Meal is the production codebase for First Taste Trading Company's customer ordering platform.
 
-| Surface | Where | Tech | Served at |
+| Surface | Location | Technology | Delivery |
 | --- | --- | --- | --- |
-| Customer mobile app | `apps/mobile/` | Expo SDK 57 / React Native 0.86 / expo-router | iOS + Android (EAS builds) |
-| Customer web app | `apps/mobile/` (same code, web export) | React Native Web via `expo export --platform web` | `/app` on the Vercel site |
-| Admin/staff console | `src/` (repo root) | Vite 6 + React 19 + Tailwind 4 | Vercel site root |
-| Backend | `supabase/` | Supabase (Postgres 17, RLS, pg_cron, Edge Functions) | Production project `wxfmmnihidsdyemasstf` |
+| Customer mobile app | `apps/mobile/` | Expo SDK 57, React Native 0.86.2, Expo Router | iOS / Android through EAS |
+| Customer web app | `apps/mobile/` | React Native Web / Expo export | Vercel `/app` |
+| Staff/admin console | `src/` | Vite 6, React 19, Tailwind CSS 4 | Vercel site root |
+| Backend | `supabase/` | Supabase Postgres, Auth, RLS, Edge Functions, pg_cron | Production Supabase project |
+| Shared design system | `design-system/` | TypeScript tokens/state contracts | Mirrored into both clients |
 
-- Bundle IDs: iOS `com.spicymeal.app`, Android `sa.com.spicymeal.app`.
-- The root Vite app redirects signed-in customers to `/app`; staff roles
-  (admin/accountant) get the AdminDashboard.
-- Deployment: Vercel builds the default branch (`npm run build` = mobile
-  `npm ci` → `vite build` → Expo web export into `dist/app`). Mobile store
-  builds go through EAS with **remote** versioning. See `docs/DEPLOY.md`.
+The old prototype/localStorage emulator architecture is obsolete. Supabase is the authoritative backend.
 
-## 2. Repository layout
+## 2. Current repository state
 
-```
-apps/mobile/            Expo app (customer iOS/Android/web)
-  app.json              Static Expo config (single source of truth)
-  app.config.js         Dynamic layer: drops the Sentry config plugin when
-                        SENTRY_AUTH_TOKEN is absent (see docs/SENTRY_*)
-  eas.json              EAS build profiles (development / preview / production)
-  src/app/              expo-router routes (incl. dev-sentry test screen)
-  src/lib/observability/  Sentry: mobile (index.ts), web (index.web.ts),
-                          shared framework-free sanitize/classify/config,
-                          webCore/webConfig/webRoutes/webClassify
-  scripts/export-web.js Web export wrapper (public env injection)
-src/                    Admin console (Vite): components/, context/, lib/
-  components/AdminDashboard.tsx + components/admin/  staff panels
-  lib/                  API/capability/business-logic modules (unit-tested)
-design-system/          "Ember on Cream" shared source of truth: tokens.ts,
-                        money.ts, buttonState.ts, fieldState.ts. Synced into
-                        the two apps by scripts/sync-design-system.mjs; CI
-                        enforces it (npm run design-system:check).
-scripts/                sync-design-system.mjs, check-design-system-hygiene.mjs,
-                        branch-audit.sh (git branch classifier)
+As of 2026-08-12:
+
+- `claude/project-build-ie4b56` is the default/production branch.
+- Historical feature/release branches have been deleted after retention verification.
+- The feature-retention integration from `release/mobile-next-build` was merged through **PR #200**.
+- The final pre-merge source gates for that release included TypeScript, unit tests, design-system checks, Expo checks, web build/export and Vercel validation.
+- A fresh **physical-device Build 5 validation remains a separate release step**. Source merge is not a substitute for installing and exercising a native build.
+
+See [`docs/GIT_BRANCHES.md`](docs/GIT_BRANCHES.md) and [`docs/BRANCH_FEATURE_RETENTION_AUDIT.md`](docs/BRANCH_FEATURE_RETENTION_AUDIT.md).
+
+## 3. Current major capabilities
+
+### Customer app
+
+- Arabic / English, RTL.
+- WhatsApp/Supabase Saudi phone login.
+- Blocking Pickup / Delivery order-type selection.
+- Branch-aware menu, categories, banners, modifiers and availability.
+- Cart, quantity editing and server-authoritative checkout.
+- Saved addresses, default address, map/current-location flow and required delivery guidance.
+- Orders, receipts and customer-safe order references.
+- Profile editing and account deletion.
+- System / Light / Dark appearance.
+- Sentry observability.
+
+### Admin/staff
+
+- Live Orders, receipt/ticket workflow and safe order-status handling.
+- Catalog, branch, banner, availability and delivery-zone management.
+- Lazywait catalog/mapping and operational review.
+- Financial/management reports using persisted order/VAT values.
+- Operations Health and health badge.
+- Operations Alerts/digest.
+- Order Integrity and stranded-order visibility.
+- Staff Access role administration with audit history.
+- TOTP/AAL2 staff MFA boundary.
+- Integration, legal and system-settings surfaces.
+
+### Backend/security
+
+Recent production-readiness work now includes:
+
+- server-side order lifecycle/cancellation compensation;
+- persisted historical VAT reporting;
+- CSV formula-injection hardening;
+- account-deletion manual-review resolution;
+- stranded-order health/alert coverage;
+- hot-path RLS/performance hardening;
+- product edits that preserve disabled state;
+- database-enforced modifier cardinality;
+- authenticated boundary for legacy WhatsApp verification sends;
+- audited staff role administration;
+- staff-access admin UI;
+- TOTP/AAL2 enforcement for privileged staff paths;
+- removal of anonymous role-helper RPC exposure.
+
+## 4. Mobile release baseline
+
+The current mobile tree is Expo SDK 57 / React Native 0.86.2.
+
+The August 11 iOS release-readiness fixes aligned:
+
+- `expo` / Expo modules to the SDK 57 compatibility line;
+- React Native 0.86.2;
+- `react-native-reanimated` 4.5.1;
+- `react-native-worklets` 0.10.1;
+- `@sentry/react-native` 7.11.x compatibility line.
+
+The August 12 feature-retention pass then restored/verified historical behavior before consolidation, including:
+
+- language switching on the blocking order-type gate;
+- customer-facing `#` prefix on external/display order references;
+- System / Light / Dark appearance behavior;
+- runtime palette-binding regression protection.
+
+For build commands and native configuration, use [`README_MOBILE.md`](README_MOBILE.md).
+
+## 5. Deliberately inactive/frozen areas
+
+### Payment and refunds — FROZEN
+
+The final payment provider has not been selected. Existing Tap/payment/refund source remains for continuity/history, but ordinary work must not modify, deploy, schedule or test that area.
+
+Automated refund processing remains disabled. The authoritative decision is [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
+
+### Push notifications — DORMANT
+
+Push source exists, but push remains intentionally disabled/unconfigured as a customer channel unless separately approved.
+
+### Discounts/campaigns — schema exists, product wiring remains decision-gated
+
+The campaign/discount foundation exists, but product/business decisions still govern whether/how it is wired into live ordering. See [`docs/DISCOUNTS_CAMPAIGNS.md`](docs/DISCOUNTS_CAMPAIGNS.md).
+
+## 6. Repository layout
+
+```text
+apps/mobile/              Expo customer app: iOS / Android / web
+src/                      Staff/admin Vite application
+design-system/            Shared Ember-on-Cream source tokens/state contracts
 supabase/
-  migrations/           Migration files (see docs/MIGRATIONS.md — the ledger)
-  functions/            Edge Functions (payment, lazywait-sync, OTP, …)
-  tests/                SQL test suites (run in a local PG harness only)
-docs/                   Authoritative runbooks (see §6)
-CLAUDE.md               MANDATORY change-control rules (read before any change)
-vercel.json             Vercel build, rewrites, headers (CSP incl. Sentry)
-vite.config.ts          Vite + token-gated Sentry source-map upload
-vitest.config.ts        Root unit-test config (includes framework-free
-                        apps/mobile tests)
+  migrations/             Forward-only migrations
+  functions/              Deno Edge Functions + _shared helpers
+  tests/                  SQL regression suites
+scripts/                  Design-system/audit/repository tooling
+docs/                     Current runbooks + historical audit evidence
+.github/workflows/         CI, EAS and controlled deployment workflows
+CLAUDE.md                  Mandatory change-control rules
+README.md                  High-level project entry point
+README_MOBILE.md           Mobile/EAS guide
 ```
 
-## 3. What is LIVE in Production right now
+Use [`docs/README.md`](docs/README.md) as the documentation index.
 
-The default branch **is** production. Everything below is deployed and active:
+## 7. Local development
 
-- **Ordering + checkout + Tap payments** are deployed and functional, but
-  **"customers order and pay today" was not true and has been removed.**
-  Measured against Production on 2026-08-07: 24 orders, **2 distinct
-  customers**, 5 profiles, 6 checkout sessions. **Not one order has ever reached
-  `delivered`** — the 24 are 21 `received` and 3 `cancelled`. Newest order
-  2026-08-01; newest OTP challenge 2026-07-21.
+### Prerequisite
 
-  (Every order is also `payment_status = 'pending'`, but that is **not** the
-  signal it looks like: for the 20 cash orders `pending` is the correct terminal
-  state by design. `status` is the lifecycle indicator — see the correction in
-  "Production reality check".)
-
-  This is **pre-launch test traffic, not trade.** The distinction matters for
-  every priority below: the risk today is not losing a book of business, it is
-  that **the order lifecycle has never once completed in production**. See
-  "Production reality check" below.
-
-  All payment/refund WORK remains postponed — §5 and
-  `docs/PAYMENT_POSTPONEMENT.md`.
-- **Lazywait POS integration**: `lazywait-sync` worker with deadline-bounded
-  retries, `confirmation_required` lifecycle state, reaper, and an admin
-  "Orders Requiring Verification" panel.
-- **Order Integrity watchdog** + admin triage panel.
-- **Operations Health Center**: staff RPC `operations_health_summary()`
-  (SECURITY DEFINER, staff-gated with 42501) + admin panel, now monitoring a
-  5-job allowlist (three critical crons + the two internal automation crons).
-  **Nine cards since 2026-08-07**: the eight subsystem cards plus `order_flow`,
-  which watches the business outcome — orders arriving in the last 60 minutes
-  against the same rolling window shifted back whole weeks over the previous 8.
-  It is in the critical set but fails quiet, reporting `idle` (never `failing`)
-  while no branch is open or the baseline has fewer than 3 comparable weeks, so
-  it currently reads `idle` on Production and moves no existing number. A
-  severity-aware health badge surfaces `failing` / `degraded` /
-  `configuration_error` in the admin sidebar, outside the Operations tab.
-- **Smart Operations Alerts + Daily Digest** (live and ACTIVE):
-  evaluator cron `operations-alerts-evaluator` every 5 min, digest cron
-  `operations-digest-generator` hourly (08:00 Asia/Riyadh in-function gate),
-  AR/EN digests, alerts inbox in the admin dashboard. **External dispatch is
-  disabled by design** — alerts/digests are internal (in-dashboard) only.
-  Since 2026-08-07 `operations_alerts_derive` carries an `order_flow` arm
-  (live `20260807172027`): `order_flow:health` at critical on `failing`, warning
-  on `degraded`/`unavailable`, and nothing at all on `idle`. The bilingual
-  renderer names it `تدفق الطلبات` / `Order Flow` in outbox rows. **It cannot
-  fire on today's data** — checked across every evaluation instant, not inferred
-  from one: the best achievable `baseline_samples` is 2 against a required 3, so
-  there is no hour of the week at which the card leaves `idle`
-  (`docs/MIGRATIONS.md` §26).
-- **Order confirmation state machine** — one authoritative customer-visible
-  order state, server-counted manual resends, and refund *enrolment*. Refund
-  *processing* is not running (§5).
-- **Discounts & campaigns schema** — tables, RLS and
-  `compute_campaign_discount()` are live, but **inert**: `place_order` does not
-  call the RPC, so no discount can affect an order total yet. Eight open
-  business questions gate the wiring — `docs/DISCOUNTS_CAMPAIGNS.md`.
-- **Sentry crash/error monitoring** (org `first-taste-trading-company`,
-  project `react-native`) on all three surfaces:
-  - mobile (PR #80): native + JS crashes, sampling prod 0.08;
-  - web/admin (PR #83): `admin-web` + `expo-web` surface tags, sampling
-    prod 0.05.
-  Ingestion works everywhere; **stack traces are unsymbolicated** until the
-  `SENTRY_AUTH_TOKEN` secret exists (§5).
-- **Auth**: Supabase auth with WhatsApp OTP flow.
-- **Account deletion** flow (store-compliance requirement).
-- **Push notifications are DORMANT.** The `push`/`expo` integration row is
-  `enabled = false` (set 2026-07-29 with owner approval), with zero credentials
-  and zero registered devices. Do not enable it.
-
-### Production reality check (measured 2026-08-07)
-
-Every readiness discussion in this repository has implicitly assumed a running
-business. The data does not support that, and saying so changes what matters.
-
-| Measure | Value |
-| --- | --- |
-| Orders, all time | **24** (21 `received`, 3 `cancelled`) |
-| Orders ever `delivered` | **0** |
-| Orders ever `payment_status = 'paid'` | 0 — but see the note below; for cash this is **correct by design**, not a gap |
-| Distinct customers who have ordered | **2** |
-| Profiles | 5 |
-| Checkout sessions | 6 |
-| OTP challenges in the last 7 days | **0** (newest 2026-07-21) |
-| Order spread | **8 distinct order dates**, spanning **24.5 days** (2026-07-08 → 2026-08-01) |
-
-> **Correction (2026-08-07): "0 orders ever paid" is a misleading metric, and it
-> was mine.** An earlier revision of this table listed it as evidence of an
-> incomplete pipeline. It is not, for most of the rows.
->
-> `20260709140000_payment_methods.sql` is explicit: *"paid is only ever set by
-> the service-role `confirm_order_payment` after a verified **online**
-> payment"*, and `"cash pending"/"unpaid"` are **derived in the UI** from method
-> plus status. `paymentDisplayState({paymentStatus:'pending', paymentMethod:'cash'})`
-> returns `cash_required`, and that is unit-tested.
->
-> So of the 24: **20 are cash, where `pending` is the correct terminal state** —
-> cash is collected at the counter through the POS, never in the app. 3 are
-> `online` and genuinely never completed payment. 1 predates the
-> `payment_method` column and is null.
->
-> Chasing "0 paid" would have meant chasing a non-problem **inside the frozen
-> payment/Tap area** (CLAUDE.md §6). **`status` is the real lifecycle indicator,
-> not `payment_status`** — and on that measure the finding stands unchanged: no
-> order has ever reached `delivered`.
-
-**What this does and does not mean.** It does *not* mean something broke: there
-was never a flow to stop, so a quiet period is not a regression. Earlier notes
-in this repository read "no orders since 2026-08-01" as an operational signal;
-that reading was wrong, and it was wrong because it looked at the newest
-timestamp without looking at the denominator.
-
-What it *does* mean is sharper: **the happy path has never completed once in
-production.** The evidence for that is `status` alone — **no order has ever moved
-past `received`**, so nothing has been prepared, dispatched or delivered. (The
-payment side adds nothing to this conclusion: 20 of the 24 are cash, where
-`pending` is the correct terminal state. Only the 3 `online` orders are genuinely
-unpaid, and those are inside the frozen payment area.) Every subsystem is
-deployed, but the thing they exist to produce end-to-end has not been observed.
-That is the largest unproven assumption on the readiness plan, and no amount of
-CI or backup configuration substitutes for it.
-
-It also re-orders urgency honestly. Point-in-time recovery (`docs/OWNER_ACTIONS.md`
-§2.1) is still the right pre-launch priority, but the data at risk *today* is 2
-test customers — so it is a launch blocker, not a live emergency. The items that
-actually gate reaching customers are the store-submission ones: legal documents
-(§4.2), a reviewer login (§4.3) and a publicly reachable privacy policy.
-
-One data oddity worth a look, not urgent: one order carries
-`payment_method = NULL` while the other 23 are `cash` (20) or `online` (3).
-
-### The post-`received` path has no server-side state machine
-
-Because no order has ever moved past `received`, the whole lifecycle beyond it
-is unexercised code. Auditing it on 2026-08-07 produced one confirmed defect and
-several negative results worth recording so nobody re-investigates them.
-
-**`orders.status` has exactly one writer, and it validates nothing.**
-`public.admin_set_order_status` (`20260724200000_order_read_contracts.sql:255`)
-is a bare `update public.orders set status = p_status, updated_at = now()`. Any
-status to any status — `delivered` back to `received`, `cancelled` forward to
-`delivered`. Every other `update public.orders` in the chain touches
-`payment_status`, `lazywait_*`, `sync_*` or `refund_state`, never `status`. No
-trigger on the table enforces an order-status state machine either.
-
-A state machine **does** exist — `ORDER_STATUS_TRANSITIONS` in
-`src/context/AppContext.tsx:236-241`, with `canTransitionOrder` unit-tested in
-`AppContext.test.ts` — but it lives in the admin console only. It constrains the
-UI, not the database, so any authenticated admin calling the RPC directly
-bypasses it. The function is `is_admin()`-gated, so this is not a privilege
-issue; it is an unguarded write.
-
-**Confirmed consequence: a cancelled order's loyalty movement is never
-reversed — in either direction.** Placement settles the balance in one
-statement, `greatest(0, balance - points_redeemed + points_earned)`, inside
-`place_customer_order`; `loyalty_awarded_at` is only ever set in that `insert`,
-never on a transition. There is no cancel function at all — cancelling *is*
-`admin_set_order_status(id, 'cancelled')`, the bare `UPDATE` above — so **both**
-halves are stranded: earned points stay credited (the business loses), and
-redeemed points are never given back (**the customer** loses, having paid points
-for an order they never received).
-
-Verified against Production on 2026-08-07 (read-only, counts only):
-
-| | Orders | Points earned | `earn` ledger rows | Reversal rows |
-| --- | --- | --- | --- | --- |
-| `received` | 21 | 1456 (−500 redeemed) | 20 | — |
-| `cancelled` | **3** | **41** | **3** | **0** |
-
-All three cancelled orders are stamped `loyalty_awarded_at`. Both profiles'
-stored `profiles.loyalty_points` reconcile exactly to their ledger sums, so this
-is not balance drift — it is the designed behaviour. One customer's 755-point
-balance includes **41 points earned on orders that were cancelled**.
-
-The customer-facing half has **not** bitten yet: all 500 redeemed points belong
-to `received` orders, and no cancelled order has redeemed any. It will bite the
-first time someone redeems and then cancels.
-
-At live settings (`points_per_riyal = 1`, `discount_per_point = 0.10`) a point is
-SAR 0.10 of discount, so a cancelled order permanently grants roughly **10% of
-its value as store credit**. Today that is SAR 4.10 of test data.
-
-**Severity, stated honestly, and it differs per half.** The *earned* half is an
-accounting inaccuracy, not an abuse vector: there is no customer-facing cancel
-anywhere in the mobile app — only display strings and fixtures — so a customer
-cannot mint credit on demand, and cancellation requires an admin. It becomes a
-real leak only at volume, or if a customer-facing cancel is ever added; adding
-one *before* fixing this would turn it into a self-service discount generator.
-
-The *redeemed* half is worse in kind though not yet in size: it takes something
-from a customer and does not give it back. It is unexposed today only because
-the one order that redeemed points was not cancelled — that is luck, not a
-control.
-
-**Negative results — investigated, no defect found.** Nothing assigns
-`loyalty_awarded_at` outside the placement `insert`, so the double-award risk on
-a repeated `delivered` transition does not exist. And `emit_order_change_event`
-only inserts `(order_id, event)` into `public.order_change_events` — a staff-only
-realtime signal with no PII, pruned after a day — so a backwards status change
-has no customer-visible notification consequence.
-
-The fix is a product decision, not just a patch: see `docs/OWNER_ACTIONS.md`
-§3.6.
-
-### Active scheduled jobs (pg_cron)
-
-| Job | Schedule | State |
-| --- | --- | --- |
-| `account-deletion-processor` | `* * * * *` | active |
-| `lazywait-sync` | `* * * * *` | active |
-| `order-integrity-watchdog` | `*/2 * * * *` | active |
-| `operations-alerts-evaluator` | `*/5 * * * *` | active |
-| `operations-digest-generator` | `0 * * * *` | active |
-| `payment-refund-worker` | `*/5 * * * *` | **DISABLED** (`active = false`, §5) |
-
-### Migration state
-
-**70** live `schema_migrations` rows; **68** repository migration files;
-**zero unapplied**. Latest live version `20260807172027`.
-
-Four migrations were applied on **2026-08-07** with explicit owner approval —
-`erasure_phone_normalization` (live `20260807140050`) and
-`admin_ranged_orders_and_stats` (live `20260807140206`), both recorded in
-`docs/MIGRATIONS.md` §24, then `order_flow_health_card` (live `20260807152347`)
-in §25 and `order_flow_alert_condition` (live `20260807172027`) in §26. The last
-two were applied verbatim, with the stored migration text proven byte-identical
-to the merged repository file in each case.
-
-The 70 / 68 gap is history, not schema: **five** live-only rows carry no
-repository file (one of them a `select 1;` connectivity probe) and **three**
-repository files were superseded by consolidated migrations. Full classification,
-recomputed from live data on 2026-08-07 and reconciling both sides exactly, in
-`docs/MIGRATIONS.md` §4.
-
-Three migrations were applied on **2026-08-05** with explicit owner approval,
-through the MCP `apply_migration` workflow — one call per file, in filename
-order, following `docs/MIGRATION_RUNBOOK_20260801_ADDRESS_DELETE.md`:
-
-| File | From | Applied version |
-| --- | --- | --- |
-| `20260801120000_address_single_default.sql` | PR #142 | `20260805061621` |
-| `20260801120100_checkout_session_address_fk_set_null.sql` | PR #142 | `20260805061912` |
-| `20260802120000_address_description_trim_all_whitespace.sql` | PR #146 | `20260805061955` |
-
-Together these make one default address per customer a server-enforced
-invariant, let a customer delete an address that has backed an online checkout
-(with a guard so a captured payment can never fail to become an order), and
-close a live defect where a landmark of only tabs and newlines satisfied the
-courier-landmark rule.
-
-The checkout-session snapshot fingerprint was **identical before and after**
-(`0bffc7257feb7ff29731ec6ac35247fd`), so no session row was written or
-re-priced. Advisors report zero ERROR on both Security and Performance. The full
-pre-live and verification record is in `docs/MIGRATIONS.md` §1.
-
-> ⚠️ **Two follow-ups remain.** The application smoke test (run-book Step 4.5 —
-> add/promote an address and the three delete cases, in the app as a real
-> customer) has **not** been done and needs a device. Version alignment
-> (run-book Step 3) was deliberately skipped: it is a separate live history
-> write needing its own explicit owner approval, and skipping it just leaves a
-> class-B entry, which is what most of the ledger already looks like.
-
-Earlier context, still accurate: ten migrations were applied on 2026-07-29,
-eight of them closing a Production incident in which the deployed frontend was
-running eight migrations ahead of the database.
-
-> **Do not reconcile the ledger by comparing filename version prefixes to
-> `schema_migrations.version` — they do not match.** Repository filenames carry
-> their own timestamps (e.g. `20260707120000_extensions_enums_helpers.sql` is
-> live as version `20260708062345`), and three older files map to differently
-> named rows: `place_order`, `loyalty` and `order_idempotency` were consolidated
-> into `order_idempotency_and_place_order` and `harden_trigger_functions`, and
-> `checkout_sessions` was applied as three rows. Mapping is **by name, through
-> `docs/MIGRATIONS.md`** — that is what the ledger is for, and a naive version
-> diff reports ~54 false "unapplied" migrations.
-
-`docs/MIGRATIONS.md` is the authoritative ledger — read it before touching
-anything database-related. Live schema changes go ONLY through the
-owner-approved MCP `apply_migration` workflow; `supabase db push` and
-`supabase migration repair` are permanently forbidden against Production.
-
-## 4. Working in VS Code — setup & daily commands
-
-Prereqs: Node 20+, npm. (No Docker needed for app work; SQL test suites need
-a local Postgres 16+ if you want to run them.)
+**Node 22 is required.** `.nvmrc` is the source of truth.
 
 ```bash
-# 1) Install root (admin web + tests) and mobile deps
-npm ci
-npm --prefix apps/mobile ci
-
-# 2) Environment (never commit real values; .env* is gitignored)
-#    Admin web (Vite):  VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
-#    Mobile (Expo):     EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY
-#    (the anon key is public by design; RLS is the security boundary)
-
-# 3) Run
-npm run dev                          # admin console on :3000
-npm --prefix apps/mobile run web     # customer app in the browser
-npm --prefix apps/mobile start       # Expo dev server (iOS/Android)
-
-# 4) Quality gates (run before every commit — all must pass)
-npm run lint                         # root tsc --noEmit (includes shared web code)
-npm test                             # vitest (root + framework-free mobile)
-npm --prefix apps/mobile run typecheck
-npm run build                        # full production build (Vite + Expo web export)
-
-# 5) Expo config sanity (after touching app.json / app.config.js)
-npx --prefix apps/mobile expo config --type prebuild --json > /dev/null
-#    Full source-map gate check: docs/SENTRY_OBSERVABILITY.md
-#    → "Verifying the source-map gate"
+nvm use
+node -v
 ```
 
-Notes:
-- `npm run build` installs `apps/mobile` deps **first** on purpose: `vite build`
-  transforms `apps/mobile/src`, whose tsconfig extends `expo/tsconfig.base`, so
-  it needs `apps/mobile/node_modules` to already exist. Reordering these breaks
-  the Vercel build.
-- Root vitest deliberately includes `apps/mobile/src/**/*.test.ts` for
-  FRAMEWORK-FREE modules only (no RN/Expo imports in those test files).
-- `supabase/tests/*.sql` run against a throwaway local PG harness — never
-  against Production.
-- Sentry is silent in dev unless you opt in (`VITE_SENTRY_DEV=1` /
-  `EXPO_PUBLIC_SENTRY_DEV=1`); test runners are always silent.
+See [`docs/NODE_VERSION.md`](docs/NODE_VERSION.md).
 
-## 5. Pending items / owner actions
+### Install
 
-**Payment & refund work is POSTPONED** (owner decision, 2026-07-29). The
-payment gateway provider has not been selected. Do not modify, deploy, schedule
-or test any payment/refund functionality. The `payment-refund-worker` cron was
-disabled; **nothing was deleted** — all payment code, migrations and Edge
-Functions remain intact. Full record, including the open double-refund design
-question that must be resolved before the worker is ever re-enabled:
-`docs/PAYMENT_POSTPONEMENT.md`.
+```bash
+npm ci
+npm --prefix apps/mobile ci
+```
 
-Open issues: **none.**
+### Run
 
-Closed since the last update:
+```bash
+# Admin/staff console
+npm run dev
 
-- **Issue #102 (closed 2026-08-05)** — the Vercel **Production Branch** was
-  unset, so the default branch only ever deployed as a **Preview**. Production
-  was serving a build roughly two days stale: fifteen merged pull requests,
-  including the customer-note fix and the removal of the false ZATCA compliance
-  claims, were not reaching customers.
+# Customer app on web
+npm --prefix apps/mobile run web
 
-  Two steps were needed, and the second is the one that is easy to miss: set the
-  branch (**Settings → Environments → Production** — Vercel moved it out of
-  Settings → Git), **and then promote**. A deployment's environment is fixed when
-  it is created, so every existing build stays a Preview forever; promoting the
-  newest one is what creates the first Production deployment and moves the alias.
+# Expo dev server
+npm --prefix apps/mobile start
+```
 
-  Verified live: the deployed admin chunk contains `Live Orders`,
-  `Customer note:`, `No internet connection`, `Open in Maps`,
-  `management sales summary`, `partially imported` and `Importing`, and the three
-  false ZATCA strings are gone. The customer app's Expo entry bundle changed,
-  carries #151's `(auth)/login` route guard and no longer references
-  `expo-notifications` (#149). All six security headers intact.
+### Required quality checks
 
-  > The old verification in `docs/DEPLOY.md` (`/` and `/app/` byte-identical)
-  > **passed throughout this outage.** It only catches the catch-all-rewrite
-  > failure, not a stale or unpromoted deployment. `docs/DEPLOY.md` now documents
-  > three checks: the `age` header, the Preview/Production badge in the
-  > Deployments list, and grepping the deployed bundle for a known-recent string.
+```bash
+npm run lint
+npm test
+npm --prefix apps/mobile run typecheck
+npm run design-system:check
+npm run build
+```
 
-- **Issue #81 (closed 2026-07-29, completed)** — the `SENTRY_AUTH_TOKEN`
-  source-map secret. Both upload gates are conditional
-  (`apps/mobile/app.config.js`, `vite.config.ts`) and activate on their own once
-  the token is present; no code change was required.
+After native/config dependency changes, also run the appropriate Expo checks from `apps/mobile/`, including `expo-doctor` and a clean prebuild/export as required by the release checklist.
 
-### Open pull-request queue — none
+## 8. Environment and secrets
 
-**Zero pull requests are open** against the default branch (verified
-2026-08-07). The 13-PR queue this section used to describe — CI gates #147,
-release discipline #152, mobile store readiness #149, route guards #151 and the
-rest — is fully merged, including the stacked pair and the superseded PR that
-`docs/GIT_BRANCHES.md` recommended closing.
+Public client configuration may include the Supabase project URL and anon/publishable key. Those values do not bypass RLS.
 
-`docs/GIT_BRANCHES.md` still documents that queue and its merge order. Treat it
-as **history** rather than a work list; check the live PR list before acting on
-anything it says is open.
+Never put server/provider secrets in:
 
-Needs an owner decision:
+- `VITE_*` values;
+- `EXPO_PUBLIC_*` values;
+- committed `.env` files;
+- logs/tests/fixtures;
+- PR descriptions or screenshots.
 
-- **Discounts & campaigns** — eight business questions in
-  `docs/DISCOUNTS_CAMPAIGNS.md` block wiring campaigns into `place_order`.
+Service-role credentials and external provider secrets belong only in server-side configuration/secret stores.
 
-Resolved 2026-07-29:
+## 9. Database rules
 
-- **Push integration row.** It had drifted to `enabled = true` in Production
-  (with zero credentials and zero devices) while `CLAUDE.md` §7 and this
-  document both described it as disabled. With owner approval it was set back to
-  `enabled = false`, so Production now matches the documented intent. Exactly one
-  row changed; no credentials were added or removed.
+[`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) is the authoritative production migration ledger.
 
-Documentation debt:
+Binding rules:
 
-- The five account-deletion migrations are applied and live but not yet itemized
-  in `docs/MIGRATIONS.md` §4/§5 (tracked in §1 of that document).
+- new forward-only migration for each schema change;
+- never edit an already-applied migration;
+- never run `supabase db push` against production;
+- never run `supabase migration repair` against production;
+- production migration/application requires the approved workflow and explicit owner approval.
 
-## 6. Authoritative docs (read these before changing the related area)
+## 10. Git/change-control rules
 
-| Doc | Owns |
+Read [`CLAUDE.md`](CLAUDE.md) before changing the repository.
+
+Normal workflow:
+
+1. Fetch the current production branch.
+2. Create a fresh purpose-specific branch.
+3. Make and validate the change there.
+4. Open a PR against `claude/project-build-ie4b56`.
+5. Do not merge without explicit owner approval.
+6. Let merged head branches be deleted; do not recreate the old branch backlog.
+
+## 11. Release/deployment model
+
+### Web
+
+Merges to the configured production branch are the web release path. `npm run build` creates both:
+
+- the Vite admin build;
+- the Expo customer web export under `dist/app`.
+
+Use [`docs/DEPLOY.md`](docs/DEPLOY.md) and [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
+
+### Native
+
+EAS profiles:
+
+- `development` — internal development client;
+- `preview` — internal distribution, Android APK;
+- `production` — store/TestFlight path with remote versioning/auto-increment.
+
+Starting EAS/store builds requires explicit owner approval.
+
+## 12. Current documentation ownership
+
+| Area | Authoritative document |
 | --- | --- |
-| `CLAUDE.md` | Change-control rules for ALL agent/automated work (§7 below) |
-| `docs/GIT_BRANCHES.md` | Git branch inventory, the open-PR merge order, branch hygiene |
-| `docs/MIGRATIONS.md` | Migration ledger + the only allowed Production schema workflow |
-| `docs/PAYMENT_POSTPONEMENT.md` | The payment/refund freeze: scope, live state, resume checklist |
-| `docs/DEPLOY.md` | Vercel deployment, Production Branch, env vars, verification |
-| `docs/OPERATIONS_ALERTS_DIGEST.md` | Alerts/digest engine, activation state, runbook |
-| `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle + refund enrolment rules |
-| `docs/DISCOUNTS_CAMPAIGNS.md` | Campaigns schema, what is live, open business questions |
-| `docs/SENTRY_OBSERVABILITY.md` | Mobile crash reporting runbook + the source-map gate |
-| `docs/SENTRY_WEB_OBSERVABILITY.md` | Web/admin error monitoring runbook |
-| `docs/INCIDENT_RESPONSE.md` | What to do when it breaks — **and why nothing pages you** |
-| `docs/ROLLBACK.md` | Getting back to a known-good state, per surface |
-| `docs/BACKUP_RECOVERY.md` | Backup/PITR state (**UNVERIFIED**) and the restore drill |
-| `docs/DEPENDENCY_ADVISORIES.md` | The audit gate and its standing exceptions |
-| `docs/OWNER_ACTIONS.md` | **Everything blocked on the owner**, ordered by risk |
-| `SECURITY.md` | How to report a vulnerability to us |
-| `README.md` / `README_MOBILE.md` | General app documentation |
+| Project overview | `README.md` |
+| Current engineering/release state | `PROJECT_STATUS.md` |
+| Mobile/EAS | `README_MOBILE.md` |
+| Architecture | `docs/ARCHITECTURE.md` |
+| Docs navigation | `docs/README.md` |
+| Change-control | `CLAUDE.md` |
+| Release checks | `docs/RELEASE_CHECKLIST.md` |
+| Deployment | `docs/DEPLOY.md` |
+| Database migrations | `docs/MIGRATIONS.md` |
+| Payment/refund freeze | `docs/PAYMENT_POSTPONEMENT.md` |
+| Git branch state | `docs/GIT_BRANCHES.md` |
+| Feature-retention evidence | `docs/BRANCH_FEATURE_RETENTION_AUDIT.md` |
 
-> ⚠️ **Two of these describe gaps, not capabilities.** `docs/BACKUP_RECOVERY.md`
-> records that no backup has been verified and no restore has ever been drilled;
-> `docs/INCIDENT_RESPONSE.md` §1 records that no alert can currently reach a
-> human. Read both before assuming this system is operationally covered.
+Historical audit documents should remain clearly dated snapshots and should not be used as a current work queue.
 
-## 7. Rules that must never be broken
+## 13. Operational truth vs historical measurements
 
-These are binding for humans and AI agents alike (full text in `CLAUDE.md`):
+Several older revisions of this file contained detailed production row counts and one-day operational findings. Those measurements were useful audit evidence, but they age immediately.
 
-1. **Never commit/push directly to the protected branches**
-   (`claude/project-build-ie4b56` = production default, and `main`).
-   Every change: fresh branch off the default branch → PR → explicit owner
-   approval → merge. A PreToolUse hook additionally blocks agent sessions
-   from editing on a protected checkout. **Delete the head branch when a PR
-   merges** — see `docs/GIT_BRANCHES.md` §7 for why (60 branches accumulated,
-   47 of them finished).
-2. **Payment/Tap area is FROZEN and payment work is POSTPONED** — no changes
-   without separate explicit owner approval, and none at all until a gateway
-   provider is selected (`docs/PAYMENT_POSTPONEMENT.md`).
-3. **Push notifications stay dormant** — row disabled, no credentials, no
-   enabling.
-4. **Production schema**: only the owner-approved `apply_migration` workflow;
-   `supabase db push` / `migration repair` are permanently forbidden; never
-   edit an already-applied migration file.
-5. Secrets (Sentry auth token, service-role keys, provider credentials) never
-   enter the repository, logs, PRs, or client bundles.
-6. Actions requiring explicit owner approval every time: PR merges, live
-   Supabase writes, migrations, Edge Function deploys, auth config, payment
-   work, push enabling, Vercel production changes, EAS/store builds,
-   destructive git operations.
+This current-status document therefore separates **source/release truth** from **point-in-time production measurements**. Do not copy an old count forward and label it "current" without re-querying the live system.
 
-## 8. Recent merged milestones (newest first)
-
-| PR | What | Merge |
-| --- | --- | --- |
-| #144 | Run-book for the two unapplied address-deletion migrations | `9032dfa` |
-| #143 | Admin dashboard navigation + branch overview reorganized | `e3130a2` |
-| #142 | Customer profile address and name management (mobile) | `d2bf2ea` |
-| #141 | Money display: configured VAT rate, mono price digits, delivery fee | `8faaca5` |
-| #140 | Accessible focus management in the console modals | `7979129` |
-| #139 | Muted ink raised to WCAG AA | `76887b2` |
-| #118–#136 | **"Ember on Cream" design system** — tokens, self-hosted fonts, shared Price/Button/Field, then a surface-by-surface migration of the customer app and the entire admin console, ending in the removal of all legacy mobile UI | `271cc22`…`e5b1c72` |
-| #120 | Repository standardized on Node 22 via `.nvmrc` | `e5458984` |
-| #116 | Corrected the source-map gate verification commands | `1a69416` |
-| #115 | Conditional Sentry source-map gate on mobile (`app.config.js`) | `537d345` |
-| #114 | Production EAS builds no longer fail on the missing Sentry token | `bff19ff` |
-| #113 | Payment postponement + migration ledger reconciliation + doc corrections | `9f0ec87` |
-| #112 | Refund worker scheduler + stale-claim reaper; `caller_can_read_order` anon revoke | `e36fff1` |
-| #85 | Operations automation cron health | `06c9bb0` |
-| #84 | `PROJECT_STATUS.md` onboarding document | `e520f0a` |
-| #83 | Sentry error monitoring for web + admin (`admin-web`/`expo-web`) | `736a6a0` |
-| #80 | Sentry crash reporting for the mobile app | `22e5aca` |
-| #78 | Internal activation of alerts/digest (live crons) | `ffa3ba3` |
-
-`docs/MIGRATIONS.md` maps every repository migration file to its applied
-Production version.
-
-## 9. Test & quality snapshot
-
-- Root vitest: **1605 tests across 107 files, all passing** — re-run and
-  verified 2026-08-05 at head `9032dfa`. `npm run lint` (root `tsc --noEmit`)
-  is clean. (The previously recorded figure of 764 was from 2026-07-24 and is
-  superseded.)
-
-  > **`npm test` requires `apps/mobile` dependencies to be installed.** Root
-  > vitest deliberately includes the framework-free `apps/mobile` tests, and
-  > `apps/mobile/tsconfig.json` extends `expo/tsconfig.base`. Without
-  > `npm --prefix apps/mobile ci`, 44 of the 107 test files fail to load with
-  > `failed to resolve "extends":"expo/tsconfig.base"`. That is a missing
-  > install, not a broken test — run both installs from §4 before trusting a
-  > red suite.
-- **Sentry source-map gate (`apps/mobile/app.config.js`, #115) — VERIFIED
-  2026-07-29.** Both checks in `docs/SENTRY_OBSERVABILITY.md` →
-  "Verifying the source-map gate" pass: direct evaluation returns **4** plugins
-  without the token and **5** with it, and `expo config --type prebuild` reports
-  the Sentry plugin absent (**0**) then present (**1**). Config resolution
-  succeeds, so the file cannot break a build, and Expo genuinely honours the
-  gate rather than only the function returning the right value.
-  **Still unproven:** that omitting the plugin leaves *native crash capture*
-  intact — config resolution cannot establish that. The reasoning is that the
-  native SDK is autolinked from the `@sentry/react-native` dependency and
-  started by `Sentry.init()`, with Debug IDs from the `getSentryExpoConfig`
-  Metro wrapper, none of which route through the config plugin. The first
-  production EAS build is the definitive check: it should complete, and Sentry
-  should still receive events from that build.
-- TypeScript: root and mobile programs clean (`--noEmit`), root with real
-  React 19 types (`@types/react@^19`, `@types/react-dom@^19`).
-- SQL suites: alerts/digest/activation/watchdog/health/order-confirmation/
-  loyalty-reason suites pass in the local PG harness. They are never run
-  against Production.
-- `npm audit` (root): 0 vulnerabilities at the last check. The mobile tree has
-  one pre-existing upstream Expo advisory (documented in PR #80, not introduced
-  by this repo).
-- Bundles: no source maps shipped, no secrets, dev-only test tooling
-  excluded from production output.
+When a production measurement matters, record the date, data source and whether the query was read-only.
