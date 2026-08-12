@@ -1,109 +1,132 @@
-# Branch onboarding checklist
+# Restaurant Branch Onboarding Checklist
 
-Everything that must be true before a new branch takes its first real order.
-Derived from the actual schema (`branches`, `branch_availability`,
-`delivery_zones`), not from memory.
+> **Updated 2026-08-12.** Everything that must be true before a new restaurant branch takes its first approved test/real order.
 
-> **The one that silently breaks things: `lazywait_branch_id`.** A branch with no
-> POS mapping still accepts and charges for orders — they just never reach the
-> kitchen. Nothing blocks it, and the customer sees a normal confirmation. Do not
-> activate a branch before §3.
+This document is about a Spicy Meal **restaurant branch**, not a Git branch.
 
----
+## 1. Create/configure the branch — Admin → Branches
 
-## 1. Create the branch — Admin → Branches
+Set and verify the current branch fields in the admin UI/source schema, including:
 
-| Field | Notes |
-| --- | --- |
-| `name_en` / `name_ar` | **Both required.** The Arabic name is what most customers see. |
-| `address_en` / `address_ar` | Shown on the receipt and used by staff on the phone. |
-| `phone` | A number a customer or a driver can actually reach during service. |
-| `latitude` / `longitude` | Used to pick the nearest branch. **Verify on a map** — a wrong pin silently routes orders to the wrong branch. |
-| `delivery_fee` | Per branch, not global. |
-| `min_delivery_order` | Below this, delivery is refused at checkout. |
-| `estimated_delivery_minutes` | Shown to the customer as a promise. Be pessimistic. |
+- Arabic/English name and address;
+- operational phone/contact;
+- latitude/longitude;
+- pickup/delivery enablement;
+- delivery fee/minimum/estimate where delivery is supported;
+- active/temporary-closure state.
 
-Leave **`is_active = false`** until everything below passes.
+Do not activate a branch simply because the row exists. Complete POS/menu/delivery verification first.
 
-## 2. Menu availability — Admin → Menu
+## 2. Menu availability
 
-Availability is per branch (`branch_availability`), and **no row means
-available**. A new branch therefore starts by offering the *entire* menu,
-including items it cannot make.
+Branch availability is server-authoritative. Historically, absence of an explicit availability override means the catalog defaults to available, so a new branch can unintentionally expose products it does not stock.
 
-- [ ] Walk the full product list with the branch manager.
-- [ ] Mark every item the branch does **not** stock as unavailable.
-- [ ] Re-check after any menu change — a new product is available everywhere by
-      default.
+Before activation:
 
-## 3. POS mapping — the step that matters most
+- [ ] review the current product list with the branch manager;
+- [ ] mark unavailable items deliberately;
+- [ ] verify required modifier groups are usable for the branch/catalog combination;
+- [ ] re-check availability after major menu additions/changes.
 
-- [ ] `lazywait_branch_id` is set to the branch's real Lazywait id.
-- [ ] Confirmed with the POS side that the id is correct — **not** guessed from a
-      similar name.
-- [ ] A test order reached the POS (see §6).
+## 3. Lazywait POS mapping — critical
 
-Without this, `lazywait-sync` cannot deliver the order. It will be accepted,
-paid for, and never printed. The admin receipt shows whether a branch is mapped;
-check it rather than assuming.
+- [ ] `lazywait_branch_id` is the branch's real Lazywait identifier.
+- [ ] Mapping is confirmed from the POS/Lazywait side, not guessed from a similar branch name.
+- [ ] Lazywait catalog/mapping state is healthy.
+- [ ] An approved pickup test order reaches the expected POS branch/ticket path before launch.
 
-## 4. Order types and delivery area
+Without a valid mapping, the system cannot safely complete normal POS synchronization. Current production hardening surfaces unexpected blocked/dead-letter states through Order Integrity / Operations Health, and the customer confirmation lifecycle should not claim restaurant confirmation without a usable POS reference—but the kitchen still will not receive a valid POS ticket.
 
-- [ ] `pickup_enabled` — set deliberately.
-- [ ] `delivery_enabled` — set deliberately.
-- [ ] `delivery_temporarily_closed = false` (this is the day-to-day switch, §5 of
-      the staff manual — not the onboarding one).
-- [ ] If delivery is on: a **delivery zone polygon** is drawn (Admin → Branches →
-      delivery zone). No zone means no delivery coverage, and the customer finds
-      out at checkout.
-- [ ] The polygon matches what the branch will actually drive to. Drawing it
-      generously is how you get orders nobody delivers.
+Do not activate a branch while relying on monitoring to catch a known bad mapping.
 
-> ⚠️ Delivery orders currently do **not** reach the POS at all
-> (`delivery_schema_unconfirmed`), and there is no driver or dispatch concept in
-> the system. If you enable delivery, the branch must have a manual process for
-> receiving and assigning those orders. Agree it before switching this on.
+## 4. Pickup and delivery
 
-## 5. Hours
+Set each order type deliberately.
 
-There is **no opening-hours model** in the schema. The platform will accept and
-push an order to this branch at 03:00 if the branch is active.
+### Pickup
 
-- [ ] The branch manager knows they must toggle `is_active` (or
-      `delivery_temporarily_closed`) at open and close, **every day**.
-- [ ] Someone is named as responsible for doing it.
+- [ ] pickup is enabled only when the branch can receive/prepare pickup orders;
+- [ ] branch location is correct for nearest-branch sorting;
+- [ ] menu availability is accurate;
+- [ ] POS mapping/test succeeds.
 
-Adding a real `branch_hours` model is tracked in the readiness plan; until then
-this is a human process and it will be forgotten at least once.
+### Delivery
 
-## 6. Test before going live
+- [ ] delivery is enabled only when the current product/process supports it;
+- [ ] delivery zone exists and matches the real service area;
+- [ ] delivery fee/minimum/estimate are correct;
+- [ ] required address guidance/landmark behavior is understood by staff;
+- [ ] branch has an agreed operational handling/dispatch process.
 
-With `is_active = true` but before announcing the branch:
+The current Lazywait integration intentionally treats `delivery_schema_unconfirmed` as a safety block rather than inventing a provider payload that has not been validated. Do not enable a customer-facing delivery operation unless the branch has a verified current process for handling the resulting orders.
 
-- [ ] Place a **cash pickup** order for this branch from a real customer account.
-- [ ] It appears in Admin → Live Orders.
-- [ ] It reached the POS — check the sync state, and confirm with the branch that
-      the ticket actually printed.
-- [ ] Advance it through the statuses; the branch sees each change.
-- [ ] If delivery is enabled, repeat with a delivery order to an address inside
-      the zone, and confirm the branch's manual process picks it up.
-- [ ] Check Admin → Orders Requiring Verification is empty for this branch.
+## 5. Operating hours / open-close process
 
-Do not use a live online payment for this. Cash exercises the same order path
-without moving money.
+The repository has historically not had a full automatic branch-hours model. Verify the current schema/admin behavior before onboarding and document who owns daily open/close/temporary-delivery-closure operations.
 
-## 7. Handover
+- [ ] named person/role owns opening state;
+- [ ] named person/role owns closing state;
+- [ ] temporary closure procedure is understood;
+- [ ] in-flight orders are checked before closing/deactivating.
 
-- [ ] Branch staff can sign in and reach Live Orders.
-- [ ] They have been walked through `docs/STAFF_MANUAL.md`.
-- [ ] They know who to call when an order does not print — and that number is a
-      person, not this repository.
+Do not assume `is_active` is a harmless setup flag; it directly affects customer eligibility/order routing.
 
----
+## 6. Approved pre-launch test
 
-## Deactivating a branch
+Do not use an online payment/refund test while the payment area is frozen unless separately approved.
 
-- [ ] `is_active = false`.
-- [ ] Check for in-flight orders **first** — deactivating does not cancel orders
-      already placed, and those still need making.
-- [ ] Tell the customers with open orders, or the branch does.
+For an approved cash/non-payment pickup test:
+
+- [ ] customer can select the branch through the order-type gate;
+- [ ] correct branch catalog is shown;
+- [ ] order appears in Admin → Live Orders;
+- [ ] Lazywait/POS lifecycle reaches the expected confirmed/synced state;
+- [ ] usable external POS/order reference is shown where expected;
+- [ ] physical/operational branch confirms the ticket/order was actually received;
+- [ ] order status can be advanced through the supported lifecycle;
+- [ ] Operations Health / Order Integrity shows no unexpected stranded state;
+- [ ] Orders Requiring Verification does not contain the test order unless the scenario intentionally tests that state.
+
+If delivery is being launched, perform a separate approved delivery process validation covering zone/address handling and the branch's real operational handoff.
+
+## 7. Staff and access readiness
+
+- [ ] intended staff can reach the admin console through the supported role/MFA flow;
+- [ ] no one is sharing a personal/admin credential as branch onboarding;
+- [ ] staff know the Live Orders / receipt/ticket / POS verification workflow;
+- [ ] staff have read `STAFF_MANUAL.md`;
+- [ ] branch knows the incident/escalation contact, not merely “ask IT.”
+
+## 8. Go-live check
+
+Before setting the branch live:
+
+- [ ] branch data/location correct;
+- [ ] product availability reviewed;
+- [ ] POS mapping verified;
+- [ ] enabled order types operationally supported;
+- [ ] delivery zone/process verified if enabled;
+- [ ] staff access/MFA works;
+- [ ] approved test completed;
+- [ ] no unexpected critical Operations Health / Order Integrity issue;
+- [ ] owner/operations approves activation.
+
+## 9. Deactivation / temporary closure
+
+Before deactivating a branch:
+
+- check in-flight orders;
+- confirm whether pickup, delivery or the entire branch needs to stop;
+- use the supported branch controls;
+- record who changed the state and expected restore time;
+- communicate with the branch/affected customers when required.
+
+Deactivation does not automatically resolve already-placed orders.
+
+## Related docs
+
+- `STAFF_MANUAL.md`
+- `INCIDENT_RESPONSE.md`
+- `ORDER_CONFIRMATION_FLOW.md`
+- `ARCHITECTURE.md`
+- `PAYMENT_POSTPONEMENT.md`
