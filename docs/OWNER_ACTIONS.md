@@ -179,40 +179,25 @@ The August 11 iOS release-readiness work added `SENTRY_AUTH_TOKEN` to the EAS pr
 
 For each production release, verify source-map upload through the current Sentry release gates rather than assuming a historical secret still exists/works.
 
-## 12. Migration ledger live reconciliation
+## 12. Migration ledger reconciliation — resolved 2026-08-12
 
-**Status:** LIVE VERIFY — documentation debt discovered 2026-08-12.
+**Status:** RESOLVED by read-only live verification.
 
-`docs/MIGRATIONS.md` was last fully reconciled against Production on 2026-08-07. It records **68 repository migrations / 70 live history rows** as that dated snapshot.
+A read-only Production reconciliation was completed against Supabase project `spicy-meal-ordering` on 2026-08-12. No migration/history/schema/data write was made.
 
-After that snapshot, the Aug 10 production-readiness PRs added **11 new repository migration files**, bringing the current repository source count to **79 migration files**:
+Current verified snapshot:
 
-- `20260810100000_order_status_cancellation_integrity.sql`
-- `20260810100500_coupon_code_identity_guard.sql`
-- `20260810113000_order_integrity_stranded_orders_health.sql`
-- `20260810113500_stranded_order_alert_and_index.sql`
-- `20260810120000_account_deletion_manual_review_resolution.sql`
-- `20260810130000_security_performance_hardening.sql`
-- `20260810132000_order_modifier_contract.sql`
-- `20260810140000_staff_role_administration.sql`
-- `20260810141000_staff_access_directory.sql`
-- `20260810142000_staff_mfa_aal2.sql`
-- `20260810143000_remove_anon_role_helper_rpcs.sql`
+- repository migration files: **79**;
+- live `supabase_migrations.schema_migrations` rows: **85**;
+- latest live migration version: **`20260810115029`**;
+- all **11 / 11** repository migration names added after the Aug 7 snapshot are represented in live Production history;
+- four of those names have two live history rows each, accounting for four corrected/re-applied history entries.
 
-That **79** is a repository/source count derived from the Aug 7 baseline plus the changed-file inventories of merged PRs #183, #185, #186, #190, #192, #194, #195, #196 and #197. It is **not** a claim about how many of those migrations are currently applied in Production.
+Therefore there is **no known repository-only migration by source-name presence** after the Aug 7 baseline. The old `68 repository files / 70 live rows` numbers are historical, not current.
 
-Therefore the Aug 7 ledger statement `Unapplied repository files: 0` must be treated as a dated snapshot, not a current production claim.
+The detailed evidence and live versions are recorded in [`MIGRATION_RECONCILIATION_20260812.md`](MIGRATION_RECONCILIATION_20260812.md).
 
-Required next reconciliation:
-
-1. count current repository migration files directly;
-2. read live `supabase_migrations.schema_migrations` rows;
-3. map by migration name/content, not filename timestamp;
-4. classify repository-only/live-only/history-divergent rows;
-5. update the header and classification algebra in `docs/MIGRATIONS.md`;
-6. do **not** apply/repair anything merely to make counts match.
-
-This is a read-only audit until a specific unapplied migration is proven and separately approved for application.
+The 137 KB `MIGRATIONS.md` historical ledger remains the workflow/provenance record. Its full A/B/C/F/H content-fingerprint classification was last recomputed Aug 7; do not arithmetically extend that table without a dedicated fingerprint pass. This does **not** affect the current name-presence conclusion above.
 
 ---
 
