@@ -1,25 +1,15 @@
-/**
- * Design-system menu card.
- *
- * Extracted from HomeMenuScreen so the menu, search results and the dev preview
- * all render one implementation. PRESENTATION ONLY — availability, modifier
- * resolution and cart mutation stay with the caller; this component receives a
- * product, a precomputed `hasModifiers` flag and an `onAdd` callback and does
- * nothing else.
- *
- * Memoized with stable props (product ref, boolean, stable handler) so a cart
- * tap or a keystroke in search does not re-render every card. Language changes
- * still propagate, because `useI18n` reads context and context bypasses memo.
- */
+/** Design-system menu card. */
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { DishIcon } from '../../components/Icons';
 import { Price } from '../../components/Price';
 import { useI18n } from '../../i18n/I18nProvider';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Product } from '../../types/models';
-import { color, motion, radius, space, type as typeScale } from '../generated/tokens';
+import { motion, radius, space, type as typeScale } from '../generated/tokens';
 import { Text } from './Text';
 
 interface Props {
@@ -30,6 +20,8 @@ interface Props {
 
 export const ProductCard = React.memo(function ProductCard({ product, hasModifiers, onAdd }: Props) {
   const { t, pick, rtlRow } = useI18n();
+  const color = useThemeColors();
+  const styles = useStyles();
   const [imgFailed, setImgFailed] = useState(false);
 
   const name = pick(product.nameEn, product.nameAr);
@@ -39,7 +31,6 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
   const showImage = !!product.imageUrl && !imgFailed;
 
   return (
-    // Mirrored in Arabic: image on the reading edge, text block reading RTL.
     <View style={[styles.card, rtlRow]}>
       {showImage ? (
         <Image
@@ -47,14 +38,11 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
           style={styles.img}
           contentFit="cover"
           transition={motion.quick}
-          // Keep decoded thumbnails in memory so cards scrolled back into view
-          // don't re-decode from disk; recyclingKey pairs with virtualization.
           cachePolicy="memory-disk"
           recyclingKey={product.id}
           onError={() => setImgFailed(true)}
         />
       ) : (
-        // Missing/broken image → a quiet plate glyph, never a blank block.
         <View style={[styles.img, styles.imgEmpty]}>
           <DishIcon size={34} color={color.heatOff} />
         </View>
@@ -62,13 +50,11 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
 
       <View style={styles.body}>
         <Text variant="heading" numberOfLines={2}>{name}</Text>
-        {description ? (
-          <Text variant="caption" tone="secondary" numberOfLines={2}>{description}</Text>
-        ) : null}
+        {description ? <Text variant="caption" tone="secondary" numberOfLines={2}>{description}</Text> : null}
 
         <View style={[styles.bottom, rtlRow]}>
           <View>
-            <Price amount={product.price} size={typeScale.body.size} color={color.appText} weight="700" />
+            <Price amount={product.price} size={typeScale.body.size} weight="700" />
             {kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}
           </View>
           <Pressable
@@ -86,30 +72,26 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
   );
 });
 
-const styles = StyleSheet.create({
-  // Flat: a hairline, not a shadow. Structure comes from colour boundaries.
+const useStyles = makeStyles((color) => ({
   card: {
-    flexDirection: 'row',
+    flexDirection: 'row' as const,
     backgroundColor: color.appSurface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: color.appLine,
-    overflow: 'hidden',
+    overflow: 'hidden' as const,
   },
   img: { width: 104, minHeight: 112, backgroundColor: color.appSurface2 },
-  // The empty state needs a visible edge: on the cream ground the tinted block
-  // alone reads as nothing at all, so the placeholder looked like a hole in the
-  // card rather than a missing photo.
   imgEmpty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     backgroundColor: color.appSurface3,
   },
   body: { flex: 1, padding: space.s3, gap: space.s1 },
   bottom: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    flexDirection: 'row' as const,
+    alignItems: 'flex-end' as const,
+    justifyContent: 'space-between' as const,
     marginTop: space.s2,
   },
   add: {
@@ -119,4 +101,4 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   addPressed: { opacity: motion.pressedOpacity },
-});
+}));
