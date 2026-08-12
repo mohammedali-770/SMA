@@ -1,125 +1,196 @@
-# Spicy Meal — Supabase backend foundation
+# Spicy Meal — Supabase Backend
 
-This directory is the **backend foundation** for Spicy Meal: the database schema,
-idempotent migrations, and Row-Level-Security (RLS) policies. It is intentionally
-**backend-only** — the front-end is not yet wired to it, and payments, SMS/OTP,
-push, and Lazywait sync are **out of scope** here (they get their own migrations
-later).
+> **Updated 2026-08-12.** Supabase is the live backend for the customer app and staff/admin console. This is no longer a disconnected “foundation” project.
 
-> Status: the migrations have been applied and idempotency-tested against
-> PostgreSQL 16, and the RLS model + `place_order` flow were verified by
-> simulating customer / admin / accountant / anon roles. See "Verification"
-> below.
+The `supabase/` tree contains the database migration history, SQL regression suites, Edge Functions and local CLI configuration for the production backend architecture.
 
-## Migration order
+## Directory layout
 
-| # | File | Contents |
-|---|------|----------|
-| 1 | `20260707120000_extensions_enums_helpers.sql` | `pgcrypto`; enums (`user_role`, `order_status`, `order_type`, `payment_status`, `sync_status`, `coupon_type`); `set_updated_at()` trigger |
-| 2 | `20260707120100_profiles.sql` | `profiles` (1:1 with `auth.users`); role helpers (`is_admin`, `is_staff`); signup auto-provision; RLS + column privileges |
-| 3 | `20260707120200_catalog.sql` | `branches`, `categories`, `products`, `modifier_groups`, `modifiers`, `product_modifier_groups`, `branch_product_availability`; RLS |
-| 4 | `20260707120300_addresses.sql` | `addresses` + customer-isolation RLS |
-| 5 | `20260707120400_coupons.sql` | `coupons` (admin-only, codes hidden) + `validate_coupon()` RPC |
-| 6 | `20260707120500_orders.sql` | `orders`, `order_items`, `order_item_modifiers`; order-number generator; RLS |
-| 7 | `20260707120600_app_settings.sql` | `app_settings` singleton (brand + VAT + loyalty); RLS |
-| 8 | `20260707120700_place_order.sql` | `place_order()` RPC — the only path that creates an order |
-| 9 | `20260707120800_loyalty.sql` | `place_order()` gains `p_loyalty_points` (server-side earn + redeem); `adjust_loyalty_points()` admin RPC |
-| 10 | `20260707120900_loyalty_audit.sql` | `orders.loyalty_points_earned/_redeemed/_awarded_at`; `loyalty_transactions` ledger (idempotency + reconciling `balance_after`); `place_order`/`adjust_loyalty_points` write the ledger under a row lock |
-| 11 | `20260707121000_integration_settings.sql` | `integration_settings` (secrets hidden; no client grants) + admin-only `list_/upsert_integration_settings()` RPCs (return `has_secret` only) |
-| 12 | `20260707121100_realtime_orders.sql` | Adds `orders` to the `supabase_realtime` publication (guarded no-op off Supabase) for the admin live console |
-| 13 | `20260707121200_perf_indexes.sql` | High-traffic composite/partial indexes (orders by branch/status/customer + created_at, sync queue, Lazywait id, catalog); drops redundant single-column orders indexes |
-| 14 | `20260707121300_payments_and_sync.sql` | `payment_records` + `integration_sync_logs` (staff-read RLS); service-role-only `confirm_order_payment()` + `record_order_sync()` hooks |
-| 15 | `20260707121400_order_idempotency.sql` | `orders.idempotency_key` + partial unique index; `place_order` gains `p_idempotency_key` (retry-safe, no duplicate orders) |
+```text
+supabase/
+  config.toml             Local Supabase CLI/function invocation configuration
+  migrations/             Forward-only database migrations
+  functions/              Deno Edge Functions + shared server helpers
+  tests/                  SQL regression/security/integrity suites
+  seed.sql                Local/test seed data only
+```
 
-`seed.sql` holds idempotent local demo data (catalog + coupons; no auth users).
-See `docs/ARCHITECTURE.md` for the production topology, security boundary, Edge
-Functions, and the high-traffic performance/monitoring/load-test plan.
+The authoritative migration workflow/history document is `docs/MIGRATIONS.md`. Its last full live-count reconciliation was Aug 7; later Aug 10 migration files mean the current live relationship needs a fresh read-only reconciliation (`docs/OWNER_ACTIONS.md` §12).
 
-## Applying
+## Current backend responsibilities
 
-With the Supabase CLI (recommended):
+Supabase currently provides:
+
+- Auth / JWT identity.
+- WhatsApp-delivered customer phone login through the Supabase Auth hook.
+- PostgREST/RPC data access.
+- Row Level Security and server-side staff/customer authorization.
+- Catalog, branches, modifiers, availability and delivery zones.
+- Customer profiles and saved addresses.
+- Server-authoritative order placement and lifecycle.
+- Loyalty and coupon/accounting contracts.
+- Lazywait POS synchronization, callbacks and operational state.
+- Account-deletion queue/processing/audit.
+- Operations Health / alerts / integrity checks.
+- Audited staff role administration and AAL2/TOTP staff authorization.
+- Edge Function provider/server boundaries.
+
+Payment/refund source remains present but **frozen/provisional** while the final provider is unresolved. Push source remains **dormant** by product decision.
+
+## Security model
+
+### Clients
+
+The customer and admin clients use:
+
+- Supabase project URL;
+- anon/publishable key;
+- user JWT/session.
+
+The anon/publishable key is not a server secret. RLS, JWT identity, server predicates and SECURITY DEFINER contracts are the authorization boundary.
+
+### Server-only
+
+The following must never be exposed to a browser/mobile bundle:
+
+- service-role key;
+- provider secret keys;
+- Meta app secret;
+- SMTP password;
+- payment/refund secrets;
+- private operational scheduler secrets.
+
+Edge Functions and approved server-side database paths are the only places that may use those credentials.
+
+## Staff authorization
+
+Do **not** use the historical `update profiles set role='admin'` shortcut as routine staff administration.
+
+Current production hardening provides audited role-administration RPCs, a Staff Access admin UI and TOTP/AAL2 requirements for privileged staff paths.
+
+If a brand-new/recovered environment has no administrator at all, initial bootstrap is a privileged recovery/setup operation. Approve/document the exact method separately; do not normalize a direct SQL role mutation into the normal onboarding workflow.
+
+## Order/data integrity
+
+The backend owns final business facts. Client UI validation is convenience, not authority.
+
+Current hardening includes server/database enforcement for areas such as:
+
+- authenticated order ownership;
+- branch/order-type requirements;
+- product/modifier relationships;
+- required/min/max modifier cardinality;
+- current monetary calculations;
+- order lifecycle transitions;
+- cancellation loyalty/coupon compensation;
+- historical VAT snapshots;
+- customer-safe order identifiers;
+- staff role/MFA boundaries.
+
+See `docs/ARCHITECTURE.md` for the system-level trust model.
+
+## Local development
+
+### Local Supabase
+
+For local/disposable development only:
 
 ```bash
-supabase start          # local stack
-supabase db reset       # applies all migrations + seed.sql
-# or, against a linked project:
+supabase start
+supabase db reset
+```
+
+`db reset` applies the repository migration chain to the local stack and loads local seed behavior as configured.
+
+### SQL suites
+
+SQL tests are designed for disposable/local databases/CI harnesses. Never point them at Production.
+
+The CI SQL gate replays the migration chain and runs the regression suites when relevant database paths change.
+
+## Production migration rules
+
+### Never use these against Production
+
+```text
 supabase db push
+supabase migration repair
 ```
 
-Manual (any Postgres): apply the files in `migrations/` in filename order. In a
-real Supabase project the `auth` schema, `auth.uid()`, and the `anon` /
-`authenticated` roles already exist; a local non-Supabase Postgres needs a small
-shim for those.
+These commands are permanently forbidden for the Production project because repository filename timestamps and live migration-history versions intentionally diverge.
 
-## Access model (RLS summary)
+### Approved production model
 
-| Table | anon | customer | accountant | admin |
-|-------|------|----------|-----------|-------|
-| branches / categories / products / modifiers | read (active) | read (active) | read (all) | read+write |
-| product_modifier_groups / branch_product_availability | read | read | read | read+write |
-| app_settings | read | read | read | read+write |
-| profiles | — | own row (name/phone/email only) | read all | read all + role mgmt |
-| addresses | — | own CRUD | read all | read all |
-| coupons | — | — (validate via RPC) | — | read+write |
-| orders / order_items / order_item_modifiers | — | read own | read all | read all + status update |
-| loyalty_transactions | — | read own | read all | read all (writes only via RPC) |
-| integration_settings | — | — | — (no access) | manage via RPC only (secrets never returned) |
+1. Add a new forward-only migration file.
+2. Add/update its regression suite.
+3. Review and merge the source through a PR.
+4. Reconcile the live migration state read-only before assuming it is unapplied.
+5. Obtain separate explicit owner approval for live application.
+6. Apply only through the approved migration workflow documented in `docs/MIGRATIONS.md`.
+7. Verify live object state/data impact.
+8. Update the migration ledger with verified evidence.
 
-Key guarantees (all verified):
-- **Customer isolation** — a customer sees only their own orders and addresses.
-- **No fake payments / no client-set totals** — orders are created **only** via
-  `place_order()`, which recomputes subtotal, modifiers, delivery fee, coupon,
-  and VAT server-side and leaves `payment_status = 'pending'`.
-- **No privilege escalation** — customers can't change their own `role` or
-  `loyalty_points` directly (column-level grants), and can't create/cancel orders.
-- **Coupon codes are secret** — never client-readable; checked via
-  `validate_coupon()`.
-- **Loyalty is server-authoritative + audited** — points are earned and redeemed
-  only inside `place_order()` (validated against the real balance under a
-  `FOR UPDATE` lock + the `min_points_to_redeem` threshold, discount capped to
-  the order), and adjusted by admins only via `adjust_loyalty_points()`. Both
-  are the only sanctioned way to write the client-hidden `loyalty_points` column,
-  and both append a reconciling `loyalty_transactions` row (a partial unique
-  index blocks a second `earn` for the same order).
-- **Integration secrets never reach the client** — `integration_settings` has
-  all client grants revoked; admins manage it only through the SECURITY DEFINER
-  `list_/upsert_integration_settings()` RPCs, which return a `has_secret` flag
-  instead of `secret_config`. Server-side code (Edge Functions / service role)
-  reads the secret. Accountants and customers get `42501`.
+Merge approval is **not** migration-application approval.
 
-## Bootstrapping the first admin
+## Current migration count caveat
 
-New users default to `role = 'customer'`. Promote a user to admin/accountant via
-the SQL editor / service role (never from the client):
+The Aug 7 ledger snapshot recorded 68 repository migration files / 70 live migration-history rows and zero repository-only migrations **at that time**.
 
-```sql
-update public.profiles set role = 'admin' where id = '<auth-user-uuid>';
-```
+Merged Aug 10 readiness work added 11 more migration files, bringing the current source count to **79**. That does not prove which ones are currently represented in live Production history.
 
-## Deliberately NOT included yet
+Until the read-only reconciliation in `docs/OWNER_ACTIONS.md` §12 is completed, do not copy the old `0 unapplied` value into new docs/release decisions.
 
-> Note: `integration_settings` now provides **secure config storage** for the
-> payment / SMS / push / Lazywait providers (admin-managed, secrets server-only).
-> The actual third-party calls below are still NOT implemented.
+## Edge Functions
 
-- Payment charge/capture, webhooks, and payment status transitions (only the
-  provider config is stored).
-- SMS/OTP send + phone-auth wiring (only the provider config is stored).
-- Push notification send (only the provider config is stored).
-- Lazywait Create-Order client, sync worker, and sync logs (only the provider
-  config is stored; the `orders.sync_status` / `lazywait_*` columns are reserved
-  placeholders).
-- Store-credit wallet + voucher redemption (the mobile Wallet's points→credit
-  conversion has no backing table yet; those actions stay disabled).
-- Staff-management RPC (role changes are done via service role for now).
-- Storage buckets/policies for product images.
+See [`functions/README.md`](functions/README.md) for the current function inventory and invocation/security model.
 
-## Verification performed
+Important principles:
 
-- All 8 migrations apply cleanly, then apply a **second time with no errors**
-  (idempotent).
-- Role simulation confirmed: customer places an order via `place_order` with
-  correct server-computed totals (`54.00` subtotal, `SAVE10` → `5.40` off,
-  inclusive VAT `6.34`, total `48.60`, payment `pending`); customer isolation,
-  admin-only status updates, accountant read-only, anon restrictions, and
-  privilege-escalation blocks all behaved as designed.
+- `verify_jwt=true` functions still need correct role/RLS behavior.
+- `verify_jwt=false` functions must authenticate through their own external/service contract.
+- provider secrets remain server-side;
+- deployment is an explicit owner-approved production action;
+- payment functions remain frozen even though they exist in source;
+- push remains dormant even though `push-dispatch` exists.
+
+## Lazywait
+
+Lazywait is an active operational integration. The backend includes:
+
+- catalog/mapping support;
+- synchronization worker;
+- webhook handling;
+- retry/deadline/fencing logic;
+- confirmation-required handling for ambiguous POS-create outcomes;
+- operational verification/health signals.
+
+Never blindly retry an ambiguous Create Order response; the lifecycle is designed specifically to avoid duplicate POS tickets.
+
+## WhatsApp authentication
+
+There are two separate server paths and they must stay conceptually separate:
+
+1. **Customer login delivery** — Supabase Auth owns the OTP/session; `auth-send-sms-whatsapp` only delivers the Auth-generated code.
+2. **Signed-in profile phone verification** — custom verification challenge/functions; does not create/login an Auth session.
+
+See `functions/README.md` for details.
+
+## Account deletion
+
+Account deletion is not a direct `delete profiles` action. The system has a verified/requested workflow, processing queue, anonymization/erasure behavior and manual-review resolution/audit controls.
+
+Restore/rebuild work must also respect this lifecycle and its database objects.
+
+## Local seed data
+
+`seed.sql` is for local/test environments. Do not treat seed rows as Production configuration or customer data, and do not use a seed command against Production.
+
+## Related documentation
+
+- `../docs/README.md` — documentation index.
+- `../docs/ARCHITECTURE.md` — current topology/trust boundaries.
+- `../docs/MIGRATIONS.md` — migration workflow/history ledger.
+- `../docs/OWNER_ACTIONS.md` — current live-reconciliation/owner decisions.
+- `../docs/PAYMENT_POSTPONEMENT.md` — payment/refund freeze.
+- `../docs/BACKUP_RECOVERY.md` — backup/restore state.
+- `functions/README.md` — Edge Functions.
