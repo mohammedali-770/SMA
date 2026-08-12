@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, type ColorSchemeName } from 'react-native';
 
 import { darkPalette, lightPalette, type AppPalette } from './palette';
 
@@ -13,7 +13,7 @@ export function parseThemePreference(value: unknown): ThemePreference {
   return value === 'system' || value === 'light' || value === 'dark' ? value : 'system';
 }
 
-export function resolveTheme(preference: ThemePreference, deviceScheme: 'light' | 'dark' | null | undefined): ResolvedTheme {
+export function resolveTheme(preference: ThemePreference, deviceScheme: ColorSchemeName): ResolvedTheme {
   if (preference === 'light' || preference === 'dark') return preference;
   return deviceScheme === 'dark' ? 'dark' : 'light';
 }
