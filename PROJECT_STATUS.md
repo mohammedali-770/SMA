@@ -192,14 +192,19 @@ Never put server/provider secrets in:
 
 Service-role credentials and external provider secrets belong only in server-side configuration/secret stores.
 
-## 9. Database rules
+## 9. Database rules and current ledger status
 
-[`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) is the authoritative production migration ledger.
+[`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) remains the authoritative **workflow/history ledger**, but its last full read-only reconciliation against Production was **2026-08-07**.
+
+That snapshot recorded 68 repository migration files / 70 live migration-history rows. The Aug 10 production-readiness sequence subsequently added 11 repository migrations, so the current source contains **79 migration files** while the current live apply/count relationship still needs a fresh read-only reconciliation. See [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §12.
+
+Do **not** interpret the old `Unapplied repository files: 0` line as a current production claim.
 
 Binding rules:
 
 - new forward-only migration for each schema change;
 - never edit an already-applied migration;
+- never infer applied/unapplied state from filename timestamp alone;
 - never run `supabase db push` against production;
 - never run `supabase migration repair` against production;
 - production migration/application requires the approved workflow and explicit owner approval.
@@ -250,7 +255,8 @@ Starting EAS/store builds requires explicit owner approval.
 | Change-control | `CLAUDE.md` |
 | Release checks | `docs/RELEASE_CHECKLIST.md` |
 | Deployment | `docs/DEPLOY.md` |
-| Database migrations | `docs/MIGRATIONS.md` |
+| Database migration workflow/history | `docs/MIGRATIONS.md` |
+| Current owner/live reconciliation gaps | `docs/OWNER_ACTIONS.md` |
 | Payment/refund freeze | `docs/PAYMENT_POSTPONEMENT.md` |
 | Git branch state | `docs/GIT_BRANCHES.md` |
 | Feature-retention evidence | `docs/BRANCH_FEATURE_RETENTION_AUDIT.md` |
