@@ -1,0 +1,69 @@
+/* Runtime dark palette for the current "Ember on Cream" admin design system.
+   The light tokens remain canonical in index.css/design-system/tokens.ts. */
+:root[data-theme='dark'] {
+  --color-con-bg: #100C1C;
+  --color-con-surface: #1E1A2E;
+  --color-con-surface-2: #252040;
+  --color-con-line: #3A3354;
+  --color-con-text: #F4F1F8;
+  --color-con-text-2: #C7C0D8;
+  --color-con-text-3: #ADA4C0;
+
+  --color-app-bg: #100C1C;
+  --color-app-surface-2: #252040;
+  --color-app-surface-3: #2E2847;
+  --color-app-line: #3A3354;
+
+  --color-mint: #4ADE80;
+  --color-sky: #60A5FA;
+  --color-warn: #FBBF24;
+  --color-danger-ds: #FF8B99;
+  --color-amber-ink: #FBBF24;
+
+  --color-warn-tint: #302611;
+  --color-warn-line: #5B4820;
+  --color-danger-tint: #2E1A1E;
+  --color-danger-line: #60313A;
+  --color-info-tint: #16253A;
+  --color-info-line: #28496F;
+  --color-mint-tint: #13291E;
+  --color-mint-line: #27583A;
+
+  --color-disabled-bg: #2F2944;
+  --color-disabled-fg: #A79FBB;
+
+  /* Brand text is lifted on the dark ground while red fills remain unchanged. */
+  --color-ember-deep: #FF8B99;
+}
+
+:root[data-theme='dark'] body {
+  background-color: var(--color-con-bg);
+  background-image: none;
+  color: var(--color-con-text);
+  color-scheme: dark;
+}
+
+/* In the console, bg-white is used as a surface by a few shared primitives.
+   Keep text-white real white; only redirect the background utility. */
+:root[data-theme='dark'] .bg-white,
+:root[data-theme='dark'] .bg-white\/50,
+:root[data-theme='dark'] .bg-white\/80 {
+  background-color: var(--color-con-surface);
+}
+
+:root[data-theme='dark'] .hover\:bg-white:hover,
+:root[data-theme='dark'] .hover\:bg-white\/80:hover {
+  background-color: var(--color-con-surface-2);
+}
+
+:root[data-theme='dark'] .border-white\/20,
+:root[data-theme='dark'] .border-white\/60,
+:root[data-theme='dark'] .border-white\/85 {
+  border-color: var(--color-con-line);
+}
+
+:root[data-theme='dark'] input,
+:root[data-theme='dark'] textarea,
+:root[data-theme='dark'] select {
+  color-scheme: dark;
+}
