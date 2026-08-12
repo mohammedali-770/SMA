@@ -15,7 +15,7 @@ supabase/
   seed.sql                Local/test seed data only
 ```
 
-The authoritative migration workflow/history document is `docs/MIGRATIONS.md`. Its last full live-count reconciliation was Aug 7; later Aug 10 migration files mean the current live relationship needs a fresh read-only reconciliation (`docs/OWNER_ACTIONS.md` §12).
+Current migration status is recorded in `docs/MIGRATION_RECONCILIATION_20260812.md`; the large `docs/MIGRATIONS.md` file remains the historical workflow/provenance ledger.
 
 ## Current backend responsibilities
 
@@ -128,17 +128,24 @@ These commands are permanently forbidden for the Production project because repo
 5. Obtain separate explicit owner approval for live application.
 6. Apply only through the approved migration workflow documented in `docs/MIGRATIONS.md`.
 7. Verify live object state/data impact.
-8. Update the migration ledger with verified evidence.
+8. Update the migration ledger/reconciliation evidence.
 
 Merge approval is **not** migration-application approval.
 
-## Current migration count caveat
+## Current migration status
 
-The Aug 7 ledger snapshot recorded 68 repository migration files / 70 live migration-history rows and zero repository-only migrations **at that time**.
+Read-only Production verification on 2026-08-12 established:
 
-Merged Aug 10 readiness work added 11 more migration files, bringing the current source count to **79**. That does not prove which ones are currently represented in live Production history.
+- repository migration files: **79**;
+- live `supabase_migrations.schema_migrations` rows: **85**;
+- latest live version: **`20260810115029`**;
+- all **11 / 11** repository migration names introduced after the Aug 7 ledger snapshot are represented in live Production history;
+- four of those names have two live history rows each after corrected/re-applied executions;
+- no known repository-only migration exists based on source-name presence.
 
-Until the read-only reconciliation in `docs/OWNER_ACTIONS.md` §12 is completed, do not copy the old `0 unapplied` value into new docs/release decisions.
+See `docs/MIGRATION_RECONCILIATION_20260812.md` for the exact live names/versions and query evidence.
+
+The old Aug 7 `68 repository files / 70 live rows` values in the 137 KB historical ledger are still useful as that dated full-fingerprint snapshot, not as current counts.
 
 ## Edge Functions
 
@@ -189,8 +196,9 @@ Restore/rebuild work must also respect this lifecycle and its database objects.
 
 - `../docs/README.md` — documentation index.
 - `../docs/ARCHITECTURE.md` — current topology/trust boundaries.
+- `../docs/MIGRATION_RECONCILIATION_20260812.md` — latest live migration snapshot.
 - `../docs/MIGRATIONS.md` — migration workflow/history ledger.
-- `../docs/OWNER_ACTIONS.md` — current live-reconciliation/owner decisions.
+- `../docs/OWNER_ACTIONS.md` — current owner/live-dashboard decisions.
 - `../docs/PAYMENT_POSTPONEMENT.md` — payment/refund freeze.
 - `../docs/BACKUP_RECOVERY.md` — backup/restore state.
 - `functions/README.md` — Edge Functions.
