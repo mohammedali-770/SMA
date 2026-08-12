@@ -192,13 +192,21 @@ Never put server/provider secrets in:
 
 Service-role credentials and external provider secrets belong only in server-side configuration/secret stores.
 
-## 9. Database rules and current ledger status
+## 9. Database rules and current migration status
 
-[`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) remains the authoritative **workflow/history ledger**, but its last full read-only reconciliation against Production was **2026-08-07**.
+A read-only Production reconciliation was completed on **2026-08-12**.
 
-That snapshot recorded 68 repository migration files / 70 live migration-history rows. The Aug 10 production-readiness sequence subsequently added 11 repository migrations, so the current source contains **79 migration files** while the current live apply/count relationship still needs a fresh read-only reconciliation. See [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §12.
+Current verified snapshot:
 
-Do **not** interpret the old `Unapplied repository files: 0` line as a current production claim.
+- repository migration files: **79**;
+- live `supabase_migrations.schema_migrations` rows: **85**;
+- latest live migration version: **`20260810115029`**;
+- all **11 / 11** repository migration names added after the Aug 7 ledger snapshot are represented in live Production history;
+- no known repository-only migration exists based on source-name presence.
+
+The count difference is historical migration-ledger structure, not evidence by itself of schema drift. Four Aug 10 migration names have two live rows each after corrected/re-applied executions.
+
+Use [`docs/MIGRATION_RECONCILIATION_20260812.md`](docs/MIGRATION_RECONCILIATION_20260812.md) for the current dated evidence. [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) remains the large workflow/provenance ledger; its Aug 7 A/B/C/F/H fingerprint table should be read as a historical full-content classification until a dedicated fingerprint refresh is performed.
 
 Binding rules:
 
@@ -255,8 +263,9 @@ Starting EAS/store builds requires explicit owner approval.
 | Change-control | `CLAUDE.md` |
 | Release checks | `docs/RELEASE_CHECKLIST.md` |
 | Deployment | `docs/DEPLOY.md` |
-| Database migration workflow/history | `docs/MIGRATIONS.md` |
-| Current owner/live reconciliation gaps | `docs/OWNER_ACTIONS.md` |
+| Latest migration status | `docs/MIGRATION_RECONCILIATION_20260812.md` |
+| Migration workflow/history | `docs/MIGRATIONS.md` |
+| Current owner/live-dashboard actions | `docs/OWNER_ACTIONS.md` |
 | Payment/refund freeze | `docs/PAYMENT_POSTPONEMENT.md` |
 | Git branch state | `docs/GIT_BRANCHES.md` |
 | Feature-retention evidence | `docs/BRANCH_FEATURE_RETENTION_AUDIT.md` |
