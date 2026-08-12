@@ -17,6 +17,8 @@ import { legal } from '../../services/api';
 import { color, space } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import type { DbLegalDocument } from '../../types/db';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 type State =
   | { kind: 'loading' }
@@ -25,6 +27,8 @@ type State =
   | { kind: 'ok'; doc: DbLegalDocument };
 
 export function LegalDocScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { type } = useLocalSearchParams<{ type: string }>();
   const { t, pick, lang } = useI18n();
   const [state, setState] = useState<State>({ kind: 'loading' });
@@ -41,7 +45,7 @@ export function LegalDocScreen() {
   const headerTitle = state.kind === 'ok' ? pick(state.doc.title_en, state.doc.title_ar) : legalTitle(docType, lang);
 
   return (
-    <Screen background={color.appBg} edges={['top', 'left', 'right']}>
+    <Screen background={colors.appBg} edges={['top', 'left', 'right']}>
       <Header title={headerTitle} showBack />
       {state.kind === 'loading' ? (
         <LoadingView label={t('loading')} />
@@ -67,9 +71,9 @@ export function LegalDocScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.s6 },
   scroll: { padding: space.s4, paddingBottom: space.s6 },
   title: { marginBottom: space.s3 },
-  metaWrap: { marginTop: space.s5, paddingTop: space.s3, borderTopWidth: 1, borderTopColor: color.appLine },
-});
+  metaWrap: { marginTop: space.s5, paddingTop: space.s3, borderTopWidth: 1, borderTopColor: colors.appLine },
+}));

@@ -43,7 +43,7 @@ function balancedSpan(src: string, start: number): number {
 
 function factorySpans(src: string): [number, number][] {
   const spans: [number, number][] = [];
-  for (const m of src.matchAll(/makeStyles\(\(colors\) => \(/g)) {
+  for (const m of src.matchAll(/makeStyles\(\([A-Za-z_$][\w$]*\)\s*=>\s*\(/g)) {
     const open = m.index! + m[0].length - 1;
     spans.push([m.index!, balancedSpan(src, open)]);
   }

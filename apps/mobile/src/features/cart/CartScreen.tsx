@@ -92,8 +92,8 @@ export function CartLine({
   item: CartItem; name: string; modifierSummary: string; lineAmount: number;
   removeLabel: string; onInc: () => void; onDec: () => void; onRemove: () => void;
 }) {
+  const colors = useThemeColors();
   const { rtlRow } = useI18n();
-  const color = useThemeColors();
   const styles = useStyles();
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = !!item.product.imageUrl && !imgFailed;
@@ -112,7 +112,7 @@ export function CartLine({
         />
       ) : (
         <View style={[styles.lineImg, styles.lineImgEmpty]}>
-          <DishIcon size={26} color={color.heatOff} />
+          <DishIcon size={26} color={colors.heatOff} />
         </View>
       )}
       <View style={styles.lineBody}>
@@ -130,7 +130,7 @@ export function CartLine({
             accessibilityLabel={removeLabel}
             style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.7 }]}
           >
-            <Text variant="caption" align="center" style={{ color: color.danger }}>{removeLabel}</Text>
+            <Text variant="caption" align="center" style={{ color: colors.danger }}>{removeLabel}</Text>
           </Pressable>
         </View>
       </View>

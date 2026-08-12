@@ -15,6 +15,7 @@ import { resolveFieldState } from '../generated/fieldState';
 import { fontFamily, hitTarget, radius, space, type } from '../generated/tokens';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 interface Props extends Omit<TextInputProps, 'style' | 'editable'> {
   id: string;
@@ -46,22 +47,23 @@ export function Field({
   inputStyle,
   ...inputProps
 }: Props) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { lang, isRTL, rtlText } = useI18n();
-  const color = useThemeColors();
   const [focused, setFocused] = useState(false);
   const state = resolveFieldState({ id, hint, error, focused, disabled, required });
 
   const textFamily = lang === 'ar' ? fontFamily.ar.regular : fontFamily.en.regular;
   const labelFamily = lang === 'ar' ? fontFamily.ar.semibold : fontFamily.en.semibold;
   const valueFamily = numeric ? fontFamily.num.regular : textFamily;
-  const borderColor = state.tone === 'error' ? color.danger : state.tone === 'focus' ? color.ember : color.appLine;
+  const borderColor = state.tone === 'error' ? colors.danger : state.tone === 'focus' ? colors.ember : colors.appLine;
 
   return (
     <View style={[styles.container, containerStyle]}>
       {labelHidden ? null : (
-        <Text nativeID={state.labelId} style={[styles.label, rtlText, { fontFamily: labelFamily, color: color.appText2 }]}>
+        <Text nativeID={state.labelId} style={[styles.label, rtlText, { fontFamily: labelFamily, color: colors.appText2 }]}>
           {label}
-          {required ? <Text style={{ color: color.danger }}> *</Text> : null}
+          {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
         </Text>
       )}
 
@@ -82,7 +84,7 @@ export function Field({
         accessibilityLabelledBy={labelHidden ? undefined : state.labelId}
         accessibilityState={{ disabled: state.disabled }}
         accessibilityValue={state.messageIsError ? { text: state.message ?? undefined } : undefined}
-        placeholderTextColor={color.appText3}
+        placeholderTextColor={colors.appText3}
         style={[
           styles.input,
           {
@@ -90,8 +92,8 @@ export function Field({
             fontFamily: valueFamily,
             writingDirection: numeric ? 'ltr' : isRTL ? 'rtl' : 'ltr',
             textAlign: numeric ? 'left' : isRTL ? 'right' : 'left',
-            backgroundColor: state.disabled ? color.disabledBg : color.appSurface,
-            color: state.disabled ? color.disabledFg : color.appText,
+            backgroundColor: state.disabled ? colors.disabledBg : colors.appSurface,
+            color: state.disabled ? colors.disabledFg : colors.appText,
           },
           inputStyle,
         ]}
@@ -104,7 +106,7 @@ export function Field({
           style={[
             styles.message,
             rtlText,
-            { fontFamily: textFamily, color: state.messageIsError ? color.danger : color.appText3 },
+            { fontFamily: textFamily, color: state.messageIsError ? colors.danger : colors.appText3 },
           ]}
         >
           {state.message}
@@ -114,7 +116,7 @@ export function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   container: { gap: space.s2 },
   label: { fontSize: type.label.size, lineHeight: type.label.lineHeight },
   input: {
@@ -125,4 +127,4 @@ const styles = StyleSheet.create({
     fontSize: type.body.size,
   },
   message: { fontSize: type.caption.size, lineHeight: type.caption.lineHeight },
-});
+}));

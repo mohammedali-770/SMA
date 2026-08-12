@@ -25,6 +25,7 @@ import {
   captureException, captureMessage, isObservabilityInitialized, observabilityEnvironment,
 } from '../lib/observability';
 import { color } from '../design-system/generated/tokens';
+import { makeStyles } from '../theme/makeStyles';
 export default function DevSentryScreen() {
   // Release builds: hard redirect. The dev-only body below is unreachable.
   if (!__DEV__) return <Redirect href="/" />;
@@ -32,6 +33,7 @@ export default function DevSentryScreen() {
 }
 
 function DevSentryBody() {
+  const styles = useStyles();
   const [lastAction, setLastAction] = useState<string>('none');
   const [crashNow, setCrashNow] = useState(false);
 
@@ -90,12 +92,12 @@ function DevSentryBody() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: color.appBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
-  title: { fontSize: 17, fontWeight: '800', color: color.appText },
-  meta: { fontSize: 12, color: color.appText2 },
-  button: { backgroundColor: color.ember, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12, minWidth: 240, alignItems: 'center' },
-  danger: { backgroundColor: color.danger },
-  buttonText: { color: color.appSurface, fontWeight: '800' },
-  note: { fontSize: 11, color: color.appText2, textAlign: 'center', marginTop: 12 },
-});
+const useStyles = makeStyles((colors) => ({
+  wrap: { flex: 1, backgroundColor: colors.appBg, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 10 },
+  title: { fontSize: 17, fontWeight: '800', color: colors.appText },
+  meta: { fontSize: 12, color: colors.appText2 },
+  button: { backgroundColor: colors.ember, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 12, minWidth: 240, alignItems: 'center' },
+  danger: { backgroundColor: colors.danger },
+  buttonText: { color: colors.appSurface, fontWeight: '800' },
+  note: { fontSize: 11, color: colors.appText2, textAlign: 'center', marginTop: 12 },
+}));

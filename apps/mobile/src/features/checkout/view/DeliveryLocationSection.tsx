@@ -27,6 +27,7 @@ import { Text } from '../../../design-system/ui/Text';
 import { descriptionCopy } from '../../order/locationDescription';
 import { SavedAddressList } from './SavedAddressList';
 import type { SavedAddress } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function DeliveryLocationSection({
   lang,
@@ -73,6 +74,7 @@ export function DeliveryLocationSection({
   blockReason: string | null;
   mapLabels: { locateHint: string; useMyLocation: string; setupRequired: string };
 }) {
+  const styles = useStyles();
   const copy = descriptionCopy[lang];
 
   return (
@@ -133,8 +135,8 @@ export function DeliveryLocationSection({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // The picker draws its own frame; this only reserves the space and clips it.
   map: { overflow: 'hidden' },
   multiline: { minHeight: 84, paddingTop: space.s3, textAlignVertical: 'top' },
-});
+}));

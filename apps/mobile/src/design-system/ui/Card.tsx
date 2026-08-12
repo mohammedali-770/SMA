@@ -15,12 +15,12 @@ interface Props {
 }
 
 export function Card({ tone = 'surface', borderless, style, children }: Props) {
-  const color = useThemeColors();
+  const colors = useThemeColors();
   const t =
-    tone === 'warning' ? { bg: color.warnTint, border: color.warnLine }
-    : tone === 'danger' ? { bg: color.dangerTint, border: color.dangerLine }
-    : tone === 'info' ? { bg: color.infoTint, border: color.infoLine }
-    : { bg: color.appSurface, border: color.appLine };
+    tone === 'warning' ? { bg: colors.warnTint, border: colors.warnLine }
+    : tone === 'danger' ? { bg: colors.dangerTint, border: colors.dangerLine }
+    : tone === 'info' ? { bg: colors.infoTint, border: colors.infoLine }
+    : { bg: colors.appSurface, border: colors.appLine };
 
   return (
     <View

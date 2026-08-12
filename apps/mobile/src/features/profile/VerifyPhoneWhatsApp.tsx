@@ -28,10 +28,12 @@ import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { useAuth } from '../../store';
 import { whatsappOtp } from '../../services/api';
+import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code' | 'verified';
 
 export function VerifyPhoneWhatsApp() {
+  const styles = useStyles();
   const { t, lang, rtlRow } = useI18n();
   const { profile, refreshProfile } = useAuth();
 
@@ -152,17 +154,17 @@ export function VerifyPhoneWhatsApp() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: { marginBottom: space.s3 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s2 },
   badge: {
     paddingHorizontal: space.s3,
     paddingVertical: 3,
     borderRadius: radius.pill,
-    backgroundColor: color.appSurface2,
+    backgroundColor: colors.appSurface2,
   },
   phoneField: { marginBottom: space.s2 },
   codeField: { marginBottom: space.s2 },
   msg: { marginTop: space.s2 },
   state: { paddingVertical: space.s2 },
-});
+}));

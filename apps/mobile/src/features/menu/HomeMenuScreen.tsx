@@ -32,9 +32,9 @@ const SECTION_HEADER_OFFSET = 40;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 10 };
 
 export function HomeMenuScreen() {
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t, pick, lang, toggle, isRTL, rtlText, rtlRow } = useI18n();
-  const color = useThemeColors();
   const styles = useStyles();
   const {
     loading, error, reload, categories, products, selectedBranch, selectedBranchId,
@@ -157,17 +157,17 @@ export function HomeMenuScreen() {
         <>
           {!branchOpen ? (
             <View style={styles.closedNotice}>
-              <Text variant="label" style={{ color: color.danger }}>{t('branchClosedNotice')}</Text>
+              <Text variant="label" style={{ color: colors.danger }}>{t('branchClosedNotice')}</Text>
             </View>
           ) : null}
 
           <View style={[styles.searchWrap, rtlRow]}>
-            <SearchIcon color={color.appText3} />
+            <SearchIcon color={colors.appText3} />
             <TextInput
               value={search}
               onChangeText={setSearch}
               placeholder={t('searchPlaceholder')}
-              placeholderTextColor={color.appText3}
+              placeholderTextColor={colors.appText3}
               style={[styles.searchInput, rtlText]}
               autoCapitalize="none"
               returnKeyType="search"
@@ -233,7 +233,7 @@ export function HomeMenuScreen() {
           <Pressable style={[styles.cartBtn, rtlRow]} onPress={() => router.push('/cart')} accessibilityRole="button">
             <View style={styles.cartCount}><Text variant="label" tone="onEmber" align="center">{cart.count}</Text></View>
             <Text variant="heading" tone="onEmber" style={{ flex: 1 }}>{t('myCart')}</Text>
-            <Price amount={cart.subtotal} size={typeScale.body.size} color={color.onEmber} weight="700" />
+            <Price amount={cart.subtotal} size={typeScale.body.size} color={colors.onEmber} weight="700" />
           </Pressable>
         </View>
       ) : null}

@@ -8,6 +8,7 @@ import { useThemeColors } from '../../theme/ThemeProvider';
 import { priceAccessibilityLabel } from '../generated/money';
 import { radius, space, type as typeScale } from '../generated/tokens';
 import { Text } from './Text';
+import { makeStyles } from '../../theme/makeStyles';
 
 export type NoticeTone = 'blocking' | 'warning' | 'info' | 'success';
 
@@ -21,13 +22,14 @@ interface Props {
 }
 
 export function Notice({ title, action, amount, amountLabel, tone = 'blocking', style }: Props) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { lang, rtlRow } = useI18n();
-  const color = useThemeColors();
   const c =
-    tone === 'warning' ? { bg: color.warnTint, bar: color.warn, title: color.amberInk }
-    : tone === 'info' ? { bg: color.infoTint, bar: color.sky, title: color.sky }
-    : tone === 'success' ? { bg: color.mintTint, bar: color.mint, title: color.mint }
-    : { bg: color.dangerTint, bar: color.danger, title: color.danger };
+    tone === 'warning' ? { bg: colors.warnTint, bar: colors.warn, title: colors.amberInk }
+    : tone === 'info' ? { bg: colors.infoTint, bar: colors.sky, title: colors.sky }
+    : tone === 'success' ? { bg: colors.mintTint, bar: colors.mint, title: colors.mint }
+    : { bg: colors.dangerTint, bar: colors.danger, title: colors.danger };
   const showAmount = amount != null && amountLabel;
 
   return (
@@ -54,7 +56,7 @@ export function Notice({ title, action, amount, amountLabel, tone = 'blocking', 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: {
     borderRadius: radius.md,
     borderCurve: 'continuous',
@@ -64,4 +66,4 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: space.s2, marginVertical: 2 },
-});
+}));

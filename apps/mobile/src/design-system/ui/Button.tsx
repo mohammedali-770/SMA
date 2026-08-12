@@ -19,6 +19,7 @@ import {
 import { fontFamily, hitTarget, motion, radius, space, type } from '../generated/tokens';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 interface Props {
   label: string;
@@ -45,22 +46,23 @@ export function Button({
   leading,
   testID,
 }: Props) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { lang } = useI18n();
-  const color = useThemeColors();
   const state = resolveButtonState({ variant, size, disabled, loading });
   const surface =
-    state.variant === 'primary' ? { bg: color.ember, fg: color.onEmber, border: 'transparent' }
-    : state.variant === 'secondary' ? { bg: color.appSurface, fg: color.ember, border: color.ember }
-    : state.variant === 'ghost' ? { bg: 'transparent', fg: color.appText, border: 'transparent' }
-    : { bg: color.danger, fg: color.onEmber, border: 'transparent' };
+    state.variant === 'primary' ? { bg: colors.ember, fg: colors.onEmber, border: 'transparent' }
+    : state.variant === 'secondary' ? { bg: colors.appSurface, fg: colors.ember, border: colors.ember }
+    : state.variant === 'ghost' ? { bg: 'transparent', fg: colors.appText, border: 'transparent' }
+    : { bg: colors.danger, fg: colors.onEmber, border: 'transparent' };
 
   const handlePress = useCallback(() => {
     if (shouldInvokePress(state)) onPress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.inert, onPress]);
 
-  const bg = state.muted ? color.disabledBg : surface.bg;
-  const fg = state.muted ? color.disabledFg : surface.fg;
+  const bg = state.muted ? colors.disabledBg : surface.bg;
+  const fg = state.muted ? colors.disabledFg : surface.fg;
   const family = lang === 'ar' ? fontFamily.ar.bold : fontFamily.en.bold;
 
   return (
@@ -74,7 +76,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         state.size === 'md' ? styles.md : styles.lg,
-        { backgroundColor: bg, borderColor: state.muted ? color.disabledBg : surface.border },
+        { backgroundColor: bg, borderColor: state.muted ? colors.disabledBg : surface.border },
         state.variant === 'secondary' && styles.bordered,
         pressed && state.allowPressFeedback && styles.pressed,
         style,
@@ -88,7 +90,7 @@ export function Button({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   base: {
     borderRadius: radius.md,
     alignItems: 'center',
@@ -103,4 +105,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   spinner: { marginEnd: space.s2 },
   label: { fontSize: type.button.size, lineHeight: type.button.lineHeight },
-});
+}));

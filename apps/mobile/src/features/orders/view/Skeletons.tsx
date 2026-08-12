@@ -14,8 +14,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { color, radius, space } from '../../../design-system/generated/tokens';
 import { useI18n } from '../../../i18n/I18nProvider';
+import { makeStyles } from '../../../theme/makeStyles';
 
 function Ghost({ children }: { children: React.ReactNode }) {
+  const styles = useStyles();
   const { t } = useI18n();
   return (
     <View
@@ -39,6 +41,7 @@ function Ghost({ children }: { children: React.ReactNode }) {
 }
 
 export function OrdersSkeleton() {
+  const styles = useStyles();
   return (
     <Ghost>
       {[0, 1, 2, 3].map((i) => (
@@ -59,6 +62,7 @@ export function OrdersSkeleton() {
 }
 
 export function ReceiptSkeleton() {
+  const styles = useStyles();
   return (
     <Ghost>
       <View style={styles.hero}>
@@ -80,19 +84,19 @@ export function ReceiptSkeleton() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: { flex: 1 },
   pad: { padding: space.s4, gap: space.s3 },
   spread: { flexDirection: 'row', justifyContent: 'space-between' },
   hero: { alignItems: 'center', paddingVertical: space.s5, gap: space.s2 },
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s2,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4, gap: space.s2,
   },
   disc: {
     width: 76, height: 76, borderRadius: 38,
-    backgroundColor: color.appSurface2, borderWidth: 1, borderColor: color.appLine,
+    backgroundColor: colors.appSurface2, borderWidth: 1, borderColor: colors.appLine,
   },
-  line: { height: 12, borderRadius: 6, backgroundColor: color.appSurface2 },
-  badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: color.appSurface2 },
-});
+  line: { height: 12, borderRadius: 6, backgroundColor: colors.appSurface2 },
+  badge: { width: 76, height: 22, borderRadius: radius.pill, backgroundColor: colors.appSurface2 },
+}));

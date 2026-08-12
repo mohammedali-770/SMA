@@ -21,6 +21,8 @@ import {
   LOCATE_BTN_BOTTOM, LOCATE_BTN_RIGHT, LOCATE_BTN_SIZE, MAP_HEIGHT,
   type CachedFix, type LocateLang, type LocateState,
 } from './locationControl';
+import { makeStyles } from '../theme/makeStyles';
+import { useThemeColors } from '../theme/ThemeProvider';
 
 interface LocationPickerMapProps {
   lat: number;
@@ -55,6 +57,8 @@ function loadGoogleMapsWeb(key: string): Promise<void> {
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   lat, lng, onChange, lang, labels, onAddressResolved,
 }) => {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const hostRef = useRef<HTMLDivElement | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
@@ -183,8 +187,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           style={({ pressed }) => [styles.locateBtn, pressed && !locating && styles.locateBtnPressed]}
         >
           {locating
-            ? <ActivityIndicator size="small" color={color.ember} />
-            : <CrosshairIcon size={22} color={color.ember} />}
+            ? <ActivityIndicator size="small" color={colors.ember} />
+            : <CrosshairIcon size={22} color={colors.ember} />}
         </Pressable>
       </View>
       <Text style={styles.hint}>{labels.locateHint}</Text>
@@ -193,24 +197,24 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   mapWrap: {
     height: MAP_HEIGHT, borderRadius: radius.md, overflow: 'hidden',
-    borderWidth: 1, borderColor: color.appLine, position: 'relative',
+    borderWidth: 1, borderColor: colors.appLine, position: 'relative',
   },
   locateBtn: {
     // Geometry is asserted in locationControl.test.ts.
     position: 'absolute', right: LOCATE_BTN_RIGHT, bottom: LOCATE_BTN_BOTTOM,
     width: LOCATE_BTN_SIZE, height: LOCATE_BTN_SIZE, borderRadius: LOCATE_BTN_SIZE / 2,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: color.appSurface,
-    borderWidth: 1, borderColor: color.appLine,
+    backgroundColor: colors.appSurface,
+    borderWidth: 1, borderColor: colors.appLine,
     shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 }, elevation: 3,
   },
-  locateBtnPressed: { backgroundColor: color.appSurface2 },
-  hint: { fontSize: type.label.size, color: color.appText2, marginTop: space.s1 },
-  locateError: { fontSize: type.label.size, color: color.danger, fontWeight: '700', marginTop: space.s1 },
-  fallback: { padding: space.s4, borderRadius: radius.md, borderWidth: 1, borderColor: color.appLine, backgroundColor: color.appSurface },
-  fallbackText: { fontSize: type.label.size, color: color.appText2, fontWeight: '700', textAlign: 'center' },
-});
+  locateBtnPressed: { backgroundColor: colors.appSurface2 },
+  hint: { fontSize: type.label.size, color: colors.appText2, marginTop: space.s1 },
+  locateError: { fontSize: type.label.size, color: colors.danger, fontWeight: '700', marginTop: space.s1 },
+  fallback: { padding: space.s4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.appLine, backgroundColor: colors.appSurface },
+  fallbackText: { fontSize: type.label.size, color: colors.appText2, fontWeight: '700', textAlign: 'center' },
+}));

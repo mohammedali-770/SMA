@@ -35,7 +35,7 @@ export function OtpCodeInput({
   accessibilityLabel,
   style,
 }: Props) {
-  const color = useThemeColors();
+  const colors = useThemeColors();
   const styles = useStyles();
   const inputs = useRef<Array<TextInput | null>>([]);
   const boxes = useMemo(() => splitCodeToBoxes(value, length), [value, length]);
@@ -83,7 +83,7 @@ export function OtpCodeInput({
           selectTextOnFocus
           accessibilityLabel={`${accessibilityLabel ?? 'One-time code'} ${index + 1}`}
           style={[styles.box, digit ? styles.boxFilled : null, !editable ? styles.boxMuted : null]}
-          placeholderTextColor={color.appText3}
+          placeholderTextColor={colors.appText3}
         />
       ))}
     </View>

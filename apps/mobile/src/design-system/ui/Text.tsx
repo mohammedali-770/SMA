@@ -40,17 +40,17 @@ export function Text({
   children,
   ...rest
 }: Props) {
+  const colors = useThemeColors();
   const { lang, isRTL } = useI18n();
-  const color = useThemeColors();
   const scale = typeScale[variant];
   const toneColor =
-    tone === 'primary' ? color.appText
-    : tone === 'secondary' ? color.appText2
-    : tone === 'tertiary' ? color.appText3
-    : tone === 'ember' ? color.ember
-    : tone === 'success' ? color.mint
-    : tone === 'danger' ? color.danger
-    : color.onEmber;
+    tone === 'primary' ? colors.appText
+    : tone === 'secondary' ? colors.appText2
+    : tone === 'tertiary' ? colors.appText3
+    : tone === 'ember' ? colors.ember
+    : tone === 'success' ? colors.mint
+    : tone === 'danger' ? colors.danger
+    : colors.onEmber;
 
   return (
     <RNText

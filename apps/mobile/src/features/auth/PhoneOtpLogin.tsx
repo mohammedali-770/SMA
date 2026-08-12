@@ -33,10 +33,12 @@ import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { requestLoginCode } from './loginAvailability';
+import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code';
 
 export function PhoneOtpLogin() {
+  const styles = useStyles();
   const { t } = useI18n();
   const [phase, setPhase] = useState<Phase>('phone');
   const [national, setNational] = useState('');  // 9-digit national part (5XXXXXXXX)
@@ -152,7 +154,7 @@ export function PhoneOtpLogin() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   field: { marginBottom: space.s3 },
   // The number the code went to — always LTR so it reads correctly in Arabic,
   // and mono because it is a structured number.
@@ -162,4 +164,4 @@ const styles = StyleSheet.create({
     marginBottom: space.s2,
   },
   msg: { marginTop: space.s1 },
-});
+}));

@@ -10,6 +10,7 @@ import { SaudiRiyalSymbol } from './SaudiRiyalSymbol';
 import { useI18n } from '../i18n/I18nProvider';
 import { fontFamily } from '../design-system/generated/tokens';
 import { useThemeColors } from '../theme/ThemeProvider';
+import { makeStyles } from '../theme/makeStyles';
 
 function monoFace(weight: TextStyle['fontWeight']): string {
   const n = Number(weight ?? 400);
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export function Price({ amount, size = 15, color: colorProp, weight = '800', prefix, style }: Props) {
+  const styles = useStyles();
   const { lang } = useI18n();
   const palette = useThemeColors();
   const color = colorProp ?? palette.appText;
@@ -41,6 +43,6 @@ export function Price({ amount, size = 15, color: colorProp, weight = '800', pre
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-});
+}));

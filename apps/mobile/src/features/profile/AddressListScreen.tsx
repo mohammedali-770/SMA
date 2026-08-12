@@ -30,8 +30,12 @@ import { contextNeedsReset, NEW_ADDRESS } from '../../store/addressBook';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAddressBook, useOrderContext } from '../../store';
 import type { SavedAddress } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 export function AddressListScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t } = useI18n();
   const book = useAddressBook();
   const orderCtx = useOrderContext();
@@ -89,7 +93,7 @@ export function AddressListScreen() {
   const failedEmpty = book.status === 'error' && book.addresses.length === 0;
 
   return (
-    <Screen background={color.appBg}>
+    <Screen background={colors.appBg}>
       <Header title={t('addrTitle')} showBack safeTop />
 
       {loading ? (
@@ -121,7 +125,7 @@ export function AddressListScreen() {
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={color.ember} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => { void refresh(); }} tintColor={colors.ember} />
           }
         >
           <View style={[columnStyles.column, styles.column]}>
@@ -189,10 +193,10 @@ export function AddressListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: { flex: 1 },
   scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' },
   column: { gap: space.s3 },
   emptyNotice: { padding: space.s4, paddingBottom: 0 },
   add: { marginTop: space.s3 },
-});
+}));

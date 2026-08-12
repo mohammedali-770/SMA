@@ -23,6 +23,7 @@ const ROOT = path.resolve('apps/mobile/src');
 const WRITE = process.argv.includes('--write');
 const SKIP = new Set([
   path.normalize('apps/mobile/src/components/ObservabilityErrorBoundary.tsx'),
+  path.normalize('apps/mobile/src/design-system/ui/ContentColumn.tsx'),
 ]);
 
 function walk(dir, out = []) {

@@ -7,9 +7,11 @@
  */
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { makeStyles } from '../theme/makeStyles';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function WebView(_props: any) {
+  const styles = useStyles();
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>الدفع الإلكتروني متاح في التطبيق فقط</Text>
@@ -19,8 +21,8 @@ export function WebView(_props: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, backgroundColor: '#fff' },
   title: { fontSize: 16, fontWeight: '800', color: '#1e293b', textAlign: 'center' },
   body: { fontSize: 13, color: '#64748b', textAlign: 'center' },
-});
+}));

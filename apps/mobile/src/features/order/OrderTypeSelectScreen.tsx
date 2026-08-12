@@ -36,9 +36,9 @@ import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/mode
 type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
 
 export function OrderTypeSelectScreen() {
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t, pick, lang, rtlRow } = useI18n();
-  const color = useThemeColors();
   const styles = useStyles();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
   const { context, valid, setPickup, setDelivery } = useOrderContext();
@@ -175,7 +175,7 @@ export function OrderTypeSelectScreen() {
       </View>
 
       {loading ? (
-        <View style={styles.center}><ActivityIndicator size="large" color={color.ember} /></View>
+        <View style={styles.center}><ActivityIndicator size="large" color={colors.ember} /></View>
       ) : error ? (
         <View style={styles.center}>
           <Notice title={error} tone="blocking" style={columnStyles.column} />
@@ -289,7 +289,7 @@ export function OrderTypeSelectScreen() {
 
       {busy ? (
         <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator size="large" color={color.onEmber} />
+          <ActivityIndicator size="large" color={colors.onEmber} />
           <Text variant="heading" tone="onEmber" align="center">{t('otResolving')}</Text>
         </View>
       ) : null}

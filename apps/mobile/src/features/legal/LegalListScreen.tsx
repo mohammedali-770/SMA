@@ -29,10 +29,14 @@ import { useCatalog } from '../../store';
 import { color, radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import type { DbLegalDocument } from '../../types/db';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 const CHANNEL_EMOJI: Record<SupportChannelKind, string> = { phone: '📞', whatsapp: '💬', email: '✉️' };
 
 export function LegalListScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, pick, lang, isRTL, rtlRow } = useI18n();
   const { support } = useCatalog();
   const [docs, setDocs] = useState<DbLegalDocument[] | null>(null);
@@ -63,7 +67,7 @@ export function LegalListScreen() {
   };
 
   return (
-    <Screen background={color.appBg} edges={['top', 'left', 'right']}>
+    <Screen background={colors.appBg} edges={['top', 'left', 'right']}>
       <Header title={t('legalSupport')} showBack />
       {error ? (
         <ErrorView message={pick('Could not load documents.', 'تعذّر تحميل المستندات.')} onRetry={load} retryLabel={t('retry')} />
@@ -127,20 +131,20 @@ export function LegalListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   scroll: { padding: space.s4, gap: space.s2 },
   supportCard: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s2, marginBottom: space.s1,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4, gap: space.s2, marginBottom: space.s1,
   },
   supportRow: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s2 },
   emoji: { lineHeight: typeScale.title.lineHeight },
   pressed: { opacity: 0.7 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: space.s3,
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4,
   },
   rowText: { flex: 1 },
   empty: { marginTop: space.s5 },
-});
+}));

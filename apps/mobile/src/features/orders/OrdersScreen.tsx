@@ -23,6 +23,8 @@ import { mapOrder } from '../../lib/mappers';
 import { OrderCard } from './view/OrderCard';
 import { OrdersSkeleton } from './view/Skeletons';
 import type { Order, OrderStatus } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | 'status_ready' | 'status_out_for_delivery' | 'status_delivered' | 'status_cancelled'> = {
   received: 'status_received',
@@ -34,6 +36,8 @@ const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | '
 };
 
 export function OrdersScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, pick } = useI18n();
   const [list, setList] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +73,7 @@ export function OrdersScreen() {
   useFocusEffect(useCallback(() => { void load('focus'); }, [load]));
 
   return (
-    <Screen background={color.appBg}>
+    <Screen background={colors.appBg}>
       <View style={styles.headerBar}>
         <View style={columnStyles.column}>
           <Text variant="display">{t('orderHistory')}</Text>
@@ -91,7 +95,7 @@ export function OrdersScreen() {
         />
       ) : list.length === 0 ? (
         <EmptyView
-          icon={<ReceiptIcon size={44} color={color.heatOff} />}
+          icon={<ReceiptIcon size={44} color={colors.heatOff} />}
           title={t('noOrders')}
           subtitle={t('noOrdersSub')}
         />
@@ -104,7 +108,7 @@ export function OrdersScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => load('refresh')}
-              tintColor={color.ember}
+              tintColor={colors.ember}
             />
           }
           // The cap goes on each ROW, not on the scroller, so the
@@ -124,7 +128,7 @@ export function OrdersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   headerBar: { paddingHorizontal: space.s4, paddingTop: space.s2, paddingBottom: space.s3, alignItems: 'center' },
   list: { padding: space.s4, gap: space.s3, alignItems: 'center' },
-});
+}));

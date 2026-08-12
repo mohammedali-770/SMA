@@ -10,9 +10,9 @@ import { useAuth } from '../../store';
 import { useThemeColors } from '../../theme/ThemeProvider';
 
 export default function TabsLayout() {
+  const colors = useThemeColors();
   const { status } = useAuth();
   const { t, pick } = useI18n();
-  const color = useThemeColors();
 
   const [deletionPending, setDeletionPending] = useState(false);
   useEffect(() => {
@@ -35,9 +35,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: color.ember,
-        tabBarInactiveTintColor: color.appText2,
-        tabBarStyle: { borderTopColor: color.appLine, backgroundColor: color.appSurface },
+        tabBarActiveTintColor: colors.ember,
+        tabBarInactiveTintColor: colors.appText2,
+        tabBarStyle: { borderTopColor: colors.appLine, backgroundColor: colors.appSurface },
         tabBarLabelStyle: { fontWeight: '700' },
       }}
     >

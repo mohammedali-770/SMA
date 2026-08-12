@@ -19,8 +19,8 @@ interface Props {
 }
 
 export const ProductCard = React.memo(function ProductCard({ product, hasModifiers, onAdd }: Props) {
+  const colors = useThemeColors();
   const { t, pick, rtlRow } = useI18n();
-  const color = useThemeColors();
   const styles = useStyles();
   const [imgFailed, setImgFailed] = useState(false);
 
@@ -44,7 +44,7 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
         />
       ) : (
         <View style={[styles.img, styles.imgEmpty]}>
-          <DishIcon size={34} color={color.heatOff} />
+          <DishIcon size={34} color={colors.heatOff} />
         </View>
       )}
 

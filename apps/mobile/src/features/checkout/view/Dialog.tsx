@@ -12,6 +12,7 @@ import { Modal, StyleSheet, View } from 'react-native';
 import { color, radius, space } from '../../../design-system/generated/tokens';
 import { Button } from '../../../design-system/ui/Button';
 import { Text } from '../../../design-system/ui/Text';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function Dialog({
   visible,
@@ -24,6 +25,7 @@ export function Dialog({
   title: string;
   children: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onRequestClose}>
       <View style={styles.backdrop}>
@@ -54,6 +56,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const styles = useStyles();
   return (
     <Dialog visible={visible} onRequestClose={onCancel} title={title}>
       {message ? <Text variant="body" tone="secondary" align="center">{message}</Text> : null}
@@ -65,10 +68,10 @@ export function ConfirmDialog({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   backdrop: {
     flex: 1,
-    backgroundColor: color.scrim,
+    backgroundColor: colors.scrim,
     alignItems: 'center',
     justifyContent: 'center',
     padding: space.s5,
@@ -76,10 +79,10 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: color.appSurface,
+    backgroundColor: colors.appSurface,
     borderRadius: radius.lg,
     padding: space.s5,
     gap: space.s2,
   },
   actions: { gap: space.s2, marginTop: space.s3, alignSelf: 'stretch' },
-});
+}));

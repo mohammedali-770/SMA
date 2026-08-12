@@ -12,6 +12,8 @@ import { Price } from '../../../components/Price';
 import { color, space, type as typeScale } from '../../../design-system/generated/tokens';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 export function ReceiptRow({
   label, value, amount, negative, strong, big, muted,
@@ -24,6 +26,8 @@ export function ReceiptRow({
   big?: boolean;
   muted?: boolean;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { isRTL, rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
@@ -40,7 +44,7 @@ export function ReceiptRow({
             amount={amount}
             prefix={negative ? '−' : undefined}
             size={big ? typeScale.title.size : typeScale.body.size}
-            color={negative ? color.mint : color.appText}
+            color={negative ? colors.mint : colors.appText}
             weight={strong || big ? '700' : '600'}
           />
         ) : (
@@ -51,7 +55,7 @@ export function ReceiptRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     gap: space.s3, paddingVertical: space.s1 + 2,
@@ -59,4 +63,4 @@ const styles = StyleSheet.create({
   label: { flexShrink: 1 },
   valueCol: { alignItems: 'flex-end', flexShrink: 1 },
   valueColRTL: { alignItems: 'flex-start' },
-});
+}));

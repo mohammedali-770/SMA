@@ -27,6 +27,8 @@ import { paymentDisplayState, paymentMethodLabel } from '../../../lib/payment';
 import { formatRiyadhDateTime } from '../../../utils/format';
 import { ReceiptRow } from './ReceiptRow';
 import type { Order } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 /** Presentation-only prefix; the stored/POS reference is never modified. */
 function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string | null {
@@ -35,6 +37,8 @@ function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string 
 }
 
 export function ReceiptBody({ order }: { order: Order }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, pick, rtlRow } = useI18n();
 
   const methodKey = paymentMethodLabel(order.paymentMethod, order.orderType);
@@ -97,7 +101,7 @@ export function ReceiptBody({ order }: { order: Order }) {
               <Price
                 amount={it.price * it.quantity}
                 size={typeScale.body.size}
-                color={color.appText}
+                color={colors.appText}
                 weight="600"
               />
             </View>
@@ -123,8 +127,8 @@ export function ReceiptBody({ order }: { order: Order }) {
 
           {order.loyaltyPointsEarned > 0 ? (
             <View style={[styles.earned, rtlRow]}>
-              <AwardIcon size={18} color={color.saffron} />
-              <Text variant="label" style={{ color: color.amberInk }}>
+              <AwardIcon size={18} color={colors.saffron} />
+              <Text variant="label" style={{ color: colors.amberInk }}>
                 +{order.loyaltyPointsEarned} {t('loyaltyPoints')}
               </Text>
             </View>
@@ -135,14 +139,14 @@ export function ReceiptBody({ order }: { order: Order }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4,
   },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3, paddingVertical: space.s1 + 2 },
   qty: { minWidth: 28 },
   itemBody: { flex: 1, gap: 2 },
-  divider: { height: 1, backgroundColor: color.appLine, marginVertical: space.s2 },
+  divider: { height: 1, backgroundColor: colors.appLine, marginVertical: space.s2 },
   earned: { flexDirection: 'row', alignItems: 'center', gap: space.s2, marginTop: space.s2 },
-});
+}));

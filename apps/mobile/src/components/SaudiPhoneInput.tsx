@@ -22,17 +22,17 @@ interface Props {
 export function SaudiPhoneInput({
   value, onChangeText, editable = true, autoFocus, label, error, style,
 }: Props) {
+  const colors = useThemeColors();
   const { t } = useI18n();
-  const color = useThemeColors();
   const styles = useStyles();
   const [focused, setFocused] = useState(false);
   const fieldLabel = label ?? t('phoneNumberLabel');
-  const borderColor = error ? color.danger : focused ? color.ember : color.appLine;
+  const borderColor = error ? colors.danger : focused ? colors.ember : colors.appLine;
 
   return (
     <View style={[styles.wrap, style]}>
       <Text variant="label" tone="secondary">{fieldLabel}</Text>
-      <View style={[styles.row, { borderColor, backgroundColor: editable ? color.appSurface : color.disabledBg }]}>
+      <View style={[styles.row, { borderColor, backgroundColor: editable ? colors.appSurface : colors.disabledBg }]}>
         <Text variant="body" tone={editable ? 'primary' : 'tertiary'} align="ltr-start" style={styles.dial}>
           {KSA_DIAL_CODE}
         </Text>
@@ -49,9 +49,9 @@ export function SaudiPhoneInput({
           textContentType="telephoneNumber"
           autoFocus={autoFocus}
           placeholder="5XXXXXXXX"
-          placeholderTextColor={color.appText3}
+          placeholderTextColor={colors.appText3}
           accessibilityLabel={fieldLabel}
-          style={[styles.input, { color: editable ? color.appText : color.disabledFg }]}
+          style={[styles.input, { color: editable ? colors.appText : colors.disabledFg }]}
         />
       </View>
       {error ? <Text variant="caption" tone="danger">{error}</Text> : null}

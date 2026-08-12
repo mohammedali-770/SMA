@@ -16,6 +16,8 @@ import { color, radius, space, type as typeScale } from '../../../design-system/
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { CartItem } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 export function CheckoutLines({
   items,
@@ -34,6 +36,8 @@ export function CheckoutLines({
   onIncrement: (cartItemId: string) => void;
   onDecrement: (cartItemId: string) => void;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { rtlRow } = useI18n();
 
   return (
@@ -51,7 +55,7 @@ export function CheckoutLines({
               <Price
                 amount={amountOf(it)}
                 size={typeScale.body.size}
-                color={color.appText}
+                color={colors.appText}
                 weight="600"
               />
             </View>
@@ -73,12 +77,12 @@ export function CheckoutLines({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   line: {
     flexDirection: 'row', alignItems: 'center', gap: space.s3,
-    backgroundColor: color.appSurface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: color.appLine,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.appLine,
     paddingHorizontal: space.s3, paddingVertical: space.s3,
   },
   body: { flex: 1, gap: 2, alignItems: 'flex-start' },
-});
+}));

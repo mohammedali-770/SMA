@@ -22,11 +22,15 @@ import { presentState } from './stateHierarchy';
 import { color, space } from '../design-system/generated/tokens';
 import { Button } from '../design-system/ui/Button';
 import { Text } from '../design-system/ui/Text';
+import { makeStyles } from '../theme/makeStyles';
+import { useThemeColors } from '../theme/ThemeProvider';
 
 export function LoadingView({ label }: { label?: string }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   return (
     <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label}>
-      <ActivityIndicator size="large" color={color.ember} />
+      <ActivityIndicator size="large" color={colors.ember} />
       {label ? <Text variant="body" tone="secondary" align="center">{label}</Text> : null}
     </View>
   );
@@ -45,6 +49,7 @@ export function ErrorView({
   /** Localized generic heading used when `message` is technical. */
   fallbackTitle?: string;
 }) {
+  const styles = useStyles();
   // Screens pass a localized fallback; the English default only applies to call
   // sites not yet migrated.
   const { heading, detail } = presentState({
@@ -77,6 +82,7 @@ export function EmptyView({
   /** Drawn icon (see components/Icons); falls back to the legacy emoji glyph. */
   icon?: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.center}>
       {icon ?? <Text variant="display" align="center">{emoji ?? '🛒'}</Text>}
@@ -90,7 +96,7 @@ export function EmptyView({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   center: {
     flex: 1,
     alignItems: 'center',
@@ -98,4 +104,4 @@ const styles = StyleSheet.create({
     padding: space.s6,
     gap: space.s2,
   },
-});
+}));
