@@ -7,6 +7,8 @@ import React, { Suspense, lazy } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { AuthScreen } from './components/AuthScreen';
 import { StaffMfaGate } from './components/StaffMfaGate';
+import { ThemeProvider } from './components/ThemeProvider';
+import { AppearanceToggle } from './components/AppearanceToggle';
 import { BrandMark } from './design-system/ui/BrandMark';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
@@ -41,6 +43,7 @@ const AppHeader: React.FC = () => {
           <div><h1 className="text-base font-black tracking-tight leading-tight text-ember">SPICY MEAL</h1></div>
         </div>
         <div className="flex items-center gap-3">
+          <AppearanceToggle />
           <div className="text-right hidden sm:block">
             <p className="text-xs font-black text-con-text leading-tight">{currentUser.fullName || currentUser.email}</p>
             <span className="text-[9px] font-black uppercase tracking-wider bg-ember/10 text-ember px-1.5 py-0.5 rounded">{roleLabel}</span>
@@ -137,9 +140,6 @@ function AppContent() {
       <AppHeader />
       <WriteErrorBanner />
       {staffIdentityKnown ? (
-        // Staff bootstrap may legitimately hit AAL1-denied RPCs before this gate
-        // knows the user's role. Do not let that DataError pre-empt MFA: verify
-        // first, then StaffMfaGate.reload() re-runs privileged reads under AAL2.
         <StaffMfaGate>
           {dataError ? (
             <DataErrorPanel />
@@ -164,5 +164,9 @@ function AppContent() {
 }
 
 export default function App() {
-  return <AppProvider><AppContent /></AppProvider>;
+  return (
+    <ThemeProvider>
+      <AppProvider><AppContent /></AppProvider>
+    </ThemeProvider>
+  );
 }
