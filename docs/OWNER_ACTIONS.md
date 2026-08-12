@@ -185,7 +185,7 @@ For each production release, verify source-map upload through the current Sentry
 
 `docs/MIGRATIONS.md` was last fully reconciled against Production on 2026-08-07. It records **68 repository migrations / 70 live history rows** as that dated snapshot.
 
-After that snapshot, the Aug 10 production-readiness PRs added **10 new repository migration files**, bringing the current repository migration-file count to **78**:
+After that snapshot, the Aug 10 production-readiness PRs added **11 new repository migration files**, bringing the current repository source count to **79 migration files**:
 
 - `20260810100000_order_status_cancellation_integrity.sql`
 - `20260810100500_coupon_code_identity_guard.sql`
@@ -199,9 +199,9 @@ After that snapshot, the Aug 10 production-readiness PRs added **10 new reposito
 - `20260810142000_staff_mfa_aal2.sql`
 - `20260810143000_remove_anon_role_helper_rpcs.sql`
 
-**Correction:** the list above contains 11 filenames, not 10; PR #183 added two and the later hardening sequence added nine. Therefore the current repository count is **79**, not 78. This arithmetic must be verified against the actual `supabase/migrations/` directory during the live reconciliation; do not use either number as a production-history claim until counted directly.
+That **79** is a repository/source count derived from the Aug 7 baseline plus the changed-file inventories of merged PRs #183, #185, #186, #190, #192, #194, #195, #196 and #197. It is **not** a claim about how many of those migrations are currently applied in Production.
 
-The key point is independent of the exact repository count: the Aug 7 `Unapplied repository files: 0` statement is no longer a current production claim.
+Therefore the Aug 7 ledger statement `Unapplied repository files: 0` must be treated as a dated snapshot, not a current production claim.
 
 Required next reconciliation:
 
