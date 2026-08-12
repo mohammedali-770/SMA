@@ -47,10 +47,13 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { mapConfig } from '../../lib/map';
 import { useAddressBook, useOrderContext } from '../../store';
 import type { SavedAddress } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 const NO_ERRORS = { description: null, nationalShortAddress: null, label: null, location: null };
 
 export function AddressEditScreen() {
+  const colors = useThemeColors();
   const { t } = useI18n();
   const params = useLocalSearchParams<{ id?: string }>();
   const id = typeof params.id === 'string' ? params.id : NEW_ADDRESS;
@@ -72,7 +75,7 @@ export function AddressEditScreen() {
 
   if (resolving) {
     return (
-      <Screen background={color.appBg}>
+      <Screen background={colors.appBg}>
         <Header title={t('addrEditTitle')} showBack safeTop />
         <LoadingView label={t('addrLoading')} />
       </Screen>
@@ -87,7 +90,7 @@ export function AddressEditScreen() {
   // one asked for.
   if (!creating && !existing) {
     return (
-      <Screen background={color.appBg}>
+      <Screen background={colors.appBg}>
         <Header title={t('addrEditTitle')} showBack safeTop />
         <EmptyView
           title={t('addrNotFound')}
@@ -104,6 +107,8 @@ export function AddressEditScreen() {
 }
 
 function AddressEditForm({ existing }: { existing: SavedAddress | null }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, pick, lang } = useI18n();
   const book = useAddressBook();
   const orderCtx = useOrderContext();
@@ -170,7 +175,7 @@ function AddressEditForm({ existing }: { existing: SavedAddress | null }) {
   };
 
   return (
-    <Screen background={color.appBg}>
+    <Screen background={colors.appBg}>
       <Header title={isNew ? t('addrNewTitle') : t('addrEditTitle')} showBack safeTop />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -275,7 +280,7 @@ function AddressEditForm({ existing }: { existing: SavedAddress | null }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: { flex: 1 },
   scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' },
   column: { gap: space.s4 },
@@ -283,4 +288,4 @@ const styles = StyleSheet.create({
   multiline: { minHeight: 84, paddingTop: space.s3, textAlignVertical: 'top' },
   defaultChip: { alignSelf: 'flex-start', minHeight: 44 },
   save: { marginTop: space.s2 },
-});
+}));

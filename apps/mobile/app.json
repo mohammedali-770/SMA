@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "spicymeal",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "locales": {
       "ar": "./locales/ar.json",
       "en": "./locales/en.json"

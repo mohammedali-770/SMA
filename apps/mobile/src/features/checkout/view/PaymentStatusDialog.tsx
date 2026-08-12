@@ -31,6 +31,8 @@ import { Button } from '../../../design-system/ui/Button';
 import { StatusPill } from '../../../design-system/ui/Chip';
 import { Text } from '../../../design-system/ui/Text';
 import { Dialog } from './Dialog';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 /** Mirrors the PayState union in CheckoutScreen. */
 export type PayState = 'opening' | 'verifying' | 'pending' | 'failed' | 'cancelled' | 'expired' | 'error';
@@ -78,13 +80,15 @@ export function PaymentStatusDialog({
   onRetryFresh: () => void;
   onClose: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const inFlight = state != null && IN_FLIGHT.includes(state);
 
   return (
     <Dialog visible={state !== null} onRequestClose={onClose} title={labels.title}>
       {state == null ? null : inFlight ? (
         <View style={styles.progress}>
-          <ActivityIndicator size="large" color={color.ember} />
+          <ActivityIndicator size="large" color={colors.ember} />
           <Text variant="body" tone="secondary" align="center">
             {state === 'opening' ? labels.opening : labels.verifying}
           </Text>
@@ -143,9 +147,9 @@ function pillLabel(state: PayState, l: PaymentStatusLabels): string {
   }
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   progress: { alignItems: 'center', gap: space.s4, paddingVertical: space.s5 },
   pillRow: { alignItems: 'center', marginBottom: space.s1 },
   actions: { gap: space.s2, marginTop: space.s3, alignSelf: 'stretch' },
   stretch: { alignSelf: 'stretch' },
-});
+}));

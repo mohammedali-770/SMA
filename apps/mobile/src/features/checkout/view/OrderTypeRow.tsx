@@ -14,6 +14,7 @@ import { color, radius, space } from '../../../design-system/generated/tokens';
 import { StatusPill } from '../../../design-system/ui/Chip';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function OrderTypeRow({
   typeLabel,
@@ -26,6 +27,7 @@ export function OrderTypeRow({
   changeLabel: string;
   onChange: () => void;
 }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
@@ -50,15 +52,15 @@ export function OrderTypeRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.s3,
-    backgroundColor: color.appSurface,
+    backgroundColor: colors.appSurface,
     borderWidth: 1,
-    borderColor: color.appLine,
+    borderColor: colors.appLine,
     borderRadius: radius.lg,
     padding: space.s3,
   },
@@ -68,7 +70,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: space.s3,
     borderRadius: radius.pill,
-    backgroundColor: color.appSurface2,
+    backgroundColor: colors.appSurface2,
   },
   pressed: { opacity: 0.7 },
-});
+}));

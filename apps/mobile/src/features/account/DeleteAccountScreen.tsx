@@ -36,6 +36,8 @@ import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { accountDeletion } from '../../services/api';
 import { useAuth } from '../../store';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 type Phase = 'checking' | 'pending' | 'intro' | 'reverify' | 'unavailable' | 'submitting' | 'success';
 
@@ -46,6 +48,8 @@ const CONSEQUENCE_KEYS = [
 ] as const;
 
 export function DeleteAccountScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, lang, rtlRow } = useI18n();
   const { signOut } = useAuth();
 
@@ -162,7 +166,7 @@ export function DeleteAccountScreen() {
   const canContinue = canSubmitDeletion({ acknowledged, method, code, password });
 
   return (
-    <Screen background={color.appBg} edges={['top', 'left', 'right', 'bottom']}>
+    <Screen background={colors.appBg} edges={['top', 'left', 'right', 'bottom']}>
       <Header title={t('delTitle')} showBack={!isDeletionLockedPhase(phase)} />
 
       {phase === 'checking' ? (
@@ -321,6 +325,7 @@ export function DeleteAccountScreen() {
   );
 
   function SuccessCard() {
+    const styles = useStyles();
     return (
       <View accessible accessibilityLiveRegion="polite" style={styles.phaseCard}>
         <View style={[styles.card, styles.successCard]}>
@@ -336,6 +341,7 @@ export function DeleteAccountScreen() {
   }
 
   function PendingCard({ statusKey }: { statusKey: Parameters<typeof t>[0] }) {
+    const styles = useStyles();
     // Reached on login/session-restore for an account that is being deleted. The
     // account is locked server-side; the only forward action is to sign out.
     return (
@@ -351,6 +357,7 @@ export function DeleteAccountScreen() {
   }
 
   function UnavailableCard() {
+    const styles = useStyles();
     return (
       <View accessible accessibilityLiveRegion="polite" style={styles.phaseCard}>
         <View style={styles.card}>
@@ -365,6 +372,7 @@ export function DeleteAccountScreen() {
 }
 
 function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
+  const styles = useStyles();
   const { t } = useI18n();
   return (
     <View style={styles.support}>
@@ -380,27 +388,27 @@ function SupportBlock({ onOpen }: { onOpen: (url: string) => void }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: { flex: 1 },
   scroll: { padding: space.s4, paddingBottom: space.s6, gap: space.s3 },
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s2,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4, gap: space.s2,
   },
   phaseCard: { gap: space.s3 },
-  successCard: { borderColor: color.mintLine, backgroundColor: color.mintTint },
+  successCard: { borderColor: colors.mintLine, backgroundColor: colors.mintTint },
 
   bullet: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s2, paddingVertical: space.s1 },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: color.ember, marginTop: 8 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.ember, marginTop: 8 },
   bulletText: { flex: 1 },
 
   ackRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3, marginTop: space.s2 },
   checkbox: {
-    width: 26, height: 26, borderRadius: radius.sm, borderWidth: 2, borderColor: color.appLine,
+    width: 26, height: 26, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.appLine,
     alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
   // Danger, not ember: ticking this box is the destructive commitment.
-  checkboxOn: { backgroundColor: color.danger, borderColor: color.danger },
+  checkboxOn: { backgroundColor: colors.danger, borderColor: colors.danger },
   ackText: { flex: 1 },
 
   codeInput: { letterSpacing: 6, textAlign: 'center' },
@@ -411,13 +419,13 @@ const styles = StyleSheet.create({
 
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: color.scrim,
+    backgroundColor: colors.scrim,
     alignItems: 'center', justifyContent: 'center', padding: space.s5,
   },
   modal: {
     width: '100%', maxWidth: 400,
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
     padding: space.s5, gap: space.s2,
   },
   modalActions: { gap: space.s2, marginTop: space.s3 },
-});
+}));

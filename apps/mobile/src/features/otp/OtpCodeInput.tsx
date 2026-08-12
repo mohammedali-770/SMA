@@ -1,27 +1,6 @@
-/**
- * Multi-box OTP entry — the robust MANUAL fallback that works when autofill is
- * unavailable, and the surface autofill fills when it is.
- *
- * Behavior (logic lives in the pure otpAutofill.ts, so it is unit-tested):
- *   - one box per digit; typing a digit auto-advances to the next box;
- *   - Backspace clears the current box, or steps back and clears the previous
- *     one when the current box is already empty;
- *   - pasting or autofilling the whole code into any box distributes the digits
- *     across the remaining boxes;
- *   - `onComplete` fires once every box is filled (the screens use it to verify).
- *
- * Direction: the digit row is intentionally NOT mirrored in Arabic. Exactly like
- * SaudiPhoneInput, a numeric code reads left-to-right (box 1 is the first digit)
- * in both languages; only the label above follows the reading edge (rtlText).
- *
- * Autofill hooks (declarative, native): box 0 carries textContentType
- * "oneTimeCode" (iOS QuickType) and autoComplete "sms-otp" (Android). The web
- * WebOTP path is driven separately by useOtpAutofill, which feeds the code in
- * via `value`.
- */
+/** Multi-box OTP entry and native autofill surface. */
 import React, { useMemo, useRef } from 'react';
 import {
-  StyleSheet,
   TextInput,
   View,
   type NativeSyntheticEvent,
@@ -30,17 +9,17 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { color, fontFamily, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { fontFamily, radius, space, type as typeScale } from '../../design-system/generated/tokens';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 import { applyBackspace, applyBoxInput, joinBoxes, splitCodeToBoxes } from './otpAutofill';
 
 interface Props {
-  /** The joined code; the parent owns this state (single source of truth). */
   value: string;
   onChange: (code: string) => void;
   length?: number;
   editable?: boolean;
   autoFocus?: boolean;
-  /** Fired once all `length` boxes are filled. */
   onComplete?: (code: string) => void;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
@@ -56,6 +35,8 @@ export function OtpCodeInput({
   accessibilityLabel,
   style,
 }: Props) {
+  const colors = useThemeColors();
+  const styles = useStyles();
   const inputs = useRef<Array<TextInput | null>>([]);
   const boxes = useMemo(() => splitCodeToBoxes(value, length), [value, length]);
 
@@ -78,8 +59,6 @@ export function OtpCodeInput({
 
   const handleKeyPress = (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
     if (e.nativeEvent.key !== 'Backspace') return;
-    // Only special-case an already-empty box; RN clears a filled box itself,
-    // which flows through handleChange with an empty string.
     if (boxes[index]) return;
     const { boxes: next, focusIndex } = applyBackspace(boxes, index);
     commit(next, focusIndex);
@@ -90,39 +69,33 @@ export function OtpCodeInput({
       {boxes.map((digit, index) => (
         <TextInput
           key={index}
-          ref={(el) => {
-            inputs.current[index] = el;
-          }}
+          ref={(el) => { inputs.current[index] = el; }}
           value={digit}
           onChangeText={(text) => handleChange(index, text)}
           onKeyPress={(e) => handleKeyPress(index, e)}
           editable={editable}
           keyboardType="number-pad"
           inputMode="numeric"
-          // maxLength = length (not 1) so a pasted/autofilled full code is
-          // captured on the first box instead of being truncated to one digit.
           maxLength={length}
           autoFocus={autoFocus && index === 0}
-          // Declarative OTP autofill lands on the first box, then distributes.
           textContentType={index === 0 ? 'oneTimeCode' : 'none'}
           autoComplete={index === 0 ? 'sms-otp' : 'off'}
           selectTextOnFocus
           accessibilityLabel={`${accessibilityLabel ?? 'One-time code'} ${index + 1}`}
           style={[styles.box, digit ? styles.boxFilled : null, !editable ? styles.boxMuted : null]}
-          placeholderTextColor={color.appText3}
+          placeholderTextColor={colors.appText3}
         />
       ))}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  // Never mirrored: the code always reads left-to-right in both languages.
+const useStyles = makeStyles((color) => ({
   row: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    flexDirection: 'row' as const,
+    justifyContent: 'center' as const,
     gap: space.s2,
-    writingDirection: 'ltr',
+    writingDirection: 'ltr' as const,
   },
   box: {
     width: 44,
@@ -131,19 +104,12 @@ const styles = StyleSheet.create({
     borderColor: color.appLine,
     borderRadius: radius.md,
     backgroundColor: color.appSurface,
-    textAlign: 'center',
+    textAlign: 'center' as const,
     fontSize: typeScale.title.size,
-    // An OTP is a structured number: always mono, never the prose face.
     fontFamily: fontFamily.num.semibold,
     color: color.appText,
-    writingDirection: 'ltr',
+    writingDirection: 'ltr' as const,
   },
-  boxFilled: {
-    borderColor: color.ember,
-    backgroundColor: color.appSurface2,
-  },
-  boxMuted: {
-    backgroundColor: color.disabledBg,
-    color: color.disabledFg,
-  },
-});
+  boxFilled: { borderColor: color.ember, backgroundColor: color.appSurface2 },
+  boxMuted: { backgroundColor: color.disabledBg, color: color.disabledFg },
+}));

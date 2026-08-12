@@ -23,6 +23,8 @@ import {
 import { color, radius, space } from '../../design-system/generated/tokens';
 import { Text } from '../../design-system/ui/Text';
 import type { DbPushDevice } from '../../types/db';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 /**
  * Gate wrapper. Push is dormant (see PUSH_CLIENT_ENABLED), so the card — and
@@ -39,6 +41,8 @@ export function NotificationSettings() {
 }
 
 function NotificationSettingsCard() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, lang, rtlRow } = useI18n();
   const { userId } = useAuth();
   const [device, setDevice] = useState<DbPushDevice | null>(null);
@@ -113,7 +117,7 @@ function NotificationSettingsCard() {
           value={prefs.orderUpdatesEnabled}
           disabled={busy}
           onValueChange={(v) => void apply({ ...prefs, orderUpdatesEnabled: v })}
-          trackColor={{ true: color.ember, false: color.appLine }}
+          trackColor={{ true: colors.ember, false: colors.appLine }}
           accessibilityLabel={t('notifOrderUpdates')}
         />
       </View>
@@ -127,7 +131,7 @@ function NotificationSettingsCard() {
           value={prefs.promosEnabled}
           disabled={busy}
           onValueChange={(v) => void apply({ ...prefs, promosEnabled: v })}
-          trackColor={{ true: color.ember, false: color.appLine }}
+          trackColor={{ true: colors.ember, false: colors.appLine }}
           accessibilityLabel={t('notifPromos')}
         />
       </View>
@@ -137,11 +141,11 @@ function NotificationSettingsCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s1,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4, gap: space.s1,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.s3, paddingVertical: space.s3 },
-  rowDivider: { borderTopWidth: 1, borderTopColor: color.appLine },
-});
+  rowDivider: { borderTopWidth: 1, borderTopColor: colors.appLine },
+}));

@@ -22,6 +22,7 @@ import { StatusPill } from '../../../design-system/ui/Chip';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { SavedAddress } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function AddressCard({
   address,
@@ -47,6 +48,7 @@ export function AddressCard({
   onSetDefault: () => void;
   onDelete: () => void;
 }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   const name = address.label || fallbackLabel;
 
@@ -106,15 +108,15 @@ export function AddressCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
     gap: space.s2,
     padding: space.s4,
     borderRadius: radius.lg,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: color.appLine,
-    backgroundColor: color.appSurface,
+    borderColor: colors.appLine,
+    backgroundColor: colors.appSurface,
   },
   head: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   name: { flexShrink: 1 },
@@ -122,4 +124,4 @@ const styles = StyleSheet.create({
   // longer than their English counterparts and would otherwise truncate.
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s2, marginTop: space.s2 },
   action: { flexGrow: 1, flexBasis: 96 },
-});
+}));

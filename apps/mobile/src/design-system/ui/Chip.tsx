@@ -1,30 +1,13 @@
-/**
- * Design-system Chip (mobile) — one component for the two pill shapes this
- * product uses, because they are the same object at different jobs:
- *
- *   selectable  a category filter. Tappable, has a selected state.
- *   status      a read-only state pill (open/closed, order type). Not tappable.
- *
- * Selected chips fill with ember — the one interactive colour — rather than
- * tinting, so the active category is unmistakable at a glance in a scrolling
- * row. Status pills use the semantic tint tokens and never ember, so a state
- * can never be mistaken for something you can press.
- */
+/** Design-system Chip (mobile). */
 import React from 'react';
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { color, radius, space } from '../generated/tokens';
+import { radius, space } from '../generated/tokens';
+import { useThemeColors } from '../../theme/ThemeProvider';
 import { Text } from './Text';
+import { makeStyles } from '../../theme/makeStyles';
 
 export type ChipTone = 'neutral' | 'success' | 'danger' | 'warning' | 'info';
-
-const TONE: Record<ChipTone, { bg: string; fg: string }> = {
-  neutral: { bg: color.appSurface2, fg: color.appText2 },
-  success: { bg: color.mintTint, fg: color.mint },
-  danger: { bg: color.dangerTint, fg: color.danger },
-  warning: { bg: color.warnTint, fg: color.amberInk },
-  info: { bg: color.infoTint, fg: color.sky },
-};
 
 interface SelectableProps {
   label: string;
@@ -34,8 +17,9 @@ interface SelectableProps {
   style?: StyleProp<ViewStyle>;
 }
 
-/** A tappable filter chip. Ember when selected. */
 export function SelectableChip({ label, selected, onPress, onLayout, style }: SelectableProps) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
@@ -46,20 +30,17 @@ export function SelectableChip({ label, selected, onPress, onLayout, style }: Se
       style={[
         styles.base,
         {
-          backgroundColor: selected ? color.ember : color.appSurface,
-          borderColor: selected ? color.ember : color.appLine,
+          backgroundColor: selected ? colors.ember : colors.appSurface,
+          borderColor: selected ? colors.ember : colors.appLine,
         },
         style,
       ]}
     >
-      <Text variant="label" tone={selected ? 'onEmber' : 'secondary'} align="center">
-        {label}
-      </Text>
+      <Text variant="label" tone={selected ? 'onEmber' : 'secondary'} align="center">{label}</Text>
     </Pressable>
   );
 }
 
-/** A read-only state pill. Never ember — a state is not a control. */
 export function StatusPill({
   label,
   tone = 'neutral',
@@ -69,17 +50,23 @@ export function StatusPill({
   tone?: ChipTone;
   style?: StyleProp<ViewStyle>;
 }) {
-  const t = TONE[tone];
+  const styles = useStyles();
+  const colors = useThemeColors();
+  const t =
+    tone === 'success' ? { bg: colors.mintTint, fg: colors.mint }
+    : tone === 'danger' ? { bg: colors.dangerTint, fg: colors.danger }
+    : tone === 'warning' ? { bg: colors.warnTint, fg: colors.amberInk }
+    : tone === 'info' ? { bg: colors.infoTint, fg: colors.sky }
+    : { bg: colors.appSurface2, fg: colors.appText2 };
+
   return (
     <View style={[styles.base, styles.status, { backgroundColor: t.bg, borderColor: 'transparent' }, style]}>
-      <Text variant="caption" align="center" style={{ color: t.fg }}>
-        {label}
-      </Text>
+      <Text variant="caption" align="center" style={{ color: t.fg }}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   base: {
     paddingHorizontal: space.s4,
     paddingVertical: space.s2,
@@ -89,4 +76,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   status: { paddingVertical: 4, paddingHorizontal: space.s3 },
-});
+}));

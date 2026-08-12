@@ -27,6 +27,8 @@ import { Button } from '../../../design-system/ui/Button';
 import { Notice } from '../../../design-system/ui/Notice';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { CONTENT_MAX_WIDTH } from './layout';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 export interface LegalLink {
   key: string;
@@ -59,6 +61,8 @@ export function CheckoutFooter({
   links: LegalLink[];
   paddingBottom: number;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { lang, rtlText } = useI18n();
   const bodyFamily = lang === 'ar' ? fontFamily.ar.regular : fontFamily.en.regular;
   const linkFamily = lang === 'ar' ? fontFamily.ar.semibold : fontFamily.en.semibold;
@@ -85,14 +89,14 @@ export function CheckoutFooter({
         variant="primary"
       />
 
-      <RNText style={[styles.consent, rtlText, { fontFamily: bodyFamily, color: color.appText3 }]}>
+      <RNText style={[styles.consent, rtlText, { fontFamily: bodyFamily, color: colors.appText3 }]}>
         {consentPrefix}
         {links.map((l, i) => (
           <RNText key={l.key}>
             <RNText
               accessibilityRole="link"
               onPress={l.onPress}
-              style={[styles.link, { fontFamily: linkFamily, color: color.ember }]}
+              style={[styles.link, { fontFamily: linkFamily, color: colors.ember }]}
             >
               {l.title}
             </RNText>
@@ -106,14 +110,14 @@ export function CheckoutFooter({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // The bar spans the full width (so it reads as a floor), but its CONTENTS are
   // capped to the same column as the page above — otherwise on a tablet the
   // action drifts away from the summary it confirms.
   footer: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: color.appSurface,
-    borderTopWidth: 1, borderTopColor: color.appLine,
+    backgroundColor: colors.appSurface,
+    borderTopWidth: 1, borderTopColor: colors.appLine,
     paddingHorizontal: space.s4, paddingTop: space.s3,
   },
   column: { width: '100%', maxWidth: CONTENT_MAX_WIDTH, alignSelf: 'center', gap: space.s2 },
@@ -123,4 +127,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   link: { fontSize: typeScale.caption.size },
-});
+}));

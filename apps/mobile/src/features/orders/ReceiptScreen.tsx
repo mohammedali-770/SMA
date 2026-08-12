@@ -37,8 +37,12 @@ import { ConfirmationHero } from './view/ConfirmationHero';
 import { ReceiptBody } from './view/ReceiptBody';
 import { ReceiptSkeleton } from './view/Skeletons';
 import type { Order } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 export function ReceiptScreen({ orderId }: { orderId: string }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t } = useI18n();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +116,7 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   }, [orderId, refreshSilently, resending, t]);
 
   return (
-    <Screen edges={['top', 'left', 'right', 'bottom']} background={color.appBg}>
+    <Screen edges={['top', 'left', 'right', 'bottom']} background={colors.appBg}>
       {loading ? (
         // Shaped like the loaded receipt so the first paint lands without a
         // jump. Rendered in the same `loading` branch; silent refreshes never
@@ -148,15 +152,15 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   flex: { flex: 1 },
   scroll: { padding: space.s4, paddingBottom: space.s5, alignItems: 'center' },
   // The bar spans the full width so it reads as a floor, but its CONTENTS are
   // capped to the same column as the receipt above it.
   footer: {
     padding: space.s4,
-    borderTopWidth: 1, borderTopColor: color.appLine, backgroundColor: color.appSurface,
+    borderTopWidth: 1, borderTopColor: colors.appLine, backgroundColor: colors.appSurface,
     alignItems: 'center',
   },
   footerColumn: { gap: space.s2 },
-});
+}));

@@ -6,10 +6,19 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/logo.png" />
     <title>Spicy Meal — Saudi Fast-Food Delivery & POS</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem('sm-admin-theme');
+          const pref = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+          const dark = pref === 'dark' || (pref === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.setAttribute('data-theme', 'dark');
+        } catch {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

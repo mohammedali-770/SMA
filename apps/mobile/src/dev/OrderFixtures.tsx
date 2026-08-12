@@ -21,6 +21,7 @@ import { ReceiptBody } from '../features/orders/view/ReceiptBody';
 import { useI18n } from '../i18n/I18nProvider';
 import { FIXTURE_ORDER_LIST, FIXTURE_RECEIPTS, type ReceiptSceneKey } from './fixtureOrders';
 import type { OrderStatus } from '../types/models';
+import { makeStyles } from '../theme/makeStyles';
 
 const noop = () => {};
 
@@ -35,6 +36,7 @@ const STATUS_KEY: Record<OrderStatus, 'status_received' | 'status_preparing' | '
 
 /** My Orders — one card per interesting confirmation state. */
 export function OrdersListFixture({ empty }: { empty?: boolean }) {
+  const styles = useStyles();
   const { t } = useI18n();
   return (
     <View style={styles.root}>
@@ -62,6 +64,7 @@ export function OrdersListFixture({ empty }: { empty?: boolean }) {
 
 /** One receipt state: the hero plus the full receipt body. */
 export function ReceiptFixture({ scene }: { scene: ReceiptSceneKey }) {
+  const styles = useStyles();
   const order = FIXTURE_RECEIPTS[scene];
   return (
     <View style={styles.root}>
@@ -74,8 +77,8 @@ export function ReceiptFixture({ scene }: { scene: ReceiptSceneKey }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.appBg },
+const useStyles = makeStyles((colors) => ({
+  root: { flex: 1, backgroundColor: colors.appBg },
   scroll: { padding: space.s4, gap: space.s3, paddingBottom: space.s6 },
   empty: { paddingVertical: space.s6, gap: space.s2 },
-});
+}));

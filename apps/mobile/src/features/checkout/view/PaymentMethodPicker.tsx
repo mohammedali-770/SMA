@@ -20,6 +20,7 @@ import { color, radius, space } from '../../../design-system/generated/tokens';
 import { Notice } from '../../../design-system/ui/Notice';
 import { Text } from '../../../design-system/ui/Text';
 import type { PaymentMethod } from '../../../lib/payment';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function PaymentMethodPicker({
   methods,
@@ -42,6 +43,7 @@ export function PaymentMethodPicker({
   /** Shown when cash is the chosen method. */
   cashNote: string | null;
 }) {
+  const styles = useStyles();
   if (blocked) return <Notice title={blockedTitle} tone="blocking" />;
 
   return (
@@ -65,6 +67,7 @@ export function PaymentMethodPicker({
 function MethodOption({
   label, active, onPress,
 }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -89,7 +92,7 @@ function MethodOption({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // Fixed row direction: the options are a set, and mirroring their order in
   // Arabic gains nothing while making the two languages harder to compare.
   options: { flexDirection: 'row', gap: space.s3 },
@@ -103,16 +106,16 @@ const styles = StyleSheet.create({
     paddingVertical: space.s3,
     borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: color.appLine,
-    backgroundColor: color.appSurface,
+    borderColor: colors.appLine,
+    backgroundColor: colors.appSurface,
   },
-  optionActive: { borderColor: color.ember, backgroundColor: color.appSurface2 },
+  optionActive: { borderColor: colors.ember, backgroundColor: colors.appSurface2 },
   pressed: { opacity: 0.8 },
   radio: {
     width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, borderColor: color.appText3,
+    borderWidth: 2, borderColor: colors.appText3,
     alignItems: 'center', justifyContent: 'center',
   },
-  radioOn: { borderColor: color.ember },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.ember },
-});
+  radioOn: { borderColor: colors.ember },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.ember },
+}));

@@ -9,6 +9,7 @@ import { color, radius, space } from '../../../design-system/generated/tokens';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { SavedAddress } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function SavedAddressList({
   addresses,
@@ -23,6 +24,7 @@ export function SavedAddressList({
   title: string;
   fallbackLabel: string;
 }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   if (addresses.length === 0) return null;
 
@@ -60,20 +62,20 @@ export function SavedAddressList({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: space.s3,
     padding: space.s3, borderRadius: radius.md,
-    borderWidth: 1.5, borderColor: color.appLine, backgroundColor: color.appSurface,
+    borderWidth: 1.5, borderColor: colors.appLine, backgroundColor: colors.appSurface,
   },
-  rowActive: { borderColor: color.ember, backgroundColor: color.appSurface2 },
+  rowActive: { borderColor: colors.ember, backgroundColor: colors.appSurface2 },
   pressed: { opacity: 0.8 },
   body: { flex: 1, gap: 2 },
   radio: {
     width: 20, height: 20, borderRadius: 10,
-    borderWidth: 2, borderColor: color.appText3,
+    borderWidth: 2, borderColor: colors.appText3,
     alignItems: 'center', justifyContent: 'center',
   },
-  radioOn: { borderColor: color.ember },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.ember },
-});
+  radioOn: { borderColor: colors.ember },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.ember },
+}));

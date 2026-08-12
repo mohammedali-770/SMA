@@ -30,6 +30,7 @@ import { useI18n } from '../../../i18n/I18nProvider';
 import { confirmationPresentation, orderConfirmationState } from '../orderConfirmation';
 import { TONE_COLOR } from './confirmationTone';
 import type { Order } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function ConfirmationHero({
   order, onResend, resending, resendError,
@@ -39,6 +40,7 @@ export function ConfirmationHero({
   resending: boolean;
   resendError: string | null;
 }) {
+  const styles = useStyles();
   const { t } = useI18n();
   const state = orderConfirmationState(order);
   const p = confirmationPresentation(state);
@@ -95,7 +97,7 @@ export function ConfirmationHero({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { alignItems: 'center', paddingVertical: space.s5, gap: space.s2 },
   // A tinted disc rather than a bare glyph: on the cream ground a lone outline
   // icon reads as an afterthought, and this is the loudest thing on the screen.
@@ -109,4 +111,4 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch', marginTop: space.s3, padding: space.s3,
     borderWidth: 1, borderRadius: radius.md, borderCurve: 'continuous', gap: 2,
   },
-});
+}));

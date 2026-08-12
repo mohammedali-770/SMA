@@ -19,11 +19,13 @@ import { catalog } from '../../services/api';
 import { mapBanner } from '../../lib/mappers';
 import { color, radius, space } from '../../design-system/generated/tokens';
 import type { HomeBanner } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
 
 const ROTATE_MS = 4000;
 const RATIO = 6 / 16; // height = width * 6/16 (~2.67:1) — short banner.
 
 export function BannerCarousel() {
+  const styles = useStyles();
   const [banners, setBanners] = useState<HomeBanner[]>([]);
   const [failed, setFailed] = useState<Record<string, true>>({});
   const [width, setWidth] = useState(0);
@@ -140,10 +142,10 @@ function BannerImage({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { marginHorizontal: space.s4, marginTop: space.s3 },
-  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: color.appSurface2, width: '100%' },
+  frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.appSurface2, width: '100%' },
   dots: { position: 'absolute', bottom: space.s2, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
-  dotActive: { backgroundColor: color.appSurface, width: 16 },
-});
+  dotActive: { backgroundColor: colors.appSurface, width: 16 },
+}));

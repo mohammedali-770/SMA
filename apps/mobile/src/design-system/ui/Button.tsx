@@ -1,15 +1,4 @@
-/**
- * Design-system Button (mobile).
- *
- * NOT a replacement for `components/Button.tsx` yet — that one still backs
- * every shipped screen and keeps the current purple primary. This is the
- * "Ember on Cream" button: red is the only interactive colour. Screens migrate
- * in a follow-up PR; until then both exist on purpose.
- *
- * All behaviour (what counts as disabled, whether a press may fire, what
- * assistive tech is told) lives in the framework-free `buttonState` module so
- * it is unit-tested for both platforms at once.
- */
+/** Design-system Button (mobile). */
 import React, { useCallback } from 'react';
 import {
   ActivityIndicator,
@@ -27,8 +16,10 @@ import {
   type ButtonSize,
   type ButtonVariant,
 } from '../generated/buttonState';
-import { color, fontFamily, hitTarget, motion, radius, space, type } from '../generated/tokens';
+import { fontFamily, hitTarget, motion, radius, space, type } from '../generated/tokens';
 import { useI18n } from '../../i18n/I18nProvider';
+import { useThemeColors } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
 
 interface Props {
   label: string;
@@ -39,17 +30,9 @@ interface Props {
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
   accessibilityLabel?: string;
-  /** Rendered before the label (already mirrored by the row's writing order). */
   leading?: React.ReactNode;
   testID?: string;
 }
-
-const SURFACE: Record<ButtonVariant, { bg: string; fg: string; border: string }> = {
-  primary: { bg: color.ember, fg: color.onEmber, border: 'transparent' },
-  secondary: { bg: color.appSurface, fg: color.ember, border: color.ember },
-  ghost: { bg: 'transparent', fg: color.appText, border: 'transparent' },
-  danger: { bg: color.danger, fg: color.onEmber, border: 'transparent' },
-};
 
 export function Button({
   label,
@@ -63,21 +46,23 @@ export function Button({
   leading,
   testID,
 }: Props) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { lang } = useI18n();
   const state = resolveButtonState({ variant, size, disabled, loading });
-  const surface = SURFACE[state.variant];
+  const surface =
+    state.variant === 'primary' ? { bg: colors.ember, fg: colors.onEmber, border: 'transparent' }
+    : state.variant === 'secondary' ? { bg: colors.appSurface, fg: colors.ember, border: colors.ember }
+    : state.variant === 'ghost' ? { bg: 'transparent', fg: colors.appText, border: 'transparent' }
+    : { bg: colors.danger, fg: colors.onEmber, border: 'transparent' };
 
-  // Guard the handler rather than trusting `disabled` alone: a Pressable whose
-  // disabled prop is forgotten downstream would otherwise double-submit.
-  // `state.inert`, not `state`: resolveButtonState returns a new object every
-  // render, so depending on the object never memoises anything.
   const handlePress = useCallback(() => {
     if (shouldInvokePress(state)) onPress();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.inert, onPress]);
 
-  const bg = state.muted ? color.disabledBg : surface.bg;
-  const fg = state.muted ? color.disabledFg : surface.fg;
+  const bg = state.muted ? colors.disabledBg : surface.bg;
+  const fg = state.muted ? colors.disabledFg : surface.fg;
   const family = lang === 'ar' ? fontFamily.ar.bold : fontFamily.en.bold;
 
   return (
@@ -85,39 +70,27 @@ export function Button({
       testID={testID}
       accessibilityRole={state.accessibility.role}
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{
-        disabled: state.accessibility.disabled,
-        busy: state.accessibility.busy,
-      }}
+      accessibilityState={{ disabled: state.accessibility.disabled, busy: state.accessibility.busy }}
       onPress={handlePress}
       disabled={state.inert}
       style={({ pressed }) => [
         styles.base,
-        // Read from the resolved state, not the raw prop, so the default lives
-        // in exactly one place (resolveButtonState).
         state.size === 'md' ? styles.md : styles.lg,
-        { backgroundColor: bg, borderColor: state.muted ? color.disabledBg : surface.border },
+        { backgroundColor: bg, borderColor: state.muted ? colors.disabledBg : surface.border },
         state.variant === 'secondary' && styles.bordered,
         pressed && state.allowPressFeedback && styles.pressed,
         style,
       ]}
     >
       <View style={styles.row}>
-        {state.showSpinner ? (
-          // marginEnd (not marginRight) so the gap mirrors in Arabic.
-          <ActivityIndicator size="small" color={fg} style={styles.spinner} />
-        ) : (
-          leading
-        )}
-        <Text style={[styles.label, { color: fg, fontFamily: family }]} numberOfLines={1}>
-          {label}
-        </Text>
+        {state.showSpinner ? <ActivityIndicator size="small" color={fg} style={styles.spinner} /> : leading}
+        <Text style={[styles.label, { color: fg, fontFamily: family }]} numberOfLines={1}>{label}</Text>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   base: {
     borderRadius: radius.md,
     alignItems: 'center',
@@ -132,4 +105,4 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   spinner: { marginEnd: space.s2 },
   label: { fontSize: type.button.size, lineHeight: type.button.lineHeight },
-});
+}));

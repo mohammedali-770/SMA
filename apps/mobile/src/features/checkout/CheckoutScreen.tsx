@@ -54,6 +54,7 @@ import { PaymentStatusDialog, type PayState } from './view/PaymentStatusDialog';
 import { CONTENT_MAX_WIDTH } from './view/layout';
 import { Section } from './view/Section';
 import { TotalsCard } from './view/TotalsCard';
+import { makeStyles } from '../../theme/makeStyles';
 
 const LEGAL_DOCS = [
   'cancellation_refund_policy',
@@ -74,6 +75,7 @@ interface BlockMessage {
 }
 
 export function CheckoutScreen() {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { t, pick, lang } = useI18n();
   const { profile } = useAuth();
@@ -843,8 +845,8 @@ function modifierSummary(it: CartItem, pick: (en: string, ar: string) => string)
   return mods.map((m) => pick(m.nameEn, m.nameAr)).join(' · ');
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.appBg },
+const useStyles = makeStyles((colors) => ({
+  root: { flex: 1, backgroundColor: colors.appBg },
   flex: { flex: 1 },
   scroll: {
     padding: space.s4,
@@ -862,4 +864,4 @@ const styles = StyleSheet.create({
   // changes nothing.
   column: { width: '100%', maxWidth: CONTENT_MAX_WIDTH, gap: space.s5 },
   multiline: { minHeight: 84, paddingTop: space.s3, textAlignVertical: 'top' },
-});
+}));

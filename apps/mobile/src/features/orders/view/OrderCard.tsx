@@ -24,12 +24,24 @@ import { formatRiyadhDateTime } from '../../../utils/format';
 import { confirmationPresentation, orderConfirmationState } from '../orderConfirmation';
 import { TONE_CHIP } from './confirmationTone';
 import type { Order, OrderStatus } from '../../../types/models';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 /** Order status → pill tone. Delivered reads settled, cancelled reads ended. */
 function statusTone(status: OrderStatus): ChipTone {
   if (status === 'delivered') return 'success';
   if (status === 'cancelled') return 'danger';
   return 'info';
+}
+
+/**
+ * Customer-facing branch reference. The provider number is the only identifier
+ * exposed to the customer; the # is presentation only and never changes the
+ * value used for API/POS reconciliation.
+ */
+function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string | null {
+  const raw = orderDisplayNumber(order);
+  return raw ? `#${raw.replace(/^#/, '')}` : null;
 }
 
 export function OrderCard({
@@ -39,9 +51,11 @@ export function OrderCard({
   statusLabel: string;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { t, lang, isRTL, rtlRow } = useI18n();
 
-  const branchNo = orderDisplayNumber(order);
+  const branchNo = visibleBranchNumber(order);
   const confirmation = confirmationPresentation(orderConfirmationState(order));
   const heading = branchNo ?? t(confirmation.titleKey);
   const itemCount = order.items.reduce((n, it) => n + it.quantity, 0);
@@ -80,7 +94,7 @@ export function OrderCard({
 
       <View style={[styles.bottom, rtlRow]}>
         <Text variant="label" tone="secondary" style={styles.meta}>{meta}</Text>
-        <Price amount={order.total} size={typeScale.title.size} color={color.appText} weight="700" />
+        <Price amount={order.total} size={typeScale.title.size} color={colors.appText} weight="700" />
       </View>
 
       <View style={styles.footer}>
@@ -90,10 +104,10 @@ export function OrderCard({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
-    borderWidth: 1, borderColor: color.appLine, padding: space.s4, gap: space.s1,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s4, gap: space.s1,
   },
   pressed: { opacity: 0.9 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.s3 },
@@ -104,5 +118,5 @@ const styles = StyleSheet.create({
   chipRow: { alignSelf: 'flex-start', marginTop: space.s1 },
   bottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: space.s1 },
   meta: { flexShrink: 1 },
-  footer: { borderTopWidth: 1, borderTopColor: color.appLine, marginTop: space.s2, paddingTop: space.s2 },
-});
+  footer: { borderTopWidth: 1, borderTopColor: colors.appLine, marginTop: space.s2, paddingTop: space.s2 },
+}));

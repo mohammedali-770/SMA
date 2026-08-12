@@ -34,6 +34,8 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { SUPABASE_URL } from '../../lib/env';
 import { readCheckoutHandoff, settleCheckoutHandoff, type CheckoutHandoffResult } from '../../features/checkout/checkoutHandoff';
 import { decideNavigation, safeHostForLog, type WebviewNavConfig } from '../../features/checkout/webviewPolicy';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -47,6 +49,8 @@ function hostOf(u: string): string {
 }
 
 export default function PaymentCheckoutScreen() {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const params = useLocalSearchParams<{ session?: string }>();
   const insets = useSafeAreaInsets();
   const { t, pick } = useI18n();
@@ -192,7 +196,7 @@ export default function PaymentCheckoutScreen() {
           // Opaque loader only before the first paint; later Tap/3DS transitions
           // render on the page itself so we don't blank an interactive checkout.
           <View style={styles.overlay} pointerEvents="none">
-            <ActivityIndicator size="large" color={color.ember} />
+            <ActivityIndicator size="large" color={colors.ember} />
             <Text variant="body" tone="secondary" align="center">{t('payScreenLoading')}</Text>
           </View>
         ) : null}
@@ -207,20 +211,20 @@ export default function PaymentCheckoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.appBg },
+const useStyles = makeStyles((colors) => ({
+  root: { flex: 1, backgroundColor: colors.appBg },
   body: { flex: 1 },
-  web: { flex: 1, backgroundColor: color.appBg },
+  web: { flex: 1, backgroundColor: colors.appBg },
   close: { minHeight: 36, justifyContent: 'center', paddingHorizontal: space.s2 },
   pressed: { opacity: 0.7 },
   overlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', gap: space.s4, padding: space.s5,
-    backgroundColor: color.appBg,
+    backgroundColor: colors.appBg,
   },
   errActions: { alignSelf: 'stretch', gap: space.s2, marginTop: space.s3 },
   footer: {
-    backgroundColor: color.appSurface, borderTopWidth: 1, borderTopColor: color.appLine,
+    backgroundColor: colors.appSurface, borderTopWidth: 1, borderTopColor: colors.appLine,
     paddingHorizontal: space.s4, paddingTop: space.s2,
   },
-});
+}));

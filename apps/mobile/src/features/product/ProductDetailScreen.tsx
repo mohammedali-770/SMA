@@ -21,8 +21,12 @@ import { useCart, useCatalog } from '../../store';
 import { computeUnitPrice } from '../../utils/format';
 import { Price } from '../../components/Price';
 import type { Modifier, ModifierGroup } from '../../types/models';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 
 export function ProductDetailScreen({ productId }: { productId: string }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t, pick, rtlText, rtlRow } = useI18n();
   const { loading, getProduct, groupsForProduct } = useCatalog();
@@ -98,7 +102,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
             </Text>
           ) : null}
           <View style={[styles.metaRow, rtlRow]}>
-            <Price amount={product.price} size={typeScale.title.size} color={color.appText} weight="700" />
+            <Price amount={product.price} size={typeScale.title.size} color={colors.appText} weight="700" />
             {product.calories ? (
               <Text variant="caption" tone="tertiary">{product.calories} {t('kcal')}</Text>
             ) : null}
@@ -141,7 +145,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
                         </View>
                         <Text variant="body" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>
                         {m.price > 0 ? (
-                          <Price amount={m.price} prefix="+" size={typeScale.label.size} color={color.ember} weight="700" />
+                          <Price amount={m.price} prefix="+" size={typeScale.label.size} color={colors.ember} weight="700" />
                         ) : null}
                       </Pressable>
                     );
@@ -170,7 +174,7 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
           <Price
             amount={total}
             size={typeScale.heading.size}
-            color={canAdd ? color.onEmber : color.disabledFg}
+            color={canAdd ? colors.onEmber : colors.disabledFg}
             weight="700"
           />
         </Pressable>
@@ -179,36 +183,36 @@ export function ProductDetailScreen({ productId }: { productId: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.appBg },
-  hero: { width: '100%', height: 260, backgroundColor: color.appSurface2 },
+const useStyles = makeStyles((colors) => ({
+  root: { flex: 1, backgroundColor: colors.appBg },
+  hero: { width: '100%', height: 260, backgroundColor: colors.appSurface2 },
   body: { padding: space.s4 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.s4, marginTop: space.s3 },
 
   // Each modifier group sits on its own flat surface so groups read as separate
   // decisions; an unmet required group gets a danger edge, not a hidden message.
   group: {
-    marginTop: space.s4, backgroundColor: color.appSurface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: color.appLine, padding: space.s3,
+    marginTop: space.s4, backgroundColor: colors.appSurface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s3,
   },
-  groupUnmet: { borderColor: color.danger },
+  groupUnmet: { borderColor: colors.danger },
   groupHead: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', marginBottom: space.s2, gap: space.s2,
   },
 
   modRow: {
-    flexDirection: 'row', alignItems: 'center', gap: space.s3, backgroundColor: color.appSurface,
-    borderRadius: radius.md, borderWidth: 1, borderColor: color.appLine,
+    flexDirection: 'row', alignItems: 'center', gap: space.s3, backgroundColor: colors.appSurface,
+    borderRadius: radius.md, borderWidth: 1, borderColor: colors.appLine,
     padding: space.s3, minHeight: 48,
   },
-  modRowOn: { borderColor: color.ember, backgroundColor: color.appSurface2 },
+  modRowOn: { borderColor: colors.ember, backgroundColor: colors.appSurface2 },
   check: {
-    width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: color.appLine,
+    width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.appLine,
     alignItems: 'center', justifyContent: 'center',
   },
   radio: { borderRadius: 12 },
-  checkOn: { backgroundColor: color.ember, borderColor: color.ember },
+  checkOn: { backgroundColor: colors.ember, borderColor: colors.ember },
 
   qtyRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -216,14 +220,14 @@ const styles = StyleSheet.create({
   },
 
   footer: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: color.appSurface,
-    borderTopWidth: 1, borderTopColor: color.appLine,
+    position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.appSurface,
+    borderTopWidth: 1, borderTopColor: colors.appLine,
     paddingHorizontal: space.s4, paddingTop: space.s3,
   },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: color.ember, borderRadius: radius.lg,
+    backgroundColor: colors.ember, borderRadius: radius.lg,
     paddingHorizontal: space.s5, paddingVertical: space.s4, minHeight: 54,
   },
-  addBtnDim: { backgroundColor: color.disabledBg },
-});
+  addBtnDim: { backgroundColor: colors.disabledBg },
+}));

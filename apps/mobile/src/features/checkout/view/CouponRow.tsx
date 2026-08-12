@@ -20,6 +20,8 @@ import { Button } from '../../../design-system/ui/Button';
 import { Field } from '../../../design-system/ui/Field';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 export function CouponRow({
   code,
@@ -42,6 +44,8 @@ export function CouponRow({
   result: { ok: boolean; message: string; discount: number } | null;
   appliedLabel: string;
 }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { rtlRow } = useI18n();
   const rejected = result && !result.ok ? result.message : null;
 
@@ -74,17 +78,17 @@ export function CouponRow({
           row is bottom-aligned, so a message growing inside the field would
           push the apply button down out of line with the input it applies to. */}
       {rejected ? (
-        <Text variant="caption" style={{ color: color.danger }}>{rejected}</Text>
+        <Text variant="caption" style={{ color: colors.danger }}>{rejected}</Text>
       ) : null}
 
       {result?.ok ? (
         <View style={[styles.applied, rtlRow]}>
-          <Text variant="label" style={{ color: color.mint }}>{appliedLabel}</Text>
+          <Text variant="label" style={{ color: colors.mint }}>{appliedLabel}</Text>
           <Price
             amount={result.discount}
             prefix="−"
             size={typeScale.label.size}
-            color={color.mint}
+            color={colors.mint}
             weight="600"
           />
         </View>
@@ -93,10 +97,10 @@ export function CouponRow({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   // Bottom-aligned so the button sits level with the input, not the label.
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: space.s2 },
   field: { flex: 1 },
   apply: { minWidth: 104, minHeight: 48 },
   applied: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
-});
+}));

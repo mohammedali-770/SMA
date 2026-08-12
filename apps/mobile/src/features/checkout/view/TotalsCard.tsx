@@ -25,6 +25,8 @@ import { color, radius, space, type as typeScale } from '../../../design-system/
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import type { PreviewTotals } from '../previewTotals';
+import { makeStyles } from '../../../theme/makeStyles';
+import { useThemeColors } from '../../../theme/ThemeProvider';
 
 export function TotalsCard({
   totals,
@@ -40,6 +42,7 @@ export function TotalsCard({
   };
   serverNote: string;
 }) {
+  const styles = useStyles();
   // testID so the money column can be targeted directly — by the dev visual
   // review today, and by an end-to-end assertion later.
   return (
@@ -65,6 +68,8 @@ export function TotalsCard({
 function MoneyRow({
   label, amount, negative, big,
 }: { label: string; amount: number; negative?: boolean; big?: boolean }) {
+  const styles = useStyles();
+  const colors = useThemeColors();
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
@@ -73,7 +78,7 @@ function MoneyRow({
         amount={amount}
         prefix={negative ? '−' : undefined}
         size={big ? typeScale.title.size : typeScale.body.size}
-        color={negative ? color.mint : color.appText}
+        color={negative ? colors.mint : colors.appText}
         weight={big ? '700' : '600'}
       />
     </View>
@@ -81,6 +86,7 @@ function MoneyRow({
 }
 
 function NoteRow({ label }: { label: string }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   return (
     <View style={[styles.row, rtlRow]}>
@@ -89,17 +95,17 @@ function NoteRow({ label }: { label: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
-    backgroundColor: color.appSurface,
+    backgroundColor: colors.appSurface,
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: color.appLine,
+    borderColor: colors.appLine,
     padding: space.s4,
   },
   row: {
     flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingVertical: space.s1, gap: space.s3,
   },
-  divider: { height: 1, backgroundColor: color.appLine, marginVertical: space.s2 },
-});
+  divider: { height: 1, backgroundColor: colors.appLine, marginVertical: space.s2 },
+}));

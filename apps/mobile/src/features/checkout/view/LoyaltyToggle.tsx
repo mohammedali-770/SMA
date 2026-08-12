@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { color, radius, space } from '../../../design-system/generated/tokens';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
+import { makeStyles } from '../../../theme/makeStyles';
 
 export function LoyaltyToggle({
   on,
@@ -26,6 +27,7 @@ export function LoyaltyToggle({
   label: string;
   pointsLabel: string;
 }) {
+  const styles = useStyles();
   const { rtlRow } = useI18n();
   return (
     <Pressable
@@ -48,11 +50,11 @@ export function LoyaltyToggle({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: {
     flexDirection: 'row', alignItems: 'center', gap: space.s3,
-    backgroundColor: color.appSurface, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: color.appLine, padding: space.s3,
+    backgroundColor: colors.appSurface, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.appLine, padding: space.s3,
     minHeight: 60,
   },
   pressed: { opacity: 0.85 },
@@ -61,9 +63,9 @@ const styles = StyleSheet.create({
   // physical gesture in both languages.
   track: {
     width: 48, height: 28, borderRadius: 14,
-    backgroundColor: color.appLine, padding: 3, justifyContent: 'center',
+    backgroundColor: colors.appLine, padding: 3, justifyContent: 'center',
   },
-  trackOn: { backgroundColor: color.ember },
-  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: color.appSurface },
+  trackOn: { backgroundColor: colors.ember },
+  knob: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.appSurface },
   knobOn: { alignSelf: 'flex-end' },
-});
+}));

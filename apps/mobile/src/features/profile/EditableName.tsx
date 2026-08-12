@@ -28,8 +28,10 @@ import { checkCustomerName, nameCopy, nameMessage, saveCustomerName, type NamePr
 import { useI18n } from '../../i18n/I18nProvider';
 import { profile as profileApi } from '../../services/api';
 import { useAuth } from '../../store';
+import { makeStyles } from '../../theme/makeStyles';
 
 export function EditableName() {
+  const styles = useStyles();
   const { lang, rtlRow, t } = useI18n();
   const { profile, refreshProfile } = useAuth();
   const copy = nameCopy[lang];
@@ -141,23 +143,23 @@ export function EditableName() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
     gap: space.s3,
-    backgroundColor: color.appSurface,
+    backgroundColor: colors.appSurface,
     borderRadius: radius.lg,
     borderCurve: 'continuous',
     borderWidth: 1,
-    borderColor: color.appLine,
+    borderColor: colors.appLine,
     padding: space.s4,
   },
   identity: { flexDirection: 'row', alignItems: 'center', gap: space.s3 },
   identityBody: { flex: 1, gap: 2 },
   avatar: {
     width: 56, height: 56, borderRadius: 28,
-    backgroundColor: color.ember, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.ember, alignItems: 'center', justifyContent: 'center',
   },
   editor: { gap: space.s3 },
   actions: { flexDirection: 'row', gap: space.s2 },
   action: { flex: 1 },
-});
+}));

@@ -30,6 +30,7 @@ import { ProductCard } from '../features/menu/HomeMenuScreen';
 import { useI18n } from '../i18n/I18nProvider';
 import { color, space } from '../design-system/generated/tokens';
 import type { CartItem, Product } from '../types/models';
+import { useThemeColors } from '../theme/ThemeProvider';
 
 const P = (o: Partial<Product>): Product => o as unknown as Product;
 const C = (o: Partial<CartItem>): CartItem => o as unknown as CartItem;
@@ -74,6 +75,7 @@ const RIYAL_SAMPLES: { label: string; a: number; s: number; w: TextStyle['fontWe
 ];
 
 export default function DevPreview() {
+  const colors = useThemeColors();
   const { c } = useLocalSearchParams<{ c?: string }>();
   const { pick, t } = useI18n();
   if (!__DEV__) return <Redirect href="/" />;
@@ -83,9 +85,9 @@ export default function DevPreview() {
         {c === 'riyal'
           ? RIYAL_SAMPLES.map((r, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: space.s3 }}>
-                <Text style={{ width: 92, fontSize: 12, color: color.appText3 }}>{r.label}</Text>
-                <Price amount={r.a} prefix={r.prefix} size={r.s} color={color.appText} weight={r.w} />
-                <Price amount={r.a} prefix={r.prefix} size={r.s} color={color.ember} weight="800" />
+                <Text style={{ width: 92, fontSize: 12, color: colors.appText3 }}>{r.label}</Text>
+                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.appText} weight={r.w} />
+                <Price amount={r.a} prefix={r.prefix} size={r.s} color={colors.ember} weight="800" />
               </View>
             ))
           : c === 'cart'
