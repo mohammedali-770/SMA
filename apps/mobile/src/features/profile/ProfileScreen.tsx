@@ -1,18 +1,13 @@
 /**
- * Profile: identity from `profiles`, loyalty balance, language toggle, sign out.
- *
- * Name editing lives in `EditableName` and saved addresses behind the row below;
- * both write through the paths the rest of the app already uses (`profiles.full_name`
- * via AuthProvider's refresh, and the shared address book), so nothing here owns
- * a second copy of either.
+ * Profile: identity, loyalty, saved addresses, language, appearance and sign out.
  */
 import { router } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { AwardIcon, SignOutIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
-import { color, radius, space } from '../../design-system/generated/tokens';
+import { radius, space } from '../../design-system/generated/tokens';
 import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
@@ -22,41 +17,44 @@ import { deactivateThisDevice } from '../notifications/pushRegistration';
 import { VerifyPhoneWhatsApp } from './VerifyPhoneWhatsApp';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAddressBook, useAuth } from '../../store';
+import { useTheme, type ThemePreference } from '../../theme/ThemeProvider';
+import { makeStyles } from '../../theme/makeStyles';
+
+const APPEARANCE: ThemePreference[] = ['system', 'light', 'dark'];
 
 export function ProfileScreen() {
   const { t, pick, lang, setLang, rtlRow } = useI18n();
+  const { preference, setPreference, colors } = useTheme();
+  const styles = useStyles();
   const { profile, signOut } = useAuth();
   const addressBook = useAddressBook();
 
   const onSignOut = async () => {
-    // Silence this device BEFORE the JWT disappears — on a shared phone the
-    // next account must not receive this account's pushes. Best-effort and
-    // fast; sign-out proceeds regardless.
     await deactivateThisDevice();
     await signOut();
     router.replace('/(auth)/login');
   };
 
-  // Saved-address count, straight from the shared book, so the row reflects a
-  // deletion made on the addresses screen the moment the customer comes back.
   const addressCount = addressBook.addresses.length;
+  const appearanceLabel = (value: ThemePreference) =>
+    value === 'system' ? pick('System', 'النظام')
+    : value === 'light' ? pick('Light', 'فاتح')
+    : pick('Dark', 'داكن');
 
   return (
-    <Screen background={color.appBg}>
+    <Screen>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[columnStyles.column, styles.column]}>
         <Text variant="display">{t('profile')}</Text>
 
         <EditableName />
 
-        {/* Loyalty — the one place a saffron accent earns its keep: a reward is
-            neither a warning nor an action. */}
         <View style={[styles.card, styles.loyalty, rtlRow]}>
           <View style={[styles.loyaltyLabel, rtlRow]}>
-            <AwardIcon size={22} color={color.saffron} />
-            <Text variant="heading" style={{ color: color.amberInk }}>{t('loyaltyPoints')}</Text>
+            <AwardIcon size={22} color={colors.saffron} />
+            <Text variant="heading" style={{ color: colors.amberInk }}>{t('loyaltyPoints')}</Text>
           </View>
-          <Text variant="display" style={{ color: color.amberInk }}>{profile?.loyaltyPoints ?? 0}</Text>
+          <Text variant="display" style={{ color: colors.amberInk }}>{profile?.loyaltyPoints ?? 0}</Text>
         </View>
 
         <View style={styles.card}>
@@ -64,7 +62,6 @@ export function ProfileScreen() {
           <DetailRow label={t('role')} value={profile?.role ?? '—'} last />
         </View>
 
-        {/* Saved addresses (signed-in only — the book is per-customer). */}
         {profile ? (
           <Pressable
             style={({ pressed }) => [styles.card, styles.legalRow, rtlRow, pressed && styles.pressed]}
@@ -83,29 +80,30 @@ export function ProfileScreen() {
           </Pressable>
         ) : null}
 
-        {/* WhatsApp phone verification (signed-in only) */}
         {profile ? <VerifyPhoneWhatsApp /> : null}
-
-        {/* Push notification preferences (signed-in only; real devices only) */}
         {profile ? <NotificationSettings /> : null}
 
         <Text variant="title" style={styles.sectionTitle}>{t('language')}</Text>
-        {/* Same setters and labels as before. Two chips rather than a bespoke
-            segmented control — the design system already owns "selected". */}
         <View style={styles.langRow}>
-          <SelectableChip
-            label={t('english')}
-            selected={lang === 'en'}
-            onPress={() => setLang('en')}
-            style={styles.langChip}
-          />
-          <SelectableChip
-            label={t('arabic')}
-            selected={lang === 'ar'}
-            onPress={() => setLang('ar')}
-            style={styles.langChip}
-          />
+          <SelectableChip label={t('english')} selected={lang === 'en'} onPress={() => setLang('en')} style={styles.langChip} />
+          <SelectableChip label={t('arabic')} selected={lang === 'ar'} onPress={() => setLang('ar')} style={styles.langChip} />
         </View>
+
+        <Text variant="title" style={styles.sectionTitle}>{pick('Appearance', 'المظهر')}</Text>
+        <View style={styles.appearanceRow}>
+          {APPEARANCE.map((value) => (
+            <SelectableChip
+              key={value}
+              label={appearanceLabel(value)}
+              selected={preference === value}
+              onPress={() => setPreference(value)}
+              style={styles.appearanceChip}
+            />
+          ))}
+        </View>
+        <Text variant="caption" tone="tertiary">
+          {pick('System follows your device appearance.', 'النظام يتبع مظهر جهازك.')}
+        </Text>
 
         <Text variant="title" style={styles.sectionTitle}>{t('legalSupport')}</Text>
         <Pressable
@@ -119,20 +117,16 @@ export function ProfileScreen() {
           <Text variant="title" tone="ember">{lang === 'ar' ? '‹' : '›'}</Text>
         </Pressable>
 
-        {/* Sign out — destructive, separated from normal settings. The sequence
-            inside onSignOut is security-sensitive and unchanged. */}
         <Pressable
           onPress={onSignOut}
           accessibilityRole="button"
           accessibilityLabel={t('signOut')}
           style={({ pressed }) => [styles.signOut, rtlRow, pressed && styles.pressed]}
         >
-          <SignOutIcon size={18} color={color.onEmber} />
+          <SignOutIcon size={18} color={colors.onEmber} />
           <Text variant="button" tone="onEmber">{t('signOut')}</Text>
         </Pressable>
 
-        {/* Delete account — destructive and de-emphasized (text only) so it is
-            discoverable but not tapped by accident. Opens the guarded flow. */}
         <Pressable
           onPress={() => router.push('/account/delete')}
           accessibilityRole="button"
@@ -154,6 +148,7 @@ export function ProfileScreen() {
 
 function DetailRow({ label, value, last }: { label: string; value: string; last?: boolean }) {
   const { rtlRow } = useI18n();
+  const styles = useStyles();
   return (
     <View style={[styles.detailRow, rtlRow, !last && styles.detailBorder]}>
       <Text variant="body" tone="secondary">{label}</Text>
@@ -162,43 +157,39 @@ function DetailRow({ label, value, last }: { label: string; value: string; last?
   );
 }
 
-const styles = StyleSheet.create({
-  scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' },
+const useStyles = makeStyles((color) => ({
+  scroll: { padding: space.s4, paddingBottom: space.s6 * 2, alignItems: 'center' as const },
   column: { gap: space.s3 },
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous' as const,
     borderWidth: 1, borderColor: color.appLine, padding: space.s4,
   },
   pressed: { opacity: 0.9 },
-
   addressLabel: { flexShrink: 1, gap: 2 },
-
   loyalty: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const,
     backgroundColor: color.warnTint, borderColor: color.warnLine,
   },
-  loyaltyLabel: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
-
+  loyaltyLabel: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.s2 },
   detailRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const,
     gap: space.s3, paddingVertical: space.s3,
   },
   detailBorder: { borderBottomWidth: 1, borderBottomColor: color.appLine },
   detailValue: { flexShrink: 1 },
-
   sectionTitle: { marginTop: space.s2 },
-  langRow: { flexDirection: 'row', gap: space.s2 },
+  langRow: { flexDirection: 'row' as const, gap: space.s2 },
   langChip: { flex: 1, minHeight: 44 },
-
-  legalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 },
+  appearanceRow: { flexDirection: 'row' as const, gap: space.s2 },
+  appearanceChip: { flex: 1, minHeight: 44, paddingHorizontal: space.s2 },
+  legalRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, minHeight: 44 },
   legalText: { flexShrink: 1 },
-
   signOut: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.s2,
-    backgroundColor: color.danger, borderRadius: radius.md, borderCurve: 'continuous',
+    flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'center' as const, gap: space.s2,
+    backgroundColor: color.danger, borderRadius: radius.md, borderCurve: 'continuous' as const,
     minHeight: 52, paddingHorizontal: space.s4, marginTop: space.s4,
   },
-  delete: { alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: space.s2 },
-  deleteText: { color: color.danger, textDecorationLine: 'underline' },
+  delete: { alignItems: 'center' as const, justifyContent: 'center' as const, minHeight: 44, marginTop: space.s2 },
+  deleteText: { color: color.danger, textDecorationLine: 'underline' as const },
   version: { marginTop: space.s5 },
-});
+}));
