@@ -1,27 +1,12 @@
 /**
  * Order-type selection — the full-screen BLOCKING gate. The customer must choose
  * Pickup or Delivery and resolve a valid branch/address here before the menu is
- * usable. Two tabs (Pickup / Delivery, EN+AR, RTL-aware):
- *   - Pickup: branches nearest-first (when location is granted), open/closed
- *     badge, only an OPEN branch is selectable.
- *   - Delivery: pick a saved address OR drop a map pin + a landmark, then the
- *     nearest OPEN branch whose active zone covers the point is resolved. No
- *     covering branch → a friendly "out of zone" message; no selection is made.
- * Every selection runs the cart through validateCartForBranch first; conflicting
- * items are only removed after the customer confirms (never silently).
- *
- * The screen never creates an order and never touches payment — it only sets the
- * order context (the server re-validates branch + zone when the order is placed).
- *
- * The design pass changed presentation only: branch selection, the pickup and
- * delivery rules, the location behaviour, the availability check and every
- * navigation target are unchanged.
+ * usable. The screen never creates an order and never touches payment.
  */
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView,
-  StyleSheet, View,
+  ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -29,7 +14,7 @@ import * as Location from 'expo-location';
 import { Header } from '../../components/Header';
 import { LocationPickerMap } from '../../components/LocationPickerMap';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
-import { color, radius, space } from '../../design-system/generated/tokens';
+import { radius, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
 import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
@@ -44,6 +29,8 @@ import { distanceKm, type GeoPoint } from '../../lib/geo';
 import { useAddressBook, useCart, useCatalog, useOrderContext } from '../../store';
 import { isBranchOpen, pickupBranches, resolveDeliveryBranch } from './orderContext';
 import { validateCartForBranch } from './cartValidation';
+import { makeStyles } from '../../theme/makeStyles';
+import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Branch, CartItem, OrderType, SavedAddress } from '../../types/models';
 
 type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
@@ -51,37 +38,29 @@ type Conflict = { apply: () => void | Promise<void>; invalid: CartItem[] };
 export function OrderTypeSelectScreen() {
   const insets = useSafeAreaInsets();
   const { t, pick, lang, rtlRow } = useI18n();
+  const color = useThemeColors();
+  const styles = useStyles();
   const { branches, deliveryZones, loading, error, reload, isAvailable } = useCatalog();
   const { context, valid, setPickup, setDelivery } = useOrderContext();
   const cart = useCart();
 
   const [tab, setTab] = useState<OrderType>(context?.orderType ?? 'pickup');
   const [location, setLocation] = useState<GeoPoint | null>(null);
-  // The SHARED address book, not a private copy — an address added or deleted in
-  // Profile is reflected here without this blocking gate being remounted.
   const addressBook = useAddressBook();
   const savedAddresses = addressBook.addresses;
   const [deliveryMode, setDeliveryMode] = useState<'choose' | 'new'>('choose');
   const [pickedLat, setPickedLat] = useState<number | null>(null);
   const [pickedLng, setPickedLng] = useState<number | null>(null);
   const [landmark, setLandmark] = useState('');
-  // Validation is only shown once the customer has tried to confirm (or has
-  // left the field), so an untouched form is not pre-painted with an error.
   const [descTouched, setDescTouched] = useState(false);
-  // Reverse-geocoded address for the current pin. Context only — never the
-  // delivery guidance, and never written into the description field.
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   const [resolveError, setResolveError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const askedLocation = useRef(false);
   const scrollRef = useRef<ScrollView | null>(null);
-  // Y offset of the description block inside the scroll view, so a validation
-  // failure can bring the field (and its message) above the keyboard.
   const descOffsetRef = useRef(0);
 
-  // Ask for location only when the Pickup tab is opened (optional — the list
-  // still works without it, just unsorted).
   useEffect(() => {
     if (tab !== 'pickup' || location || askedLocation.current) return;
     askedLocation.current = true;
@@ -97,8 +76,6 @@ export function OrderTypeSelectScreen() {
     return () => { active = false; };
   }, [tab, location]);
 
-  // BLOCKING: hardware back only leaves when a valid context already exists (i.e.
-  // the customer arrived here via "Change"); otherwise it is swallowed.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (valid) { router.replace('/(tabs)'); return true; }
@@ -109,7 +86,6 @@ export function OrderTypeSelectScreen() {
 
   const done = useCallback(() => router.replace('/(tabs)'), []);
 
-  // Apply a selection, but validate the cart against the target branch first.
   const commit = useCallback(async (apply: () => void | Promise<void>) => {
     setBusy(true);
     try { await apply(); done(); }
@@ -117,8 +93,6 @@ export function OrderTypeSelectScreen() {
     finally { setBusy(false); }
   }, [done, t]);
 
-  // Validate the cart against the target branch; only surface the conflict sheet
-  // when some line is no longer orderable (availability mirrors the menu filter).
   const runSelection = useCallback((branchId: string, apply: () => void | Promise<void>) => {
     const v = validateCartForBranch(cart.items, branchId, isAvailable);
     if (!v.allValid) { setConflict({ apply, invalid: v.invalid }); return; }
@@ -135,9 +109,6 @@ export function OrderTypeSelectScreen() {
     const branch = resolveDeliveryBranch({ lat: a.lat, lng: a.lng }, branches, deliveryZones);
     if (!branch) { setResolveError(t('otDeliveryUnavailable')); return; }
     setResolveError(null);
-    // Addresses saved before the description became mandatory have none. Rather
-    // than block the customer on a card they cannot edit, open the editor on
-    // that exact pin so they only have to add the landmark.
     const saved = checkDescription(a.description);
     if (!saved.valid) {
       setPickedLat(a.lat);
@@ -151,9 +122,6 @@ export function OrderTypeSelectScreen() {
   };
 
   const confirmNewAddress = () => {
-    // The description is mandatory: a courier cannot find a Saudi address from
-    // coordinates alone. Reveal the message and scroll it into view rather than
-    // failing silently on a disabled button.
     setDescTouched(true);
     const desc = checkDescription(landmark, resolvedAddress);
     if (!desc.valid) {
@@ -165,8 +133,6 @@ export function OrderTypeSelectScreen() {
     if (!branch) { setResolveError(t('otDeliveryUnavailable')); return; }
     setResolveError(null);
     runSelection(branch.id, async () => {
-      // Routed through the shared book (same `addresses.create` underneath) so
-      // Profile and Checkout see the new address without a refetch.
       const created = await addressBook.create({
         label: desc.value.slice(0, 60),
         description: desc.value,
@@ -174,8 +140,6 @@ export function OrderTypeSelectScreen() {
         longitude: pickedLng,
         isDefault: shouldBecomeDefault(savedAddresses),
       });
-      // Carried into Checkout through the order context, so the customer never
-      // retypes it and Checkout never creates an address without one.
       setDelivery({ branch, addressId: created.id, lat: pickedLat, lng: pickedLng, description: desc.value });
     });
   };
@@ -196,8 +160,6 @@ export function OrderTypeSelectScreen() {
   const sortedPickup = useMemo(() => pickupBranches(branches, location), [branches, location]);
   const mapLat = pickedLat ?? mapConfig.defaultCenter.lat;
   const mapLng = pickedLng ?? mapConfig.defaultCenter.lng;
-
-  // Inline description validation, revealed only after a confirm attempt or blur.
   const descCheck = checkDescription(landmark, resolvedAddress);
   const descError = descTouched ? descriptionMessage(descCheck.problem, lang) : null;
 
@@ -205,21 +167,10 @@ export function OrderTypeSelectScreen() {
     <View style={styles.root}>
       <Header title={t('otTitle')} showBack={valid} onBack={done} safeTop />
 
-      {/* Pickup / Delivery — one choice, not two buttons. */}
       <View style={styles.tabsBar}>
         <View style={[columnStyles.column, styles.tabs]}>
-          <SelectableChip
-            label={t('otPickup')}
-            selected={tab === 'pickup'}
-            onPress={() => { setTab('pickup'); setResolveError(null); }}
-            style={styles.tab}
-          />
-          <SelectableChip
-            label={t('otDelivery')}
-            selected={tab === 'delivery'}
-            onPress={() => { setTab('delivery'); setResolveError(null); }}
-            style={styles.tab}
-          />
+          <SelectableChip label={t('otPickup')} selected={tab === 'pickup'} onPress={() => { setTab('pickup'); setResolveError(null); }} style={styles.tab} />
+          <SelectableChip label={t('otDelivery')} selected={tab === 'delivery'} onPress={() => { setTab('delivery'); setResolveError(null); }} style={styles.tab} />
         </View>
       </View>
 
@@ -251,148 +202,98 @@ export function OrderTypeSelectScreen() {
                     <Text variant="heading" style={styles.name}>{pick(b.nameEn, b.nameAr)}</Text>
                     <OpenClosedBadge open={open} />
                   </View>
-                  {pick(b.addressEn, b.addressAr) ? (
-                    <Text variant="caption" tone="secondary">{pick(b.addressEn, b.addressAr)}</Text>
-                  ) : null}
-                  {dist != null ? (
-                    <Text variant="label" tone="secondary">{dist.toFixed(1)} {t('otKmAway')}</Text>
-                  ) : null}
+                  {pick(b.addressEn, b.addressAr) ? <Text variant="caption" tone="secondary">{pick(b.addressEn, b.addressAr)}</Text> : null}
+                  {dist != null ? <Text variant="label" tone="secondary">{dist.toFixed(1)} {t('otKmAway')}</Text> : null}
                 </Pressable>
               );
             })}
           </View>
         </ScrollView>
       ) : (
-        // Delivery tab. KeyboardAvoidingView + a scrollable body keep the
-        // description field, its validation message and Confirm reachable while
-        // the keyboard is open; `keyboardShouldPersistTaps` lets Confirm be
-        // pressed directly without a dismiss tap first (which used to eat the
-        // press and look like the button was broken).
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
-        >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={styles.listKeyboard}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="none"
-        >
-          <View style={[columnStyles.column, styles.stack]}>
-          {!deliveryPossible ? (
-            <Notice title={t('otNoDeliveryZones')} tone="warning" />
-          ) : deliveryMode === 'choose' ? (
-            <>
-              <Text variant="title">{t('otSavedAddresses')}</Text>
-              {savedAddresses.length === 0 ? (
-                <Text variant="body" tone="secondary">{t('otNoSaved')}</Text>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={styles.listKeyboard}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="none"
+          >
+            <View style={[columnStyles.column, styles.stack]}>
+              {!deliveryPossible ? (
+                <Notice title={t('otNoDeliveryZones')} tone="warning" />
+              ) : deliveryMode === 'choose' ? (
+                <>
+                  <Text variant="title">{t('otSavedAddresses')}</Text>
+                  {savedAddresses.length === 0 ? (
+                    <Text variant="body" tone="secondary">{t('otNoSaved')}</Text>
+                  ) : (
+                    savedAddresses.map((a) => (
+                      <Pressable key={a.id} onPress={() => chooseSavedAddress(a)} accessibilityRole="button" style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+                        <Text variant="heading">{a.label || t('deliveryAddress')}</Text>
+                        {a.description ? <Text variant="caption" tone="secondary">{a.description}</Text> : null}
+                      </Pressable>
+                    ))
+                  )}
+                  {resolveError ? <Notice title={resolveError} tone="blocking" /> : null}
+                  <Button label={t('otAddAddress')} onPress={() => { setResolveError(null); setDeliveryMode('new'); }} variant="secondary" />
+                </>
               ) : (
-                savedAddresses.map((a) => (
-                  <Pressable
-                    key={a.id}
-                    onPress={() => chooseSavedAddress(a)}
-                    accessibilityRole="button"
-                    style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-                  >
-                    <Text variant="heading">{a.label || t('deliveryAddress')}</Text>
-                    {a.description ? (
-                      <Text variant="caption" tone="secondary">{a.description}</Text>
+                <>
+                  <Text variant="title">{t('otAddAddress')}</Text>
+                  <LocationPickerMap
+                    lat={mapLat}
+                    lng={mapLng}
+                    lang={lang}
+                    onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setResolveError(null); }}
+                    onAddressResolved={setResolvedAddress}
+                    labels={{ locateHint: t('otMapMoveHint'), useMyLocation: t('otUseMyLocation'), setupRequired: t('otMapSetup') }}
+                  />
+
+                  <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
+                    {resolvedAddress ? (
+                      <Text variant="caption" tone="tertiary" numberOfLines={2} style={styles.resolvedAddr}>
+                        {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
+                      </Text>
                     ) : null}
-                  </Pressable>
-                ))
+                    <Field
+                      id="order-type-landmark"
+                      label={descriptionCopy[lang].label}
+                      required
+                      value={landmark}
+                      onChangeText={setLandmark}
+                      onBlur={() => setDescTouched(true)}
+                      onFocus={() => { scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true }); }}
+                      error={descError}
+                      placeholder={descriptionCopy[lang].placeholder}
+                      accessibilityHint={descriptionCopy[lang].placeholder}
+                      multiline
+                      inputStyle={styles.multiline}
+                    />
+                  </View>
+
+                  {resolveError ? (
+                    <Notice
+                      title={resolveError}
+                      action={pick('Move the pin to a location we deliver to.', 'حرّك الدبوس إلى موقع نقوم بالتوصيل إليه.')}
+                      tone="blocking"
+                    />
+                  ) : null}
+
+                  <Button label={t('otConfirmLocation')} onPress={confirmNewAddress} disabled={pickedLat == null || pickedLng == null} variant="primary" />
+                  <Button label={t('otSavedAddresses')} onPress={() => { setResolveError(null); setDeliveryMode('choose'); }} variant="ghost" />
+                </>
               )}
-              {resolveError ? <Notice title={resolveError} tone="blocking" /> : null}
-              <Button
-                label={t('otAddAddress')}
-                onPress={() => { setResolveError(null); setDeliveryMode('new'); }}
-                variant="secondary"
-              />
-            </>
-          ) : (
-            <>
-              <Text variant="title">{t('otAddAddress')}</Text>
-              <LocationPickerMap
-                lat={mapLat}
-                lng={mapLng}
-                lang={lang}
-                onChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setResolveError(null); }}
-                // The reverse-geocoded address is CONTEXT, never the delivery
-                // guidance: prefilling the field with it would let the map
-                // satisfy the mandatory-guidance rule on the customer's behalf.
-                onAddressResolved={setResolvedAddress}
-                labels={{ locateHint: t('otMapMoveHint'), useMyLocation: t('otUseMyLocation'), setupRequired: t('otMapSetup') }}
-              />
-
-              <View onLayout={(e) => { descOffsetRef.current = e.nativeEvent.layout.y; }}>
-                {/* The pin's own address, read-only. Shown so the customer can
-                    confirm the map is right without it counting as guidance. */}
-                {resolvedAddress ? (
-                  <Text variant="caption" tone="tertiary" numberOfLines={2} style={styles.resolvedAddr}>
-                    {`${descriptionCopy[lang].addressPrefix}: ${resolvedAddress}`}
-                  </Text>
-                ) : null}
-                <Field
-                  id="order-type-landmark"
-                  label={descriptionCopy[lang].label}
-                  required
-                  value={landmark}
-                  onChangeText={setLandmark}
-                  onBlur={() => setDescTouched(true)}
-                  onFocus={() => {
-                    // Bring the field above the keyboard on both platforms;
-                    // KeyboardAvoidingView alone does not scroll a field that is
-                    // already laid out below the fold.
-                    scrollRef.current?.scrollTo({ y: Math.max(0, descOffsetRef.current - 24), animated: true });
-                  }}
-                  error={descError}
-                  placeholder={descriptionCopy[lang].placeholder}
-                  accessibilityHint={descriptionCopy[lang].placeholder}
-                  multiline
-                  inputStyle={styles.multiline}
-                />
-              </View>
-
-              {resolveError ? (
-                <Notice
-                  title={resolveError}
-                  action={pick('Move the pin to a location we deliver to.', 'حرّك الدبوس إلى موقع نقوم بالتوصيل إليه.')}
-                  tone="blocking"
-                />
-              ) : null}
-
-              <Button
-                label={t('otConfirmLocation')}
-                onPress={confirmNewAddress}
-                // Coordinates gate the button; the description reports its own
-                // problem on press so the customer is told what is missing
-                // instead of facing a silently dead button.
-                disabled={pickedLat == null || pickedLng == null}
-                variant="primary"
-              />
-              <Button
-                label={t('otSavedAddresses')}
-                onPress={() => { setResolveError(null); setDeliveryMode('choose'); }}
-                variant="ghost"
-              />
-            </>
-          )}
-          </View>
-        </ScrollView>
+            </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       )}
 
       {busy ? (
-        // Dark scrim, so the spinner and label are white — the same treatment
-        // as the modals. Ember on a dark scrim would be the one place in the
-        // app where the interactive colour marks something you cannot press.
         <View style={styles.overlay} pointerEvents="none">
           <ActivityIndicator size="large" color={color.onEmber} />
           <Text variant="heading" tone="onEmber" align="center">{t('otResolving')}</Text>
         </View>
       ) : null}
 
-      {/* Cart-conflict confirmation (never silently drops items) */}
       <Modal visible={conflict !== null} transparent animationType="fade" onRequestClose={() => setConflict(null)}>
         <View style={styles.backdrop}>
           <View style={[styles.sheet, { paddingBottom: insets.bottom + space.s4 }]}>
@@ -412,52 +313,42 @@ export function OrderTypeSelectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((color) => ({
   root: { flex: 1, backgroundColor: color.appBg },
   flex: { flex: 1 },
-
   tabsBar: {
     padding: space.s4, backgroundColor: color.appSurface,
     borderBottomWidth: 1, borderBottomColor: color.appLine,
-    alignItems: 'center',
+    alignItems: 'center' as const,
   },
-  // Fixed row direction: the two order types are a set, and mirroring their
-  // order in Arabic gains nothing while making the languages harder to compare.
-  tabs: { flexDirection: 'row', gap: space.s2 },
-  tab: { flex: 1, minHeight: 44, justifyContent: 'center' },
-
-  list: { padding: space.s4, alignItems: 'center' },
-  // Extra tail room so the Confirm button clears the keyboard when the
-  // description field is focused at the bottom of the form.
-  listKeyboard: { padding: space.s4, paddingBottom: 260, alignItems: 'center' },
+  tabs: { flexDirection: 'row' as const, gap: space.s2 },
+  tab: { flex: 1, minHeight: 44, justifyContent: 'center' as const },
+  list: { padding: space.s4, alignItems: 'center' as const },
+  listKeyboard: { padding: space.s4, paddingBottom: 260, alignItems: 'center' as const },
   stack: { gap: space.s3 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: space.s3, padding: space.s5 },
-
+  center: { flex: 1, alignItems: 'center' as const, justifyContent: 'center' as const, gap: space.s3, padding: space.s5 },
   card: {
-    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous',
+    backgroundColor: color.appSurface, borderRadius: radius.lg, borderCurve: 'continuous' as const,
     padding: space.s4, borderWidth: 1.5, borderColor: color.appLine, gap: space.s1,
   },
   cardSelected: { borderColor: color.ember, backgroundColor: color.appSurface2 },
   cardDisabled: { opacity: 0.55 },
   pressed: { opacity: 0.9 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s2 },
+  cardTop: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, gap: space.s2 },
   name: { flex: 1 },
-
-  multiline: { minHeight: 72, paddingTop: space.s3, textAlignVertical: 'top' },
+  multiline: { minHeight: 72, paddingTop: space.s3, textAlignVertical: 'top' as const },
   resolvedAddr: { marginBottom: space.s2 },
-
   overlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center', gap: space.s3,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
+    alignItems: 'center' as const, justifyContent: 'center' as const, gap: space.s3,
     backgroundColor: color.scrim,
   },
-
-  backdrop: { flex: 1, backgroundColor: color.scrim, justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: color.scrim, justifyContent: 'flex-end' as const },
   sheet: {
     backgroundColor: color.appSurface,
     borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
-    padding: space.s5, alignItems: 'center',
+    padding: space.s5, alignItems: 'center' as const,
   },
   sheetBody: { gap: space.s2 },
   sheetActions: { gap: space.s2, marginTop: space.s3 },
-});
+}));
