@@ -4,15 +4,17 @@
 
 This document is about **Git branches**, not Spicy Meal restaurant branches. Restaurant-branch operations are documented separately in [`BRANCH_DELETION.md`](BRANCH_DELETION.md) and [`BRANCH_ONBOARDING.md`](BRANCH_ONBOARDING.md).
 
-## Current remote state
+## Current branch model
 
-GitHub currently exposes **one remote branch**:
+The cleanup reduced the repository to **one long-lived branch**:
 
 | Branch | Role | Status |
 | --- | --- | --- |
-| `claude/project-build-ie4b56` | Default / production | Active and protected by repository workflow/rules |
+| `claude/project-build-ie4b56` | Default / production | Long-lived production branch |
 
-All historical feature/release/cleanup branches used during the July–August development cycle have been removed after the feature-retention audit and consolidation.
+Normal development still creates short-lived purpose-specific PR branches (for example the branch carrying this documentation refresh). Those branches should disappear after merge through GitHub's automatic head-branch deletion.
+
+All historical feature/release/cleanup branches used during the July–August development cycle were removed after feature-retention verification.
 
 The old `main` remote branch is also gone. Its name remains reserved in `CLAUDE.md`/agent protection rules so an automated session cannot casually recreate or push a second production-looking branch.
 
@@ -40,7 +42,7 @@ The repository's Git history and pull-request record remain the historical sourc
 
 ## Re-auditing
 
-The repository contains `scripts/branch-audit.sh` for read-only branch classification. It is useful when branch count grows again, but with a single remote branch there is currently nothing to clean up.
+The repository contains `scripts/branch-audit.sh` for read-only branch classification. It is useful when branch count grows again; immediately after cleanup there was only the production branch, and ordinary PR branches should remain temporary.
 
 ```bash
 scripts/branch-audit.sh
