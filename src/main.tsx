@@ -4,6 +4,7 @@ import App from './App.tsx';
 import {ObservabilityErrorBoundary} from './components/ObservabilityErrorBoundary.tsx';
 import {initAdminObservability} from './lib/observability/index.ts';
 import './index.css';
+import './theme-dark.css';
 
 // Sentry (surface 'admin-web') initializes before the first render so bootstrap
 // failures are captured. Disabled in tests and in dev without VITE_SENTRY_DEV=1;
