@@ -1,125 +1,144 @@
-# Spicy Meal — Edge Functions (secure server-side boundary)
+# Spicy Meal — Supabase Edge Functions
 
-These Deno Edge Functions are the **only** place third-party providers and their
-secrets are ever touched. The Expo app and the Admin frontend never call a
-gateway/SMS/push/Lazywait API directly and never receive a secret — they hold
-only the Supabase **anon** key and talk to PostgREST/RPCs under RLS.
+> **Updated 2026-08-12.** Edge Functions are the server-side boundary for provider calls, service-role work and externally authenticated callbacks. The older Geidea-only documentation is obsolete.
 
-| Function | Caller | verify_jwt | Status | Purpose |
-|----------|--------|-----------|--------|---------|
-| `order-intake` | app (user) | true | working wrapper | Calls `place_order` AS THE USER (RLS + totals stay authoritative); future create-order+payment orchestration point. |
-| `payment-initiate` | app (user) | true | **Geidea** | Reads the user's own order (RLS → trusted total), creates a **Geidea** session (server-to-server, Basic auth + HMAC signature), returns `sessionId` + hosted-checkout URL. Never returns a secret. |
-| `payment-webhook` | Geidea | false | **Geidea** | Verifies the **Geidea callback HMAC signature** server-side, then on `status=Paid`+`responseCode=000` calls `confirm_order_payment` (amount must equal the server total; idempotent). A forged callback can't mark an order paid. |
-| `lazywait-sync` | schedule/cron | false | **Lazywait** | POS sync worker: claims due orders (SKIP LOCKED), `POST /pos/orders/create` (pickup only), records via `record_lazywait_sync` with retry/backoff/dead-letter. See `docs/LAZYWAIT.md`. |
-| `lazywait-catalog` | admin (browser) | true | **Lazywait** | Admin-only catalog pull: GETs branches/categories/items/addons/addon-groups server-side and caches them in `lazywait_catalog_items` for id-mapping review. Extra `is_admin()` check; never returns a secret. |
-| `lazywait-webhook` | Lazywait | false | **Lazywait** | Verifies the `X-LazyWait-Signature` HMAC (hex), records POS status; unknown events are logged + accepted safely. |
-| `push-dispatch` | server + admin (browser) | false | **active (flag-gated)** | Expo Push sender. Actions: `order_status` (service-role/internal or admin; idempotent per (order,status) via `notification_log`; anti-spoof re-reads the order's real status), `test` (admin → own devices), `broadcast` (admin → opted-in devices only, returns counts). Batches of 100; ticket-level `DeviceNotRegistered` deactivates the device row. **No-ops until the `push` integration row (provider `expo`) is ENABLED** — seeded disabled. Payloads carry only `{type, orderId}` — never customer/order/payment data. |
-| `auth-send-sms-whatsapp` | Supabase Auth (Send SMS Hook) | false | active | **Real customer login delivery leg.** Supabase Phone Auth generates the login OTP and calls this hook (Standard Webhooks signed) to deliver it via WhatsApp. Supabase Auth stays the sole login authority — this issues no session, generates no code, stores no challenge. Fails closed until `whatsapp_login_enabled` + Meta creds + template. |
-| `whatsapp-send-otp` | app (pre-login) | false | active (secondary) | **Phone _verification_ only, NOT login.** Send WhatsApp OTP (Meta Cloud API) for a signed-in user to verify their profile phone. Rate-limited, hashed, generic responses. Returns `disabled` until configured. |
-| `whatsapp-verify-otp` | app | false | active (secondary) | Verify the *verification* OTP (timing-safe); marks the signed-in user's `phone_verified`. Never issues a session; not part of login. |
-| `whatsapp-webhook` | Meta | false | active | GET verify-token challenge + POST status callbacks (app-secret HMAC), logged sanitized. |
-| `whatsapp-test-config` | admin browser | true | active | Admin `is_admin()`-gated status booleans + test send. No secret values returned. |
+The Expo customer app and the staff/admin web app use the Supabase anon/publishable key plus the signed-in user's JWT. They must never receive the service-role key or provider secrets.
 
-`_shared/`
-- `cors.ts` — CORS + `json()` helper.
-- `supabaseClient.ts` — `adminClient()` (service role, **server-only**) and
-  `userClient(authHeader)` (acts as the calling user so RLS/auth.uid() apply).
-- `secrets.ts` — `getProviderConfig()` reads `integration_settings.secret_config`
-  server-side (service role). Secrets never leave the function.
+## Security model
 
-## WhatsApp OTP architecture — TWO intentional paths (do not consolidate)
+Functions fall into three invocation models:
 
-**A. Customer login (active mobile login flow).** Supabase Auth is the sole
-login authority: it generates AND verifies the OTP
-(`signInWithOtp`/`verifyOtp`). The project's **Send-SMS Auth hook** (configured
-in the Supabase dashboard) calls `auth-send-sms-whatsapp`, which only
-*delivers* the Auth-generated code over WhatsApp (Standard-Webhooks-signed
-call; it issues no session, generates no code, stores no challenge).
+1. **Signed-in user/admin (`verify_jwt = true`)** — Supabase validates the JWT first; the function then applies RLS and/or explicit admin checks.
+2. **External webhook/hook (`verify_jwt = false`)** — authentication is done by the function using the provider/hook signature or another dedicated mechanism.
+3. **Scheduled/service path (`verify_jwt = false`)** — protected by server/service credentials, dedicated scheduler secrets and/or service-role-only database contracts.
 
-**B. Profile phone verification (signed-in customers).**
-`whatsapp-send-otp` creates the custom challenge (`otp_challenges` +
-`otp_begin_send`/`otp_get_active_challenge`/`otp_increment_attempt`);
-`whatsapp-verify-otp` verifies and consumes it (`otp_consume`) and calls
-`mark_phone_verified` to update the signed-in user's verified profile phone.
-**This path never issues or fabricates an Auth session** — it is not a login
-path.
+`verify_jwt = false` does **not** mean "public and trusted". Each such function must fail closed on its own authentication contract.
 
-**C. Shared delivery logging.** Both paths send through
-`_shared/whatsappSend.ts`, which records every delivery in
-`whatsapp_message_logs` (via `record_whatsapp_message`); `whatsapp-webhook`
-records Meta delivery-status callbacks into the same table. These objects
-support BOTH paths and must remain.
+## Current function inventory
 
-The two paths are **intentional** (different jobs: login delivery vs. profile
-verification). Do **not** remove or consolidate either one as "cleanup" —
-consolidation would be a feature redesign requiring separate owner approval.
+### Ordering and Lazywait
 
-## Secrets / environment
-The Supabase runtime injects `SUPABASE_URL`, `SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY`. Provider secrets are stored in the
-`integration_settings` table (admin-managed, RLS-revoked) and read via the
-service role — **not** via env vars and **never** with a `VITE_` prefix.
+| Function | `verify_jwt` | Status | Responsibility |
+| --- | --- | --- | --- |
+| `order-intake` | true | active | Authenticated order-intake/orchestration wrapper around server-authoritative ordering contracts |
+| `lazywait-sync` | false | active | POS synchronization worker with claim/fencing/retry/confirmation-required handling |
+| `lazywait-catalog` | true | active | Admin-only Lazywait catalog pull/mapping support |
+| `lazywait-webhook` | false | active | Lazywait callback receiver with signature validation and sanitized handling |
 
-## Local run
+Lazywait is the active operational POS integration. Ambiguous Create Order outcomes must not be blindly re-sent; the database/worker lifecycle can route them to `confirmation_required` for human verification.
+
+### WhatsApp and authentication
+
+| Function | `verify_jwt` | Status | Responsibility |
+| --- | --- | --- | --- |
+| `auth-send-sms-whatsapp` | false | active | Supabase Auth Send-SMS hook: delivers the **Auth-generated** login OTP over WhatsApp |
+| `whatsapp-send-otp` | true | active secondary path | Signed-in profile-phone verification send; not the login authority |
+| `whatsapp-verify-otp` | true | active secondary path | Verifies the signed-in profile-phone challenge; never creates an Auth session |
+| `whatsapp-webhook` | false | active | Meta webhook verification/status callbacks with app-secret signature checks |
+| `whatsapp-test-config` | true | admin-only | Configuration/status/test tooling without returning secrets |
+
+The login and profile-verification paths are intentionally separate. Do not merge them as cleanup: Supabase Auth owns login session issuance, while the custom verification path only verifies a signed-in user's phone.
+
+### Account deletion
+
+| Function | `verify_jwt` | Status | Responsibility |
+| --- | --- | --- | --- |
+| `account-delete-request` | true | active | Customer-owned deletion request/verification/enqueue path |
+| `account-delete-process` | false | active backend path | Service-side deletion/anonymization processor |
+| `account-delete-scheduler` | false | active scheduler gateway | Authenticated cron gateway into the deletion processor |
+
+Account-deletion server logic includes phone normalization and audited manual-review resolution in the database layer; do not reduce it to a simple profile delete.
+
+### Other integration tooling
+
+| Function | `verify_jwt` | Status | Responsibility |
+| --- | --- | --- | --- |
+| `email-test-config` | true | admin-only | SMTP/configuration status and test-send tooling; secret stays server-side |
+| `push-dispatch` | false | **dormant / flag-gated** | Expo push sender retained in source; product decision keeps push disabled |
+
+The existence of `push-dispatch` does not mean push is an active customer channel.
+
+## Payment/refund functions — PROVISIONAL AND FROZEN
+
+The repository still contains the existing payment implementation and historical provider scaffolding:
+
+| Function | `verify_jwt` | Current treatment |
+| --- | --- | --- |
+| `payment-initiate` | true | frozen provisional payment initiation; source contains Tap path plus older Geidea scaffold |
+| `payment-verify` | true | frozen Tap verification path |
+| `payment-webhook` | false | frozen provider webhook path |
+| `payment-return` | false | frozen public return/redirect path |
+| `payment-refund` | false | frozen refund processor; automated scheduling remains disabled |
+| `payment-test-config` | true | frozen admin payment diagnostics/test tooling |
+| `tap-admin-test-return` | false | frozen isolated Tap test return page |
+
+**Do not treat Tap or the old Geidea scaffold as the final payment architecture.** The owner decision is that the final payment provider has not been selected and payment/refund work is postponed.
+
+Binding rules are in [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) and `CLAUDE.md`:
+
+- no ordinary payment/refund code changes;
+- no provider configuration changes;
+- no payment/refund deployment/testing;
+- no automated refund re-enablement;
+- reopening requires a separate provider decision and explicit approval.
+
+## Shared server helpers — `_shared/`
+
+The `_shared` directory contains reusable server-only contracts, including:
+
+- CORS/response helpers;
+- Supabase service/user clients;
+- integration-secret readers;
+- WhatsApp send/logging helpers;
+- Lazywait client/contracts;
+- Tap helpers and refund classification;
+- legacy Geidea helper code retained by the existing provisional payment path.
+
+A helper being present does not imply its provider is active or approved.
+
+## Secrets
+
+### Injected/runtime Supabase credentials
+
+The Edge runtime provides the Supabase runtime credentials needed by server functions. The service-role key is server-only.
+
+### Provider configuration
+
+Provider secrets are read server-side from the approved integration/secret storage paths and must never be returned to a client.
+
+Never put a server secret in:
+
+- `VITE_*`;
+- `EXPO_PUBLIC_*`;
+- a committed `.env`;
+- logs/errors/test snapshots;
+- function JSON responses.
+
+Admin "status" endpoints should return presence/health booleans, not secret values.
+
+## Local validation
+
+Function source is typechecked as part of the production gates. For local checks, use the repository's documented Deno command rather than deploying anything:
+
 ```bash
-supabase start
-supabase functions serve --env-file supabase/.env.local   # optional local env
-# invoke:
-curl -i -X POST http://127.0.0.1:54321/functions/v1/payment-webhook -d '{}'
+deno check --no-lock --node-modules-dir=none supabase/functions/*/index.ts
 ```
 
-## Deploy
-```bash
-supabase functions deploy order-intake payment-initiate payment-webhook \
-  lazywait-sync lazywait-catalog push-dispatch
-# secrets that are NOT in integration_settings (rare) go via:
-# supabase secrets set SOME_KEY=... 
-```
+Some functions require a local Supabase stack or test environment to execute meaningfully. SQL regression suites live under `supabase/tests/` and must run only against disposable/local databases, never production.
 
-## Geidea payment setup
+## Deployment policy
 
-The Geidea merchant credentials live in the `integration_settings` `payment`
-row — **never in the app**. Set them with the admin RPC (service role / SQL
-editor / admin dashboard), NOT from the client:
+Do **not** copy old README commands that directly deploy a set of functions to production.
 
-```sql
-select public.upsert_integration_settings(
-  'payment', 'geidea', true,
-  -- public_config (non-secret): environment + currency + app return URL
-  '{"country":"ksa","currency":"SAR","returnUrl":"spicymeal://payment-return"}'::jsonb,
-  -- secret_config (server-only): Geidea merchant public key + API password
-  '{"publicKey":"<MERCHANT_PUBLIC_KEY>","apiPassword":"<API_PASSWORD>"}'::jsonb
-);
-```
+Production Edge Function deployment is an explicit owner-approved action governed by `CLAUDE.md` and the controlled GitHub workflow. The deployment workflow is manual, production-branch constrained and requires named functions/confirmation.
 
-- `public_config.country` selects the host (`ksa` default); override the exact
-  hosts with `apiBaseUrl` / `checkoutBaseUrl` to point at the **sandbox** during
-  testing.
-- The `apiPassword` is both the Basic-auth password **and** the HMAC signing key
-  (see `_shared/geidea.ts`).
+Payment functions remain frozen even though the workflow can technically deploy them.
 
-**Flow:** app calls `place_order` → order `payment_status='pending'` → app calls
-`payment-initiate {orderId}` → opens the returned Geidea checkout URL → customer
-pays → Geidea POSTs the signed callback to `payment-webhook` → verified
-`Paid`+`000` → `confirm_order_payment` flips the order to `paid`. The client is
-never trusted to set payment status.
+## Related docs
 
-## Push notification credentials (required BEFORE enabling the push integration)
-
-The `push-dispatch` function itself needs no provider secret for Expo's public
-push API, but **device tokens only work when the app's native push credentials
-are configured in EAS**:
-
-- **Android — FCM V1:** create a Firebase project for the app's Android
-  package (`app.json → android.package`), download the FCM service-account
-  JSON, and upload it with `eas credentials` (Android → Google Service
-  Account Key → FCM V1). Without it, Android tokens are issued but Expo cannot
-  deliver.
-- **iOS — APNs:** upload an APNs key (`eas credentials` → iOS → Push
-  Notifications) under the Apple Developer team that owns the bundle id.
-- Optional hardening: an Expo Access Token can be added later as an
-  `Authorization` header on the Expo Push API call — not required for launch.
-
-Rollout order: (1) configure EAS credentials, (2) build + install the app so
-devices register, (3) enable the `push` integration row (provider `expo`) in
-Admin → Integrations, (4) use "Send test notification" in the admin Push tools.
+- [`../../docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) — system/trust architecture.
+- [`../../docs/PAYMENT_POSTPONEMENT.md`](../../docs/PAYMENT_POSTPONEMENT.md) — binding payment/refund freeze.
+- [`../../docs/ORDER_CONFIRMATION_FLOW.md`](../../docs/ORDER_CONFIRMATION_FLOW.md) — order/POS confirmation lifecycle.
+- [`../../docs/OPERATIONS_ALERTS_DIGEST.md`](../../docs/OPERATIONS_ALERTS_DIGEST.md) — operations alert engine.
+- [`../../docs/MIGRATIONS.md`](../../docs/MIGRATIONS.md) — database migration authority.
+- [`../../docs/RELEASE_CHECKLIST.md`](../../docs/RELEASE_CHECKLIST.md) — release and verification gates.
