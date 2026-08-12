@@ -32,6 +32,16 @@ function statusTone(status: OrderStatus): ChipTone {
   return 'info';
 }
 
+/**
+ * Customer-facing branch reference. The provider number is the only identifier
+ * exposed to the customer; the # is presentation only and never changes the
+ * value used for API/POS reconciliation.
+ */
+function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string | null {
+  const raw = orderDisplayNumber(order);
+  return raw ? `#${raw.replace(/^#/, '')}` : null;
+}
+
 export function OrderCard({
   order, statusLabel, onPress,
 }: {
@@ -41,7 +51,7 @@ export function OrderCard({
 }) {
   const { t, lang, isRTL, rtlRow } = useI18n();
 
-  const branchNo = orderDisplayNumber(order);
+  const branchNo = visibleBranchNumber(order);
   const confirmation = confirmationPresentation(orderConfirmationState(order));
   const heading = branchNo ?? t(confirmation.titleKey);
   const itemCount = order.items.reduce((n, it) => n + it.quantity, 0);
