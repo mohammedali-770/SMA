@@ -49,7 +49,7 @@ Git does **not** contain:
 - a full proof of which Edge Function bytes are deployed;
 - current cron/manual configuration that lives outside the migration chain.
 
-As of the 2026-08-12 source audit, the repository contains **79 migration files**. The detailed `docs/MIGRATIONS.md` live-count reconciliation is still the Aug 7 snapshot and needs a new read-only Production reconciliation before its apply/unapplied counts are treated as current.
+As of the 2026-08-12 reconciliation, the repository contains **79 migration files** and Production contains **85 migration-history rows**, latest `20260810115029`. All 11 repository migration names added after the Aug 7 snapshot are represented live. See `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Schema source is not a data backup.** Replaying migrations onto an empty project does not restore business data.
 
@@ -129,6 +129,6 @@ After any backup-setting change or restore drill:
 - update this file with the live values/date;
 - update `docs/OWNER_ACTIONS.md` so resolved items disappear;
 - update `docs/INCIDENT_RESPONSE.md` if roles/channels change;
-- update `docs/MIGRATIONS.md` only after a read-only ledger reconciliation or approved migration action.
+- update migration-status evidence after any approved migration action.
 
 A backup feature shown in a dashboard is not "ready" until the team has demonstrated that it can restore usable data inside the agreed RPO/RTO.
