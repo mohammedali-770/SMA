@@ -126,7 +126,7 @@ npm run design-system:check
 npm run build
 ```
 
-Additional SQL and Edge Function checks run in CI. Production database changes must follow the migration workflow documented in [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md).
+Additional SQL and Edge Function checks run in CI. Production database changes must follow the approved migration workflow; note that the detailed Aug 7 live-count reconciliation in [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) is now a dated snapshot after later Aug 10 migration files were added. See [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) §12 before using those counts as current.
 
 ## Repository layout
 
@@ -163,7 +163,8 @@ Start with [`docs/README.md`](docs/README.md). The most important documents are:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current system architecture.
 - [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) — release gates and verification.
 - [`docs/DEPLOY.md`](docs/DEPLOY.md) — Vercel/deployment behavior.
-- [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) — authoritative production migration ledger.
+- [`docs/MIGRATIONS.md`](docs/MIGRATIONS.md) — migration workflow/history ledger; live-count reconciliation last completed Aug 7.
+- [`docs/OWNER_ACTIONS.md`](docs/OWNER_ACTIONS.md) — current owner/live-dashboard decisions, including migration reconciliation.
 - [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md) — payment/refund freeze.
 - [`docs/BRANCH_FEATURE_RETENTION_AUDIT.md`](docs/BRANCH_FEATURE_RETENTION_AUDIT.md) — final feature-retention evidence from the branch cleanup.
 
