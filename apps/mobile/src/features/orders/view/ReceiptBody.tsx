@@ -28,6 +28,12 @@ import { formatRiyadhDateTime } from '../../../utils/format';
 import { ReceiptRow } from './ReceiptRow';
 import type { Order } from '../../../types/models';
 
+/** Presentation-only prefix; the stored/POS reference is never modified. */
+function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string | null {
+  const raw = orderDisplayNumber(order);
+  return raw ? `#${raw.replace(/^#/, '')}` : null;
+}
+
 export function ReceiptBody({ order }: { order: Order }) {
   const { t, pick, rtlRow } = useI18n();
 
@@ -52,7 +58,7 @@ export function ReceiptBody({ order }: { order: Order }) {
     : payState === 'unpaid' ? t('notPaidYet')
     : null;
 
-  const branchNumber = orderDisplayNumber(order);
+  const branchNumber = visibleBranchNumber(order);
 
   return (
     <View style={{ gap: space.s4 }}>
