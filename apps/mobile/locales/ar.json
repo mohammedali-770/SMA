@@ -1,4 +1,6 @@
 {
-  "CFBundleDisplayName": "سبايسي ميل",
-  "NSLocationWhenInUseUsageDescription": "يستخدم سبايسي ميل موقعك فقط لتحديد موقعك على خريطة التوصيل. يمكنك دائماً تحريك المؤشر يدوياً."
+  "ios": {
+    "CFBundleDisplayName": "سبايسي ميل",
+    "NSLocationWhenInUseUsageDescription": "يستخدم سبايسي ميل موقعك فقط لتحديد موقعك على خريطة التوصيل. يمكنك دائماً تحريك المؤشر يدوياً."
+  }
 }
