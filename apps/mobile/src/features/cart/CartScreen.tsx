@@ -44,17 +44,17 @@ export function CartLine({ item, name, modifierSummary: summary, lineAmount, rem
 }) {
   const colors = useThemeColors(); const { rtlRow } = useI18n(); const styles = useStyles(); const [imgFailed, setImgFailed] = useState(false); const showImage = !!item.product.imageUrl && !imgFailed;
   return <View style={styles.line}>
-    <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`${editLabel}: ${name}`} style={({ pressed }) => [styles.editArea, rtlRow, pressed && styles.pressed]}>
+    <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`${editLabel}: ${name}`} accessibilityHint={editLabel} style={({ pressed }) => [styles.editArea, rtlRow, pressed && styles.pressed]}>
       {showImage ? <Image source={{ uri: item.product.imageUrl }} style={styles.lineImg} contentFit="cover" transition={150} cachePolicy="memory-disk" recyclingKey={item.product.id} onError={() => setImgFailed(true)} /> : <View style={[styles.lineImg, styles.lineImgEmpty]}><DishIcon size={26} color={colors.heatOff} /></View>}
       <View style={styles.lineBody}><View style={[styles.lineTop, rtlRow]}><Text variant="heading" style={{ flex: 1 }} numberOfLines={2}>{name}</Text><Price amount={lineAmount} size={typeScale.body.size} weight="700" /></View>
-        {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}<Text variant="caption" tone="ember">{editLabel}</Text></View>
+        {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}</View>
     </Pressable>
     <View style={[styles.lineBottom, rtlRow]}><QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small /><Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}><Text variant="caption" align="center" style={{ color: colors.danger }}>{removeLabel}</Text></Pressable></View>
   </View>;
 }
 const useStyles = makeStyles((color) => ({
   root: { flex: 1, backgroundColor: color.appBg }, line: { backgroundColor: color.appSurface, borderRadius: radius.lg, borderWidth: 1, borderColor: color.appLine, padding: space.s3, gap: space.s3 },
-  editArea: { flexDirection: 'row' as const, gap: space.s3 }, lineImg: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: color.appSurface2 }, lineImgEmpty: { alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: color.appSurface3 }, lineBody: { flex: 1, gap: space.s1 },
+  editArea: { flexDirection: 'row' as const, gap: space.s3 }, lineImg: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: color.appSurface2 }, lineImgEmpty: { alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: color.appSurface3 }, lineBody: { flex: 1, gap: space.s1, justifyContent: 'center' as const },
   lineTop: { flexDirection: 'row' as const, alignItems: 'flex-start' as const, justifyContent: 'space-between' as const, gap: space.s3 }, lineBottom: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, borderTopWidth: 1, borderTopColor: color.appLine, paddingTop: space.s2 },
   removeBtn: { minHeight: 34, justifyContent: 'center' as const, paddingHorizontal: space.s3, borderRadius: radius.pill, backgroundColor: color.dangerTint }, pressed: { opacity: 0.72 },
   footer: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, backgroundColor: color.appSurface, borderTopWidth: 1, borderTopColor: color.appLine, paddingHorizontal: space.s4, paddingTop: space.s3, gap: space.s3 }, subtotalRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const },

@@ -2,62 +2,59 @@ import { color as lightColor } from '../design-system/generated/tokens';
 
 /**
  * Runtime colour contract for the current Ember-on-Cream design system.
- *
  * The generated `color` object remains the canonical LIGHT palette. Dark mode
- * deliberately lives outside the generated file so `design-system:sync` keeps
- * working exactly as before and the Build 4 token source is not rewritten.
- * Every key is mirrored here, which lets migrated components switch palettes
- * without inventing per-screen colours.
+ * uses a low-glare warm-charcoal palette: neutral surfaces, softer dividers and
+ * readable text/status tones without the previous purple cast.
  */
 export type AppPalette = { [K in keyof typeof lightColor]: string };
 
 export const lightPalette: AppPalette = lightColor;
 
 export const darkPalette: AppPalette = {
-  ember: '#E02D3D',
-  emberDeep: '#AE0F20',
-  emberGlow: '#FF7A52',
-  saffron: '#FFC84A',
-  brandViolet: '#B3A3F5',
-  brandVioletSoft: '#9B85F0',
-  brandInk: '#F4F1F8',
+  ember: '#D63245',
+  emberDeep: '#A92435',
+  emberGlow: '#ED7480',
+  saffron: '#E6B84A',
+  brandViolet: '#B8AEC4',
+  brandVioletSoft: '#9E93AA',
+  brandInk: '#F7F3F1',
 
-  appBg: '#100C1C',
-  appSurface: '#1E1A2E',
-  appSurface2: '#252040',
-  appSurface3: '#2E2847',
-  appLine: '#3A3354',
+  appBg: '#151318',
+  appSurface: '#201D23',
+  appSurface2: '#29252C',
+  appSurface3: '#332E36',
+  appLine: '#48414A',
 
-  appText: '#F4F1F8',
-  appText2: '#C7C0D8',
-  appText3: '#ADA4C0',
+  appText: '#F7F3F1',
+  appText2: '#D5CECB',
+  appText3: '#AAA2A1',
 
-  conBg: '#100C1C',
-  conSurface: '#1E1A2E',
-  conSurface2: '#252040',
-  conLine: '#3A3354',
-  conText: '#F4F1F8',
-  conText2: '#C7C0D8',
-  conText3: '#ADA4C0',
+  conBg: '#151318',
+  conSurface: '#201D23',
+  conSurface2: '#29252C',
+  conLine: '#48414A',
+  conText: '#F7F3F1',
+  conText2: '#D5CECB',
+  conText3: '#AAA2A1',
 
-  mint: '#4ADE80',
-  sky: '#60A5FA',
-  warn: '#FBBF24',
-  danger: '#FF8B99',
-  amberInk: '#FBBF24',
-  heatOff: '#4A4460',
+  mint: '#79C99E',
+  sky: '#7FAFD8',
+  warn: '#D9AD4A',
+  danger: '#E57B86',
+  amberInk: '#E4B957',
+  heatOff: '#625B64',
 
-  warnTint: '#302611',
-  warnLine: '#5B4820',
-  dangerTint: '#2E1A1E',
-  dangerLine: '#60313A',
-  infoTint: '#16253A',
-  infoLine: '#28496F',
-  mintTint: '#13291E',
-  mintLine: '#27583A',
+  warnTint: '#30291B',
+  warnLine: '#665535',
+  dangerTint: '#352124',
+  dangerLine: '#6A3B41',
+  infoTint: '#1E2932',
+  infoLine: '#40596D',
+  mintTint: '#1D2D26',
+  mintLine: '#3E6250',
 
   onEmber: '#FFFFFF',
-  disabledBg: '#2F2944',
-  disabledFg: '#A79FBB',
-  scrim: '#08060EB8',
+  disabledBg: '#343035',
+  disabledFg: '#9C959C',
+  scrim: '#0C0A0ECC',
 };
