@@ -1,5 +1,5 @@
 /** Bottom tabs + mandatory fresh-session order-type popup. */
-import { Redirect, router, Tabs } from 'expo-router';
+import { Redirect, router, Tabs, usePathname } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
@@ -12,6 +12,7 @@ import { useThemeColors } from '../../theme/ThemeProvider';
 
 export default function TabsLayout() {
   const colors = useThemeColors();
+  const pathname = usePathname();
   const { status } = useAuth();
   const { loading: catalogLoading, error: catalogError } = useCatalog();
   const orderCtx = useOrderContext();
@@ -29,7 +30,10 @@ export default function TabsLayout() {
 
   if (status === 'signed_out') return <Redirect href="/(auth)/login" />;
   if (deletionPending) return <Redirect href="/account/delete" />;
-  const requireOrderChoice = status === 'signed_in' && orderCtx.ready && !catalogLoading && !catalogError && !orderCtx.valid;
+  // Native Modal renders above the root stack. Hide it while /select is active
+  // so the branch/address resolver is usable; if the user returns without a
+  // valid context, the popup automatically appears again on the tabs route.
+  const requireOrderChoice = status === 'signed_in' && orderCtx.ready && !catalogLoading && !catalogError && !orderCtx.valid && pathname !== '/select';
 
   return (
     <>
