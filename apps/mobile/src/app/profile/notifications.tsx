@@ -1,0 +1,1 @@
+import React from'react';import{AuthGate}from'../../components/AuthGate';import{NotificationPreferencesScreen}from'../../features/profile/NotificationPreferencesScreen';export default function NotificationPreferencesRoute(){return <AuthGate><NotificationPreferencesScreen/></AuthGate>;}

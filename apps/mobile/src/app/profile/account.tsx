@@ -1,0 +1,1 @@
+import React from'react';import{AuthGate}from'../../components/AuthGate';import{AccountSettingsScreen}from'../../features/profile/AccountSettingsScreen';export default function AccountSettingsRoute(){return <AuthGate><AccountSettingsScreen/></AuthGate>;}
