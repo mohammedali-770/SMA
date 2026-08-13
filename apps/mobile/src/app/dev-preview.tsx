@@ -99,6 +99,8 @@ export default function DevPreview() {
                   modifierSummary={m.modsEn ? pick(m.modsEn, m.modsAr) : ''}
                   lineAmount={m.item.unitPrice * m.item.quantity}
                   removeLabel={t('remove')}
+                  editLabel={pick('Edit item', 'تعديل المنتج')}
+                  onEdit={() => {}}
                   onInc={() => {}}
                   onDec={() => {}}
                   onRemove={() => {}}
