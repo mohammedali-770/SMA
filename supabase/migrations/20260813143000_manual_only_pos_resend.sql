@@ -60,10 +60,11 @@ end $$;
 revoke all on function public.claim_lazywait_sync_one(uuid) from public, anon, authenticated;
 grant execute on function public.claim_lazywait_sync_one(uuid) to service_role;
 
--- 2) A PROVEN failure must carry neither a may-have-sent marker nor a future
--- schedule. The worker may still calculate its historical backoff metadata, but
--- this trigger makes the persisted queue contract manual-only. Ambiguous outcomes
--- use confirmation_required and therefore bypass this trigger unchanged.
+-- 2) A PROVEN failure must not retain an automatic schedule. For a NEW state
+-- transition produced by the worker, sync_last_error is also evidence that the
+-- worker classified the outcome; then the pre-send phase marker can be cleared.
+-- Existing historical rows keep any marker unless a fresh classified transition
+-- occurs, preserving the conservative may-have-sent rule during rollout.
 create or replace function public.normalize_known_pos_failure_for_manual_resend()
 returns trigger
 language plpgsql
@@ -71,18 +72,26 @@ set search_path = public
 as $$
 begin
   if new.lazywait_sync_state in ('failed','dead_letter','blocked') then
-    new.pos_create_attempted_at := null;
-    new.pos_create_attempt_token := null;
     new.sync_next_attempt_at := null;
+
+    if tg_op = 'UPDATE'
+       and new.lazywait_sync_state is distinct from old.lazywait_sync_state
+       and new.sync_last_error is not null then
+      new.pos_create_attempted_at := null;
+      new.pos_create_attempt_token := null;
+    end if;
   end if;
   return new;
 end $$;
+
 drop trigger if exists normalize_known_pos_failure_for_manual_resend on public.orders;
-create trigger normalize_known_pos_failure_for_manual_resend
-  before insert or update of lazywait_sync_state, sync_next_attempt_at on public.orders
+drop trigger if exists aa_normalize_known_pos_failure_for_manual_resend on public.orders;
+create trigger aa_normalize_known_pos_failure_for_manual_resend
+  before insert or update of lazywait_sync_state, sync_next_attempt_at, sync_last_error on public.orders
   for each row execute function public.normalize_known_pos_failure_for_manual_resend();
 
--- Existing failed rows may carry an old automatic schedule. Clear it now.
+-- Existing failed rows may carry an old automatic schedule. Clear the schedule
+-- but deliberately preserve any historical may-have-sent marker.
 update public.orders
    set sync_next_attempt_at = null,
        updated_at = now()
@@ -176,8 +185,9 @@ revoke all on function public.request_customer_pos_resend(uuid) from public, ano
 grant execute on function public.request_customer_pos_resend(uuid) to authenticated;
 
 -- 5) After the last customer-triggered attempt, a proven failed state is terminal.
--- This lets the existing refund-enrollment trigger see `dead_letter` for a paid
--- order and open the existing safe refund lifecycle.
+-- The aa_* normalizer runs before this trigger, so a freshly classified known
+-- failure has its marker cleared first. Existing ambiguous markers remain and
+-- therefore cannot be converted/refunded accidentally.
 create or replace function public.enforce_customer_manual_resend_limit()
 returns trigger
 language plpgsql
@@ -199,8 +209,8 @@ create trigger enforce_customer_manual_resend_limit
   before insert or update of lazywait_sync_state, pos_customer_retry_count, pos_create_attempted_at on public.orders
   for each row execute function public.enforce_customer_manual_resend_limit();
 
--- Backfill an already-exhausted proven failure through the new trigger so paid
--- rows enter the pre-existing refund enrollment path atomically.
+-- Backfill already-exhausted PROVEN failures only. Historical marked rows remain
+-- untouched and continue to require verification rather than refund/resend.
 update public.orders
    set lazywait_sync_state='failed', updated_at=now()
  where lazywait_sync_state='failed'
@@ -208,16 +218,25 @@ update public.orders
    and lazywait_ref is null
    and pos_create_attempted_at is null;
 
--- 6) Legacy `pos_retrying` producers are normalized to `pos_failed` at the log
--- boundary. This prevents a future enabled push channel from telling customers
--- that the system is retrying automatically; the order itself remains manual.
+-- 6) Legacy `pos_retrying` producers can still exist inside the worker, but a
+-- persisted failed row now has no automatic schedule. Rewrite that notification
+-- only when the stored order proves it is in this new manual-only shape. This
+-- intentionally leaves legacy/fencing fixtures with a real future schedule
+-- untouched, preserving the notification fencing contract.
 create or replace function public.normalize_manual_pos_sync_notification()
 returns trigger
 language plpgsql
 set search_path = public
 as $$
 begin
-  if new.kind='pos_sync' and new.status='pos_retrying' then
+  if new.kind='pos_sync'
+     and new.status='pos_retrying'
+     and exists (
+       select 1 from public.orders o
+        where o.id=new.order_id
+          and o.lazywait_sync_state in ('failed','dead_letter','blocked')
+          and o.sync_next_attempt_at is null
+     ) then
     new.status := 'pos_failed';
   end if;
   return new;
