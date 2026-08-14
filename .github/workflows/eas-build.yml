@@ -91,4 +91,12 @@ jobs:
       # `production` explicitly. Left as-is rather than silently changing what a
       # tag does, because that would alter release behaviour without approval.
       - name: Submit EAS build
-        run: eas build --platform "${{ inputs.platform || 'android' }}" --profile "${{ inputs.profile || 'preview' }}" --non-interactive --no-wait
+        env:
+          PLATFORM: ${{ inputs.platform || 'android' }}
+          PROFILE: ${{ inputs.profile || 'preview' }}
+        run: |
+          if [ "$PLATFORM" = "ios" ] && [ "$PROFILE" = "production" ]; then
+            eas build --platform "$PLATFORM" --profile "$PROFILE" --auto-submit --non-interactive --no-wait
+          else
+            eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --no-wait
+          fi
