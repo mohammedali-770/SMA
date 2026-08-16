@@ -1,0 +1,50 @@
+name: One-shot mobile nanoid lock patch
+
+on:
+  push:
+    branches: [chore/pin-vercel-node-22]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: chore/pin-vercel-node-22
+          persist-credentials: true
+
+      - name: Patch only the mobile nanoid 3.x lock entry
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('apps/mobile/package-lock.json')
+          text = path.read_text()
+          old = '''    "node_modules/nanoid": {\n      "version": "3.3.17",\n      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.17.tgz",\n      "integrity": "sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==",'''
+          new = '''    "node_modules/nanoid": {\n      "version": "3.3.18",\n      "resolved": "https://registry.npmjs.org/nanoid/-/nanoid-3.3.18.tgz",\n      "integrity": "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w==",'''
+
+          if old in text:
+              path.write_text(text.replace(old, new, 1))
+          elif new in text:
+              print('mobile lock entry already patched; nothing to do')
+          else:
+              raise SystemExit('expected mobile nanoid 3.3.17 lock block not found; refusing broad edit')
+
+      - name: Commit mobile lockfile only when changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- apps/mobile/package-lock.json; then
+            echo "apps/mobile/package-lock.json already patched"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- apps/mobile/package-lock.json
+          git diff --cached --check
+          git diff --cached --name-only | grep -qx 'apps/mobile/package-lock.json'
+          git commit -m "fix(mobile-deps): lock nanoid 3.3.18"
+          git push origin HEAD:chore/pin-vercel-node-22
