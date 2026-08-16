@@ -6,6 +6,13 @@ on:
   pull_request:
   push:
     branches: [claude/project-build-ie4b56, main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy the selected protected commit after every production gate is green"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -109,9 +116,12 @@ jobs:
     name: Deploy to Vercel (gated on CI)
     needs: [build, edge-functions, audit]
     if: >-
-      github.event_name == 'push' &&
       github.ref == 'refs/heads/claude/project-build-ie4b56' &&
-      vars.DEPLOY_GATE_ENABLED == 'true'
+      vars.DEPLOY_GATE_ENABLED == 'true' &&
+      (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.deploy == true)
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
