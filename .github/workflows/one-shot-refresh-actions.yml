@@ -1,0 +1,76 @@
+name: One-shot refresh action revisions
+
+on:
+  push:
+    branches: [chore/refresh-github-actions]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: chore/refresh-github-actions
+          persist-credentials: true
+
+      - name: Replace only reviewed action refs
+        shell: python
+        run: |
+          from pathlib import Path
+
+          replacements = {
+              'actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4':
+                  'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6',
+              'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4':
+                  'actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6',
+              'expo/expo-github-action@v8':
+                  'expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e # v8',
+              'supabase/setup-cli@v1':
+                  'supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1',
+          }
+
+          changed = []
+          for path in sorted(Path('.github/workflows').glob('*.yml')):
+              if path.name == 'one-shot-refresh-actions.yml':
+                  continue
+              text = path.read_text()
+              original = text
+              for old, new in replacements.items():
+                  text = text.replace(old, new)
+              if text != original:
+                  path.write_text(text)
+                  changed.append(str(path))
+
+          if not changed:
+              print('all reviewed action refs already refreshed')
+          else:
+              print('changed:')
+              for path in changed:
+                  print(f'  {path}')
+
+      - name: Validate no reviewed legacy refs remain
+        run: |
+          set -euo pipefail
+          ! grep -R -nF 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' .github/workflows --exclude='one-shot-refresh-actions.yml'
+          ! grep -R -nF 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' .github/workflows --exclude='one-shot-refresh-actions.yml'
+          ! grep -R -nF 'expo/expo-github-action@v8' .github/workflows --exclude='one-shot-refresh-actions.yml'
+          ! grep -R -nF 'supabase/setup-cli@v1' .github/workflows --exclude='one-shot-refresh-actions.yml'
+
+      - name: Commit workflow files only when changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- .github/workflows ':!.github/workflows/one-shot-refresh-actions.yml'; then
+            echo "reviewed action refs already refreshed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- .github/workflows/*.yml
+          git reset -- .github/workflows/one-shot-refresh-actions.yml
+          git diff --cached --check
+          git commit -m "ci: refresh pinned action revisions"
+          git push origin HEAD:chore/refresh-github-actions
