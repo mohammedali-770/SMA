@@ -1,10 +1,15 @@
 # Node version
 
-**The repository standard is Node 22.**
+**The repository and Vercel production standard is Node 22.**
 
-`.nvmrc` at the repository root is the single source of truth. Every workflow
-that sets up Node reads it via `node-version-file: .nvmrc` rather than hardcoding
-a number, so the version cannot drift between workflows again.
+`.nvmrc` at the repository root is the developer/CI source of truth. Every
+GitHub workflow that sets up Node reads it via `node-version-file: .nvmrc`
+rather than hardcoding a number, so the version cannot drift between workflows.
+
+The root `package.json` also declares `engines.node: "22.x"`. Vercel reads that
+field and uses it to select the build runtime, overriding the project-level Node
+setting. Keeping both declarations aligned prevents CI and production from
+silently running different Node majors.
 
 ```bash
 nvm use          # reads .nvmrc
@@ -24,33 +29,37 @@ implementation via the transport option.
  ❯ src/lib/supabase.ts:19:25
 ```
 
-Node 22 is therefore a floor, not a preference. It is also the version
-`eas-build.yml` already used, so standardising on it changed the fewest things.
+Node 22 is therefore a floor, not a preference. It is also the version used by
+EAS-related GitHub workflows and the production web build.
 
 ## Where the version applies
 
-| Workflow | Node | Notes |
+| Surface | Node | Notes |
 | --- | --- | --- |
-| `design-system.yml` | `.nvmrc` | The only workflow that runs `npm test`. |
-| `eas-build.yml` | `.nvmrc` | Was already 22. Fires on `workflow_dispatch` or a `mobile-build-*` tag only. |
-| `eas-status.yml` | `.nvmrc` | Was 20 — the last workflow behind. Read-only EAS query; never starts a build. |
-| `deploy-functions.yml` | n/a | Uses `supabase/setup-cli` only. No Node, no npm, nothing to standardise. |
+| Local development | `.nvmrc` | `nvm use` selects Node 22. |
+| GitHub Actions | `.nvmrc` | Workflows use `node-version-file: .nvmrc`. |
+| Vercel builds | `package.json` `engines.node` | Overrides the Vercel project-level Node setting. |
+| `eas-build.yml` | `.nvmrc` | Fires on `workflow_dispatch` or a `mobile-build-*` tag only. |
+| `eas-status.yml` | `.nvmrc` | Read-only EAS query; never starts a build. |
+| `deploy-functions.yml` | n/a | Uses `supabase/setup-cli`; no Node/npm setup. |
 
-## Deliberately NOT set here
+## Why the Vercel pin was added separately
 
-**`engines.node` in `package.json`.** It is the stronger, machine-enforced form
-of this standard, but Vercel reads `engines.node` to select the build runtime.
-Adding it would change the deployed Node version as a side effect, which is a
-production deployment change and does not belong in a CI-standardisation commit.
-Track it separately if you want npm to warn on a mismatched local Node.
+Earlier CI-standardisation work deliberately did **not** add `engines.node`,
+because doing so changes the deployed Vercel runtime and therefore deserved a
+separate production change. A later live Vercel audit found the project setting
+on Node 24.x while the repository and CI were standardized on Node 22.
 
-`.nvmrc` is safe by comparison: Vercel does not read it, so it advises
-developers and drives CI without touching the deployment runtime.
+The production-safe correction is to pin Node 22 in source using
+`engines.node`. Vercel documents that this setting overrides the dashboard Node
+selection, removing that runtime drift without relying on an out-of-band project
+setting.
 
 ## Changing the standard
 
-Edit `.nvmrc`. Every workflow follows automatically. Then check:
+Change `.nvmrc` and `package.json` together. Then verify:
 
 - the unit suite still runs (`npm test`);
+- production/web builds still run (`npm run build`);
 - `eas-cli` still supports the version (`eas-build.yml`, `eas-status.yml`);
-- whether Vercel's project setting should move to match.
+- Vercel preview/build output reports the intended Node major before production promotion.

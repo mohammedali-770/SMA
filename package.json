@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web",
@@ -46,8 +49,9 @@
     "vite": "^6.2.3",
     "vitest": "^4.1.10"
   },
-  "//overrides": "Transitive-only security patch. undici reaches this tree once, as a dependency of jsdom, which is a devDependency used only for the vitest jsdom environment — it is never bundled or shipped. The bump stays within the same major (7.28.0 -> 7.29.0), so no dependent's API expectations change. Pinned surgically rather than via `npm audit fix`, per docs/DEPENDENCY_ADVISORIES.md §2.",
+  "//overrides": "Targeted transitive security patches only. undici is a jsdom/vitest dev dependency; nanoid 3.x is pulled by PostCSS/Vite. Both pins stay within the dependency ranges/majors already requested by their parents and avoid broad `npm audit fix` churn. See docs/DEPENDENCY_ADVISORIES.md.",
   "overrides": {
+    "nanoid": "3.3.18",
     "undici": "^7.29.0"
   }
 }
