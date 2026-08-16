@@ -90,5 +90,39 @@ jobs:
       # build. Tagging is therefore not a release. Use the Actions tab and pick
       # `production` explicitly. Left as-is rather than silently changing what a
       # tag does, because that would alter release behaviour without approval.
+      #
+      # For production iOS, --auto-submit queues the finished archive for App
+      # Store Connect/TestFlight using submit.production.ios in eas.json. Android
+      # is intentionally NOT auto-submitted. When platform=all, split the calls
+      # so only the iOS half gets --auto-submit; this fixes the prior PR #207 P1
+      # where `all` built iOS successfully but silently skipped TestFlight.
       - name: Submit EAS build
-        run: eas build --platform "${{ inputs.platform || 'android' }}" --profile "${{ inputs.profile || 'preview' }}" --non-interactive --no-wait
+        env:
+          PLATFORM: ${{ inputs.platform || 'android' }}
+          PROFILE: ${{ inputs.profile || 'preview' }}
+        run: |
+          set -euo pipefail
+
+          if [ "$PROFILE" != "production" ]; then
+            eas build --platform "$PLATFORM" --profile "$PROFILE" --non-interactive --no-wait
+            exit 0
+          fi
+
+          case "$PLATFORM" in
+            ios)
+              eas build --platform ios --profile production --auto-submit --non-interactive --no-wait
+              ;;
+            android)
+              eas build --platform android --profile production --non-interactive --no-wait
+              ;;
+            all)
+              # Keep Android as build-only. Queue iOS separately with auto-submit
+              # so TestFlight is never skipped just because "all" was selected.
+              eas build --platform android --profile production --non-interactive --no-wait
+              eas build --platform ios --profile production --auto-submit --non-interactive --no-wait
+              ;;
+            *)
+              echo "::error::Unsupported platform: $PLATFORM"
+              exit 2
+              ;;
+          esac
