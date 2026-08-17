@@ -54,11 +54,11 @@ Account-deletion server logic includes phone normalization and audited manual-re
 | Function | `verify_jwt` | Status | Responsibility |
 | --- | --- | --- | --- |
 | `email-test-config` | true | admin-only | SMTP/configuration status and test-send tooling; secret stays server-side |
-| `push-dispatch` | false | **flag-gated (master flag OFF)** | Expo push sender; EAS credentials configured, but every action no-ops until the `push`/`expo` integration row is enabled |
+| `push-dispatch` | false | **LIVE** | Expo push sender; credentials configured, master flag enabled, delivering to real customer devices |
 
-The client gate was opened by owner approval on 2026-08-17 and EAS now holds real iOS APNs and Android FCM V1 credentials, so customers on a build that contains the `expo-notifications` plugin can opt in and register devices.
+Push went live on 2026-08-17. `push-dispatch` still reads the `integration_settings` row (`provider_type='push'`) on every request and returns `{status:'disabled'}` unless it is `enabled` **and** its provider resolves to exactly `expo` — that gate is simply passing now. Turning the row off is the kill switch for all sending, including order updates.
 
-Sending is still off. `push-dispatch` reads the `integration_settings` row (`provider_type='push'`) on every request and returns `{status:'disabled'}` unless it is `enabled` **and** its provider resolves to exactly `expo`. Enabling that row is an owner action (`CLAUDE.md` §5). The existence of a deployed `push-dispatch` does not mean push is an active customer channel.
+Because this function now messages real customers, changes to its status copy, targeting or dispatch behaviour are customer-facing changes. Its `order_status` and `pos_sync` paths are idempotent per `(order_id, status)` under a claim/fencing lifecycle; `broadcast` is immediate, non-recallable, and restricted to devices with `promos_enabled = true`.
 
 ## Payment/refund functions — PROVISIONAL AND FROZEN
 

@@ -37,8 +37,9 @@ verify_jwt = true
 [functions.lazywait-webhook]
 verify_jwt = false
 
-# Expo push sender. Client gate open + EAS credentials configured, but every
-# action no-ops until the `push`/`expo` integration master flag is enabled.
+# Expo push sender — LIVE. Credentials configured and the `push`/`expo`
+# integration master flag is enabled, so this delivers to real customer
+# devices. Disabling that row is the kill switch for all sending.
 [functions.push-dispatch]
 verify_jwt = false
 

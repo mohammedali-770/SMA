@@ -105,11 +105,13 @@ The final payment provider has not been selected. Existing Tap/payment/refund so
 
 Automated refund processing remains disabled. The authoritative decision is [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 
-### Push notifications — client enabled, sending still flag-gated
+### Push notifications — LIVE
 
-Owner-approved on 2026-08-17: the mobile client gate (`PUSH_CLIENT_ENABLED`) is open, the `expo-notifications` plugin and `google-services.json` ship in `apps/mobile/app.json`, and EAS holds iOS APNs (Sandbox & Production) and Android FCM V1 credentials. Customers can opt in and register a device.
+Enabled end-to-end on 2026-08-17. The mobile client gate (`PUSH_CLIENT_ENABLED`) is open, the `expo-notifications` plugin and `google-services.json` ship in `apps/mobile/app.json`, EAS holds iOS APNs (Sandbox & Production) and Android FCM V1 credentials, and the `integration_settings` push master flag is **enabled**.
 
-Delivery is still off: the `integration_settings` push row remains **disabled**, and `push-dispatch` no-ops entirely while it is. Enabling that master flag — and any EAS/store build that ships the capability — remains an owner-approval action (`CLAUDE.md` §5).
+Order-status notifications reach opted-in customers automatically (`order_updates_enabled` defaults TRUE). Admin promotional broadcasts reach only devices with `promos_enabled = true`, which defaults FALSE and is customer-controlled — marketing is strictly opt-in.
+
+Sending a broadcast, changing the audience model, or turning the master flag off are owner-approval actions (`CLAUDE.md` §5).
 
 ### Discounts/campaigns — schema exists, product wiring remains decision-gated
 
