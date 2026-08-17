@@ -2,6 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CART_STORAGE_KEY as CART_KEY } from '../lib/storageKeys';
+import { noteCartAdd } from '../features/cart/suggestionStore';
 import { computeUnitPrice, makeCartItemId, cartSubtotal } from '../utils/format';
 import { uuidv4 } from '../utils/uuid';
 import type { CartItem, Modifier, Product } from '../types/models';
@@ -20,6 +21,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() => uuidv4());
   const hydrated = useRef(false);
+  // The pre-add basket for the suggestion model. It cannot be read from the
+  // `setItems` updater (updaters must be pure, and StrictMode double-invokes
+  // them, which would double-count every add) nor from the closure (stale).
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; }, [items]);
   useEffect(() => {
     AsyncStorage.getItem(CART_KEY).then((raw) => { if (raw) { try { setItems(JSON.parse(raw) as CartItem[]); } catch {} } }).catch(() => {}).finally(() => { hydrated.current = true; });
   }, []);
@@ -30,6 +36,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, [items]);
 
   const addItem = useCallback((product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number) => {
+    // Every add in the app funnels through here — menu one-tap, product page and
+    // the cart suggestion strip — so this is the one place the on-device
+    // suggestion model can learn from. Fire-and-forget and fully swallowed: it
+    // cannot alter cart state, throw, or change timing.
+    noteCartAdd(product, itemsRef.current);
     const cartItemId = makeCartItemId(product.id, selected); const unitPrice = computeUnitPrice(product, selected);
     setItems((prev) => {
       const existing = prev.find((it) => it.cartItemId === cartItemId);

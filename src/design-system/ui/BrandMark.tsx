@@ -1,10 +1,15 @@
 /**
  * Spicy Meal brand mark (admin console).
  *
- * Renders the OFFICIAL production logo — `public/logo.png`, the chef-rooster
- * mascot. That exact file is also the iOS/Android app icon and the mobile
- * splash image (`assets/icon.png` and `apps/mobile/assets/icon.png` are
- * byte-identical to it), so the console and the app show the same mark.
+ * Renders the OFFICIAL production logo — the chef-rooster mascot — from
+ * `public/logo-mark.png`. That file is derived from the approved master
+ * `public/logo.png` by `scripts/build-logo-mark.mjs`, which knocks the white
+ * backdrop out of the square so the mark sits on the surface behind it instead
+ * of punching a white tile through it. The mobile app renders the same derived
+ * file, so the console and the app show the same mark.
+ *
+ * The master keeps its opaque backdrop because it is also the store icon, and
+ * iOS rejects app icons that carry an alpha channel.
  *
  * Do not substitute a redrawn or vector "reinterpretation" of the mascot: the
  * PNG is the approved asset and there is no official SVG in the repo.
@@ -15,7 +20,7 @@
 import React from 'react';
 
 /** Path is served from `public/`, so it is origin-relative and cache-busted by deploy. */
-const LOGO_SRC = '/logo.png';
+const LOGO_SRC = '/logo-mark.png';
 
 export function BrandMark({
   className = '',

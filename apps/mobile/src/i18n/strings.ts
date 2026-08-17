@@ -132,6 +132,7 @@ export const STRINGS = {
     remove: 'Remove',
     item: 'item',
     items: 'items',
+    cartSuggestTitle: 'You might also like',
 
     // checkout
     checkout: 'Checkout',
@@ -476,6 +477,7 @@ export const STRINGS = {
     remove: 'حذف',
     item: 'عنصر',
     items: 'عناصر',
+    cartSuggestTitle: 'قد يعجبك أيضاً',
 
     checkout: 'إتمام الطلب',
     orderType: 'نوع الطلب',

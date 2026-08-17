@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CART_STORAGE_KEY, LANGUAGE_STORAGE_KEY } from './storageKeys';
+import { CART_STORAGE_KEY, LANGUAGE_STORAGE_KEY, ORDER_CONTEXT_STORAGE_KEY, SUGGESTIONS_STORAGE_KEY } from './storageKeys';
 
 describe('storageKeys', () => {
   // These literals are persisted on customers' devices. Changing a value
@@ -12,9 +12,12 @@ describe('storageKeys', () => {
   it('language key is stable', () => {
     expect(LANGUAGE_STORAGE_KEY).toBe('spicymeal.lang');
   });
+  it('suggestions key is stable', () => {
+    expect(SUGGESTIONS_STORAGE_KEY).toBe('spicymeal.suggestions');
+  });
   it('keys are distinct and namespaced', () => {
-    expect(CART_STORAGE_KEY).not.toBe(LANGUAGE_STORAGE_KEY);
-    expect(CART_STORAGE_KEY.startsWith('spicymeal.')).toBe(true);
-    expect(LANGUAGE_STORAGE_KEY.startsWith('spicymeal.')).toBe(true);
+    const all = [CART_STORAGE_KEY, LANGUAGE_STORAGE_KEY, ORDER_CONTEXT_STORAGE_KEY, SUGGESTIONS_STORAGE_KEY];
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.every((k) => k.startsWith('spicymeal.'))).toBe(true);
   });
 });
