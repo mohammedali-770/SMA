@@ -23,8 +23,9 @@
     },
     "android": {
       "package": "sa.com.spicymeal.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#ffffff" },
-      "permissions": ["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION"]
+      "permissions": ["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS"]
     },
     "web": { "output": "single", "favicon": "./assets/favicon.png" },
     "plugins": [
@@ -33,7 +34,8 @@
       ["expo-splash-screen", { "image": "./assets/adaptive-icon.png", "imageWidth": 200, "resizeMode": "contain", "backgroundColor": "#ffffff" }],
       "expo-web-browser",
       "expo-image",
-      "expo-status-bar"
+      "expo-status-bar",
+      ["expo-notifications", { "color": "#E02D3D", "defaultChannel": "default" }]
     ],
     "extra": { "router": {}, "eas": { "projectId": "c8422901-b27a-40b3-91c7-b6ce99d97936" } },
     "experiments": { "baseUrl": "/app" }

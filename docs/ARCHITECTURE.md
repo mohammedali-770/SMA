@@ -196,11 +196,13 @@ Important consequences:
 
 Architecture diagrams or README text must not describe the provisional Tap stack as the final gateway.
 
-## 10. Push notifications — dormant
+## 10. Push notifications — client enabled, sending flag-gated
 
-Push-notification source is retained, but the product decision is to keep push dormant unless separately enabled/configured with explicit approval.
+Owner-approved 2026-08-17. The client/native side is live: `PUSH_CLIENT_ENABLED` is `true`, `apps/mobile/app.json` carries the `expo-notifications` plugin and `google-services.json`, and EAS holds iOS APNs (Sandbox & Production) plus Android FCM V1 credentials. Customers can opt in from Profile → Notifications; registration writes go through the `register_push_device` / `deactivate_push_device` SECURITY DEFINER RPCs (there is no client write path on `push_devices`).
 
-Do not infer from the presence of `push-dispatch` or client notification code that push is an active production customer channel.
+Sending remains gated by the `integration_settings` push master flag (`provider_type='push'`, provider `expo`), re-checked by `push-dispatch` on every action. While that flag is disabled — its current state — every action no-ops with `{status:'disabled'}` and nothing is delivered.
+
+Do not infer from the open client gate that push is an active production customer channel; the master flag and a shipping EAS build are both separate owner-approval steps.
 
 ## 11. Shared design system
 

@@ -158,7 +158,7 @@ Important principles:
 - provider secrets remain server-side;
 - deployment is an explicit owner-approved production action;
 - payment functions remain frozen even though they exist in source;
-- push remains dormant even though `push-dispatch` exists.
+- push sending remains disabled by the `integration_settings` master flag even though `push-dispatch` exists and EAS credentials are configured.
 
 ## Lazywait
 
