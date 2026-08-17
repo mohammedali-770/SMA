@@ -6,7 +6,6 @@ export const STRINGS = {
   en: {
     appName: 'Spicy Meal',
     tagline: 'Hot, Crispy, Fresh and Golden Bites',
-    welcome: 'Satisfy Your Cravings!',
 
     // common
     retry: 'Try Again',
@@ -17,19 +16,19 @@ export const STRINGS = {
     close: 'Close',
     back: 'Back',
 
-    // auth
-    authSub: 'Order your favourite spicy meals in seconds.',
-
-    // customer login — WhatsApp only, Saudi mobiles only (Supabase Phone Auth)
+    // customer login — WhatsApp only, Saudi mobiles only (Supabase Phone Auth).
+    // The screen carries the brand lockup and the field, nothing else: there is
+    // deliberately no heading or explanatory paragraph above the input.
     loginWithWhatsapp: 'Login with WhatsApp',
-    loginPhoneTitle: 'Login with WhatsApp',
-    loginPhoneSub: 'Enter your Saudi mobile number and we’ll send a login code to your WhatsApp.',
     phoneNumberLabel: 'Mobile number',
     saudiNumbersOnly: 'Saudi mobile numbers only (+966).',
-    sendLoginCode: 'Send login code',
+    loginContinue: 'Continue',
+    loginCodeOnWhatsapp: 'Your verification code will arrive on WhatsApp',
     weSentLoginCode: 'We sent a login code to your WhatsApp.',
-    enterLoginCode: 'Enter your login code',
-    verifyAndLogin: 'Verify & Login',
+    enterCodeTitle: 'Enter your code',
+    verifyShort: 'Verify',
+    changeShort: 'Change',
+    /** Screen-reader label for the inline "Change" action, which needs the noun. */
     changeNumber: 'Change number',
     invalidSaudiPhone: 'Enter a valid Saudi mobile number, e.g. 05XXXXXXXX.',
     loginCodeSendFailed: 'Could not send the login code. Please try again.',
@@ -357,7 +356,6 @@ export const STRINGS = {
   ar: {
     appName: 'سبايسي ميل',
     tagline: 'حار، مقرمش، طازج ولقيمات ذهبية',
-    welcome: 'أشبع رغبتك في الطعم الحار!',
 
     retry: 'إعادة المحاولة',
     loading: 'جارٍ التحميل…',
@@ -367,18 +365,17 @@ export const STRINGS = {
     close: 'إغلاق',
     back: 'رجوع',
 
-    authSub: 'اطلب وجباتك الحارة المفضلة في ثوانٍ.',
-
     // تسجيل دخول العميل عبر واتساب فقط — أرقام سعودية فقط (مصادقة الجوال في Supabase)
     loginWithWhatsapp: 'تسجيل الدخول عبر واتساب',
-    loginPhoneTitle: 'تسجيل الدخول عبر واتساب',
-    loginPhoneSub: 'أدخل رقم جوالك السعودي وسنرسل رمز الدخول إلى واتساب الخاص بك.',
     phoneNumberLabel: 'رقم الجوال',
     saudiNumbersOnly: 'أرقام الجوال السعودية فقط (+966).',
-    sendLoginCode: 'إرسال رمز الدخول',
+    loginContinue: 'متابعة',
+    loginCodeOnWhatsapp: 'سيصلك رمز التحقق عبر WhatsApp',
     weSentLoginCode: 'أرسلنا رمز الدخول إلى واتساب الخاص بك.',
-    enterLoginCode: 'أدخل رمز الدخول',
-    verifyAndLogin: 'تحقّق وتسجيل الدخول',
+    enterCodeTitle: 'أدخل الرمز',
+    verifyShort: 'تأكيد',
+    changeShort: 'تغيير',
+    /** تسمية قارئ الشاشة لزر «تغيير» المضمّن، ويحتاج إلى الاسم كاملاً. */
     changeNumber: 'تغيير الرقم',
     invalidSaudiPhone: 'أدخل رقم جوال سعودي صحيح، مثل 05XXXXXXXX.',
     loginCodeSendFailed: 'تعذّر إرسال رمز الدخول. حاول مرة أخرى.',

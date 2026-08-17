@@ -18,9 +18,9 @@
  */
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { color, fontFamily, space } from '../../design-system/generated/tokens';
+import { fontFamily, hitTarget, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
 import { Text } from '../../design-system/ui/Text';
 import { SaudiPhoneInput } from '../../components/SaudiPhoneInput';
@@ -104,64 +104,100 @@ export function PhoneOtpLogin() {
     onCode: (c) => { setCode(c); void verify(c); },
   });
 
-  return (
-    <View style={{ gap: space.s3 }}>
-      <Text variant="title">{t('loginPhoneTitle')}</Text>
-      <Text variant="body" tone="secondary" style={{ marginBottom: space.s2 }}>{t('loginPhoneSub')}</Text>
+  // ---- phase 1: the number ------------------------------------------------
+  // No heading and no explanatory paragraph. The field is labelled, the +966
+  // prefix is visible, and the one line that genuinely carries new information
+  // — that the code arrives on WhatsApp — sits under the button, where it is
+  // read at the moment it applies.
+  if (phase === 'phone') {
+    return (
+      <View style={styles.stack}>
+        <SaudiPhoneInput value={national} onChangeText={setNational} />
+        <Button
+          label={t('loginContinue')}
+          onPress={sendCode}
+          loading={busy}
+          disabled={!isSaudiMobile(national)}
+        />
+        <Text variant="caption" tone="secondary" align="center">{t('loginCodeOnWhatsapp')}</Text>
+        {error ? <Text variant="caption" tone="danger" align="center">{error}</Text> : null}
+      </View>
+    );
+  }
 
-      <SaudiPhoneInput
-        value={national}
-        onChangeText={setNational}
-        editable={phase === 'phone'}
-        style={styles.field}
+  // ---- phase 2: the code --------------------------------------------------
+  // The number moves up as a compact line with an inline "Change", which
+  // replaces both the disabled phone field and a third full-width button. That
+  // leaves the six boxes as the only thing competing for attention.
+  return (
+    <View style={styles.stack}>
+      <Text variant="display" align="center">{t('enterCodeTitle')}</Text>
+
+      <View style={styles.sentToRow}>
+        <Text variant="body" style={styles.sentTo}>{formatSaudiE164(e164)}</Text>
+        <Pressable
+          onPress={changeNumber}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={t('changeNumber')}
+          hitSlop={space.s2}
+          style={styles.inlineAction}
+        >
+          <Text variant="label" tone="ember">{t('changeShort')}</Text>
+        </Pressable>
+      </View>
+
+      <OtpCodeInput
+        value={code}
+        onChange={setCode}
+        length={DEFAULT_OTP_LENGTH}
+        onComplete={(c) => verify(c)}
+        autoFocus
+        accessibilityLabel={t('enterCodeTitle')}
+        style={styles.otp}
       />
 
-      {phase === 'phone' ? (
-        <Button label={t('sendLoginCode')} onPress={sendCode} loading={busy} disabled={!isSaudiMobile(national)} />
-      ) : (
-        <>
-          <Text variant="heading" tone="ember" align="center" style={styles.sentTo}>
-            {formatSaudiE164(e164)}
-          </Text>
-          <View style={styles.field}>
-            <Text variant="label" tone="secondary" style={{ marginBottom: space.s2 }}>
-              {t('enterLoginCode')}
-            </Text>
-            <OtpCodeInput
-              value={code}
-              onChange={setCode}
-              length={DEFAULT_OTP_LENGTH}
-              onComplete={(c) => verify(c)}
-              autoFocus
-              accessibilityLabel={t('enterLoginCode')}
-            />
-          </View>
-          <Button label={t('verifyAndLogin')} onPress={() => verify()} loading={busy} />
-          <Button
-            label={cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
-            onPress={sendCode}
-            disabled={busy || cooldown > 0}
-            variant="ghost"
-            style={{ marginTop: space.s1 }}
-          />
-          <Button label={t('changeNumber')} onPress={changeNumber} disabled={busy} variant="ghost" />
-        </>
-      )}
+      <Button label={t('verifyShort')} onPress={() => verify()} loading={busy} />
 
-      {notice ? <Text variant="caption" tone="success" style={styles.msg}>{notice}</Text> : null}
-      {error ? <Text variant="caption" tone="danger" style={styles.msg}>{error}</Text> : null}
+      <Pressable
+        onPress={sendCode}
+        disabled={busy || cooldown > 0}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: busy || cooldown > 0 }}
+        style={styles.resend}
+      >
+        <Text variant="caption" tone={cooldown > 0 ? 'tertiary' : 'ember'} align="center">
+          {cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
+        </Text>
+      </Pressable>
+
+      {error ? (
+        <Text variant="caption" tone="danger" align="center">{error}</Text>
+      ) : (
+        <Text variant="caption" tone="secondary" align="center">
+          {notice ?? t('loginCodeOnWhatsapp')}
+        </Text>
+      )}
     </View>
   );
 }
 
-const useStyles = makeStyles((colors) => ({
-  field: { marginBottom: space.s3 },
+const useStyles = makeStyles(() => ({
+  stack: { gap: space.s3 },
+  sentToRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.s2,
+    // Fixed LTR: the number and its "Change" action read left-to-right in both
+    // languages, so the pair never reverses around the number.
+    direction: 'ltr',
+  },
   // The number the code went to — always LTR so it reads correctly in Arabic,
   // and mono because it is a structured number.
-  sentTo: {
-    fontFamily: fontFamily.num.semibold,
-    writingDirection: 'ltr',
-    marginBottom: space.s2,
-  },
-  msg: { marginTop: space.s1 },
+  sentTo: { fontFamily: fontFamily.num.semibold, writingDirection: 'ltr' },
+  // Both inline actions still clear the 44px touch minimum.
+  inlineAction: { minHeight: hitTarget, justifyContent: 'center' },
+  resend: { minHeight: hitTarget, justifyContent: 'center' },
+  otp: { marginVertical: space.s2 },
 }));

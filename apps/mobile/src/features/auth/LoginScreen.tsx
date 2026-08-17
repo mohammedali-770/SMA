@@ -19,7 +19,7 @@ import { showsUnavailableCard, type WhatsAppLoginAvailability } from './loginAva
 import { PhoneOtpLogin } from './PhoneOtpLogin';
 
 export function LoginScreen() {
-  const { t, pick, lang, isRTL } = useI18n();
+  const { t, pick, lang } = useI18n();
   const styles = useStyles();
   const [availability, setAvailability] = useState<WhatsAppLoginAvailability | null>(null);
 
@@ -39,10 +39,14 @@ export function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={[styles.hero, isRTL && styles.heroRTL]}>
-            <Logo />
-            <Text variant="display" style={styles.welcome}>{t('welcome')}</Text>
-            <Text variant="body" tone="secondary">{t('authSub')}</Text>
+          {/*
+            The brand IS the header. There is no headline or marketing line
+            under the mark any more: on a screen whose only job is one phone
+            field, every extra sentence was something to read before you could
+            act. What remains is the launch screen's own lockup.
+          */}
+          <View style={styles.hero}>
+            <Logo stacked />
           </View>
 
           {availability === null ? (
@@ -75,9 +79,9 @@ export function LoginScreen() {
 
 const useStyles = makeStyles((color) => ({
   scroll: { padding: space.s5, paddingBottom: space.s6, gap: space.s3 },
-  hero: { alignItems: 'flex-start' as const, marginBottom: space.s5, gap: space.s1 },
-  heroRTL: { alignItems: 'flex-end' as const },
-  welcome: { marginTop: space.s3 },
+  // Centred in BOTH languages — the lockup is the one block on this screen with
+  // no reading direction. The form below it keeps the reading edge.
+  hero: { alignItems: 'center' as const, marginTop: space.s5, marginBottom: space.s6 },
   policy: {
     marginTop: space.s5,
     textAlign: 'center' as const,

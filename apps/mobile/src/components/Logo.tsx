@@ -1,10 +1,11 @@
 /** Spicy Meal logo lockup: brand mark + wordmark, shown at the top of screens. */
 import { Image } from 'expo-image';
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { space } from '../design-system/generated/tokens';
 import { Text } from '../design-system/ui/Text';
+import { useI18n } from '../i18n/I18nProvider';
 import { makeStyles } from '../theme/makeStyles';
 
 // The official production mark, with the master's white backdrop knocked out so
@@ -13,8 +14,36 @@ import { makeStyles } from '../theme/makeStyles';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const MARK = require('../../assets/logo-mark.png');
 
-export function Logo({ compact = false }: { compact?: boolean }) {
+interface Props {
+  /** Mark only, 30px — for dense headers. */
+  compact?: boolean;
+  /**
+   * Centred hero lockup: large mark over the wordmark and "Since 1997".
+   *
+   * Deliberately the SAME three elements, in the same order, as the launch
+   * screen (`app/index.tsx`) and the home header, so the splash hands off to a
+   * login screen that reads as one continuous brand rather than a second one.
+   * The wordmark is localized here for the same reason those two are.
+   */
+  stacked?: boolean;
+}
+
+export function Logo({ compact = false, stacked = false }: Props) {
   const styles = useStyles();
+  const { pick } = useI18n();
+
+  if (stacked) {
+    return (
+      <View style={styles.stack}>
+        <Image source={MARK} style={styles.markXl} contentFit="contain" />
+        <View style={styles.stackCopy}>
+          <Text variant="display" align="center">{pick('Spicy Meal', 'سبايسي ميل')}</Text>
+          <Text variant="heading" tone="ember" align="center">{pick('Since 1997', 'منذ 1997')}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.row}>
       <Image source={MARK} style={compact ? styles.markSm : styles.mark} contentFit="contain" />
@@ -28,9 +57,14 @@ export function Logo({ compact = false }: { compact?: boolean }) {
   );
 }
 
-const useStyles = makeStyles((colors) => ({
+const useStyles = makeStyles(() => ({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.s2 },
   // No corner radius: the mark is transparent now, so there is no tile to round.
   mark: { width: 40, height: 40 },
   markSm: { width: 30, height: 30 },
+  // The hero mark carries the login screen on its own — there is no headline
+  // beside it to share the weight with, which is what buys it this size.
+  markXl: { width: 104, height: 104 },
+  stack: { alignItems: 'center', gap: space.s3 },
+  stackCopy: { alignItems: 'center', gap: space.s1 },
 }));
