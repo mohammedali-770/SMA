@@ -66,11 +66,15 @@ export function InstagramIcon({ size = 28 }: SocialIconProps) {
   );
 }
 
-/** Black ghost on Snapchat yellow, the way Snapchat ships its own icon. */
+/**
+ * White ghost on Snapchat yellow — the way Snapchat ships its own app icon.
+ * The black ghost is the variant for light backgrounds, not for the yellow
+ * badge.
+ */
 export function SnapchatIcon({ size = 28 }: SocialIconProps) {
   return (
     <Badge size={size} fill="#FFFC00">
-      <Path d={SNAPCHAT_GLYPH} fill="#000000" />
+      <Path d={SNAPCHAT_GLYPH} fill="#ffffff" />
     </Badge>
   );
 }
