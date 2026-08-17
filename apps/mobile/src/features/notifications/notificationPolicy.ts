@@ -15,24 +15,31 @@
 /**
  * Master client-side gate for the push stack.
  *
- * The push stack is deliberately dormant (CLAUDE.md §7): the `push`/`expo`
- * integration row is disabled, no credentials are configured, and nothing
- * server-side can deliver a notification. While that is true the app must not
- * ask a customer for OS notification permission — a permission prompt for a
- * capability that cannot deliver is a store-review question we would fail to
- * answer, and a denial is sticky (`canAskAgain: false`), so it also poisons the
- * prompt for whenever push does ship.
+ * ENABLED (owner-approved 2026-08-17). The binary can now deliver: EAS holds
+ * real credentials for both platforms (iOS APNs key configured for Sandbox &
+ * Production; Android FCM V1 service-account key), and `app.json` carries the
+ * `expo-notifications` plugin plus `google-services.json`, so the iOS push
+ * entitlement and the Android channel exist in the build. Asking a customer for
+ * OS notification permission is therefore an honest request for a capability we
+ * can actually honour.
  *
- * This is a build-time constant rather than a read of the server flag on
+ * This stays a build-time constant rather than a read of the server flag on
  * purpose: `integration_settings` is fully revoked from the API, so the client
  * cannot see the real row, and a network-dependent gate would fail open on a
  * timeout — exactly the wrong direction for this decision.
  *
- * To enable push, this flips to `true` in the SAME change that enables the
- * server integration row and restores the `expo-notifications` plugin in
- * apps/mobile/app.json — all three, or none.
+ * SENDING IS STILL SEPARATELY GATED. This constant only controls whether the
+ * customer can opt in and register a device. Delivery additionally requires the
+ * server master flag (`integration_settings` provider_type='push', provider
+ * 'expo', `enabled = true`), which push-dispatch checks on every action and
+ * which remains an owner-controlled admin switch. Turning this on cannot by
+ * itself cause a single notification to be sent.
+ *
+ * Reverting to dormancy means flipping this back to `false` in the SAME change
+ * that removes the `expo-notifications` plugin from apps/mobile/app.json and
+ * disables the server integration row — all three, or none.
  */
-export const PUSH_CLIENT_ENABLED = false;
+export const PUSH_CLIENT_ENABLED = true;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

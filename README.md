@@ -178,7 +178,7 @@ Do not treat this repository like a sandbox:
 - Do not push directly to the production branch; use a fresh branch and PR.
 - Do not use `supabase db push` or `supabase migration repair` against production.
 - Do not modify payment/refund/provider behavior while the payment area is frozen.
-- Do not enable push notifications without explicit approval.
+- Do not enable push *sending* (the `integration_settings` push master flag) or broadcast without explicit approval; the mobile client gate is open, delivery is not.
 - Do not commit secrets, service-role keys or provider credentials.
 
 See [`CLAUDE.md`](CLAUDE.md) for the binding rules.

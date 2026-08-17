@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -80,30 +82,59 @@ describe('device preference defaults + lifecycle', () => {
 /**
  * Deliberate tripwire, not a behavioural assertion.
  *
- * The push stack is dormant by policy (CLAUDE.md §7): the `push`/`expo`
- * integration row is disabled and no credentials exist, so nothing can deliver a
- * notification. While that holds, the app must never ask for OS notification
- * permission — an iOS denial is sticky (`canAskAgain: false`), so a prompt today
- * permanently costs us the customer's opt-in for whenever push actually ships,
- * and a declared-but-undeliverable capability is a store-review question we
- * cannot answer.
+ * The rule this guards is a COUPLING, not a value: the app may only ask a
+ * customer for OS notification permission when the binary it ships in can
+ * actually receive a notification. An iOS denial is sticky
+ * (`canAskAgain: false`), so a prompt raised by a build with no push
+ * entitlement permanently costs us that customer's opt-in — and a
+ * declared-but-undeliverable capability is a store-review question we cannot
+ * answer.
  *
- * This test exists so that flipping the constant cannot be a silent one-liner.
- * Whoever changes it has to come here and read the list below.
+ * Push was enabled by explicit owner approval on 2026-08-17 (CLAUDE.md §5),
+ * with EAS credentials in place for both platforms. So instead of pinning the
+ * constant to a literal, this asserts the invariant that made enabling it safe:
+ * whenever the client gate is open, apps/mobile/app.json MUST carry the native
+ * push configuration. Flipping either side alone fails here.
  */
-describe('push dormancy (CLAUDE.md §7)', () => {
-  it('keeps the client push gate closed', () => {
-    // Enabling push is NOT just this constant. All of these move in one change:
-    //   1. PUSH_CLIENT_ENABLED -> true
-    //   2. the `push`/`expo` integration row enabled server-side, with real
-    //      credentials configured
-    //   3. the `expo-notifications` plugin restored in apps/mobile/app.json, so
-    //      the iOS push entitlement and the Android channel exist in the binary
-    //   4. explicit owner approval — CLAUDE.md §5 lists enabling push and
-    //      configuring push credentials as owner-approval-gated
-    // Steps 1 and 3 together are what stops the app declaring a capability it
-    // cannot honour; without step 2 the toggle would grant permission and then
-    // silently never deliver anything.
-    expect(PUSH_CLIENT_ENABLED).toBe(false);
+describe('push client gate ↔ native config coupling (CLAUDE.md §7)', () => {
+  // Read the REAL manifest — a stub would defeat the point of the tripwire.
+  const appJson = JSON.parse(
+    readFileSync(new URL('../../../app.json', import.meta.url), 'utf8'),
+  ) as {
+    expo: {
+      plugins?: (string | [string, Record<string, unknown>])[];
+      android?: { googleServicesFile?: string; permissions?: string[] };
+    };
+  };
+  const pluginName = (p: string | [string, Record<string, unknown>]) => (Array.isArray(p) ? p[0] : p);
+  const hasNotificationsPlugin = (appJson.expo.plugins ?? []).some(
+    (p) => pluginName(p) === 'expo-notifications',
+  );
+
+  it('ships the expo-notifications plugin whenever the client gate is open', () => {
+    // The plugin is what puts the iOS `aps-environment` entitlement and the
+    // Android notification channel into the binary. Without it the permission
+    // prompt would be asking for something the build cannot honour.
+    if (PUSH_CLIENT_ENABLED) expect(hasNotificationsPlugin).toBe(true);
+    else expect(hasNotificationsPlugin).toBe(false);
+  });
+
+  it('points Android at google-services.json whenever the client gate is open', () => {
+    // FCM V1 needs the Firebase config in the build; without it Android
+    // registers no token and every send silently targets nobody.
+    if (!PUSH_CLIENT_ENABLED) return;
+    expect(appJson.expo.android?.googleServicesFile).toBe('./google-services.json');
+    expect(appJson.expo.android?.permissions ?? []).toContain('POST_NOTIFICATIONS');
+  });
+
+  it('documents what enabling push does NOT unlock', () => {
+    // Reminder for whoever reads this next: the client gate only lets a
+    // customer OPT IN and register a device. Delivery is separately gated by
+    // the server master flag (integration_settings provider_type='push',
+    // provider 'expo', enabled=true), re-checked by push-dispatch on every
+    // action. Opening this gate cannot by itself send a notification, and
+    // enabling the server flag is its own owner-approval-gated step
+    // (CLAUDE.md §5).
+    expect(typeof PUSH_CLIENT_ENABLED).toBe('boolean');
   });
 });

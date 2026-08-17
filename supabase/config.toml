@@ -37,7 +37,8 @@ verify_jwt = true
 [functions.lazywait-webhook]
 verify_jwt = false
 
-# Source retained but product activation is DORMANT/flag-gated.
+# Expo push sender. Client gate open + EAS credentials configured, but every
+# action no-ops until the `push`/`expo` integration master flag is enabled.
 [functions.push-dispatch]
 verify_jwt = false
 

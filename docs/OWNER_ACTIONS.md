@@ -167,9 +167,24 @@ If legal text is still placeholder/incomplete, separate factual product correcti
 
 ## 10. Push notifications
 
-**Status:** SOURCE CONFIRMED — intentionally dormant; no action unless product decision changes.
+**Status:** CLIENT ENABLED 2026-08-17 by explicit owner approval — **sending still disabled; owner action outstanding.**
 
-Push code exists but is not an active customer channel by design. Do not add credentials, native push entitlement, enable the integration or start sending notifications without a separate owner decision and rollout plan.
+Completed (no further action):
+
+- iOS APNs key registered in EAS, configured **Sandbox & Production**, team-scoped (`PVR7L55YFX`);
+- Android FCM V1 service-account key uploaded to EAS for application identifier `sa.com.spicymeal.app`;
+- `apps/mobile/google-services.json` committed (Firebase project `spicy-meal`; contains no secret);
+- `PUSH_CLIENT_ENABLED = true` and the `expo-notifications` plugin in `apps/mobile/app.json`.
+
+**Outstanding owner actions — nothing is delivered until all three are done, in this order:**
+
+1. **Ship a build that contains the capability.** The plugin change is native config, so an OTA update cannot carry it — an EAS build is required (owner-approval-gated, §5/`docs/RELEASE_CHECKLIST.md`). Until a customer is on such a build, the app registers no token.
+2. **Enable the master flag.** Admin → Integrations → Push Notifications → provider `expo` → enable. `push-dispatch` no-ops with `{status:'disabled'}` until this is on.
+3. **Verify before any broadcast.** Sign into the new build with an admin account, opt in under Profile → Notifications, then use Admin → Push tools → *Send test*. Only after a test delivers should a promotional broadcast be sent — broadcasts are immediate and cannot be recalled.
+
+Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit.
+
+Do not add further push credentials, widen the audience beyond the existing opt-in model, or enable automated broadcasts without a separate owner decision.
 
 ## 11. Sentry production source maps
 

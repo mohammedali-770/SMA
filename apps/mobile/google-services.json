@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "193068471384",
+    "project_id": "spicy-meal",
+    "storage_bucket": "spicy-meal.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:193068471384:android:e177f2212178db2f07e62d",
+        "android_client_info": {
+          "package_name": "sa.com.spicymeal.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-tlx3q_df-Arjisa9sVOC5hXfPVk_Z90"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

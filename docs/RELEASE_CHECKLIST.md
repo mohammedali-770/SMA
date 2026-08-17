@@ -13,7 +13,7 @@ Before release work:
 - [ ] No direct production-branch push/merge is being used.
 - [ ] Any action that requires explicit owner approval has that approval in the conversation.
 - [ ] Payment/refund code is untouched unless a separate payment exception was explicitly approved.
-- [ ] Push remains dormant unless a separate rollout decision was explicitly approved.
+- [ ] Push sending remains disabled (`integration_settings` push row OFF) unless a separate rollout decision was explicitly approved. The client gate being open is not that approval.
 
 See `CLAUDE.md`.
 

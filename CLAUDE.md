@@ -72,9 +72,17 @@ Automated refund processing is intended to remain disabled while the freeze is a
 
 Authoritative product decision: `docs/PAYMENT_POSTPONEMENT.md`.
 
-## 7. Push notifications stay dormant
+## 7. Push notifications — client gate OPEN, sending still owner-gated
 
-Push source remains in the repository, but the product decision keeps it dormant. Do not enable push, add push credentials/entitlements, or start sending notifications without separate explicit owner approval and a rollout plan.
+The owner explicitly approved enabling push in source on **2026-08-17**. That approval covers the client/native side only:
+
+- `PUSH_CLIENT_ENABLED = true` (`apps/mobile/src/features/notifications/notificationPolicy.ts`) — customers can opt in from Profile → Notifications and register a device;
+- the `expo-notifications` plugin and `google-services.json` are present in `apps/mobile/app.json`, so the iOS push entitlement and the Android channel exist in the binary;
+- EAS holds real credentials for both platforms (iOS APNs key configured for **Sandbox & Production**; Android **FCM V1** service-account key).
+
+**Sending is still disabled and still owner-gated.** Delivery additionally requires the `integration_settings` row (`provider_type='push'`, provider `expo`) to be `enabled`, which `push-dispatch` re-checks on every action. That row stays **disabled** until the owner turns it on, and enabling it remains an owner-approval action under §5, as does any store/EAS build that ships the capability.
+
+Do not add further push credentials/entitlements, enable the server master flag, or start broadcasting without separate explicit owner approval and a rollout plan. Approval to enable the client gate is **not** approval to send.
 
 ## 8. Production migration commands
 

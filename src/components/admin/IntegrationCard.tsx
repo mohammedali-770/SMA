@@ -62,7 +62,7 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
   },
   push: {
     title: 'Push Notifications',
-    subtitle: 'Expo Push sender (push-dispatch). Enable ONLY after EAS push credentials are configured — see supabase/functions/README.md',
+    subtitle: 'Expo Push sender (push-dispatch). EAS credentials are configured (iOS APNs + Android FCM V1). Enabling this starts real delivery to opted-in devices on a build that ships the notifications plugin — see docs/OWNER_ACTIONS.md §10',
     // Expo is the implemented sender; other options removed until a sender
     // for them exists (a stale 'sandbox' row is normalized to expo by the
     // 20260714090000 migration).

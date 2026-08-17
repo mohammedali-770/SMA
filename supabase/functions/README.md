@@ -54,9 +54,11 @@ Account-deletion server logic includes phone normalization and audited manual-re
 | Function | `verify_jwt` | Status | Responsibility |
 | --- | --- | --- | --- |
 | `email-test-config` | true | admin-only | SMTP/configuration status and test-send tooling; secret stays server-side |
-| `push-dispatch` | false | **dormant / flag-gated** | Expo push sender retained in source; product decision keeps push disabled |
+| `push-dispatch` | false | **flag-gated (master flag OFF)** | Expo push sender; EAS credentials configured, but every action no-ops until the `push`/`expo` integration row is enabled |
 
-The existence of `push-dispatch` does not mean push is an active customer channel.
+The client gate was opened by owner approval on 2026-08-17 and EAS now holds real iOS APNs and Android FCM V1 credentials, so customers on a build that contains the `expo-notifications` plugin can opt in and register devices.
+
+Sending is still off. `push-dispatch` reads the `integration_settings` row (`provider_type='push'`) on every request and returns `{status:'disabled'}` unless it is `enabled` **and** its provider resolves to exactly `expo`. Enabling that row is an owner action (`CLAUDE.md` §5). The existence of a deployed `push-dispatch` does not mean push is an active customer channel.
 
 ## Payment/refund functions — PROVISIONAL AND FROZEN
 
