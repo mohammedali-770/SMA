@@ -12,3 +12,9 @@
 export const CART_STORAGE_KEY = 'spicymeal.cart';
 export const LANGUAGE_STORAGE_KEY = 'spicymeal.lang';
 export const ORDER_CONTEXT_STORAGE_KEY = 'spicymeal.orderContext';
+/**
+ * On-device behaviour profile behind the cart suggestion strip. No version
+ * suffix in the KEY — the header above forbids ever changing these values, so
+ * the schema version lives inside the payload as `v` instead.
+ */
+export const SUGGESTIONS_STORAGE_KEY = 'spicymeal.suggestions';

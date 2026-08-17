@@ -16,9 +16,32 @@ import { useCart, useOrderContext } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { CartItem } from '../../types/models';
+import { SuggestionStrip, type SuggestionCardModel } from './SuggestionStrip';
+import { useCartSuggestions } from './useCartSuggestions';
 
 export function CartScreen() {
-  const insets = useSafeAreaInsets(); const { t, pick, rtlRow } = useI18n(); const styles = useStyles(); const cart = useCart(); const orderCtx = useOrderContext();
+  const insets = useSafeAreaInsets(); const { t, pick, rtlRow, isRTL } = useI18n(); const styles = useStyles(); const cart = useCart(); const orderCtx = useOrderContext();
+  // Called before the empty-cart early return so the hook order never changes.
+  const { suggestions, noteRemoved } = useCartSuggestions();
+  const suggestionCards: SuggestionCardModel[] = suggestions.map((s) => {
+    const name = pick(s.product.nameEn, s.product.nameAr);
+    const actionLabel = s.addability === 'configure' ? t('customizeAdd') : t('addToCart');
+    return {
+      id: s.product.id, name, imageUrl: s.product.imageUrl, price: s.product.price,
+      kcalLabel: s.product.calories > 0 ? `${s.product.calories} ${t('kcal')}` : '',
+      actionLabel,
+      // Bare "Add" three times in a row is useless to a screen reader.
+      accessibilityLabel: `${actionLabel}: ${name}`,
+      accessibilityHint: s.addability === 'configure' ? pick('Opens item options', 'يفتح خيارات المنتج') : undefined,
+    };
+  });
+  // A product with any modifier group opens its page — matching the menu, and
+  // so an optional PRICED group can never be added cheaper than the card shows.
+  const onSuggestionPress = (id: string) => {
+    const s = suggestions.find((x) => x.product.id === id); if (!s) return;
+    if (s.addability === 'configure') router.push({ pathname: '/product/[id]', params: { id: s.product.id } });
+    else cart.addItem(s.product, {}, 1);
+  };
   if (cart.items.length === 0) return <View style={styles.root}><Header title={t('myCart')} showBack safeTop /><EmptyView icon={<BagIcon size={48} />} title={t('emptyCartTitle')} subtitle={t('emptyCartSub')} actionLabel={t('browseMenu')} onAction={() => router.replace('/(tabs)')} /></View>;
   return (
     <View style={styles.root}>
@@ -27,8 +50,15 @@ export function CartScreen() {
         {cart.items.map((it) => <CartLine key={it.cartItemId} item={it} name={pick(it.product.nameEn, it.product.nameAr)} modifierSummary={modifierSummary(it, pick)} lineAmount={it.unitPrice * it.quantity}
           removeLabel={t('remove')} editLabel={pick('Edit item', 'تعديل المنتج')}
           onEdit={() => router.push({ pathname: '/product/[id]', params: { id: it.product.id, cartItemId: it.cartItemId } })}
-          onInc={() => cart.incrementLine(it.cartItemId)} onDec={() => cart.decrementLine(it.cartItemId)} onRemove={() => cart.removeLine(it.cartItemId)} />)}
-      </View></ScrollView>
+          onInc={() => cart.incrementLine(it.cartItemId)}
+          // Suggesting back the item the customer just deleted reads as broken —
+          // and removal frees it from the in-cart filter, so without this it
+          // would immediately become a high-scoring candidate.
+          onDec={() => { if (it.quantity === 1) noteRemoved(it.product.id); cart.decrementLine(it.cartItemId); }}
+          onRemove={() => { noteRemoved(it.product.id); cart.removeLine(it.cartItemId); }} />)}
+      </View>
+      <SuggestionStrip title={t('cartSuggestTitle')} items={suggestionCards} isRTL={isRTL} onPress={onSuggestionPress} />
+      </ScrollView>
       <View style={[styles.footer, { paddingBottom: insets.bottom + space.s2 }]}>
         <View style={[styles.subtotalRow, rtlRow]}><Text variant="body" tone="secondary">{t('subtotal')}</Text><Price amount={cart.subtotal} size={typeScale.heading.size} weight="700" /></View>
         {orderCtx.valid ? <Pressable style={[styles.checkoutBtn, rtlRow]} onPress={() => router.push('/checkout')} accessibilityRole="button"><Text variant="heading" tone="onEmber">{t('goToCheckout')}</Text><Text variant="caption" tone="onEmber">{cart.count} {cart.count === 1 ? t('item') : t('items')}</Text></Pressable>
