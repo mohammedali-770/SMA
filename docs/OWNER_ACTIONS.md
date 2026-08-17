@@ -167,24 +167,29 @@ If legal text is still placeholder/incomplete, separate factual product correcti
 
 ## 10. Push notifications
 
-**Status:** CLIENT ENABLED 2026-08-17 by explicit owner approval — **sending still disabled; owner action outstanding.**
+**Status:** **LIVE 2026-08-17.** Delivery to real customer devices is confirmed working end-to-end. No outstanding setup action.
 
-Completed (no further action):
+Completed:
 
 - iOS APNs key registered in EAS, configured **Sandbox & Production**, team-scoped (`PVR7L55YFX`);
 - Android FCM V1 service-account key uploaded to EAS for application identifier `sa.com.spicymeal.app`;
 - `apps/mobile/google-services.json` committed (Firebase project `spicy-meal`; contains no secret);
-- `PUSH_CLIENT_ENABLED = true` and the `expo-notifications` plugin in `apps/mobile/app.json`.
+- `PUSH_CLIENT_ENABLED = true` and the `expo-notifications` plugin in `apps/mobile/app.json`;
+- iOS production build shipped to TestFlight;
+- **master flag enabled** by the owner in Admin → Integrations → Push Notifications (provider resolves to `expo`);
+- delivery verified: broadcasts sent on 2026-08-17 reached their targeted device with zero failures.
 
-**Outstanding owner actions — nothing is delivered until all three are done, in this order:**
+**What is now automatic.** Order-status transitions push to real customers with no further action — `order_updates_enabled` defaults **TRUE** at registration. Treat any change to status copy, dispatch behaviour or targeting as a change to live customer messaging.
 
-1. **Ship a build that contains the capability.** The plugin change is native config, so an OTA update cannot carry it — an EAS build is required (owner-approval-gated, §5/`docs/RELEASE_CHECKLIST.md`). Until a customer is on such a build, the app registers no token.
-2. **Enable the master flag.** Admin → Integrations → Push Notifications → provider `expo` → enable. `push-dispatch` no-ops with `{status:'disabled'}` until this is on.
-3. **Verify before any broadcast.** Sign into the new build with an admin account, opt in under Profile → Notifications, then use Admin → Push tools → *Send test*. Only after a test delivers should a promotional broadcast be sent — broadcasts are immediate and cannot be recalled.
+**Ongoing owner-gated actions (§5):**
+
+- **sending a promotional broadcast** — immediate and **cannot be recalled**; check the live opt-in count in the confirm line before clicking;
+- **turning the master flag off** — the way to stop all sending, including order updates;
+- **changing who a broadcast reaches.** `promos_enabled` defaults FALSE and only the customer can switch it on. Broadcast audience therefore starts at zero and grows only by explicit opt-in. Making marketing opt-out, or widening targeting, is a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and needs a separate owner decision — not a code change made in passing.
+
+**Known issue, cosmetic:** `test` and `broadcast` rows in `notification_log` stay at `send_status = 'processing'` after a successful send, because `push-dispatch` inserts them without a terminal status. Delivery counters on the row are correct and the operations health center already compensates by summing the `failed` device counter instead of trusting the lifecycle column, so nothing is mis-reported as failed. The dashboard's `send_status_counts_24h` will show completed broadcasts as `processing`. Fixing it touches an Edge Function and therefore needs a deployment.
 
 Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit.
-
-Do not add further push credentials, widen the audience beyond the existing opt-in model, or enable automated broadcasts without a separate owner decision.
 
 ## 11. Sentry production source maps
 

@@ -25,8 +25,10 @@ import { getProviderConfig } from '../_shared/secrets.ts';
  *
  * MASTER FLAG: integration_settings (provider_type='push') must be ENABLED
  * with provider 'expo' — otherwise every action no-ops with
- * {status:'disabled'}. Seeded DISABLED; nothing can send until the admin
- * turns it on AND EAS push credentials exist (see functions/README.md).
+ * {status:'disabled'}. It was seeded DISABLED and enabled by the owner on
+ * 2026-08-17, so this function is LIVE and reaches real customer devices.
+ * Disabling that row remains the kill switch for ALL sending, order updates
+ * included (see functions/README.md).
  *
  * PAYLOAD SAFETY: notification data carries ONLY { type, orderId } — never
  * customer, order-content, amount, or payment data; titles/bodies are fixed
@@ -408,8 +410,7 @@ Deno.serve(async (req: Request) => {
   // under concurrency: a token-fenced atomic claim (pending -> processing) lets
   // exactly one dispatcher send; 'processing' is never reclaimed and terminal
   // rows are no-ops, so a status reaches a device at most once even if two
-  // dispatchers race. (Push stays master-flag disabled, so this path is dormant
-  // in prod.)
+  // dispatchers race. Push is live, so this path now delivers in prod.
   if (body.action === 'pos_sync') {
     const fromService = isServiceRoleCall(req);
     const adminId = fromService ? null : await callingAdminId(req, admin);

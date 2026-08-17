@@ -51,7 +51,7 @@ The app is portrait-only, phone-focused on iOS (`supportsTablet: false`), and de
 
 Payment/provider code exists but is deliberately frozen while the final payment gateway decision is pending. Do not change or test payment/refund behavior as part of ordinary mobile work; see [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
 
-Push code is also retained but dormant by product decision.
+Push notifications are live. The Profile → Notifications toggles register a real device, order-status pushes reach opted-in customers automatically, and marketing broadcasts are strictly opt-in. Changes to notification copy, targeting or dispatch behaviour are customer-facing — see `CLAUDE.md` §7.
 
 ## Local setup
 

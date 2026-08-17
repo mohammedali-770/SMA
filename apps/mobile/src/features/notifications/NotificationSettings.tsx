@@ -27,13 +27,14 @@ import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 
 /**
- * Gate wrapper. Push is dormant (see PUSH_CLIENT_ENABLED), so the card — and
- * therefore the toggle that triggers the OS permission prompt — must not be
- * reachable. Kept as a hook-free wrapper around the real card rather than an
- * early return inside it, so the conditional never sits above a hook call.
+ * Gate wrapper on PUSH_CLIENT_ENABLED, which is now TRUE — the card renders and
+ * the toggle really does raise the OS permission prompt.
  *
- * The implementation below is intentionally left whole: enabling push should be
- * a one-line flip plus the server row and the app.json plugin, not a rewrite.
+ * The wrapper is kept rather than deleted because it is the kill switch: an iOS
+ * denial is sticky (`canAskAgain: false`), so if the app ever had to stop
+ * asking, flipping the constant must hide the card without a code change here.
+ * It stays a hook-free wrapper around the real card rather than an early return
+ * inside it, so the conditional never sits above a hook call.
  */
 export function NotificationSettings() {
   if (!PUSH_CLIENT_ENABLED) return null;

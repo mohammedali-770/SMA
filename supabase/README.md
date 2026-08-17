@@ -35,7 +35,7 @@ Supabase currently provides:
 - Audited staff role administration and AAL2/TOTP staff authorization.
 - Edge Function provider/server boundaries.
 
-Payment/refund source remains present but **frozen/provisional** while the final provider is unresolved. Push source remains **dormant** by product decision.
+Payment/refund source remains present but **frozen/provisional** while the final provider is unresolved. Push is **live** — see `CLAUDE.md` §7.
 
 ## Security model
 
@@ -158,7 +158,7 @@ Important principles:
 - provider secrets remain server-side;
 - deployment is an explicit owner-approved production action;
 - payment functions remain frozen even though they exist in source;
-- push sending remains disabled by the `integration_settings` master flag even though `push-dispatch` exists and EAS credentials are configured.
+- push sending is **live** — the `integration_settings` master flag is enabled and `push-dispatch` delivers to real customer devices; turning that row off is the kill switch.
 
 ## Lazywait
 
