@@ -107,7 +107,32 @@ function lowestFirst(keys: string[], weightOf: (key: string) => number): string[
   return keys.sort((l, r) => weightOf(l) - weightOf(r) || (l < r ? -1 : l > r ? 1 : 0));
 }
 
-function normalizeWeights(map: Record<string, number>, cap: number): Record<string, number> {
+/**
+ * Eviction order: rows just written by the current mutation sort LAST, so they
+ * survive. Without this a customer's first-ever add of a product enters at
+ * weight 1.0, is the lowest row in a saturated map, and is evicted by the very
+ * call that recorded it — closing the profile to new products for as long as
+ * the incumbents stay above 1.0. The freshest signal is the one worth keeping.
+ */
+function evictionOrder(
+  keys: string[],
+  weightOf: (key: string) => number,
+  protect: ReadonlySet<string> | undefined,
+): string[] {
+  if (!protect || protect.size === 0) return lowestFirst(keys, weightOf);
+  return keys.sort((l, r) => {
+    const pl = protect.has(l) ? 1 : 0;
+    const pr = protect.has(r) ? 1 : 0;
+    if (pl !== pr) return pl - pr;
+    return weightOf(l) - weightOf(r) || (l < r ? -1 : l > r ? 1 : 0);
+  });
+}
+
+function normalizeWeights(
+  map: Record<string, number>,
+  cap: number,
+  protect?: ReadonlySet<string>,
+): Record<string, number> {
   const kept: Record<string, number> = {};
   for (const key of Object.keys(map)) {
     const w = clampWeight(map[key], MAX_WEIGHT);
@@ -115,13 +140,16 @@ function normalizeWeights(map: Record<string, number>, cap: number): Record<stri
   }
   const keys = Object.keys(kept);
   if (keys.length <= cap) return kept;
-  const evicted = lowestFirst(keys, (k) => kept[k]).slice(keys.length - cap);
+  const survivors = evictionOrder(keys, (k) => kept[k], protect).slice(keys.length - cap);
   const out: Record<string, number> = {};
-  for (const key of evicted) out[key] = kept[key];
+  for (const key of survivors) out[key] = kept[key];
   return out;
 }
 
-function normalizeProducts(map: Record<string, ProductStat>): Record<string, ProductStat> {
+function normalizeProducts(
+  map: Record<string, ProductStat>,
+  protect?: ReadonlySet<string>,
+): Record<string, ProductStat> {
   const kept: Record<string, ProductStat> = {};
   for (const key of Object.keys(map)) {
     const row = map[key];
@@ -133,21 +161,29 @@ function normalizeProducts(map: Record<string, ProductStat>): Record<string, Pro
   }
   const keys = Object.keys(kept);
   if (keys.length <= MAX_TRACKED_PRODUCTS) return kept;
-  const evicted = lowestFirst(keys, (k) => kept[k].a + kept[k].s).slice(keys.length - MAX_TRACKED_PRODUCTS);
+  const survivors = evictionOrder(keys, (k) => kept[k].a + kept[k].s, protect)
+    .slice(keys.length - MAX_TRACKED_PRODUCTS);
   const out: Record<string, ProductStat> = {};
-  for (const key of evicted) out[key] = kept[key];
+  for (const key of survivors) out[key] = kept[key];
   return out;
 }
 
+/** Rows written by the mutation currently in flight; exempt from eviction. */
+interface Protected {
+  p?: ReadonlySet<string>;
+  c?: ReadonlySet<string>;
+  x?: ReadonlySet<string>;
+}
+
 /** ε-prune, then cap-evict, then clamp — the ratchet that holds the ceiling for all time. */
-function normalize(draft: SuggestionState): SuggestionState {
+function normalize(draft: SuggestionState, protect?: Protected): SuggestionState {
   return {
     v: 1,
     t: Number.isFinite(draft.t) && draft.t > 0 ? draft.t : 0,
     n: clampWeight(draft.n, MAX_TOTAL),
-    p: normalizeProducts(draft.p),
-    c: normalizeWeights(draft.c, MAX_TRACKED_CATEGORIES),
-    x: normalizeWeights(draft.x, MAX_TRACKED_PAIRS),
+    p: normalizeProducts(draft.p, protect?.p),
+    c: normalizeWeights(draft.c, MAX_TRACKED_CATEGORIES, protect?.c),
+    x: normalizeWeights(draft.x, MAX_TRACKED_PAIRS, protect?.x),
   };
 }
 
@@ -206,6 +242,7 @@ export function recordAdd(state: SuggestionState, event: AddEvent, now: number):
   if (categoryId) c[categoryId] = (c[categoryId] ?? 0) + 1;
 
   const x: Record<string, number> = { ...base.x };
+  const touchedPairs = new Set<string>();
   if (categoryId) {
     const seen = new Set<string>();
     for (const from of event.cartCategoryIds) {
@@ -216,11 +253,21 @@ export function recordAdd(state: SuggestionState, event: AddEvent, now: number):
       // strongly than the reverse, and "cart has A, suggest B" is the query.
       // Self-pairs are recorded — "adds a second main" is real behaviour.
       const key = `${from}>${categoryId}`;
-      if (key.length <= MAX_KEY_LEN) x[key] = (x[key] ?? 0) + 1;
+      if (key.length <= MAX_KEY_LEN) {
+        x[key] = (x[key] ?? 0) + 1;
+        touchedPairs.add(key);
+      }
     }
   }
 
-  return normalize({ v: 1, t: base.t, n: base.n + 1, p, c, x });
+  // An add is the strongest signal the model gets, so it must not be evicted by
+  // the same call that recorded it. Impressions get no such exemption: they are
+  // weaker evidence and should lose to a better-known incumbent.
+  return normalize({ v: 1, t: base.t, n: base.n + 1, p, c, x }, {
+    p: new Set([productId]),
+    c: categoryId ? new Set([categoryId]) : undefined,
+    x: touchedPairs,
+  });
 }
 
 /**

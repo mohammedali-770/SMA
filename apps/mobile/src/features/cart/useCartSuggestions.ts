@@ -24,6 +24,8 @@ const IMPRESSION_DWELL_MS = 800;
 export function useCartSuggestions(): {
   suggestions: ScoredSuggestion[];
   noteRemoved: (productId: string) => void;
+  /** Called by the screen once the rail is actually inside the viewport. */
+  noteSlateVisible: () => void;
 } {
   const cart = useCart();
   const catalog = useCatalog();
@@ -32,6 +34,9 @@ export function useCartSuggestions(): {
   const [ready, setReady] = useState(false);
   const [removedTick, setRemovedTick] = useState(0);
   const removedRef = useRef<Set<string>>(new Set());
+  const [onScreen, setOnScreen] = useState(false);
+  /** The last slate actually charged an impression, so a re-entry cannot double-count. */
+  const chargedRef = useRef('');
 
   // Hydrate once. Load-bearing: a write that fires before the read resolves
   // would persist EMPTY_STATE over the customer's real profile.
@@ -76,6 +81,11 @@ export function useCartSuggestions(): {
   const suggestions = useMemo<ScoredSuggestion[]>(() => {
     if (!ready || catalog.loading || catalog.error) return [];
     if (!selectedBranchId || !orderCtx.valid) return [];
+    // CartScreen early-returns the empty view before the strip exists, so a
+    // slate computed here would be scored, charged an impression and never
+    // shown. Emptying the cart is the ordinary end of an abandoned basket, so
+    // without this gate every abandonment silently fatigues three products.
+    if (!cartProductKey) return [];
 
     const cartProductIds = new Set(cartProductKey ? cartProductKey.split('|') : []);
     const candidates = eligibleCandidates({
@@ -101,16 +111,28 @@ export function useCartSuggestions(): {
     // quantity changes deliberately do not recompute the slate.
   }, [ready, catalog.loading, catalog.error, selectedBranchId, orderCtx.valid, products, cartProductKey, removedTick, isAvailable, groupsForProduct]);
 
-  // Impressions are keyed on the slate itself, so re-renders cannot inflate
-  // them. If this write is skipped the strip shows the same cards forever —
-  // fatigue is the only rotation mechanism there is.
-  const slateKey = suggestions.map((s) => s.product.id).join('|');
-  useEffect(() => {
-    if (!slateKey) return;
-    const ids = slateKey.split('|');
-    const timer = setTimeout(() => noteImpressions(ids), IMPRESSION_DWELL_MS);
-    return () => clearTimeout(timer);
-  }, [slateKey]);
 
-  return { suggestions, noteRemoved };
+  // Keyed on the product SET, not the presentation order: fresh jitter can
+  // reorder an unchanged trio on any recompute, and an order-sensitive key
+  // would charge a second impression for one uninterrupted viewing.
+  const slateKey = suggestions.map((s) => s.product.id).sort().join('|');
+
+  const noteSlateVisible = useCallback(() => setOnScreen(true), []);
+  // A new slate has to earn its own impression.
+  useEffect(() => { setOnScreen(false); }, [slateKey]);
+
+  // Dwell measures attention, but only once the rail is genuinely on screen.
+  // With four or more cart lines the strip sits below the fold, so a timer
+  // armed on mount alone would charge impressions for cards nobody saw.
+  useEffect(() => {
+    if (!slateKey || !onScreen || chargedRef.current === slateKey) return;
+    const ids = slateKey.split('|');
+    const timer = setTimeout(() => {
+      chargedRef.current = slateKey;
+      noteImpressions(ids);
+    }, IMPRESSION_DWELL_MS);
+    return () => clearTimeout(timer);
+  }, [slateKey, onScreen]);
+
+  return { suggestions, noteRemoved, noteSlateVisible };
 }

@@ -53,7 +53,7 @@ export function SuggestionStrip({ title, items, isRTL, onPress }: {
         // origin at x=0: a reversed rail would otherwise open on the LAST card.
         onContentSizeChange={() => { if (isRTL) railRef.current?.scrollToEnd({ animated: false }); }}
       >
-        {items.map((item) => <SuggestionCard key={item.id} item={item} onPress={() => onPress(item.id)} />)}
+        {items.map((item) => <SuggestionCard key={item.id} item={item} isRTL={isRTL} onPress={() => onPress(item.id)} />)}
       </ScrollView>
     </View>
   );
@@ -64,7 +64,7 @@ export function SuggestionStrip({ title, items, isRTL, onPress }: {
  * View that looks like a button: at 148pt wide the card is far above the 44pt
  * minimum, so a nested Pressable would only add stop-propagation complexity.
  */
-function SuggestionCard({ item, onPress }: { item: SuggestionCardModel; onPress: () => void }) {
+function SuggestionCard({ item, isRTL, onPress }: { item: SuggestionCardModel; isRTL: boolean; onPress: () => void }) {
   const styles = useStyles();
   const colors = useThemeColors();
   const [imgFailed, setImgFailed] = useState(false);
@@ -85,7 +85,14 @@ function SuggestionCard({ item, onPress }: { item: SuggestionCardModel; onPress:
       <View style={styles.body}>
         <Text variant="label" numberOfLines={2}>{item.name}</Text>
         {item.kcalLabel ? <Text variant="caption" tone="tertiary">{item.kcalLabel}</Text> : null}
-        <Price amount={item.price} size={typeScale.label.size} weight="700" />
+        {/* Price is a View, not a Text, so it does not pick up the reading-edge
+            alignment the name and caption get. Stretched to the card width it
+            would pack left even in Arabic — row-reverse anchors the block to
+            the reading edge while leaving the riyal symbol on the left of the
+            digits, which Price deliberately keeps in both languages. */}
+        <View style={isRTL ? styles.priceRowRTL : styles.priceRow}>
+          <Price amount={item.price} size={typeScale.label.size} weight="700" />
+        </View>
         <View style={styles.action}><Text variant="label" tone="onEmber" align="center">{item.actionLabel}</Text></View>
       </View>
     </Pressable>
@@ -99,8 +106,14 @@ const useStyles = makeStyles((color) => ({
   section: { marginTop: space.s5, marginHorizontal: -space.s4, gap: space.s3 },
   sectionTitle: { marginHorizontal: space.s4 },
   railViewport: { flexGrow: 0 },
-  rail: { paddingHorizontal: space.s4, gap: space.s2, paddingBottom: space.s1 },
+  // flexGrow keeps the content view at least viewport-wide. Without it a
+  // two-card slate measures ~336pt, the scroll view pins it at content origin
+  // x=0, and `row-reverse` — which only reorders items INSIDE that box — leaves
+  // the rail hugging the left edge in Arabic.
+  rail: { flexGrow: 1, paddingHorizontal: space.s4, gap: space.s2, paddingBottom: space.s1 },
   railRTL: { flexDirection: 'row-reverse' as const },
+  priceRow: { flexDirection: 'row' as const },
+  priceRowRTL: { flexDirection: 'row-reverse' as const },
   card: { width: 148, backgroundColor: color.appSurface, borderRadius: radius.lg, borderWidth: 1, borderColor: color.appLine, overflow: 'hidden' as const },
   cardPressed: { opacity: motion.pressedOpacity },
   img: { width: '100%' as const, height: 96, backgroundColor: color.appSurface2 },

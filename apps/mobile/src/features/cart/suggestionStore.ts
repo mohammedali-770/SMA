@@ -79,6 +79,11 @@ function enqueue(event: QueuedEvent): void {
   // there is. Bounded so a stuck hydration cannot grow it without limit.
   if (queue.length >= MAX_QUEUED_EVENTS) queue.shift();
   queue.push(event);
+  // Self-starting: most adds happen on the menu, and a customer who browses,
+  // adds and abandons never opens the cart. Without this kick the only caller
+  // of hydrateSuggestions is the cart screen, so those sessions would queue
+  // events in memory and lose every one of them with the process.
+  if (!hydrating) void hydrateSuggestions().catch(() => {});
 }
 
 /** Loads the profile once. Safe to call repeatedly; concurrent calls share one read. */

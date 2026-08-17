@@ -95,13 +95,25 @@ describe('parseSuggestionState', () => {
 
 describe('serializeSuggestionState', () => {
   it('round-trips a realistic profile to three decimal places', () => {
-    const before = state({ n: 4, p: { p1: { a: 2.5, s: 1.25 } }, c: { c1: 3.5 }, x: { 'c1>c2': 1.5 } });
+    // Values chosen to actually need rounding — 2.5/1.25 would survive the
+    // identity function and assert nothing about the precision contract.
+    const before = state({ n: 4.00049, p: { p1: { a: 2.55555, s: 1.0004 } }, c: { c1: 3.9999 }, x: { 'c1>c2': 1.5 } });
     const after = parseSuggestionState(serializeSuggestionState(before));
+    expect(after.p.p1).toEqual({ a: 2.556, s: 1 });
+    expect(after.c.c1).toBe(4);
     expect(after.n).toBe(4);
-    expect(after.p.p1).toEqual({ a: 2.5, s: 1.25 });
-    expect(after.c.c1).toBe(3.5);
     expect(after.x['c1>c2']).toBe(1.5);
     expect(after.t).toBe(T0);
+  });
+
+  it('a row kept by the epsilon floor is still above it after a round trip', () => {
+    // Rounding must not push a surviving row back under PRUNE_EPSILON and
+    // silently delete it on the next read.
+    const before = state({ n: 1, p: { p1: { a: 0.0001, s: 0.0201 } }, c: { c1: PRUNE_EPSILON } });
+    const after = parseSuggestionState(serializeSuggestionState(before));
+    expect(after.p.p1).toBeDefined();
+    expect(after.p.p1.a + after.p.p1.s).toBeGreaterThanOrEqual(PRUNE_EPSILON);
+    expect(after.c.c1).toBeGreaterThanOrEqual(PRUNE_EPSILON);
   });
 
   it('a profile saturated at every cap serialises within SUGGESTION_STATE_MAX_CHARS', () => {
@@ -126,12 +138,25 @@ describe('serializeSuggestionState', () => {
   });
 
   it('an artificially oversized state is shrunk until it fits, and terminates', () => {
-    // Ids are not ours to guarantee; 300-char keys blow past the derived ceiling.
+    // Ids are not ours to guarantee. 400-char keys give a ~32 KB naive payload,
+    // so this genuinely drives the shrink loop rather than returning on pass 0.
     const p: Record<string, { a: number; s: number }> = {};
-    for (let i = 0; i < MAX_TRACKED_PRODUCTS; i += 1) p[`${'k'.repeat(88)}${i}`] = { a: 5, s: 5 };
+    for (let i = 0; i < MAX_TRACKED_PRODUCTS; i += 1) p[`${'k'.repeat(396)}${String(i).padStart(4, '0')}`] = { a: i + 1, s: 0 };
     const out = serializeSuggestionState(state({ n: 50, p }));
     expect(out.length).toBeLessThanOrEqual(SUGGESTION_STATE_MAX_CHARS);
-    expect(() => JSON.parse(out)).not.toThrow();
+    const survivors = Object.keys(JSON.parse(out).p as Record<string, unknown>);
+    // Rows were actually dropped, and the heaviest are the ones kept.
+    expect(survivors.length).toBeGreaterThan(0);
+    expect(survivors.length).toBeLessThan(MAX_TRACKED_PRODUCTS);
+  });
+
+  it('a state that cannot be shrunk to fit falls back to the empty state rather than overflowing', () => {
+    // One row whose key alone exceeds the ceiling: no amount of dropping the
+    // OTHER maps helps, so the loop must bail out instead of returning it.
+    const p: Record<string, { a: number; s: number }> = { [`${'k'.repeat(SUGGESTION_STATE_MAX_CHARS + 500)}`]: { a: 5, s: 5 } };
+    const out = serializeSuggestionState(state({ n: 1, p }));
+    expect(out.length).toBeLessThanOrEqual(SUGGESTION_STATE_MAX_CHARS);
+    expect(parseSuggestionState(out).p).toEqual({});
   });
 });
 
@@ -292,6 +317,46 @@ describe('recordAdd', () => {
     const s = recordAdd(EMPTY_STATE, { productId: 'p1', categoryId: 'c2', cartCategoryIds: ['c1', 'c1', 'c1'] }, T0);
     expect(s.x['c1>c2']).toBe(1);
     expect(Object.keys(s.x).length).toBe(1);
+  });
+
+  it('a first-time add survives a saturated product map', () => {
+    // Every incumbent outweighs a fresh add, so without an eviction exemption
+    // the newest and strongest signal is the one thrown away — and the profile
+    // closes to new products for as long as the incumbents stay above 1.0.
+    let s = EMPTY_STATE;
+    for (let i = 0; i < MAX_TRACKED_PRODUCTS; i += 1) {
+      s = recordAdd(s, { productId: uuidLike(i), categoryId: 'c1', cartCategoryIds: [] }, T0);
+      s = recordAdd(s, { productId: uuidLike(i), categoryId: 'c1', cartCategoryIds: [] }, T0);
+    }
+    expect(Object.keys(s.p).length).toBe(MAX_TRACKED_PRODUCTS);
+
+    const newcomer = 'brand-new-product';
+    s = recordAdd(s, { productId: newcomer, categoryId: 'c1', cartCategoryIds: [] }, T0);
+    expect(s.p[newcomer]).toEqual({ a: 1, s: 0 });
+    expect(Object.keys(s.p).length).toBe(MAX_TRACKED_PRODUCTS);
+  });
+
+  it('a pair recorded into a saturated pair map is not evicted by its own write', () => {
+    let s = EMPTY_STATE;
+    for (let i = 0; i < MAX_TRACKED_PAIRS; i += 1) {
+      const from = `from${i}`;
+      for (let k = 0; k < 5; k += 1) {
+        s = recordAdd(s, { productId: `p${i}`, categoryId: `to${i}`, cartCategoryIds: [from] }, T0);
+      }
+    }
+    expect(Object.keys(s.x).length).toBe(MAX_TRACKED_PAIRS);
+    s = recordAdd(s, { productId: 'pz', categoryId: 'drinks', cartCategoryIds: ['burgers'] }, T0);
+    expect(s.x['burgers>drinks']).toBe(1);
+  });
+
+  it('an impression gets no eviction exemption — it is weaker evidence than an add', () => {
+    let s = EMPTY_STATE;
+    for (let i = 0; i < MAX_TRACKED_PRODUCTS; i += 1) {
+      s = recordAdd(s, { productId: uuidLike(i), categoryId: 'c1', cartCategoryIds: [] }, T0);
+      s = recordAdd(s, { productId: uuidLike(i), categoryId: 'c1', cartCategoryIds: [] }, T0);
+    }
+    s = recordImpressions(s, ['never-added'], T0);
+    expect(s.p['never-added']).toBeUndefined();
   });
 
   it('recordAdd does not mutate the frozen EMPTY_STATE', () => {

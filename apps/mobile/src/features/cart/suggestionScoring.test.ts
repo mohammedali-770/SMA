@@ -183,12 +183,17 @@ describe('features', () => {
 
   it('the strongest single pair dominates rather than being averaged away', () => {
     const c = candidate(product({ id: 'p', categoryId: 'drinks' }));
+    // BOTH pairs are non-zero, so a mean would be visibly different from a max:
+    // max -> saturate(9,3) = 0.75, mean of matched -> (0.75 + 0.25) / 2 = 0.50.
+    // "Goes with the burger" must not be diluted by "rarely follows dessert".
     const ctx = context({
       cartCategoryIds: ['burgers', 'desserts'],
-      state: state({ n: 40, x: { 'burgers>drinks': 9, 'desserts>drinks': 0 } }),
+      state: state({ n: 40, x: { 'burgers>drinks': 9, 'desserts>drinks': 1 } }),
     });
-    const only = context({ cartCategoryIds: ['burgers'], state: state({ n: 40, x: { 'burgers>drinks': 9 } }) });
-    expect(suggestionFeatures(c, ctx).complement).toBeCloseTo(suggestionFeatures(c, only).complement, 6);
+    const confidence = 40 / 46;
+    expect(suggestionFeatures(c, ctx).complement).toBeCloseTo(0.55 + (0.75 - 0.55) * confidence, 6);
+    // Pin the negative: the mean-of-matched blend would land here instead.
+    expect(suggestionFeatures(c, ctx).complement).not.toBeCloseTo(0.55 + (0.5 - 0.55) * confidence, 3);
   });
 
   it('confidence is zero on a fresh device, so no personal term can contribute', () => {
