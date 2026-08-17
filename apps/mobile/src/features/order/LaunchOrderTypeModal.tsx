@@ -14,7 +14,7 @@ import type { OrderType } from '../../types/models';
 export function LaunchOrderTypeModal({ onChoose }: { onChoose: (type: OrderType) => void }) {
   const styles = useStyles(); const colors = useThemeColors(); const { pick, rtlRow } = useI18n();
   return <Modal visible transparent animationType="fade" onRequestClose={() => {}}><View style={styles.backdrop}><View style={styles.card}>
-    <Image source={require('../../../assets/adaptive-icon.png')} style={styles.logo} contentFit="contain" />
+    <Image source={require('../../../assets/logo-mark.png')} style={styles.logo} contentFit="contain" />
     <Text variant="title" align="center">{pick('Choose order type','اختر نوع الطلب')}</Text>
     <Text variant="body" tone="secondary" align="center">{pick('Choose how you’d like to receive your order.','اختر طريقة استلام طلبك.')}</Text>
     <View style={[styles.choices,rtlRow]}>

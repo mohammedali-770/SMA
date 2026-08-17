@@ -12,6 +12,8 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
+    "logo:build": "node scripts/build-logo-mark.mjs",
+    "logo:check": "node scripts/build-logo-mark.mjs --check",
     "design-system:sync": "node scripts/sync-design-system.mjs",
     "design-system:check": "node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs",
     "test": "vitest run",
