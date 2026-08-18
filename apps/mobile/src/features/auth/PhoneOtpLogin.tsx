@@ -34,6 +34,7 @@ import { OtpResendTimer, type OtpResendHandle } from '../otp/OtpResendTimer';
 import { useOtpAutofill } from '../otp/useOtpAutofill';
 import { auth } from '../../services/api';
 import { requestLoginCode } from './loginAvailability';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code';
@@ -71,7 +72,16 @@ export function PhoneOtpLogin() {
       setNotice(t('weSentLoginCode'));
       resend.current?.start(OTP_RESEND_COOLDOWN_SECONDS);
     } else {
-      setError(outcome.message ?? t('loginCodeSendFailed'));
+      // NEVER render the provider's own text: a corporate Wi-Fi that intercepts
+      // TLS used to put "fetch failed: UnexpectedException: A TLS error caused
+      // the secure connection to fail. (at ExpoModulesCore/Promise.swift:56)"
+      // on this screen. The customer gets actionable copy; the technical detail
+      // goes to Sentry with subsystem + op attached.
+      setError(failureMessage(outcome.message, t, {
+        subsystem: 'auth',
+        op: 'send_login_code',
+        fallbackKey: 'loginCodeSendFailed',
+      }));
     }
     setBusy(false);
   };
@@ -89,8 +99,15 @@ export function PhoneOtpLogin() {
       } else {
         setError(t('invalidOrExpiredCode'));
       }
-    } catch {
-      setError(t('invalidOrExpiredCode'));
+    } catch (err) {
+      // A wrong code and an unreachable server are different problems: telling
+      // someone on a blocked network that their code is invalid sends them to
+      // request another one that also cannot arrive.
+      setError(failureMessage(err, t, {
+        subsystem: 'auth',
+        op: 'verify_login_code',
+        fallbackKey: 'invalidOrExpiredCode',
+      }));
     } finally {
       setBusy(false);
     }

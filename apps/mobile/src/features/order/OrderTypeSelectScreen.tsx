@@ -16,6 +16,7 @@ import { Notice } from '../../design-system/ui/Notice';
 import { Text } from '../../design-system/ui/Text';
 import { checkDescription, descriptionCopy, descriptionMessage } from './locationDescription';
 import { useI18n } from '../../i18n/I18nProvider';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { shouldBecomeDefault } from '../../store/addressBook';
 import { mapConfig } from '../../lib/map';
 import { distanceKm, type GeoPoint } from '../../lib/geo';
@@ -46,7 +47,7 @@ export function OrderTypeSelectScreen({ initialType }: { initialType?: OrderType
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { if (valid) { router.replace('/(tabs)'); return true; } return true; }); return () => sub.remove(); }, [valid]);
 
   const done = useCallback(() => router.replace('/(tabs)'), []);
-  const commit = useCallback(async (apply: () => void | Promise<void>) => { setBusy(true); try { await apply(); done(); } catch (e) { setResolveError(e instanceof Error ? e.message : t('somethingWentWrong')); } finally { setBusy(false); } }, [done, t]);
+  const commit = useCallback(async (apply: () => void | Promise<void>) => { setBusy(true); try { await apply(); done(); } catch (e) { setResolveError(failureMessage(e, t, { subsystem: 'branch', op: 'commit_order_context' })); } finally { setBusy(false); } }, [done, t]);
   const runSelection = useCallback((branchId: string, apply: () => void | Promise<void>) => { const v = validateCartForBranch(cart.items, branchId, isAvailable); if (!v.allValid) { setConflict({ apply, invalid: v.invalid }); return; } void commit(apply); }, [cart.items, isAvailable, commit]);
   const choosePickup = (b: Branch) => { if (!isBranchOpen(b)) return; setResolveError(null); runSelection(b.id, () => setPickup(b)); };
   const chooseSavedAddress = (a: SavedAddress) => {

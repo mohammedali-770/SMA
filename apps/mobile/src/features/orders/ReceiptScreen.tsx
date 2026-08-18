@@ -30,6 +30,7 @@ import { color, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { useI18n } from '../../i18n/I18nProvider';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { orders } from '../../services/api';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
 import { mapOrder } from '../../lib/mappers';
@@ -58,7 +59,7 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
     setError(null);
     orders.byId(orderId)
       .then((row) => { const o = mapOrder(row); orderRef.current = o; setOrder(o); })
-      .catch((e) => setError(e instanceof Error ? e.message : t('somethingWentWrong')))
+      .catch((e) => setError(failureMessage(e, t, { subsystem: 'orders', op: 'load_receipt' })))
       .finally(() => setLoading(false));
   };
   useEffect(load, [orderId]);
