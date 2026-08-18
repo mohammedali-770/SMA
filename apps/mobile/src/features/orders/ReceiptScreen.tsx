@@ -21,17 +21,23 @@
  */
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { AlertIcon } from '../../components/Icons';
+import { AlertIcon, PinIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
 import { ErrorView } from '../../components/StateViews';
-import { color, space } from '../../design-system/generated/tokens';
+import { color, hitTarget, radius, space } from '../../design-system/generated/tokens';
 import { Button } from '../../design-system/ui/Button';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
+import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
 import { orders } from '../../services/api';
+import { useCatalog } from '../../store';
+import { directionsUrl } from '../../lib/mapsLink';
+import { isCompletedForReview, shouldRequestReview } from '../onboarding/firstRun';
+import { markReviewAsked, readFirstRun } from '../onboarding/firstRunStore';
+import { requestStoreReview } from '../onboarding/storeReview';
 import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
 import { mapOrder } from '../../lib/mappers';
 import { ConfirmationHero } from './view/ConfirmationHero';
@@ -44,7 +50,8 @@ import { useThemeColors } from '../../theme/ThemeProvider';
 export function ReceiptScreen({ orderId }: { orderId: string }) {
   const styles = useStyles();
   const colors = useThemeColors();
-  const { t } = useI18n();
+  const { t, pick } = useI18n();
+  const { branches } = useCatalog();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -99,6 +106,45 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
    * observes an already-requeued order, so it can never double the counter or
    * open a second send.
    */
+  /**
+   * Directions are a PICKUP-only affordance: on a delivery order the food comes
+   * to the customer, so a route to the branch is noise.
+   *
+   * The order row carries `branchId` and the branch NAME but no coordinates —
+   * those live in the catalog — so the branch is looked up here. When the
+   * catalog has not loaded, or the branch was deactivated since the order was
+   * placed, there is no location and the button simply does not render rather
+   * than opening a broken map.
+   */
+  const branch = branches.find((b) => b.id === order?.branchId);
+  const mapsUrl = order && order.orderType === 'pickup' && branch
+    ? directionsUrl(branch.latitude, branch.longitude, pick(branch.nameEn, branch.nameAr))
+    : null;
+
+  /**
+   * Ask for a store review as the customer LEAVES this screen, never while it
+   * is open: they show this screen to a cashier, and a system rating dialog
+   * would sit on top of the order number. Fires once, ever, and only for an
+   * order that actually reached the branch.
+   */
+  const leave = useCallback((href: '/(tabs)' | '/(tabs)/orders') => {
+    router.replace(href);
+    void (async () => {
+      const state = await readFirstRun();
+      const ok = shouldRequestReview({
+        state,
+        orderCompleted: isCompletedForReview(order?.status, order?.lazywaitSyncState),
+        leavingConfirmation: true,
+        available: await requestStoreReview.isAvailable(),
+      });
+      if (!ok) return;
+      // Mark BEFORE asking: if the OS silently declines to show its dialog we
+      // still must not try again on the next order.
+      await markReviewAsked();
+      await requestStoreReview.request();
+    })();
+  }, [order?.status, order?.lazywaitSyncState]);
+
   const resend = useCallback(async () => {
     if (resending) return;
     setResending(true);
@@ -138,13 +184,28 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
               resendError={resendError}
             />
             <ReceiptBody order={order} />
+            {/* Styled to match the design system's `secondary` Button (same
+                radius, height and ember outline) but rendered inline because
+                Button has no icon slot, and a pin is what makes this read as
+                "directions" rather than another generic action. */}
+            {mapsUrl ? (
+              <Pressable
+                onPress={() => { void Linking.openURL(mapsUrl).catch(() => { /* no maps app installed */ }); }}
+                accessibilityRole="link"
+                accessibilityLabel={t('oc_directions')}
+                style={({ pressed }) => [styles.directions, pressed && styles.directionsPressed]}
+              >
+                <PinIcon size={18} color={colors.ember} />
+                <Text variant="button" tone="ember">{t('oc_directions')}</Text>
+              </Pressable>
+            ) : null}
             </View>
           </ScrollView>
 
           <View style={styles.footer}>
             <View style={[columnStyles.column, styles.footerColumn]}>
-            <Button label={t('viewMyOrders')} onPress={() => router.replace('/(tabs)/orders')} variant="primary" />
-            <Button label={t('backToMenu')} onPress={() => router.replace('/(tabs)')} variant="secondary" />
+            <Button label={t('viewMyOrders')} onPress={() => leave('/(tabs)/orders')} variant="primary" />
+            <Button label={t('backToMenu')} onPress={() => leave('/(tabs)')} variant="secondary" />
             </View>
           </View>
         </View>
@@ -164,4 +225,19 @@ const useStyles = makeStyles((colors) => ({
     alignItems: 'center',
   },
   footerColumn: { gap: space.s2 },
+  directions: {
+    marginTop: space.s4,
+    minHeight: hitTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.s2,
+    borderWidth: 1.5,
+    borderColor: colors.ember,
+    backgroundColor: colors.appSurface,
+    borderRadius: radius.md,
+    borderCurve: 'continuous',
+    paddingHorizontal: space.s4,
+  },
+  directionsPressed: { opacity: 0.92 },
 }));

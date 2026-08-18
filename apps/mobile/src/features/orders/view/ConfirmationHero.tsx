@@ -2,11 +2,13 @@
 import React from 'react';
 import { View } from 'react-native';
 import { AlertIcon, CheckCircleIcon, ClockIcon } from '../../../components/Icons';
-import { radius, space } from '../../../design-system/generated/tokens';
+import { Logo } from '../../../components/Logo';
+import { fontFamily, radius, space, type as typeScale } from '../../../design-system/generated/tokens';
 import { Button } from '../../../design-system/ui/Button';
 import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { confirmationPresentation, orderConfirmationState, type CustomerOrderState } from '../orderConfirmation';
+import { orderDisplayNumber } from '../../../lib/mappers';
 import { TONE_COLOR } from './confirmationTone';
 import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
@@ -21,11 +23,40 @@ function manualFlowBody(state:CustomerOrderState,pick:(en:string,ar:string)=>str
 
 export function ConfirmationHero({order,onResend,resending,resendError}:{order:Order;onResend:()=>void;resending:boolean;resendError:string|null;}){
   const styles=useStyles();const{t,pick}=useI18n();const state=orderConfirmationState(order);const p=confirmationPresentation(state);const tone=TONE_COLOR[p.tone];const body=manualFlowBody(state,pick,t(p.bodyKey));
-  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t(p.titleKey)}. ${body}`}>
-    <View style={[styles.badge,{backgroundColor:tone.bg,borderColor:tone.line}]}>{p.success?<CheckCircleIcon size={40} color={tone.fg}/>:p.tone==='danger'?<AlertIcon size={40} color={tone.fg}/>:<ClockIcon size={40} color={tone.fg}/>}</View>
-    <Text variant="display" align="center" style={{color:tone.fg}}>{t(p.titleKey)}</Text><Text variant="body" tone="secondary" align="center">{body}</Text>
+  // The branch number, raw. The "#" prefix is dropped at this size: the label
+  // above it already says what the number is, so the symbol is only noise.
+  const raw=orderDisplayNumber(order);const branchNumber=raw?raw.replace(/^#/,''):null;
+  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}. ${t(p.titleKey)}. ${body}`}>
+    {/* The cashier is handed a phone: they need to see WHOSE order this is. */}
+    <Logo compact />
+
+    {/* THE thing this screen exists to show across a counter. Always LTR so a
+        two-digit number can never render reversed in an Arabic layout. */}
+    <View style={styles.numberCard}>
+      <Text variant="label" tone="tertiary" align="center" style={styles.numberLabel}>{t('oc_branch_order_number')}</Text>
+      {branchNumber
+        ? <Text align="center" style={styles.number} accessibilityElementsHidden>{branchNumber}</Text>
+        : <><Text variant="title" tone="tertiary" align="center">{t('oc_number_pending')}</Text>
+            <Text variant="caption" tone="tertiary" align="center">{t('oc_number_pending_hint')}</Text></>}
+    </View>
+
+    {/* Reassurance, not the headline: once the number is visible the customer
+        has what they came for, so the state becomes a compact pill. */}
+    <View style={[styles.pill,{backgroundColor:tone.bg,borderColor:tone.line}]}>
+      {p.success?<CheckCircleIcon size={16} color={tone.fg}/>:p.tone==='danger'?<AlertIcon size={16} color={tone.fg}/>:<ClockIcon size={16} color={tone.fg}/>}
+      <Text variant="label" style={{color:tone.fg}}>{t(p.titleKey)}</Text>
+    </View>
+    <Text variant="body" tone="secondary" align="center">{body}</Text>
+
     {p.canResend?<View style={styles.action}><Button label={resending?t('oc_resending'):t('oc_resend')} onPress={onResend} loading={resending} variant="primary"/>{resendError?<Text variant="label" tone="danger" align="center" accessibilityLiveRegion="polite">{resendError}</Text>:null}</View>:null}
     {order.refundState&&order.refundState!=='none'?<View style={[styles.refund,{backgroundColor:tone.bg,borderColor:tone.line}]}><Text variant="label" tone="secondary">{t('oc_refund_status')}</Text><Text variant="heading" style={{color:tone.fg}}>{order.refundState==='refunded'?t('oc_refunded'):order.refundState==='failed'?t('oc_refund_failed'):t('oc_refund_pending')}</Text></View>:null}
   </View>;
 }
-const useStyles=makeStyles(()=>({wrap:{alignItems:'center' as const,paddingVertical:space.s5,gap:space.s2},badge:{width:76,height:76,borderRadius:38,alignItems:'center' as const,justifyContent:'center' as const,borderWidth:1,marginBottom:space.s2},action:{alignSelf:'stretch' as const,marginTop:space.s3,gap:space.s2},refund:{alignSelf:'stretch' as const,marginTop:space.s3,padding:space.s3,borderWidth:1,borderRadius:radius.md,borderCurve:'continuous' as const,gap:2}}));
+const useStyles=makeStyles((color)=>({
+  wrap:{alignItems:'center' as const,paddingVertical:space.s5,gap:space.s2},
+  numberCard:{alignSelf:'stretch' as const,marginTop:space.s3,paddingVertical:space.s4,paddingHorizontal:space.s3,backgroundColor:color.appSurface,borderWidth:1.5,borderColor:color.appLine,borderRadius:radius.xl,borderCurve:'continuous' as const,alignItems:'center' as const,gap:2},
+  numberLabel:{letterSpacing:0.6},
+  // Sized to be read at arm's length across a counter, not on a phone held close.
+  number:{fontSize:72,lineHeight:78,color:color.ember,fontFamily:fontFamily.num.semibold,writingDirection:'ltr' as const},
+  pill:{flexDirection:'row' as const,alignItems:'center' as const,gap:space.s2,paddingVertical:space.s2,paddingHorizontal:space.s3,borderRadius:radius.pill,borderWidth:1,marginTop:space.s3},
+  badge:{width:76,height:76,borderRadius:38,alignItems:'center' as const,justifyContent:'center' as const,borderWidth:1,marginBottom:space.s2},action:{alignSelf:'stretch' as const,marginTop:space.s3,gap:space.s2},refund:{alignSelf:'stretch' as const,marginTop:space.s3,padding:space.s3,borderWidth:1,borderRadius:radius.md,borderCurve:'continuous' as const,gap:2}}));
