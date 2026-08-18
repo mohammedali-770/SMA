@@ -100,6 +100,7 @@ Before relying on server-side enforcement, verify the default-branch ruleset req
 - `Edge Function typecheck (Deno)`
 - `Dependency audit (high+)`
 - `SQL suites gate`
+- `Documentation (generated + ownership)`
 
 Do **not** require `Migration chain + SQL suites`; that heavy job is path-gated and does not report on every PR.
 
@@ -163,7 +164,9 @@ Before submission verify, at minimum:
 - iOS/Android identifiers, versions and signing credentials are correct;
 - native build has completed the physical-device gate.
 
-If legal text is still placeholder/incomplete, separate factual product corrections from wording that requires counsel.
+The nine in-app legal documents are no longer placeholder text — see §13. What remains for submission is
+the **public** privacy-policy URL (the store listing cannot link to an in-app screen) and a counsel review
+of the published wording.
 
 ## 10. Push notifications
 
@@ -219,6 +222,65 @@ The detailed evidence and live versions are recorded in [`MIGRATION_RECONCILIATI
 
 The 137 KB `MIGRATIONS.md` historical ledger remains the workflow/provenance record. Its full A/B/C/F/H content-fingerprint classification was last recomputed Aug 7; do not arithmetically extend that table without a dedicated fingerprint pass. This does **not** affect the current name-presence conclusion above.
 
+
+## 13. In-app legal documents — replaced 2026-08-18
+
+**Status:** SOURCE/LIVE CONTENT updated. Counsel review still outstanding.
+
+All nine `public.legal_documents` rows were rewritten and published to Production on 2026-08-18 with the
+owner's explicit approval (CLAUDE.md §5, live Supabase write). Every row is now `version = '2.0'`,
+`effective_date = 2026-08-18`, `is_active = true`.
+
+**Do not read `supabase/migrations/20260712140000_legal_documents.sql` as current content.** That migration
+seeded editable placeholder wording and says so in its own header. Seven of the nine rows still carried that
+seed text unchanged until this replacement. The migration remains valid history and must not be edited; it is
+simply no longer a description of what customers read.
+
+What the replacement fixed, verified read-only against Production before and after:
+
+- **Literal `\n` rendering.** `account_data_deletion` and `contact_support` had been saved with the two
+  characters backslash-n instead of line breaks. The in-app viewer renders content verbatim
+  (`LegalDocScreen`), so customers were reading the escape sequence as visible text.
+- **Tap Payments named as the live card processor** in the privacy, payment, and cancellation/refund
+  documents, while the payment integration is disabled and no provider has been selected
+  (`docs/PAYMENT_POSTPONEMENT.md`). All three now describe cash payment and commit to naming a provider
+  before any online option appears.
+- **Undisclosed processors.** Sentry, Expo push (with Apple APNs and Google FCM) and Mapbox all ship in the
+  current build and appeared in no policy. The privacy policy now names them alongside Supabase, Lazywait,
+  Meta/WhatsApp and the email provider.
+- **Account deletion.** The privacy policy still directed customers to email support; the in-app
+  self-service flow with one-time-code re-verification has existed since July.
+- **Missing effective dates.** Seven of nine rows had `effective_date IS NULL`.
+
+**Commitments now live to customers**, made by owner approval on 2026-08-18 and enforceable — do not weaken
+them without an owner decision:
+
+- support messages acknowledged within one working day;
+- accounts restricted to customers aged 18 or older;
+- advance in-app notice before the value of already-earned loyalty points is reduced.
+
+**Coupled to live settings.** `offers_loyalty_terms` states the current loyalty economics — 1 point per SAR,
+0.10 SAR per point, 100-point redemption minimum. These are `app_settings` columns an admin can change
+(`points_per_riyal`, `discount_per_point`, `min_points_to_redeem`). Changing them in the console makes the
+published document wrong; update the document in the same action.
+
+**Open items:**
+
+- **OWNER DECISION** — support working hours. The line was omitted from `contact_support` rather than
+  publishing a visible placeholder; it needs to be added once the hours are fixed.
+- **OWNER DECISION** — whether the support number 9200 31495 also accepts WhatsApp. Currently published as
+  a phone number only.
+- **OWNER DECISION** — `requires_acceptance` is `false` on all nine rows, so nothing is presented for
+  acceptance at sign-up. A customer can order without ever being shown the terms or the privacy policy.
+  Turning it on is a product change, not a content change.
+- **BUSINESS/LEGAL** — counsel has not reviewed the published wording. The open Personal Data Protection Law
+  questions that source cannot settle are the exact retention periods, the lawful basis for transferring
+  personal data outside the Kingdom to Supabase, Sentry, Expo, Mapbox and Meta, and whether a data protection
+  officer must be designated. The Arabic is a faithful translation of the English rather than an independent
+  legal text; counsel should confirm both read the same way.
+
+Rollback path: the seven previously-unmodified bodies are recoverable from the seeding migration above; the
+two hand-edited v1.1 bodies are recoverable from the PR history for this change.
 
 ## 14. Documentation gate — add the required status check
 
