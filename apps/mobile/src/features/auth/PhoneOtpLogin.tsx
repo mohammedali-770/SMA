@@ -28,6 +28,7 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { formatSaudiE164, isSaudiMobile, toSaudiE164 } from '../../lib/phone';
 import { DEFAULT_OTP_LENGTH } from '../otp/otpAutofill';
 import { OtpCodeInput } from '../otp/OtpCodeInput';
+import { OtpPasteAssist } from '../otp/OtpPasteAssist';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../otp/otpInput';
 import { OtpResendTimer, type OtpResendHandle } from '../otp/OtpResendTimer';
 import { useOtpAutofill } from '../otp/useOtpAutofill';
@@ -107,6 +108,13 @@ export function PhoneOtpLogin() {
   verifyRef.current = verify;
   const handleCodeComplete = useCallback((c: string) => { void verifyRef.current(c); }, []);
 
+  // A pasted code is treated exactly like an autofilled one: fill the field and
+  // submit, so the customer never taps Verify separately after pasting.
+  const handlePastedCode = useCallback((c: string) => {
+    setCode(c);
+    void verifyRef.current(c);
+  }, []);
+
   // Zero-tap autofill (WebOTP on web; declarative on native). Only listens on the
   // code step; on read it fills the boxes and hands the code straight to verify.
   useOtpAutofill({
@@ -166,6 +174,18 @@ export function PhoneOtpLogin() {
         autoFocus
         accessibilityLabel={t('enterCodeTitle')}
         style={styles.otp}
+      />
+
+      {/*
+        iOS 26.x does not reliably offer the keyboard autofill suggestion for a
+        WhatsApp-delivered code (Apple bug, no public API to opt into), but
+        WhatsApp's own "Copy code" button always works. This turns that into a
+        single tap. Shown only while the code is incomplete.
+      */}
+      <OtpPasteAssist
+        length={DEFAULT_OTP_LENGTH}
+        visible={code.length < DEFAULT_OTP_LENGTH}
+        onCode={handlePastedCode}
       />
 
       <Button label={t('verifyShort')} onPress={() => verify()} loading={busy} />

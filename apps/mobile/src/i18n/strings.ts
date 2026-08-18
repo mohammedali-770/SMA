@@ -28,6 +28,7 @@ export const STRINGS = {
     enterCodeTitle: 'Enter your code',
     verifyShort: 'Verify',
     changeShort: 'Change',
+    pasteCode: 'Paste code',
     /** Screen-reader label for the inline "Change" action, which needs the noun. */
     changeNumber: 'Change number',
     invalidSaudiPhone: 'Enter a valid Saudi mobile number, e.g. 05XXXXXXXX.',
@@ -375,6 +376,7 @@ export const STRINGS = {
     enterCodeTitle: 'أدخل الرمز',
     verifyShort: 'تأكيد',
     changeShort: 'تغيير',
+    pasteCode: 'لصق الرمز',
     /** تسمية قارئ الشاشة لزر «تغيير» المضمّن، ويحتاج إلى الاسم كاملاً. */
     changeNumber: 'تغيير الرقم',
     invalidSaudiPhone: 'أدخل رقم جوال سعودي صحيح، مثل 05XXXXXXXX.',
