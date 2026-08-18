@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_FIRST_RUN, isCompletedForReview, shouldRequestReview, shouldShowOnboarding,
+  DEFAULT_FIRST_RUN, isCompletedForReview, shouldRequestFirstRunPermissions, shouldRequestReview,
 } from './firstRun';
 
-describe('shouldShowOnboarding', () => {
-  it('shows once for a signed-in customer who has not seen it', () => {
-    expect(shouldShowOnboarding(DEFAULT_FIRST_RUN, true)).toBe(true);
+describe('shouldRequestFirstRunPermissions', () => {
+  it('raises the OS dialogs once for a signed-in customer', () => {
+    expect(shouldRequestFirstRunPermissions(DEFAULT_FIRST_RUN, true)).toBe(true);
   });
-  it('never shows before sign-in — the name needs a session to save to', () => {
-    expect(shouldShowOnboarding(DEFAULT_FIRST_RUN, false)).toBe(false);
+  it('never asks before sign-in — a granted notification permission is useless without an account to register', () => {
+    expect(shouldRequestFirstRunPermissions(DEFAULT_FIRST_RUN, false)).toBe(false);
   });
-  it('never shows twice', () => {
-    expect(shouldShowOnboarding({ ...DEFAULT_FIRST_RUN, onboarded: true }, true)).toBe(false);
+  it('never asks twice — an iOS notification denial is permanent', () => {
+    expect(shouldRequestFirstRunPermissions({ ...DEFAULT_FIRST_RUN, permissionsRequested: true }, true)).toBe(false);
   });
 });
 
@@ -30,7 +30,7 @@ describe('shouldRequestReview', () => {
   });
 
   it('never asks twice', () => {
-    expect(shouldRequestReview({ ...base, state: { onboarded: true, reviewAsked: true } })).toBe(false);
+    expect(shouldRequestReview({ ...base, state: { permissionsRequested: true, reviewAsked: true } })).toBe(false);
   });
 
   it('does not ask when the order did not complete', () => {

@@ -43,19 +43,6 @@ export const STRINGS = {
     whatsappLoginNotAvailable: 'WhatsApp login isn’t available right now.',
     whatsappLoginNotAvailableSub: 'Please try again shortly. If it keeps happening, contact us and we’ll help you get in.',
 
-    // first-run onboarding (after the FIRST successful sign-in, once)
-    onbTitle: 'Welcome to Spicy Meal',
-    onbSub: 'Two quick things and you’re set.',
-    onbNameLabel: 'What should we call you?',
-    onbNamePlaceholder: 'Your name',
-    onbNotifTitle: 'Order updates',
-    onbNotifSub: 'Know the moment your order is confirmed, ready, or on the way.',
-    onbLocTitle: 'Location',
-    onbLocSub: 'Find your nearest branch and set delivery addresses faster.',
-    onbContinue: 'Continue',
-    onbSkip: 'Skip for now',
-    onbSaveFailed: 'We could not save your name. You can add it later in Profile.',
-
     // branch
     selectBranch: 'Select Branch',
     changeBranch: 'Change',
@@ -410,18 +397,6 @@ export const STRINGS = {
     loginCodeSendFailed: 'تعذّر إرسال رمز الدخول. حاول مرة أخرى.',
     whatsappLoginNotAvailable: 'تسجيل الدخول عبر واتساب غير متاح حالياً.',
     whatsappLoginNotAvailableSub: 'يرجى المحاولة بعد قليل. وإذا تكرر الأمر تواصل معنا وسنساعدك في الدخول.',
-
-    onbTitle: 'أهلاً بك في سبايسي ميل',
-    onbSub: 'أمران سريعان وتكون جاهزاً.',
-    onbNameLabel: 'بماذا نناديك؟',
-    onbNamePlaceholder: 'اسمك',
-    onbNotifTitle: 'تحديثات الطلب',
-    onbNotifSub: 'اعرف فور تأكيد طلبك أو جهوزيته أو خروجه للتوصيل.',
-    onbLocTitle: 'الموقع',
-    onbLocSub: 'اعثر على أقرب فرع وحدّد عناوين التوصيل بسرعة.',
-    onbContinue: 'متابعة',
-    onbSkip: 'تخطي الآن',
-    onbSaveFailed: 'تعذّر حفظ اسمك. يمكنك إضافته لاحقاً من الملف الشخصي.',
 
     selectBranch: 'اختر الفرع',
     changeBranch: 'تغيير',

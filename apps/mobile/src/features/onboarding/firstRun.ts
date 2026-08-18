@@ -4,8 +4,9 @@
  *
  * Two independent one-shot moments:
  *
- *  1. ONBOARDING — shown once, after the customer's first successful sign-in
- *     (not before: the name is saved to their profile, which needs a session).
+ *  1. PERMISSIONS — the OS dialogs are raised once, on the first run after
+ *     sign-in. There is no in-app screen in front of them: the system asks,
+ *     and whatever the customer allows is what the app then uses.
  *
  *  2. REVIEW PROMPT — offered once, after their first completed order.
  *     Deliberately NOT while the confirmation screen is open: customers show
@@ -15,17 +16,24 @@
  */
 
 export interface FirstRunState {
-  /** The onboarding flow has been completed or explicitly skipped. */
-  onboarded: boolean;
+  /** The OS permission dialogs have already been raised once. */
+  permissionsRequested: boolean;
   /** We have already asked for a store review; we never ask twice ourselves. */
   reviewAsked: boolean;
 }
 
-export const DEFAULT_FIRST_RUN: FirstRunState = { onboarded: false, reviewAsked: false };
+export const DEFAULT_FIRST_RUN: FirstRunState = { permissionsRequested: false, reviewAsked: false };
 
-/** Onboarding is for signed-in customers who have not been through it. */
-export function shouldShowOnboarding(state: FirstRunState, signedIn: boolean): boolean {
-  return signedIn && !state.onboarded;
+/**
+ * Raise the OS prompts once, for a signed-in customer.
+ *
+ * Signed-in specifically: a granted notification permission is only useful once
+ * there is an account to register the device against, and asking a
+ * not-yet-signed-in visitor spends the one prompt iOS allows on someone we
+ * cannot yet deliver to.
+ */
+export function shouldRequestFirstRunPermissions(state: FirstRunState, signedIn: boolean): boolean {
+  return signedIn && !state.permissionsRequested;
 }
 
 /**

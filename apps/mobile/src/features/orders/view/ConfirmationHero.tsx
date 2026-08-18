@@ -23,9 +23,11 @@ function manualFlowBody(state:CustomerOrderState,pick:(en:string,ar:string)=>str
 
 export function ConfirmationHero({order,onResend,resending,resendError}:{order:Order;onResend:()=>void;resending:boolean;resendError:string|null;}){
   const styles=useStyles();const{t,pick}=useI18n();const state=orderConfirmationState(order);const p=confirmationPresentation(state);const tone=TONE_COLOR[p.tone];const body=manualFlowBody(state,pick,t(p.bodyKey));
-  // The branch number, raw. The "#" prefix is dropped at this size: the label
-  // above it already says what the number is, so the symbol is only noise.
-  const raw=orderDisplayNumber(order);const branchNumber=raw?raw.replace(/^#/,''):null;
+  // VERBATIM. Lazywait issues the number already prefixed ("#1", "#10"), and
+  // that string is what the branch's own screens show — so stripping the "#"
+  // would print something the cashier cannot match against their system.
+  // Whatever the POS returns is what appears here, unaltered.
+  const branchNumber=orderDisplayNumber(order);
   return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}. ${t(p.titleKey)}. ${body}`}>
     {/* The cashier is handed a phone: they need to see WHOSE order this is. */}
     <Logo compact />
