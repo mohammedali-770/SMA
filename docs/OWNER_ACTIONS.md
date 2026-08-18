@@ -1,6 +1,6 @@
 # Owner Actions — Current Decision Register
 
-> **Updated 2026-08-12.** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
+> **Updated 2026-08-18.** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
 
 Historical solved items remain available in Git/PR history; they are not repeated here as if they were still open.
 
@@ -218,6 +218,28 @@ Therefore there is **no known repository-only migration by source-name presence*
 The detailed evidence and live versions are recorded in [`MIGRATION_RECONCILIATION_20260812.md`](MIGRATION_RECONCILIATION_20260812.md).
 
 The 137 KB `MIGRATIONS.md` historical ledger remains the workflow/provenance record. Its full A/B/C/F/H content-fingerprint classification was last recomputed Aug 7; do not arithmetically extend that table without a dedicated fingerprint pass. This does **not** affect the current name-presence conclusion above.
+
+
+## 14. Documentation gate — add the required status check
+
+**Status:** OWNER ACTION — GitHub dashboard, one setting.
+
+A blocking documentation gate now runs on every pull request (`.github/workflows/docs.yml`). It
+regenerates `docs/reference/` and fails on drift, and it enforces the source-to-document ownership
+map in `docs/ownership.json`. See [`decisions/0001-documentation-system.md`](decisions/0001-documentation-system.md).
+
+The workflow reports the status check context:
+
+- `Documentation (generated + ownership)`
+
+**Making it actually block a merge is dashboard state, not source** (§12). Add that context in
+**Settings → Rules** alongside the other intended required contexts. Until it is added, the check
+runs and reports but a red result does not prevent merging.
+
+Use the emitted job name exactly as written above. The equivalent mistake has been made before with
+the design-system job, whose context is the job ID `design-system` rather than the workflow display
+name `Design system`. The authoritative list of emitted contexts is generated at
+[`reference/ci-and-scripts.md`](reference/ci-and-scripts.md).
 
 ---
 

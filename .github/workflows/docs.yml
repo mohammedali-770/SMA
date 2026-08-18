@@ -1,0 +1,84 @@
+name: Documentation
+
+# Keeps the documentation set honest. Two checks, both from docs/CONTRIBUTING.md:
+#
+#   1. GENERATED DRIFT. docs/reference/ is rewritten from source by
+#      scripts/docs-generate.mjs. This job regenerates in memory and fails if
+#      anything differs, so an added route, Edge Function, table, environment
+#      variable or workflow job cannot land with a stale inventory beside it.
+#
+#   2. OWNERSHIP. docs/ownership.json maps source paths to the document that
+#      must change with them. Changing payment, push, WhatsApp sign-in, POS,
+#      account-deletion, order-lifecycle, order-integrity, maps, OTP or deploy
+#      code without touching its runbook fails here. The escape hatch is a
+#      `docs-exempt: <rule> — <reason>` line in a commit message, which is
+#      reviewable rather than silent.
+#
+# WHY A SEPARATE WORKFLOW rather than a job inside production-gates.yml: both
+# scripts are dependency-free Node, so this needs no `npm ci` at all and
+# finishes in seconds. Folding it into a workflow that installs both dependency
+# trees would make the fastest signal in CI wait on the slowest.
+#
+# The pull_request trigger is deliberately NOT filtered by base branch, for the
+# reason recorded in design-system.yml: a `branches:` filter matches the BASE
+# branch, so stacked pull requests — which this repository uses — would silently
+# run nothing.
+
+on:
+  pull_request:
+  push:
+    branches: [claude/project-build-ie4b56, main]
+  workflow_dispatch:
+
+# Read-only. This workflow inspects the checkout and never comments, pushes or
+# publishes. Declared explicitly rather than inheriting the repository default.
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Documentation (generated + ownership)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Actions are pinned to commit SHAs, not floating tags: a tag can be
+      # repointed, and this job runs on pull_request against the default branch.
+      #
+      # fetch-depth: 0 is required. The ownership check diffs this branch
+      # against its merge base, and it reads commit messages in that range to
+      # find exemptions. A shallow clone has neither.
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          # Single source of truth: .nvmrc (Node 22 — see docs/NODE_VERSION.md).
+          node-version-file: .nvmrc
+
+      # No `npm ci`. Both scripts import only node: builtins, on purpose — a
+      # documentation gate that needs a dependency tree is a documentation gate
+      # people will start skipping.
+
+      - name: Generated reference is up to date
+        run: node scripts/docs-generate.mjs --check
+
+      # `github.base_ref` is set on pull_request events and empty on push. On a
+      # push to the default branch the merge base is HEAD, so the check finds no
+      # changed files and passes — correct, because the pull request already
+      # gated them.
+      - name: Fetch the base branch
+        if: github.base_ref != ''
+        run: git fetch --no-tags origin "${{ github.base_ref }}"
+
+      - name: Documentation ownership
+        env:
+          DOCS_BASE_REF: ${{ github.base_ref != '' && format('origin/{0}', github.base_ref) || '' }}
+        run: node scripts/docs-check-ownership.mjs
