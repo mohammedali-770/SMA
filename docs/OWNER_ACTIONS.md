@@ -100,6 +100,7 @@ Before relying on server-side enforcement, verify the default-branch ruleset req
 - `Edge Function typecheck (Deno)`
 - `Dependency audit (high+)`
 - `SQL suites gate`
+- `Documentation (generated + ownership)`
 
 Do **not** require `Migration chain + SQL suites`; that heavy job is path-gated and does not report on every PR.
 
@@ -280,6 +281,27 @@ published document wrong; update the document in the same action.
 
 Rollback path: the seven previously-unmodified bodies are recoverable from the seeding migration above; the
 two hand-edited v1.1 bodies are recoverable from the PR history for this change.
+
+## 14. Documentation gate — add the required status check
+
+**Status:** OWNER ACTION — GitHub dashboard, one setting.
+
+A blocking documentation gate now runs on every pull request (`.github/workflows/docs.yml`). It
+regenerates `docs/reference/` and fails on drift, and it enforces the source-to-document ownership
+map in `docs/ownership.json`. See [`decisions/0001-documentation-system.md`](decisions/0001-documentation-system.md).
+
+The workflow reports the status check context:
+
+- `Documentation (generated + ownership)`
+
+**Making it actually block a merge is dashboard state, not source** (§12). Add that context in
+**Settings → Rules** alongside the other intended required contexts. Until it is added, the check
+runs and reports but a red result does not prevent merging.
+
+Use the emitted job name exactly as written above. The equivalent mistake has been made before with
+the design-system job, whose context is the job ID `design-system` rather than the workflow display
+name `Design system`. The authoritative list of emitted contexts is generated at
+[`reference/ci-and-scripts.md`](reference/ci-and-scripts.md).
 
 ---
 
