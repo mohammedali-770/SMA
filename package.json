@@ -16,6 +16,8 @@
     "logo:check": "node scripts/build-logo-mark.mjs --check",
     "design-system:sync": "node scripts/sync-design-system.mjs",
     "design-system:check": "node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs",
+    "docs:generate": "node scripts/docs-generate.mjs",
+    "docs:check": "node scripts/docs-generate.mjs --check && node scripts/docs-check-ownership.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "build:site": "vite build"

@@ -1,0 +1,129 @@
+{
+  "$comment": [
+    "Documentation ownership map. Read by scripts/docs-check-ownership.mjs, which runs in CI.",
+    "",
+    "Each rule says: when a change touches these source paths, it must also touch at least one of",
+    "these documents. This is the mechanism that makes prose documentation follow code, rather than",
+    "relying on anybody remembering. It is deliberately narrow — it covers the areas where a silent",
+    "behaviour change has actually caused an operational problem before, not every file in the repo.",
+    "",
+    "Adding a rule is cheap and is the right response to finding stale documentation. Removing one",
+    "needs a reason recorded in the pull request.",
+    "",
+    "Escape hatch: put `docs-exempt: <rule-id> — <reason>` in a commit message when a change genuinely",
+    "does not affect the documented behaviour (a rename, a test-only change, a dependency bump). The",
+    "reason is required, it is recorded in history, and it is reviewable. Do not use it to defer",
+    "documentation you intend to write later.",
+    "",
+    "Generated reference files are NOT listed here. They are covered by the stricter drift check in",
+    "scripts/docs-generate.mjs --check, which fails unless they are regenerated exactly."
+  ],
+  "rules": [
+    {
+      "id": "payments",
+      "why": "Payment work is frozen and the provider is unchosen. Any change here has to be reconciled against the freeze document in the same pull request, or the freeze silently stops describing reality.",
+      "sources": [
+        "supabase/functions/payment-*/**",
+        "supabase/functions/tap-*/**",
+        "supabase/functions/_shared/tap.ts",
+        "supabase/functions/_shared/geidea.ts",
+        "supabase/functions/_shared/paymentSync.ts"
+      ],
+      "docs": ["docs/PAYMENT_POSTPONEMENT.md", "CLAUDE.md"]
+    },
+    {
+      "id": "push-notifications",
+      "why": "Push reaches real customers automatically on every order-status transition. A change to dispatch, targeting or consent is a change to live customer messaging.",
+      "sources": [
+        "supabase/functions/push-dispatch/**",
+        "apps/mobile/src/features/notifications/**",
+        "src/components/admin/PushToolsPanel.tsx"
+      ],
+      "docs": ["docs/OWNER_ACTIONS.md", "CLAUDE.md"]
+    },
+    {
+      "id": "whatsapp-auth",
+      "why": "Sign-in depends on the WhatsApp send hook and the OTP functions. A change that breaks this locks every customer out, so the runbook has to stay accurate.",
+      "sources": [
+        "supabase/functions/whatsapp-*/**",
+        "supabase/functions/auth-send-sms-whatsapp/**",
+        "supabase/functions/_shared/whatsapp*.ts",
+        "supabase/functions/_shared/authHook.ts"
+      ],
+      "docs": ["docs/WHATSAPP_LOGIN.md"]
+    },
+    {
+      "id": "lazywait-pos",
+      "why": "Orders reach the kitchen through Lazywait. The integration contract and its failure modes are documented because an outage here is invisible in the app but total in the branch.",
+      "sources": [
+        "supabase/functions/lazywait-*/**",
+        "supabase/functions/_shared/lazywait*.ts",
+        "src/components/admin/LazywaitPanel.tsx",
+        "src/components/admin/LazywaitCatalogMapping.tsx"
+      ],
+      "docs": ["docs/LAZYWAIT.md", "docs/integrations/Lazywait_API_Reference.md"]
+    },
+    {
+      "id": "account-deletion",
+      "why": "Deletion is destructive, automated, and legally load-bearing. The runbook and the customer-facing policy have to move together.",
+      "sources": [
+        "supabase/functions/account-delete-*/**",
+        "supabase/functions/_shared/accountDeletion.ts",
+        "apps/mobile/src/features/account/**"
+      ],
+      "docs": ["docs/account-deletion-scheduler.md", "docs/OWNER_ACTIONS.md"]
+    },
+    {
+      "id": "order-lifecycle",
+      "why": "The confirmation flow spans the app, the POS and the receipt a cashier reads. Its documentation is what makes a customer complaint traceable.",
+      "sources": [
+        "supabase/functions/order-intake/**",
+        "apps/mobile/src/features/orders/**",
+        "apps/mobile/src/features/checkout/**"
+      ],
+      "docs": ["docs/ORDER_CONFIRMATION_FLOW.md"]
+    },
+    {
+      "id": "order-integrity",
+      "why": "The watchdog decides when a stranded order raises an alert. Changing its thresholds without saying so leaves operations trusting a number that no longer exists.",
+      "sources": [
+        "src/components/admin/OrderIntegrityPanel.tsx",
+        "src/lib/operationsHealthApi.ts",
+        "src/components/admin/view/health/**",
+        "src/components/admin/view/alerts/**"
+      ],
+      "docs": [
+        "docs/ORDER_INTEGRITY_WATCHDOG.md",
+        "docs/OPERATIONS_HEALTH_CENTER.md",
+        "docs/OPERATIONS_ALERTS_DIGEST.md"
+      ]
+    },
+    {
+      "id": "maps",
+      "why": "The map provider is switchable and its tokens are client-visible. Setup and constraints are documented so the next person does not ship an unrestricted key.",
+      "sources": [
+        "apps/mobile/src/lib/map.ts",
+        "apps/mobile/src/lib/maps.ts",
+        "apps/mobile/src/lib/mapsLink.ts",
+        "apps/mobile/src/components/LocationPickerMap.tsx"
+      ],
+      "docs": ["docs/MAPS.md"]
+    },
+    {
+      "id": "otp-entry",
+      "why": "The one-time-code field carries platform-specific autofill behaviour that took a long investigation to establish. Changing it without updating the findings invites repeating that investigation.",
+      "sources": ["apps/mobile/src/features/otp/**"],
+      "docs": ["docs/OTP_AUTOFILL.md"]
+    },
+    {
+      "id": "deployment",
+      "why": "There is more than one path to production and only one of them is meant to be active. A workflow change that adds a second deploy path must be visible in the deployment documentation.",
+      "sources": [
+        ".github/workflows/deploy-functions.yml",
+        ".github/workflows/eas-build.yml",
+        "vercel.json"
+      ],
+      "docs": ["docs/DEPLOY.md", "docs/RELEASE_CHECKLIST.md", "docs/OWNER_ACTIONS.md"]
+    }
+  ]
+}
