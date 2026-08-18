@@ -18,7 +18,7 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 
-import { PUSH_CLIENT_ENABLED } from '../notifications/notificationPolicy';
+import { NOTIFICATIONS_ON, PUSH_CLIENT_ENABLED } from '../notifications/notificationPolicy';
 import {
   ensureAndroidChannel, ensureNotificationPermission, registerThisDevice,
 } from '../notifications/pushRegistration';
@@ -45,11 +45,11 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): vo
           await ensureAndroidChannel();
           const granted = await ensureNotificationPermission();
           if (granted) {
-            // Use what the customer just allowed: register the device so order
-            // updates reach it. Promotions stay FALSE — that is a separate
-            // consent the customer gives in Profile, not part of a system
-            // permission grant.
-            await registerThisDevice(lang, { orderUpdatesEnabled: true, promosEnabled: false });
+            // Use what the customer just allowed. Notifications are a single
+            // choice (owner decision 2026-08-18), so allowing them registers
+            // both order updates and offers; the customer turns the lot off
+            // again from Profile or iOS Settings.
+            await registerThisDevice(lang, NOTIFICATIONS_ON);
           }
         } catch { /* a permission prompt must never break app start */ }
       }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildDirectionsUrl, hasUsableCoordinates } from './maps';
+import { buildDirectionsUrl, buildGoogleMapsUrl, hasUsableCoordinates } from './maps';
 
 const RIYADH = { lat: 24.7136, lng: 46.6753 };
 
@@ -53,5 +53,22 @@ describe('buildDirectionsUrl', () => {
   it('omits the label entirely when there is none', () => {
     expect(buildDirectionsUrl('ios', 1, 2)).not.toContain('&q=');
     expect(buildDirectionsUrl('android', 1, 2)).toBe('geo:1,2?q=1,2');
+  });
+});
+
+describe('buildGoogleMapsUrl', () => {
+  const RIYADH = { lat: 24.7136, lng: 46.6753 };
+
+  it('uses the app scheme when Google Maps is installed', () => {
+    const url = buildGoogleMapsUrl(RIYADH.lat, RIYADH.lng, true);
+    expect(url.startsWith('comgooglemaps://')).toBe(true);
+    expect(url).toContain('daddr=24.7136,46.6753');
+    expect(url).toContain('directionsmode=driving');
+  });
+
+  it('falls back to the web form when it is not installed', () => {
+    const url = buildGoogleMapsUrl(RIYADH.lat, RIYADH.lng, false);
+    expect(url.startsWith('https://www.google.com/maps/dir/')).toBe(true);
+    expect(url).not.toContain('comgooglemaps://');
   });
 });

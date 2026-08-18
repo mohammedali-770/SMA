@@ -1,6 +1,8 @@
 /**
- * Profile → Notifications card. Two per-device toggles:
- *   Order updates (default ON at registration) · Offers & promotions (OPT-IN).
+ * Profile → Notifications card. ONE per-device switch (owner decision
+ * 2026-08-18): allowing notifications means order updates AND offers together.
+ * The two server columns are still written separately, so the split can be
+ * restored in the UI without a schema change.
  *
  * The OS permission is requested only when the customer first turns a toggle
  * ON (clear context — see notificationPolicy.toggleRequiresPermission). With
@@ -15,7 +17,8 @@ import * as Device from 'expo-device';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useAuth } from '../../store';
 import {
-  deviceShouldStayActive, PUSH_CLIENT_ENABLED, toggleRequiresPermission, type DevicePrefs,
+  deviceShouldStayActive, notificationsEnabled, NOTIFICATIONS_OFF, NOTIFICATIONS_ON,
+  PUSH_CLIENT_ENABLED, toggleRequiresPermission, type DevicePrefs,
 } from './notificationPolicy';
 import {
   deactivateThisDeviceStrict, ensureAndroidChannel, ensureNotificationPermission, findThisDevice, registerThisDevice,
@@ -47,7 +50,7 @@ function NotificationSettingsCard() {
   const { t, lang, rtlRow } = useI18n();
   const { userId } = useAuth();
   const [device, setDevice] = useState<DbPushDevice | null>(null);
-  const [prefs, setPrefs] = useState<DevicePrefs>({ orderUpdatesEnabled: false, promosEnabled: false });
+  const [prefs, setPrefs] = useState<DevicePrefs>(NOTIFICATIONS_OFF);
   const [busy, setBusy] = useState(false);
   const [denied, setDenied] = useState(false);
   const [supported, setSupported] = useState(true);
@@ -60,9 +63,11 @@ function NotificationSettingsCard() {
       const row = await findThisDevice();
       if (!active || !row) return;
       setDevice(row);
+      // A device registered under the old two-toggle model reads as ON here if
+      // either channel was on, so nobody's existing choice is silently lost.
       setPrefs(row.is_active
         ? { orderUpdatesEnabled: row.order_updates_enabled, promosEnabled: row.promos_enabled }
-        : { orderUpdatesEnabled: false, promosEnabled: false });
+        : NOTIFICATIONS_OFF);
     })();
     return () => { active = false; };
   }, []);
@@ -111,29 +116,15 @@ function NotificationSettingsCard() {
 
       <View style={[styles.row, rtlRow]}>
         <View style={{ flex: 1 }}>
-          <Text variant="label">{t('notifOrderUpdates')}</Text>
-          <Text variant="caption" tone="secondary">{t('notifOrderUpdatesSub')}</Text>
+          <Text variant="label">{t('notifAll')}</Text>
+          <Text variant="caption" tone="secondary">{t('notifAllSub')}</Text>
         </View>
         <Switch
-          value={prefs.orderUpdatesEnabled}
+          value={notificationsEnabled(prefs)}
           disabled={busy}
-          onValueChange={(v) => void apply({ ...prefs, orderUpdatesEnabled: v })}
+          onValueChange={(v) => void apply(v ? NOTIFICATIONS_ON : NOTIFICATIONS_OFF)}
           trackColor={{ true: colors.ember, false: colors.appLine }}
-          accessibilityLabel={t('notifOrderUpdates')}
-        />
-      </View>
-
-      <View style={[styles.row, styles.rowDivider, rtlRow]}>
-        <View style={{ flex: 1 }}>
-          <Text variant="label">{t('notifPromos')}</Text>
-          <Text variant="caption" tone="secondary">{t('notifPromosSub')}</Text>
-        </View>
-        <Switch
-          value={prefs.promosEnabled}
-          disabled={busy}
-          onValueChange={(v) => void apply({ ...prefs, promosEnabled: v })}
-          trackColor={{ true: colors.ember, false: colors.appLine }}
-          accessibilityLabel={t('notifPromos')}
+          accessibilityLabel={t('notifAll')}
         />
       </View>
 

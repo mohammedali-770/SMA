@@ -87,7 +87,15 @@ Push is an **active production customer channel**. Both gates are open:
 
 Do not treat the old "push is dormant" framing anywhere as current. Sending an actual broadcast, widening the audience model, adding credentials, or turning the master flag back off all remain owner-approval actions under §5.
 
-Marketing remains **strictly opt-in**: `promos_enabled` defaults FALSE and only the customer can turn it on. Do not change that default, or broaden who a broadcast reaches, without a separate explicit owner decision — it is a consent decision, not a code detail.
+### Notification consent — changed 2026-08-18 by explicit owner decision
+
+Notifications are now a **single customer choice**. Allowing notifications enables order updates **and** offers together; `promos_enabled` is registered TRUE alongside `order_updates_enabled`, and Profile shows one switch rather than two.
+
+This replaces the previous strictly-opt-in marketing model. It was an owner decision, taken with the trade-off stated: a customer who wants order updates can no longer decline offers separately — the only way to stop marketing is to turn all notifications off, losing transactional messages too. That bundling is the part to re-examine if a consent question is ever raised (PDPL; Apple and Google both police unsolicited marketing push).
+
+**What did not change:** the two columns still exist on `push_devices`, `push-dispatch` still targets `order_status` and `broadcast` by their own flag, and devices registered under the old model keep whatever they had. So restoring a separate marketing opt-in is a UI change, not a schema change or a re-registration.
+
+Widening a broadcast beyond `promos_enabled` devices, or sending one, still requires explicit owner approval under §5.
 
 ## 8. Production migration commands
 

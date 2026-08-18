@@ -21,7 +21,7 @@
  */
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { AlertIcon, PinIcon } from '../../components/Icons';
 import { Screen } from '../../components/Screen';
@@ -35,6 +35,7 @@ import { failureMessage } from '../../lib/errors/reportFailure';
 import { orders } from '../../services/api';
 import { useCatalog } from '../../store';
 import { directionsUrl } from '../../lib/mapsLink';
+import { openDirections } from '../../lib/openDirections';
 import { isCompletedForReview, shouldRequestReview } from '../onboarding/firstRun';
 import { markReviewAsked, readFirstRun } from '../onboarding/firstRunStore';
 import { requestStoreReview } from '../onboarding/storeReview';
@@ -190,7 +191,12 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
                 "directions" rather than another generic action. */}
             {mapsUrl ? (
               <Pressable
-                onPress={() => { void Linking.openURL(mapsUrl).catch(() => { /* no maps app installed */ }); }}
+                onPress={() => { void openDirections(branch?.latitude, branch?.longitude, pick(branch?.nameEn ?? '', branch?.nameAr ?? ''), {
+                  title: t('oc_directions_choose'),
+                  appleMaps: t('oc_maps_apple'),
+                  googleMaps: t('oc_maps_google'),
+                  cancel: t('cancel'),
+                }); }}
                 accessibilityRole="link"
                 accessibilityLabel={t('oc_directions')}
                 style={({ pressed }) => [styles.directions, pressed && styles.directionsPressed]}

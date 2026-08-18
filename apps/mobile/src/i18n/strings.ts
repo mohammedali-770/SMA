@@ -96,7 +96,9 @@ export const STRINGS = {
 
     // notifications
     notificationsTitle: 'Notifications',
-    notificationsSub: 'Choose what we can notify you about on this device.',
+    notificationsSub: 'Notifications for this device.',
+    notifAll: 'Allow notifications',
+    notifAllSub: 'Order updates and occasional offers.',
     notifOrderUpdates: 'Order updates',
     notifOrderUpdatesSub: 'Status of your orders (preparing, ready, delivered…)',
     notifPromos: 'Offers & promotions',
@@ -362,6 +364,9 @@ export const STRINGS = {
     oc_number_pending: 'Not issued yet',
     oc_number_pending_hint: 'It will appear here as soon as the branch issues it.',
     oc_directions: 'Directions to branch',
+    oc_directions_choose: 'Open directions in',
+    oc_maps_apple: 'Apple Maps',
+    oc_maps_google: 'Google Maps',
   },
   ar: {
     appName: 'سبايسي ميل',
@@ -449,7 +454,9 @@ export const STRINGS = {
 
     // الإشعارات
     notificationsTitle: 'الإشعارات',
-    notificationsSub: 'اختر ما يمكننا إشعارك به على هذا الجهاز.',
+    notificationsSub: 'الإشعارات على هذا الجهاز.',
+    notifAll: 'تفعيل الإشعارات',
+    notifAllSub: 'تحديثات الطلب وعروض من حين لآخر.',
     notifOrderUpdates: 'تحديثات الطلب',
     notifOrderUpdatesSub: 'حالة طلباتك (قيد التحضير، جاهز، تم التوصيل…)',
     notifPromos: 'العروض والترويجات',
@@ -695,6 +702,9 @@ export const STRINGS = {
     oc_number_pending: 'لم يصدر بعد',
     oc_number_pending_hint: 'سيظهر هنا فور إصداره من الفرع.',
     oc_directions: 'الاتجاهات إلى الفرع',
+    oc_directions_choose: 'افتح الاتجاهات في',
+    oc_maps_apple: 'خرائط آبل',
+    oc_maps_google: 'خرائط جوجل',
   },
 } as const;
 

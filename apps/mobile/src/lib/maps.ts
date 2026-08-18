@@ -31,6 +31,20 @@ export function hasUsableCoordinates(lat: unknown, lng: unknown): boolean {
   );
 }
 
+/**
+ * Google Maps directions. The `comgooglemaps://` scheme opens the installed
+ * app; callers fall back to the https form when it is absent. Listing the
+ * scheme in ios.infoPlist.LSApplicationQueriesSchemes is what allows
+ * Linking.canOpenURL to answer truthfully on iOS — without it iOS returns
+ * false and the app appears uninstalled.
+ */
+export function buildGoogleMapsUrl(lat: number, lng: number, installed: boolean): string {
+  const coords = `${lat},${lng}`;
+  return installed
+    ? `comgooglemaps://?daddr=${coords}&directionsmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${coords}&travelmode=driving`;
+}
+
 /** Build the directions URL for a platform. Exported for tests. */
 export function buildDirectionsUrl(
   platform: 'ios' | 'android' | 'web',
