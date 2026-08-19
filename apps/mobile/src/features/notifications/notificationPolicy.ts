@@ -69,28 +69,11 @@ export interface DevicePrefs {
   promosEnabled: boolean;
 }
 
-/**
- * Notifications are ONE choice for the customer (owner decision 2026-08-18):
- * allowing notifications means both order updates and offers.
- *
- * The two server columns are kept — push_devices still stores them separately,
- * and push-dispatch still targets order_status and broadcast by their own
- * flag — so the split can be reinstated in the UI without a schema change or
- * a re-registration of every device.
- */
+/** Defaults per spec: order updates ON, promotions strictly OPT-IN (OFF). */
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
   orderUpdatesEnabled: true,
-  promosEnabled: true,
+  promosEnabled: false,
 };
-
-/** The single switch's two states, so callers cannot drift out of step. */
-export const NOTIFICATIONS_ON: DevicePrefs = { orderUpdatesEnabled: true, promosEnabled: true };
-export const NOTIFICATIONS_OFF: DevicePrefs = { orderUpdatesEnabled: false, promosEnabled: false };
-
-/** True when the single switch should read as on. */
-export function notificationsEnabled(prefs: DevicePrefs): boolean {
-  return prefs.orderUpdatesEnabled || prefs.promosEnabled;
-}
 
 /**
  * A device row is worth keeping active only while some channel is on; with

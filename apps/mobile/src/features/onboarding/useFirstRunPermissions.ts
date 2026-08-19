@@ -18,11 +18,12 @@
 import { useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 
-import { NOTIFICATIONS_ON, PUSH_CLIENT_ENABLED } from '../notifications/notificationPolicy';
+import { PUSH_CLIENT_ENABLED } from '../notifications/notificationPolicy';
 import {
-  ensureAndroidChannel, ensureNotificationPermission, registerThisDevice,
+  ensureAndroidChannel, ensureNotificationPermission, hasNotificationPermission,
+  registerThisDevice,
 } from '../notifications/pushRegistration';
-import { shouldRequestFirstRunPermissions } from './firstRun';
+import { shouldRegisterOnFirstRun, shouldRequestFirstRunPermissions } from './firstRun';
 import { markPermissionsRequested, readFirstRun } from './firstRunStore';
 
 export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): void {
@@ -43,13 +44,28 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): vo
         try {
           // The Android channel must exist before the prompt; a no-op on iOS.
           await ensureAndroidChannel();
-          const granted = await ensureNotificationPermission();
-          if (granted) {
-            // Use what the customer just allowed. Notifications are a single
-            // choice (owner decision 2026-08-18), so allowing them registers
-            // both order updates and offers; the customer turns the lot off
-            // again from Profile or iOS Settings.
-            await registerThisDevice(lang, NOTIFICATIONS_ON);
+
+          // ONLY register when the customer grants permission ON THIS RUN.
+          //
+          // This flag is a new storage key, so first run is also every EXISTING
+          // customer's next launch. Such a customer already holds OS permission,
+          // which means `ensureNotificationPermission` returns true without
+          // showing anything — and `register_push_device` upserts
+          // `is_active = true` along with both preference columns
+          // (20260714090000_push_notifications.sql:157). Registering here would
+          // therefore silently rewrite a choice the customer made deliberately:
+          // it would reactivate a device they had switched off in Profile, and
+          // overwrite their promotions setting in whichever direction this
+          // call happens to pass. First run is for ASKING someone who has not
+          // been asked, never for restating an answer already given.
+          if (shouldRegisterOnFirstRun(await hasNotificationPermission())) {
+            const granted = await ensureNotificationPermission();
+            if (granted) {
+              // Promotions stay FALSE — marketing is a separate consent the
+              // customer gives in Profile, not something a system permission
+              // grant implies (CLAUDE.md section 7).
+              await registerThisDevice(lang, { orderUpdatesEnabled: true, promosEnabled: false });
+            }
           }
         } catch { /* a permission prompt must never break app start */ }
       }

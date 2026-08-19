@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_FIRST_RUN, isCompletedForReview, shouldRequestFirstRunPermissions, shouldRequestReview,
+  DEFAULT_FIRST_RUN, isCompletedForReview, shouldRegisterOnFirstRun,
+  shouldRequestFirstRunPermissions, shouldRequestReview,
 } from './firstRun';
 
 describe('shouldRequestFirstRunPermissions', () => {
@@ -55,5 +56,23 @@ describe('isCompletedForReview', () => {
     expect(isCompletedForReview('cancelled', 'synced')).toBe(false);
     expect(isCompletedForReview(null)).toBe(false);
     expect(isCompletedForReview(undefined)).toBe(false);
+  });
+});
+
+describe('shouldRegisterOnFirstRun', () => {
+  it('registers a device that has never been granted permission', () => {
+    expect(shouldRegisterOnFirstRun(false)).toBe(true);
+  });
+
+  it('NEVER re-registers a device that already holds permission', () => {
+    // The regression this pins: the first-run flag is a new storage key, so
+    // first run is also every EXISTING customer's next launch. Such a customer
+    // already holds OS permission, so the permission call returns true without
+    // showing anything — and register_push_device upserts `is_active = true`
+    // with both preference columns. Registering here silently reactivated
+    // devices customers had switched off and overwrote their promotions
+    // choice. Marketing consent must only ever change by the customer's own
+    // action in Profile.
+    expect(shouldRegisterOnFirstRun(true)).toBe(false);
   });
 });

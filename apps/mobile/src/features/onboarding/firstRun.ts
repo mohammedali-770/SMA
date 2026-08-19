@@ -37,6 +37,27 @@ export function shouldRequestFirstRunPermissions(state: FirstRunState, signedIn:
 }
 
 /**
+ * Whether first run may REGISTER this device for push.
+ *
+ * False whenever the OS permission was already granted before this run.
+ *
+ * The first-run flag is a storage key that no existing install has, so "first
+ * run" is also every existing customer's next launch after upgrading. Those
+ * customers already hold OS permission and are already registered under
+ * preferences they chose themselves. `register_push_device` upserts
+ * `is_active = true` together with both preference columns
+ * (20260714090000_push_notifications.sql:157), so registering again would
+ * reactivate a device the customer had deliberately switched off in Profile
+ * and overwrite their promotions setting.
+ *
+ * Asking someone who has not been asked is the entire purpose of first run.
+ * Restating an answer they already gave is not.
+ */
+export function shouldRegisterOnFirstRun(permissionAlreadyGranted: boolean): boolean {
+  return !permissionAlreadyGranted;
+}
+
+/**
  * Whether to offer the store-review dialog.
  *
  * Every condition here is a deliberate guard:

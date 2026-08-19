@@ -96,9 +96,7 @@ export const STRINGS = {
 
     // notifications
     notificationsTitle: 'Notifications',
-    notificationsSub: 'Notifications for this device.',
-    notifAll: 'Allow notifications',
-    notifAllSub: 'Order updates and occasional offers.',
+    notificationsSub: 'Choose what we can notify you about on this device.',
     notifOrderUpdates: 'Order updates',
     notifOrderUpdatesSub: 'Status of your orders (preparing, ready, delivered…)',
     notifPromos: 'Offers & promotions',
@@ -454,9 +452,7 @@ export const STRINGS = {
 
     // الإشعارات
     notificationsTitle: 'الإشعارات',
-    notificationsSub: 'الإشعارات على هذا الجهاز.',
-    notifAll: 'تفعيل الإشعارات',
-    notifAllSub: 'تحديثات الطلب وعروض من حين لآخر.',
+    notificationsSub: 'اختر ما يمكننا إشعارك به على هذا الجهاز.',
     notifOrderUpdates: 'تحديثات الطلب',
     notifOrderUpdatesSub: 'حالة طلباتك (قيد التحضير، جاهز، تم التوصيل…)',
     notifPromos: 'العروض والترويجات',

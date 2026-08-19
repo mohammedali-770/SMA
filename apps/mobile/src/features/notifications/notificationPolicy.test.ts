@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan, NOTIFICATION_FALLBACK_ROUTE,
-  NOTIFICATIONS_OFF, NOTIFICATIONS_ON, notificationsEnabled,
   notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute, shouldHandleResponse,
   toggleRequiresPermission,
 } from './notificationPolicy';
@@ -64,26 +63,14 @@ describe('exactly-once tap handling (cold start + listener see the SAME response
 });
 
 describe('device preference defaults + lifecycle', () => {
-  it('allowing notifications enables both channels', () => {
-    // One customer-facing switch: allowing notifications means both channels.
-    // The server columns stay separate so the split can return without a
-    // schema change (owner decision 2026-08-18).
-    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: true });
+  it('order updates default ON, promotions default OFF (strict opt-in)', () => {
+    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: false });
   });
   it('device stays active while any channel is on; deactivates when both off', () => {
     expect(deviceShouldStayActive({ orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
     expect(deviceShouldStayActive({ orderUpdatesEnabled: false, promosEnabled: true })).toBe(true);
     expect(deviceShouldStayActive({ orderUpdatesEnabled: false, promosEnabled: false })).toBe(false);
   });
-  it('the single switch maps to both channels together', () => {
-    expect(NOTIFICATIONS_ON).toEqual({ orderUpdatesEnabled: true, promosEnabled: true });
-    expect(NOTIFICATIONS_OFF).toEqual({ orderUpdatesEnabled: false, promosEnabled: false });
-    expect(notificationsEnabled(NOTIFICATIONS_ON)).toBe(true);
-    expect(notificationsEnabled(NOTIFICATIONS_OFF)).toBe(false);
-    // A device registered under the old two-toggle model still reads as on.
-    expect(notificationsEnabled({ orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
-  });
-
   it('OS permission is requested only on the off→on transition (clear context)', () => {
     const off = { orderUpdatesEnabled: false, promosEnabled: false };
     expect(toggleRequiresPermission(off, { orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);

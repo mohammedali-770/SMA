@@ -22,6 +22,19 @@ import { pushDevices } from '../../services/api';
 import { DEFAULT_DEVICE_PREFS, type DevicePrefs } from './notificationPolicy';
 import type { DbPushDevice } from '../../types/db';
 
+/**
+ * True when the OS has ALREADY granted permission — asks the customer nothing.
+ *
+ * Callers need this to tell "the customer just granted permission" apart from
+ * "permission was granted at some point in the past", because
+ * `ensureNotificationPermission` returns true for both without showing a
+ * dialog, and the two must not lead to the same write. See the first-run hook.
+ */
+export async function hasNotificationPermission(): Promise<boolean> {
+  const current = await Notifications.getPermissionsAsync();
+  return current.granted;
+}
+
 /** Ask (or re-check) OS notification permission. Returns true when granted. */
 export async function ensureNotificationPermission(): Promise<boolean> {
   const current = await Notifications.getPermissionsAsync();
