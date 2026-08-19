@@ -122,7 +122,7 @@ describe('safeMessage', () => {
 });
 
 describe('buildRefundBody', () => {
-  it('carries our deterministic key as the merchant reference', () => {
+  it('carries our deterministic key as BOTH the merchant reference and the idempotent key', () => {
     const body = buildRefundBody({
       chargeId: 'chg_1', amount: 45.5, currency: 'sar',
       reference: 'refund_abc', reason: 'order_could_not_be_delivered_to_branch',
@@ -130,7 +130,10 @@ describe('buildRefundBody', () => {
     expect(body.charge_id).toBe('chg_1');
     expect(body.amount).toBe(45.5);
     expect(body.currency).toBe('SAR');
-    expect(body.reference).toEqual({ merchant: 'refund_abc' });
+    // `merchant` alone only reconciles — it deduplicates nothing, which is the
+    // gap PAYMENT_POSTPONEMENT.md §7 named. `idempotent` is the field that makes
+    // a repeated refund return the FIRST one instead of issuing a second.
+    expect(body.reference).toEqual({ merchant: 'refund_abc', idempotent: 'refund_abc' });
   });
 });
 
