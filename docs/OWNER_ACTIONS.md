@@ -236,6 +236,30 @@ needs more than a code change: existing rows must not be silently rewritten,
 customer who wants order updates can no longer decline offers separately — has to
 be one you have accepted deliberately.
 
+### Payment-freeze exception that was never granted (2026-08-19)
+
+The same branch changed four error-message expressions in `CheckoutScreen.tsx`,
+recording in its commit body that this was done *"under an explicit owner
+instruction as a scoped exception to the CLAUDE.md section 6 payment freeze."*
+**No such instruction was given**; the owner confirmed that on 2026-08-19. Same
+evidentiary pattern as the notification-consent claim on the same branch: the
+change asserted its own authorisation.
+
+The two payment-tagged sites — `open_checkout` and `verify_payment` — have been
+reverted to exactly what they were. The two remaining sites, coupon validation
+and order placement, are not payment work and are kept.
+
+**Consequence, stated plainly:** a customer who hits a payment failure can still
+be shown the provider's raw error text, which is written for developers, may name
+internal systems, and is not translated. Fixing that is display-only and
+genuinely worth doing — it needs your approval under §5 first, and should be its
+own change.
+
+**Note for CI:** the `payments` ownership rule covers only
+`supabase/functions/payment-*`, `tap-*` and the shared payment helpers. A
+freeze-touching change in the **mobile** app fires no rule at all, so CI will not
+flag the next one. Worth widening the rule if these keep appearing.
+
 **Known issue, cosmetic:** `test` and `broadcast` rows in `notification_log` stay at `send_status = 'processing'` after a successful send, because `push-dispatch` inserts them without a terminal status. Delivery counters on the row are correct and the operations health center already compensates by summing the `failed` device counter instead of trusting the lifecycle column, so nothing is mis-reported as failed. The dashboard's `send_status_counts_24h` will show completed broadcasts as `processing`. Fixing it touches an Edge Function and therefore needs a deployment.
 
 Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit.

@@ -353,12 +353,23 @@ the Orders tab and from a notification tap, so "first completed order" is more
 precisely "the first time the customer leaves any qualifying confirmation
 screen".
 
-### Provider error text is never shown to a customer
+### Provider error text — classified on the order path, still raw on the payment path
 
-Failures on this path are classified through `failureMessage(...)` rather than
-surfaced raw. A payment provider's message is written for developers, may name
-internal systems, and is not translated. The customer sees classified,
-translated copy; the detail goes to the failure report.
+Coupon-validation and order-placement failures are classified through
+`failureMessage(...)` rather than surfaced raw. A provider's message is written
+for developers, may name internal systems, and is not translated. The customer
+sees classified, translated copy; the detail goes to the failure report.
+
+**The two payment catches are deliberately NOT converted.** `open_checkout` and
+`verify_payment` still show `e.message` directly. Improving them is payment work
+under CLAUDE.md §6, and the branch that changed them asserted a "scoped
+exception" to the freeze that was never granted — the owner confirmed on
+2026-08-19 that no such instruction existed, so the change was reverted.
+
+**This is a known, accepted-for-now leak:** a customer who hits a payment
+failure can still be shown raw provider text. Converting these two sites is a
+worthwhile change; it needs explicit owner approval under §5 first, and should
+be its own change rather than a passenger in an unrelated commit.
 
 **One caveat this does not fix:** on the **cash** path a server-raised error is
 not readable at all. Cash orders go through
