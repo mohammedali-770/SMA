@@ -14,6 +14,8 @@ export default defineConfig({
       'src/**/*.test.{ts,tsx}',
       'supabase/functions/**/*.test.ts',
       'apps/mobile/src/**/*.test.{ts,tsx}',
+      // Expo config plugins: pure transforms, no React Native imports.
+      'apps/mobile/plugins/**/*.test.ts',
     ],
   },
 });
