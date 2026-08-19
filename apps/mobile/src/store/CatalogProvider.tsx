@@ -9,6 +9,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { catalog } from '../services/api';
+import { failureMessage } from '../lib/errors/reportFailure';
+import { useI18n } from '../i18n/I18nProvider';
 import {
   buildAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory, mapDeliveryZone, mapLoyaltySettings,
   mapModifierGroup, mapPaymentMethodSettings, mapProduct, mapSupportSettings,
@@ -58,6 +60,8 @@ export interface CatalogValue {
 export const CatalogContext = createContext<CatalogValue | null>(null);
 
 export function CatalogProvider({ children }: { children: React.ReactNode }) {
+  // Safe: _layout nests I18nProvider OUTSIDE AppStoreProvider.
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -105,13 +109,14 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setSupport(mapSupportSettings(raw.settings));
         setDeliveryZones((raw.deliveryZones ?? []).map(mapDeliveryZone));
       } catch (e) {
-        if (mounted.current) setError(e instanceof Error ? e.message : 'Failed to load the menu.');
+        // Was rendering the raw provider message straight onto the menu screen.
+        if (mounted.current) setError(failureMessage(e, t, { subsystem: 'menu', op: 'load_catalog' }));
       } finally {
         if (mounted.current) setLoading(false);
       }
     })();
     return () => { mounted.current = false; };
-  }, [reloadTick]);
+  }, [reloadTick, t]);
 
   // Mirror of the order context's branch. The persisted source of truth lives in
   // OrderContextProvider; this stays the accessor the menu/product/checkout

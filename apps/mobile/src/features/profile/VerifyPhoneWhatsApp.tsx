@@ -11,7 +11,7 @@
  * part and normalized once with `toSaudiE164` before either call, so send and
  * verify key off the same canonical string the server derives.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { color, radius, space } from '../../design-system/generated/tokens';
@@ -88,6 +88,14 @@ export function VerifyPhoneWhatsApp() {
 
   // Zero-tap autofill (WebOTP on web; declarative on native). Only listens on the
   // code step; on read it fills the boxes and hands the code straight to verify.
+  // Stable identity so the memoized OtpCodeInput is not re-rendered by this
+  // screen's own 1 Hz resend countdown while the field is focused (iOS 26 drops
+  // focused state on re-render). The countdown itself is left as-is here — this
+  // screen is not the reported bug, and a structural change to it is out of scope.
+  const verifyRef = useRef(verify);
+  verifyRef.current = verify;
+  const handleCodeComplete = useCallback((c: string) => { void verifyRef.current(c); }, []);
+
   useOtpAutofill({
     enabled: phase === 'code',
     length: DEFAULT_OTP_LENGTH,
@@ -131,7 +139,7 @@ export function VerifyPhoneWhatsApp() {
                 value={code}
                 onChange={setCode}
                 length={DEFAULT_OTP_LENGTH}
-                onComplete={(c) => verify(c)}
+                onComplete={handleCodeComplete}
                 accessibilityLabel={t('enterVerificationCode')}
                 style={styles.codeField}
               />

@@ -11,6 +11,8 @@
 import { DEFAULT_DEVICE_PREFS, type DevicePrefs } from './notificationPolicy';
 import type { DbPushDevice } from '../../types/db';
 
+export async function hasNotificationPermission(): Promise<boolean> { return false; }
+
 export async function ensureNotificationPermission(): Promise<boolean> {
   return false; // never prompts on web
 }

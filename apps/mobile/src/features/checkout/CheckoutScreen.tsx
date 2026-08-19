@@ -35,6 +35,7 @@ import {
 import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { checkout, coupons, orders, payments } from '../../services/api';
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
@@ -246,7 +247,9 @@ export function CheckoutScreen() {
       const res = await coupons.validate(code, cart.subtotal);
       setCouponResult({ ok: res.valid, message: res.message, discount: Number(res.discount_amount) || 0 });
     } catch (e) {
-      setCouponResult({ ok: false, message: e instanceof Error ? e.message : t('somethingWentWrong'), discount: 0 });
+      // Transport only: a coupon that is expired/invalid comes back on the
+      // SUCCESS path as res.message, so nothing meaningful is lost here.
+      setCouponResult({ ok: false, message: failureMessage(e, t, { subsystem: 'checkout', op: 'validate_coupon' }), discount: 0 });
     } finally {
       setCheckingCoupon(false);
     }
@@ -500,7 +503,7 @@ export function CheckoutScreen() {
         router.replace(`/receipt/${order.id}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('somethingWentWrong'));
+      setError(failureMessage(e, t, { subsystem: 'checkout', op: 'place_order' }));
     } finally {
       setPlacing(false);
     }
@@ -550,6 +553,10 @@ export function CheckoutScreen() {
         await verifyPaymentSession(sessionId);
       }
     } catch (e) {
+      // FROZEN PATH — left exactly as it was. Improving this message is
+      // payment work under CLAUDE.md section 6 and was never owner-approved;
+      // the branch asserted a "scoped exception" that did not exist. It does
+      // still leak raw provider text to the customer — see docs/OWNER_ACTIONS.md.
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       payRunningRef.current = false;
@@ -598,6 +605,7 @@ export function CheckoutScreen() {
     } catch (e) {
       // Transient verify error — KEEP the persisted session so recovery can
       // resolve it on the next launch / checkout entry (never a new charge).
+      // FROZEN PATH — see the note on the open_checkout catch above.
       setPayFlow({ state: 'error', sessionId, message: e instanceof Error ? e.message : t('somethingWentWrong') });
     } finally {
       setPayBusy(false);

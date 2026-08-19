@@ -14,12 +14,53 @@ so one implementation covers all three targets.
 
 | File | Role |
 | --- | --- |
-| `src/features/otp/otpAutofill.ts` | PURE, framework-free logic: code normalization/extraction (Arabic-Indic aware), multi-box distribution (paste / auto-advance / backspace), and the WebOTP capability guard + read (dependency-injected navigator). |
-| `src/features/otp/otpAutofill.test.ts` | 26 unit tests for the above (parsing, paste, auto-advance, backspace, capability guard with a mock `navigator.credentials`). Runs under the root Node vitest suite. |
+| `src/features/otp/otpAutofill.ts` | PURE, framework-free logic: code normalization/extraction (Arabic-Indic aware) and the WebOTP capability guard + read (dependency-injected navigator). |
+| `src/features/otp/otpAutofill.test.ts` | Unit tests for the above (parsing, extraction, capability guard with a mock `navigator.credentials`). Runs under the root Node vitest suite. |
 | `src/features/otp/useOtpAutofill.ts` | React hook: WebOTP on web (guarded, `AbortController` cleaned up on unmount); no-op on native (autofill there is declarative on the input). |
-| `src/features/otp/OtpCodeInput.tsx` | Multi-box OTP input (paste-to-fill, auto-advance, backspace, `onComplete`); box 0 carries `textContentType="oneTimeCode"` (iOS) + `autoComplete="sms-otp"` (Android). |
-| `src/features/auth/PhoneOtpLogin.tsx` | Login screen — code step now uses `OtpCodeInput` + `useOtpAutofill`; the same `verify()` path is reused (now accepts an optional autofilled code). |
+| `src/features/otp/OtpCodeInput.tsx` | **One real `TextInput`** carrying the autofill contract, drawn to look like separate digit cells. |
+| `src/features/otp/OtpPasteAssist.tsx` | One-tap paste affordance, shown only when the clipboard holds something and the code is incomplete. |
+| `src/features/otp/OtpResendTimer.tsx` | Owns the resend countdown so its per-second tick cannot re-render the code field. |
+| `src/features/auth/PhoneOtpLogin.tsx` | Login screen — code step uses `OtpCodeInput` + `useOtpAutofill`; the same `verify()` path is reused. |
 | `src/features/profile/VerifyPhoneWhatsApp.tsx` | Profile phone-verification card — same wiring. |
+
+### Why one input, not six boxes
+
+The original implementation used six separate `TextInput`s. **On iOS that
+structure is why autofill never appeared**, for two compounding reasons:
+
+1. **iOS offers the QuickType code suggestion to a field it believes holds the
+   whole code.** Six one-character fields do not read that way, and only box 0
+   carried `textContentType="oneTimeCode"`.
+2. **iOS 26 drops a field's focused state on re-render**, and the resend
+   countdown ticked once per second *in the screen that owned the input* — so
+   the focused field was torn down and rebuilt roughly sixty times during a
+   single cooldown. The suggestion cannot persist on a field that keeps losing
+   focus.
+
+So the field is now a single `TextInput` with `maxLength={length}`, styled to
+*look* like separate cells (the digits are rendered over it). The autofill
+contract sits on the one real field, and `OtpResendTimer` owns the countdown in
+its own subtree so a tick re-renders the timer and nothing else.
+
+`otpAutofill.ts` lost its multi-box distribution helpers (`BoxEdit`,
+`applyBoxInput`, `applyBackspace`) along with the boxes — there is no longer a
+per-box cursor to manage. Normalization and extraction are unchanged.
+
+### One-tap paste (`OtpPasteAssist`)
+
+iOS 26.x does not reliably surface the keyboard autofill suggestion for codes
+delivered by **WhatsApp**. Apple's developer forums report the same across
+26.0.1–26.3, there is no public API to opt into — only an OS heuristic — and
+WhatsApp's own "Copy code" button works every time. The app therefore meets the
+customer where the platform is reliable: copy in WhatsApp, one tap here.
+
+- **iOS 16+** renders `UIPasteControl` (`ClipboardPasteButton`), which pastes
+  **without** the "Allow Paste?" dialog — the tap itself is the consent.
+- **Elsewhere** a plain action reads the clipboard on press. That does prompt
+  once on iOS, but it is never reached on a version that has the control.
+- The affordance appears **only** when the clipboard actually holds something
+  and the code is still incomplete, so it is never dead furniture. The check
+  uses `hasStringAsync` precisely because it does **not** prompt.
 
 ### Graceful degradation (by design)
 
@@ -28,22 +69,35 @@ so one implementation covers all three targets.
   `navigator.credentials.get`). Unsupported browser, abort, or user-declined →
   resolves `null`, manual entry stays fully usable. The `AbortController` is
   aborted on unmount / when the code step closes.
-- **iOS**: `textContentType="oneTimeCode"` → QuickType offers the code above the
-  keyboard; tapping it fills box 0, which distributes across the boxes.
-- **Android**: `autoComplete="sms-otp"` gives the platform autofill affordance.
+- **iOS**: `textContentType="oneTimeCode"` on the single field → QuickType
+  offers the code above the keyboard and fills the whole field at once. When it
+  does not appear (see the WhatsApp caveat above), `OtpPasteAssist` is the
+  reliable path.
+- **Android**: `autoComplete="sms-otp"` — Android's documented OTP hint, kept
+  byte-identical to what shipped before rather than assuming the native hint
+  mapping matches the cross-platform value.
+- **`Platform.select` needs its `default` key.** With only `ios` and `android`
+  keys it returns `undefined` on web, emitting no `autocomplete` attribute at
+  all. Web is given `'one-time-code'`, which is the value the HTML spec
+  actually defines — note that the pre-existing code sent Android's `sms-otp`
+  to web, which is not a valid HTML token either. Web autofill in practice
+  comes from WebOTP below; the attribute is the belt to its braces.
 - **No native module is required and none is assumed** — there is no crash path
   if a native SMS-retriever module is absent (the native branch of the hook is a
   no-op; see the OWNER follow-up below for true zero-tap on Android).
 
 ### RTL / i18n
 
-- No new user-facing strings were added; the boxes reuse the existing translated
+- The field itself adds no user-facing strings; it reuses the existing translated
   labels (`enterLoginCode` / `enterVerificationCode`) for their accessibility
   labels, so AR + EN are covered by the current translation system.
-- The digit row is intentionally **not** mirrored in Arabic — a numeric code
-  reads left-to-right (box 1 = first digit) in both languages, matching the
+- The digit cells are intentionally **not** mirrored in Arabic — a numeric code
+  reads left-to-right (first cell = first digit) in both languages, matching the
   established `SaudiPhoneInput` convention. Only the label above follows the
   reading edge (`rtlText`).
+- `OtpPasteAssist` and `OtpResendTimer` do add user-facing strings; both
+  languages are covered in `src/i18n/strings.ts` and pinned by the i18n contract
+  tests (identical key sets, non-empty values, AR ≠ EN).
 
 ## OWNER / blocked follow-ups (NOT done here — require owner action)
 

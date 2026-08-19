@@ -11,6 +11,13 @@ export const STRINGS = {
     retry: 'Try Again',
     loading: 'Loading…',
     somethingWentWrong: 'Something went wrong.',
+    // Customer-safe failure copy. Chosen so each one names something the
+    // customer can actually DO; the technical cause goes to Sentry instead.
+    errOffline: 'You appear to be offline. Check your connection and try again.',
+    errNetworkBlocked: 'We couldn’t reach Spicy Meal on this network. Try mobile data or a different Wi‑Fi.',
+    errTimeout: 'That took too long. Please try again.',
+    errRateLimited: 'Too many attempts. Please wait a moment and try again.',
+    errServer: 'Something went wrong on our side. Please try again shortly.',
     sar: 'SAR',
     cancel: 'Cancel',
     close: 'Close',
@@ -28,6 +35,7 @@ export const STRINGS = {
     enterCodeTitle: 'Enter your code',
     verifyShort: 'Verify',
     changeShort: 'Change',
+    pasteCode: 'Paste code',
     /** Screen-reader label for the inline "Change" action, which needs the noun. */
     changeNumber: 'Change number',
     invalidSaudiPhone: 'Enter a valid Saudi mobile number, e.g. 05XXXXXXXX.',
@@ -352,6 +360,11 @@ export const STRINGS = {
     oc_refund_failed: 'Refund in progress',
     oc_branch_order_number: 'Branch order number',
     oc_number_pending: 'Not issued yet',
+    oc_number_pending_hint: 'It will appear here as soon as the branch issues it.',
+    oc_directions: 'Directions to branch',
+    oc_directions_choose: 'Open directions in',
+    oc_maps_apple: 'Apple Maps',
+    oc_maps_google: 'Google Maps',
   },
   ar: {
     appName: 'سبايسي ميل',
@@ -360,6 +373,11 @@ export const STRINGS = {
     retry: 'إعادة المحاولة',
     loading: 'جارٍ التحميل…',
     somethingWentWrong: 'حدث خطأ ما.',
+    errOffline: 'يبدو أنك غير متصل بالإنترنت. تحقق من اتصالك ثم حاول مرة أخرى.',
+    errNetworkBlocked: 'تعذّر الوصول إلى سبايسي ميل عبر هذه الشبكة. جرّب بيانات الجوال أو شبكة واي فاي أخرى.',
+    errTimeout: 'استغرقت العملية وقتاً طويلاً. حاول مرة أخرى.',
+    errRateLimited: 'محاولات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
+    errServer: 'حدث خطأ لدينا. حاول مرة أخرى بعد قليل.',
     sar: 'ر.س',
     cancel: 'إلغاء',
     close: 'إغلاق',
@@ -375,6 +393,7 @@ export const STRINGS = {
     enterCodeTitle: 'أدخل الرمز',
     verifyShort: 'تأكيد',
     changeShort: 'تغيير',
+    pasteCode: 'لصق الرمز',
     /** تسمية قارئ الشاشة لزر «تغيير» المضمّن، ويحتاج إلى الاسم كاملاً. */
     changeNumber: 'تغيير الرقم',
     invalidSaudiPhone: 'أدخل رقم جوال سعودي صحيح، مثل 05XXXXXXXX.',
@@ -677,6 +696,11 @@ export const STRINGS = {
     oc_refund_failed: 'الاسترداد قيد المتابعة',
     oc_branch_order_number: 'رقم الطلب لدى الفرع',
     oc_number_pending: 'لم يصدر بعد',
+    oc_number_pending_hint: 'سيظهر هنا فور إصداره من الفرع.',
+    oc_directions: 'الاتجاهات إلى الفرع',
+    oc_directions_choose: 'افتح الاتجاهات في',
+    oc_maps_apple: 'خرائط آبل',
+    oc_maps_google: 'خرائط جوجل',
   },
 } as const;
 

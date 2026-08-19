@@ -15,29 +15,73 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.spicymeal.app",
-      "config": { "usesNonExemptEncryption": false },
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
-        "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your location only to center the delivery map on you. You can always move the pin manually."
+        "NSLocationWhenInUseUsageDescription": "Spicy Meal uses your location only to center the delivery map on you. You can always move the pin manually.",
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps"
+        ]
       }
     },
     "android": {
       "package": "sa.com.spicymeal.app",
       "googleServicesFile": "./google-services.json",
-      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#ffffff" },
-      "permissions": ["INTERNET","ACCESS_FINE_LOCATION","ACCESS_COARSE_LOCATION","POST_NOTIFICATIONS"]
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
+      ]
     },
-    "web": { "output": "single", "favicon": "./assets/favicon.png" },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
     "plugins": [
-      ["@sentry/react-native/expo", { "organization": "first-taste-trading-company", "project": "react-native", "url": "https://sentry.io/" }],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "first-taste-trading-company",
+          "project": "react-native",
+          "url": "https://sentry.io/"
+        }
+      ],
       "expo-router",
-      ["expo-splash-screen", { "image": "./assets/adaptive-icon.png", "imageWidth": 200, "resizeMode": "contain", "backgroundColor": "#ffffff" }],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/adaptive-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
       "expo-web-browser",
       "expo-image",
       "expo-status-bar",
-      ["expo-notifications", { "color": "#E02D3D", "defaultChannel": "default" }]
+      [
+        "expo-notifications",
+        {
+          "color": "#E02D3D",
+          "defaultChannel": "default"
+        }
+      ]
     ],
-    "extra": { "router": {}, "eas": { "projectId": "c8422901-b27a-40b3-91c7-b6ce99d97936" } },
-    "experiments": { "baseUrl": "/app" }
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c8422901-b27a-40b3-91c7-b6ce99d97936"
+      }
+    },
+    "experiments": {
+      "baseUrl": "/app"
+    }
   }
 }

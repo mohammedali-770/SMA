@@ -369,6 +369,93 @@ was additionally mutation-checked — dropping the two triggers makes it fail at
 CASE 2 — so a green run means the guard is present, not merely that the file
 executed.
 
+## 10d. The confirmation screen — what the cashier is shown
+
+This screen exists to be **held up across a counter**. Its layout follows from
+that, and the reasoning is recorded here because a well-meaning tidy-up could
+undo it.
+
+| Element | Why |
+| --- | --- |
+| Brand lockup at the top | The cashier is handed a stranger's phone; they need to see whose order this is before reading anything else. |
+| Branch order number, very large, in its own card | The one thing the screen is for. Forced **LTR** so a two-digit number can never render reversed in an Arabic layout. |
+| Order state as a compact pill | Reassurance, not the headline. Once the number is visible the customer already has what they came for. |
+
+### The number is shown VERBATIM
+
+`orderDisplayNumber(order)` returns what Lazywait issued, unaltered — **no `#`
+added, none stripped, no reformatting.**
+
+This was got wrong once and corrected within the same branch. An earlier
+revision stripped the leading `#`, on the assumption the app was adding it.
+Verified read-only against Production: **the POS itself issues the number
+already prefixed** — `#1`, `#2`, `#10` — and that exact string is what the
+branch's own screens display. Stripping it printed something the cashier could
+not match against their system, which defeats the purpose of the screen.
+
+When the number has not been issued yet, the card says so and explains that it
+will appear as soon as the branch issues it, rather than showing a blank or a
+placeholder that could be mistaken for a real number.
+
+### Directions, for pickup only
+
+A **Directions to branch** control appears only when the order is `pickup`, the
+branch is in the catalog, and its coordinates are usable. A delivery order never
+shows it — the food travels to the customer. If the catalog has not loaded or
+the branch was deactivated since the order was placed, the control simply does
+not render rather than opening a broken map. Platform behaviour and the iOS
+`LSApplicationQueriesSchemes` requirement are in [`MAPS.md`](MAPS.md).
+
+### The store-review prompt
+
+Leaving the confirmation screen may raise the OS review dialog. Every guard is
+deliberate:
+
+- **never while the screen is open** — a system dialog must not sit on top of
+  the number the customer is showing a cashier;
+- **only after a completed order** — `syncState === 'synced'` and a status of
+  `delivered | ready | out_for_delivery | preparing | received`. Asking after a
+  failed or unconfirmed order invites a one-star rating for something the
+  customer is still upset about;
+- **once, ever**, from our side. The flag is written **before** asking, because
+  neither platform reports whether its dialog actually appeared.
+
+Both platforms treat this as a *request*: iOS caps its own dialog at three per
+365 days and may show nothing at all. It can never be relied on to have been
+seen.
+
+Two limits worth knowing: the prompt can fire on a `preparing` or `received`
+order — before the customer has eaten — and `/receipt/{id}` is reachable from
+the Orders tab and from a notification tap, so "first completed order" is more
+precisely "the first time the customer leaves any qualifying confirmation
+screen".
+
+### Provider error text — classified on the order path, still raw on the payment path
+
+Coupon-validation and order-placement failures are classified through
+`failureMessage(...)` rather than surfaced raw. A provider's message is written
+for developers, may name internal systems, and is not translated. The customer
+sees classified, translated copy; the detail goes to the failure report.
+
+**The two payment catches are deliberately NOT converted.** `open_checkout` and
+`verify_payment` still show `e.message` directly. Improving them is payment work
+under CLAUDE.md §6, and the branch that changed them asserted a "scoped
+exception" to the freeze that was never granted — the owner confirmed on
+2026-08-19 that no such instruction existed, so the change was reverted.
+
+**This is a known, accepted-for-now leak:** a customer who hits a payment
+failure can still be shown raw provider text. Converting these two sites is a
+worthwhile change; it needs explicit owner approval under §5 first, and should
+be its own change rather than a passenger in an unrelated commit.
+
+**One caveat this does not fix:** on the **cash** path a server-raised error is
+not readable at all. Cash orders go through
+`supabase.functions.invoke('order-intake')`, which returns HTTP 400 with the
+message in the body — but a non-2xx `invoke` yields `FunctionsHttpError`, whose
+`.message` is the generic *"Edge Function returned a non-2xx status code"*.
+`invokePaymentFn` already recovers the body via `error.context.json()`;
+`placeAndSync` has never had the same treatment.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and

@@ -30,12 +30,6 @@ import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
 import { useThemeColors } from '../../../theme/ThemeProvider';
 
-/** Presentation-only prefix; the stored/POS reference is never modified. */
-function visibleBranchNumber(order: Pick<Order, 'lazywaitOrderNumber'>): string | null {
-  const raw = orderDisplayNumber(order);
-  return raw ? `#${raw.replace(/^#/, '')}` : null;
-}
-
 export function ReceiptBody({ order }: { order: Order }) {
   const styles = useStyles();
   const colors = useThemeColors();
@@ -62,16 +56,12 @@ export function ReceiptBody({ order }: { order: Order }) {
     : payState === 'unpaid' ? t('notPaidYet')
     : null;
 
-  const branchNumber = visibleBranchNumber(order);
-
   return (
     <View style={{ gap: space.s4 }}>
       <View style={styles.card}>
-        <ReceiptRow
-          label={t('oc_branch_order_number')}
-          value={branchNumber ?? t('oc_number_pending')}
-          strong={branchNumber != null}
-        />
+        {/* The branch number now leads the screen in ConfirmationHero, at a
+            size a cashier can read across a counter. Repeating it here would
+            just compete with it. */}
         <ReceiptRow label={t('paymentMethodTitle')} value={methodText} />
         <ReceiptRow label={t('paymentStatus')} value={statusText} />
         <ReceiptRow label={pick('Type', 'النوع')} value={order.orderType === 'delivery' ? t('delivery') : t('pickup')} />

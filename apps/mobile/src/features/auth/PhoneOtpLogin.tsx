@@ -17,7 +17,7 @@
  * function, and never fakes a session — Supabase Auth is the login authority.
  */
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { fontFamily, hitTarget, space } from '../../design-system/generated/tokens';
@@ -28,11 +28,13 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { formatSaudiE164, isSaudiMobile, toSaudiE164 } from '../../lib/phone';
 import { DEFAULT_OTP_LENGTH } from '../otp/otpAutofill';
 import { OtpCodeInput } from '../otp/OtpCodeInput';
+import { OtpPasteAssist } from '../otp/OtpPasteAssist';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../otp/otpInput';
+import { OtpResendTimer, type OtpResendHandle } from '../otp/OtpResendTimer';
 import { useOtpAutofill } from '../otp/useOtpAutofill';
-import { useOtpCooldown } from '../otp/useOtpCooldown';
 import { auth } from '../../services/api';
 import { requestLoginCode } from './loginAvailability';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { makeStyles } from '../../theme/makeStyles';
 
 type Phase = 'phone' | 'code';
@@ -47,7 +49,11 @@ export function PhoneOtpLogin() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const { cooldown, startCooldown, resetCooldown } = useOtpCooldown();
+  // The countdown deliberately does NOT live in this component's state: it
+  // ticks once per second, and re-rendering the focused OTP field ~60 times per
+  // cooldown is one of the two causes of the iOS 26 autofill failure. It owns
+  // its own state inside OtpResendTimer and is driven from here by ref.
+  const resend = useRef<OtpResendHandle>(null);
 
   const sendCode = async () => {
     setError(null); setNotice(null);
@@ -64,9 +70,18 @@ export function PhoneOtpLogin() {
       setE164(normalized);
       setPhase('code');
       setNotice(t('weSentLoginCode'));
-      startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
+      resend.current?.start(OTP_RESEND_COOLDOWN_SECONDS);
     } else {
-      setError(outcome.message ?? t('loginCodeSendFailed'));
+      // NEVER render the provider's own text: a corporate Wi-Fi that intercepts
+      // TLS used to put "fetch failed: UnexpectedException: A TLS error caused
+      // the secure connection to fail. (at ExpoModulesCore/Promise.swift:56)"
+      // on this screen. The customer gets actionable copy; the technical detail
+      // goes to Sentry with subsystem + op attached.
+      setError(failureMessage(outcome.message, t, {
+        subsystem: 'auth',
+        op: 'send_login_code',
+        fallbackKey: 'loginCodeSendFailed',
+      }));
     }
     setBusy(false);
   };
@@ -84,8 +99,15 @@ export function PhoneOtpLogin() {
       } else {
         setError(t('invalidOrExpiredCode'));
       }
-    } catch {
-      setError(t('invalidOrExpiredCode'));
+    } catch (err) {
+      // A wrong code and an unreachable server are different problems: telling
+      // someone on a blocked network that their code is invalid sends them to
+      // request another one that also cannot arrive.
+      setError(failureMessage(err, t, {
+        subsystem: 'auth',
+        op: 'verify_login_code',
+        fallbackKey: 'invalidOrExpiredCode',
+      }));
     } finally {
       setBusy(false);
     }
@@ -93,8 +115,22 @@ export function PhoneOtpLogin() {
 
   const changeNumber = () => {
     setPhase('phone'); setCode(''); setError(null); setNotice(null);
-    resetCooldown();
+    resend.current?.reset();
   };
+
+  // Stable identities for the memoized OtpCodeInput: `busy`, `error` and the
+  // notice all change while the code field is focused, and the field must not
+  // be re-rendered by any of them.
+  const verifyRef = useRef(verify);
+  verifyRef.current = verify;
+  const handleCodeComplete = useCallback((c: string) => { void verifyRef.current(c); }, []);
+
+  // A pasted code is treated exactly like an autofilled one: fill the field and
+  // submit, so the customer never taps Verify separately after pasting.
+  const handlePastedCode = useCallback((c: string) => {
+    setCode(c);
+    void verifyRef.current(c);
+  }, []);
 
   // Zero-tap autofill (WebOTP on web; declarative on native). Only listens on the
   // code step; on read it fills the boxes and hands the code straight to verify.
@@ -151,25 +187,41 @@ export function PhoneOtpLogin() {
         value={code}
         onChange={setCode}
         length={DEFAULT_OTP_LENGTH}
-        onComplete={(c) => verify(c)}
+        onComplete={handleCodeComplete}
         autoFocus
         accessibilityLabel={t('enterCodeTitle')}
         style={styles.otp}
       />
 
+      {/*
+        iOS 26.x does not reliably offer the keyboard autofill suggestion for a
+        WhatsApp-delivered code (Apple bug, no public API to opt into), but
+        WhatsApp's own "Copy code" button always works. This turns that into a
+        single tap. Shown only while the code is incomplete.
+      */}
+      <OtpPasteAssist
+        length={DEFAULT_OTP_LENGTH}
+        visible={code.length < DEFAULT_OTP_LENGTH}
+        onCode={handlePastedCode}
+      />
+
       <Button label={t('verifyShort')} onPress={() => verify()} loading={busy} />
 
-      <Pressable
-        onPress={sendCode}
-        disabled={busy || cooldown > 0}
-        accessibilityRole="button"
-        accessibilityState={{ disabled: busy || cooldown > 0 }}
-        style={styles.resend}
-      >
-        <Text variant="caption" tone={cooldown > 0 ? 'tertiary' : 'ember'} align="center">
-          {cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
-        </Text>
-      </Pressable>
+      <OtpResendTimer ref={resend}>
+        {(cooldown) => (
+          <Pressable
+            onPress={sendCode}
+            disabled={busy || cooldown > 0}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: busy || cooldown > 0 }}
+            style={styles.resend}
+          >
+            <Text variant="caption" tone={cooldown > 0 ? 'tertiary' : 'ember'} align="center">
+              {cooldown > 0 ? `${t('resendIn')} ${cooldown}s` : t('resendCode')}
+            </Text>
+          </Pressable>
+        )}
+      </OtpResendTimer>
 
       {error ? (
         <Text variant="caption" tone="danger" align="center">{error}</Text>
