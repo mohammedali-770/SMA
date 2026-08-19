@@ -74,8 +74,15 @@ describe('buildTapChargePayload', () => {
     expect(b.threeDSecure).toBe(true);
     expect(b.save_card).toBe(false);
     expect((b.source as any).id).toBe('src_all');
-    expect(b.idempotent).toBe('txn_abc');
-    expect((b.reference as any)).toEqual({ transaction: 'txn_abc', order: 'SM-2026-000001' });
+    // REGRESSION. This assertion previously pinned `idempotent` at the TOP
+    // LEVEL and pinned `reference` to exactly {transaction, order} — so it
+    // actively certified the bug: Tap's schema has no top-level `idempotent`,
+    // and the value was discarded. A retried create could produce a second
+    // charge. https://developers.tap.company/reference/create-a-charge
+    expect(b.idempotent).toBeUndefined();
+    expect((b.reference as any)).toEqual({
+      transaction: 'txn_abc', order: 'SM-2026-000001', idempotent: 'txn_abc',
+    });
     expect(b.amount).toBe(45.5);
     expect((b.post as any).url).toContain('payment-webhook');
     expect((b.redirect as any).url).toContain('payment-return');

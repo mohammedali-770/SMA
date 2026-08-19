@@ -98,15 +98,29 @@ export interface RefundRequest {
   chargeId: string;
   amount: number;
   currency: string;
-  /** OUR idempotency key — also sent as Tap's `post.reference` for reconciliation. */
+  /**
+   * Our deterministic per-refund key. Sent as BOTH `reference.merchant`
+   * (reconciliation) and `reference.idempotent` (Tap-side deduplication).
+   */
   reference: string;
   reason: string;
 }
 
 /**
- * Build the Tap refund request body. `reference` carries our deterministic
- * per-order idempotency key so a duplicated request is reconcilable on Tap's side
- * as well as ours; our own DB claim is what actually prevents a double refund.
+ * Build the Tap refund request body.
+ *
+ * `reference.merchant` is a RECONCILIATION reference — it does not deduplicate
+ * anything, which is what docs/PAYMENT_POSTPONEMENT.md §7 identified as the
+ * double-refund risk. `reference.idempotent` is the field that actually
+ * restricts duplicates: passing the same string returns the FIRST refund's
+ * response instead of initiating a second one.
+ * https://developers.tap.company/reference/create-a-refund
+ *
+ * BOUNDED, NOT ELIMINATED. Tap's idempotent string is valid for 24 HOURS
+ * (https://developers.tap.company/docs/idempotency). A retry after that window
+ * is a genuinely new refund to Tap, so this narrows the risk rather than
+ * closing it — our own DB claim remains the primary control, and §7 must still
+ * be resolved before automated refunds are re-enabled.
  */
 export function buildRefundBody(req: RefundRequest): Record<string, unknown> {
   return {
@@ -114,7 +128,7 @@ export function buildRefundBody(req: RefundRequest): Record<string, unknown> {
     amount: Number(req.amount),
     currency: (req.currency || 'SAR').toUpperCase(),
     reason: req.reason,
-    reference: { merchant: req.reference },
+    reference: { merchant: req.reference, idempotent: req.reference },
     // Tap notifies this endpoint on refund state changes; the worker also polls,
     // so delivery is not depended upon.
     post: { url: null },

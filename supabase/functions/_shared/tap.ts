@@ -178,8 +178,17 @@ export function buildTapChargePayload(p: BuildChargeParams): Record<string, unkn
     threeDSecure: true,
     save_card: false,
     description: p.description,
-    idempotent: p.idempotent,
-    reference: { transaction: p.referenceTransaction, order: p.referenceOrder },
+    // `idempotent` belongs INSIDE `reference`. Tap's Create-a-Charge schema has
+    // no top-level `idempotent` field, so the value sat at the top level was
+    // simply ignored and the charge was never deduplicated — a retried
+    // payment-initiate could create a SECOND charge. Nothing was affected in
+    // practice because online payment has never been enabled.
+    // https://developers.tap.company/reference/create-a-charge
+    reference: {
+      transaction: p.referenceTransaction,
+      order: p.referenceOrder,
+      idempotent: p.idempotent,
+    },
     receipt: { email: false, sms: false },
     customer,
     merchant: { id: p.merchantId },
