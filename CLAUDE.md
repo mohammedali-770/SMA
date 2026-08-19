@@ -157,6 +157,7 @@ The intended always-reporting required check contexts are:
 - `Edge Function typecheck (Deno)`
 - `Dependency audit (high+)`
 - `SQL suites gate`
+- `Documentation (generated + ownership)`
 
 Do **not** require:
 
@@ -187,7 +188,20 @@ Do not leave old screenshots/README text describing:
 - direct Production CLI deploy/db-push shortcuts;
 - dated dashboard counts/settings as current without re-verification.
 
-`docs/README.md` defines the current documentation ownership/navigation model.
+`docs/README.md` defines the current documentation ownership/navigation model, and
+`docs/CONTRIBUTING.md` defines the standard every document is written to.
+
+This rule is now partly **enforced** rather than only stated. `npm run docs:check`
+regenerates `docs/reference/` and fails on drift, and enforces `docs/ownership.json`,
+which maps source paths to the document that must change with them. A change to
+payment, push, WhatsApp sign-in, POS, account-deletion, order-lifecycle,
+order-integrity, maps, OTP or deploy code fails CI unless its owning document is
+updated in the same change, or a commit message records
+`docs-exempt: <rule> — <reason>`.
+
+Never hand-edit a file in `docs/reference/`; fix the generator instead. The exemption
+is for changes that genuinely do not affect documented behaviour — not for deferring
+documentation.
 
 ---
 
