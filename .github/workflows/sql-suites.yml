@@ -150,9 +150,50 @@ jobs:
           persist-credentials: false
 
       - name: Install psql client
+        # WHY THIS IS NOT JUST `apt-get install`.
+        # `apt-get update` hung here for the FULL 20-minute job budget on two of
+        # three consecutive runs (1172s and 1195s), which killed the job before
+        # the replay started and failed `SQL suites gate` closed for a reason
+        # that had nothing to do with the change under test. The replay itself
+        # takes ~21 seconds, so the job spent its entire life on a package
+        # manager it did not need: the runner image already ships a pgdg client
+        # (psql 16.15 on the run that survived).
+        #
+        # So: use what is already installed, and if apt genuinely is required,
+        # bound it so a wedged mirror fails in seconds instead of consuming the
+        # job. This does NOT weaken the gate — if the client is still missing
+        # afterwards the step exits non-zero, the replay never runs, and the
+        # gate stays red.
+        timeout-minutes: 5
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
+          set -euo pipefail
+
+          # run.sh uses all three, not just psql.
+          have_client() {
+            command -v psql     >/dev/null 2>&1 \
+              && command -v createdb >/dev/null 2>&1 \
+              && command -v dropdb   >/dev/null 2>&1
+          }
+
+          if have_client; then
+            echo "Using the client already on the runner: $(psql --version)"
+            exit 0
+          fi
+
+          echo "psql/createdb/dropdb not all present - installing postgresql-client."
+          for attempt in 1 2 3; do
+            if sudo timeout 120 apt-get update -qq \
+               && sudo timeout 240 apt-get install -y -qq postgresql-client; then
+              break
+            fi
+            echo "::warning::apt attempt ${attempt} failed or timed out; retrying." >&2
+            sleep 5
+          done
+
+          if ! have_client; then
+            echo "::error::postgresql-client is still unavailable after 3 attempts." >&2
+            exit 1
+          fi
           psql --version
 
       - name: Install pg_cron / pg_net CI stubs into the server
