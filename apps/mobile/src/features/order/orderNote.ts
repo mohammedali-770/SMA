@@ -85,12 +85,18 @@ export function orderNoteRemaining(raw: string | null | undefined): number {
 export const orderNoteCopy = {
   en: {
     too_long: `Keep the note under ${ORDER_NOTE_MAX_LENGTH} characters`,
-    /** Rendered with {n} replaced by the remaining count. */
-    remaining: '{n} characters left',
+    /**
+     * Rendered with {n} replaced by the remaining count. Two forms, because the
+     * counter reaches exactly 1 on the way to the limit and "1 characters left"
+     * is the one value a customer is guaranteed to see up close.
+     */
+    remaining_one: '1 character left',
+    remaining_other: '{n} characters left',
   },
   ar: {
     too_long: `اجعل الملاحظة أقل من ${ORDER_NOTE_MAX_LENGTH} حرفاً`,
-    remaining: 'بقي {n} حرفاً',
+    remaining_one: 'بقي حرف واحد',
+    remaining_other: 'بقي {n} حرفاً',
   },
 } as const;
 
@@ -112,5 +118,7 @@ export function orderNoteRemainingMessage(
 ): string | null {
   const remaining = orderNoteRemaining(raw);
   if (remaining > ORDER_NOTE_COUNTER_THRESHOLD) return null;
-  return orderNoteCopy[lang].remaining.replace('{n}', String(Math.max(remaining, 0)));
+  const n = Math.max(remaining, 0);
+  if (n === 1) return orderNoteCopy[lang].remaining_one;
+  return orderNoteCopy[lang].remaining_other.replace('{n}', String(n));
 }

@@ -315,6 +315,7 @@ refused.
 |---|---|---|
 | Client | `apps/mobile/src/features/order/orderNote.ts` | `ORDER_NOTE_MAX_LENGTH = 280`, validator, remaining-characters copy in both languages |
 | Client | `apps/mobile/src/features/checkout/CheckoutScreen.tsx` | `maxLength`, a counter that appears in the last 40 characters, and `normalizeOrderNote` on submit |
+| Server | `public.order_note_normalized(text)` | the one definition of "trimmed": whitespace-stripped, NULL rather than empty |
 | Server | `public.order_note_is_acceptable(text)` | the predicate — NULL or ≤ 280 characters after trimming |
 | Server | `trg_orders_note_length`, `trg_checkout_sessions_note_length` | reject an over-long note and store the trimmed value |
 
@@ -337,6 +338,18 @@ against a session that can never succeed. Rejecting the note when the session is
 created means it is refused before any money moves. This is a uniform input rule
 applied to a column: no provider logic, no pricing and no session lifecycle is
 touched by it.
+
+**A trap worth knowing about.** The trim set is built with `chr()`, not with an
+`E''` escape string, because PostgreSQL's C-style escape table has **no `\v`** —
+an unrecognised escape yields the character literally, so `E'\v'` is the letter
+`v` (ascii 118), not the vertical tab. Written the obvious way,
+`btrim(notes, E' \t\r\n\f\v')` stores `"eg only"` for `"veg only"`, turns a bare
+`"v"` into no note at all, and — because trimming happens before the length is
+measured — lets a 281-character note beginning with `v` through the limit
+entirely. This is the same class of bug as `20260802120000`, where
+single-argument `btrim()` turned out to strip spaces only. Caught in review
+before merge; `order_note_length_test.sql` CASE 1 and CASE 3 now assert both
+halves, and re-introducing the escape string makes CASE 1 fail.
 
 **NULL stays legal.** The note is optional, and account deletion
 (`20260715120000`:250) and the erasure job (`20260806120000`:143) both

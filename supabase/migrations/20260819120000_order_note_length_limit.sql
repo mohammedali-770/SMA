@@ -65,6 +65,43 @@
 -- through the owner-approved apply_migration workflow (docs/MIGRATIONS.md).
 -- `supabase db push` is forbidden against production (CLAUDE.md §8).
 
+-- ONE definition of "trimmed", used by the predicate, the error detail and the
+-- stored value, so the three can never disagree.
+--
+-- The character set is built with chr() rather than an E'' escape string ON
+-- PURPOSE. PostgreSQL's C-style escape table has NO \v: an unrecognised escape
+-- yields the character literally, so E'\v' is the LETTER v (ascii 118), not the
+-- vertical tab (11). Written the obvious way, `btrim(notes, E' \t\r\n\f\v')`
+-- stores "eg only" for "veg only" and turns a bare "v" into no note at all —
+-- and, because trimming happens before the length is measured, it also lets a
+-- 281-character note beginning with "v" through the limit this migration
+-- exists to impose. That is the same class of bug as 20260802120000, where
+-- single-argument btrim() turned out to strip spaces only.
+--
+-- The set is space, tab, LF, VT, FF, CR and U+00A0. JavaScript's trim() strips
+-- all of these, so the two halves agree on every input a customer can type.
+-- (JS also strips the rarer Unicode space separators; those are not reachable
+-- from the keyboard and are still bounded by the length rule.)
+create or replace function public.order_note_normalized(p_notes text)
+returns text
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select nullif(
+    btrim(
+      p_notes,
+      ' ' || chr(9) || chr(10) || chr(11) || chr(12) || chr(13) || chr(160)
+    ),
+    ''
+  );
+$$;
+
+comment on function public.order_note_normalized(text) is
+  'The stored form of an order note: trimmed of ASCII/NBSP whitespace, and NULL rather than an empty string. Mirrors String.prototype.trim() in the mobile client.';
+
+revoke all on function public.order_note_normalized(text) from public, anon, authenticated;
+
 -- Maximum stored length of an order note, after trimming. Mirrors
 -- ORDER_NOTE_MAX_LENGTH in apps/mobile/src/features/order/orderNote.ts —
 -- change both together.
@@ -74,12 +111,10 @@ language sql
 immutable
 set search_path = public, pg_temp
 as $$
-  -- The note is optional, so NULL is acceptable. The explicit character set is
-  -- required: single-argument btrim() strips SPACES ONLY, which is the bug
-  -- 20260802120000 had to fix for addresses.description. JavaScript's trim()
-  -- strips all of these, so this keeps the two halves genuinely mirrored.
-  select p_notes is null
-      or char_length(btrim(p_notes, E' \t\r\n\f\v')) <= 280;
+  -- The note is optional, so NULL is acceptable: it normalizes to NULL, and
+  -- coalesce measures that as an empty note rather than yielding NULL (which
+  -- would make the whole predicate NULL, and `if not null` never fires).
+  select char_length(coalesce(public.order_note_normalized(p_notes), '')) <= 280;
 $$;
 
 comment on function public.order_note_is_acceptable(text) is
@@ -107,14 +142,15 @@ begin
         message = 'The order note is too long. Keep it under 280 characters.',
         detail  = format(
           '%I.notes must be at most 280 characters after trimming; got %s.',
-          tg_table_name, char_length(btrim(new.notes, E' \t\r\n\f\v'))),
+          tg_table_name,
+          char_length(coalesce(public.order_note_normalized(new.notes), ''))),
         hint    = 'Shorten the note and place the order again.';
   end if;
 
   -- Store the trimmed value, and store nothing rather than an empty string, so
   -- no row carries padding a cashier would see as a blank instruction line.
-  -- This matches what the client already sends (CheckoutScreen: trim() || null).
-  new.notes := nullif(btrim(new.notes, E' \t\r\n\f\v'), '');
+  -- This matches what the client already sends (CheckoutScreen: normalizeOrderNote).
+  new.notes := public.order_note_normalized(new.notes);
   return new;
 end;
 $$;
@@ -143,3 +179,4 @@ create trigger trg_checkout_sessions_note_length
 -- drop trigger if exists trg_orders_note_length on public.orders;
 -- drop function if exists public.enforce_order_note();
 -- drop function if exists public.order_note_is_acceptable(text);
+-- drop function if exists public.order_note_normalized(text);

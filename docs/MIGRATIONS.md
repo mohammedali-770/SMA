@@ -2238,9 +2238,10 @@ volume that does not exist yet. §25's closing note applies unchanged.
 | From | PR for `feat/order-note-length-limit` |
 | Approval | owner approved *building* it on its own branch; applying it to Production is a separate §5 decision and has **not** been given |
 
-**What it does.** Adds `public.order_note_is_acceptable(text)` and
-`public.enforce_order_note()`, plus one `before insert or update of notes`
-trigger on `public.orders` and one on `public.checkout_sessions`. An order note
+**What it does.** Adds `public.order_note_normalized(text)`,
+`public.order_note_is_acceptable(text)` and `public.enforce_order_note()`, plus
+one `before insert or update of notes` trigger on `public.orders` and one on
+`public.checkout_sessions`. An order note
 may be NULL or at most 280 characters after trimming; the stored value is
 trimmed, and a whitespace-only note becomes NULL.
 
@@ -2272,10 +2273,12 @@ facts, not standing ones.
 on 2026-08-19 using `.github/sql-ci/run.sh`: **82 migrations applied cleanly from
 empty**, and **41/44 SQL suites passed with 0 new failures** (the 3 quarantine
 entries in `.github/sql-ci/known-failing.txt` are unchanged). The paired suite
-`supabase/tests/order_note_length_test.sql` was additionally mutation-checked —
-dropping both triggers makes it fail at CASE 2 — so its green run means the
-guard is present rather than merely that the file executed.
+`supabase/tests/order_note_length_test.sql` was additionally mutation-checked
+twice — dropping both triggers makes it fail at CASE 2, and re-introducing the
+`E''` escape set described in `docs/ORDER_CONFIRMATION_FLOW.md` §10c makes it
+fail at CASE 1 — so its green run means the guard is present and correct rather
+than merely that the file executed.
 
-**Rollback.** Drop the two triggers and the two functions; the commands are in
+**Rollback.** Drop the two triggers and the three functions; the commands are in
 the migration footer. No row is modified, no column type changes, and the rule
 is strictly narrowing — every value accepted after it was accepted before.

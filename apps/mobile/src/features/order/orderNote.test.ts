@@ -96,6 +96,14 @@ describe('orderNoteRemainingMessage', () => {
     );
   });
 
+  it('uses the singular form at exactly one character left', () => {
+    // The counter passes through 1 on the way to the limit, so this is the one
+    // value every customer who fills the field will see up close.
+    const oneLeft = 'x'.repeat(ORDER_NOTE_MAX_LENGTH - 1);
+    expect(orderNoteRemainingMessage(oneLeft, 'en')).toBe('1 character left');
+    expect(orderNoteRemainingMessage(oneLeft, 'ar')).toBe('بقي حرف واحد');
+  });
+
   it('never shows a negative count', () => {
     const over = 'x'.repeat(ORDER_NOTE_MAX_LENGTH + 10);
     expect(orderNoteRemainingMessage(over, 'en')).toBe('0 characters left');
@@ -110,7 +118,7 @@ describe('orderNoteMessage', () => {
   });
 
   it('has copy in both languages for every problem case', () => {
-    const problems = Object.keys(orderNoteCopy.en).filter((k) => k !== 'remaining');
+    const problems = Object.keys(orderNoteCopy.en).filter((k) => !k.startsWith('remaining'));
     for (const p of problems) {
       expect(orderNoteMessage(p as 'too_long', 'en')).toBeTruthy();
       expect(orderNoteMessage(p as 'too_long', 'ar')).toBeTruthy();

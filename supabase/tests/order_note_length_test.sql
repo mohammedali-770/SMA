@@ -63,9 +63,25 @@ begin
   end if;
   -- ...and cannot be used to smuggle one under it. Single-argument btrim()
   -- strips SPACES ONLY; this is the bug 20260802120000 had to fix for
-  -- addresses.description, so the whitespace set is asserted explicitly here.
-  if public.order_note_is_acceptable(E'\t\n' || repeat('x', 281) || E'\r\v\f') then
+  -- addresses.description, so every whitespace character is asserted by code
+  -- point rather than by an escape sequence.
+  if public.order_note_is_acceptable(
+       chr(9) || chr(10) || repeat('x', 281) || chr(13) || chr(11) || chr(12)) then
     raise exception 'CASE 1 FAILED: tab/newline-padded over-length value accepted';
+  end if;
+  if public.order_note_is_acceptable(chr(160) || repeat('x', 281) || chr(160)) then
+    raise exception 'CASE 1 FAILED: NBSP-padded over-length value accepted';
+  end if;
+
+  -- REGRESSION: the trim set must not contain the LETTER v. PostgreSQL has no
+  -- \v escape, so E'\v' is ascii 118 — writing the set as an escape string
+  -- makes btrim eat "v" from "veg only", and lets a 281-character note that
+  -- starts with "v" trim its way under the limit.
+  if public.order_note_is_acceptable('v' || repeat('x', 280)) then
+    raise exception 'CASE 1 FAILED: 281 characters accepted because a leading v was trimmed';
+  end if;
+  if public.order_note_is_acceptable(repeat('x', 280) || 'v') then
+    raise exception 'CASE 1 FAILED: 281 characters accepted because a trailing v was trimmed';
   end if;
 
   -- char_length() counts characters, matching the client's String.length.
@@ -137,7 +153,34 @@ begin
     raise exception 'CASE 3 FAILED: whitespace-only note stored as %, expected null', quote_literal(v_stored);
   end if;
 
-  raise notice 'CASE 3 ok: stored note is trimmed, whitespace-only becomes null';
+  -- REGRESSION: an ordinary note that begins or ends with "v" must survive
+  -- intact. "veg only" and "vanilla shake" are ordinary kitchen instructions.
+  for v_stored in
+    select unnest(array['veg only', 'vanilla shake', 'v', 'no veg'])
+  loop
+    insert into public.orders (customer_id, branch_id, order_type, subtotal, total,
+                               payment_method, payment_status, customer_phone, notes)
+      values (v_cust, v_branch, 'pickup', 50, 50, 'cash', 'pending', '+966500000091', v_stored)
+      returning id into v_id;
+    if (select notes from public.orders where id = v_id) is distinct from v_stored then
+      raise exception 'CASE 3 FAILED: note % was mangled to %',
+        quote_literal(v_stored),
+        quote_literal((select notes from public.orders where id = v_id));
+    end if;
+  end loop;
+
+  -- A note of vertical tabs alone is whitespace, not a note.
+  insert into public.orders (customer_id, branch_id, order_type, subtotal, total,
+                             payment_method, payment_status, customer_phone, notes)
+    values (v_cust, v_branch, 'pickup', 50, 50, 'cash', 'pending', '+966500000091',
+            chr(11) || chr(11) || chr(160))
+    returning id into v_id;
+  select notes into v_stored from public.orders where id = v_id;
+  if v_stored is not null then
+    raise exception 'CASE 3 FAILED: vertical-tab/NBSP-only note stored as %, expected null', quote_literal(v_stored);
+  end if;
+
+  raise notice 'CASE 3 ok: stored note is trimmed, whitespace-only becomes null, v-notes intact';
 end $$;
 
 -- Case 4: an UPDATE that changes the note is guarded; one that does not is NOT.

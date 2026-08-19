@@ -175,6 +175,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_integrity_suppress_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_watchdog` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
+| `order_note_normalized` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_refund_due` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `otp_begin_send` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_consume` | 1 | `20260710140000_whatsapp_otp.sql` |
