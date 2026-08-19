@@ -154,6 +154,40 @@ refund that actually succeeded but returned ambiguously would be re-attempted.
 stale `processing` claim to `failed`/`lease_expired` rather than retrying it),
 but it does not change the in-function `pending` release path.
 
+### UPDATE 2026-08-19 — Tap answers this, with a 24-hour caveat
+
+Researched from Tap's public documentation (`docs/integrations/Tap_API_Reference.md`),
+under an explicit owner instruction to investigate Tap. **Not confirmed by Tap and
+not tested against a live account.**
+
+Tap **does** provide a true idempotency key: `reference.idempotent` restricts
+duplicate transactions on Authorize, Charges **and Refunds** — the same string
+returns the first response instead of initiating a second refund. Tap also
+documents a refund retrieve endpoint.
+
+Two things follow, and they pull in opposite directions:
+
+1. **The refund path now sends it.** `buildRefundBody` previously sent only
+   `reference.merchant`, which is exactly the "reconciliation reference, not an
+   idempotency key" this section describes. It now sends `reference.idempotent`
+   as well.
+2. **The key expires after 24 hours.** A refund retried beyond that window is a
+   genuinely new refund as far as Tap is concerned. So the double-refund risk is
+   **bounded, not eliminated**, and the every-5-minutes worker could still cross
+   that boundary on a long-stuck refund.
+
+**This section therefore stands.** The worker stays disabled. What has changed is
+that the remaining work is now specific rather than open-ended: either confirm
+`GET /v2/refunds/{id}` can resolve an ambiguous attempt (Q3 in the Tap
+reference), or make the claim/release path refuse to retry past the idempotency
+window and route those refunds to human review instead.
+
+**A related defect was found and fixed in the same pass.** The CHARGE payload had
+`idempotent` at the top level, where Tap's schema does not define it, so charge
+idempotency had never been active at all — a retried `payment-initiate` could
+have created a second charge. Nothing was affected in practice because online
+payment has never been enabled. See the Tap reference §2.
+
 **Before any automated refund processing is re-enabled**, the chosen provider
 must supply either a true idempotency key on the refund endpoint, or a
 reliable refund-status lookup that can resolve an ambiguous attempt before a
