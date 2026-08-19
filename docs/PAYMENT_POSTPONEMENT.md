@@ -160,6 +160,30 @@ reliable refund-status lookup that can resolve an ambiguous attempt before a
 retry. If neither exists, ambiguous refunds must route to human review instead
 of being retried automatically.
 
+### Committed but DORMANT — the Tap card interop plugin (2026-08-19)
+
+`apps/mobile/plugins/withTapCardInterop.js` exists and is unit-tested, and is
+**deliberately not listed in `app.json` → plugins**. It therefore runs on no
+build and changes no binary. `card-react-native` is not a dependency, online
+payment is disabled, and the agreement is not signed.
+
+It is committed dormant on purpose: the finding it encodes is easy to lose and
+expensive to rediscover. `card-react-native` ships a legacy paper view manager
+with no `codegenConfig`, so under the mandatory New Architecture on RN 0.86 it
+renders on Android (interop is on by default) but **fails silently on iOS**,
+where `RCTLegacyViewManagerInteropComponentView` matches a hardcoded allowlist
+that no third-party component is in. The library's own error message blames the
+build, so the cause is not where anyone would look. Full detail:
+`docs/integrations/Tap_API_Reference.md` §4.1.
+
+**To activate**, once the SDK is installed and the freeze is lifted, add
+`"./plugins/withTapCardInterop"` to the plugins array. That is a payment change
+and needs its own owner approval.
+
+**Still unproven:** that the card fields render once registered, and that Tap's
+Android SDK does not collide with Expo SDK 57. Both need an EAS build on a real
+device — neither can be settled from source.
+
 ## 8. Resume checklist (when the gateway is officially selected)
 
 Each item requires its own explicit owner approval — none of it is authorized
