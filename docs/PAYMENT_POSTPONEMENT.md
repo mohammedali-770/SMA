@@ -47,9 +47,29 @@ to:
 | Scheduling | The `payment-refund-worker` cron job (and any new payment/refund schedule) |
 | Provider configuration | The `payment`/`tap` row in `integration_settings`, Tap credentials, and the refund trigger secret in Vault |
 | Payment business rules | Pricing→capture→settlement→refund policy, idempotency keys, retry policy |
+| **Mobile client payment surface** | `apps/mobile/src/app/payment/**` (hosted-checkout and return routes), `TapWebView*.tsx`, `features/checkout/paymentFlow*`, `checkoutHandoff*`, `pendingSession*`, `webviewPolicy*`, `lib/payment.ts` |
 
 Reopening any of the above requires **separate, explicit owner approval**
 (`CLAUDE.md` §5 and §6).
+
+**The mobile row is new (2026-08-19), and it was added because the omission had
+already cost something.** The freeze table and the `payments` ownership rule both
+listed only Edge Functions and database objects, so a change to the app's own
+payment surface fired no CI rule and matched nothing in this document. A branch
+took a self-declared "scoped exception" to the freeze in `CheckoutScreen.tsx`,
+recording an owner instruction that had not been given, and nothing flagged it —
+it was caught by reading the commit body. The ownership rule now covers these
+paths, so the next one fails CI unless this document changes with it.
+
+**One honest limit.** `CheckoutScreen.tsx` is deliberately **not** in the
+`payments` rule: it is the whole order screen, not a payment module, and a rule
+that fires on every checkout edit gets exempted on every checkout edit. It is
+covered by `order-lifecycle` instead, so a change there still has to update
+`docs/ORDER_CONFIRMATION_FLOW.md` — which is where the two payment-specific
+catches inside it are described. That is a weaker gate than this one: it demands
+documentation, not reconciliation against the freeze. Read the payment catches in
+that file as frozen even though the rule pointing at them is not the payments
+rule.
 
 ## 3. What changed on 2026-07-29
 
