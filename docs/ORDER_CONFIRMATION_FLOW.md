@@ -211,6 +211,11 @@ npm --prefix apps/mobile run typecheck
 # Requires a throwaway PG16 with the full migration chain applied:
 psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   -f supabase/tests/order_confirmation_state_machine_test.sql
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/order_note_length_test.sql
+
+# Or replay the chain and run every suite exactly as CI does:
+bash .github/sql-ci/run.sh
 ```
 
 No test sends a real payment, refund, Lazywait order, OTP, message or email. The
@@ -292,6 +297,65 @@ verification binding stays on `reference.order`, unchanged. `tap.test.ts` pins
 both halves: the description carries no `SM-…`, and `reference.order` still
 carries the exact attempt reference.
 
+## 10c. The order note — bounded at 280 characters (closed)
+
+The free-text note a customer attaches at Checkout reaches a cashier and is
+printed on the ticket. It was unbounded from the day the column was created
+(`20260707120500`:32) until `20260819120000_order_note_length_limit.sql`: no
+`maxLength` on the input, no check in `place_order`, no constraint on the column.
+
+**Why the UI was never the control.** `place_customer_order` is granted to
+`authenticated` (`20260724200000`:336), so any signed-in customer can call it
+directly with the publishable key and their own JWT. A limit that lives only in
+`CheckoutScreen.tsx` is a suggestion. The bound is therefore enforced in the
+database, and the client mirrors it so the customer is stopped before they are
+refused.
+
+| Half | Where | What it does |
+|---|---|---|
+| Client | `apps/mobile/src/features/order/orderNote.ts` | `ORDER_NOTE_MAX_LENGTH = 280`, validator, remaining-characters copy in both languages |
+| Client | `apps/mobile/src/features/checkout/CheckoutScreen.tsx` | `maxLength`, a counter that appears in the last 40 characters, and `normalizeOrderNote` on submit |
+| Server | `public.order_note_is_acceptable(text)` | the predicate — NULL or ≤ 280 characters after trimming |
+| Server | `trg_orders_note_length`, `trg_checkout_sessions_note_length` | reject an over-long note and store the trimmed value |
+
+**Why a trigger and not a CHECK constraint.** The same reason `20260724170000`
+gave for `addresses.description`: a CHECK is re-evaluated on *every* subsequent
+UPDATE of a row, not only when the guarded column changes. `public.orders` is
+updated constantly on unrelated columns — POS sync state, confirmation
+lifecycle, cancellation integrity, manual resend — so one historical row with an
+over-long note would start failing status transitions that never touched
+`notes`. The trigger fires on INSERT, and on an UPDATE that actually changes
+`notes`.
+
+**Why `checkout_sessions` is guarded too.** Two independent writers reach
+`orders.notes`: `place_order` (cash/direct) and `insert_order_from_snapshot`,
+which `finalize_checkout_session` calls with the note it reads back from
+`checkout_sessions.notes`. Guarding only `orders` would move the failure past
+the point of no return — finalize runs *after* the provider has captured, and a
+failure there is caught by `_shared/tapVerify.ts`, logged, and retried forever
+against a session that can never succeed. Rejecting the note when the session is
+created means it is refused before any money moves. This is a uniform input rule
+applied to a column: no provider logic, no pricing and no session lifecycle is
+touched by it.
+
+**NULL stays legal.** The note is optional, and account deletion
+(`20260715120000`:250) and the erasure job (`20260806120000`:143) both
+`set notes = null`. The predicate accepts NULL so both keep working; a
+whitespace-only note is stored as NULL rather than as a blank instruction line.
+
+**Where 280 came from.** A kitchen note is an instruction, not a message. It is
+**not** derived from any POS capability — whether Lazywait accepts an order note
+at all is still open question Q5 (`docs/lazywait-delivery-open-questions.md`),
+and `lazywait-sync` does not forward notes today. If Lazywait confirms a shorter
+maximum this number narrows; it should never silently widen.
+
+Proven on a disposable PostgreSQL 16 + PostGIS 3.4 cluster on 2026-08-19: the
+full 82-migration chain applied from empty, and **41/44 SQL suites passed with 0
+new failures** (3 pre-existing quarantine entries). `order_note_length_test.sql`
+was additionally mutation-checked — dropping the two triggers makes it fail at
+CASE 2 — so a green run means the guard is present, not merely that the file
+executed.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and
@@ -323,6 +387,24 @@ carries the exact attempt reference.
   means a human working the `confirmation_required` feed. When such an endpoint
   is published, an automated reconciler could convert some ambiguous orders into
   proven-not-sent ones and widen resend eligibility.
+- **A server-raised order error is not readable on the cash path.** Cash orders
+  go through `supabase.functions.invoke('order-intake')`, which returns HTTP 400
+  with the Postgres message in the body — but a non-2xx `invoke` yields
+  `FunctionsHttpError`, whose `.message` is the generic *"Edge Function returned
+  a non-2xx status code"*. `placeAndSync` (`apps/mobile/src/services/api.ts`
+  :219) rethrows that, so the customer sees the generic text. The online path is
+  unaffected. `invokePaymentFn` (:314) already recovers the body via
+  `error.context.json()`; `placeAndSync` has never had the same treatment. This
+  is latent rather than active for the note limit specifically — the client
+  `maxLength` stops a customer reaching the server bound at all — but any future
+  server-side order rule will hit it.
+- **Per-item notes do not exist.** There is no `order_items.notes` column, no UI
+  and no field for one in `serializeOrderItem`
+  (`supabase/functions/_shared/lazywaitApi.ts`). Adding them is blocked on the
+  same Lazywait question as §10c: the confirmed Create Order body has no note
+  field of any kind, `delivery_notes` is `[ASSUMPTION]`-tagged and gated behind
+  `allowAssumedFields` (default off), and per-item notes are not even on the
+  question list.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Tap sandbox.** The pure
   classifier is unit-tested; the transport path is not exercised.

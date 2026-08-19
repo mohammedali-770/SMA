@@ -25,6 +25,13 @@ import { Header } from '../../components/Header';
 import { color, space } from '../../design-system/generated/tokens';
 import { Field } from '../../design-system/ui/Field';
 import { checkDescription, descriptionCopy, descriptionMessage } from '../order/locationDescription';
+import {
+  ORDER_NOTE_MAX_LENGTH,
+  checkOrderNote,
+  normalizeOrderNote,
+  orderNoteMessage,
+  orderNoteRemainingMessage,
+} from '../order/orderNote';
 import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -266,6 +273,7 @@ export function CheckoutScreen() {
   // Delivery needs a landmark; pickup does not.
   const requiresDescription = orderType === 'delivery';
   const descCheck = checkDescription(addrDesc, resolvedAddress);
+  const noteCheck = checkOrderNote(notes);
   const descError = descTouched && requiresDescription
     ? descriptionMessage(descCheck.problem, lang)
     : null;
@@ -463,7 +471,7 @@ export function CheckoutScreen() {
         items: cart.toOrderItems(),
         addressId: deliveryAddressId,
         couponCode: couponResult?.ok ? couponCode.trim() : null,
-        notes: notes.trim() || null,
+        notes: normalizeOrderNote(notes),
         loyaltyPoints: redeemPoints ? availablePoints : 0,
         idempotencyKey: cart.idempotencyKey,
         paymentMethod,
@@ -724,6 +732,13 @@ export function CheckoutScreen() {
               placeholder={t('notesPlaceholder')}
               multiline
               inputStyle={styles.multiline}
+              // The server enforces the same bound
+              // (supabase/migrations/20260819120000_order_note_length_limit.sql).
+              // This stops the customer reaching it rather than being refused
+              // after tapping Place order.
+              maxLength={ORDER_NOTE_MAX_LENGTH}
+              hint={orderNoteRemainingMessage(notes, lang) ?? undefined}
+              error={orderNoteMessage(noteCheck.problem, lang)}
             />
           </Section>
 

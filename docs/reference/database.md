@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **81**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260813143000_manual_only_pos_resend.sql`.
+Migration files in the repository: **82**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260819120000_order_note_length_limit.sql`.
 
 ## Tables
 
@@ -113,6 +113,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `enforce_address_description` | 1 | `20260724170000_require_address_description.sql` |
 | `enforce_customer_manual_resend_limit` | 1 | `20260813143000_manual_only_pos_resend.sql` |
 | `enforce_new_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
+| `enforce_order_note` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `enforce_refund_state_transition` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `enforce_single_default_address` | 1 | `20260801120000_address_single_default.sql` |
 | `expire_stale_order_refund_claims` | 1 | `20260729090000_payment_refund_scheduler.sql` |
@@ -173,6 +174,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_integrity_list_incidents` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_suppress_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_watchdog` | 1 | `20260721170000_order_integrity_watchdog.sql` |
+| `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_refund_due` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `otp_begin_send` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_consume` | 1 | `20260710140000_whatsapp_otp.sql` |
@@ -214,4 +216,4 @@ A function defined by more than one migration has been redefined; the last defin
 
 ## Triggers
 
-43 trigger names are declared across the migration set: `aa_normalize_known_pos_failure_for_manual_resend`, `emit_orders_change_event`, `enforce_customer_manual_resend_limit`, `enforce_deletion_lock_addresses`, `enforce_deletion_lock_checkout_sessions`, `enforce_deletion_lock_orders`, `enforce_deletion_lock_push_devices`, `enforce_orders_refund_transition`, `guard_used_coupon_identity`, `normalize_manual_pos_sync_notification`, `on_auth_user_created`, `on_auth_user_phone_confirmed`, `open_orders_refund_record`, `set_`, `set_account_deletion_requests_updated_at`, `set_addresses_updated_at`, `set_app_settings_updated_at`, `set_branch_delivery_zones_updated_at`, `set_campaigns_updated_at`, `set_checkout_sessions_updated_at`, `set_coupons_updated_at`, `set_homepage_banners_updated_at`, `set_integration_settings_updated_at`, `set_legal_documents_updated_at`, `set_loyalty_transactions_safe_reason`, `set_notification_log_updated_at`, `set_operations_alert_outbox_updated_at`, `set_operations_alert_settings_updated_at`, `set_operations_alert_state_updated_at`, `set_order_refunds_updated_at`, `set_orders_lazywait_initial_sync`, `set_orders_number`, `set_orders_refund_enrollment`, `set_orders_updated_at`, `set_otp_challenges_updated_at`, `set_payment_records_updated_at`, `set_pos_sync_deadline`, `set_profiles_updated_at`, `set_push_devices_updated_at`, `stamp_payment_record_ts`, `trg_addresses_guard_live_checkout`, `trg_addresses_require_description`, `trg_addresses_single_default`.
+45 trigger names are declared across the migration set: `aa_normalize_known_pos_failure_for_manual_resend`, `emit_orders_change_event`, `enforce_customer_manual_resend_limit`, `enforce_deletion_lock_addresses`, `enforce_deletion_lock_checkout_sessions`, `enforce_deletion_lock_orders`, `enforce_deletion_lock_push_devices`, `enforce_orders_refund_transition`, `guard_used_coupon_identity`, `normalize_manual_pos_sync_notification`, `on_auth_user_created`, `on_auth_user_phone_confirmed`, `open_orders_refund_record`, `set_`, `set_account_deletion_requests_updated_at`, `set_addresses_updated_at`, `set_app_settings_updated_at`, `set_branch_delivery_zones_updated_at`, `set_campaigns_updated_at`, `set_checkout_sessions_updated_at`, `set_coupons_updated_at`, `set_homepage_banners_updated_at`, `set_integration_settings_updated_at`, `set_legal_documents_updated_at`, `set_loyalty_transactions_safe_reason`, `set_notification_log_updated_at`, `set_operations_alert_outbox_updated_at`, `set_operations_alert_settings_updated_at`, `set_operations_alert_state_updated_at`, `set_order_refunds_updated_at`, `set_orders_lazywait_initial_sync`, `set_orders_number`, `set_orders_refund_enrollment`, `set_orders_updated_at`, `set_otp_challenges_updated_at`, `set_payment_records_updated_at`, `set_pos_sync_deadline`, `set_profiles_updated_at`, `set_push_devices_updated_at`, `stamp_payment_record_ts`, `trg_addresses_guard_live_checkout`, `trg_addresses_require_description`, `trg_addresses_single_default`, `trg_checkout_sessions_note_length`, `trg_orders_note_length`.
