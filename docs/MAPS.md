@@ -137,6 +137,57 @@ which forwards `process.env`. Set the same three variables in the Vercel
 project's environment for the web map to render. `vercel.json` already allows
 `maps.googleapis.com` in the CSP.
 
+## Directions to a branch — the maps chooser
+
+Separate from the picker above: the order-confirmation screen offers
+**Directions to branch** for *pickup* orders, which hands off to a maps app
+rather than rendering a map. It needs no API key — these are public URL schemes.
+
+**Files:** [`openDirections.ts`](../apps/mobile/src/lib/openDirections.ts)
+(platform behaviour), [`mapsLink.ts`](../apps/mobile/src/lib/mapsLink.ts)
+(native/Apple URL), [`maps.ts`](../apps/mobile/src/lib/maps.ts)
+(`buildGoogleMapsUrl`, `hasUsableCoordinates`). The URL builders are pure and
+unit-tested; only `openDirections` touches the platform.
+
+| Platform | Behaviour |
+| --- | --- |
+| **iOS, Google Maps installed** | An `ActionSheetIOS` asks which app to use. |
+| **iOS, Google Maps absent** | Apple Maps opens directly — a one-option menu is not a choice. |
+| **Android** | The `geo:` intent opens the **OS app picker**. The app deliberately adds no sheet of its own; that would put a second chooser in front of the real one. |
+
+### `LSApplicationQueriesSchemes` is load-bearing on iOS
+
+Detecting Google Maps uses `Linking.canOpenURL('comgooglemaps://')`, and **iOS
+answers `false` regardless of what is installed unless the scheme is declared**
+in `apps/mobile/app.json` → `ios.infoPlist.LSApplicationQueriesSchemes`:
+
+```json
+"LSApplicationQueriesSchemes": ["comgooglemaps"]
+```
+
+Without it every iOS customer silently gets Apple Maps and the chooser never
+appears — a failure that looks exactly like the feature not having shipped. It
+is an installed-app probe, so it is a privacy-adjacent declaration worth
+knowing about; it reveals only whether that one scheme can be opened.
+
+**No pull-request job reads `app.json`** — the EAS workflow is
+`workflow_dispatch` plus tag-push — so this key is first exercised at build
+time. A missing or misspelt entry will not be caught by CI.
+
+### Guards, and one dead branch
+
+`openDirections` returns without doing anything when the coordinates are
+unusable. Callers already hide the control in that case; this is the second line
+of defence. On the confirmation screen the button renders only for a pickup
+order whose branch is in the catalog with usable coordinates — a delivery order
+never shows it, because the food travels to the customer.
+
+**Known dead branch:** the `Alert.alert` chooser at the end of `openDirections`
+is unreachable. `googleMapsInstalled()` returns `false` for every non-iOS
+platform, so Android and web always take the early `open(native)` return above
+it. It is harmless, but do not read it as the Android path — Android's chooser
+is the OS app picker, not this alert.
+
 ## Diagnosing a blank or missing map
 
 `LocationPickerMap` reports failures to Sentry as `MAP_LOAD_FAILED`

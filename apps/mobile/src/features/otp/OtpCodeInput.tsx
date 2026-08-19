@@ -120,7 +120,14 @@ function OtpCodeInputImpl({
         // documented OTP hint is 'sms-otp' and that is what shipped before this
         // change — keep Android byte-identical rather than assume the native
         // hint mapping is the same.
-        autoComplete={Platform.select({ ios: 'one-time-code', android: 'sms-otp' })}
+        //
+        // `default` matters: Platform.select with only ios/android keys returns
+        // undefined on web, which would emit NO autocomplete attribute at all.
+        // 'one-time-code' is the value the HTML spec actually defines, so web
+        // gets the standard token rather than Android's native hint.
+        autoComplete={Platform.select({
+          ios: 'one-time-code', android: 'sms-otp', default: 'one-time-code',
+        })}
         importantForAutofill="yes"
         autoCorrect={false}
         caretHidden

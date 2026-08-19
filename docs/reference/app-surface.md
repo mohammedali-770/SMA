@@ -54,9 +54,10 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | `legal` | 2 |
 | `menu` | 3 |
 | `notifications` | 8 |
+| `onboarding` | 4 |
 | `order` | 5 |
 | `orders` | 10 |
-| `otp` | 5 |
+| `otp` | 7 |
 | `product` | 1 |
 | `profile` | 12 |
 

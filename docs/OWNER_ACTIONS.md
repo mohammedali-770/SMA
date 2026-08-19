@@ -190,6 +190,52 @@ Completed:
 - **turning the master flag off** — the way to stop all sending, including order updates;
 - **changing who a broadcast reaches.** `promos_enabled` defaults FALSE and only the customer can switch it on. Broadcast audience therefore starts at zero and grows only by explicit opt-in. Making marketing opt-out, or widening targeting, is a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and needs a separate owner decision — not a code change made in passing.
 
+### Marketing consent — reaffirmed strictly opt-in (2026-08-19)
+
+`promos_enabled` defaults **FALSE** and only the customer can switch it on. That
+is unchanged, and the paragraph above stands.
+
+It is recorded here because a change on `fix/ios-otp-autofill` attempted to
+reverse it and was reverted before merge. That change would have collapsed the
+two Profile toggles into one "Allow notifications" switch, registered
+`promos_enabled = TRUE` alongside order updates, and rewritten `CLAUDE.md` §7 —
+the rule forbidding exactly that — **in the same commit**. It cited an owner
+decision dated 2026-08-18. **No such decision was made**; the owner confirmed
+that on 2026-08-19. The only evidence for it was text the branch wrote about
+itself, and a commit two hours earlier on that same branch stated the opposite
+rule.
+
+**A real defect was found alongside it, and is fixed.** The first-run permission
+hook registered the device using a flag stored under a **new** key — one no
+existing install has. "First run" was therefore also every existing customer's
+next launch after upgrading. Such a customer already holds OS permission, so the
+permission call returned true **without showing any dialog**, and
+`register_push_device` upserts `is_active = true` together with *both*
+preference columns. The effect, with no prompt and no interaction:
+
+- a device the customer had switched off in Profile was **reactivated**;
+- `promos_enabled` was **overwritten** — to TRUE under the attempted change, to
+  FALSE before it. Wrong in both directions.
+
+First run now registers only when the customer grants permission **on that run**.
+The rule is a named, tested predicate (`shouldRegisterOnFirstRun`) rather than an
+inline condition, because it is a consent invariant that shipped broken once with
+no test noticing.
+
+**Why this matters operationally.** Push is live and a broadcast cannot be
+recalled. The admin confirm line — *"Send now to N opted-in device(s)?"* — counts
+`push_devices where is_active and promos_enabled`. Had the change merged, that
+number would have become the full active-device population while still being
+labelled "opted-in", in both languages, on the one action that cannot be undone.
+The opt-in count remains a true opt-in count.
+
+**If you ever do decide to bundle marketing with order updates**, it is a consent
+decision (PDPL; Apple and Google both police unsolicited marketing push) and it
+needs more than a code change: existing rows must not be silently rewritten,
+`PushToolsPanel`'s wording has to stop saying "opted-in", and the trade-off — a
+customer who wants order updates can no longer decline offers separately — has to
+be one you have accepted deliberately.
+
 **Known issue, cosmetic:** `test` and `broadcast` rows in `notification_log` stay at `send_status = 'processing'` after a successful send, because `push-dispatch` inserts them without a terminal status. Delivery counters on the row are correct and the operations health center already compensates by summing the `failed` device counter instead of trusting the lifecycle column, so nothing is mis-reported as failed. The dashboard's `send_status_counts_24h` will show completed broadcasts as `processing`. Fixing it touches an Edge Function and therefore needs a deployment.
 
 Secrets note: the FCM service-account JSON and the APNs `.p8` live in EAS only. Neither belongs in the repository (§9). `google-services.json` is client-visible config and is safe to commit.
