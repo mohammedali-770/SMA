@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**118 TypeScript test files declaring 1654 test blocks, plus 43 SQL suites.**
+**119 TypeScript test files declaring 1661 test blocks, plus 43 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -76,7 +76,15 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 
 ## TypeScript suites
 
-Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,tsx}`, `supabase/functions/**/*.test.ts`, `apps/mobile/src/**/*.test.{ts,tsx}`.
+Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,tsx}`, `supabase/functions/**/*.test.ts`, `apps/mobile/src/**/*.test.{ts,tsx}`, `apps/mobile/plugins/**/*.test.ts`.
+
+### `apps/mobile/plugins/`
+
+1 files, 7 declared test blocks.
+
+| File | Blocks | First suite |
+| --- | --- | --- |
+| `apps/mobile/plugins/withTapCardInterop.test.ts` | 7 | addTapCardInterop |
 
 ### `apps/mobile/src/`
 
