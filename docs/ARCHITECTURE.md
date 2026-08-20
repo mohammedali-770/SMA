@@ -154,6 +154,38 @@ the service role.
 
 Catalog, branch, modifier, availability and delivery-zone data live in Supabase. The clients consume those rows/RPCs and do not own the authoritative state.
 
+#### Timed item availability
+
+`branch_product_availability` carries `is_available` plus a `snoozed_until`
+timer. **`is_available` remains the authoritative flag**: a snooze sets it
+false, and `branch-availability-sweep` (pg_cron, every minute) flips it back
+when the timer expires. That is deliberate — the eight `is_available = false`
+guards across the `place_order` revisions and `begin_checkout_session` keep
+their exact original meaning, so timed availability required no change to any
+order-path function and none to the payment-adjacent checkout session.
+
+A row with `is_available = false` and `snoozed_until IS NULL` is an **untimed**
+closure — an admin delisting an item through Branch Management. The sweeper
+never touches those.
+
+Branch operators close items through `set_product_snooze` /
+`clear_product_snooze`, which require a duration: everything a cashier closes
+reopens by itself. The untimed close stays an admin control. Authorization is
+`is_admin() OR is_branch_operator(branch)` — the call centre is deliberately
+excluded from item availability, though it does control delivery.
+
+Every transition is written to the append-only `branch_availability_events` by
+a trigger on the table itself, so the pre-existing direct admin toggle is
+audited too and no write path can escape the trail. Actor attribution needs no
+flag: `auth.uid()` is null under pg_cron, which is what distinguishes an
+automatic reopen from a manual one.
+
+The table is world-readable (`bpa_select_public` is `using (true)` for `anon`)
+and both clients request `select('*')`, so it carries only non-sensitive fields.
+The staff user id and the operator's free-text note live exclusively on the
+audit table, which has no anon grant. **Do not add identifying or free-text
+columns to `branch_product_availability`.**
+
 ### Order placement
 
 The backend owns the final order facts. A client can propose a cart/order request, but the server re-validates the authoritative inputs such as:
@@ -219,6 +251,15 @@ The admin system includes:
 - stranded-order detection;
 - internal Operations Alerts and digest generation;
 - staff-visible health/attention indicators.
+
+`branch-availability-sweep` is **not** on the Operations Health board yet. The
+allowlist is a hardcoded list inside `operations_health_snapshot_internal()` and
+`operations_automation_cron_health_test.sql` asserts its exact job counts, so
+registering a job means re-emitting that function and updating that suite —
+tracked as its own change. An unregistered job is invisible to the board rather
+than alarming (the query drives from the allowlist), but it also means a failing
+sweep will not surface there until it is registered. Its own ledger,
+`branch_availability_runs`, is the interim record.
 
 These are operational visibility controls, not a substitute for external paging or a completed restore/incident drill. Refer to `INCIDENT_RESPONSE.md` and `BACKUP_RECOVERY.md` for the current operational limitations.
 

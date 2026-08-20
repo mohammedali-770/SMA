@@ -84,6 +84,19 @@ Use the supported Menu/branch-availability control to mark an item unavailable f
 
 Restore availability when the branch can sell it again and verify the correct branch was changed.
 
+Two kinds of closure now exist, and the difference matters:
+
+- A **timed** closure carries a duration and a reason, and reopens by itself when
+  the timer expires. This is what branch staff use, and it is why a forgotten
+  item no longer stays off the menu all weekend.
+- An **untimed** closure — the admin toggle described above — stays closed until
+  someone reopens it. Nothing reopens it automatically. Use it for an item that
+  is genuinely withdrawn, not for one that is merely sold out tonight.
+
+Every open and close is recorded with who did it, when, why, and whether it was
+a person or the timer. Do not work around the control with a direct database
+edit: that is the one path the record cannot see.
+
 **العربية**
 
 استخدم شاشة المنيو/توفر الفرع لإيقاف الصنف في **الفرع الصحيح**. لا تحذف الصنف أو التصنيف لمجرد أنه غير متوفر مؤقتاً.
