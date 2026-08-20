@@ -19,7 +19,8 @@ import {
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
 // ---------------------------------------------------------------------------
-export type UserRole = 'customer' | 'admin' | 'accountant';
+export type { UserRole } from './roles';
+import type { UserRole } from './roles';
 export type OrderStatus =
   | 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 export type OrderType = 'delivery' | 'pickup';
