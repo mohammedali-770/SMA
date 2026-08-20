@@ -51,6 +51,8 @@ Key properties:
 - Supabase Auth with WhatsApp delivery for the Saudi-phone login flow.
 - Order-type-first Pickup/Delivery context.
 - Branch-aware catalog, modifiers, banners and availability.
+- Sold-out items shown in place, not hidden, with availability refreshed on
+  foreground and on returning to the menu.
 - Saved-address and map/location workflows.
 - Server-authoritative checkout/order placement.
 - Order history, customer-safe references, confirmation/receipt states and account deletion.
@@ -177,6 +179,29 @@ the service role.
 ### Catalog and branch state
 
 Catalog, branch, modifier, availability and delivery-zone data live in Supabase. The clients consume those rows/RPCs and do not own the authoritative state.
+
+#### How availability reaches the customer
+
+The customer app loads the catalog once per mount and subscribes to nothing.
+Availability alone is re-read on two cheap triggers — app foreground, and
+returning to the menu — which are the two moments a stale menu actually bites:
+the app sat in the background while the branch closed half the menu, or the
+customer was on the cart while an item went. Prices, categories and modifiers
+still need the full reload.
+
+A sold-out item **stays on the menu**, dimmed and inert, rather than
+disappearing; a customer who cannot find yesterday's item concludes the app is
+broken, whereas a greyed row with a reason is an answer. Delisted products
+(`isActive` false) are a different thing and are still removed entirely.
+
+Checkout re-reads availability and names anything that sold out mid-order,
+instead of surfacing `place_order`'s raw "a product in your cart is not
+available" at the very end of the flow without saying which one. If that refresh
+fails the order proceeds and the server stays the authority — a flaky network
+must not block a valid order.
+
+The app deliberately gets no realtime subscription; it has never had one, and
+refetch-on-focus is enough for this.
 
 #### Timed item availability
 

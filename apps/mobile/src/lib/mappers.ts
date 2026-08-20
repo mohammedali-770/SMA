@@ -120,9 +120,14 @@ export function mapModifierGroup(g: DbModifierGroup, modifiers: DbModifier[]): M
 /**
  * productId -> branchId -> available. The table stores only explicit rows; an
  * absent row means "available", so seed every pair true, then apply exceptions.
+ *
+ * The seed parameters are typed by what this actually reads — an id — rather
+ * than by the full DB rows. That lets a caller rebuild the matrix from ids it
+ * already holds (the availability-only refresh) without re-fetching the whole
+ * catalog just to satisfy the type. Full DbProduct/DbBranch rows still pass.
  */
 export function buildAvailabilityMatrix(
-  products: DbProduct[], branches: DbBranch[], rows: DbBranchAvailability[],
+  products: { id: string }[], branches: { id: string }[], rows: DbBranchAvailability[],
 ): { [productId: string]: { [branchId: string]: boolean } } {
   const matrix: { [productId: string]: { [branchId: string]: boolean } } = {};
   for (const p of products) {

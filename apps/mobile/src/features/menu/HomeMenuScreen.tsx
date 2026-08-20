@@ -1,6 +1,6 @@
 /** Home + Menu on ONE page with virtualized sections and a sticky cart bar. */
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, SectionList, TextInput, View, type LayoutChangeEvent, type SectionListData, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,9 +27,14 @@ const SECTION_HEADER_OFFSET = 40; const VIEWABILITY_CONFIG = { itemVisiblePercen
 
 export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressInvalidRedirect?: boolean } = {}) {
   const colors = useThemeColors(); const insets = useSafeAreaInsets(); const { t, pick, lang, toggle, isRTL, rtlText, rtlRow } = useI18n(); const styles = useStyles();
-  const { loading, error, reload, categories, products, selectedBranch, selectedBranchId, isAvailable, branchIsOpen, groupsForProduct } = useCatalog();
+  const { loading, error, reload, refreshAvailability, categories, products, selectedBranch, selectedBranchId, isAvailable, branchIsOpen, groupsForProduct } = useCatalog();
   const cart = useCart(); const { addItem } = cart; const orderCtx = useOrderContext();
   useEffect(() => { if (!suppressInvalidRedirect && shouldForceSelection({ ready: orderCtx.ready, loading, error, valid: orderCtx.valid })) router.replace('/select'); }, [orderCtx.ready, orderCtx.valid, loading, error, suppressInvalidRedirect]);
+
+  // Returning to the menu is the other moment stale availability shows up: the
+  // customer may have been sitting on the cart or a product page while the
+  // branch closed something. Cheap enough to run on every focus.
+  useFocusEffect(useCallback(() => { void refreshAvailability(); }, [refreshAvailability]));
 
   const [search, setSearch] = useState(''); const listRef = useRef<SectionList<MenuSectionItem, MenuSection>>(null); const chipScrollRef = useRef<ScrollView>(null); const chipOffsets = useRef<Record<string, { x: number; width: number }>>({}); const [activeCatId, setActiveCatId] = useState<string | null>(null);
   const branchOpen = branchIsOpen(selectedBranch); const searchIndex = useMemo(() => buildSearchIndex(products), [products]); const hasModifiers = useCallback((p: Product) => groupsForProduct(p).length > 0, [groupsForProduct]);
@@ -41,7 +46,7 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
   useEffect(() => { const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null; if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true }); }, [activeCatIdResolved]);
   const handleAdd = useCallback((product: Product, withModifiers: boolean) => { if (withModifiers) router.push(`/product/${product.id}`); else addItem(product, {}, 1); }, [addItem]);
-  const renderItem = useCallback(({ item }: { item: MenuSectionItem }) => <ProductCard product={item.product} hasModifiers={item.hasModifiers} onAdd={handleAdd} />, [handleAdd]);
+  const renderItem = useCallback(({ item }: { item: MenuSectionItem }) => <ProductCard product={item.product} hasModifiers={item.hasModifiers} available={item.available} onAdd={handleAdd} />, [handleAdd]);
 
   return <View style={styles.root}>
     <View style={[styles.topBar, { paddingTop: insets.top + space.s2 }]}>

@@ -35,3 +35,18 @@ export function validateCartForBranch(
   }
   return { valid, invalid, allValid: invalid.length === 0 };
 }
+
+/**
+ * Adapt a freshly fetched availability matrix into the lookup
+ * `validateCartForBranch` expects.
+ *
+ * The `?? true` is the load-bearing part and mirrors the database: the
+ * availability table stores only EXCEPTIONS, so a missing entry means the item
+ * is on sale, not that it is unknown. Defaulting the other way would tell a
+ * customer their whole cart had sold out the first time a new product appeared.
+ */
+export function availabilityLookup(
+  matrix: { [productId: string]: { [branchId: string]: boolean } },
+): (productId: string, branchId: string) => boolean {
+  return (productId, branchId) => matrix[productId]?.[branchId] ?? true;
+}

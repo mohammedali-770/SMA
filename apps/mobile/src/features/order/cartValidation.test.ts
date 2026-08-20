@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { validateCartForBranch } from './cartValidation';
+import { availabilityLookup, validateCartForBranch } from './cartValidation';
 import type { CartItem, Product } from '../../types/models';
 
 function product(id: string, isActive = true): Product {
@@ -48,5 +48,29 @@ describe('validateCartForBranch', () => {
     const items = [line('a'), line('b')];
     validateCartForBranch(items, 'b1', isAvailable);
     expect(items).toHaveLength(2);
+  });
+});
+
+describe('availabilityLookup', () => {
+  it('treats a missing entry as available, matching the exceptions-only table', () => {
+    // Defaulting the other way would tell a customer their whole cart had sold
+    // out the first time a product appeared that has no availability row yet.
+    const lookup = availabilityLookup({});
+    expect(lookup('p1', 'b1')).toBe(true);
+  });
+
+  it('treats a missing branch on a known product as available', () => {
+    const lookup = availabilityLookup({ p1: { b2: false } });
+    expect(lookup('p1', 'b1')).toBe(true);
+  });
+
+  it('reports an explicit closure', () => {
+    const lookup = availabilityLookup({ p1: { b1: false } });
+    expect(lookup('p1', 'b1')).toBe(false);
+  });
+
+  it('reports an explicit availability', () => {
+    const lookup = availabilityLookup({ p1: { b1: true } });
+    expect(lookup('p1', 'b1')).toBe(true);
   });
 });

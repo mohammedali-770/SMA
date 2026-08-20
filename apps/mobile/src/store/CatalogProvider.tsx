@@ -7,6 +7,7 @@
  * selection screen before the menu is usable.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { catalog } from '../services/api';
 import {
@@ -23,10 +24,27 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
   onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
 };
 
+export type AvailabilityMatrix = { [productId: string]: { [branchId: string]: boolean } };
+
 export interface CatalogValue {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /**
+   * Re-read ONLY branch availability, without re-fetching the whole menu graph.
+   *
+   * The catalog otherwise loads once per mount, which meant a customer already
+   * browsing never learned that a branch had closed an item — they discovered it
+   * as a raw server error at checkout. This is cheap enough to run on every
+   * foreground and every return to the menu; prices, categories and modifiers
+   * still need the full `reload()`.
+   *
+   * Returns the freshly built matrix so a caller can act on it immediately —
+   * React state set inside this call is not visible to the awaiting closure,
+   * and the checkout pre-check has to decide with the values it just fetched.
+   * Null means the refresh failed and the caller should not draw conclusions.
+   */
+  refreshAvailability: () => Promise<AvailabilityMatrix | null>;
 
   branches: Branch[];
   categories: Category[];
@@ -69,10 +87,13 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [payment, setPayment] = useState<PaymentMethodSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [support, setSupport] = useState<SupportSettings | null>(null);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
-  const [availability, setAvailability] = useState<{ [p: string]: { [b: string]: boolean } }>({});
+  const [availability, setAvailability] = useState<AvailabilityMatrix>({});
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
+  // The matrix seeds every product x branch to available before applying stored
+  // exceptions, so a partial refresh needs the same id lists the full load used.
+  const matrixSeed = useRef<{ products: { id: string }[]; branches: { id: string }[] }>({ products: [], branches: [] });
 
   // NOTE: the branch itself is not persisted here — OrderContextProvider owns
   // the persisted pickup/delivery decision and mirrors its (re-validated)
@@ -98,6 +119,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setCategories(raw.categories.map(mapCategory));
         setProducts(mappedProducts);
         setModifierGroupsById(groups);
+        matrixSeed.current = { products: raw.products, branches: raw.branches };
         setAvailability(buildAvailabilityMatrix(raw.products, raw.branches, raw.availability));
         setBrand(mapBrandSettings(raw.settings));
         setLoyalty(mapLoyaltySettings(raw.settings));
@@ -122,6 +144,31 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
 
+  const refreshAvailability = useCallback(async (): Promise<AvailabilityMatrix | null> => {
+    const seed = matrixSeed.current;
+    if (seed.products.length === 0) return null;   // nothing loaded yet
+    try {
+      const rows = await catalog.availability();
+      const next = buildAvailabilityMatrix(seed.products, seed.branches, rows);
+      if (mounted.current) setAvailability(next);
+      return next;
+    } catch {
+      // Deliberately silent. This is a freshness nicety on top of state the
+      // customer already has; a failed refresh must not replace a working menu
+      // with an error, and place_order re-checks availability regardless.
+      return null;
+    }
+  }, []);
+
+  // Foreground is the moment stale availability matters most: the app may have
+  // sat in the background for hours while the branch closed half the menu.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshAvailability();
+    });
+    return () => sub.remove();
+  }, [refreshAvailability]);
+
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -144,12 +191,12 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const branchIsOpen = useCallback((branch: Branch | null | undefined) => Boolean(branch?.isActive), []);
 
   const value = useMemo<CatalogValue>(() => ({
-    loading, error, reload,
+    loading, error, reload, refreshAvailability,
     branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch,
     getProduct, groupsForProduct, isAvailable, branchIsOpen,
   }), [
-    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
+    loading, error, reload, refreshAvailability, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable, branchIsOpen,
   ]);
 

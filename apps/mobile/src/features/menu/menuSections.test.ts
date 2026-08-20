@@ -86,10 +86,33 @@ describe('buildMenuSections', () => {
     expect(out[0].data.map((i) => i.product.id)).toEqual(['p1']);
   });
 
-  it('filters inactive products and branch-unavailable products', () => {
-    const products = [product('p1', { isActive: false }), product('p2'), product('p3')];
-    const out = build({ products, isAvailable: (pid) => pid !== 'p3' });
+  it('filters DELISTED products out entirely', () => {
+    const products = [product('p1', { isActive: false }), product('p2')];
+    const out = build({ products });
     expect(out[0].data.map((i) => i.product.id)).toEqual(['p2']);
+  });
+
+  it('KEEPS branch-unavailable products, flagged rather than removed', () => {
+    // Changed deliberately: a sold-out item used to vanish, which reads to a
+    // customer as "the app lost it". It now stays listed and renders as out of
+    // stock, so the menu answers the question instead of raising it.
+    const products = [product('p1'), product('p2'), product('p3')];
+    const out = build({ products, isAvailable: (pid) => pid !== 'p3' });
+    expect(out[0].data.map((i) => i.product.id)).toEqual(['p1', 'p2', 'p3']);
+    expect(out[0].data.map((i) => i.available)).toEqual([true, true, false]);
+  });
+
+  it('keeps a category whose items are all sold out', () => {
+    const products = [product('p1')];
+    const out = build({ products, isAvailable: () => false });
+    expect(out).toHaveLength(1);
+    expect(out[0].data[0].available).toBe(false);
+  });
+
+  it('does not reorder sold-out items — the menu stays where customers expect', () => {
+    const products = [product('p1'), product('p2'), product('p3')];
+    const out = build({ products, isAvailable: (pid) => pid === 'p2' });
+    expect(out[0].data.map((i) => i.product.id)).toEqual(['p1', 'p2', 'p3']);
   });
 
   it('orders sections by category sortOrder and drops empty sections', () => {
