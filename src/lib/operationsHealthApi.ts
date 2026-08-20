@@ -134,9 +134,13 @@ const JOBS: Array<{ job_name: string; subsystem: string; expected_schedule: stri
   { job_name: 'account-deletion-processor', subsystem: 'account_deletion', expected_schedule: '* * * * *', critical: true },
   { job_name: 'lazywait-sync', subsystem: 'lazywait', expected_schedule: '* * * * *', critical: true },
   { job_name: 'order-integrity-watchdog', subsystem: 'order_integrity', expected_schedule: '*/2 * * * *', critical: true },
-  // Non-critical internal automation crons (Operations Alerts + Daily Digest).
+  // Non-critical internal automation crons (Operations Alerts, Daily Digest,
+  // and the branch-availability sweeper that reopens expired closures). This
+  // list mirrors the server allowlist in operations_health_snapshot_internal;
+  // a job missing here vanishes from the table in the offline view only.
   { job_name: 'operations-alerts-evaluator', subsystem: 'operations_alerts', expected_schedule: '*/5 * * * *', critical: false },
   { job_name: 'operations-digest-generator', subsystem: 'operations_digest', expected_schedule: '0 * * * *', critical: false },
+  { job_name: 'branch-availability-sweep', subsystem: 'branch_availability', expected_schedule: '* * * * *', critical: false },
 ];
 
 /**

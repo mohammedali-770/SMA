@@ -2,11 +2,13 @@
 -- Operations Health — internal automation cron monitoring tests
 -- (migration 20260723140000_operations_automation_cron_health).
 --
--- Verifies that the scheduled-jobs card now also observes the two INTERNAL
--- automation crons — operations-alerts-evaluator (*/5) and
--- operations-digest-generator (hourly) — with PER-CADENCE staleness windows,
--- as NON-CRITICAL jobs that never affect the overall platform state, and that
--- the alert engine derives WARNING (not critical) per-job conditions for them.
+-- Verifies that the scheduled-jobs card now also observes the INTERNAL
+-- automation crons — operations-alerts-evaluator (*/5),
+-- operations-digest-generator (hourly) and, since 20260820150000,
+-- branch-availability-sweep (every minute) — with PER-CADENCE staleness
+-- windows, as NON-CRITICAL jobs that never affect the overall platform state,
+-- and that the alert engine derives WARNING (not critical) per-job conditions
+-- for them.
 --
 -- Transactional, deterministic, no external provider calls.
 -- ============================================================================
@@ -31,15 +33,23 @@ create function pg_temp.oac_fail(p_name text, p_age interval) returns void langu
   select jobid, 'failed', now() - p_age - interval '10 seconds', now() - p_age
   from cron.job where jobname = p_name;
 $$;
--- Reset the three CRITICAL application crons to a fresh, healthy state so any
--- movement in database_jobs / overall is attributable to the automation crons.
-create function pg_temp.oac_critical_healthy() returns void language sql as $$
+-- Park every cron that is NOT under test in a fresh, healthy state, so any
+-- movement in database_jobs / automation_state / overall is attributable to the
+-- job the case is actually driving.
+--
+-- branch-availability-sweep belongs here even though it is non-critical: it is
+-- scheduled by 20260820111000 with no run history in a fresh database, which
+-- reads as `degraded` (no_success_yet) and would otherwise hold
+-- `automation_state` degraded in every case that expects a clean baseline.
+create function pg_temp.oac_baseline_healthy() returns void language sql as $$
   select pg_temp.oac_ready('account-deletion-processor','* * * * *');
   select pg_temp.oac_success('account-deletion-processor', interval '60 seconds');
   select pg_temp.oac_ready('lazywait-sync','* * * * *');
   select pg_temp.oac_success('lazywait-sync', interval '60 seconds');
   select pg_temp.oac_ready('order-integrity-watchdog','*/2 * * * *');
   select pg_temp.oac_success('order-integrity-watchdog', interval '60 seconds');
+  select pg_temp.oac_ready('branch-availability-sweep','* * * * *');
+  select pg_temp.oac_success('branch-availability-sweep', interval '60 seconds');
 $$;
 create function pg_temp.oac_jobstate(p_name text) returns text language sql as $$
   select j->>'state'
@@ -71,15 +81,16 @@ create function pg_temp.oac_attention_sev(p_code text) returns text language sql
   limit 1;
 $$;
 
--- ---- A. ALLOWLIST SHAPE: 5 JOBS, 2 NON-CRITICAL AUTOMATION CRONS ------------
+-- ---- A. ALLOWLIST SHAPE: 6 JOBS, 3 NON-CRITICAL AUTOMATION CRONS ------------
 do $$
 declare
   s jsonb;
   dbj jsonb;
   ev jsonb;
   dg jsonb;
+  bas jsonb;
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
   perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
   perform pg_temp.oac_ready('operations-digest-generator','0 * * * *');
@@ -87,15 +98,15 @@ begin
 
   s := public.operations_health_summary();
 
-  if jsonb_array_length(s->'jobs') <> 5 then
-    raise exception 'expected 5 allowlisted jobs, got %', jsonb_array_length(s->'jobs');
+  if jsonb_array_length(s->'jobs') <> 6 then
+    raise exception 'expected 6 allowlisted jobs, got %', jsonb_array_length(s->'jobs');
   end if;
 
   select x->'details' into dbj
   from jsonb_array_elements(s->'systems') x where x->>'id' = 'database_jobs';
-  if (dbj->>'expected_jobs')::int <> 5
+  if (dbj->>'expected_jobs')::int <> 6
      or (dbj->>'critical_jobs')::int <> 3
-     or (dbj->>'automation_jobs')::int <> 2 then
+     or (dbj->>'automation_jobs')::int <> 3 then
     raise exception 'database_jobs counts wrong: %', dbj;
   end if;
   if dbj->>'automation_state' is null then
@@ -104,11 +115,20 @@ begin
 
   select j into ev from jsonb_array_elements(s->'jobs') j where j->>'job_name'='operations-alerts-evaluator';
   select j into dg from jsonb_array_elements(s->'jobs') j where j->>'job_name'='operations-digest-generator';
-  if ev is null or dg is null then
+  select j into bas from jsonb_array_elements(s->'jobs') j where j->>'job_name'='branch-availability-sweep';
+  if ev is null or dg is null or bas is null then
     raise exception 'automation crons missing from jobs[]';
   end if;
-  if (ev->>'critical')::boolean or (dg->>'critical')::boolean then
+  if (ev->>'critical')::boolean or (dg->>'critical')::boolean or (bas->>'critical')::boolean then
     raise exception 'automation crons must be non-critical';
+  end if;
+  -- The sweeper only ever REOPENS things, so a dead one over-blocks rather than
+  -- over-sells. It must never be able to flip the platform rollup red.
+  if bas->>'subsystem' <> 'branch_availability' then
+    raise exception 'sweeper subsystem wrong: %', bas->>'subsystem';
+  end if;
+  if bas->>'expected_schedule' <> '* * * * *' then
+    raise exception 'sweeper expected_schedule wrong: %', bas->>'expected_schedule';
   end if;
   -- The three application crons stay critical.
   if (select count(*) from jsonb_array_elements(s->'jobs') j
@@ -126,7 +146,7 @@ end $$;
 -- idle-but-recent success stays healthy.
 do $$
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
 
   -- Evaluator (*/5, 15m window): a success 3 min ago is healthy...
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
@@ -182,7 +202,7 @@ declare
   ov_base text;
   db_base text;
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   -- Both automation crons healthy -> capture the baseline overall/database_jobs.
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
   perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
@@ -237,7 +257,7 @@ end $$;
 -- ---- D. DEGRADED AUTOMATION (no completed success yet) ----------------------
 do $$
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
   perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
   -- Digest active but with no completed run at all -> degraded (no_success_yet).
@@ -265,7 +285,7 @@ end $$;
 -- ---- E. CRITICAL REGRESSION: A FAILING CRITICAL CRON STILL FLIPS THE ROLLUP -
 do $$
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
   perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
   perform pg_temp.oac_ready('operations-digest-generator','0 * * * *');
@@ -291,6 +311,71 @@ begin
   raise notice 'CRITICAL REGRESSION OK';
 end $$;
 
+-- ---- E2. A DEAD SWEEPER IS A WARNING, NEVER A PLATFORM-RED -----------------
+-- The sweeper only ever reopens expired closures. If it dies, items and
+-- delivery pauses outlive their timers: over-blocking, never over-selling. It
+-- must be VISIBLE (the whole point of registering it) and must not be able to
+-- take the platform red.
+do $$
+declare
+  ov_base text;
+  db_base text;
+  conds jsonb;
+  sev text;
+begin
+  perform pg_temp.oac_baseline_healthy();
+  perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
+  perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
+  perform pg_temp.oac_ready('operations-digest-generator','0 * * * *');
+  perform pg_temp.oac_success('operations-digest-generator', interval '30 minutes');
+  ov_base := pg_temp.oac_overall();
+  db_base := pg_temp.oac_dbjobs_state();
+
+  -- 10 minutes with no success, against a 6-minute window.
+  perform pg_temp.oac_ready('branch-availability-sweep','* * * * *');
+  perform pg_temp.oac_success('branch-availability-sweep', interval '10 minutes');
+
+  if pg_temp.oac_jobstate('branch-availability-sweep') <> 'failing' then
+    raise exception 'a 10m-stale sweeper must be failing, got %',
+      pg_temp.oac_jobstate('branch-availability-sweep');
+  end if;
+  if pg_temp.oac_automation_state() <> 'failing' then
+    raise exception 'automation_state must reflect the dead sweeper, got %',
+      pg_temp.oac_automation_state();
+  end if;
+  if pg_temp.oac_dbjobs_state() <> db_base then
+    raise exception 'the sweeper must not change database_jobs state (% -> %)',
+      db_base, pg_temp.oac_dbjobs_state();
+  end if;
+  if pg_temp.oac_overall() <> ov_base then
+    raise exception 'the sweeper must not change overall state (% -> %)',
+      ov_base, pg_temp.oac_overall();
+  end if;
+  if pg_temp.oac_has_attention('SCHEDULED_JOBS_FAILING') then
+    raise exception 'the sweeper must not raise a critical SCHEDULED_JOBS_FAILING item';
+  end if;
+
+  -- And it alerts, at warning severity, under the existing database_jobs
+  -- subsystem — so no new render arm is needed.
+  conds := public.operations_alerts_derive(public.operations_health_summary(), '{}'::jsonb);
+  select c->>'severity' into sev
+  from jsonb_array_elements(conds) c
+  where c->>'fingerprint' = 'database_jobs:job_health:branch-availability-sweep';
+  if sev is null then
+    raise exception 'derive must emit a per-job condition for the failing sweeper';
+  end if;
+  if sev <> 'warning' then
+    raise exception 'the sweeper must derive a WARNING alert, got %', sev;
+  end if;
+  if (select c->>'subsystem' from jsonb_array_elements(conds) c
+      where c->>'fingerprint' = 'database_jobs:job_health:branch-availability-sweep')
+     <> 'database_jobs' then
+    raise exception 'sweeper condition must sit under the database_jobs subsystem';
+  end if;
+
+  raise notice 'DEAD SWEEPER IS A WARNING OK';
+end $$;
+
 -- ---- F. DERIVE: PER-JOB ALERT SEVERITY FOLLOWS THE CRITICAL FLAG ------------
 do $$
 declare
@@ -299,7 +384,7 @@ declare
   dg_sev text;
   lw_sev text;
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   perform pg_temp.oac_ready('operations-alerts-evaluator','*/5 * * * *');
   perform pg_temp.oac_success('operations-alerts-evaluator', interval '3 minutes');
   -- Non-critical digest failing (stale) + critical lazywait-sync failing (stale).
@@ -336,7 +421,7 @@ do $$
 declare
   txt text;
 begin
-  perform pg_temp.oac_critical_healthy();
+  perform pg_temp.oac_baseline_healthy();
   perform pg_temp.oac_ready('operations-digest-generator','0 * * * *');
   update cron.job set command = 'AUTOMSENTINELCMD' where jobname = 'operations-digest-generator';
   perform pg_temp.oac_fail('operations-digest-generator', interval '5 minutes');

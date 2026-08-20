@@ -45,9 +45,17 @@ The overall platform state is derived only from these critical systems:
    authoritative state source.
 3. **Account Deletion Processor** — allowlisted pg_cron execution evidence plus
    safe queue counts (`due`, `manual_review`, oldest due time).
-4. **Database & Scheduled Jobs** — exactly three allowlisted application jobs:
-   `account-deletion-processor`, `lazywait-sync`, and
-   `order-integrity-watchdog`.
+4. **Database & Scheduled Jobs** — three **critical** allowlisted application
+   jobs whose health feeds the platform rollup: `account-deletion-processor`,
+   `lazywait-sync`, and `order-integrity-watchdog`.
+
+   The same card also observes three **non-critical** internal automation crons
+   — `operations-alerts-evaluator`, `operations-digest-generator` and
+   `branch-availability-sweep` — under a separate `automation_state` rollup.
+   They surface as warning-level attention items and deliberately never affect
+   `database_jobs.state` or the overall platform state. Each job carries its own
+   staleness window sized to its cadence, so a healthy-but-idle sparse job is
+   never mislabelled failing.
 
 A missing or temporarily unavailable critical health source degrades the overall
 platform state. A proven critical failure makes it failing. A verified

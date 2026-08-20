@@ -48,8 +48,8 @@ describe('unavailableOperationsHealthSummary', () => {
     expect(summary.systems_unavailable_count).toBe(9);
     expect(summary.systems).toHaveLength(9);
     expect(summary.systems.every((system) => system.state === 'unavailable')).toBe(true);
-    // 3 critical application crons + 2 non-critical internal automation crons.
-    expect(summary.jobs).toHaveLength(5);
+    // 3 critical application crons + 3 non-critical internal automation crons.
+    expect(summary.jobs).toHaveLength(6);
     expect(summary.jobs.every((job) => job.state === 'unavailable')).toBe(true);
   });
 
@@ -61,6 +61,10 @@ describe('unavailableOperationsHealthSummary', () => {
     expect(byName['operations-alerts-evaluator']?.expected_schedule).toBe('*/5 * * * *');
     expect(byName['operations-digest-generator']?.critical).toBe(false);
     expect(byName['operations-digest-generator']?.expected_schedule).toBe('0 * * * *');
+    // The sweeper only ever REOPENS expired closures, so a dead one over-blocks
+    // rather than over-sells. It must never be able to flip the platform rollup.
+    expect(byName['branch-availability-sweep']?.critical).toBe(false);
+    expect(byName['branch-availability-sweep']?.expected_schedule).toBe('* * * * *');
     // The three pre-existing application crons stay critical.
     expect(byName['account-deletion-processor']?.critical).toBe(true);
     expect(byName['lazywait-sync']?.critical).toBe(true);

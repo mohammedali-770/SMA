@@ -410,14 +410,23 @@ The admin system includes:
 - internal Operations Alerts and digest generation;
 - staff-visible health/attention indicators.
 
-`branch-availability-sweep` is **not** on the Operations Health board yet. The
-allowlist is a hardcoded list inside `operations_health_snapshot_internal()` and
-`operations_automation_cron_health_test.sql` asserts its exact job counts, so
-registering a job means re-emitting that function and updating that suite —
-tracked as its own change. An unregistered job is invisible to the board rather
-than alarming (the query drives from the allowlist), but it also means a failing
-sweep will not surface there until it is registered. Its own ledger,
-`branch_availability_runs`, is the interim record.
+`branch-availability-sweep` is on the board as a **non-critical** automation
+cron (6-minute staleness window), alongside the alerts evaluator and the digest
+generator. The allowlist is a hardcoded list inside
+`operations_health_snapshot_internal()`, so registering a job means re-emitting
+that function and updating the two suites that assert its exact counts
+(`operations_automation_cron_health_test.sql`,
+`operations_health_center_test.sql`) — plus the client-side offline fallback
+list in `src/lib/operationsHealthApi.ts`, which mirrors the same allowlist.
+
+Non-critical is deliberate. The sweeper only ever *reopens* expired closures, so
+a dead one means items and delivery pauses outlive their timers: over-blocking,
+never over-selling. That is worth a warning — it raises
+`OPERATIONS_AUTOMATION_JOBS_FAILING` and a
+`database_jobs:job_health:branch-availability-sweep` alert condition at warning
+severity — but it must never flip `database_jobs.state` or the overall platform
+rollup, which stay the property of the three critical application crons. Its own
+ledger, `branch_availability_runs`, remains the per-run record.
 
 These are operational visibility controls, not a substitute for external paging or a completed restore/incident drill. Refer to `INCIDENT_RESPONSE.md` and `BACKUP_RECOVERY.md` for the current operational limitations.
 
