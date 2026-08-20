@@ -25,7 +25,7 @@ export const DIGEST_HISTORY_LIMIT = 30;
 
 export const SUBSYSTEMS = [
   'platform', 'lazywait', 'order_integrity', 'order_flow', 'account_deletion',
-  'database_jobs', 'payment', 'push', 'email', 'otp',
+  'database_jobs', 'branch_availability', 'payment', 'push', 'email', 'otp',
 ];
 
 const SUBSYSTEM_TEXT: Record<string, { en: string; ar: string }> = {
@@ -35,6 +35,7 @@ const SUBSYSTEM_TEXT: Record<string, { en: string; ar: string }> = {
   order_flow: { en: 'Order Flow', ar: 'تدفق الطلبات' },
   account_deletion: { en: 'Account Deletion', ar: 'حذف الحسابات' },
   database_jobs: { en: 'Scheduled Jobs', ar: 'المهام المجدولة' },
+  branch_availability: { en: 'Branch Availability', ar: 'إتاحة الأصناف بالفروع' },
   payment: { en: 'Payment / Tap', ar: 'الدفع / Tap' },
   push: { en: 'Push Notifications', ar: 'الإشعارات الفورية' },
   email: { en: 'Email / SMTP', ar: 'البريد / SMTP' },

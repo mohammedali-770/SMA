@@ -2226,3 +2226,49 @@ volume that does not exist yet. §25's closing note applies unchanged.
 >   Correcting the in-body comment would mean re-emitting a 1000-line function,
 >   which is not worth it for a comment — recorded here and in the card's test
 >   suite, where someone reasoning about the arms will look.
+
+---
+
+## 27. Branch operations — NOT APPLIED (as of 2026-08-20)
+
+Eight migrations on `claude/item-snooze-architecture-hwbgp9` implement the
+branch-operations feature (timed item/option availability, delivery control,
+the two operations consoles, and the health/alert surfaces). **None has been
+applied to Production**, and applying any of them is a separate owner-approval
+action under CLAUDE.md §5.
+
+They are cumulative and must be applied in filename order. Two of them are
+irreversible in one specific respect, noted below.
+
+| Order | File | Notes |
+|---|---|---|
+| 1 | `20260820100000_ops_roles_enum.sql` | `ALTER TYPE user_role ADD VALUE` ×2. **Irreversible** — inert while unused, but a rollback cannot take it back. Alone in its own file because PG16 forbids using a new enum value in the transaction that adds it. |
+| 2 | `20260820100500_ops_branch_scoping.sql` | `staff_branch_assignments` + the branch predicates. |
+| 3 | `20260820110000_branch_availability_snooze.sql` | Snooze columns on `branch_product_availability`, the events table, normalize + audit triggers. |
+| 4 | `20260820110500_branch_availability_rpcs.sql` | `set_product_snooze` / `clear_product_snooze`. |
+| 5 | `20260820111000_branch_availability_sweeper.sql` | The sweeper, its run ledger, and the `branch-availability-sweep` cron registration. **Schedules a pg_cron job.** |
+| 6 | `20260820120000_branch_delivery_control.sql` + `20260820120500_branch_delivery_rpcs.sql` + `20260820121000_sweeper_delivery_resume.sql` | Delivery pause, advisory areas, working hours; the sweeper gains delivery counters **without being re-scheduled**. |
+| 7 | `20260820130000_ops_change_events.sql` | Realtime signal table. **Adds a table to the `supabase_realtime` publication** — a separate owner approval. |
+| 8 | `20260820140000` + `20260820140500` | Modifier availability, and the ONE re-emission of `place_order` in this work (8th revision; 18 lines added, 0 removed, machine-verified). |
+| 9 | `20260820150000` + `20260820160000` | Operations Health: the sweeper joins the cron allowlist, then the `branch_availability` card and its alert condition. Function re-emissions only — no table, policy, grant or cron change. |
+
+**Do not recompute the §4 classification counts from this list.** Those are a
+dated full-fingerprint snapshot (CLAUDE.md §8); adding rows here does not extend
+them, and arithmetic is not evidence.
+
+### One trap worth recording
+
+`20260810113500` **renamed** the alert-engine's per-card function to
+`operations_alerts_derive_pre_stranded` and made `operations_alerts_derive` a
+thin wrapper that appends the independent `order_integrity:stranded_orders`
+critical condition. While writing `20260820160000` the new arm was first added
+by re-emitting the *wrapper's* name, which silently deleted that stranded-order
+alert — a critical condition whose entire purpose is that a warning cannot mask
+it. The migration-chain suite caught it. New per-card arms go in the **renamed**
+function; `supabase/tests/branch_availability_health_card_test.sql` case H now
+asserts the wrapper survives.
+
+The general rule: before re-emitting any function, confirm which migration holds
+its **current** definition — `grep -ln 'create or replace function public.<name>'
+supabase/migrations/*.sql | sort | tail -1` — rather than the one you happen to
+remember.

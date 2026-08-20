@@ -428,6 +428,21 @@ severity — but it must never flip `database_jobs.state` or the overall platfor
 rollup, which stay the property of the three critical application crons. Its own
 ledger, `branch_availability_runs`, remains the per-run record.
 
+**The cron entry and the `branch_availability` card answer different questions,
+and only the second one is trustworthy about the sweeper.**
+`branch_availability_sweep` catches its own exceptions: it writes
+`status='failed'` to `branch_availability_runs` and then **returns normally**, so
+pg_cron records the run as `succeeded`. The Scheduled Jobs card would read the
+sweeper healthy while every single sweep failed. The `branch_availability` card
+(20260820160000) reads the ledger and the availability state instead — closed
+items, closed options, paused branches, disabled areas, and how far past its
+restore time the oldest closure is. It is the only place a sweeper that runs and
+fails is visible.
+
+It is non-critical for the same reason the cron entry is, and carries **counts
+only**: no branch is ever named in Operations Health or in alert evidence. The
+call-centre console is where an operator sees which branch and acts on it.
+
 These are operational visibility controls, not a substitute for external paging or a completed restore/incident drill. Refer to `INCIDENT_RESPONSE.md` and `BACKUP_RECOVERY.md` for the current operational limitations.
 
 ### Sentry

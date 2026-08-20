@@ -93,6 +93,12 @@ const SYSTEM_TEXT: Record<OperationsHealthSystem['id'], {
     descEn: 'Allowlisted pg_cron jobs (critical + internal automation) with per-cadence staleness windows.',
     descAr: 'مهام pg_cron المسموحة (الحرجة والأتمتة الداخلية) بنوافذ تقادم حسب وتيرة كل مهمة.',
   },
+  branch_availability: {
+    en: 'Branch Availability',
+    ar: 'إتاحة الأصناف بالفروع',
+    descEn: 'Whether timed item, option and delivery closures actually reopen. Counts only — the call-centre console names the branch.',
+    descAr: 'هل تعود الأصناف والخيارات والتوصيل بعد انتهاء المدة فعلاً. أعداد فقط — لوحة مركز الاتصال تحدد الفرع.',
+  },
 };
 
 /** Icon by state. Only healthy/idle get a tick; a fault gets the shield. */
@@ -141,6 +147,20 @@ function SystemMetrics({ system, lang }: { system: OperationsHealthSystem; lang:
         <HealthMetric label={isAr ? 'طلبات حديثة' : 'Recent orders'} value={numberValue(d, 'orders_in_window')} />
         <HealthMetric label={isAr ? 'فروع نشطة' : 'Active branches'} value={numberValue(d, 'open_branches')} />
         <HealthMetric label={isAr ? 'متوسط خط الأساس' : 'Baseline avg'} value={numberValue(d, 'baseline_orders')} />
+      </>
+    );
+  }
+
+  if (system.id === 'branch_availability') {
+    // Wire keys from 20260820160000_branch_availability_health_card.sql. An
+    // explicit block is required, not optional: the fall-through at the bottom
+    // renders the database_jobs metrics, so without this the card would read
+    // "Expected jobs / pg_cron / Read-only" — plausible and entirely wrong.
+    return (
+      <>
+        <HealthMetric label={isAr ? 'أصناف موقوفة' : 'Closed items'} value={numberValue(d, 'closed_products')} />
+        <HealthMetric label={isAr ? 'خيارات موقوفة' : 'Closed options'} value={numberValue(d, 'closed_options')} />
+        <HealthMetric label={isAr ? 'متأخرة عن العودة' : 'Overdue restores'} value={numberValue(d, 'overdue_restores')} />
       </>
     );
   }

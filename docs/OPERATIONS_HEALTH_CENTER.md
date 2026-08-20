@@ -63,6 +63,30 @@ configuration error has the highest precedence.
 
 ### Optional/informational systems
 
+- **Branch Availability** — whether timed item, option and delivery closures
+  actually reopen. `degraded` once anything is more than 5 minutes past its
+  restore time (five missed ticks of a one-minute sweep, so a single unlucky run
+  is not a backlog) or when the most recent sweep run in
+  `branch_availability_runs` failed; `failing` past 30 minutes; `idle` on a fresh
+  database with nothing closed and no sweep recorded yet.
+
+  **This is not the `branch-availability-sweep` cron entry on the Scheduled Jobs
+  card, and the difference is the reason the card exists.**
+  `branch_availability_sweep` catches its own exceptions: it records
+  `status='failed'` in its ledger and then returns normally, so pg_cron reports
+  the run as `succeeded`. The Scheduled Jobs card would show the sweeper healthy
+  while every sweep failed. Only the ledger plus the availability state can see
+  that.
+
+  Non-critical: a stalled sweeper leaves things closed longer than intended,
+  which over-blocks and never over-sells. It is absent from `critical_systems`
+  and cannot move the overall platform state.
+
+  Counts only — closed items, closed options, paused branches, disabled areas,
+  overdue restores. **No branch is ever named here.** Operations Health is
+  read-only; the call-centre console is where an operator sees which branch and
+  acts on it.
+
 - **Payment / Tap** — enabled/configured metadata, safe payment status counts,
   recent stale initiated attempts, latest paid time, and payment-related Order
   Integrity incident counts. No Tap API availability probe exists in v1.

@@ -24,7 +24,8 @@ export type OperationsHealthSystemId =
   | 'push'
   | 'email'
   | 'otp'
-  | 'database_jobs';
+  | 'database_jobs'
+  | 'branch_availability';
 
 export interface OperationsHealthSystem {
   id: OperationsHealthSystemId;
@@ -128,6 +129,11 @@ const SYSTEMS: Array<{ id: OperationsHealthSystemId; critical: boolean }> = [
   { id: 'email', critical: false },
   { id: 'otp', critical: false },
   { id: 'database_jobs', critical: true },
+  // 20260820160000. Non-critical on purpose: a stalled availability sweeper
+  // over-blocks and never over-sells, so it must be visible without being able
+  // to turn the platform red. Absent from `critical_systems` below for the same
+  // reason.
+  { id: 'branch_availability', critical: false },
 ];
 
 const JOBS: Array<{ job_name: string; subsystem: string; expected_schedule: string; critical: boolean }> = [

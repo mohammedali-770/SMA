@@ -102,12 +102,13 @@ begin
   systems := s->'systems';
   jobs := s->'jobs';
 
-  -- 9 since 20260807150000 added the order_flow card. The exact count is
-  -- asserted on purpose: a card silently disappearing is the failure this line
-  -- exists to catch, so it is updated deliberately when one is added, never
-  -- loosened to >=.
-  if jsonb_typeof(systems) <> 'array' or jsonb_array_length(systems) <> 9 then
-    raise exception 'expected 9 subsystem cards, got %', systems;
+  -- 10 since 20260820160000 added the non-critical branch_availability card
+  -- (9 since 20260807150000 added order_flow). The exact count is asserted on
+  -- purpose: a card silently disappearing is the failure this line exists to
+  -- catch, so it is updated deliberately when one is added, never loosened
+  -- to >=.
+  if jsonb_typeof(systems) <> 'array' or jsonb_array_length(systems) <> 10 then
+    raise exception 'expected 10 subsystem cards, got %', systems;
   end if;
   -- 3 critical application crons + 3 non-critical internal automation crons:
   -- operations-alerts-evaluator and operations-digest-generator from migration
@@ -532,7 +533,7 @@ begin
   if state <> 'not_configured' then
     raise exception 'missing email row should be not_configured, got %', state;
   end if;
-  if jsonb_array_length(s->'systems') <> 9 then
+  if jsonb_array_length(s->'systems') <> 10 then
     raise exception 'one missing optional config removed other subsystem cards';
   end if;
 
