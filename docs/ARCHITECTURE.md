@@ -327,7 +327,19 @@ two things to the `20260710120100` body:
 
 `begin_checkout_session` and `compute_order_snapshot` are **not** touched — they
 are payment-adjacent, and because `is_available` stays authoritative they never
-needed to be. The re-emission also emits **no grants**: `create or replace
+needed to be.
+
+On the clients, the required-group rule is a **computation, not a second
+server check**. A product is orderable when its own row says so *and* every
+required option group still has enough available options to satisfy its
+minimum — `apps/mobile/src/lib/orderability.ts`, mirrored for the operator
+console by `productBlockedByOptions` in `src/components/ops/branchConsole.ts`.
+When it fails, the customer app renders the item as out of stock and
+non-clickable and the branch console flags the product row, so a cashier is
+never shown "available" for something nobody can buy. Closed options are
+rendered inert (not merely disabled) on the product screen, and a cart line
+being edited drops any option that has since closed rather than carrying it
+silently. The re-emission also emits **no grants**: `create or replace
 function` preserves the existing ACL, and `20260724200000` deliberately revoked
 `place_order` from `authenticated` in favour of the `place_customer_order`
 wrapper. Re-granting would silently undo that.

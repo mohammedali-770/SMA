@@ -39,6 +39,14 @@ export interface BranchAvailabilityRow {
   reasonCode: OpsReasonCode | null;
 }
 
+/** The same, for one OPTION rather than a whole product. */
+export interface BranchModifierAvailabilityRow {
+  modifierId: string;
+  isAvailable: boolean;
+  snoozedUntil: string | null;
+  reasonCode: OpsReasonCode | null;
+}
+
 function fail(error: { message: string } | null): void {
   if (error) throw new Error(error.message);
 }
@@ -94,6 +102,24 @@ export const opsApi = {
     }));
   },
 
+  /**
+   * Option-availability exceptions for one branch. Exceptions only, exactly as
+   * for products — an absent row means the option is on sale.
+   */
+  async branchModifierAvailability(branchId: string): Promise<BranchModifierAvailabilityRow[]> {
+    const { data, error } = await supabase
+      .from('branch_modifier_availability')
+      .select('modifier_id, is_available, snoozed_until, reason_code')
+      .eq('branch_id', branchId);
+    fail(error);
+    return (data ?? []).map((r) => ({
+      modifierId: r.modifier_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
   /** Close a product at this branch for a bounded number of minutes. */
   async snoozeProduct(input: {
     branchId: string;
@@ -117,6 +143,33 @@ export const opsApi = {
     const { error } = await supabase.rpc('clear_product_snooze', {
       p_branch_id: branchId,
       p_product_id: productId,
+    });
+    fail(error);
+  },
+
+  /** Close one option at this branch for a bounded number of minutes. */
+  async snoozeModifier(input: {
+    branchId: string;
+    modifierId: string;
+    minutes: number;
+    reasonCode: OpsReasonCode;
+    note?: string | null;
+  }): Promise<void> {
+    const { error } = await supabase.rpc('set_modifier_snooze', {
+      p_branch_id: input.branchId,
+      p_modifier_id: input.modifierId,
+      p_minutes: input.minutes,
+      p_reason_code: input.reasonCode,
+      p_note: input.note?.trim() ? input.note.trim() : null,
+    });
+    fail(error);
+  },
+
+  /** Reopen one option at this branch immediately. Idempotent server-side. */
+  async reopenModifier(branchId: string, modifierId: string): Promise<void> {
+    const { error } = await supabase.rpc('clear_modifier_snooze', {
+      p_branch_id: branchId,
+      p_modifier_id: modifierId,
     });
     fail(error);
   },

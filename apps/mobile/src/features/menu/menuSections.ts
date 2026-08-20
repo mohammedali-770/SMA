@@ -54,10 +54,15 @@ export function buildMenuSections(opts: {
   branchId: string | null;
   query: string;
   searchIndex: Map<string, string>;
-  isAvailable: (productId: string, branchId: string) => boolean;
+  /**
+   * Orderable, not merely "not closed" — a product whose required option group
+   * has been entirely closed at this branch has no valid selection left and is
+   * out of stock too. See lib/orderability.ts.
+   */
+  isOrderable: (productId: string, branchId: string) => boolean;
   hasModifiers: (product: Product) => boolean;
 }): MenuSection[] {
-  const { products, categories, branchId, query, searchIndex, isAvailable, hasModifiers } = opts;
+  const { products, categories, branchId, query, searchIndex, isOrderable, hasModifiers } = opts;
   if (!branchId) return [];
   const q = query.trim().toLowerCase();
   // Only `isActive` filters here. Branch availability decorates the row instead
@@ -76,7 +81,7 @@ export function buildMenuSections(opts: {
         .map((product) => ({
           product,
           hasModifiers: hasModifiers(product),
-          available: isAvailable(product.id, branchId),
+          available: isOrderable(product.id, branchId),
         })),
     }))
     .filter((s) => s.data.length > 0);

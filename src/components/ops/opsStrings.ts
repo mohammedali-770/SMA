@@ -71,6 +71,18 @@ export const OPS_STRINGS = {
     reason_quality_hold: 'إيقاف للجودة',
     reason_other: 'سبب آخر',
 
+    // options (modifiers — Lazywait calls them Prices)
+    optionsLabel: 'الخيارات',
+    showOptions: 'عرض الخيارات',
+    hideOptions: 'إخفاء الخيارات',
+    noOptions: 'لا توجد خيارات لهذا الصنف.',
+    closedOptions: 'الخيارات الموقوفة',
+    closeOptionTitle: 'إيقاف الخيار مؤقتاً',
+    optionAutoReopenHint: 'سيعود الخيار تلقائياً عند انتهاء المدة.',
+    requiredGroup: 'إلزامي',
+    optionalGroup: 'اختياري',
+    blockedByOptions: 'الصنف غير قابل للطلب: مجموعة إلزامية لا تحتوي على خيار متاح.',
+
     // countdown
     backIn: 'يعود خلال',
     reopeningNow: 'يعود الآن',
@@ -202,6 +214,17 @@ export const OPS_STRINGS = {
     dreason_kitchen_overload: 'Kitchen overloaded',
     dreason_area_incident: 'Incident in the area',
     dreason_other: 'Other',
+
+    optionsLabel: 'Options',
+    showOptions: 'Show options',
+    hideOptions: 'Hide options',
+    noOptions: 'This item has no options.',
+    closedOptions: 'Closed options',
+    closeOptionTitle: 'Close this option',
+    optionAutoReopenHint: 'The option reopens by itself when the timer ends.',
+    requiredGroup: 'Required',
+    optionalGroup: 'Optional',
+    blockedByOptions: 'Not orderable: a required group has no available option left.',
 
     authSignInTitle: 'Sign in to your account',
     authSignUpTitle: 'Create your account',

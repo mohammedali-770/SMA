@@ -3,8 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Category, Product } from '../../types';
-import type { BranchAvailabilityRow, DeliveryReasonCode, OpsReasonCode } from '../../lib/opsApi';
+import type { Category, Modifier, ModifierGroup, Product } from '../../types';
+import type {
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryReasonCode, OpsReasonCode,
+} from '../../lib/opsApi';
 import type { OpsStringKey } from './opsStrings';
 
 /**
@@ -135,6 +137,81 @@ export function searchableGroups(
   if (orphans.length > 0) groups.push({ categoryId: null, products: orphans });
 
   return groups;
+}
+
+/** Ids of options closed at this branch. */
+export function closedModifierIds(rows: BranchModifierAvailabilityRow[]): Set<string> {
+  return new Set(rows.filter((r) => !r.isAvailable).map((r) => r.modifierId));
+}
+
+export interface ClosedOption {
+  modifier: Modifier;
+  group: ModifierGroup;
+  snoozedUntil: string | null;
+}
+
+/**
+ * Options currently closed at this branch, soonest-returning first — the same
+ * ordering rule as `closedItems`, so the two lists read alike.
+ */
+export function closedOptions(
+  groups: ModifierGroup[],
+  rows: BranchModifierAvailabilityRow[],
+): ClosedOption[] {
+  const closed = closedModifierIds(rows);
+  const until = new Map(rows.map((r) => [r.modifierId, r.snoozedUntil]));
+  const out: ClosedOption[] = [];
+  for (const group of groups) {
+    for (const modifier of group.modifiers) {
+      if (closed.has(modifier.id)) {
+        out.push({ modifier, group, snoozedUntil: until.get(modifier.id) ?? null });
+      }
+    }
+  }
+  return out.sort((a, b) => {
+    if (!a.snoozedUntil && !b.snoozedUntil) return 0;
+    if (!a.snoozedUntil) return 1;
+    if (!b.snoozedUntil) return -1;
+    return Date.parse(a.snoozedUntil) - Date.parse(b.snoozedUntil);
+  });
+}
+
+/** The option groups attached to a product, in the product's own order. */
+export function groupsForProduct(
+  product: Product,
+  groups: ModifierGroup[],
+): ModifierGroup[] {
+  const byId = new Map(groups.map((g) => [g.id, g]));
+  return product.modifierGroupIds
+    .map((id) => byId.get(id))
+    .filter((g): g is ModifierGroup => Boolean(g));
+}
+
+/**
+ * How many options a customer MUST pick from this group — the same resolution
+ * of `isRequired` against `minSelection` the customer app makes, because the
+ * cashier needs to be told when a close has silently taken the whole item off
+ * the menu.
+ */
+export function requiredCount(group: ModifierGroup): number {
+  return group.isRequired ? Math.max(1, group.minSelection) : group.minSelection;
+}
+
+/**
+ * True when closing options has left a REQUIRED group unsatisfiable, so the
+ * product can no longer be ordered at all even though its own row says it is
+ * on sale. The customer app renders it as out of stock and `place_order`
+ * refuses it, so the console must say so too rather than showing a product as
+ * open that nobody can buy.
+ */
+export function productBlockedByOptions(
+  product: Product,
+  groups: ModifierGroup[],
+  closed: Set<string>,
+): boolean {
+  return groupsForProduct(product, groups).some(
+    (g) => g.modifiers.filter((m) => !closed.has(m.id)).length < requiredCount(g),
+  );
 }
 
 /**

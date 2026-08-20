@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { availabilityLookup, validateCartForBranch } from './cartValidation';
-import type { CartItem, Product } from '../../types/models';
+import type { CartItem, Modifier, Product } from '../../types/models';
 
 function product(id: string, isActive = true): Product {
   return {
@@ -48,6 +48,45 @@ describe('validateCartForBranch', () => {
     const items = [line('a'), line('b')];
     validateCartForBranch(items, 'b1', isAvailable);
     expect(items).toHaveLength(2);
+  });
+});
+
+describe('validateCartForBranch — closed OPTIONS', () => {
+  const withMods = (id: string, mods: Modifier[]): CartItem => ({
+    ...line(id),
+    selectedModifiers: { g1: mods },
+  });
+  const mod = (id: string): Modifier => ({ id, groupId: 'g1', nameEn: id, nameAr: id, price: 0 });
+  const openAll = () => true;
+
+  it('a line naming a CLOSED option is invalid even though the product is open', () => {
+    const r = validateCartForBranch(
+      [withMods('a', [mod('m1')])], 'b1', isAvailable, (mid) => mid !== 'm1');
+    expect(r.invalid.map((i) => i.product.id)).toEqual(['a']);
+  });
+
+  it('a line whose options are all open stays valid', () => {
+    const r = validateCartForBranch([withMods('a', [mod('m1')])], 'b1', isAvailable, openAll);
+    expect(r.allValid).toBe(true);
+  });
+
+  it('one closed option among several fails the line', () => {
+    const r = validateCartForBranch(
+      [withMods('a', [mod('m1'), mod('m2')])], 'b1', isAvailable, (mid) => mid !== 'm2');
+    expect(r.allValid).toBe(false);
+  });
+
+  it('OMITTING the option lookup preserves the old product-only behaviour', () => {
+    // The branch-switch screen still calls the three-argument form; adding a
+    // fourth parameter must not change what it decides.
+    const r = validateCartForBranch([withMods('a', [mod('m1')])], 'b1', isAvailable);
+    expect(r.allValid).toBe(true);
+  });
+
+  it('a closed option is checked against the TARGET branch, not any branch', () => {
+    const r = validateCartForBranch(
+      [withMods('a', [mod('m1')])], 'b1', isAvailable, (_mid, bid) => bid !== 'b1');
+    expect(r.allValid).toBe(false);
   });
 });
 

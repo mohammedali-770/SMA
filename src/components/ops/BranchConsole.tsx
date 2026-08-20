@@ -4,7 +4,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock, RefreshCw, Search, Store } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, RefreshCw, Search, Store } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
@@ -12,13 +12,20 @@ import { Card } from '../../design-system/ui/Card';
 import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
-import { BranchAvailabilityRow, OpsReasonCode, opsApi } from '../../lib/opsApi';
-import type { Product } from '../../types';
+import {
+  BranchAvailabilityRow, BranchModifierAvailabilityRow, OpsReasonCode, opsApi,
+} from '../../lib/opsApi';
+import type { Modifier, Product } from '../../types';
 import {
   ClosedItem,
+  ClosedOption,
   closedItems,
+  closedModifierIds,
+  closedOptions,
   closedProductIds,
   formatRemaining,
+  groupsForProduct,
+  productBlockedByOptions,
   searchableGroups,
 } from './branchConsole';
 import { CloseItemDialog } from './CloseItemDialog';
@@ -42,14 +49,22 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   branchId,
   i18n,
 }) => {
-  const { branches, products, categories } = useApp();
+  const { branches, products, categories, modifierGroups } = useApp();
   const { t, isRTL } = i18n;
 
   const [rows, setRows] = useState<BranchAvailabilityRow[]>([]);
+  const [modRows, setModRows] = useState<BranchModifierAvailabilityRow[]>([]);
+  // Which product's options are open. One at a time: on a POS screen an
+  // accordion that can be opened everywhere becomes a wall of text.
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [target, setTarget] = useState<Product | null>(null);
+  // What the close dialog is aimed at. One piece of state, not two, so the two
+  // flows cannot both be open at once.
+  const [target, setTarget] = useState<
+    { kind: 'product'; product: Product } | { kind: 'option'; modifier: Modifier } | null
+  >(null);
   const [busy, setBusy] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
@@ -67,7 +82,12 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     if (!branchId) { setLoading(false); return; }
     setError(null);
     try {
-      setRows(await opsApi.branchAvailability(branchId));
+      const [productRows, optionRows] = await Promise.all([
+        opsApi.branchAvailability(branchId),
+        opsApi.branchModifierAvailability(branchId),
+      ]);
+      setRows(productRows);
+      setModRows(optionRows);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -81,9 +101,9 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
   // once a minute. Re-reading shortly after expiry keeps the screen honest
   // instead of leaving a row stuck at "reopening now".
   const expired = useMemo(
-    () => rows.some((r) => !r.isAvailable && r.snoozedUntil !== null
+    () => [...rows, ...modRows].some((r) => !r.isAvailable && r.snoozedUntil !== null
       && Date.parse(r.snoozedUntil) <= now),
-    [rows, now],
+    [rows, modRows, now],
   );
   useEffect(() => {
     if (!expired) return;
@@ -93,6 +113,9 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
 
   const closed = useMemo(() => closedItems(products, rows), [products, rows]);
   const closedIds = useMemo(() => closedProductIds(rows), [rows]);
+  const closedOptionIds = useMemo(() => closedModifierIds(modRows), [modRows]);
+  const closedOpts = useMemo(
+    () => closedOptions(modifierGroups, modRows), [modifierGroups, modRows]);
   const groups = useMemo(
     () => searchableGroups(products, categories, query),
     [products, categories, query],
@@ -109,7 +132,13 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     if (!branchId || !target) return;
     setBusy(true); setDialogError(null);
     try {
-      await opsApi.snoozeProduct({ branchId, productId: target.id, minutes, reasonCode: reason, note });
+      if (target.kind === 'product') {
+        await opsApi.snoozeProduct({
+          branchId, productId: target.product.id, minutes, reasonCode: reason, note });
+      } else {
+        await opsApi.snoozeModifier({
+          branchId, modifierId: target.modifier.id, minutes, reasonCode: reason, note });
+      }
       setTarget(null);
       await refresh();
     } catch (e) {
@@ -132,6 +161,19 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     }
   };
 
+  const reopenOption = async (modifierId: string) => {
+    if (!branchId) return;
+    setBusy(true); setError(null);
+    try {
+      await opsApi.reopenModifier(branchId, modifierId);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!branchId) {
     return (
       <Card className="p-5">
@@ -140,11 +182,13 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
     );
   }
 
-  const countdownFor = (item: ClosedItem) => {
+  const countdownFor = (item: ClosedItem | ClosedOption) => {
     if (!item.snoozedUntil) return t('untimed');
     const remaining = formatRemaining(item.snoozedUntil, now);
     return remaining ? `${t('backIn')} ${remaining}` : t('reopeningNow');
   };
+
+  const modifierName = (m: Modifier) => (isRTL ? m.nameAr : m.nameEn);
 
   return (
     <div className="space-y-4">
@@ -205,6 +249,41 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
         )}
       </Card>
 
+      {/* ---- options that are off ---- */}
+      {closedOpts.length > 0 ? (
+        <Card className="space-y-3 p-4">
+          <div className="flex items-center gap-2">
+            <Clock className="size-4 text-ember" aria-hidden="true" />
+            <Text variant="heading" as="h2">{t('closedOptions')}</Text>
+            <StatusPill label={String(closedOpts.length)} tone="warning" />
+          </div>
+          <div className="space-y-2">
+            {closedOpts.map((opt) => (
+              <div
+                key={opt.modifier.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
+              >
+                <div className="min-w-0">
+                  <Text variant="label" as="p">{modifierName(opt.modifier)}</Text>
+                  <Text variant="caption" tone="tertiary" as="p">
+                    {isRTL ? opt.group.nameAr : opt.group.nameEn}
+                  </Text>
+                  <Text variant="caption" tone="tertiary" as="p" numeric>
+                    {countdownFor(opt)}
+                  </Text>
+                </div>
+                <Button
+                  label={t('reopen')}
+                  onClick={() => { void reopenOption(opt.modifier.id); }}
+                  disabled={busy}
+                  variant="secondary"
+                />
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : null}
+
       {/* ---- the menu ---- */}
       <Card className="space-y-3 p-4">
         <Text variant="heading" as="h2">{t('allItems')}</Text>
@@ -230,21 +309,89 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
               <Text variant="caption" tone="tertiary" as="h3">{categoryName(g.categoryId)}</Text>
               {g.products.map((p) => {
                 const isClosed = closedIds.has(p.id);
+                const optionGroups = groupsForProduct(p, modifierGroups);
+                const isOpen = expanded === p.id;
+                // Closing options can take a product off the menu without ever
+                // touching its own row. Say so on the row itself — otherwise a
+                // cashier reads "open" here while customers see "out of stock".
+                const blocked = !isClosed
+                  && productBlockedByOptions(p, modifierGroups, closedOptionIds);
                 return (
                   <div
                     key={p.id}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
+                    className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Text variant="label" as="span">{productName(p)}</Text>
-                      {isClosed ? <StatusPill label={t('close')} tone="danger" /> : null}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <Text variant="label" as="span">{productName(p)}</Text>
+                        {isClosed ? <StatusPill label={t('close')} tone="danger" /> : null}
+                        {blocked ? <StatusPill label={t('blockedByOptions')} tone="warning" /> : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {optionGroups.length > 0 ? (
+                          <Button
+                            label={isOpen ? t('hideOptions') : t('showOptions')}
+                            onClick={() => setExpanded(isOpen ? null : p.id)}
+                            disabled={busy}
+                            variant="ghost"
+                            leading={isOpen
+                              ? <ChevronUp className="size-4" />
+                              : <ChevronDown className="size-4" />}
+                          />
+                        ) : null}
+                        <Button
+                          label={isClosed ? t('reopen') : t('close')}
+                          onClick={() => {
+                            if (isClosed) { void reopen(p.id); }
+                            else { setDialogError(null); setTarget({ kind: 'product', product: p }); }
+                          }}
+                          disabled={busy}
+                          variant="secondary"
+                        />
+                      </div>
                     </div>
-                    <Button
-                      label={isClosed ? t('reopen') : t('close')}
-                      onClick={() => { if (isClosed) { void reopen(p.id); } else { setDialogError(null); setTarget(p); } }}
-                      disabled={busy}
-                      variant="secondary"
-                    />
+
+                    {isOpen ? (
+                      <div className="space-y-3 border-t border-con-line pt-3">
+                        {optionGroups.map((og) => (
+                          <div key={og.id} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Text variant="caption" tone="tertiary" as="h4">
+                                {isRTL ? og.nameAr : og.nameEn}
+                              </Text>
+                              <StatusPill
+                                label={og.isRequired ? t('requiredGroup') : t('optionalGroup')}
+                                tone={og.isRequired ? 'danger' : 'neutral'}
+                              />
+                            </div>
+                            {og.modifiers.map((m) => {
+                              const optClosed = closedOptionIds.has(m.id);
+                              return (
+                                <div
+                                  key={m.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line p-2"
+                                >
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    <Text variant="body" as="span">{modifierName(m)}</Text>
+                                    {optClosed ? <StatusPill label={t('close')} tone="danger" /> : null}
+                                  </div>
+                                  <Button
+                                    label={optClosed ? t('reopen') : t('close')}
+                                    data-testid={`option-${m.id}`}
+                                    onClick={() => {
+                                      if (optClosed) { void reopenOption(m.id); }
+                                      else { setDialogError(null); setTarget({ kind: 'option', modifier: m }); }
+                                    }}
+                                    disabled={busy}
+                                    variant="secondary"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 );
               })}
@@ -255,7 +402,11 @@ export const BranchConsole: React.FC<{ branchId: string | null; i18n: OpsLangVal
 
       {target ? (
         <CloseItemDialog
-          productName={productName(target)}
+          productName={target.kind === 'product'
+            ? productName(target.product)
+            : modifierName(target.modifier)}
+          titleKey={target.kind === 'product' ? 'closeTitle' : 'closeOptionTitle'}
+          hintKey={target.kind === 'product' ? 'autoReopenHint' : 'optionAutoReopenHint'}
           i18n={i18n}
           busy={busy}
           error={dialogError}

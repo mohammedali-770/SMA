@@ -25,11 +25,17 @@ import { OpsChoiceChips } from './OpsChoiceChips';
 export const CloseItemDialog: React.FC<{
   productName: string;
   i18n: OpsLangValue;
+  /** Overridden when the target is one OPTION rather than a whole product. */
+  titleKey?: 'closeTitle' | 'closeOptionTitle';
+  hintKey?: 'autoReopenHint' | 'optionAutoReopenHint';
   busy: boolean;
   error: string | null;
   onCancel: () => void;
   onConfirm: (minutes: number, reason: OpsReasonCode, note: string) => void;
-}> = ({ productName, i18n, busy, error, onCancel, onConfirm }) => {
+}> = ({
+  productName, i18n, busy, error, onCancel, onConfirm,
+  titleKey = 'closeTitle', hintKey = 'autoReopenHint',
+}) => {
   const { t, isRTL } = i18n;
   const [minutes, setMinutes] = useState(DURATION_OPTIONS[0].minutes);
   const [reason, setReason] = useState<OpsReasonCode>(REASON_OPTIONS[0].code);
@@ -37,7 +43,7 @@ export const CloseItemDialog: React.FC<{
 
   return (
     <AdminModal
-      title={t('closeTitle')}
+      title={t(titleKey)}
       subtitle={productName}
       isRTL={isRTL}
       onClose={onCancel}
@@ -87,7 +93,7 @@ export const CloseItemDialog: React.FC<{
           />
         </div>
 
-        <Text variant="caption" tone="tertiary" as="p">{t('autoReopenHint')}</Text>
+        <Text variant="caption" tone="tertiary" as="p">{t(hintKey)}</Text>
       </div>
     </AdminModal>
   );

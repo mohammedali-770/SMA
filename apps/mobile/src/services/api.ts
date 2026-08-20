@@ -20,7 +20,8 @@ import {
   isEmptyPatch, requireCustomerId, toAddressInsert, toAddressPatch, type AddressInput,
 } from './addressPayload';
 import type {
-  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
+  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone,
+  DbBranchModifierAvailability, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
   DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
@@ -122,6 +123,13 @@ export const catalog = {
     ok<DbProductModifierGroup[]>(await supabase.from('product_modifier_groups').select('*')),
   availability: async () =>
     ok<DbBranchAvailability[]>(await supabase.from('branch_product_availability').select('*')),
+  /**
+   * Per-branch OPTION availability. Same shape and same exception-only storage
+   * as product availability: an absent row means the option is on sale.
+   */
+  modifierAvailability: async () =>
+    ok<DbBranchModifierAvailability[]>(
+      await supabase.from('branch_modifier_availability').select('*')),
   settings: async () =>
     ok<DbAppSettings>(await supabase.from('app_settings').select('*').eq('id', true).single()),
   /** Active delivery zones (safe columns only — never `updated_by`). */
@@ -132,13 +140,16 @@ export const catalog = {
       .eq('is_active', true)),
   /** Fetch the whole menu graph in parallel (one app-open round of requests). */
   async all() {
-    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones] =
+    const [branches, categories, products, modifierGroups, modifiers, links, availability,
+           modifierAvailability, settings, deliveryZones] =
       await Promise.all([
         this.branches(), this.categories(), this.products(), this.modifierGroups(),
-        this.modifiers(), this.productModifierGroups(), this.availability(), this.settings(),
+        this.modifiers(), this.productModifierGroups(), this.availability(),
+        this.modifierAvailability(), this.settings(),
         this.deliveryZones(),
       ]);
-    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones };
+    return { branches, categories, products, modifierGroups, modifiers, links, availability,
+             modifierAvailability, settings, deliveryZones };
   },
 };
 

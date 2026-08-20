@@ -414,13 +414,15 @@ export function CheckoutScreen() {
       // an item mid-order. Without this, the only signal was place_order's raw
       // "A product in your cart is not available at the selected branch", at the
       // very end of the flow and without saying WHICH product. Check first, and
-      // name them. A failed refresh returns null; in that case say nothing and
+      // name them. Options count too: a line naming a closed modifier is just
+      // as unorderable as one naming a closed product. A failed refresh returns null; in that case say nothing and
       // let the server remain the authority, rather than blocking a valid order
       // on a flaky network.
       const fresh = await refreshAvailability();
       if (fresh) {
         const soldOut = validateCartForBranch(
-          cart.items, selectedBranch.id, availabilityLookup(fresh),
+          cart.items, selectedBranch.id,
+          availabilityLookup(fresh.products), availabilityLookup(fresh.modifiers),
         ).invalid;
         if (soldOut.length > 0) {
           const names = soldOut.map((it) => pick(it.product.nameEn, it.product.nameAr)).join('، ');

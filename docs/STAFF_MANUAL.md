@@ -99,6 +99,10 @@ becomes unorderable on its own — the app shows it as out of stock and the
 server refuses it — so closing the last option in a required group is the same
 decision as closing the item.
 
+Options you have closed are listed above the menu with their own countdowns and
+a one-tap Reopen, the same as closed items. To close one, find the product, tap
+**Show options**, and close the option you mean.
+
 ### Pausing delivery
 
 Delivery is paused by the **call centre or an administrator**, not by branch

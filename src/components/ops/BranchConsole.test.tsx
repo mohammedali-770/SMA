@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import type { Branch, Category, Product } from '../../types';
+import type { Branch, Category, ModifierGroup, Product } from '../../types';
 
 // The console reads the catalog from the app context and everything else from
 // opsApi. Mock both so the screen can be driven without Supabase or a provider
@@ -16,8 +16,11 @@ vi.mock('../../context/AppContext', () => ({
 
 const mocks = vi.hoisted(() => ({
   branchAvailability: vi.fn(),
+  branchModifierAvailability: vi.fn(),
   snoozeProduct: vi.fn(),
   reopenProduct: vi.fn(),
+  snoozeModifier: vi.fn(),
+  reopenModifier: vi.fn(),
 }));
 vi.mock('../../lib/opsApi', () => ({ opsApi: mocks }));
 
@@ -39,7 +42,16 @@ const product = (id: string, nameEn: string): Product => ({
   imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [],
 });
 
-const fries = product('p1', 'Spicy Fries');
+const heat: ModifierGroup = {
+  id: 'g1', nameAr: 'الحرارة', nameEn: 'Heat level',
+  minSelection: 1, maxSelection: 1, isRequired: true,
+  modifiers: [
+    { id: 'm1', groupId: 'g1', nameAr: 'خفيف', nameEn: 'Mild', price: 0 },
+    { id: 'm2', groupId: 'g1', nameAr: 'حار', nameEn: 'Hot', price: 0 },
+  ],
+};
+
+const fries = { ...product('p1', 'Spicy Fries'), modifierGroupIds: ['g1'] };
 const cola = product('p2', 'Cola');
 
 // English so assertions read plainly; the Arabic default is covered separately.
@@ -51,10 +63,15 @@ const i18n = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useApp.mockReturnValue({ branches: [branch], products: [fries, cola], categories: [category] });
+  useApp.mockReturnValue({
+    branches: [branch], products: [fries, cola], categories: [category], modifierGroups: [heat],
+  });
   mocks.branchAvailability.mockResolvedValue([]);
+  mocks.branchModifierAvailability.mockResolvedValue([]);
   mocks.snoozeProduct.mockResolvedValue(undefined);
   mocks.reopenProduct.mockResolvedValue(undefined);
+  mocks.snoozeModifier.mockResolvedValue(undefined);
+  mocks.reopenModifier.mockResolvedValue(undefined);
 });
 afterEach(cleanup);
 
@@ -147,6 +164,56 @@ describe('BranchConsole', () => {
     fireEvent.click((await screen.findAllByRole('button', { name: /^Close$/i }))[0]);
     fireEvent.click(await screen.findByRole('button', { name: /Confirm closure/i }));
     expect(await screen.findByText(/Not authorized/i)).toBeTruthy();
+  });
+
+  it('closes ONE option without touching the product', async () => {
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /Show options/i }))[0]);
+    fireEvent.click(await screen.findByTestId('option-m1'));
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm closure/i }));
+
+    await waitFor(() => expect(mocks.snoozeModifier).toHaveBeenCalledWith({
+      branchId: 'b1', modifierId: 'm1', minutes: 30, reasonCode: 'out_of_stock', note: '',
+    }));
+    expect(mocks.snoozeProduct).not.toHaveBeenCalled();
+  });
+
+  it('reopens one option through its own RPC', async () => {
+    mocks.branchModifierAvailability.mockResolvedValue([
+      { modifierId: 'm1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    const reopen = await screen.findAllByRole('button', { name: /Reopen/i });
+    fireEvent.click(reopen[0]);
+    await waitFor(() => expect(mocks.reopenModifier).toHaveBeenCalledWith('b1', 'm1'));
+    expect(mocks.reopenProduct).not.toHaveBeenCalled();
+  });
+
+  it('warns that closing the last option in a REQUIRED group took the item off the menu', async () => {
+    // The product's own row still says available. Without this the cashier sees
+    // "open" while customers see "out of stock".
+    mocks.branchModifierAvailability.mockResolvedValue([
+      { modifierId: 'm1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+      { modifierId: 'm2', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    expect(await screen.findByText(/required group has no available option/i)).toBeTruthy();
+  });
+
+  it('does NOT warn while a required group still has one option left', async () => {
+    mocks.branchModifierAvailability.mockResolvedValue([
+      { modifierId: 'm1', isAvailable: false, snoozedUntil: null, reasonCode: null },
+    ]);
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    await screen.findByText('Spicy Fries');
+    expect(screen.queryByText(/required group has no available option/i)).toBeNull();
+  });
+
+  it('offers no options control for a product that has none', async () => {
+    render(<BranchConsole branchId="b1" i18n={i18n} />);
+    await screen.findByText('Cola');
+    // Only Spicy Fries carries a group, so exactly one toggle exists.
+    expect(screen.getAllByRole('button', { name: /Show options/i })).toHaveLength(1);
   });
 
   it('filters the menu by search in either language', async () => {

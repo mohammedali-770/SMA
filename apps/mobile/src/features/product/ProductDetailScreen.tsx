@@ -1,7 +1,7 @@
 /** Product detail + modifier selection; supports editing one existing cart line. */
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../components/Header';
@@ -16,15 +16,34 @@ import { useCart, useCatalog } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Modifier, ModifierGroup } from '../../types/models';
+import { blockingGroups, requiredCount } from '../../lib/orderability';
 import { computeUnitPrice } from '../../utils/format';
 
 export function ProductDetailScreen({ productId, cartItemId }: { productId: string; cartItemId?: string }) {
   const styles = useStyles(); const colors = useThemeColors(); const insets = useSafeAreaInsets();
-  const { t, pick, rtlRow } = useI18n(); const { loading, getProduct, groupsForProduct } = useCatalog(); const cart = useCart();
+  const { t, pick, rtlRow } = useI18n();
+  const { loading, getProduct, groupsForProduct, selectedBranchId, isAvailable, isModifierAvailable } = useCatalog();
+  const cart = useCart();
   const product = getProduct(productId);
   const groups = useMemo(() => product ? groupsForProduct(product) : [], [product, groupsForProduct]);
+  // No branch resolved yet → assume everything is on sale. That matches the
+  // availability table (exceptions only) and place_order remains the authority.
+  const modAvailable = useCallback(
+    (modifierId: string) => !selectedBranchId || isModifierAvailable(modifierId, selectedBranchId),
+    [selectedBranchId, isModifierAvailable],
+  );
   const editingLine = useMemo(() => cartItemId ? cart.items.find((it) => it.cartItemId === cartItemId) ?? null : null, [cart.items, cartItemId]);
-  const [selected, setSelected] = useState<{ [groupId: string]: Modifier[] }>(() => editingLine?.selectedModifiers ?? {});
+  // A line being edited can name an option the branch has since closed. Drop it
+  // from the initial selection rather than carrying it silently: the group then
+  // reads as unmet and the customer chooses again, which is the truth.
+  const [selected, setSelected] = useState<{ [groupId: string]: Modifier[] }>(() => {
+    const initial = editingLine?.selectedModifiers ?? {};
+    const kept: { [groupId: string]: Modifier[] } = {};
+    for (const [groupId, mods] of Object.entries(initial)) {
+      kept[groupId] = mods.filter((m) => modAvailable(m.id));
+    }
+    return kept;
+  });
   const [qty, setQty] = useState(() => editingLine?.quantity ?? 1);
   const [showErrors, setShowErrors] = useState(false);
 
@@ -32,6 +51,7 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   if (!product) return <View style={styles.root}><Header showBack safeTop /><ErrorView message={t('somethingWentWrong')} onRetry={() => router.back()} retryLabel={t('back')} /></View>;
 
   const toggle = (group: ModifierGroup, mod: Modifier) => setSelected((prev) => {
+    if (!modAvailable(mod.id)) return prev;
     const current = prev[group.id] ?? []; const single = group.maxSelection === 1; const already = current.some((m) => m.id === mod.id);
     let next: Modifier[];
     if (single) next = already && !group.isRequired ? [] : [mod];
@@ -39,8 +59,15 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
     else { if (current.length >= group.maxSelection) return prev; next = [...current, mod]; }
     return { ...prev, [group.id]: next };
   });
-  const missingGroups = groups.filter((g) => (selected[g.id] ?? []).length < (g.isRequired ? Math.max(1, g.minSelection) : g.minSelection));
-  const canSave = missingGroups.length === 0; const total = Number((computeUnitPrice(product, selected) * qty).toFixed(2));
+  const missingGroups = groups.filter((g) => (selected[g.id] ?? []).length < requiredCount(g));
+  // Closed options only stop the sale when a REQUIRED group runs out of them
+  // entirely — then no valid selection exists and place_order would refuse the
+  // order. Say so here instead of at the payment screen.
+  const blocked = blockingGroups(groups, modAvailable);
+  const productClosed = Boolean(selectedBranchId) && !isAvailable(product.id, selectedBranchId as string);
+  const orderable = !productClosed && blocked.length === 0;
+  const canSave = orderable && missingGroups.length === 0;
+  const total = Number((computeUnitPrice(product, selected) * qty).toFixed(2));
   const isEditing = Boolean(cartItemId && editingLine);
   const save = () => {
     if (!canSave) { setShowErrors(true); return; }
@@ -57,13 +84,28 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
           <Text variant="display">{pick(product.nameEn, product.nameAr)}</Text>
           {pick(product.descriptionEn, product.descriptionAr) ? <Text variant="body" tone="secondary" style={{ marginTop: space.s1 }}>{pick(product.descriptionEn, product.descriptionAr)}</Text> : null}
           <View style={[styles.metaRow, rtlRow]}><Price amount={product.price} size={typeScale.title.size} color={colors.appText} weight="700" />{product.calories ? <Text variant="caption" tone="tertiary">{product.calories} {t('kcal')}</Text> : null}</View>
+          {!orderable ? <View style={styles.blockedNotice}>
+            <Text variant="label" tone="danger">{t('outOfStock')}</Text>
+            {productClosed ? null : <Text variant="caption" tone="secondary" style={{ marginTop: space.s1 }}>{t('productBlockedByOptions')}</Text>}
+          </View> : null}
           {groups.map((g) => {
-            const count = (selected[g.id] ?? []).length; const min = g.isRequired ? Math.max(1, g.minSelection) : g.minSelection; const unmet = showErrors && count < min;
+            const count = (selected[g.id] ?? []).length; const min = requiredCount(g); const unmet = showErrors && count < min;
             return <View key={g.id} style={[styles.group, unmet && styles.groupUnmet]}>
               <View style={[styles.groupHead, rtlRow]}><Text variant="heading" style={{ flex: 1 }}>{pick(g.nameEn, g.nameAr)}</Text><StatusPill label={g.isRequired ? t('required') : t('optional')} tone={g.isRequired ? 'danger' : 'neutral'} /></View>
               {unmet ? <Text variant="caption" tone="danger" style={{ marginBottom: space.s1 }}>{t('required')} · {min}</Text> : null}
               <View style={{ gap: space.s2 }}>{g.modifiers.map((m) => {
                 const checked = (selected[g.id] ?? []).some((x) => x.id === m.id);
+                // A closed option renders as a plain View, not a disabled
+                // Pressable: there is no press to swallow, so it cannot be
+                // tapped by accident or reached by the accessibility focus
+                // order as something actionable.
+                if (!modAvailable(m.id)) {
+                  return <View key={m.id} style={[styles.modRow, rtlRow, styles.modRowOff]} accessibilityLabel={`${pick(m.nameEn, m.nameAr)} — ${t('optionOutOfStock')}`}>
+                    <View style={[styles.check, g.maxSelection === 1 ? styles.radio : null]} />
+                    <Text variant="body" tone="tertiary" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>
+                    <StatusPill label={t('optionOutOfStock')} tone="neutral" />
+                  </View>;
+                }
                 return <Pressable key={m.id} style={[styles.modRow, rtlRow, checked && styles.modRowOn]} onPress={() => toggle(g, m)} accessibilityRole={g.maxSelection === 1 ? 'radio' : 'checkbox'} accessibilityState={{ checked }}>
                   <View style={[styles.check, g.maxSelection === 1 ? styles.radio : null, checked && styles.checkOn]}>{checked ? <Text variant="label" tone="onEmber" align="center">✓</Text> : null}</View>
                   <Text variant="body" style={{ flex: 1 }}>{pick(m.nameEn, m.nameAr)}</Text>{m.price > 0 ? <Price amount={m.price} prefix="+" size={typeScale.label.size} color={colors.ember} weight="700" /> : null}
@@ -87,7 +129,8 @@ const useStyles = makeStyles((colors) => ({
   metaRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.s4, marginTop: space.s3 },
   group: { marginTop: space.s4, backgroundColor: colors.appSurface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.appLine, padding: space.s3 }, groupUnmet: { borderColor: colors.danger },
   groupHead: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, marginBottom: space.s2, gap: space.s2 },
-  modRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.s3, backgroundColor: colors.appSurface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.appLine, padding: space.s3, minHeight: 48 }, modRowOn: { borderColor: colors.ember, backgroundColor: colors.appSurface2 },
+  modRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.s3, backgroundColor: colors.appSurface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.appLine, padding: space.s3, minHeight: 48 }, modRowOn: { borderColor: colors.ember, backgroundColor: colors.appSurface2 }, modRowOff: { backgroundColor: colors.disabledBg, opacity: 0.6 },
+  blockedNotice: { marginTop: space.s3, backgroundColor: colors.dangerTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.dangerLine, padding: space.s3 },
   check: { width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.appLine, alignItems: 'center' as const, justifyContent: 'center' as const }, radio: { borderRadius: 12 }, checkOn: { backgroundColor: colors.ember, borderColor: colors.ember },
   qtyRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, marginTop: space.s5 },
   footer: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, backgroundColor: colors.appSurface, borderTopWidth: 1, borderTopColor: colors.appLine, paddingHorizontal: space.s4, paddingTop: space.s3 },
