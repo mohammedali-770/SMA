@@ -90,6 +90,28 @@ and why, confirm. Closed items are listed at the top of the screen with a
 countdown and a one-tap Reopen. The branch is fixed to the one your account is
 linked to, so there is no wrong branch to pick.
 
+### Pausing delivery
+
+Delivery is paused by the **call centre or an administrator**, not by branch
+staff — the branch owns what is sellable, the call centre owns where it can go.
+Pausing delivery never affects pickup: the branch keeps trading over the counter.
+
+There are two controls on the branch card and they mean different things. **Pause
+delivery for…** takes a duration and a reason and resumes by itself. **Pause
+delivery (no timer)** stays off until somebody turns it back on — use it only
+when delivery is off until further notice.
+
+A branch with delivery paused simply stops appearing as a delivery option. If
+another branch covers the same area the app uses that one instead; only when none
+remain does the customer see a message.
+
+### Delivery area names
+
+The named areas on a branch are a **reference list for answering the phone**.
+Disabling one does **not** stop the app accepting orders from that area —
+delivery is decided by the branch's map area, not by these names. If you need to
+actually stop delivery, pause delivery for the branch.
+
 Two kinds of closure now exist, and the difference matters:
 
 - A **timed** closure carries a duration and a reason, and reopens by itself when

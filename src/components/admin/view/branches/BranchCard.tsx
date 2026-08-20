@@ -50,6 +50,7 @@ export function BranchCard({
   onEdit,
   onOpenZone,
   onDelete,
+  onPauseDelivery,
 }: {
   branch: Branch;
   products: Product[];
@@ -62,6 +63,8 @@ export function BranchCard({
   onToggleProduct: (productId: string) => void;
   onEdit: () => void;
   onOpenZone: () => void;
+  /** Opens the timed-pause dialog. The toggle beside it stays untimed. */
+  onPauseDelivery?: () => void;
   onDelete: () => void;
 }) {
   const t = ADMIN_LOCALES[adminLang];
@@ -196,9 +199,24 @@ export function BranchCard({
           <Text variant="caption" tone={deliveryClosed ? 'warning' : 'tertiary'} as="span">
             {deliveryClosed
               ? (isRTL ? 'التوصيل موقوف مؤقتاً' : 'Delivery temporarily closed')
-              : (isRTL ? 'إيقاف التوصيل مؤقتاً' : 'Pause delivery temporarily')}
+              : (isRTL ? 'إيقاف التوصيل بدون مدة' : 'Pause delivery (no timer)')}
           </Text>
         </button>
+        {/* The timed pause is a separate control, not a replacement: "off until
+            further notice" and "off for an hour" are different decisions, and
+            only the second one resumes itself. */}
+        {!deliveryClosed && onPauseDelivery && (
+          <button
+            type="button"
+            onClick={onPauseDelivery}
+            disabled={isAccountant}
+            className={`${ROW_BTN} border-con-line bg-con-surface-2`}
+          >
+            <Text variant="caption" tone="tertiary" as="span">
+              {isRTL ? 'إيقاف التوصيل لمدة…' : 'Pause delivery for…'}
+            </Text>
+          </button>
+        )}
 
         <div className="space-y-1.5 border-t border-con-line pt-2">
           <div className="flex items-center justify-between gap-2">

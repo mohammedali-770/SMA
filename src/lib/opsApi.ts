@@ -16,6 +16,14 @@ import { supabase } from './supabase';
  * catalog write policy is `is_admin()` only. Authorization is re-checked
  * server-side in every case.
  */
+/** Reasons a branch's delivery, or one advisory area, gets paused. */
+export type DeliveryReasonCode =
+  | 'no_driver'
+  | 'weather'
+  | 'kitchen_overload'
+  | 'area_incident'
+  | 'other';
+
 export type OpsReasonCode =
   | 'out_of_stock'
   | 'supplier_delay'
@@ -89,6 +97,62 @@ export const opsApi = {
       p_branch_id: branchId,
       p_product_id: productId,
     });
+    fail(error);
+  },
+
+  /**
+   * Pause a branch's delivery for a bounded period.
+   *
+   * Authorized server-side for admins and the call centre only — branch staff
+   * are deliberately excluded, the mirror image of item snoozing, which
+   * excludes the call centre. Pickup is unaffected: pausing delivery must never
+   * take a whole branch offline.
+   */
+  async pauseDelivery(input: {
+    branchId: string;
+    minutes: number;
+    reasonCode: DeliveryReasonCode;
+    note?: string | null;
+  }): Promise<void> {
+    const { error } = await supabase.rpc('set_branch_delivery_pause', {
+      p_branch_id: input.branchId,
+      p_minutes: input.minutes,
+      p_reason_code: input.reasonCode,
+      p_note: input.note?.trim() ? input.note.trim() : null,
+    });
+    fail(error);
+  },
+
+  /** Resume delivery immediately. Idempotent server-side. */
+  async resumeDelivery(branchId: string): Promise<void> {
+    const { error } = await supabase.rpc('clear_branch_delivery_pause', {
+      p_branch_id: branchId,
+    });
+    fail(error);
+  },
+
+  /**
+   * Disable one ADVISORY named area. This does not stop the app accepting
+   * orders from it — delivery eligibility is decided solely by the branch
+   * polygon. The area list exists for call-centre staff taking phone orders.
+   */
+  async disableArea(input: {
+    areaId: string;
+    minutes: number;
+    reasonCode: DeliveryReasonCode;
+    note?: string | null;
+  }): Promise<void> {
+    const { error } = await supabase.rpc('set_delivery_area_disabled', {
+      p_area_id: input.areaId,
+      p_minutes: input.minutes,
+      p_reason_code: input.reasonCode,
+      p_note: input.note?.trim() ? input.note.trim() : null,
+    });
+    fail(error);
+  },
+
+  async enableArea(areaId: string): Promise<void> {
+    const { error } = await supabase.rpc('clear_delivery_area_disabled', { p_area_id: areaId });
     fail(error);
   },
 };

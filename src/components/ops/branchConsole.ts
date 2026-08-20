@@ -4,7 +4,7 @@
  */
 
 import type { Category, Product } from '../../types';
-import type { BranchAvailabilityRow, OpsReasonCode } from '../../lib/opsApi';
+import type { BranchAvailabilityRow, DeliveryReasonCode, OpsReasonCode } from '../../lib/opsApi';
 import type { OpsStringKey } from './opsStrings';
 
 /**
@@ -136,3 +136,19 @@ export function searchableGroups(
 
   return groups;
 }
+
+/**
+ * Delivery pauses use the same duration ladder as item closures — same hardware,
+ * same hands, same expectations — but their own reasons: what stops delivery is
+ * rarely what empties a fryer.
+ */
+export const DELIVERY_DURATION_OPTIONS = DURATION_OPTIONS;
+
+/** Must stay in step with the reason vocabulary in set_branch_delivery_pause. */
+export const DELIVERY_REASON_OPTIONS: { code: DeliveryReasonCode; key: OpsStringKey }[] = [
+  { code: 'no_driver',        key: 'dreason_no_driver' },
+  { code: 'weather',          key: 'dreason_weather' },
+  { code: 'kitchen_overload', key: 'dreason_kitchen_overload' },
+  { code: 'area_incident',    key: 'dreason_area_incident' },
+  { code: 'other',            key: 'dreason_other' },
+];

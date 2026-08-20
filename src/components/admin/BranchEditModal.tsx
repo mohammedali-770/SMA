@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
 
 import { Button } from '../../design-system/ui/Button';
@@ -9,6 +9,10 @@ import { Text } from '../../design-system/ui/Text';
 import type { Branch } from '../../types';
 import { AdminModal } from './view/shared/AdminModal';
 import { ToggleChip } from './view/shared/ToggleChip';
+import { WorkingHoursEditor } from './view/branches/WorkingHoursEditor';
+import { DeliveryAreasEditor } from './view/branches/DeliveryAreasEditor';
+import { validateWeek, weekFrom } from './view/branches/workingHours';
+import { WorkingHoursDay, branchConfig } from '../../lib/branchConfigApi';
 
 // Lazy so mapbox-gl only loads when the modal is actually opened.
 const LocationPicker = React.lazy(() =>
@@ -44,6 +48,11 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
   const [addressEn, setAddressEn] = useState(branch.addressEn ?? '');
   const [addressAr, setAddressAr] = useState(branch.addressAr ?? '');
   const [phone, setPhone] = useState(branch.phone ?? '');
+  const [email, setEmail] = useState(branch.email ?? '');
+  // Hours live in their own table, so they load here and save alongside the
+  // branch patch — one Save button, not two.
+  const [week, setWeek] = useState<WorkingHoursDay[]>(() => weekFrom([]));
+  const [hoursLoaded, setHoursLoaded] = useState(false);
   const [lat, setLat] = useState<number>(Number.isFinite(branch.latitude) ? branch.latitude : 0);
   const [lng, setLng] = useState<number>(Number.isFinite(branch.longitude) ? branch.longitude : 0);
   const [deliveryFee, setDeliveryFee] = useState<number>(branch.deliveryFee ?? 0);
@@ -68,7 +77,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
 
   const handleSave = async () => {
     setError(null);
-    const v = validate();
+    const v = validate() ?? validateWeek(week, isRTL);
     if (v) { setError(v); return; }
     setBusy(true);
     try {
@@ -79,7 +88,11 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
         latitude: lat, longitude: lng,
         deliveryFee, minDeliveryOrder, estimatedDeliveryMinutes: eta,
         deliveryEnabled, pickupEnabled, isActive,
+        email: email.trim(),
       });
+      // Hours are a separate table with its own admin RPC. Written after the
+      // branch patch so a rejected branch edit does not leave hours changed.
+      if (hoursLoaded) await branchConfig.saveWorkingHours(branch.id, week);
       onClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : (isRTL ? 'فشل الحفظ.' : 'Save failed.'));
@@ -88,11 +101,29 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
     }
   };
 
+  useEffect(() => {
+    let disposed = false;
+    void (async () => {
+      try {
+        const stored = await branchConfig.workingHours(branch.id);
+        if (!disposed) setWeek(weekFrom(stored));
+      } catch {
+        // Hours are supplementary; a failure here must not block editing the
+        // branch itself. The row simply shows every day closed until reload.
+      } finally {
+        if (!disposed) setHoursLoaded(true);
+      }
+    })();
+    return () => { disposed = true; };
+  }, [branch.id]);
+
   const label = (en: string, ar: string) => (isRTL ? ar : en);
 
   return (
     <AdminModal
       title={`${disabled ? label('View branch', 'عرض الفرع') : label('Edit branch', 'تعديل الفرع')}: ${isRTL ? branch.nameAr : branch.nameEn}`}
+      // Seven weekday rows and an area list do not fit the default max-w-lg.
+      size="xl"
       isRTL={isRTL}
       onClose={onClose}
       footer={
@@ -115,6 +146,7 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
         <Field label={label('Address (English)', 'العنوان (إنجليزي)')} value={addressEn} onValueChange={setAddressEn} disabled={disabled} />
         <Field label={label('Address (Arabic)', 'العنوان (عربي)')} value={addressAr} onValueChange={setAddressAr} disabled={disabled} dir="rtl" />
         <Field label={label('Phone', 'الهاتف')} value={phone} onValueChange={setPhone} disabled={disabled} numeric placeholder="+9665XXXXXXXX" />
+        <Field label={label('Contact email', 'البريد الإلكتروني')} type="email" value={email} onValueChange={setEmail} disabled={disabled} placeholder="branch@example.com" hint={label('Visible to customers, like the phone number.', 'ظاهر للعملاء، مثل رقم الهاتف.')} />
         <Field label={label('Estimated delivery (min)', 'وقت التوصيل (دقيقة)')} type="number" value={etaMin} onValueChange={setEtaMin} disabled={disabled} numeric placeholder="—" />
         <Field label={label('Delivery fee (SAR)', 'رسوم التوصيل')} type="number" value={String(deliveryFee)} onValueChange={(v) => setDeliveryFee(num(v))} disabled={disabled} numeric />
         <Field label={label('Delivery minimum (SAR)', 'الحد الأدنى للتوصيل')} type="number" value={String(minDeliveryOrder)} onValueChange={(v) => setMinDeliveryOrder(num(v))} disabled={disabled} numeric />
@@ -154,6 +186,10 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
         <ToggleChip on={pickupEnabled} disabled={disabled} onToggle={() => setPickupEnabled(v => !v)} label={label('Pickup', 'الاستلام')} />
         <ToggleChip on={isActive} disabled={disabled} onToggle={() => setIsActive(v => !v)} label={label('Open', 'مفتوح')} />
       </div>
+
+      <WorkingHoursEditor week={week} disabled={disabled} isRTL={isRTL} onChange={setWeek} />
+
+      <DeliveryAreasEditor branchId={branch.id} disabled={disabled} isRTL={isRTL} />
 
       {error && <Notice title={error} tone="blocking" />}
     </AdminModal>

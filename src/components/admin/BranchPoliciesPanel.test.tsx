@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import type { Branch } from '../../types';
 
@@ -17,6 +17,9 @@ vi.mock('../../context/AppContext', () => ({
   AppContext: React.createContext(undefined),
   useApp: () => useApp(),
 }));
+
+const opsMocks = vi.hoisted(() => ({ pauseDelivery: vi.fn() }));
+vi.mock('../../lib/opsApi', () => ({ opsApi: opsMocks }));
 
 import { BranchPoliciesPanel } from './BranchPoliciesPanel';
 
@@ -118,5 +121,59 @@ describe('BranchPoliciesPanel — branch deletion', () => {
 
     resolveDelete?.();
     await waitFor(() => expect(deleteBtn('Branch A').disabled).toBe(false));
+  });
+});
+
+describe('timed delivery pause', () => {
+  beforeEach(() => { opsMocks.pauseDelivery.mockReset().mockResolvedValue(undefined); });
+
+  it('offers a timed pause alongside the untimed toggle', () => {
+    // Two controls on purpose: "off until further notice" and "off for an hour"
+    // are different decisions, and only the second resumes itself.
+    mockContext();
+    render(<BranchPoliciesPanel />);
+    expect(screen.getAllByRole('button', { name: /Pause delivery \(no timer\)/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /Pause delivery for…/i }).length).toBeGreaterThan(0);
+  });
+
+  it('pauses through the RPC with the chosen duration and reason', async () => {
+    mockContext();
+    render(<BranchPoliciesPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Pause delivery for…/i })[0]);
+
+    fireEvent.click(await screen.findByRole('button', { name: '3 hours' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Weather' }));
+    fireEvent.click(screen.getByRole('button', { name: /Confirm pause/i }));
+
+    await waitFor(() => expect(opsMocks.pauseDelivery).toHaveBeenCalledWith({
+      branchId: 'a', minutes: 180, reasonCode: 'weather', note: '',
+    }));
+  });
+
+  it('never offers an untimed option inside the timed dialog', async () => {
+    mockContext();
+    render(<BranchPoliciesPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Pause delivery for…/i })[0]);
+    await screen.findByRole('button', { name: '30 minutes' });
+    // Scoped to the dialog: the untimed toggle legitimately exists on the cards
+    // behind it, and that is the whole distinction being asserted.
+    const dialog = within(screen.getByRole('dialog'));
+    expect(dialog.queryByRole('button', { name: /no timer|until i resume|indefinite/i })).toBeNull();
+  });
+
+  it('shows a server refusal instead of closing as if it worked', async () => {
+    opsMocks.pauseDelivery.mockRejectedValue(new Error('Not authorized to change delivery'));
+    mockContext();
+    render(<BranchPoliciesPanel />);
+    fireEvent.click(screen.getAllByRole('button', { name: /Pause delivery for…/i })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm pause/i }));
+    expect(await screen.findByText(/Not authorized to change delivery/i)).toBeTruthy();
+  });
+
+  it('hides the timed pause from a read-only accountant', () => {
+    mockContext({ currentUser: { role: 'accountant' } });
+    render(<BranchPoliciesPanel />);
+    const btns = screen.queryAllByRole('button', { name: /Pause delivery for…/i }) as HTMLButtonElement[];
+    expect(btns.every((b) => b.disabled)).toBe(true);
   });
 });

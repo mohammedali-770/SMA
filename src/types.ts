@@ -25,6 +25,8 @@ export interface Branch {
   addressAr: string;
   addressEn: string;
   phone: string;
+  /** Public branch contact address. Readable by anonymous customers, like phone. */
+  email?: string;
   latitude: number;
   longitude: number;
   isActive: boolean;

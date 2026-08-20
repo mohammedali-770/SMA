@@ -9,36 +9,40 @@ import { AdminModal } from '../admin/view/shared/AdminModal';
 import { Button } from '../../design-system/ui/Button';
 import { Notice } from '../../design-system/ui/Notice';
 import { Text } from '../../design-system/ui/Text';
-import type { OpsReasonCode } from '../../lib/opsApi';
-import { DURATION_OPTIONS, REASON_OPTIONS } from './branchConsole';
-import type { OpsLangValue } from './useOpsLang';
+import type { DeliveryReasonCode } from '../../lib/opsApi';
+import { DELIVERY_DURATION_OPTIONS, DELIVERY_REASON_OPTIONS } from './branchConsole';
 import { OpsChoiceChips } from './OpsChoiceChips';
+import { OpsLang, opsT } from './opsStrings';
 
 /**
- * The close flow: pick how long, pick why, optionally say more.
+ * Pause one branch's delivery for a bounded period.
  *
- * Both choices are pre-selected — 30 minutes and "out of stock" are what a
- * cashier means the overwhelming majority of the time — so the common case is
- * open, confirm, done. Nothing here offers an untimed closure: the whole point
- * is that this reopens itself.
+ * Takes a bare language rather than the ops i18n object, so the admin console
+ * (which has its own `adminLang`) and the call-centre console can render the
+ * same dialog. Duplicating it per surface is how the two would drift.
+ *
+ * Like the item dialog there is no untimed option here: the untimed pause is the
+ * separate admin toggle on the branch card, which is a different decision with a
+ * different meaning ("off until further notice" rather than "off for an hour").
  */
-export const CloseItemDialog: React.FC<{
-  productName: string;
-  i18n: OpsLangValue;
+export const PauseDeliveryDialog: React.FC<{
+  branchName: string;
+  lang: OpsLang;
   busy: boolean;
   error: string | null;
   onCancel: () => void;
-  onConfirm: (minutes: number, reason: OpsReasonCode, note: string) => void;
-}> = ({ productName, i18n, busy, error, onCancel, onConfirm }) => {
-  const { t, isRTL } = i18n;
-  const [minutes, setMinutes] = useState(DURATION_OPTIONS[0].minutes);
-  const [reason, setReason] = useState<OpsReasonCode>(REASON_OPTIONS[0].code);
+  onConfirm: (minutes: number, reason: DeliveryReasonCode, note: string) => void;
+}> = ({ branchName, lang, busy, error, onCancel, onConfirm }) => {
+  const t = (k: Parameters<typeof opsT>[1]) => opsT(lang, k);
+  const isRTL = lang === 'ar';
+  const [minutes, setMinutes] = useState(DELIVERY_DURATION_OPTIONS[0].minutes);
+  const [reason, setReason] = useState<DeliveryReasonCode>(DELIVERY_REASON_OPTIONS[0].code);
   const [note, setNote] = useState('');
 
   return (
     <AdminModal
-      title={t('closeTitle')}
-      subtitle={productName}
+      title={t('pauseDeliveryTitle')}
+      subtitle={branchName}
       isRTL={isRTL}
       onClose={onCancel}
       size="md"
@@ -47,7 +51,7 @@ export const CloseItemDialog: React.FC<{
         <div className="flex flex-wrap justify-end gap-2">
           <Button label={t('cancel')} onClick={onCancel} variant="secondary" disabled={busy} />
           <Button
-            label={busy ? t('working') : t('confirmClose')}
+            label={busy ? t('working') : t('confirmPause')}
             onClick={() => onConfirm(minutes, reason, note)}
             disabled={busy}
           />
@@ -59,7 +63,7 @@ export const CloseItemDialog: React.FC<{
 
         <OpsChoiceChips
           legend={t('durationLabel')}
-          options={DURATION_OPTIONS.map((d) => ({ value: d.minutes, label: t(d.key) }))}
+          options={DELIVERY_DURATION_OPTIONS.map((d) => ({ value: d.minutes, label: t(d.key) }))}
           value={minutes}
           disabled={busy}
           onChange={(v) => setMinutes(v)}
@@ -67,7 +71,7 @@ export const CloseItemDialog: React.FC<{
 
         <OpsChoiceChips
           legend={t('reasonLabel')}
-          options={REASON_OPTIONS.map((r) => ({ value: r.code, label: t(r.key) }))}
+          options={DELIVERY_REASON_OPTIONS.map((r) => ({ value: r.code, label: t(r.key) }))}
           value={reason}
           disabled={busy}
           onChange={(v) => setReason(v)}
@@ -87,7 +91,7 @@ export const CloseItemDialog: React.FC<{
           />
         </div>
 
-        <Text variant="caption" tone="tertiary" as="p">{t('autoReopenHint')}</Text>
+        <Text variant="caption" tone="tertiary" as="p">{t('deliveryAutoResumeHint')}</Text>
       </div>
     </AdminModal>
   );

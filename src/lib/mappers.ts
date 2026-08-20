@@ -32,6 +32,7 @@ export function mapBranch(b: DbBranch): Branch {
     addressEn: b.address_en ?? '',
     addressAr: b.address_ar ?? '',
     phone: b.phone ?? '',
+    email: b.email ?? undefined,
     latitude: b.latitude ?? 0,
     longitude: b.longitude ?? 0,
     isActive: b.is_active,
@@ -366,6 +367,7 @@ export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
   if (patch.addressEn !== undefined) out.address_en = patch.addressEn;
   if (patch.addressAr !== undefined) out.address_ar = patch.addressAr;
   if (patch.phone !== undefined) out.phone = patch.phone;
+  if (patch.email !== undefined) out.email = patch.email || null;
   if (patch.latitude !== undefined) out.latitude = patch.latitude;
   if (patch.longitude !== undefined) out.longitude = patch.longitude;
   if (patch.lazywaitBranchId !== undefined) out.lazywait_branch_id = patch.lazywaitBranchId || null;

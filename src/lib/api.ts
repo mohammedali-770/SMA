@@ -28,6 +28,7 @@ export type OrderType = 'delivery' | 'pickup';
 export interface DbBranch {
   id: string; name_en: string; name_ar: string;
   address_en: string | null; address_ar: string | null; phone: string | null;
+  email?: string | null;
   latitude: number | null; longitude: number | null;
   delivery_fee: number; min_delivery_order: number; is_active: boolean;
   lazywait_branch_id?: string | null;

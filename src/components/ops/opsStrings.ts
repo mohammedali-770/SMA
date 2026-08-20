@@ -76,6 +76,17 @@ export const OPS_STRINGS = {
     reopeningNow: 'يعود الآن',
     untimed: 'موقوف بدون مدة',
 
+    // delivery pause
+    pauseDeliveryTitle: 'إيقاف التوصيل مؤقتاً',
+    pauseDelivery: 'إيقاف التوصيل لمدة…',
+    confirmPause: 'تأكيد الإيقاف',
+    deliveryAutoResumeHint: 'سيعود التوصيل تلقائياً عند انتهاء المدة. الاستلام من الفرع لا يتأثر.',
+    dreason_no_driver: 'لا يوجد سائق',
+    dreason_weather: 'الطقس',
+    dreason_kitchen_overload: 'ضغط على المطبخ',
+    dreason_area_incident: 'ظرف في المنطقة',
+    dreason_other: 'سبب آخر',
+
     // sign-in
     authSignInTitle: 'تسجيل الدخول إلى حسابك',
     authSignUpTitle: 'إنشاء حساب جديد',
@@ -138,6 +149,16 @@ export const OPS_STRINGS = {
     backIn: 'Back in',
     reopeningNow: 'Reopening now',
     untimed: 'Closed with no timer',
+
+    pauseDeliveryTitle: 'Pause delivery temporarily',
+    pauseDelivery: 'Pause delivery for…',
+    confirmPause: 'Confirm pause',
+    deliveryAutoResumeHint: 'Delivery resumes by itself when the timer runs out. Pickup is unaffected.',
+    dreason_no_driver: 'No driver',
+    dreason_weather: 'Weather',
+    dreason_kitchen_overload: 'Kitchen overloaded',
+    dreason_area_incident: 'Incident in the area',
+    dreason_other: 'Other',
 
     authSignInTitle: 'Sign in to your account',
     authSignUpTitle: 'Create your account',
