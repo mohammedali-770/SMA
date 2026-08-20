@@ -203,6 +203,43 @@ must not block a valid order.
 The app deliberately gets no realtime subscription; it has never had one, and
 refetch-on-focus is enough for this.
 
+#### Timed delivery pause, advisory areas, working hours
+
+`branches.delivery_temporarily_closed` stays the **authoritative** flag, with
+`delivery_closed_until` as the scheduled resume time, so the two byte-identical
+delivery guards keep their current meaning and no order-path function was
+modified. Those guards live in `place_order` and — note — in
+**`compute_order_snapshot`**, not `begin_checkout_session`, which declares no
+branches rowtype. A pause with `delivery_closed_until IS NULL` is the admin's
+untimed toggle and the sweeper never resumes it.
+
+Authorization is the mirror image of item snoozing: delivery pause and area
+disabling are **`is_admin() OR is_call_center()`**, deliberately not
+`is_ops_operator()`, which would admit branch staff. Between the two files the
+split is: the branch owns what is sellable, the call centre owns where it can
+go, and an admin can do both.
+
+`branch_delivery_areas` and `branch_working_hours` are **advisory and enforce
+nothing**. Delivery eligibility is decided solely by
+`point_in_active_delivery_zone` against the branch polygon, and branch
+open/closed for ordering remains `is_active`. Disabling a named area does not
+stop the app accepting orders from it — the names exist for call-centre staff
+taking phone orders. Both tables carry that in a `comment on table`, and the SQL
+suite asserts it by placing a real order with an area disabled.
+
+Working hours are one window per weekday; a `closes_at` at or before `opens_at`
+means the window **crosses midnight** (12:00 → 02:00), which is normal for a
+late-night branch and must not be "fixed" as inverted data. Do not confuse this
+with `app_settings.support_hours_*`, which is one global free-text *support*
+hours string shown on the customer Legal screen.
+
+Exposure follows the same rule as items: `branches` is readable by `anon` and
+both clients request `select('*')`, so the staff actor and any free text live
+only on `branch_delivery_events`. A reason code is kept off `branches` too — a
+paused branch simply drops out of the delivery list, so unlike a product's
+reason it has no customer-facing use and no reason to be exposed. Area names are
+ops-only; working hours are public business information.
+
 #### Timed item availability
 
 `branch_product_availability` carries `is_available` plus a `snoozed_until`
