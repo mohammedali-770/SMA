@@ -13,8 +13,13 @@ import { pushAdmin, type PushSendResult } from '../../lib/api';
  * Admin push tools (below the push credentials card):
  *  - device / promo-opt-in counts (admin-only RLS reads),
  *  - "Send test" → the calling admin's OWN devices,
- *  - immediate promotional broadcast (EN+AR title/body) to OPTED-IN devices
- *    only, with delivery result counts.
+ *  - immediate promotional broadcast (EN+AR title/body) to every device with
+ *    promotions ON, with delivery result counts.
+ *
+ * Wording note: promotions became OPT-OUT on 2026-08-20 (the OS permission
+ * grant enables both channels). This panel therefore says "promotions on"
+ * rather than "opted-in" — the audience is now everyone who has not switched
+ * offers off, not a hand-raised subset, and the broadcast cannot be recalled.
  * Everything is server-enforced by push-dispatch (admin JWT re-verified,
  * master flag gated); accountants see a read-only card.
  * No scheduling, segmentation, analytics, topics, or custom sounds.
@@ -72,8 +77,8 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
             <Text variant="label" as="p">{isRTL ? 'أدوات الإشعارات' : 'Push tools'}</Text>
             <Text variant="caption" tone="tertiary" as="p">
               {isRTL
-                ? 'إشعار تجريبي وبثّ ترويجي فوري للمشتركين فقط. يتطلب تفعيل التكامل أعلاه.'
-                : 'Test notification + immediate promo broadcast to opted-in devices only. Requires the integration above to be enabled.'}
+                ? 'إشعار تجريبي وبثّ ترويجي فوري لكل جهاز مفعّل للعروض. يتطلب تفعيل التكامل أعلاه.'
+                : 'Test notification + immediate promo broadcast to every device with promotions on. Requires the integration above to be enabled.'}
             </Text>
           </div>
         </div>
@@ -83,7 +88,7 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
               {isRTL ? `الأجهزة النشطة: ${counts.activeDevices}` : `Active devices: ${counts.activeDevices}`}
             </Text>
             <Text variant="caption" tone="secondary" numeric as="p">
-              {isRTL ? `مشتركو العروض: ${counts.promoOptIns}` : `Promo opt-ins: ${counts.promoOptIns}`}
+              {isRTL ? `أجهزة مفعّلة للعروض: ${counts.promoOptIns}` : `Promotions on: ${counts.promoOptIns}`}
             </Text>
           </div>
         ) : null}
@@ -146,8 +151,8 @@ export const PushToolsPanel: React.FC<{ disabled: boolean }> = ({ disabled }) =>
         <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-ds-md)] border border-warn-line bg-warn-tint p-2.5">
           <Text variant="label" tone="warning" as="span">
             {isRTL
-              ? `إرسال الآن إلى ${counts?.promoOptIns ?? '؟'} جهاز مشترك؟`
-              : `Send now to ${counts?.promoOptIns ?? '?'} opted-in device(s)?`}
+              ? `إرسال الآن إلى ${counts?.promoOptIns ?? '؟'} جهازًا مفعّلًا للعروض؟`
+              : `Send now to ${counts?.promoOptIns ?? '?'} device(s) with promotions on?`}
           </Text>
           <Button
             label={busy === 'broadcast'

@@ -69,10 +69,30 @@ export interface DevicePrefs {
   promosEnabled: boolean;
 }
 
-/** Defaults per spec: order updates ON, promotions strictly OPT-IN (OFF). */
+/**
+ * Defaults applied when a device registers without an explicit choice.
+ *
+ * BOTH CHANNELS ON (owner decision 2026-08-20). The consent moment is the OS
+ * notification permission dialog: granting it turns on every channel, and the
+ * customer never has to switch anything on inside the app. Switching a channel
+ * back off is theirs to do — iOS/Android Settings, or the Profile toggles,
+ * which stay in place for exactly that purpose.
+ *
+ * This REPLACES the previous strictly-opt-in marketing default
+ * (`promosEnabled: false`). The database column keeps its own `default false`
+ * (20260714090000_push_notifications.sql:25) and that is deliberate, not an
+ * oversight: every registration path passes both preferences explicitly through
+ * `register_push_device`, so the column default never decides a real device's
+ * targeting and no migration is needed to change this behaviour.
+ *
+ * Store-review note: Apple guideline 4.5.4 expects an explicit in-app opt-in
+ * before marketing push. Under this model the Profile "Offers & promotions"
+ * toggle is the in-app consent surface and it is opt-OUT. Recorded in
+ * CLAUDE.md section 7 and docs/OWNER_ACTIONS.md section 10.
+ */
 export const DEFAULT_DEVICE_PREFS: DevicePrefs = {
   orderUpdatesEnabled: true,
-  promosEnabled: false,
+  promosEnabled: true,
 };
 
 /**
@@ -93,6 +113,39 @@ export function toggleRequiresPermission(before: DevicePrefs, after: DevicePrefs
   const wasOff = !before.orderUpdatesEnabled && !before.promosEnabled;
   const nowOn = after.orderUpdatesEnabled || after.promosEnabled;
   return wasOff && nowOn;
+}
+
+/**
+ * Whether signing in should CLAIM this device for the customer who just
+ * signed in.
+ *
+ * `register_push_device` reassigns the Expo token to the caller, so this one
+ * decision carries both the "notifications survive a sign-out" rule and the
+ * shared-phone safety rule:
+ *
+ *  - no OS permission   → false. Never register what the OS will not deliver,
+ *                         and never prompt from here: iOS allows a single ask
+ *                         and `useFirstRunPermissions` owns it.
+ *  - a row of my own    → false. The token is already mine, so whatever state
+ *                         it is in is a state I chose — still active, or
+ *                         switched off deliberately. Re-registering would
+ *                         reactivate a device the customer had silenced and
+ *                         overwrite their promotions choice. "To stop
+ *                         notifications the customer turns them off" only
+ *                         holds if the next sign-in respects that.
+ *  - no row of my own   → true. Either this device has never registered, or
+ *                         the token still belongs to a PREVIOUS account on a
+ *                         shared phone. Both want a fresh registration under
+ *                         the current customer — which is also what stops the
+ *                         previous owner being targeted on a phone they no
+ *                         longer hold.
+ */
+export function shouldRegisterOnSignIn(input: {
+  permissionGranted: boolean;
+  myDevice: { isActive: boolean } | null;
+}): boolean {
+  if (!input.permissionGranted) return false;
+  return input.myDevice === null;
 }
 
 export type RegistrationStep =

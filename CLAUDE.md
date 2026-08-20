@@ -82,12 +82,23 @@ Push is an **active production customer channel**. Both gates are open:
 **Consequences to hold in mind before touching anything in this area:**
 
 - order-status transitions push to real customers automatically — `order_updates_enabled` defaults **TRUE** at device registration, so an opted-in customer receives received/preparing/ready/out_for_delivery/delivered without any further action;
-- admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true`;
+- admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true` — which since 2026-08-20 means **every device that granted OS notification permission and has not switched offers off**, not the small hand-raised subset it used to be. The confirm line's count is now close to the whole active base; read it before clicking;
+- signing out no longer silences a device. Sign-out used to deactivate the `push_devices` row while the first-run permission flag is device-scoped and never re-raised, so push stayed dead after signing back in. The row is now left alone and the token is re-claimed at the next sign-in (`usePushDeviceSync`). Account **deletion** still deactivates;
 - a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code.
 
 Do not treat the old "push is dormant" framing anywhere as current. Sending an actual broadcast, widening the audience model, adding credentials, or turning the master flag back off all remain owner-approval actions under §5.
 
-Marketing remains **strictly opt-in**: `promos_enabled` defaults FALSE and only the customer can turn it on. Do not change that default, or broaden who a broadcast reaches, without a separate explicit owner decision — it is a consent decision, not a code detail.
+Marketing is **opt-OUT as of the owner decision on 2026-08-20**. The OS notification permission dialog is the single consent moment: granting it registers the device with **both** channels on (`DEFAULT_DEVICE_PREFS` in `notificationPolicy.ts` now sets `promosEnabled: true`), so a customer never switches anything on inside the app. The Profile "Offers & promotions" toggle stays, as the in-app **opt-out**, alongside iOS/Android Settings.
+
+This supersedes the strictly-opt-in rule and the 2026-08-19 reaffirmation recorded in `docs/OWNER_ACTIONS.md` §10. That section is kept, marked superseded, because it also records a fabricated-approval incident that remains worth reading.
+
+What did **not** change, and still needs a separate explicit owner decision:
+
+- **who a broadcast reaches** beyond "every device with `promos_enabled = true`" — targeting and audience-model changes are still consent decisions;
+- the column default `push_devices.promos_enabled default false`, which stays FALSE. Every registration path passes both preferences explicitly through `register_push_device`, so the column default never decides a live device's targeting — this change needed no migration;
+- **existing rows are never silently rewritten.** First run registers only on a permission grant made on that run, and sign-in registers only when the customer holds no row for this token (`shouldRegisterOnFirstRun`, `shouldRegisterOnSignIn` — both tested). A customer who switched offers off keeps that choice through sign-out and sign-in.
+
+**Store-review exposure, stated rather than buried.** Apple guideline 4.5.4 expects an explicit in-app opt-in before marketing push; here the opt-out toggle is the in-app consent surface. This was raised with the owner on 2026-08-20 and accepted. If App Review rejects on 4.5.4, the revert is one line — `promosEnabled: false` in `DEFAULT_DEVICE_PREFS` — not a rebuild of the flow.
 
 ## 8. Production migration commands
 
