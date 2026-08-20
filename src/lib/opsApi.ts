@@ -103,6 +103,25 @@ export const opsApi = {
   },
 
   /**
+   * Option-availability exceptions across EVERY branch, for the call-centre
+   * board. One unfiltered read, for the same reason as `allAvailability`: the
+   * table stores only exceptions, so it is small by construction.
+   */
+  async allModifierAvailability(): Promise<(BranchModifierAvailabilityRow & { branchId: string })[]> {
+    const { data, error } = await supabase
+      .from('branch_modifier_availability')
+      .select('branch_id, modifier_id, is_available, snoozed_until, reason_code');
+    fail(error);
+    return (data ?? []).map((r) => ({
+      branchId: r.branch_id as string,
+      modifierId: r.modifier_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
+  /**
    * Option-availability exceptions for one branch. Exceptions only, exactly as
    * for products — an absent row means the option is on sale.
    */

@@ -129,6 +129,23 @@ it currently cannot sell with the time each item returns, and the two controls
 call-centre staff may use: pause or resume delivery, and disable or enable a
 named area.
 
+**Two reasons an item cannot be ordered, and they need different answers.** An
+item the branch **closed** is their decision — ask them to reopen it. An item
+listed as **blocked** was never closed by anyone: every choice in one of its
+required groups ran out, so no valid order exists. Telling a branch "you closed
+the burger" when they did not wastes the call, so the panel names the cause
+first — the group, how many of its options are off, and how many items that
+takes off the menu. Only the branch can reopen an option; the call centre cannot.
+
+A time shown as **Earliest return** is worked out from the options' own timers,
+not set by anyone. It is the soonest the item *could* come back, so treat it as
+an estimate rather than a promise — unlike **Back in**, which is a timer a
+person actually set.
+
+Branches whose only closed options still leave every item orderable are listed
+separately below the board, by option name. They are not a problem; that list is
+there to answer "can I still get garlic sauce at Jeddah?".
+
 A new closure anywhere raises a notice and, unless muted, a short beep. Muting
 silences the sound only — the notice still appears.
 
