@@ -73,6 +73,27 @@ export const opsApi = {
     }));
   },
 
+  /**
+   * Availability exceptions across EVERY branch, for the call-centre board.
+   *
+   * One unfiltered read rather than one per branch: the table stores only
+   * exceptions, so it is small by construction, and a per-branch fan-out would
+   * scale with the number of branches for no benefit.
+   */
+  async allAvailability(): Promise<(BranchAvailabilityRow & { branchId: string })[]> {
+    const { data, error } = await supabase
+      .from('branch_product_availability')
+      .select('branch_id, product_id, is_available, snoozed_until, reason_code');
+    fail(error);
+    return (data ?? []).map((r) => ({
+      branchId: r.branch_id as string,
+      productId: r.product_id as string,
+      isAvailable: r.is_available as boolean,
+      snoozedUntil: (r.snoozed_until as string | null) ?? null,
+      reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
   /** Close a product at this branch for a bounded number of minutes. */
   async snoozeProduct(input: {
     branchId: string;

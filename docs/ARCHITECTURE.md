@@ -104,6 +104,30 @@ It uses only the catalog already loaded for these roles plus a narrow
 availability read; it never triggers the admin order/profile bootstrap, which
 `is_staff()` would refuse anyway.
 
+The call-centre board shows **only branches with something wrong**, colour-banded
+rather than numerically ranked, with a detail panel carrying contact, trading
+hours, the closed-item list, and the two controls that role is authorized for
+(delivery pause/resume and advisory area toggles). A branch that gains a closure
+raises a toast and an optional sound; that comparison is per-branch, so one
+branch recovering cannot mask another failing.
+
+#### The operations realtime signal
+
+`ops_change_events` carries a branch id and a change kind — never an item, a
+reason or an actor — and is the only new table added to `supabase_realtime`.
+Publishing the data tables directly would be wrong twice over: `postgres_changes`
+re-evaluates RLS per subscriber and delivers whole rows, and
+`branch_product_availability` is readable by `anon`, so every closure at every
+branch would reach every anonymous browser holding a socket. The consoles treat
+an event as a hint to refetch, never as data.
+
+Realtime is an enhancement, never a dependency. `useOpsChangeFeed` mirrors the
+admin order feed: a six-second connect timeout falls back to a fast poll, an
+always-on slow backstop covers a channel that connects but never delivers (what
+a missing publication looks like from the client), refetches are throttled to a
+floor rather than debounced, and the trailing run is kept so an event arriving
+mid-refresh is not lost until the backstop.
+
 ## 3. Authorization and trust boundaries
 
 ### Public/client credentials

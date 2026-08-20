@@ -94,6 +94,25 @@ export const branchConfig = {
     }));
   },
 
+  /** Every branch's areas, for the call-centre board. */
+  async allAreas(): Promise<DeliveryArea[]> {
+    const { data, error } = await supabase
+      .from('branch_delivery_areas')
+      .select('id, branch_id, name_ar, name_en, sort_order, is_disabled, disabled_until')
+      .order('branch_id')
+      .order('sort_order');
+    fail(error);
+    return (data ?? []).map((r) => ({
+      id: r.id as string,
+      branchId: r.branch_id as string,
+      nameAr: r.name_ar as string,
+      nameEn: (r.name_en as string | null) ?? null,
+      sortOrder: r.sort_order as number,
+      isDisabled: r.is_disabled as boolean,
+      disabledUntil: (r.disabled_until as string | null) ?? null,
+    }));
+  },
+
   async addArea(branchId: string, nameAr: string, nameEn?: string | null): Promise<void> {
     const { error } = await supabase.rpc('admin_add_delivery_area', {
       p_branch_id: branchId,

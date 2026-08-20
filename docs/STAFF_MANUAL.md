@@ -105,6 +105,20 @@ A branch with delivery paused simply stops appearing as a delivery option. If
 another branch covers the same area the app uses that one instead; only when none
 remain does the customer see a message.
 
+### The call-centre board
+
+Call-centre staff see a board of **only the branches that need attention** —
+nothing closed means nothing listed, which is the point. A tile turns red when
+that branch's delivery is paused, amber when several things are closed.
+
+Opening a tile gives the branch's phone and email, its trading hours, everything
+it currently cannot sell with the time each item returns, and the two controls
+call-centre staff may use: pause or resume delivery, and disable or enable a
+named area.
+
+A new closure anywhere raises a notice and, unless muted, a short beep. Muting
+silences the sound only — the notice still appears.
+
 ### Delivery area names
 
 The named areas on a branch are a **reference list for answering the phone**.

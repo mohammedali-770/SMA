@@ -4,14 +4,14 @@
  */
 
 import React from 'react';
-import { Headset, Languages } from 'lucide-react';
+import { Languages } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
-import { Card } from '../../design-system/ui/Card';
 import { Notice } from '../../design-system/ui/Notice';
 import { Text } from '../../design-system/ui/Text';
 import { opsApi } from '../../lib/opsApi';
 import { BranchConsole } from './BranchConsole';
+import { CallCentreConsole } from './CallCentreConsole';
 import { useOpsLang } from './useOpsLang';
 
 /**
@@ -53,7 +53,7 @@ export const OpsConsole: React.FC = () => {
   }, [isCallCentre]);
 
   return (
-    <main className="flex-grow w-full max-w-3xl mx-auto p-4 md:p-6 space-y-4" dir={dir}>
+    <main className={`flex-grow w-full mx-auto p-4 md:p-6 space-y-4 ${isCallCentre ? 'max-w-6xl' : 'max-w-3xl'}`} dir={dir}>
       <div className="flex justify-end">
         <button
           type="button"
@@ -66,13 +66,7 @@ export const OpsConsole: React.FC = () => {
       </div>
 
       {isCallCentre ? (
-        <Card className="space-y-3 p-5">
-          <div className="flex items-center gap-3">
-            <Headset className="size-6 text-ember" aria-hidden="true" />
-            <Text variant="title" as="h1">{t('callCentreConsole')}</Text>
-          </div>
-          <Notice title={t('callCentreScope')} tone="info" />
-        </Card>
+        <CallCentreConsole i18n={i18n} />
       ) : resolving ? (
         <Text variant="body" tone="tertiary" as="p">{t('loading')}</Text>
       ) : error ? (
