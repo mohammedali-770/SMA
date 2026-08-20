@@ -296,6 +296,42 @@ The staff user id and the operator's free-text note live exclusively on the
 audit table, which has no anon grant. **Do not add identifying or free-text
 columns to `branch_product_availability`.**
 
+#### Timed modifier availability
+
+Options are closed the same way through `branch_modifier_availability`
+(`branch_id`, `modifier_id`, `is_available`, `snoozed_until`, …), with
+`set_modifier_snooze` / `clear_modifier_snooze` under the same
+`is_admin() OR is_branch_operator(branch)` authorization, the same
+normalize-and-audit trigger pair writing to `branch_availability_events`
+(`modifier_id` set, `product_id` null), and the same sweeper pass — counted
+separately as `modifiers_reopened` so the existing `products_reopened`
+assertions keep measuring what they claim to. Untimed modifier closures are
+never auto-reopened either.
+
+**This is the one part of branch availability that changes the order path.**
+Nothing else enforces per-branch modifier stock: the deferred modifier-contract
+trigger checks cardinality, not availability, and returns early for anything
+that is not a cash order. So `place_order` is re-emitted once, adding exactly
+two things to the `20260710120100` body:
+
+1. an availability lookup inside the **existing** modifier loop, refusing a
+   snoozed option before payment — the same boundary the product check already
+   sits on, and deliberately not a commit-time re-check (see
+   `20260810132000_order_modifier_contract.sql`: re-validating an authorized
+   snapshot against mutable menu data can leave a charged customer without an
+   order);
+2. `and (snoozed_until is null or snoozed_until > now())` on both the product
+   and modifier guards, so an elapsed timer stops blocking immediately instead
+   of up to a minute later when the sweeper next runs. Lazy expiry at read,
+   sweeper for the durable write.
+
+`begin_checkout_session` and `compute_order_snapshot` are **not** touched — they
+are payment-adjacent, and because `is_available` stays authoritative they never
+needed to be. The re-emission also emits **no grants**: `create or replace
+function` preserves the existing ACL, and `20260724200000` deliberately revoked
+`place_order` from `authenticated` in favour of the `place_customer_order`
+wrapper. Re-granting would silently undo that.
+
 ### Order placement
 
 The backend owns the final order facts. A client can propose a cart/order request, but the server re-validates the authoritative inputs such as:

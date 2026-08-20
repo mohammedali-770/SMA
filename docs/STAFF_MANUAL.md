@@ -90,6 +90,15 @@ and why, confirm. Closed items are listed at the top of the screen with a
 countdown and a one-tap Reopen. The branch is fixed to the one your account is
 linked to, so there is no wrong branch to pick.
 
+**One option, not the whole item.** If only a choice is out — one sauce, one
+size, one add-on — close that option instead of the product. The item stays on
+the menu and customers can still order it with anything else in the group.
+Closing an option works exactly like closing an item: a duration, a reason, an
+automatic reopen. If every option in a *required* group is closed, the product
+becomes unorderable on its own — the app shows it as out of stock and the
+server refuses it — so closing the last option in a required group is the same
+decision as closing the item.
+
 ### Pausing delivery
 
 Delivery is paused by the **call centre or an administrator**, not by branch
