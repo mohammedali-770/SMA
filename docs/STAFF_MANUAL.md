@@ -84,6 +84,12 @@ Use the supported Menu/branch-availability control to mark an item unavailable f
 
 Restore availability when the branch can sell it again and verify the correct branch was changed.
 
+Branch staff do this from the **branch console**, which opens automatically on
+sign-in: find the item (search or scroll its category), tap Close, pick how long
+and why, confirm. Closed items are listed at the top of the screen with a
+countdown and a one-tap Reopen. The branch is fixed to the one your account is
+linked to, so there is no wrong branch to pick.
+
 Two kinds of closure now exist, and the difference matters:
 
 - A **timed** closure carries a duration and a reason, and reopens by itself when

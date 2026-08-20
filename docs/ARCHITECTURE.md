@@ -78,6 +78,30 @@ It includes:
 
 Staff roles and privileged operations are enforced server-side; hiding a UI control is never the authorization boundary.
 
+### Branch-operations console — `src/components/ops/`
+
+The same Vite bundle serves a second, much smaller surface for the
+`branch_staff` and `call_center` roles, chosen by `src/lib/roles.ts` and
+deliberately outside `StaffMfaGate`.
+
+It is not a trimmed-down admin console. The branch is pinned from
+`staff_branch_assignments`, so there is no branch picker and the "closed the
+item at the wrong branch" mistake `STAFF_MANUAL.md` warns about cannot be made.
+Closed items sit at the top with live countdowns, because mid-rush the question
+is "what is off and when does it come back", not "where is this in the menu".
+The item list is searched and grouped by category, where the admin equivalent is
+a fixed-height scroll of the entire catalog.
+
+Copy lives in a typed table (`src/components/ops/opsStrings.ts`) following the
+customer app's i18n pattern rather than the admin console's inline ternaries,
+defaults to Arabic and is persisted. The shared sign-in screen reads the same
+preference but defaults to English, so adding the toggle changed nothing for
+existing admins.
+
+It uses only the catalog already loaded for these roles plus a narrow
+availability read; it never triggers the admin order/profile bootstrap, which
+`is_staff()` would refuse anyway.
+
 ## 3. Authorization and trust boundaries
 
 ### Public/client credentials
