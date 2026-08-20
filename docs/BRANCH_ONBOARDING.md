@@ -92,6 +92,8 @@ If delivery is being launched, perform a separate approved delivery process vali
 ## 7. Staff and access readiness
 
 - [ ] intended staff can reach the admin console through the supported role/MFA flow;
+- [ ] the branch has its own `branch_staff` account, created from Admin → Integrations → Staff Access → Accounts and pinned to this branch;
+- [ ] that account signs in with email and password only — branch and call-centre roles are deliberately outside the TOTP requirement (see `ARCHITECTURE.md` §3), so it must not be shared beyond the people working the counter;
 - [ ] no one is sharing a personal/admin credential as branch onboarding;
 - [ ] staff know the Live Orders / receipt/ticket / POS verification workflow;
 - [ ] staff have read `STAFF_MANUAL.md`;

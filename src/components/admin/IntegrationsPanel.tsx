@@ -27,7 +27,7 @@ type IntegrationGroup = 'payments' | 'messaging' | 'pos' | 'staff';
 export const IntegrationsPanel: React.FC = () => {
   const {
     integrationSettings, integrationsLoading, integrationsError, loadIntegrations, saveIntegration,
-    currentUser, adminLang,
+    currentUser, adminLang, branches,
   } = useApp();
   const isRTL = adminLang === 'ar';
   const isAccountant = currentUser.role === 'accountant';
@@ -157,7 +157,7 @@ export const IntegrationsPanel: React.FC = () => {
           </div>
 
           {group === 'staff'
-            ? <StaffAccessPanel lang={adminLang} currentUserId={currentUser.id} />
+            ? <StaffAccessPanel lang={adminLang} currentUserId={currentUser.id} branches={branches} />
             : providerContent()}
         </>
       )}

@@ -71,8 +71,9 @@ It includes:
 - Reports and management statistics.
 - Operations Health, Operations Alerts and Order Integrity.
 - Stranded-order visibility and confirmation-required operational review.
-- Staff Access role administration.
-- TOTP/AAL2 staff MFA gate.
+- Staff Access role administration, and provisioning for branch/call-centre accounts.
+- TOTP/AAL2 staff MFA gate (admin/accountant only — see §3).
+- Branch-operations console for branch and call-centre operators.
 - Integration and legal/settings surfaces.
 
 Staff roles and privileged operations are enforced server-side; hiding a UI control is never the authorization boundary.
@@ -102,6 +103,50 @@ Current staff access uses defense in depth:
 - staff/admin privilege requires AAL2/TOTP where wired by the production hardening migrations;
 - role administration is through audited admin-only RPCs rather than customer-writable profile fields;
 - anonymous role-helper RPC exposure was removed.
+
+### Branch-operations roles and branch scoping
+
+The role vocabulary is `customer`, `admin`, `accountant`, `branch_staff` and
+`call_center`. The last two were added for the branch-operations consoles
+(`20260820100000_ops_roles_enum.sql`).
+
+`staff_branch_assignments` pins a `branch_staff` operator to exactly one branch
+— the primary key on `user_id` is what enforces "exactly one". The table is
+read-only to clients (own row, or everything for an admin) and carries no client
+write grant at all, so an operator cannot move themselves to another branch;
+assignment happens through `admin_set_staff_branch` / `admin_clear_staff_branch`.
+
+Authorization for branch operations goes through `is_ops_operator(branch_id)`,
+which is `is_admin() OR is_call_center() OR is_branch_operator(branch_id)`.
+
+**MFA boundary.** `is_admin()` and `is_staff()` still require JWT `aal=aal2`.
+`is_branch_operator()` and `is_call_center()` deliberately do **not** — those
+accounts work from shared shop-floor hardware and sign in with email and
+password (owner decision 2026-08-20). That carve-out is only safe because the
+new roles are narrow by construction: they inherit nothing from `is_staff()`,
+and their predicates must never be used to gate orders, customers, profiles,
+pricing, payments, reports or integration settings. `supabase/tests/ops_roles_test.sql`
+asserts both halves — that the new roles gain no admin/staff privilege, and that
+the existing predicates still require `aal2`.
+
+Surface selection lives in one place, `src/lib/roles.ts`: `admin`/`accountant`
+get the admin console behind `StaffMfaGate`, `branch_staff`/`call_center` get the
+operations console, and everyone else is redirected to `/app`. It is deliberately
+no longer expressed as "not a customer".
+
+### Staff account provisioning
+
+Admin and accountant access is still granted by promoting an account that
+already exists. Branch and call-centre accounts are different: they are handed
+out and revoked by an administrator through the `staff-accounts` Edge Function,
+the only place in the repository that calls `auth.admin.createUser`.
+
+Its guards are the point: `verify_jwt` plus an explicit `profiles.role === 'admin'`
+re-check, and an allow-list that restricts every action to `branch_staff` /
+`call_center` targets, so it can neither mint an administrator nor touch a
+customer. Role and branch assignment run through the existing audited RPCs using
+the caller's JWT, so `role_change_audit` records the human who acted rather than
+the service role.
 
 ## 4. Data and business authority
 
