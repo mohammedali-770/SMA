@@ -391,6 +391,40 @@ workflows:
 | `function-drift.yml` | **Read-only.** Runs `supabase functions list`, compares names against `supabase/functions/`, has no deploy step, declares `permissions: contents: read`. |
 | `deploy-functions.yml` | **Deploys Edge Functions to production.** |
 
+**THE BIGGER RISK IS NOT THE DEPLOY WORKFLOW.** An earlier revision of this
+section framed the danger as "it also arms `deploy-functions.yml`". That
+understated it.
+
+A Supabase access token **cannot be scoped to a project or an organisation**. It
+carries the same privileges as the account that created it, across every
+organisation and every project. Supabase has an open feature request for
+per-project tokens; it does not exist today.
+
+So this secret would not grant access to `spicy-meal-ordering`. It would grant
+full account access to **all four projects** on the account —
+`spicy-meal-ordering` (production), `spicy-meal-operation`,
+`spicy-meal-whatsapp-inbox`, and the personal project — and to any project
+created later.
+
+**And this repository is public.** Fork pull requests do not receive secrets,
+and both workflows trigger only on schedule or manual dispatch, so there is no
+obvious path for an outsider. But anyone with write access can add a workflow
+that reads the secret, and the blast radius is the whole Supabase account rather
+than one project.
+
+**Recommendation: do not add it.** What it buys is a weekly report comparing
+function NAMES. What it costs is an unscopeable full-account credential stored
+in a public repository. The same question — "is the right set of functions
+deployed?" — can be answered on demand by anyone with Supabase access; that is
+how the two orphan diagnostic functions were found and confirmed deleted on
+2026-08-19, without any token existing. Monthly is ample: that drift
+accumulated over months.
+
+**If automation is wanted later**, the safer route is a separate Supabase user
+added to this organisation only, holding the least privilege that still permits
+`functions list`, with the token generated from that account. More setup, but it
+bounds the damage to one organisation instead of the whole account.
+
 **Why the warning was written.** `deploy-functions.yml` once carried a `push:`
 trigger with no branch filter, a hardcoded production project ref, and a default
 function list of exactly the four payment functions frozen by CLAUDE.md §6. Any
@@ -410,7 +444,7 @@ typed into a confirmation field. Deploying an Edge Function still requires
 explicit owner approval every time under CLAUDE.md §5, and the payment functions
 are frozen on top of that under §6.
 
-**The decision.** Adding the token does not recreate the 2026-07-13 exposure —
+**On the historical risk specifically.** Adding the token does not recreate the 2026-07-13 exposure —
 that configuration no longer exists. It removes the last accidental barrier in
 front of a path that now has three deliberate ones. Against that, the drift
 report is currently the only way anyone could see what is deployed without
