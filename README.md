@@ -50,7 +50,7 @@ This repository is **not the old prototype/emulator anymore**. The customer app 
 - Account-deletion request/processing workflow.
 - Scheduled operations-health and alerting functions.
 - Payment/Tap source remains in the repository but is **provisional and frozen** while the final gateway decision is pending. Automated refund processing remains disabled. See [`docs/PAYMENT_POSTPONEMENT.md`](docs/PAYMENT_POSTPONEMENT.md).
-- Push-notification code is retained but **dormant by product decision**.
+- Push notifications are **live**: order updates reach opted-in customers automatically, and marketing broadcasts reach only customers who opted into promotions.
 
 ## Tech stack
 
@@ -178,7 +178,7 @@ Do not treat this repository like a sandbox:
 - Do not push directly to the production branch; use a fresh branch and PR.
 - Do not use `supabase db push` or `supabase migration repair` against production.
 - Do not modify payment/refund/provider behavior while the payment area is frozen.
-- Do not enable push *sending* (the `integration_settings` push master flag) or broadcast without explicit approval; the mobile client gate is open, delivery is not.
+- Push notifications are live. Do not send a broadcast, change notification targeting, or turn the push master flag off without explicit approval; marketing push stays opt-in.
 - Do not commit secrets, service-role keys or provider credentials.
 
 See [`CLAUDE.md`](CLAUDE.md) for the binding rules.

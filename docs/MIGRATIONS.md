@@ -2227,11 +2227,68 @@ volume that does not exist yet. §25's closing note applies unchanged.
 >   which is not worth it for a comment — recorded here and in the card's test
 >   suite, where someone reasoning about the arms will look.
 
+
+## 27. Unapplied migration: order-note length limit (NOT applied, awaiting owner approval)
+
+| | |
+| --- | --- |
+| Repository file | `20260819120000_order_note_length_limit.sql` (145 lines) |
+| Live version | **none — not applied** |
+| Class | n/a until applied |
+| From | PR for `feat/order-note-length-limit` |
+| Approval | owner approved *building* it on its own branch; applying it to Production is a separate §5 decision and has **not** been given |
+
+**What it does.** Adds `public.order_note_normalized(text)`,
+`public.order_note_is_acceptable(text)` and `public.enforce_order_note()`, plus
+one `before insert or update of notes` trigger on `public.orders` and one on
+`public.checkout_sessions`. An order note
+may be NULL or at most 280 characters after trimming; the stored value is
+trimmed, and a whitespace-only note becomes NULL.
+
+**Why it exists.** `orders.notes` has been unbounded since `20260707120500`:32.
+`place_customer_order` is granted to `authenticated`, so the UI limit was never
+a control — a signed-in customer can call the RPC directly. Full rationale,
+including why a trigger rather than a CHECK constraint and why
+`checkout_sessions` is guarded too, is in `docs/ORDER_CONFIRMATION_FLOW.md`
+§10c.
+
+**Pre-apply evidence, read-only Production inspection 2026-08-19** (permitted by
+CLAUDE.md §10; it authorizes no write):
+
+| | |
+| --- | --- |
+| `orders` rows | 32 |
+| rows with a non-empty note | 2 |
+| longest existing note | **2 characters** |
+| rows over 280 characters | **0** |
+| `checkout_sessions` rows | 6 |
+| sessions carrying any note | **0** |
+
+So nothing in Production becomes unupdatable by this rule, and no unconsumed
+checkout session carries a note that could strand a captured payment at
+finalize. Re-verify both counts immediately before applying — these are dated
+facts, not standing ones.
+
+**Chain evidence.** Replayed on a disposable PostgreSQL 16 + PostGIS 3.4 cluster
+on 2026-08-19 using `.github/sql-ci/run.sh`: **82 migrations applied cleanly from
+empty**, and **41/44 SQL suites passed with 0 new failures** (the 3 quarantine
+entries in `.github/sql-ci/known-failing.txt` are unchanged). The paired suite
+`supabase/tests/order_note_length_test.sql` was additionally mutation-checked
+twice — dropping both triggers makes it fail at CASE 2, and re-introducing the
+`E''` escape set described in `docs/ORDER_CONFIRMATION_FLOW.md` §10c makes it
+fail at CASE 1 — so its green run means the guard is present and correct rather
+than merely that the file executed.
+
+**Rollback.** Drop the two triggers and the three functions; the commands are in
+the migration footer. No row is modified, no column type changes, and the rule
+is strictly narrowing — every value accepted after it was accepted before.
+
 ---
 
-## 27. Branch operations — NOT APPLIED (as of 2026-08-20)
+## 28. Branch operations — NOT APPLIED (as of 2026-08-20)
 
-Eight migrations on `claude/item-snooze-architecture-hwbgp9` implement the
+Thirteen migrations on `claude/item-snooze-architecture-hwbgp9`, grouped into
+the nine ordered steps below, implement the
 branch-operations feature (timed item/option availability, delivery control,
 the two operations consoles, and the health/alert surfaces). **None has been
 applied to Production**, and applying any of them is a separate owner-approval

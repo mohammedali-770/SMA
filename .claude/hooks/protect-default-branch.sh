@@ -14,6 +14,12 @@
 #      force-move a protected ref (explicit refspecs included).
 #   3. Fail CLOSED: unparseable hook input, missing tool name, unverifiable
 #      project root, or an undeterminable current branch => deny.
+#   4. Stay RECOVERABLE while failing closed. A conflicted rebase detaches
+#      HEAD, and denying everything in that state also denied `git rebase
+#      --abort`, which permanently locked the session out of git. The branch
+#      is now recovered from the rebase state when git recorded it, and when
+#      it genuinely cannot be recovered a short allowlist of abort/reset
+#      commands is permitted so the state can be ended. See section 5b.
 #
 # Protected branches:
 #   - claude/project-build-ie4b56   (default / production branch)
@@ -27,6 +33,8 @@
 # Denials use the structured PreToolUse decision (permissionDecision=deny)
 # so the agent receives a clear, actionable reason. Allowed calls exit 0
 # with no output and fall through to the normal permission flow.
+#
+# Tests: .claude/hooks/protect-default-branch.test.sh
 # ============================================================================
 
 set -u
@@ -152,11 +160,47 @@ git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
   || deny "change-control guard: CLAUDE_PROJECT_DIR is not a git work tree; failing closed."
 
 CURRENT_BRANCH="$(git -C "$PROJECT_DIR" branch --show-current 2>/dev/null || true)"
-[ -n "$CURRENT_BRANCH" ] \
-  || deny "change-control guard: cannot determine the current branch (detached HEAD or git error); failing closed."
 
+# A conflicted rebase leaves HEAD detached, so `branch --show-current` prints
+# nothing. Denying every call at that point also denied `git rebase --abort` —
+# the one command that clears the state being objected to — so an agent that
+# hit a merge conflict was locked out of git for the rest of the session.
+#
+# Recover the branch the in-progress operation started FROM. git records it in
+# the rebase state directory and it is authoritative: a rebase of a feature
+# branch IS feature-branch work and must be treated as such, while a rebase of
+# a protected branch stays protected and keeps every restriction below.
+BRANCH_UNKNOWN=0
+if [ -z "$CURRENT_BRANCH" ]; then
+  GIT_DIR_PATH="$(git -C "$PROJECT_DIR" rev-parse --git-dir 2>/dev/null || true)"
+  case "$GIT_DIR_PATH" in
+    '') ;;                                       # unresolvable; handled below
+    /*) ;;                                       # already absolute
+    *)  GIT_DIR_PATH="$PROJECT_DIR/$GIT_DIR_PATH" ;;
+  esac
+  for REBASE_STATE_DIR in rebase-merge rebase-apply; do
+    [ -n "$GIT_DIR_PATH" ] && [ -f "$GIT_DIR_PATH/$REBASE_STATE_DIR/head-name" ] || continue
+    REBASE_HEAD_NAME="$(cat "$GIT_DIR_PATH/$REBASE_STATE_DIR/head-name" 2>/dev/null || true)"
+    case "$REBASE_HEAD_NAME" in
+      # git writes the literal string "detached HEAD" when the rebase itself
+      # started from a detached HEAD; that tells us nothing, so stay unknown.
+      refs/heads/?*) CURRENT_BRANCH="${REBASE_HEAD_NAME#refs/heads/}" ;;
+      *) ;;
+    esac
+    break
+  done
+  [ -n "$CURRENT_BRANCH" ] || BRANCH_UNKNOWN=1
+fi
+
+# An unknown branch state is still FAIL CLOSED: treat it as protected, which
+# turns on every restriction in sections 6 and 7. Section 5b then carves out
+# the narrow set of commands whose only purpose is to END that state.
 ON_PROTECTED=0
-is_protected "$CURRENT_BRANCH" && ON_PROTECTED=1
+if [ "$BRANCH_UNKNOWN" -eq 1 ]; then
+  ON_PROTECTED=1
+else
+  is_protected "$CURRENT_BRANCH" && ON_PROTECTED=1
+fi
 
 # ---------------------------------------------------------------------------
 # 3. Regex building blocks
@@ -608,6 +652,37 @@ fi
 # ---------------------------------------------------------------------------
 
 [ "$ON_PROTECTED" -eq 1 ] || allow
+
+# ---------------------------------------------------------------------------
+# 5b. UNKNOWN branch state: a detached HEAD that no rebase state explains.
+#
+#     Section 2 already treated this as protected, so sections 6 and 7 would
+#     deny everything. That is right for ordinary work and wrong for RECOVERY:
+#     it denies the very commands that end the unknown state, which is how a
+#     session ends up unable to touch git at all.
+#
+#     Allow exactly those commands, plus read-only inspection of the state.
+#     None of them can advance a ref — abort/quit/reset only restore what the
+#     interrupted operation saved — and the any-branch protected-ref rules in
+#     section 4 have already run against this command. Anything carrying a
+#     shell operator, quote or substitution is rejected before the allowlist,
+#     so nothing can be chained onto a permitted command.
+# ---------------------------------------------------------------------------
+
+if [ "$BRANCH_UNKNOWN" -eq 1 ]; then
+  [ "$TOOL_NAME" = "Bash" ] \
+    || deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); file-writing tool calls are denied. End the in-progress git operation first: git rebase --abort, git merge --abort, git cherry-pick --abort, or git bisect reset."
+
+  case "$TOOL_COMMAND" in
+    *';'*|*'&'*|*'|'*|*'>'*|*'<'*|*'`'*|*'$'*|*'('*|*')'*|*"'"*|*'"'*|*'\'*)
+      deny "change-control guard: the current branch cannot be determined; only a single plain recovery command is allowed here — no operators, quoting or substitution. Allowed: git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only." ;;
+  esac
+
+  RECOVERY_CMD='^[[:space:]]*git[[:space:]]+((rebase|cherry-pick|revert|am)[[:space:]]+--(abort|quit)|merge[[:space:]]+--abort|bisect[[:space:]]+reset|status|branch[[:space:]]+--show-current|rev-parse[[:space:]]+--git-dir|log[[:space:]]+--oneline[[:space:]]+-[0-9][0-9]*|diff[[:space:]]+--name-only)[[:space:]]*$'
+  printf '%s' "$TOOL_COMMAND" | grep -Eq "$RECOVERY_CMD" && allow
+
+  deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); failing closed. Allowed here: git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only."
+fi
 
 # ---------------------------------------------------------------------------
 # 6. On a protected branch: deny all file-writing tools outright.

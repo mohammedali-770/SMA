@@ -32,7 +32,7 @@
                                                     (email, maps, etc.)
 
           Payment/Tap code remains present but is PROVISIONAL + FROZEN.
-          Push code remains present but DORMANT.
+          Push notifications (Expo) are LIVE — see §10.
 ```
 
 The clients do **not** share an in-memory/localStorage database. Supabase is the authoritative backend.
@@ -464,13 +464,22 @@ Important consequences:
 
 Architecture diagrams or README text must not describe the provisional Tap stack as the final gateway.
 
-## 10. Push notifications — client enabled, sending flag-gated
+## 10. Push notifications — LIVE
 
-Owner-approved 2026-08-17. The client/native side is live: `PUSH_CLIENT_ENABLED` is `true`, `apps/mobile/app.json` carries the `expo-notifications` plugin and `google-services.json`, and EAS holds iOS APNs (Sandbox & Production) plus Android FCM V1 credentials. Customers can opt in from Profile → Notifications; registration writes go through the `register_push_device` / `deactivate_push_device` SECURITY DEFINER RPCs (there is no client write path on `push_devices`).
+Enabled end-to-end 2026-08-17. `PUSH_CLIENT_ENABLED` is `true`, `apps/mobile/app.json` carries the `expo-notifications` plugin and `google-services.json`, EAS holds iOS APNs (Sandbox & Production) plus Android FCM V1 credentials, and the `integration_settings` push master flag is enabled, so `push-dispatch` passes its gate and delivers.
 
-Sending remains gated by the `integration_settings` push master flag (`provider_type='push'`, provider `expo`), re-checked by `push-dispatch` on every action. While that flag is disabled — its current state — every action no-ops with `{status:'disabled'}` and nothing is delivered.
+Customers opt in from Profile → Notifications. Registration writes go through the `register_push_device` / `deactivate_push_device` SECURITY DEFINER RPCs — there is no client write path on `push_devices`, so the token-format guard and the shared-device ownership transfer cannot be bypassed by a direct REST write.
 
-Do not infer from the open client gate that push is an active production customer channel; the master flag and a shipping EAS build are both separate owner-approval steps.
+Delivery paths:
+
+- **order_status** — fired by `order-intake` (service role, best-effort, `waitUntil`) and by admin status changes. Idempotent per `(order_id, status)` via the unique index plus the `send_status` lifecycle, and anti-spoofed by re-reading the order's real status server-side. Targets only that order's customer, and only devices with `order_updates_enabled` (**defaults TRUE**).
+- **pos_sync** — POS confirmation lifecycle, consumed from deduplicated events under a fenced claim.
+- **broadcast** — admin-initiated, immediate, non-recallable. Targets only devices with `promos_enabled` (**defaults FALSE** — marketing is strictly opt-in).
+- **test** — admin-initiated, targets only the calling admin's own registered devices.
+
+Payloads carry only `{ type, orderId }`; tap navigation resolves through `resolveNotificationRoute`'s allow-list, so a payload can never open an arbitrary route or an external URL.
+
+Known ledger quirk: `test` and `broadcast` rows are inserted without a terminal `send_status`, so they remain `processing` after a successful send. The delivery counters on the row are accurate, and the operations health center deliberately sums the `failed` device counter rather than trusting the lifecycle column for these kinds.
 
 ## 11. Shared design system
 

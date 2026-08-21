@@ -2,13 +2,16 @@
  * Web build of push-token registration — a graceful no-op mirror.
  *
  * Browser push (service workers / VAPID) is a different stack from Expo push
- * tokens, and push sending is dormant anyway. On web: permission is reported
+ * tokens, and is deliberately not implemented: push is a native-app channel
+ * here even though sending is live. On web: permission is reported
  * as unavailable, no token is fetched, and no push_devices row is written —
  * the Profile notification toggles render their unsupported state instead of
  * failing. Signatures mirror ./pushRegistration exactly (bundler-selected).
  */
 import { DEFAULT_DEVICE_PREFS, type DevicePrefs } from './notificationPolicy';
 import type { DbPushDevice } from '../../types/db';
+
+export async function hasNotificationPermission(): Promise<boolean> { return false; }
 
 export async function ensureNotificationPermission(): Promise<boolean> {
   return false; // never prompts on web

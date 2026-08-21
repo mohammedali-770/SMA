@@ -10,6 +10,7 @@ import { SelectableChip } from '../../design-system/ui/Chip';
 import { columnStyles } from '../../design-system/ui/ContentColumn';
 import { Text } from '../../design-system/ui/Text';
 import { useI18n } from '../../i18n/I18nProvider';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { mapOrder } from '../../lib/mappers';
 import { orders } from '../../services/api';
 import { makeStyles } from '../../theme/makeStyles';
@@ -25,7 +26,7 @@ type Filter = 'all'|'active'|'delivered'|'cancelled';
 export function OrdersScreen() {
   const styles = useStyles(); const colors = useThemeColors(); const { t, pick, isRTL } = useI18n();
   const [list,setList]=useState<Order[]>([]); const [filter,setFilter]=useState<Filter>('all'); const [loading,setLoading]=useState(true); const [refreshing,setRefreshing]=useState(false); const [error,setError]=useState<string|null>(null); const hasData=useRef(false);
-  const load=useCallback(async(mode:'focus'|'refresh'='focus')=>{ if(mode==='refresh')setRefreshing(true); else if(!hasData.current)setLoading(true); try{const rows=await orders.listWithItems(ORDERS_PAGE_LIMIT);setList(rows.map(mapOrder));setError(null);hasData.current=true;}catch(e){if(!hasData.current)setError(e instanceof Error?e.message:t('somethingWentWrong'));}finally{setLoading(false);setRefreshing(false);}},[t]);
+  const load=useCallback(async(mode:'focus'|'refresh'='focus')=>{ if(mode==='refresh')setRefreshing(true); else if(!hasData.current)setLoading(true); try{const rows=await orders.listWithItems(ORDERS_PAGE_LIMIT);setList(rows.map(mapOrder));setError(null);hasData.current=true;}catch(e){if(!hasData.current)setError(failureMessage(e,t,{subsystem:'orders',op:'load_orders'}));}finally{setLoading(false);setRefreshing(false);}},[t]);
   useFocusEffect(useCallback(()=>{void load('focus');},[load]));
   const filtered=useMemo(()=>list.filter((o)=>filter==='all'?true:filter==='delivered'?o.status==='delivered':filter==='cancelled'?o.status==='cancelled':o.status!=='delivered'&&o.status!=='cancelled'),[list,filter]);
   const filters:{key:Filter;label:string}[]=[{key:'all',label:pick('All','الكل')},{key:'active',label:pick('Active','جاري')},{key:'delivered',label:pick('Delivered','تم التوصيل')},{key:'cancelled',label:pick('Cancelled','ملغي')}];

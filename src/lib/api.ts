@@ -750,11 +750,11 @@ export const orders = {
       p_order_id: orderId, p_status: status,
     });
     if (error) throw new Error(error.message);
-    // Fire-and-forget push notification for the customer. Server-side
-    // push-dispatch re-verifies the caller is an admin, re-reads the order's
-    // REAL status (anti-spoof), is idempotent per (order,status), and no-ops
-    // entirely while the push master flag is disabled — a push failure never
-    // fails the status change itself.
+    // Fire-and-forget push notification for the customer. Push is LIVE, so this
+    // really does reach the customer's phone. Server-side push-dispatch
+    // re-verifies the caller is an admin, re-reads the order's REAL status
+    // (anti-spoof), and is idempotent per (order,status) — a push failure never
+    // fails the status change itself, and a repeated call never double-sends.
     void supabase.functions.invoke('push-dispatch', {
       body: { action: 'order_status', orderId, status },
     }).catch(() => {});
@@ -1007,8 +1007,9 @@ export const legalDocs = {
 
 // ---------------------------------------------------------------------------
 // Push notifications (admin tools). All calls hit the push-dispatch Edge
-// Function with the ADMIN's JWT; the function re-verifies the role server-side
-// and no-ops entirely while the push master flag is disabled.
+// Function with the ADMIN's JWT; the function re-verifies the role server-side.
+// Push is LIVE: `broadcast` reaches every opted-in customer device immediately
+// and cannot be recalled. The master flag remains the server-side kill switch.
 // ---------------------------------------------------------------------------
 export interface PushSendResult { status: string; targeted?: number; sent?: number; failed?: number; deactivated?: number; hint?: string; reason?: string }
 

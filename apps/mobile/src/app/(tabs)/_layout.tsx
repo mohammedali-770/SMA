@@ -5,6 +5,7 @@ import { AppState } from 'react-native';
 
 import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
 import { LaunchOrderTypeModal } from '../../features/order/LaunchOrderTypeModal';
+import { useFirstRunPermissions } from '../../features/onboarding/useFirstRunPermissions';
 import { useI18n } from '../../i18n/I18nProvider';
 import { accountDeletion } from '../../services/api';
 import { useAuth, useCatalog, useOrderContext } from '../../store';
@@ -16,8 +17,12 @@ export default function TabsLayout() {
   const { status } = useAuth();
   const { loading: catalogLoading, error: catalogError } = useCatalog();
   const orderCtx = useOrderContext();
-  const { t, pick } = useI18n();
+  const { t, pick, lang } = useI18n();
+  // The OS raises its own permission dialogs once, on the first run after
+  // sign-in. Nothing is rendered for this and nothing is blocked by it.
+  useFirstRunPermissions(status === 'signed_in', lang);
   const [deletionPending, setDeletionPending] = useState(false);
+
 
   useEffect(() => {
     if (status !== 'signed_in') { setDeletionPending(false); return; }

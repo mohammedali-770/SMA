@@ -45,7 +45,7 @@ An unsatisfied hook is safer than an unauthorized production-branch write.
 - Edge Function deployments/deletions
 - Auth configuration changes
 - **payment/refund/provider work of any kind while the freeze is active**
-- enabling/configuring push notifications
+- sending a push broadcast, changing push targeting/audience, or turning the push master flag on or off
 - Vercel Production changes
 - EAS/APK/TestFlight/store builds
 - releases/tags that change release state
@@ -72,17 +72,22 @@ Automated refund processing is intended to remain disabled while the freeze is a
 
 Authoritative product decision: `docs/PAYMENT_POSTPONEMENT.md`.
 
-## 7. Push notifications — client gate OPEN, sending still owner-gated
+## 7. Push notifications — LIVE
 
-The owner explicitly approved enabling push in source on **2026-08-17**. That approval covers the client/native side only:
+Push is an **active production customer channel**. Both gates are open:
 
-- `PUSH_CLIENT_ENABLED = true` (`apps/mobile/src/features/notifications/notificationPolicy.ts`) — customers can opt in from Profile → Notifications and register a device;
-- the `expo-notifications` plugin and `google-services.json` are present in `apps/mobile/app.json`, so the iOS push entitlement and the Android channel exist in the binary;
-- EAS holds real credentials for both platforms (iOS APNs key configured for **Sandbox & Production**; Android **FCM V1** service-account key).
+- **Client/native** (owner-approved 2026-08-17): `PUSH_CLIENT_ENABLED = true` (`apps/mobile/src/features/notifications/notificationPolicy.ts`); the `expo-notifications` plugin and `google-services.json` are in `apps/mobile/app.json`, so the iOS push entitlement and the Android channel exist in the binary; EAS holds real credentials for both platforms (iOS APNs key configured for **Sandbox & Production**; Android **FCM V1** service-account key).
+- **Server master flag** (owner-enabled 2026-08-17, verified live): the `integration_settings` row (`provider_type='push'`, provider resolving to `expo`) is **enabled**. `push-dispatch` re-checks it on every action and now passes.
 
-**Sending is still disabled and still owner-gated.** Delivery additionally requires the `integration_settings` row (`provider_type='push'`, provider `expo`) to be `enabled`, which `push-dispatch` re-checks on every action. That row stays **disabled** until the owner turns it on, and enabling it remains an owner-approval action under §5, as does any store/EAS build that ships the capability.
+**Consequences to hold in mind before touching anything in this area:**
 
-Do not add further push credentials/entitlements, enable the server master flag, or start broadcasting without separate explicit owner approval and a rollout plan. Approval to enable the client gate is **not** approval to send.
+- order-status transitions push to real customers automatically — `order_updates_enabled` defaults **TRUE** at device registration, so an opted-in customer receives received/preparing/ready/out_for_delivery/delivered without any further action;
+- admin broadcasts are **immediate and cannot be recalled**, and reach every device with `promos_enabled = true`;
+- a change to status copy, dispatch behaviour or targeting is now a change to live customer messaging, not to dormant code.
+
+Do not treat the old "push is dormant" framing anywhere as current. Sending an actual broadcast, widening the audience model, adding credentials, or turning the master flag back off all remain owner-approval actions under §5.
+
+Marketing remains **strictly opt-in**: `promos_enabled` defaults FALSE and only the customer can turn it on. Do not change that default, or broaden who a broadcast reaches, without a separate explicit owner decision — it is a consent decision, not a code detail.
 
 ## 8. Production migration commands
 
@@ -152,6 +157,7 @@ The intended always-reporting required check contexts are:
 - `Edge Function typecheck (Deno)`
 - `Dependency audit (high+)`
 - `SQL suites gate`
+- `Documentation (generated + ownership)`
 
 Do **not** require:
 
@@ -182,7 +188,20 @@ Do not leave old screenshots/README text describing:
 - direct Production CLI deploy/db-push shortcuts;
 - dated dashboard counts/settings as current without re-verification.
 
-`docs/README.md` defines the current documentation ownership/navigation model.
+`docs/README.md` defines the current documentation ownership/navigation model, and
+`docs/CONTRIBUTING.md` defines the standard every document is written to.
+
+This rule is now partly **enforced** rather than only stated. `npm run docs:check`
+regenerates `docs/reference/` and fails on drift, and enforces `docs/ownership.json`,
+which maps source paths to the document that must change with them. A change to
+payment, push, WhatsApp sign-in, POS, account-deletion, order-lifecycle,
+order-integrity, maps, OTP or deploy code fails CI unless its owning document is
+updated in the same change, or a commit message records
+`docs-exempt: <rule> — <reason>`.
+
+Never hand-edit a file in `docs/reference/`; fix the generator instead. The exemption
+is for changes that genuinely do not affect documented behaviour — not for deferring
+documentation.
 
 ---
 

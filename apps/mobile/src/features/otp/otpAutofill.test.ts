@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  applyBackspace,
-  applyBoxInput,
   extractOtp,
   isWebOtpSupported,
   joinBoxes,
@@ -48,87 +46,44 @@ describe('splitCodeToBoxes / joinBoxes', () => {
   });
 });
 
-describe('applyBoxInput', () => {
-  const empty = ['', '', '', '', '', ''];
-
-  it('fills a box with a single digit and auto-advances', () => {
-    expect(applyBoxInput(empty, 0, '4', 6)).toEqual({
-      boxes: ['4', '', '', '', '', ''],
-      focusIndex: 1,
-    });
+/**
+ * The iOS autofill contract, pinned as logic.
+ *
+ * iOS hands an autofilled one-time code to the field as ONE change event
+ * containing the whole code — not six keystrokes. OtpCodeInput funnels every
+ * change through normalizeCode, so these cases are the ones autofill actually
+ * exercises. (The component itself cannot be rendered here: the repo has no
+ * react-native testing renderer.)
+ */
+describe('single-field OTP autofill contract', () => {
+  it('accepts all six characters delivered in one call', () => {
+    expect(normalizeCode('471928', 6)).toBe('471928');
   });
 
-  it('does not advance past the last box', () => {
-    const boxes = ['1', '2', '3', '4', '5', ''];
-    expect(applyBoxInput(boxes, 5, '6', 6)).toEqual({
-      boxes: ['1', '2', '3', '4', '5', '6'],
-      focusIndex: 5,
-    });
+  it('folds an Arabic-Indic autofill payload (the app is Arabic-first)', () => {
+    expect(normalizeCode('\u0664\u0667\u0661\u0669\u0662\u0668', 6)).toBe('471928');
   });
 
-  it('replaces the digit and advances when typing into a filled box', () => {
-    // Controlled input reports old + new ("7" + "9") when a filled box is typed.
-    const boxes = ['7', '', '', '', '', ''];
-    expect(applyBoxInput(boxes, 0, '79', 6)).toEqual({
-      boxes: ['9', '', '', '', '', ''],
-      focusIndex: 1,
-    });
+  it('strips separators and spacing some senders add', () => {
+    expect(normalizeCode('471-928', 6)).toBe('471928');
+    expect(normalizeCode(' 471 928 ', 6)).toBe('471928');
   });
 
-  it('clears a box on empty input and stays put', () => {
-    const boxes = ['1', '2', '', '', '', ''];
-    expect(applyBoxInput(boxes, 1, '', 6)).toEqual({
-      boxes: ['1', '', '', '', '', ''],
-      focusIndex: 1,
-    });
+  it('caps an over-long paste at the field length', () => {
+    expect(normalizeCode('4719281234', 6)).toBe('471928');
   });
 
-  it('distributes a pasted full code from the target box', () => {
-    expect(applyBoxInput(empty, 0, '123456', 6)).toEqual({
-      boxes: ['1', '2', '3', '4', '5', '6'],
-      focusIndex: 5,
-    });
+  it('keeps partial entry partial, so onComplete cannot fire early', () => {
+    expect(normalizeCode('471', 6)).toBe('471');
+    expect(normalizeCode('471', 6).length).toBeLessThan(6);
   });
 
-  it('distributes a partial paste and clamps at the field length', () => {
-    const boxes = ['1', '', '', '', '', ''];
-    expect(applyBoxInput(boxes, 2, '9876', 6)).toEqual({
-      boxes: ['1', '', '9', '8', '7', '6'],
-      focusIndex: 5,
-    });
+  it('backspacing to empty clears the code rather than throwing', () => {
+    expect(normalizeCode('', 6)).toBe('');
   });
 
-  it('folds Arabic-Indic digits when pasting', () => {
-    expect(applyBoxInput(empty, 0, '١٢٣', 6)).toEqual({
-      boxes: ['1', '2', '3', '', '', ''],
-      focusIndex: 3,
-    });
-  });
-});
-
-describe('applyBackspace', () => {
-  it('clears a filled box in place', () => {
-    const boxes = ['1', '2', '3', '', '', ''];
-    expect(applyBackspace(boxes, 2)).toEqual({
-      boxes: ['1', '2', '', '', '', ''],
-      focusIndex: 2,
-    });
-  });
-
-  it('steps back and clears the previous box when the current is empty', () => {
-    const boxes = ['1', '2', '', '', '', ''];
-    expect(applyBackspace(boxes, 2)).toEqual({
-      boxes: ['1', '', '', '', '', ''],
-      focusIndex: 1,
-    });
-  });
-
-  it('stays at index 0 when already at the first box', () => {
-    const boxes = ['', '', '', '', '', ''];
-    expect(applyBackspace(boxes, 0)).toEqual({
-      boxes: ['', '', '', '', '', ''],
-      focusIndex: 0,
-    });
+  it('still renders six boxes for any partial code', () => {
+    expect(splitCodeToBoxes(normalizeCode('47', 6), 6)).toEqual(['4', '7', '', '', '', '']);
   });
 });
 

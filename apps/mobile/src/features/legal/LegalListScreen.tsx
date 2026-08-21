@@ -6,6 +6,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-n
 import { Header } from '../../components/Header';
 import { Screen } from '../../components/Screen';
 import { useI18n } from '../../i18n/I18nProvider';
+import { failureMessage } from '../../lib/errors/reportFailure';
 import { legalDocOrder } from '../../lib/legal';
 import { supportDescription, visibleSupportChannels, workingHoursText, type SupportChannelKind } from '../../lib/supportContact';
 import { legal } from '../../services/api';
@@ -21,7 +22,7 @@ const CHANNEL_EMOJI: Record<SupportChannelKind, string> = { phone: '📞', whats
 export function LegalListScreen() {
   const styles = useStyles(); const colors = useThemeColors(); const { t, pick, lang, isRTL, rtlRow } = useI18n(); const { support } = useCatalog();
   const [docs, setDocs] = useState<DbLegalDocument[] | null>(null); const [error, setError] = useState<string | null>(null); const [openError, setOpenError] = useState(false);
-  const load = () => { setError(null); setDocs(null); legal.list().then((rows) => setDocs(rows.slice().sort((a, b) => legalDocOrder(a.document_type) - legalDocOrder(b.document_type)))).catch((e) => setError(e instanceof Error ? e.message : String(e))); };
+  const load = () => { setError(null); setDocs(null); legal.list().then((rows) => setDocs(rows.slice().sort((a, b) => legalDocOrder(a.document_type) - legalDocOrder(b.document_type)))).catch((e) => setError(failureMessage(e, t, { subsystem: 'app', op: 'load_legal_docs' }))); };
   useEffect(load, []);
   const channels = visibleSupportChannels(support); const hours = workingHoursText(support, lang); const desc = supportDescription(support, lang);
   const channelLabel: Record<SupportChannelKind, string> = { phone: t('callSupport'), whatsapp: t('whatsappSupport'), email: t('emailSupport') };

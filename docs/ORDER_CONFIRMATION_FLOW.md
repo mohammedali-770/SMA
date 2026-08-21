@@ -211,6 +211,11 @@ npm --prefix apps/mobile run typecheck
 # Requires a throwaway PG16 with the full migration chain applied:
 psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   -f supabase/tests/order_confirmation_state_machine_test.sql
+psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -f supabase/tests/order_note_length_test.sql
+
+# Or replay the chain and run every suite exactly as CI does:
+bash .github/sql-ci/run.sh
 ```
 
 No test sends a real payment, refund, Lazywait order, OTP, message or email. The
@@ -292,6 +297,200 @@ verification binding stays on `reference.order`, unchanged. `tap.test.ts` pins
 both halves: the description carries no `SM-…`, and `reference.order` still
 carries the exact attempt reference.
 
+## 10c. The order note — bounded at 280 characters (closed)
+
+The free-text note a customer attaches at Checkout reaches a cashier and is
+printed on the ticket. It was unbounded from the day the column was created
+(`20260707120500`:32) until `20260819120000_order_note_length_limit.sql`: no
+`maxLength` on the input, no check in `place_order`, no constraint on the column.
+
+**Why the UI was never the control.** `place_customer_order` is granted to
+`authenticated` (`20260724200000`:336), so any signed-in customer can call it
+directly with the publishable key and their own JWT. A limit that lives only in
+`CheckoutScreen.tsx` is a suggestion. The bound is therefore enforced in the
+database, and the client mirrors it so the customer is stopped before they are
+refused.
+
+| Half | Where | What it does |
+|---|---|---|
+| Client | `apps/mobile/src/features/order/orderNote.ts` | `ORDER_NOTE_MAX_LENGTH = 280`, validator, remaining-characters copy in both languages |
+| Client | `apps/mobile/src/features/checkout/CheckoutScreen.tsx` | `maxLength`, a counter that appears in the last 40 characters, and `normalizeOrderNote` on submit |
+| Server | `public.order_note_normalized(text)` | the one definition of "trimmed": whitespace-stripped, NULL rather than empty |
+| Server | `public.order_note_is_acceptable(text)` | the predicate — NULL or ≤ 280 characters after trimming |
+| Server | `trg_orders_note_length`, `trg_checkout_sessions_note_length` | reject an over-long note and store the trimmed value |
+
+**Why a trigger and not a CHECK constraint.** The same reason `20260724170000`
+gave for `addresses.description`: a CHECK is re-evaluated on *every* subsequent
+UPDATE of a row, not only when the guarded column changes. `public.orders` is
+updated constantly on unrelated columns — POS sync state, confirmation
+lifecycle, cancellation integrity, manual resend — so one historical row with an
+over-long note would start failing status transitions that never touched
+`notes`. The trigger fires on INSERT, and on an UPDATE that actually changes
+`notes`.
+
+**Why `checkout_sessions` is guarded too.** Two independent writers reach
+`orders.notes`: `place_order` (cash/direct) and `insert_order_from_snapshot`,
+which `finalize_checkout_session` calls with the note it reads back from
+`checkout_sessions.notes`. Guarding only `orders` would move the failure past
+the point of no return — finalize runs *after* the provider has captured, and a
+failure there is caught by `_shared/tapVerify.ts`, logged, and retried forever
+against a session that can never succeed. Rejecting the note when the session is
+created means it is refused before any money moves. This is a uniform input rule
+applied to a column: no provider logic, no pricing and no session lifecycle is
+touched by it.
+
+**A trap worth knowing about.** The trim set is built with `chr()`, not with an
+`E''` escape string, because PostgreSQL's C-style escape table has **no `\v`** —
+an unrecognised escape yields the character literally, so `E'\v'` is the letter
+`v` (ascii 118), not the vertical tab. Written the obvious way,
+`btrim(notes, E' \t\r\n\f\v')` stores `"eg only"` for `"veg only"`, turns a bare
+`"v"` into no note at all, and — because trimming happens before the length is
+measured — lets a 281-character note beginning with `v` through the limit
+entirely. This is the same class of bug as `20260802120000`, where
+single-argument `btrim()` turned out to strip spaces only. Caught in review
+before merge; `order_note_length_test.sql` CASE 1 and CASE 3 now assert both
+halves, and re-introducing the escape string makes CASE 1 fail.
+
+**NULL stays legal.** The note is optional, and account deletion
+(`20260715120000`:250) and the erasure job (`20260806120000`:143) both
+`set notes = null`. The predicate accepts NULL so both keep working; a
+whitespace-only note is stored as NULL rather than as a blank instruction line.
+
+**Where 280 came from.** A kitchen note is an instruction, not a message. It is
+**not** derived from any POS capability — whether Lazywait accepts an order note
+at all is still open question Q5 (`docs/lazywait-delivery-open-questions.md`),
+and `lazywait-sync` does not forward notes today. If Lazywait confirms a shorter
+maximum this number narrows; it should never silently widen.
+
+Proven on a disposable PostgreSQL 16 + PostGIS 3.4 cluster on 2026-08-19: the
+full 82-migration chain applied from empty, and **41/44 SQL suites passed with 0
+new failures** (3 pre-existing quarantine entries). `order_note_length_test.sql`
+was additionally mutation-checked — dropping the two triggers makes it fail at
+CASE 2 — so a green run means the guard is present, not merely that the file
+executed.
+
+## 10c-bis. Availability is re-checked before payment, not after
+
+`place_order` has always refused a cart containing something the branch has
+closed. Until the branch-operations work the customer met that refusal as a raw
+server exception at the very end of checkout, after choosing a payment method
+and without being told **which** item was the problem — and a customer already
+browsing never learned about a closure at all, because the mobile catalog loaded
+once per mount.
+
+Three things changed, all on the client, none of them a new rule:
+
+1. `CatalogProvider` re-reads branch availability — products **and** options — on
+   app foreground and on returning to the menu. Prices, categories and modifiers
+   still need a full `reload()`.
+2. `CheckoutScreen.placeOrder` re-reads availability **before anything
+   expensive** and names any line that has just sold out, including a line whose
+   chosen *option* was closed. A failed refresh returns null and the order
+   proceeds: the server stays the authority, and a flaky network must not block
+   a valid order.
+3. Snoozed items stay on the menu rendered as out of stock rather than
+   disappearing. A customer who cannot find yesterday's item assumes the app is
+   broken; a greyed row with a reason is an answer.
+
+**This adds no check the backend does not already make, and it deliberately does
+not move any check later.** `20260810132000_order_modifier_contract.sql` records
+why availability is validated at order *creation* and never re-validated at
+finalize: re-checking an authorized online snapshot against mutable menu data
+could leave a charged customer without an order. The pre-check above runs before
+payment is initiated, which is the same side of that boundary as the guard
+inside `place_order`.
+
+Details of the availability model itself — the keystone that keeps
+`is_available` authoritative, and why `begin_checkout_session` and
+`compute_order_snapshot` were never touched — are in `docs/ARCHITECTURE.md` §4.
+
+## 10d. The confirmation screen — what the cashier is shown
+
+This screen exists to be **held up across a counter**. Its layout follows from
+that, and the reasoning is recorded here because a well-meaning tidy-up could
+undo it.
+
+| Element | Why |
+| --- | --- |
+| Brand lockup at the top | The cashier is handed a stranger's phone; they need to see whose order this is before reading anything else. |
+| Branch order number, very large, in its own card | The one thing the screen is for. Forced **LTR** so a two-digit number can never render reversed in an Arabic layout. |
+| Order state as a compact pill | Reassurance, not the headline. Once the number is visible the customer already has what they came for. |
+
+### The number is shown VERBATIM
+
+`orderDisplayNumber(order)` returns what Lazywait issued, unaltered — **no `#`
+added, none stripped, no reformatting.**
+
+This was got wrong once and corrected within the same branch. An earlier
+revision stripped the leading `#`, on the assumption the app was adding it.
+Verified read-only against Production: **the POS itself issues the number
+already prefixed** — `#1`, `#2`, `#10` — and that exact string is what the
+branch's own screens display. Stripping it printed something the cashier could
+not match against their system, which defeats the purpose of the screen.
+
+When the number has not been issued yet, the card says so and explains that it
+will appear as soon as the branch issues it, rather than showing a blank or a
+placeholder that could be mistaken for a real number.
+
+### Directions, for pickup only
+
+A **Directions to branch** control appears only when the order is `pickup`, the
+branch is in the catalog, and its coordinates are usable. A delivery order never
+shows it — the food travels to the customer. If the catalog has not loaded or
+the branch was deactivated since the order was placed, the control simply does
+not render rather than opening a broken map. Platform behaviour and the iOS
+`LSApplicationQueriesSchemes` requirement are in [`MAPS.md`](MAPS.md).
+
+### The store-review prompt
+
+Leaving the confirmation screen may raise the OS review dialog. Every guard is
+deliberate:
+
+- **never while the screen is open** — a system dialog must not sit on top of
+  the number the customer is showing a cashier;
+- **only after a completed order** — `syncState === 'synced'` and a status of
+  `delivered | ready | out_for_delivery | preparing | received`. Asking after a
+  failed or unconfirmed order invites a one-star rating for something the
+  customer is still upset about;
+- **once, ever**, from our side. The flag is written **before** asking, because
+  neither platform reports whether its dialog actually appeared.
+
+Both platforms treat this as a *request*: iOS caps its own dialog at three per
+365 days and may show nothing at all. It can never be relied on to have been
+seen.
+
+Two limits worth knowing: the prompt can fire on a `preparing` or `received`
+order — before the customer has eaten — and `/receipt/{id}` is reachable from
+the Orders tab and from a notification tap, so "first completed order" is more
+precisely "the first time the customer leaves any qualifying confirmation
+screen".
+
+### Provider error text — classified on the order path, still raw on the payment path
+
+Coupon-validation and order-placement failures are classified through
+`failureMessage(...)` rather than surfaced raw. A provider's message is written
+for developers, may name internal systems, and is not translated. The customer
+sees classified, translated copy; the detail goes to the failure report.
+
+**The two payment catches are deliberately NOT converted.** `open_checkout` and
+`verify_payment` still show `e.message` directly. Improving them is payment work
+under CLAUDE.md §6, and the branch that changed them asserted a "scoped
+exception" to the freeze that was never granted — the owner confirmed on
+2026-08-19 that no such instruction existed, so the change was reverted.
+
+**This is a known, accepted-for-now leak:** a customer who hits a payment
+failure can still be shown raw provider text. Converting these two sites is a
+worthwhile change; it needs explicit owner approval under §5 first, and should
+be its own change rather than a passenger in an unrelated commit.
+
+**One caveat this does not fix:** on the **cash** path a server-raised error is
+not readable at all. Cash orders go through
+`supabase.functions.invoke('order-intake')`, which returns HTTP 400 with the
+message in the body — but a non-2xx `invoke` yields `FunctionsHttpError`, whose
+`.message` is the generic *"Edge Function returned a non-2xx status code"*.
+`invokePaymentFn` already recovers the body via `error.context.json()`;
+`placeAndSync` has never had the same treatment.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and
@@ -323,6 +522,24 @@ carries the exact attempt reference.
   means a human working the `confirmation_required` feed. When such an endpoint
   is published, an automated reconciler could convert some ambiguous orders into
   proven-not-sent ones and widen resend eligibility.
+- **A server-raised order error is not readable on the cash path.** Cash orders
+  go through `supabase.functions.invoke('order-intake')`, which returns HTTP 400
+  with the Postgres message in the body — but a non-2xx `invoke` yields
+  `FunctionsHttpError`, whose `.message` is the generic *"Edge Function returned
+  a non-2xx status code"*. `placeAndSync` (`apps/mobile/src/services/api.ts`
+  :219) rethrows that, so the customer sees the generic text. The online path is
+  unaffected. `invokePaymentFn` (:314) already recovers the body via
+  `error.context.json()`; `placeAndSync` has never had the same treatment. This
+  is latent rather than active for the note limit specifically — the client
+  `maxLength` stops a customer reaching the server bound at all — but any future
+  server-side order rule will hit it.
+- **Per-item notes do not exist.** There is no `order_items.notes` column, no UI
+  and no field for one in `serializeOrderItem`
+  (`supabase/functions/_shared/lazywaitApi.ts`). Adding them is blocked on the
+  same Lazywait question as §10c: the confirmed Create Order body has no note
+  field of any kind, `delivery_notes` is `[ASSUMPTION]`-tagged and gated behind
+  `allowAssumedFields` (default off), and per-item notes are not even on the
+  question list.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Tap sandbox.** The pure
   classifier is unit-tested; the transport path is not exercised.

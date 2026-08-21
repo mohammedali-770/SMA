@@ -47,9 +47,29 @@ to:
 | Scheduling | The `payment-refund-worker` cron job (and any new payment/refund schedule) |
 | Provider configuration | The `payment`/`tap` row in `integration_settings`, Tap credentials, and the refund trigger secret in Vault |
 | Payment business rules | Pricing→capture→settlement→refund policy, idempotency keys, retry policy |
+| **Mobile client payment surface** | `apps/mobile/src/app/payment/**` (hosted-checkout and return routes), `TapWebView*.tsx`, `features/checkout/paymentFlow*`, `checkoutHandoff*`, `pendingSession*`, `webviewPolicy*`, `lib/payment.ts` |
 
 Reopening any of the above requires **separate, explicit owner approval**
 (`CLAUDE.md` §5 and §6).
+
+**The mobile row is new (2026-08-19), and it was added because the omission had
+already cost something.** The freeze table and the `payments` ownership rule both
+listed only Edge Functions and database objects, so a change to the app's own
+payment surface fired no CI rule and matched nothing in this document. A branch
+took a self-declared "scoped exception" to the freeze in `CheckoutScreen.tsx`,
+recording an owner instruction that had not been given, and nothing flagged it —
+it was caught by reading the commit body. The ownership rule now covers these
+paths, so the next one fails CI unless this document changes with it.
+
+**One honest limit.** `CheckoutScreen.tsx` is deliberately **not** in the
+`payments` rule: it is the whole order screen, not a payment module, and a rule
+that fires on every checkout edit gets exempted on every checkout edit. It is
+covered by `order-lifecycle` instead, so a change there still has to update
+`docs/ORDER_CONFIRMATION_FLOW.md` — which is where the two payment-specific
+catches inside it are described. That is a weaker gate than this one: it demands
+documentation, not reconciliation against the freeze. Read the payment catches in
+that file as frozen even though the rule pointing at them is not the payments
+rule.
 
 ## 3. What changed on 2026-07-29
 
@@ -154,11 +174,69 @@ refund that actually succeeded but returned ambiguously would be re-attempted.
 stale `processing` claim to `failed`/`lease_expired` rather than retrying it),
 but it does not change the in-function `pending` release path.
 
+### UPDATE 2026-08-19 — Tap answers this, with a 24-hour caveat
+
+Researched from Tap's public documentation (`docs/integrations/Tap_API_Reference.md`),
+under an explicit owner instruction to investigate Tap. **Not confirmed by Tap and
+not tested against a live account.**
+
+Tap **does** provide a true idempotency key: `reference.idempotent` restricts
+duplicate transactions on Authorize, Charges **and Refunds** — the same string
+returns the first response instead of initiating a second refund. Tap also
+documents a refund retrieve endpoint.
+
+Two things follow, and they pull in opposite directions:
+
+1. **The refund path now sends it.** `buildRefundBody` previously sent only
+   `reference.merchant`, which is exactly the "reconciliation reference, not an
+   idempotency key" this section describes. It now sends `reference.idempotent`
+   as well.
+2. **The key expires after 24 hours.** A refund retried beyond that window is a
+   genuinely new refund as far as Tap is concerned. So the double-refund risk is
+   **bounded, not eliminated**, and the every-5-minutes worker could still cross
+   that boundary on a long-stuck refund.
+
+**This section therefore stands.** The worker stays disabled. What has changed is
+that the remaining work is now specific rather than open-ended: either confirm
+`GET /v2/refunds/{id}` can resolve an ambiguous attempt (Q3 in the Tap
+reference), or make the claim/release path refuse to retry past the idempotency
+window and route those refunds to human review instead.
+
+**A related defect was found and fixed in the same pass.** The CHARGE payload had
+`idempotent` at the top level, where Tap's schema does not define it, so charge
+idempotency had never been active at all — a retried `payment-initiate` could
+have created a second charge. Nothing was affected in practice because online
+payment has never been enabled. See the Tap reference §2.
+
 **Before any automated refund processing is re-enabled**, the chosen provider
 must supply either a true idempotency key on the refund endpoint, or a
 reliable refund-status lookup that can resolve an ambiguous attempt before a
 retry. If neither exists, ambiguous refunds must route to human review instead
 of being retried automatically.
+
+### Committed but DORMANT — the Tap card interop plugin (2026-08-19)
+
+`apps/mobile/plugins/withTapCardInterop.js` exists and is unit-tested, and is
+**deliberately not listed in `app.json` → plugins**. It therefore runs on no
+build and changes no binary. `card-react-native` is not a dependency, online
+payment is disabled, and the agreement is not signed.
+
+It is committed dormant on purpose: the finding it encodes is easy to lose and
+expensive to rediscover. `card-react-native` ships a legacy paper view manager
+with no `codegenConfig`, so under the mandatory New Architecture on RN 0.86 it
+renders on Android (interop is on by default) but **fails silently on iOS**,
+where `RCTLegacyViewManagerInteropComponentView` matches a hardcoded allowlist
+that no third-party component is in. The library's own error message blames the
+build, so the cause is not where anyone would look. Full detail:
+`docs/integrations/Tap_API_Reference.md` §4.1.
+
+**To activate**, once the SDK is installed and the freeze is lifted, add
+`"./plugins/withTapCardInterop"` to the plugins array. That is a payment change
+and needs its own owner approval.
+
+**Still unproven:** that the card fields render once registered, and that Tap's
+Android SDK does not collide with Expo SDK 57. Both need an EAS build on a real
+device — neither can be settled from source.
 
 ## 8. Resume checklist (when the gateway is officially selected)
 

@@ -6,30 +6,37 @@ export const STRINGS = {
   en: {
     appName: 'Spicy Meal',
     tagline: 'Hot, Crispy, Fresh and Golden Bites',
-    welcome: 'Satisfy Your Cravings!',
 
     // common
     retry: 'Try Again',
     loading: 'Loading…',
     somethingWentWrong: 'Something went wrong.',
+    // Customer-safe failure copy. Chosen so each one names something the
+    // customer can actually DO; the technical cause goes to Sentry instead.
+    errOffline: 'You appear to be offline. Check your connection and try again.',
+    errNetworkBlocked: 'We couldn’t reach Spicy Meal on this network. Try mobile data or a different Wi‑Fi.',
+    errTimeout: 'That took too long. Please try again.',
+    errRateLimited: 'Too many attempts. Please wait a moment and try again.',
+    errServer: 'Something went wrong on our side. Please try again shortly.',
     sar: 'SAR',
     cancel: 'Cancel',
     close: 'Close',
     back: 'Back',
 
-    // auth
-    authSub: 'Order your favourite spicy meals in seconds.',
-
-    // customer login — WhatsApp only, Saudi mobiles only (Supabase Phone Auth)
+    // customer login — WhatsApp only, Saudi mobiles only (Supabase Phone Auth).
+    // The screen carries the brand lockup and the field, nothing else: there is
+    // deliberately no heading or explanatory paragraph above the input.
     loginWithWhatsapp: 'Login with WhatsApp',
-    loginPhoneTitle: 'Login with WhatsApp',
-    loginPhoneSub: 'Enter your Saudi mobile number and we’ll send a login code to your WhatsApp.',
     phoneNumberLabel: 'Mobile number',
     saudiNumbersOnly: 'Saudi mobile numbers only (+966).',
-    sendLoginCode: 'Send login code',
+    loginContinue: 'Continue',
+    loginCodeOnWhatsapp: 'Your verification code will arrive on WhatsApp',
     weSentLoginCode: 'We sent a login code to your WhatsApp.',
-    enterLoginCode: 'Enter your login code',
-    verifyAndLogin: 'Verify & Login',
+    enterCodeTitle: 'Enter your code',
+    verifyShort: 'Verify',
+    changeShort: 'Change',
+    pasteCode: 'Paste code',
+    /** Screen-reader label for the inline "Change" action, which needs the noun. */
     changeNumber: 'Change number',
     invalidSaudiPhone: 'Enter a valid Saudi mobile number, e.g. 05XXXXXXXX.',
     loginCodeSendFailed: 'Could not send the login code. Please try again.',
@@ -359,32 +366,41 @@ export const STRINGS = {
     oc_refund_failed: 'Refund in progress',
     oc_branch_order_number: 'Branch order number',
     oc_number_pending: 'Not issued yet',
+    oc_number_pending_hint: 'It will appear here as soon as the branch issues it.',
+    oc_directions: 'Directions to branch',
+    oc_directions_choose: 'Open directions in',
+    oc_maps_apple: 'Apple Maps',
+    oc_maps_google: 'Google Maps',
   },
   ar: {
     appName: 'سبايسي ميل',
     tagline: 'حار، مقرمش، طازج ولقيمات ذهبية',
-    welcome: 'أشبع رغبتك في الطعم الحار!',
 
     retry: 'إعادة المحاولة',
     loading: 'جارٍ التحميل…',
     somethingWentWrong: 'حدث خطأ ما.',
+    errOffline: 'يبدو أنك غير متصل بالإنترنت. تحقق من اتصالك ثم حاول مرة أخرى.',
+    errNetworkBlocked: 'تعذّر الوصول إلى سبايسي ميل عبر هذه الشبكة. جرّب بيانات الجوال أو شبكة واي فاي أخرى.',
+    errTimeout: 'استغرقت العملية وقتاً طويلاً. حاول مرة أخرى.',
+    errRateLimited: 'محاولات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
+    errServer: 'حدث خطأ لدينا. حاول مرة أخرى بعد قليل.',
     sar: 'ر.س',
     cancel: 'إلغاء',
     close: 'إغلاق',
     back: 'رجوع',
 
-    authSub: 'اطلب وجباتك الحارة المفضلة في ثوانٍ.',
-
     // تسجيل دخول العميل عبر واتساب فقط — أرقام سعودية فقط (مصادقة الجوال في Supabase)
     loginWithWhatsapp: 'تسجيل الدخول عبر واتساب',
-    loginPhoneTitle: 'تسجيل الدخول عبر واتساب',
-    loginPhoneSub: 'أدخل رقم جوالك السعودي وسنرسل رمز الدخول إلى واتساب الخاص بك.',
     phoneNumberLabel: 'رقم الجوال',
     saudiNumbersOnly: 'أرقام الجوال السعودية فقط (+966).',
-    sendLoginCode: 'إرسال رمز الدخول',
+    loginContinue: 'متابعة',
+    loginCodeOnWhatsapp: 'سيصلك رمز التحقق عبر WhatsApp',
     weSentLoginCode: 'أرسلنا رمز الدخول إلى واتساب الخاص بك.',
-    enterLoginCode: 'أدخل رمز الدخول',
-    verifyAndLogin: 'تحقّق وتسجيل الدخول',
+    enterCodeTitle: 'أدخل الرمز',
+    verifyShort: 'تأكيد',
+    changeShort: 'تغيير',
+    pasteCode: 'لصق الرمز',
+    /** تسمية قارئ الشاشة لزر «تغيير» المضمّن، ويحتاج إلى الاسم كاملاً. */
     changeNumber: 'تغيير الرقم',
     invalidSaudiPhone: 'أدخل رقم جوال سعودي صحيح، مثل 05XXXXXXXX.',
     loginCodeSendFailed: 'تعذّر إرسال رمز الدخول. حاول مرة أخرى.',
@@ -692,6 +708,11 @@ export const STRINGS = {
     oc_refund_failed: 'الاسترداد قيد المتابعة',
     oc_branch_order_number: 'رقم الطلب لدى الفرع',
     oc_number_pending: 'لم يصدر بعد',
+    oc_number_pending_hint: 'سيظهر هنا فور إصداره من الفرع.',
+    oc_directions: 'الاتجاهات إلى الفرع',
+    oc_directions_choose: 'افتح الاتجاهات في',
+    oc_maps_apple: 'خرائط آبل',
+    oc_maps_google: 'خرائط جوجل',
   },
 } as const;
 
