@@ -1,7 +1,8 @@
 /**
  * Web build of the delivery-location picker: renders Google Maps JS directly
  * in the page (no WebView needed in a real browser) with the same props
- * contract as the native component — draggable pin, tap-to-set, and the same
+ * contract as the native component — draggable pin, tap-to-set, `readOnly`
+ * preview mode, and the same
  * compact in-map current-location control. Arabic labels are shaped natively by
  * Google. When the google provider/key is absent it shows the same setup hint as
  * native, and manual coordinate entry in the caller keeps working.
@@ -31,6 +32,13 @@ interface LocationPickerMapProps {
   lang: LocateLang;
   labels: { locateHint: string; useMyLocation: string; setupRequired: string };
   onAddressResolved?: (text: string) => void;
+  /** PREVIEW mode — see the native component for the full rationale. Must stay
+   *  in lockstep with it: the same screens ship in the web export, and a web
+   *  build that still let the pin be dragged would put Checkout back to editing
+   *  a location it is only supposed to confirm. */
+  readOnly?: boolean;
+  /** Preview height. Defaults to the full picker height. */
+  height?: number;
 }
 
 declare global {
@@ -55,7 +63,7 @@ function loadGoogleMapsWeb(key: string): Promise<void> {
 }
 
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
-  lat, lng, onChange, lang, labels, onAddressResolved,
+  lat, lng, onChange, lang, labels, onAddressResolved, readOnly = false, height,
 }) => {
   const styles = useStyles();
   const colors = useThemeColors();
@@ -84,17 +92,18 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         clickableIcons: false, streetViewControl: false, mapTypeControl: false,
         fullscreenControl: false,
         // Same stacking as native: zoom mid-right, locate control bottom-right.
-        zoomControl: true, zoomControlOptions: { position: g.ControlPosition.RIGHT_CENTER },
+        zoomControl: !readOnly, zoomControlOptions: { position: g.ControlPosition.RIGHT_CENTER },
+        gestureHandling: readOnly ? 'none' : 'auto', keyboardShortcuts: !readOnly,
       });
       mapRef.current = map;
-      const marker = new g.Marker({ position: start, map, draggable: true });
+      const marker = new g.Marker({ position: start, map, draggable: !readOnly });
       markerRef.current = marker;
-      marker.addListener('dragend', () => {
+      if (!readOnly) marker.addListener('dragend', () => {
         const p = marker.getPosition();
         if (p) onChange(roundCoord(p.lat()), roundCoord(p.lng()));
       });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      map.addListener('click', (e: any) => {
+      if (!readOnly) map.addListener('click', (e: any) => {
         if (!e.latLng) return;
         marker.setPosition(e.latLng);
         onChange(roundCoord(e.latLng.lat()), roundCoord(e.latLng.lng()));
@@ -174,10 +183,10 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
 
   return (
     <View>
-      <View style={styles.mapWrap}>
+      <View style={[styles.mapWrap, height != null && { height }]}>
         {/* Plain DOM host for Google Maps — valid in react-native-web trees. */}
         <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
-        <Pressable
+        {readOnly ? null : <Pressable
           onPress={useMyLocation}
           accessibilityRole="button"
           accessibilityLabel={labels.useMyLocation}
@@ -189,9 +198,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           {locating
             ? <ActivityIndicator size="small" color={colors.ember} />
             : <CrosshairIcon size={22} color={colors.ember} />}
-        </Pressable>
+        </Pressable>}
       </View>
-      <Text style={styles.hint}>{labels.locateHint}</Text>
+      {readOnly ? null : <Text style={styles.hint}>{labels.locateHint}</Text>}
       {locateError ? <Text style={styles.locateError}>{locateError}</Text> : null}
     </View>
   );

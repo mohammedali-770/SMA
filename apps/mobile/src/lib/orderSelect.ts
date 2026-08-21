@@ -39,6 +39,18 @@ export const CUSTOMER_ORDER_COLUMNS = [
   // payment presentation
   'payment_status',
   'payment_method',
+  // the customer's OWN kitchen note, shown back to them on the receipt
+  //
+  // RECLASSIFIED, deliberately. `notes` was swept into the internal list with
+  // `coupon_code` and `address_snapshot` when Issue #94 replaced `select('*')`
+  // — a blanket narrowing, not a judgement about this column. It holds text the
+  // customer typed themselves, on their own RLS-scoped order, bounded to
+  // ORDER_NOTE_MAX_LENGTH. Showing someone their own instruction back
+  // ("no onion") discloses nothing they do not already know, and not showing it
+  // meant the receipt could not confirm what the kitchen was actually told.
+  //
+  // The rest of the internal list is unchanged and still asserted below.
+  'notes',
   // the ONLY customer-visible order number
   'lazywait_order_number',
   // confirmation state-machine inputs (see features/orders/orderConfirmation.ts)
@@ -73,7 +85,6 @@ export const INTERNAL_ONLY_ORDER_COLUMNS = [
   'address_id',
   'address_snapshot',
   'coupon_code',
-  'notes',
   'idempotency_key',
   'payment_provider',
   'paid_at',
@@ -109,7 +120,7 @@ export const INTERNAL_ONLY_ORDER_COLUMNS = [
 // literal type, and `'a' + 'b'` widens to `string`, which collapses the result
 // to GenericStringError. Do not reformat this across lines or via join().
 // eslint-disable-next-line max-len
-export const CUSTOMER_ORDER_SELECT = 'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, loyalty_points_earned, payment_status, payment_method, lazywait_order_number, lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, pos_create_attempted_at, pos_customer_retry_count, refund_state, order_items(id, name_en, name_ar, unit_price, quantity, order_item_modifiers(id, name_en, name_ar, price))';
+export const CUSTOMER_ORDER_SELECT = 'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, loyalty_points_earned, payment_status, payment_method, notes, lazywait_order_number, lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, pos_create_attempted_at, pos_customer_retry_count, refund_state, order_items(id, name_en, name_ar, unit_price, quantity, order_item_modifiers(id, name_en, name_ar, price))';
 
 /** The same expression rebuilt from the arrays — the drift guard for the literal. */
 export const CUSTOMER_ORDER_SELECT_FROM_COLUMNS =

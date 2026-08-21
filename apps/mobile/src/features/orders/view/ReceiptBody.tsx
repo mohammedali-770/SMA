@@ -97,6 +97,23 @@ export function ReceiptBody({ order }: { order: Order }) {
             </View>
           ))}
 
+          {/* The customer's own kitchen note, shown back to them.
+              It sits with the ITEMS rather than in the metadata card because it
+              is an instruction about the food, and a customer checking "did I
+              remember to say no onion?" looks where the food is. Rendered only
+              when there is one — an empty "Notes: —" row is noise on every
+              order that has none. Never truncated: the receipt is the detailed
+              record, the same rule the modifier lines follow. */}
+          {order.notes ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.noteBlock}>
+                <Text variant="label" tone="secondary">{t('orderNotes')}</Text>
+                <Text variant="body">{order.notes}</Text>
+              </View>
+            </>
+          ) : null}
+
           <View style={styles.divider} />
           <ReceiptRow label={t('subtotal')} amount={order.subtotal} />
           {order.deliveryFee > 0 ? <ReceiptRow label={t('deliveryFee')} amount={order.deliveryFee} /> : null}
@@ -135,6 +152,7 @@ const useStyles = makeStyles((colors) => ({
     borderWidth: 1, borderColor: colors.appLine, padding: space.s4,
   },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.s3, paddingVertical: space.s1 + 2 },
+  noteBlock: { gap: 2, paddingVertical: space.s1 },
   qty: { minWidth: 28 },
   itemBody: { flex: 1, gap: 2 },
   divider: { height: 1, backgroundColor: colors.appLine, marginVertical: space.s2 },

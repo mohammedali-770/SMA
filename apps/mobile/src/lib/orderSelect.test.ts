@@ -52,6 +52,7 @@ describe('customer order select — no internal columns', () => {
       'lazywait_order_number', 'lazywait_sync_state', 'lazywait_ref',
       'sync_blocked_reason', 'sync_next_attempt_at',
       'pos_create_attempted_at', 'pos_customer_retry_count', 'refund_state',
+      'notes',
     ]) {
       expect(CUSTOMER_ORDER_COLUMNS as readonly string[], needed).toContain(needed);
     }
@@ -81,7 +82,7 @@ describe('mapOrder — mapped object carries nothing internal', () => {
     loyalty_points_earned: 1, loyalty_points_redeemed: 5,
     payment_status: 'paid', payment_method: 'online',
     payment_provider: 'tap', paid_at: '2026-07-24T00:00:00Z',
-    coupon_code: 'SECRET10', notes: 'private note',
+    coupon_code: 'SECRET10', notes: 'extra spicy, no onion',
     created_at: '2026-07-24T00:00:00Z',
     lazywait_order_number: '#42', lazywait_sync_state: 'synced', lazywait_ref: '#42',
     sync_blocked_reason: null, sync_next_attempt_at: null,
@@ -103,13 +104,28 @@ describe('mapOrder — mapped object carries nothing internal', () => {
     expect(serialized).not.toContain('TOKEN-SHOULD-NEVER-APPEAR');
   });
 
-  it('drops customer-identity copies, coupon, notes and address snapshot', () => {
-    for (const k of ['customerId', 'customerName', 'customerPhone', 'couponCode', 'notes', 'address']) {
+  it('drops customer-identity copies, the coupon code and the address snapshot', () => {
+    for (const k of ['customerId', 'customerName', 'customerPhone', 'couponCode', 'address']) {
       expect(Object.keys(mapped), k).not.toContain(k);
     }
     expect(serialized).not.toContain('Real Name');
     expect(serialized).not.toContain('SECRET10');
-    expect(serialized).not.toContain('private note');
+  });
+
+  /**
+   * `notes` is the one column deliberately moved OUT of the internal set. It is
+   * the customer's own kitchen note on their own RLS-scoped order, and the
+   * receipt shows it back to them so they can check what the kitchen was told.
+   * Everything else in the hostile row stays dropped, which the assertions
+   * above still prove.
+   */
+  it('carries the customer their own kitchen note', () => {
+    expect(mapped.notes).toBe('extra spicy, no onion');
+  });
+
+  it('treats a blank note as no note rather than an empty line', () => {
+    expect(mapOrder({ ...hostileRow, notes: '   ' } as unknown as DbOrderWithItems).notes).toBeUndefined();
+    expect(mapOrder({ ...hostileRow, notes: null } as unknown as DbOrderWithItems).notes).toBeUndefined();
   });
 
   it('keeps exactly what the receipt and state machine need', () => {

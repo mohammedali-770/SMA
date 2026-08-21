@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**123 TypeScript test files declaring 1710 test blocks, plus 44 SQL suites.**
+**124 TypeScript test files declaring 1728 test blocks, plus 44 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -89,7 +89,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-52 files, 738 declared test blocks.
+53 files, 756 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -105,6 +105,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 13 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
+| `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentFlow.test.ts` | 3 | chooseCheckoutTransport |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 16 | parsePendingSession |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 24 | lineTotal |
@@ -119,7 +120,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 14 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 16 | reference and channel safety |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 2 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
@@ -136,7 +137,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
-| `apps/mobile/src/lib/orderSelect.test.ts` | 11 | customer order select — no internal columns |
+| `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |

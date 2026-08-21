@@ -135,9 +135,10 @@ export interface OrderItem {
 
 /**
  * The CUSTOMER view of an order. Deliberately narrower than the table: the
- * internal `SM-…` order number, customer-identity copies, coupon/notes,
+ * internal `SM-…` order number, customer-identity copies, the coupon code, the
  * address snapshot and every operational column are neither fetched nor
- * representable here (Issue #94). See lib/orderSelect.ts.
+ * representable here (Issue #94). See lib/orderSelect.ts. The customer's own
+ * kitchen note IS carried — it is their text, on their order.
  */
 export interface Order {
   id: string;
@@ -156,6 +157,8 @@ export interface Order {
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // 'online' | 'cash' (admin-configured availability)
   createdAt: string;
+  /** The kitchen note the customer attached at checkout, shown back on the receipt. */
+  notes?: string;
   /** Branch (POS) order number once accepted — the ONLY number ever shown. */
   lazywaitOrderNumber?: string;
   // Confirmation state-machine inputs (see features/orders/orderConfirmation.ts).

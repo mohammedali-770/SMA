@@ -198,9 +198,11 @@ function mapOrderItem(i: CustomerOrderItem & { order_item_modifiers?: CustomerOr
 
 export function mapOrder(o: DbCustomerOrderWithItems): Order {
   return {
-    // NOTE: order_number (the internal SM-â€¦ id), customer_* copies, coupon/notes,
+    // NOTE: order_number (the internal SM-â€¦ id), customer_* copies, coupon_code,
     // address_snapshot and every operational column are deliberately NOT mapped â€”
     // they are no longer fetched either (see lib/orderSelect.ts). Issue #94.
+    // `notes` IS mapped: it is the customer's own kitchen note, shown back to
+    // them on their own receipt.
     id: o.id,
     branchId: o.branch_id,
     branchNameEn: o.branch_name_en ?? '',
@@ -217,6 +219,7 @@ export function mapOrder(o: DbCustomerOrderWithItems): Order {
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
     createdAt: o.created_at,
+    notes: o.notes?.trim() || undefined,
     lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
     lazywaitSyncState: o.lazywait_sync_state ?? undefined,
     lazywaitRef: o.lazywait_ref ?? undefined,

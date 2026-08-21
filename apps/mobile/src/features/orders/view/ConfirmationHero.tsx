@@ -28,19 +28,27 @@ export function ConfirmationHero({order,onResend,resending,resendError}:{order:O
   // would print something the cashier cannot match against their system.
   // Whatever the POS returns is what appears here, unaltered.
   const branchNumber=orderDisplayNumber(order);
-  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}. ${t(p.titleKey)}. ${body}`}>
+  return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={[p.showBranchNumber?`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}`:null,t(p.titleKey),body].filter(Boolean).join('. ')}>
     {/* The cashier is handed a phone: they need to see WHOSE order this is. */}
     <Logo compact />
 
     {/* THE thing this screen exists to show across a counter. Always LTR so a
-        two-digit number can never render reversed in an Arabic layout. */}
-    <View style={styles.numberCard}>
-      <Text variant="label" tone="tertiary" align="center" style={styles.numberLabel}>{t('oc_branch_order_number')}</Text>
-      {branchNumber
-        ? <Text align="center" style={styles.number} accessibilityElementsHidden>{branchNumber}</Text>
-        : <><Text variant="title" tone="tertiary" align="center">{t('oc_number_pending')}</Text>
-            <Text variant="caption" tone="tertiary" align="center">{t('oc_number_pending_hint')}</Text></>}
-    </View>
+        two-digit number can never render reversed in an Arabic layout.
+
+        GATED on p.showBranchNumber, which is the whole point of that flag. The
+        card used to render unconditionally — the flag had no consumer at all —
+        so an order on a channel with NO POS step still read "not issued yet"
+        above "it will appear here as soon as the branch issues it". For a
+        delivery order that promise can never come true. */}
+    {p.showBranchNumber ? (
+      <View style={styles.numberCard}>
+        <Text variant="label" tone="tertiary" align="center" style={styles.numberLabel}>{t('oc_branch_order_number')}</Text>
+        {branchNumber
+          ? <Text align="center" style={styles.number} accessibilityElementsHidden>{branchNumber}</Text>
+          : <><Text variant="title" tone="tertiary" align="center">{t('oc_number_pending')}</Text>
+              <Text variant="caption" tone="tertiary" align="center">{t('oc_number_pending_hint')}</Text></>}
+      </View>
+    ) : null}
 
     {/* Reassurance, not the headline: once the number is visible the customer
         has what they came for, so the state becomes a compact pill. */}

@@ -15,6 +15,7 @@
  * `PaymentStatusDialog` is what makes "declined", "expired" and "still pending"
  * reviewable without running a real charge (see src/dev/fixtureData.ts).
  */
+import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -24,7 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Header } from '../../components/Header';
 import { color, space } from '../../design-system/generated/tokens';
 import { Field } from '../../design-system/ui/Field';
-import { checkDescription, descriptionCopy, descriptionMessage } from '../order/locationDescription';
+import { checkDescription } from '../order/locationDescription';
 import {
   ORDER_NOTE_MAX_LENGTH,
   checkOrderNote,
@@ -33,6 +34,7 @@ import {
   orderNoteRemainingMessage,
 } from '../order/orderNote';
 import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
@@ -109,13 +111,29 @@ export function CheckoutScreen() {
   const addressBook = useAddressBook();
   const addressList = addressBook.addresses;
   const [addressId, setAddressId] = useState<string | null>(null);
-  // Map-picked delivery location (null until the customer confirms one).
-  const [pickedLat, setPickedLat] = useState<number | null>(null);
-  const [pickedLng, setPickedLng] = useState<number | null>(null);
-  const [addrLabel, setAddrLabel] = useState('');
-  // Bump to remount + recenter the map (saved-address tap / geolocation), without
-  // remounting on every pin drag.
-  const [recenterSeed, setRecenterSeed] = useState(0);
+  // The CONFIRMED delivery point, seeded from the order context — the location
+  // the customer already resolved on the blocking order-type gate. Checkout
+  // confirms that decision rather than asking for it a second time, and the
+  // only way it changes here is selecting a different SAVED location.
+  //
+  // Seeding from the context (not only from a saved-address lookup) is
+  // deliberate: the context carries the exact point the branch was resolved
+  // against, so what the customer sees is what the order will use even if the
+  // address book is still loading or has since been edited.
+  const [pickedLat, setPickedLat] = useState<number | null>(
+    orderCtx.context?.orderType === 'delivery' ? orderCtx.context.deliveryLat : null,
+  );
+  const [pickedLng, setPickedLng] = useState<number | null>(
+    orderCtx.context?.orderType === 'delivery' ? orderCtx.context.deliveryLng : null,
+  );
+  // The change-location picker. `pendingAddressId` is held apart from
+  // `addressId` so cancelling cannot leave the order pointed at a location the
+  // customer only browsed past.
+  const [changingLocation, setChangingLocation] = useState(false);
+  const [pendingAddressId, setPendingAddressId] = useState<string | null>(null);
+  // Best-effort device position, for the distance WARNING only. Never blocks,
+  // never prompts — see the effect below.
+  const [deviceFix, setDeviceFix] = useState<DeviceFix | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [couponResult, setCouponResult] = useState<{ ok: boolean; message: string; discount: number } | null>(null);
   const [checkingCoupon, setCheckingCoupon] = useState(false);
@@ -123,13 +141,6 @@ export function CheckoutScreen() {
   const [notes, setNotes] = useState('');
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Mandatory delivery landmark. Seeded from the address chosen in the blocking
-  // order-type gate so the customer never retypes it (section 2).
-  const [addrDesc, setAddrDesc] = useState<string>(orderCtx.context?.deliveryDescription ?? '');
-  const [descTouched, setDescTouched] = useState(false);
-  // Reverse-geocoded address for the current pin. Context only — never the
-  // delivery guidance, and never written into the description field.
-  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
   // Set while a quantity change is settling; blocks submission so the server is
   // never handed a cart the customer has not seen priced, and drives the
   // stepper's `busy` state. Cleared by an effect once the cart re-renders (below)
@@ -189,12 +200,45 @@ export function CheckoutScreen() {
     const def = preselectAddress(addressList, ctxId);
     if (def) {
       setAddressId(def.id);
-      setPickedLat(def.lat);
-      setPickedLng(def.lng);
+      // Only fill a pin the order context did not already supply. The context
+      // point is what the branch was resolved against, so it wins; overwriting
+      // it from a fallback address would silently move the delivery.
+      setPickedLat((prev) => (prev == null ? def.lat : prev));
+      setPickedLng((prev) => (prev == null ? def.lng : prev));
     }
     // The order context is read for the initial preselection only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addressBook.status, addressList]);
+
+  /**
+   * Read the device position ONCE, for the distance warning and nothing else.
+   *
+   * It never prompts: `getForegroundPermissionsAsync` only reports a grant the
+   * customer has already given elsewhere (the order-type gate asks, in the
+   * context where the answer is actually useful). Asking for location for the
+   * first time on the payment screen would be both surprising and easy to
+   * refuse, and a refusal here must cost nothing — the whole feature is one
+   * advisory line. Every failure is swallowed: no fix simply means no warning.
+   */
+  useEffect(() => {
+    if (orderType !== 'delivery') return;
+    let active = true;
+    void (async () => {
+      try {
+        const { granted } = await Location.getForegroundPermissionsAsync();
+        if (!granted || !active) return;
+        const known = await Location.getLastKnownPositionAsync({ maxAge: 5 * 60_000 });
+        if (known && active) {
+          setDeviceFix({ lat: known.coords.latitude, lng: known.coords.longitude, accuracyM: known.coords.accuracy });
+        }
+        const fresh = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (fresh && active) {
+          setDeviceFix({ lat: fresh.coords.latitude, lng: fresh.coords.longitude, accuracyM: fresh.coords.accuracy });
+        }
+      } catch { /* no permission, no hardware, no fix — all mean "no warning" */ }
+    })();
+    return () => { active = false; };
+  }, [orderType]);
 
   // The selected address disappearing (deleted from Profile while Checkout was
   // mounted) must not leave a dangling id that place_order would reject. The
@@ -230,13 +274,30 @@ export function CheckoutScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Select a saved location: use its coords + recenter the map on it.
-  const chooseSavedAddress = (a: SavedAddress) => {
-    setAddressId(a.id);
-    setPickedLat(a.lat);
-    setPickedLng(a.lng);
-    setRecenterSeed((s) => s + 1);
+  /**
+   * The change-location flow. Three separate handlers rather than one, because
+   * selecting a row and COMMITTING it are different acts: a customer scrolling
+   * the list has not changed their delivery address until they confirm, and
+   * cancelling must leave the order exactly as it was.
+   *
+   * Note what is missing: there is no "edit this location" here, and no way to
+   * create one. Both belong to location settings, which owns the landmark —
+   * having Checkout write it too is what let one address carry two different
+   * descriptions depending on which screen last saved it.
+   */
+  const startLocationChange = () => { setPendingAddressId(addressId); setChangingLocation(true); };
+  const cancelLocationChange = () => { setPendingAddressId(null); setChangingLocation(false); };
+  const confirmLocationChange = () => {
+    const next = addressList.find((a) => a.id === pendingAddressId);
+    if (!next) return;
+    setAddressId(next.id);
+    setPickedLat(next.lat);
+    setPickedLng(next.lng);
+    setChangingLocation(false);
+    setPendingAddressId(null);
   };
+  const selectPendingAddress = (a: SavedAddress) => setPendingAddressId(a.id);
+  const goToLocationSettings = () => { setChangingLocation(false); setPendingAddressId(null); router.push('/profile/addresses'); };
 
   const applyCoupon = async () => {
     const code = couponCode.trim();
@@ -273,13 +334,27 @@ export function CheckoutScreen() {
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
   }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty]);
 
-  // Delivery needs a landmark; pickup does not.
+  // The confirmed location, and the landmark that travels WITH it.
+  //
+  // The landmark is read off the saved address rather than a field on this
+  // screen. Checkout no longer edits it — location settings owns it — so the
+  // only question left here is whether the address the customer is about to
+  // order to actually carries one. An address written by the order-type gate
+  // always does; one created before the landmark became mandatory may not, and
+  // that is what this still guards.
+  const selectedAddress = useMemo(
+    () => addressList.find((a) => a.id === addressId) ?? null,
+    [addressList, addressId],
+  );
   const requiresDescription = orderType === 'delivery';
-  const descCheck = checkDescription(addrDesc, resolvedAddress);
+  const descCheck = checkDescription(selectedAddress?.description);
   const noteCheck = checkOrderNote(notes);
-  const descError = descTouched && requiresDescription
-    ? descriptionMessage(descCheck.problem, lang)
-    : null;
+
+  // Advisory only — see deliveryLocationWarning. Never feeds a block.
+  const gpsWarning = useMemo(
+    () => (orderType === 'delivery' ? mismatchWarning(deviceFix, { lat: pickedLat, lng: pickedLng }, lang) : null),
+    [orderType, deviceFix, pickedLat, pickedLng, lang],
+  );
 
   // ---- Delivery serviceability pre-check (UX only; place_order is authoritative) ----
   const branchZone = deliveryZones.find((z) => z.branchId === selectedBranch?.id && z.isActive);
@@ -294,7 +369,7 @@ export function CheckoutScreen() {
   const deliveryBlockReason: string | null =
     orderType !== 'delivery' ? null
     : branchDeliveryOff ? pick('Delivery is currently closed for this branch', 'التوصيل مغلق حالياً لهذا الفرع')
-    : !hasPickedCoords ? pick('Please select your location on the map', 'يرجى تحديد موقعك على الخريطة')
+    : !hasPickedCoords ? pick('No delivery location is selected', 'لم يتم تحديد موقع التوصيل')
     : !branchZone ? pick('Delivery is not available for this location', 'التوصيل غير متاح لهذا الموقع')
     : !insideZone ? pick('Outside delivery area', 'خارج منطقة التوصيل')
     : null;
@@ -343,11 +418,16 @@ export function CheckoutScreen() {
       case 'no-payment':
         return { title: pick('No payment method is available', 'لا توجد طريقة دفع متاحة'), action: pick('Please try again shortly.', 'يرجى المحاولة بعد قليل.') };
       case 'delivery-unserviceable':
-        return { title: deliveryBlockReason as string, action: pick('Move the pin to your exact location.', 'حرّك الدبوس إلى موقعك بالضبط.') };
+        // The fix is no longer "move the pin" — Checkout does not move pins any
+        // more. It is to pick a different saved location, or add one in
+        // location settings.
+        return { title: deliveryBlockReason as string, action: pick('Choose a different saved location.', 'اختر موقعاً محفوظاً آخر.') };
       case 'need-description':
+        // Likewise: the landmark belongs to the saved location, so the fix is to
+        // edit it where it lives, not to retype it here.
         return {
-          title: pick('Add a location description', 'أضف وصف الموقع'),
-          action: descriptionMessage(descCheck.problem, lang),
+          title: pick('This location needs delivery guidance', 'هذا الموقع يحتاج إرشادات توصيل'),
+          action: pick('Open location settings and add a nearby landmark.', 'افتح إعدادات المواقع وأضف أقرب معلم.'),
         };
       default:
         return null;
@@ -433,39 +513,28 @@ export function CheckoutScreen() {
       if (rec.kind === 'receipt') { cart.clear(); router.replace(`/receipt/${rec.orderId}`); return; }
       if (rec.kind === 'resume') { await runTapPaymentSession(rec.sessionId); return; }
 
-      // Resolve the delivery address: reuse the selected saved address when the
-      // pin hasn't moved off it, otherwise persist the map-picked coordinates.
+      // Resolve the delivery address. Checkout SELECTS one; it never writes one.
+      //
+      // Every delivery order arrives here with a saved address behind it: the
+      // order-type gate is blocking and its `confirmNewAddress` always persists
+      // the chosen point through `addressBook.create`. So the three-way
+      // create/update/reuse dance that used to live here is gone, and with it
+      // the second place a landmark could be written — the duplication
+      // `order/locationDescription` exists to prevent.
       let deliveryAddressId: string | null = null;
       if (orderType === 'delivery') {
-        if (pickedLat == null || pickedLng == null) throw new Error(pick('Please select your location on the map', 'يرجى تحديد موقعك على الخريطة'));
-        // Mandatory landmark, re-checked here and not only on the button: the
-        // address row is written from this path, and it previously stored no
-        // description at all.
-        const desc = checkDescription(addrDesc, resolvedAddress);
-        if (!desc.valid) {
-          setDescTouched(true);
-          throw new Error(descriptionMessage(desc.problem, lang) ?? descriptionCopy[lang].empty);
-        }
         const saved = addressList.find((a) => a.id === addressId);
-        if (saved && saved.lat === pickedLat && saved.lng === pickedLng && saved.description === desc.value) {
-          deliveryAddressId = saved.id;
-        } else if (saved && saved.lat === pickedLat && saved.lng === pickedLng) {
-          // Same pin, edited landmark — update in place rather than creating a
-          // near-duplicate address for the customer. Routed through the shared
-          // book (same `addresses.update` call underneath) so Profile and the
-          // order-type gate see the new landmark without a refetch.
-          const updated = await addressBook.update(saved.id, { description: desc.value });
-          deliveryAddressId = updated.id;
-        } else {
-          const created = await addressBook.create({
-            label: (addrLabel.trim() || desc.value).slice(0, 60),
-            description: desc.value,
-            latitude: pickedLat,
-            longitude: pickedLng,
-            isDefault: addressList.length === 0,
-          });
-          deliveryAddressId = created.id;
+        if (!saved) throw new Error(pick('No delivery location is selected', 'لم يتم تحديد موقع التوصيل'));
+        // The landmark is the saved location's own. An address with an unusable
+        // one is fixed in location settings, not retyped here.
+        const desc = checkDescription(saved.description);
+        if (!desc.valid) {
+          throw new Error(pick(
+            'This location needs delivery guidance. Open location settings and add a nearby landmark.',
+            'هذا الموقع يحتاج إرشادات توصيل. افتح إعدادات المواقع وأضف أقرب معلم.',
+          ));
         }
+        deliveryAddressId = saved.id;
       }
 
       const orderInput = {
@@ -638,7 +707,7 @@ export function CheckoutScreen() {
 
   return (
     <View style={styles.root}>
-      <Header title={t('checkout')} showBack />
+      <Header title={t('checkout')} showBack safeTop />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
           // Tail room clears the sticky footer AND the keyboard, so the focused
@@ -674,28 +743,35 @@ export function CheckoutScreen() {
           </Section>
 
           {isDelivery ? (
-            <Section title={pick('Select your delivery location', 'حدّد موقع التوصيل')}>
+            <Section title={changingLocation
+              ? pick('Choose your delivery location', 'اختر موقع التوصيل')
+              : pick('Delivery location', 'موقع التوصيل')}>
               <DeliveryLocationSection
                 lang={lang}
-                recenterSeed={recenterSeed}
-                lat={pickedLat ?? selectedBranch?.latitude ?? 24.7136}
-                lng={pickedLng ?? selectedBranch?.longitude ?? 46.6753}
-                onPinChange={(la, ln) => { setPickedLat(la); setPickedLng(ln); setAddressId(null); }}
-                onAddressResolved={setResolvedAddress}
-                resolvedAddress={resolvedAddress}
-                description={addrDesc}
-                onDescriptionChange={setAddrDesc}
-                onDescriptionBlur={() => setDescTouched(true)}
-                descriptionError={descError}
-                addressLabel={addrLabel}
-                onAddressLabelChange={setAddrLabel}
-                optionalLabel={pick('Building / street / apartment (optional)', 'المبنى / الشارع / الشقة (اختياري)')}
+                lat={pickedLat}
+                lng={pickedLng}
+                locationLabel={selectedAddress?.label?.trim() || t('deliveryAddress')}
+                locationDescription={selectedAddress?.description ?? orderCtx.context?.deliveryDescription ?? ''}
+                changing={changingLocation}
+                onStartChange={startLocationChange}
+                onCancelChange={cancelLocationChange}
+                onConfirmChange={confirmLocationChange}
+                onManageLocations={goToLocationSettings}
                 addresses={addressList}
-                selectedAddressId={addressId}
-                onSelectAddress={chooseSavedAddress}
-                savedTitle={pick('Saved locations', 'المواقع المحفوظة')}
-                savedFallbackLabel={t('deliveryAddress')}
+                selectedAddressId={changingLocation ? pendingAddressId : addressId}
+                onSelectAddress={selectPendingAddress}
+                gpsWarning={gpsWarning}
                 blockReason={deliveryBlockReason}
+                labels={{
+                  change: pick('Change location', 'تغيير الموقع'),
+                  confirm: pick('Confirm location', 'تأكيد الموقع'),
+                  cancel: t('cancel'),
+                  savedTitle: pick('Saved locations', 'المواقع المحفوظة'),
+                  savedFallbackLabel: t('deliveryAddress'),
+                  manageTitle: pick('Manage saved locations', 'إدارة المواقع المحفوظة'),
+                  manageSubtitle: pick('Add a new location or edit a saved one', 'أضف موقعاً جديداً أو عدّل موقعاً محفوظاً'),
+                  missing: pick('No delivery location is selected', 'لم يتم تحديد موقع التوصيل'),
+                }}
                 mapLabels={{
                   locateHint: pick('Move the pin to your exact location', 'حرّك الدبوس إلى موقعك بالضبط'),
                   useMyLocation: pick('Use my location', 'استخدم موقعي'),
@@ -761,6 +837,10 @@ export function CheckoutScreen() {
               amountOf={lineTotal}
               onIncrement={(id) => changeQuantity(id, 1)}
               onDecrement={(id) => changeQuantity(id, -1)}
+              // Same destination the Cart screen uses, so one line edited from
+              // either screen goes through one editor and one cart.updateItem.
+              onEdit={(it) => router.push({ pathname: '/product/[id]', params: { id: it.product.id, cartItemId: it.cartItemId } })}
+              editLabel={pick('Edit item', 'تعديل المنتج')}
             />
           </Section>
 

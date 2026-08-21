@@ -180,6 +180,8 @@ export interface DbCustomerOrder {
   loyalty_points_earned: number;
   payment_status: 'pending' | 'paid';
   payment_method: string | null;
+  /** The customer's own kitchen note. See lib/orderSelect.ts. */
+  notes?: string | null;
   lazywait_order_number?: string | null;
   lazywait_sync_state?: string | null;
   lazywait_ref?: string | null;
