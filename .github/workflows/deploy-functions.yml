@@ -22,7 +22,7 @@ name: Deploy Supabase Functions
 # CLI with "Access token not provided".
 #
 # The trigger is gone. Deploys are deliberate only: Actions tab → Run workflow.
-# See docs/OWNER_ACTIONS.md §0/§1.
+# See docs/OWNER_ACTIONS.md §15.
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Deploying an Edge Function requires explicit owner approval every time
@@ -116,7 +116,7 @@ jobs:
           set -euo pipefail
 
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-            echo "::error::SUPABASE_ACCESS_TOKEN is not set, so nothing can be deployed. Read docs/OWNER_ACTIONS.md §0 BEFORE adding it."
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set, so nothing can be deployed. Read docs/OWNER_ACTIONS.md §15 BEFORE adding it."
             exit 1
           fi
 
