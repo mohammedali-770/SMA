@@ -502,29 +502,40 @@ do not prove the deployed code matches the repository. Read a clean run as "the
 right set of functions exists", never as "production matches the default
 branch".
 
-## 16. Branch operations — five gated actions, none of them taken
+## 16. Branch operations — two actions taken 2026-08-21, three still gated
 
-**Status:** OWNER DECISION ×5. Source is complete and merged-ready; every step
-that would make it *live* is listed here and none has been requested.
+**Status:** OWNER DECISION ×5 — actions 1 and 2 are **done**; 3, 4 and 5 have not
+been requested.
 
 The branch-operations feature (timed item and option availability, delivery
 control, the branch and call-centre consoles, and their health/alert surfaces)
-lands as source only. It **ships dark**: nothing in it is reachable until an
-account holding one of the two new roles exists, and none does.
+is merged and its schema is live. It still **ships dark**: nothing in it is
+reachable until an account holding one of the two new roles exists, and none
+does.
 
-| # | Action | Why it is gated |
+| # | Action | Status |
 | --- | --- | --- |
-| 1 | Apply the thirteen migrations to Production | CLAUDE.md §5, §8. Cumulative; apply in filename order. Catalogued with per-file notes in [`MIGRATIONS.md`](MIGRATIONS.md) §28. |
-| 2 | Add `ops_change_events` to the `supabase_realtime` publication | Changes what Realtime broadcasts. The table is deliberately narrow — branch id and change kind, nothing else — because `postgres_changes` re-evaluates RLS per subscriber. |
-| 3 | Deploy the `staff-accounts` Edge Function | The repository's first `auth.admin.createUser`. Also needs `verify_jwt = true` to remain set in `supabase/config.toml`. |
-| 4 | Create the first branch / call-centre accounts | The moment the feature stops being inert. |
-| 5 | Enable the branch-availability alert condition's outbound delivery | Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval. |
+| 1 | Apply the thirteen migrations to Production | **DONE 2026-08-21.** Owner approval in-conversation; applied one per file in filename order via MCP `apply_migration`. Every live row is full-text md5-identical to its repository file. Evidence, per-file versions and the §9-E verification are in [`MIGRATIONS.md`](MIGRATIONS.md) §28. |
+| 2 | Add `ops_change_events` to the `supabase_realtime` publication | **DONE 2026-08-21**, as part of migration 9 and named in the same approval. The publication went from one table to two (`order_change_events`, `ops_change_events`). The new table is deliberately narrow — branch id and change kind, nothing else — because `postgres_changes` re-evaluates RLS per subscriber, and its policy is ops-roles-only rather than `using (true)`. |
+| 3 | Deploy the `staff-accounts` Edge Function | **Not requested.** The repository's first `auth.admin.createUser`. Also needs `verify_jwt = true` to remain set in `supabase/config.toml`. |
+| 4 | Create the first branch / call-centre accounts | **Not requested.** The moment the feature stops being inert. Until then the roles exist in the enum and nothing holds them. |
+| 5 | Enable the branch-availability alert condition's outbound delivery | **Not requested.** Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval and is already populated by the live card. |
 
-**One step is irreversible.** `20260820100000_ops_roles_enum.sql` is
-`ALTER TYPE public.user_role ADD VALUE` twice. It is inert while unused and
-harmless to apply, but a rollback cannot take it back — it is the only line in
-this feature with that property, and it is called out again in `MIGRATIONS.md`
-§28.
+**The irreversible step has been taken.** `20260820100000_ops_roles_enum.sql`
+ran on 2026-08-21: `ALTER TYPE public.user_role ADD VALUE` twice. PostgreSQL
+cannot drop an enum value, so `branch_staff` and `call_center` are now permanent
+members of `public.user_role`. They are inert — `is_admin()` and `is_staff()`
+test explicit role lists, so a profile holding either inherits nothing — but no
+rollback can remove them. This was the only line in the feature with that
+property and it is spent.
+
+**A cron job and a Realtime publication are now live.**
+`branch-availability-sweep` runs every minute, reopening item/option snoozes and
+delivery pauses whose timers have expired; it never touches an untimed closure.
+It is on the Operations Health board twice over — as a cron entry, and as the
+`branch_availability` card that reads the run ledger, because the sweeper
+catches its own exceptions and pg_cron would report a failed sweep as
+`succeeded`.
 
 **The 2FA carve-out is a security-posture decision, not an implementation
 detail.** `branch_staff` and `call_center` authenticate with email and password
@@ -533,16 +544,22 @@ hardware has no authenticator app. `admin` and `accountant` keep AAL2 exactly as
 `20260810142000_staff_mfa_aal2.sql` left it, and the new predicates
 (`is_branch_operator`, `is_call_center`) do not call `jwt_has_aal2()`. If that
 trade is not acceptable, it is one line per predicate to change — but it should
-be changed deliberately rather than discovered.
+be changed deliberately rather than discovered. **Action 4 is the last point at
+which refusing it costs nothing:** once accounts exist, changing the rule locks
+real people out mid-shift.
 
-**Nothing here touches the payment freeze (§6) or push sending (§7).** No
-payment, refund or checkout-session function is modified; the
-`integration_settings` push row is untouched and still disabled.
+**Nothing here touched the payment freeze (§6) or push (§7).** No payment,
+refund or checkout-session function was modified — `compute_order_snapshot` and
+`begin_checkout_session` are untouched, which is why modifier availability is
+enforced for cash orders and not yet for online checkout sessions. The
+`integration_settings` push row was not read or written by any of the thirteen
+migrations; it remains as CLAUDE.md §7 describes it — **enabled**, provider
+`expo` — and this feature neither depends on that nor changes it.
 
 Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
 [`STAFF_MANUAL.md`](STAFF_MANUAL.md) §4–§5,
 [`OPERATIONS_HEALTH_CENTER.md`](OPERATIONS_HEALTH_CENTER.md),
-[`MIGRATIONS.md`](MIGRATIONS.md) §28.
+[`MIGRATIONS.md`](MIGRATIONS.md) §28–§29.
 
 ---
 
