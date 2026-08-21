@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**126 TypeScript test files declaring 1748 test blocks, plus 45 SQL suites.**
+**139 TypeScript test files declaring 1978 test blocks, plus 51 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -38,6 +38,9 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/address_single_default_test.sql`
 - `supabase/tests/admin_ranged_orders_and_stats_test.sql`
 - `supabase/tests/anon_role_helper_exposure_test.sql`
+- `supabase/tests/branch_availability_health_card_test.sql`
+- `supabase/tests/branch_availability_snooze_test.sql`
+- `supabase/tests/branch_delivery_control_test.sql`
 - `supabase/tests/checkout_session_address_fk_test.sql`
 - `supabase/tests/coupon_code_identity_guard_test.sql`
 - `supabase/tests/discounts_campaigns_test.sql`
@@ -57,6 +60,8 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/operations_alerts_digest_test.sql`
 - `supabase/tests/operations_automation_cron_health_test.sql`
 - `supabase/tests/operations_health_center_test.sql`
+- `supabase/tests/ops_change_events_test.sql`
+- `supabase/tests/ops_roles_test.sql`
 - `supabase/tests/order_cancellation_integrity_test.sql`
 - `supabase/tests/order_confirmation_state_machine_test.sql`
 - `supabase/tests/order_flow_alert_condition_test.sql`
@@ -68,6 +73,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/order_note_length_test.sql`
 - `supabase/tests/order_read_contracts_test.sql`
 - `supabase/tests/order_refund_claim_liveness_test.sql`
+- `supabase/tests/place_order_modifier_availability_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
@@ -90,7 +96,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-55 files, 776 declared test blocks.
+56 files, 803 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -113,12 +119,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 24 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 16 | decideNavigation — allow (Tap ecosystem) |
-| `apps/mobile/src/features/menu/menuSections.test.ts` | 12 | menuItemKey (branch-selection crash regression) |
+| `apps/mobile/src/features/menu/menuSections.test.ts` | 15 | menuItemKey (branch-selection crash regression) |
 | `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 20 | resolveNotificationRoute (allow-listed internal routes ONLY) |
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 13 | shouldRequestFirstRunPermissions |
-| `apps/mobile/src/features/order/cartValidation.test.ts` | 6 | validateCartForBranch |
+| `apps/mobile/src/features/order/cartValidation.test.ts` | 15 | validateCartForBranch |
 | `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
@@ -140,6 +146,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/observability/webClassify.test.ts` | 3 | web expected-error classification |
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
+| `apps/mobile/src/lib/orderability.test.ts` | 15 | requiredCount |
 | `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
@@ -152,12 +159,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-61 files, 769 declared test blocks.
+72 files, 963 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
-| `src/components/admin/BranchPoliciesPanel.test.tsx` | 6 | BranchPoliciesPanel — branch deletion |
+| `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
+| `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
@@ -165,11 +173,14 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
 | `src/components/admin/ReportsPanel.test.tsx` | 17 | CSV export — the machine contract |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 4 | StaffAccessPanel |
+| `src/components/admin/staffAccounts.test.ts` | 10 | validateNewOpsAccount |
 | `src/components/admin/StatsPanel.test.tsx` | 24 | the ranked chart |
 | `src/components/admin/view/adminNav.test.ts` | 23 | grouping is total |
 | `src/components/admin/view/AdminSidebar.test.tsx` | 29 | structure |
-| `src/components/admin/view/alerts/alertsView.test.ts` | 17 | load contract |
-| `src/components/admin/view/health/healthView.test.ts` | 21 | polling contract |
+| `src/components/admin/view/alerts/alertsView.test.ts` | 18 | load contract |
+| `src/components/admin/view/branches/DeliveryAreasEditor.test.tsx` | 10 | DeliveryAreasEditor |
+| `src/components/admin/view/branches/workingHours.test.ts` | 20 | WEEKDAYS |
+| `src/components/admin/view/health/healthView.test.ts` | 22 | polling contract |
 | `src/components/admin/view/integrity/integrityView.test.ts` | 21 | ageLabel |
 | `src/components/admin/view/NumericCommitField.test.tsx` | 11 | NumericCommitField |
 | `src/components/admin/view/orders/OrderReceiptModal.test.tsx` | 3 | OrderReceiptModal — customer note |
@@ -177,6 +188,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/view/shared/ModalShell.test.tsx` | 20 | modality is claimed only because it is enforced |
 | `src/components/admin/view/stats/branchSales.test.ts` | 38 | buildBranchSalesRows |
 | `src/components/ObservabilityErrorBoundary.test.tsx` | 4 | admin ObservabilityErrorBoundary |
+| `src/components/ops/branchConsole.test.ts` | 31 | duration and reason vocabularies |
+| `src/components/ops/BranchConsole.test.tsx` | 15 | BranchConsole |
+| `src/components/ops/callCentre.test.ts` | 51 | buildClosureSummaries |
+| `src/components/ops/CallCentreConsole.test.tsx` | 28 | CallCentreConsole |
+| `src/components/ops/opsRefreshQueue.test.ts` | 5 | makeRefreshQueue |
+| `src/components/ops/opsStrings.test.ts` | 4 | ops console copy |
 | `src/components/Price.contract.test.tsx` | 13 | digits render mono |
 | `src/components/Price.test.tsx` | 6 | Price (web) |
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
@@ -201,26 +218,27 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 10 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/mappers.test.ts` | 21 | catalog mappers |
+| `src/lib/mappers.test.ts` | 23 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |
 | `src/lib/observability/devTest.test.ts` | 3 | admin dev Sentry test facility |
 | `src/lib/operationsAlertsApi.test.ts` | 13 | safeAlertCount |
 | `src/lib/operationsAlertsCapability.test.ts` | 6 | classifyOperationsAlertsProbe |
-| `src/lib/operationsHealthApi.test.ts` | 9 | pushFailureMetrics |
+| `src/lib/operationsHealthApi.test.ts` | 10 | pushFailureMetrics |
 | `src/lib/operationsHealthCapability.test.ts` | 12 | classifyOperationsHealthProbe |
 | `src/lib/orderIntegrityCapability.test.ts` | 17 | classifyWatchdogProbe |
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 13 | checkout payment availability |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
+| `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `src/lib/tapAdminTest.test.ts` | 4 | canRunAdminTestCheckout |
 | `src/utils/calculations.test.ts` | 35 | getVATBreakdown |
 
 ### `supabase/functions/`
 
-9 files, 196 declared test blocks.
+10 files, 205 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -233,3 +251,4 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/tapRefund.test.ts` | 18 | classifyRefundResponse — confirmed success |
 | `supabase/functions/_shared/whatsapp.test.ts` | 18 | normalizePhoneE164 |
 | `supabase/functions/payment-return/returnLink.test.ts` | 7 | sanitizeUuid |
+| `supabase/functions/staff-accounts/guards.test.ts` | 9 | staff-accounts manageable-role allow-list |

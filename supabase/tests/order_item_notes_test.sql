@@ -147,6 +147,12 @@ declare
   v_src text;
 begin
   -- 1. place_order — cash / direct.
+  -- Only the NOTE is asserted here. That this redefinition did not also revert
+  -- the per-branch availability checks it inherited from 20260820140500 is
+  -- covered behaviourally by place_order_modifier_availability_test.sql, which
+  -- runs against the same fully-replayed chain — see that file's "a snoozed
+  -- modifier still placed an order" guard. Two suites, one chain: a stale copy
+  -- of this body fails there, not silently here.
   select p.prosrc into v_src
   from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.proname = 'place_order';

@@ -84,11 +84,142 @@ Use the supported Menu/branch-availability control to mark an item unavailable f
 
 Restore availability when the branch can sell it again and verify the correct branch was changed.
 
+Branch staff do this from the **branch console**, which opens automatically on
+sign-in: find the item (search or scroll its category), tap Close, pick how long
+and why, confirm. Closed items are listed at the top of the screen with a
+countdown and a one-tap Reopen. The branch is fixed to the one your account is
+linked to, so there is no wrong branch to pick.
+
+**One option, not the whole item.** If only a choice is out — one sauce, one
+size, one add-on — close that option instead of the product. The item stays on
+the menu and customers can still order it with anything else in the group.
+Closing an option works exactly like closing an item: a duration, a reason, an
+automatic reopen. If every option in a *required* group is closed, the product
+becomes unorderable on its own — the app shows it as out of stock and the
+server refuses it — so closing the last option in a required group is the same
+decision as closing the item.
+
+Options you have closed are listed above the menu with their own countdowns and
+a one-tap Reopen, the same as closed items. To close one, find the product, tap
+**Show options**, and close the option you mean.
+
+### Pausing delivery
+
+Delivery is paused by the **call centre or an administrator**, not by branch
+staff — the branch owns what is sellable, the call centre owns where it can go.
+Pausing delivery never affects pickup: the branch keeps trading over the counter.
+
+There are two controls on the branch card and they mean different things. **Pause
+delivery for…** takes a duration and a reason and resumes by itself. **Pause
+delivery (no timer)** stays off until somebody turns it back on — use it only
+when delivery is off until further notice.
+
+A branch with delivery paused simply stops appearing as a delivery option. If
+another branch covers the same area the app uses that one instead; only when none
+remain does the customer see a message.
+
+### The call-centre board
+
+Call-centre staff see a board of **only the branches that need attention** —
+nothing closed means nothing listed, which is the point. A tile turns red when
+that branch's delivery is paused, amber when several things are closed.
+
+Opening a tile gives the branch's phone and email, its trading hours, everything
+it currently cannot sell with the time each item returns, and the two controls
+call-centre staff may use: pause or resume delivery, and disable or enable a
+named area.
+
+**Two reasons an item cannot be ordered, and they need different answers.** An
+item the branch **closed** is their decision — ask them to reopen it. An item
+listed as **blocked** was never closed by anyone: every choice in one of its
+required groups ran out, so no valid order exists. Telling a branch "you closed
+the burger" when they did not wastes the call, so the panel names the cause
+first — the group, how many of its options are off, and how many items that
+takes off the menu. Only the branch can reopen an option; the call centre cannot.
+
+A time shown as **Earliest return** is worked out from the options' own timers,
+not set by anyone. It is the soonest the item *could* come back, so treat it as
+an estimate rather than a promise — unlike **Back in**, which is a timer a
+person actually set.
+
+A paused branch now also says **when delivery resumes**, on the tile and in the
+panel — that is a timer a person set, so it is a fact, not an estimate. A pause
+made with the plain admin toggle has no timer and says so; it stays off until
+someone turns it back on.
+
+Branches whose only closed options still leave every item orderable are listed
+separately below the board, by option name. They are not a problem; that list is
+there to answer "can I still get garlic sauce at Jeddah?".
+
+A new closure anywhere raises a notice and, unless muted, a short beep. Muting
+silences the sound only — the notice still appears.
+
+### Delivery area names
+
+The named areas on a branch are a **reference list for answering the phone**.
+Disabling one does **not** stop the app accepting orders from that area —
+delivery is decided by the branch's map area, not by these names. If you need to
+actually stop delivery, pause delivery for the branch.
+
+Two kinds of closure now exist, and the difference matters:
+
+- A **timed** closure carries a duration and a reason, and reopens by itself when
+  the timer expires. This is what branch staff use, and it is why a forgotten
+  item no longer stays off the menu all weekend.
+- An **untimed** closure — the admin toggle described above — stays closed until
+  someone reopens it. Nothing reopens it automatically. Use it for an item that
+  is genuinely withdrawn, not for one that is merely sold out tonight.
+
+Every open and close is recorded with who did it, when, why, and whether it was
+a person or the timer. Do not work around the control with a direct database
+edit: that is the one path the record cannot see.
+
+**If closures stop reopening.** Timed closures are restored by a job that runs
+every minute. Operations Health carries a **Branch Availability** card that goes
+amber when anything is more than five minutes past its reopening time and red
+past thirty. If you see it, reopen the affected items by hand from the branch
+console — that always works — and raise it: the restore job needs attention, and
+a stranded *delivery* pause is the costly one, because the branch quietly drops
+out of the delivery list.
+
 **العربية**
 
 استخدم شاشة المنيو/توفر الفرع لإيقاف الصنف في **الفرع الصحيح**. لا تحذف الصنف أو التصنيف لمجرد أنه غير متوفر مؤقتاً.
 
 أعد تفعيل الصنف عندما يصبح متوفراً وتأكد أنك عدّلت الفرع الصحيح.
+
+**موظفو الفرع** يستخدمون **لوحة الفرع** التي تفتح تلقائياً عند تسجيل الدخول: ابحث
+عن الصنف أو تصفّح تصنيفه، اضغط «إيقاف»، اختر المدة والسبب، ثم أكّد. الأصناف
+الموقوفة تظهر في أعلى الشاشة مع العدّاد وزر «إتاحة» بضغطة واحدة. الفرع مثبّت على
+الفرع المرتبط بحسابك، فلا يوجد فرع خاطئ يمكن اختياره.
+
+**خيار واحد وليس الصنف كله.** إذا نفد خيار واحد فقط — صلصة أو حجم أو إضافة —
+أوقف ذلك الخيار بدلاً من الصنف. يبقى الصنف في المنيو ويستطيع العميل طلبه بأي
+خيار آخر في نفس المجموعة. إيقاف الخيار يعمل تماماً مثل إيقاف الصنف: مدة وسبب
+وعودة تلقائية. لعرض الخيارات اضغط **«عرض الخيارات»** على الصنف.
+
+إذا أوقفت **كل** خيارات مجموعة **إلزامية**، يصبح الصنف غير قابل للطلب: يظهر
+للعميل «غير متوفر حالياً» ولا يمكن الضغط عليه، والخادم يرفض الطلب. لذلك إيقاف
+آخر خيار في مجموعة إلزامية هو نفسه قرار إيقاف الصنف — واللوحة تنبّهك إلى ذلك على
+سطر الصنف.
+
+**نوعان من الإيقاف، والفرق مهم:**
+
+- إيقاف **بمدة**: يحمل مدة وسبباً ويعود من تلقاء نفسه عند انتهاء المدة. هذا ما
+  يستخدمه موظفو الفرع، ولهذا لم يعد الصنف المنسي يبقى موقوفاً طوال العطلة.
+- إيقاف **بدون مدة**: مفتاح المسؤول أعلاه؛ يبقى موقوفاً حتى يعيده شخص ما. لا شيء
+  يعيده تلقائياً. استخدمه للصنف المسحوب فعلاً، لا للصنف الذي نفد الليلة فقط.
+
+**إيقاف التوصيل** ليس من صلاحية موظفي الفرع: يقوم به مركز الاتصال أو المسؤول.
+إيقاف التوصيل لا يؤثر على الاستلام من الفرع إطلاقاً.
+
+**أسماء مناطق التوصيل** مرجع لمركز الاتصال عند الرد على الهاتف فقط. إيقاف اسم
+منطقة **لا يمنع** التطبيق من قبول الطلبات منها — التوصيل يُحدَّد بمنطقة الفرع على
+الخريطة. إذا أردت إيقاف التوصيل فعلاً، أوقف التوصيل للفرع.
+
+كل إيقاف وإتاحة مسجَّل: من قام به ومتى ولماذا وهل كان شخصاً أم المؤقّت. لا تلتف
+على هذه الشاشات بتعديل مباشر على قاعدة البيانات — هذا هو المسار الوحيد الذي لا
+يستطيع السجل رؤيته.
 
 ## 5. Close or pause a restaurant branch — إغلاق أو إيقاف الفرع
 

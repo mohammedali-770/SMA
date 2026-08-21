@@ -98,7 +98,29 @@ classification lives in `condition_code`/severity. Charset is enforced:
   `terminal_failure`, `stale_success`, `job_missing` (critical) or
   `no_success_yet`, `schedule_mismatch`, `job_degraded` (warning) classify it
 - `push:failed_deliveries`, `push:failed_send_events`
+- `branch_availability:health` — identity is the card; one fingerprint across
+  every alertable state so an ageing restore backlog **escalates** rather than
+  recovering and reopening. `restores_overdue` / `sweep_failing` /
+  `unavailable` are warnings; `restores_stalled` (anything more than 30 minutes
+  past its restore time) is critical. `idle` and `healthy` emit nothing. Muted
+  with `system_rule_overrides.branch_availability.muted`.
 - `<system>:configuration` — optional systems, **opt-in only**
+
+`branch_availability` is a **non-critical card that can raise a critical
+alert**, and that is deliberate rather than an inconsistency: the card's
+`critical` flag decides whether it may move the *platform* rollup, while alert
+severity says how loudly to shout. `payment` has worked the same way since
+20260807. `branch_availability:health` is also **not** gated behind
+`optional_system_alerts_enabled` — that flag exists for the *configuration*
+states of optional integrations, not for a real failure of an always-on
+internal mechanism.
+
+**Where the per-card arms live.** Since `20260810113500` the arms are in
+`operations_alerts_derive_pre_stranded`; `operations_alerts_derive` is a thin
+wrapper that calls it and appends the independent
+`order_integrity:stranded_orders` critical condition. Re-emitting the arms under
+the wrapper's name silently deletes that stranded-order alert — whose entire
+purpose is that a warning cannot mask it. Add new arms to the renamed function.
 
 Because identity is stable, a warning that worsens **escalates the same
 alert** (event `escalated`) and a critical that improves **downgrades** it

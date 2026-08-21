@@ -13,7 +13,7 @@
 -- all three must carry `note` or it silently disappears on whichever path was
 -- missed:
 --
---   3. place_order                 - cash / direct  (last defined 20260710120100)
+--   3. place_order                 - cash / direct  (last defined 20260820140500)
 --   4. compute_order_snapshot      - builds the online snapshot (20260712160000)
 --   5. insert_order_from_snapshot  - writes it after payment (20260712170000)
 --
@@ -24,6 +24,20 @@
 -- migration that last defined it, with exactly one edit: the note. Nothing else
 -- in them changed. They were extracted programmatically and each edit asserted
 -- to match exactly once, so a hand-copying slip cannot hide in 300 lines.
+--
+-- THIS ALREADY ALMOST WENT WRONG ONCE, which is why the parenthesised versions
+-- above are worth checking rather than trusting. This migration was first
+-- written against place_order as of 20260710120100. While it sat in review,
+-- 20260820140500_place_order_modifier_availability.sql landed on the base
+-- branch and added per-branch product and modifier availability checks. Because
+-- this file sorts AFTER that one, the original copy would have replayed the
+-- older body over it and silently deleted those checks — no conflict, no error,
+-- and an out-of-stock option quietly orderable again. The body below was
+-- rebuilt from 20260820140500 and re-diffed to a single hunk.
+--
+-- So: before touching any body here, re-run the check. `create or replace`
+-- against a stale copy is a silent revert, and the migration chain will not
+-- notice.
 --
 -- GRANTS ARE NOT RE-ISSUED, deliberately. `create or replace function` preserves
 -- the existing ACL, and 20260724200000_order_read_contracts.sql revoked EXECUTE
@@ -269,11 +283,16 @@ begin
       raise exception 'A product in your cart is no longer on the menu';
     end if;
 
+    -- Lazy expiry: a snooze whose timer has passed is NOT a closure, even if the
+    -- sweeper has not run yet. Without this a customer stays blocked for up to a
+    -- tick after the item is genuinely back. An untimed closure (snoozed_until
+    -- null) still blocks, which is the whole point of the distinction.
     if exists (
       select 1 from public.branch_product_availability bpa
       where bpa.branch_id = p_branch_id
         and bpa.product_id = v_product.id
         and bpa.is_available = false
+        and (bpa.snoozed_until is null or bpa.snoozed_until > now())
     ) then
       raise exception 'A product in your cart is not available at the selected branch';
     end if;
@@ -290,6 +309,19 @@ begin
         where m.id = v_mod_id and m.is_active and pmg.product_id = v_product.id;
         if not found then
           raise exception 'An invalid modifier was supplied for a product';
+        end if;
+        -- Per-branch modifier availability. Nothing else enforces this: the
+        -- deferred modifier-contract trigger checks cardinality, not stock, and
+        -- returns early for anything that is not a cash order. Same lazy-expiry
+        -- rule as products.
+        if exists (
+          select 1 from public.branch_modifier_availability bma
+          where bma.branch_id = p_branch_id
+            and bma.modifier_id = v_modifier.id
+            and bma.is_available = false
+            and (bma.snoozed_until is null or bma.snoozed_until > now())
+        ) then
+          raise exception 'An option in your cart is not available at the selected branch';
         end if;
         v_unit_price := v_unit_price + v_modifier.price;
       end loop;

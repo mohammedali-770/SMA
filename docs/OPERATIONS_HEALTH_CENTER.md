@@ -45,15 +45,47 @@ The overall platform state is derived only from these critical systems:
    authoritative state source.
 3. **Account Deletion Processor** — allowlisted pg_cron execution evidence plus
    safe queue counts (`due`, `manual_review`, oldest due time).
-4. **Database & Scheduled Jobs** — exactly three allowlisted application jobs:
-   `account-deletion-processor`, `lazywait-sync`, and
-   `order-integrity-watchdog`.
+4. **Database & Scheduled Jobs** — three **critical** allowlisted application
+   jobs whose health feeds the platform rollup: `account-deletion-processor`,
+   `lazywait-sync`, and `order-integrity-watchdog`.
+
+   The same card also observes three **non-critical** internal automation crons
+   — `operations-alerts-evaluator`, `operations-digest-generator` and
+   `branch-availability-sweep` — under a separate `automation_state` rollup.
+   They surface as warning-level attention items and deliberately never affect
+   `database_jobs.state` or the overall platform state. Each job carries its own
+   staleness window sized to its cadence, so a healthy-but-idle sparse job is
+   never mislabelled failing.
 
 A missing or temporarily unavailable critical health source degrades the overall
 platform state. A proven critical failure makes it failing. A verified
 configuration error has the highest precedence.
 
 ### Optional/informational systems
+
+- **Branch Availability** — whether timed item, option and delivery closures
+  actually reopen. `degraded` once anything is more than 5 minutes past its
+  restore time (five missed ticks of a one-minute sweep, so a single unlucky run
+  is not a backlog) or when the most recent sweep run in
+  `branch_availability_runs` failed; `failing` past 30 minutes; `idle` on a fresh
+  database with nothing closed and no sweep recorded yet.
+
+  **This is not the `branch-availability-sweep` cron entry on the Scheduled Jobs
+  card, and the difference is the reason the card exists.**
+  `branch_availability_sweep` catches its own exceptions: it records
+  `status='failed'` in its ledger and then returns normally, so pg_cron reports
+  the run as `succeeded`. The Scheduled Jobs card would show the sweeper healthy
+  while every sweep failed. Only the ledger plus the availability state can see
+  that.
+
+  Non-critical: a stalled sweeper leaves things closed longer than intended,
+  which over-blocks and never over-sells. It is absent from `critical_systems`
+  and cannot move the overall platform state.
+
+  Counts only — closed items, closed options, paused branches, disabled areas,
+  overdue restores. **No branch is ever named here.** Operations Health is
+  read-only; the call-centre console is where an operator sees which branch and
+  acts on it.
 
 - **Payment / Tap** — enabled/configured metadata, safe payment status counts,
   recent stale initiated attempts, latest paid time, and payment-related Order

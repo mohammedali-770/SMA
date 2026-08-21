@@ -12,9 +12,20 @@ import type { Product } from '../../types/models';
 import { motion, radius, space, type as typeScale } from '../generated/tokens';
 import { Text } from './Text';
 
-interface Props { product: Product; hasModifiers: boolean; onAdd: (product: Product, withModifiers: boolean) => void; }
+interface Props {
+  product: Product;
+  hasModifiers: boolean;
+  /**
+   * Orderable at the selected branch. A sold-out item stays on the menu but
+   * becomes inert: dimmed, no Add button, and the whole card stops being
+   * pressable so a modifier product cannot be opened either. Hiding it instead
+   * would leave the customer hunting for something they saw yesterday.
+   */
+  available?: boolean;
+  onAdd: (product: Product, withModifiers: boolean) => void;
+}
 
-export const ProductCard = React.memo(function ProductCard({ product, hasModifiers, onAdd }: Props) {
+export const ProductCard = React.memo(function ProductCard({ product, hasModifiers, available = true, onAdd }: Props) {
   const colors = useThemeColors();
   const { t, pick, rtlRow } = useI18n();
   const styles = useStyles();
@@ -33,14 +44,29 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
         {description ? <Text variant="caption" tone="secondary" numberOfLines={2}>{description}</Text> : null}
         <View style={[styles.bottom, rtlRow]}>
           <View><Price amount={product.price} size={typeScale.body.size} weight="700" />{kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}</View>
-          <Pressable onPress={(event) => { event.stopPropagation(); onAdd(product, hasModifiers); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}
-            style={({ pressed }) => [styles.add, pressed && styles.addPressed]}>
-            <Text variant="label" tone="onEmber" align="center">{actionLabel}</Text>
-          </Pressable>
+          {available ? (
+            <Pressable onPress={(event) => { event.stopPropagation(); onAdd(product, hasModifiers); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}
+              style={({ pressed }) => [styles.add, pressed && styles.addPressed]}>
+              <Text variant="label" tone="onEmber" align="center">{actionLabel}</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.soldOut}>
+              <Text variant="label" tone="secondary" align="center">{t('outOfStock')}</Text>
+            </View>
+          )}
         </View>
       </View>
     </>
   );
+  if (!available) {
+    // Inert by construction, not merely styled: no Pressable wrapper at all, so
+    // there is nothing to tap and nothing for a screen reader to offer.
+    return (
+      <View style={[styles.card, styles.cardUnavailable, rtlRow]} accessibilityLabel={`${name} — ${t('outOfStock')}`}>
+        {content}
+      </View>
+    );
+  }
   if (hasModifiers) {
     return <Pressable onPress={() => onAdd(product, true)} accessibilityRole="button" accessibilityLabel={name} accessibilityHint={pick('Opens item options', 'يفتح خيارات المنتج')}
       style={({ pressed }) => [styles.card, rtlRow, pressed && styles.cardPressed]}>{content}</Pressable>;
@@ -51,6 +77,8 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
 const useStyles = makeStyles((color) => ({
   card: { flexDirection: 'row' as const, backgroundColor: color.appSurface, borderRadius: radius.lg, borderWidth: 1, borderColor: color.appLine, overflow: 'hidden' as const },
   cardPressed: { opacity: motion.pressedOpacity },
+  cardUnavailable: { opacity: 0.55 },
+  soldOut: { backgroundColor: color.appSurface3, borderWidth: 1, borderColor: color.appLine, paddingHorizontal: space.s4, paddingVertical: space.s2, borderRadius: radius.md },
   img: { width: 104, minHeight: 112, backgroundColor: color.appSurface2 },
   imgEmpty: { alignItems: 'center' as const, justifyContent: 'center' as const, backgroundColor: color.appSurface3 },
   body: { flex: 1, padding: space.s3, gap: space.s1 },

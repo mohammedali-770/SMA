@@ -1,0 +1,33 @@
+-- ============================================================================
+-- Spicy Meal — operations roles: enum values only
+--
+-- Adds the two branch-operations roles used by the branch console and the
+-- call-centre console:
+--
+--   branch_staff  — pinned to exactly one branch; may snooze that branch's
+--                   items and pause that branch's delivery, nothing else.
+--   call_center   — sees every branch's closures; may pause delivery and
+--                   disable advisory delivery areas, but may NOT snooze items
+--                   and may NOT read orders or customer data.
+--
+-- THIS FILE INTENTIONALLY CONTAINS NOTHING ELSE.
+--
+-- PostgreSQL allows `ALTER TYPE ... ADD VALUE` inside a transaction block, but
+-- the new value cannot be *used* until that transaction commits. Every object
+-- that references these values therefore lives in the next migration, which
+-- runs in its own transaction. Merging the two files fails at apply time with
+-- "unsafe use of new value of enum type".
+--
+-- SAFETY: this is purely additive. `is_admin()` and `is_staff()`
+-- (20260810142000_staff_mfa_aal2.sql) test explicit role lists, so a profile
+-- holding one of these new roles inherits NO privilege from the existing
+-- policy surface. Capability is granted explicitly, per role, in later
+-- migrations — the roles are inert until then.
+--
+-- NOT REVERSIBLE: PostgreSQL cannot drop an enum value. An unused value is
+-- harmless, but this is the one statement in the operations-console work that
+-- a rollback cannot take back.
+-- ============================================================================
+
+alter type public.user_role add value if not exists 'branch_staff';
+alter type public.user_role add value if not exists 'call_center';

@@ -19,7 +19,8 @@ import {
 // ---------------------------------------------------------------------------
 // Row types (subset of columns the app uses).
 // ---------------------------------------------------------------------------
-export type UserRole = 'customer' | 'admin' | 'accountant';
+export type { UserRole } from './roles';
+import type { UserRole } from './roles';
 export type OrderStatus =
   | 'received' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
 export type OrderType = 'delivery' | 'pickup';
@@ -27,6 +28,7 @@ export type OrderType = 'delivery' | 'pickup';
 export interface DbBranch {
   id: string; name_en: string; name_ar: string;
   address_en: string | null; address_ar: string | null; phone: string | null;
+  email?: string | null;
   latitude: number | null; longitude: number | null;
   delivery_fee: number; min_delivery_order: number; is_active: boolean;
   lazywait_branch_id?: string | null;
@@ -34,6 +36,13 @@ export interface DbBranch {
   delivery_enabled?: boolean;
   pickup_enabled?: boolean;
   delivery_temporarily_closed?: boolean;
+  /**
+   * Scheduled resume time for a TIMED pause. Null on the admin's untimed toggle.
+   * `delivery_temporarily_closed` stays the authoritative flag; this is only when
+   * the sweeper will lift it. Public-safe by design — the reason code and the
+   * staff actor live on `branch_delivery_events`, which anon cannot read.
+   */
+  delivery_closed_until?: string | null;
   estimated_delivery_minutes?: number | null;
 }
 /** An active per-branch delivery coverage polygon (non-secret; safe columns only). */

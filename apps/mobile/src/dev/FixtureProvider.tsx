@@ -140,6 +140,12 @@ function FixtureProviderInner({
         selectedBranchId: branch.id,
         selectBranch: noop,
         isAvailable: () => true,
+        isModifierAvailable: () => true,
+        isOrderable: () => true,
+        // The menu and checkout screens call this on focus / before paying. The
+        // cast below hides a missing key, so anything the real screens invoke
+        // has to be spelled out here or the fixture crashes at run time.
+        refreshAvailability: async () => null,
         branchIsOpen: () => true,
         getProduct: (id: string) => FIXTURE_PRODUCTS.find((p) => p.id === id),
         groupsForProduct: () => [],

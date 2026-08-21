@@ -94,6 +94,15 @@ describe('labels keep unknown values visible', () => {
     expect(subsystemLabel('brand_new_subsystem', 'en')).toBe('brand_new_subsystem');
   });
 
+  it('names branch_availability in both languages and offers it as a filter', () => {
+    // The alert engine emits subsystem 'branch_availability' as of migration
+    // 20260820160000. Without these the inbox shows a raw wire id and the
+    // filter cannot reach the alerts at all.
+    expect(subsystemLabel('branch_availability', 'en')).toBe('Branch Availability');
+    expect(subsystemLabel('branch_availability', 'ar')).toBe('إتاحة الأصناف بالفروع');
+    expect(SUBSYSTEMS).toContain('branch_availability');
+  });
+
   it('names order_flow in both languages and offers it as a filter', () => {
     // The alert engine emits subsystem 'order_flow' as of migration
     // 20260807170000. Without these the inbox would show the raw id, and the

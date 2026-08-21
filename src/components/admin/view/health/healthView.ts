@@ -128,6 +128,14 @@ const ATTENTION_TEXT: Record<string, { en: string; ar: string }> = {
     en: 'Push send failures were recorded in the last 24 hours.',
     ar: 'تم تسجيل إخفاقات في إرسال الإشعارات خلال آخر 24 ساعة.',
   },
+  BRANCH_AVAILABILITY_FAILING: {
+    en: 'Closed items or paused delivery have stopped reopening on time.',
+    ar: 'توقفت الأصناف الموقوفة أو التوصيل المتوقف عن العودة في موعدها.',
+  },
+  BRANCH_AVAILABILITY_DEGRADED: {
+    en: 'Some closures are past their reopening time, or the last availability sweep failed.',
+    ar: 'تجاوزت بعض الإيقافات موعد عودتها، أو أخفقت آخر عملية مراجعة للإتاحة.',
+  },
   OPERATIONS_AUTOMATION_JOBS_FAILING: {
     en: 'An internal automation job (alerts evaluator / daily digest) has stopped running on schedule.',
     ar: 'توقفت إحدى مهام الأتمتة الداخلية (مقيّم التنبيهات / الملخص اليومي) عن العمل في موعدها.',

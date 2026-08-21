@@ -2,6 +2,8 @@ import React, { Suspense, useState } from 'react';
 
 import { useApp } from '../../context/AppContext';
 import { Text } from '../../design-system/ui/Text';
+import { PauseDeliveryDialog } from '../ops/PauseDeliveryDialog';
+import { DeliveryReasonCode, opsApi } from '../../lib/opsApi';
 import type { GeoJSONGeometry } from '../../lib/geo';
 import type { Branch } from '../../types';
 import { ADMIN_LOCALES } from './adminLocales';
@@ -34,10 +36,34 @@ export const BranchPoliciesPanel: React.FC = () => {
   const [zoneBranchId, setZoneBranchId] = useState<string | null>(null);
   const [editBranchId, setEditBranchId] = useState<string | null>(null);
   const [deletingBranchId, setDeletingBranchId] = useState<string | null>(null);
+  // The timed pause needs a promise, a busy flag and somewhere to put a server
+  // refusal. `updateBranchSettings` has none of those — it is fire-and-forget
+  // into a dashboard-wide banner — so this control owns its own state here in
+  // the panel, alongside the zone and edit modals.
+  const [pauseBranchId, setPauseBranchId] = useState<string | null>(null);
+  const [pausing, setPausing] = useState(false);
+  const [pauseError, setPauseError] = useState<string | null>(null);
 
   const zoneForBranch = (branchId: string) => deliveryZones.find(z => z.branchId === branchId && z.isActive);
   const zoneBranch = branches.find(b => b.id === zoneBranchId) ?? null;
   const editBranch = branches.find(b => b.id === editBranchId) ?? null;
+  const pauseBranch = branches.find(b => b.id === pauseBranchId) ?? null;
+
+  const handlePauseDelivery = async (minutes: number, reason: DeliveryReasonCode, note: string) => {
+    if (!pauseBranchId) return;
+    setPausing(true); setPauseError(null);
+    try {
+      await opsApi.pauseDelivery({ branchId: pauseBranchId, minutes, reasonCode: reason, note });
+      setPauseBranchId(null);
+      // The branch row now carries the pause; re-read it the same way every
+      // other write in this panel does.
+      updateBranchSettings(pauseBranchId, { deliveryTemporarilyClosed: true });
+    } catch (e) {
+      setPauseError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPausing(false);
+    }
+  };
 
   const handleSaveZone = async (branchId: string, geojson: GeoJSONGeometry) => {
     await saveBranchDeliveryZone(branchId, geojson);
@@ -86,10 +112,22 @@ export const BranchPoliciesPanel: React.FC = () => {
             onToggleProduct={(productId) => toggleProductAvailability(productId, branch.id)}
             onEdit={() => setEditBranchId(branch.id)}
             onOpenZone={() => setZoneBranchId(branch.id)}
+            onPauseDelivery={() => { setPauseError(null); setPauseBranchId(branch.id); }}
             onDelete={() => { void handleDeleteBranch(branch); }}
           />
         ))}
       </div>
+
+      {pauseBranch && (
+        <PauseDeliveryDialog
+          branchName={isRTL ? pauseBranch.nameAr : pauseBranch.nameEn}
+          lang={adminLang}
+          busy={pausing}
+          error={pauseError}
+          onCancel={() => { if (!pausing) setPauseBranchId(null); }}
+          onConfirm={(m, r, n) => { void handlePauseDelivery(m, r, n); }}
+        />
+      )}
 
       {zoneBranch && (
         <Suspense fallback={null}>

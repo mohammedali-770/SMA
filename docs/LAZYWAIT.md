@@ -282,8 +282,20 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   `customer_cell`/`customer_id` in Create Order are **not confirmed** → not sent.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
-- Stock endpoint may return `[]` (unknown ≠ out of stock); stock/86 auto-sync is
-  prepared (webhook + endpoint) but not yet wired to `branch_product_availability`.
+- **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line
+  previously said stock auto-sync was "prepared (webhook + endpoint)", which
+  overstated the code. The typed v2 client covers POS orders, menu
+  products/categories, addons/groups and branches — there is no stock or
+  availability endpoint among them, none is documented in
+  `docs/integrations/Lazywait_API_Reference.md`, and `lazywait-webhook` only maps
+  `order_ref` → `lazywait_status`. Nothing reads or writes
+  `branch_product_availability` from the Lazywait side. Item availability is
+  therefore maintained by staff in the branch-operations console, not synced.
+- If Lazywait later exposes stock reads/events, note that an empty response means
+  **unknown**, not "everything is out of stock" — a naive sync would 86 the whole
+  menu, so any such sync must be additive. The planned availability tables carry a
+  `source` column for exactly this reason, so a POS sync can write the same rows
+  without fighting a manual closure.
 - Lazywait Loyalty is **not** used — app loyalty stays internal in Supabase.
 - Lazywait response `total` is ignored; the Supabase order total is authoritative.
 - Webhook URL registration method + exact event catalog are not fully confirmed.

@@ -27,6 +27,7 @@ import {
   PaymentMethod, PaymentMethodSettings, resolveDefaultMethod, availableMethods,
 } from '../lib/payment';
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
+import { isOpsConsoleRole } from '../lib/roles';
 
 /**
  * Minimum gap between two event-driven order refetches, in ms.
@@ -461,6 +462,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const firstActive = mappedBranches.find(b => b.isActive) ?? mappedBranches[0] ?? null;
       setSelectedBranch(prev => prev ?? firstActive);
 
+      // Branch-operations roles deliberately stop here. They are authorized for
+      // branch availability and delivery state only — `is_staff()` is false for
+      // them — so the admin order/profile reads below would either come back
+      // empty or fail on RLS. Loading the catalog is all their console needs.
+      if (isOpsConsoleRole(user.role)) {
+        setAddresses([]);
+        setProfiles([user]);
+        return;
+      }
+
       await refreshOrders();
 
       if (user.role === 'customer') {
@@ -541,7 +552,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // also runs even in realtime mode, so a silently-stalled subscription still
   // catches up. All timers/channels are torn down on sign-out / unmount.
   useEffect(() => {
-    if (!isAuthenticated || currentUser.role === 'customer') {
+    // Customers have no live board, and branch-operations roles cannot read
+    // orders at all (is_staff() is false for them), so neither should hold a
+    // realtime channel or a poll timer open.
+    if (!isAuthenticated || currentUser.role === 'customer' || isOpsConsoleRole(currentUser.role)) {
       setOrdersLiveMode('off');
       return;
     }

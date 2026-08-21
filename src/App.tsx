@@ -10,10 +10,14 @@ import { StaffMfaGate } from './components/StaffMfaGate';
 import { ThemeProvider } from './components/ThemeProvider';
 import { AppearanceToggle } from './components/AppearanceToggle';
 import { BrandMark } from './design-system/ui/BrandMark';
+import { isAdminConsoleRole, isOpsConsoleRole } from './lib/roles';
 import { Server, Loader2, LogOut, AlertTriangle, RefreshCw, X } from 'lucide-react';
 
 const AdminDashboard = lazy(() =>
   import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard }))
+);
+const OpsConsole = lazy(() =>
+  import('./components/ops/OpsConsole').then(m => ({ default: m.OpsConsole }))
 );
 const DatabasePlayground = lazy(() =>
   import('./components/DatabasePlayground').then(m => ({ default: m.DatabasePlayground }))
@@ -133,13 +137,20 @@ function AppContent() {
   if (!authReady) return <FullScreenLoader label="Starting…" />;
   if (!isAuthenticated) return <AuthScreen />;
 
-  const staffIdentityKnown = Boolean(currentUser.id) && currentUser.role !== 'customer';
+  const identityKnown = Boolean(currentUser.id);
+  // Routing used to be `role !== 'customer'`, i.e. "anyone who is not a customer
+  // gets the admin console behind the TOTP gate". With the branch-operations
+  // roles that is no longer the right question — a cashier signing in on shared
+  // shop-floor hardware has no authenticator app and no permission to read the
+  // admin dataset. Each surface is now chosen explicitly.
+  const adminConsole = identityKnown && isAdminConsoleRole(currentUser.role);
+  const opsConsole = identityKnown && isOpsConsoleRole(currentUser.role);
 
   return (
     <div className="min-h-screen flex flex-col font-sans">
       <AppHeader />
       <WriteErrorBanner />
-      {staffIdentityKnown ? (
+      {adminConsole ? (
         <StaffMfaGate>
           {dataError ? (
             <DataErrorPanel />
@@ -149,6 +160,14 @@ function AppContent() {
             <StaffApp />
           )}
         </StaffMfaGate>
+      ) : opsConsole ? (
+        dataError ? (
+          <DataErrorPanel />
+        ) : dataLoading ? (
+          <FullScreenLoader label="Loading branch data…" />
+        ) : (
+          <Suspense fallback={<PanelFallback />}><OpsConsole /></Suspense>
+        )
       ) : dataError ? (
         <DataErrorPanel />
       ) : dataLoading && !currentUser.id ? (
