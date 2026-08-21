@@ -188,12 +188,57 @@ Completed:
 
 - **sending a promotional broadcast** — immediate and **cannot be recalled**; check the live opt-in count in the confirm line before clicking;
 - **turning the master flag off** — the way to stop all sending, including order updates;
-- **changing who a broadcast reaches.** `promos_enabled` defaults FALSE and only the customer can switch it on. Broadcast audience therefore starts at zero and grows only by explicit opt-in. Making marketing opt-out, or widening targeting, is a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and needs a separate owner decision — not a code change made in passing.
+- **changing who a broadcast reaches.** As of 2026-08-20 `promos_enabled` defaults **TRUE** at registration (see the 2026-08-20 subsection below), so the broadcast audience is now every device that granted OS notification permission and has not switched offers off. Widening targeting beyond that — segments, topics, reaching devices that opted out — is still a consent decision (PDPL; Apple and Google both police unsolicited marketing push) and still needs a separate owner decision, not a code change made in passing.
 
-### Marketing consent — reaffirmed strictly opt-in (2026-08-19)
+### Marketing consent — now opt-OUT (owner decision, 2026-08-20)
 
-`promos_enabled` defaults **FALSE** and only the customer can switch it on. That
-is unchanged, and the paragraph above stands.
+**Status:** SOURCE CONFIRMED — this is the current rule.
+
+The owner decided on 2026-08-20 that the OS notification permission dialog is the
+single consent moment: granting it turns on **both** channels, and the customer
+never switches anything on inside the app. `DEFAULT_DEVICE_PREFS` now sets
+`promosEnabled: true`. The Profile "Offers & promotions" toggle stays, as the
+in-app **opt-out**, alongside iOS/Android Settings.
+
+The pre-conditions the superseded section below set out for exactly this change
+were met in the same change:
+
+- **existing rows are not silently rewritten** — first run still registers only
+  on a grant made on that run (`shouldRegisterOnFirstRun`), and sign-in registers
+  only when the customer holds no row for this token (`shouldRegisterOnSignIn`).
+  A customer who switched offers off keeps that choice across sign-out/sign-in;
+- **`PushToolsPanel` stopped saying "opted-in"** — the count now reads
+  "Promotions on" and the irreversible confirm line reads "Send now to N
+  device(s) with promotions on?", in both languages;
+- **the trade-off was put to the owner and accepted** — a customer who wants
+  order updates can no longer decline offers separately at registration time;
+  they must switch offers off afterwards.
+
+Also raised and accepted: **Apple guideline 4.5.4** expects an explicit in-app
+opt-in before marketing push, and under this model the opt-out toggle is the
+in-app consent surface. If App Review rejects on 4.5.4 the revert is one line —
+`promosEnabled: false` in `DEFAULT_DEVICE_PREFS`.
+
+The database column keeps `default false`; every registration path passes both
+preferences explicitly through `register_push_device`, so no migration was
+needed and none was written.
+
+**Sign-out no longer silences the device**, fixed in the same change. Sign-out
+used to deactivate the `push_devices` row, while the first-run permission flag is
+device-scoped and never re-raised — so nothing re-registered and push stayed dead
+for good after a single sign-out. The row is now left alone and the token is
+re-claimed at the next sign-in, which is also what hands a shared phone to its new
+account. Account **deletion** still deactivates.
+
+### Marketing consent — reaffirmed strictly opt-in (2026-08-19) — SUPERSEDED
+
+> **Superseded on 2026-08-20** by the subsection above. The consent rule stated
+> here is no longer current. It is kept because the incident it records — a
+> branch asserting its own authorisation — is still worth reading, and because
+> the conditions it set for bundling marketing are the ones the 2026-08-20
+> change had to satisfy.
+
+`promos_enabled` defaulted **FALSE** and only the customer could switch it on.
 
 It is recorded here because a change on `fix/ios-otp-autofill` attempted to
 reverse it and was reverted before merge. That change would have collapsed the
@@ -227,7 +272,7 @@ recalled. The admin confirm line — *"Send now to N opted-in device(s)?"* — c
 `push_devices where is_active and promos_enabled`. Had the change merged, that
 number would have become the full active-device population while still being
 labelled "opted-in", in both languages, on the one action that cannot be undone.
-The opt-in count remains a true opt-in count.
+At that time the opt-in count remained a true opt-in count; under the 2026-08-20 decision it no longer is, which is why the panel's wording changed with it.
 
 **If you ever do decide to bundle marketing with order updates**, it is a consent
 decision (PDPL; Apple and Google both police unsolicited marketing push) and it

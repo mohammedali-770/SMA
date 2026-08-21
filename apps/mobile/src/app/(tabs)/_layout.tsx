@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { HomeIcon, PersonIcon, ReceiptIcon } from '../../components/Icons';
-import { LaunchOrderTypeModal } from '../../features/order/LaunchOrderTypeModal';
+import { usePushDeviceSync } from '../../features/notifications/usePushDeviceSync';
 import { useFirstRunPermissions } from '../../features/onboarding/useFirstRunPermissions';
+import { LaunchOrderTypeModal } from '../../features/order/LaunchOrderTypeModal';
 import { useI18n } from '../../i18n/I18nProvider';
 import { accountDeletion } from '../../services/api';
 import { useAuth, useCatalog, useOrderContext } from '../../store';
@@ -21,6 +22,10 @@ export default function TabsLayout() {
   // The OS raises its own permission dialogs once, on the first run after
   // sign-in. Nothing is rendered for this and nothing is blocked by it.
   useFirstRunPermissions(status === 'signed_in', lang);
+  // And on EVERY sign-in, claim this device's push token for the customer who
+  // just signed in — the half of "notifications survive a sign-out" that a
+  // one-shot first run cannot cover. Never prompts.
+  usePushDeviceSync(status === 'signed_in', lang);
   const [deletionPending, setDeletionPending] = useState(false);
 
 
