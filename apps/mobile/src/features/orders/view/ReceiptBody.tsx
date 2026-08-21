@@ -87,6 +87,9 @@ export function ReceiptBody({ order }: { order: Order }) {
                     {it.selectedModifiers.map((m) => pick(m.nameEn, m.nameAr)).join(' · ')}
                   </Text>
                 ) : null}
+                {/* Never truncated: the receipt is the detailed record, the
+                    same rule the modifier lines follow. */}
+                {it.note ? <Text variant="caption" tone="ember">{it.note}</Text> : null}
               </View>
               <Price
                 amount={it.price * it.quantity}

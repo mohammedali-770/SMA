@@ -124,6 +124,8 @@ export interface OrderItemModifier {
 
 export interface OrderItem {
   id: string;
+  /** The customer's instruction for this line, when they left one. */
+  note?: string;
   // productId / modifierId are NOT fetched for a customer order (they are catalog
   // joins the receipt never uses) — see lib/orderSelect.ts.
   nameEn: string;
@@ -178,11 +180,17 @@ export interface Order {
 
 /** A configured product in the cart (product + the modifiers chosen per group). */
 export interface CartItem {
-  cartItemId: string; // product.id + sorted modifier ids
+  cartItemId: string; // product.id + sorted modifier ids + the note
   product: Product;
   selectedModifiers: { [groupId: string]: Modifier[] };
   quantity: number;
   unitPrice: number; // base price + selected modifier prices (per single item)
+  /**
+   * Optional instruction for THIS line ("no onion"). Part of `cartItemId`, so
+   * the same dish ordered twice with different notes stays two lines.
+   * Bounded by ITEM_NOTE_MAX_LENGTH; absent rather than '' when there is none.
+   */
+  note?: string;
 }
 
 export interface BrandSettings {

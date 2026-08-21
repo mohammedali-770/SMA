@@ -99,7 +99,8 @@ export function CartLine({ item, name, modifierSummary: summary, lineAmount, rem
     <Pressable onPress={onEdit} accessibilityRole="button" accessibilityLabel={`${editLabel}: ${name}`} accessibilityHint={editLabel} style={({ pressed }) => [styles.editArea, rtlRow, pressed && styles.pressed]}>
       {showImage ? <Image source={{ uri: item.product.imageUrl }} style={styles.lineImg} contentFit="cover" transition={150} cachePolicy="memory-disk" recyclingKey={item.product.id} onError={() => setImgFailed(true)} /> : <View style={[styles.lineImg, styles.lineImgEmpty]}><DishIcon size={26} color={colors.heatOff} /></View>}
       <View style={styles.lineBody}><View style={[styles.lineTop, rtlRow]}><Text variant="heading" style={{ flex: 1 }} numberOfLines={2}>{name}</Text><Price amount={lineAmount} size={typeScale.body.size} weight="700" /></View>
-        {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}</View>
+        {summary ? <Text variant="caption" tone="secondary" numberOfLines={2}>{summary}</Text> : null}
+        {item.note ? <Text variant="caption" tone="ember" numberOfLines={2}>{item.note}</Text> : null}</View>
     </Pressable>
     <View style={[styles.lineBottom, rtlRow]}><QtyStepper value={item.quantity} onIncrement={onInc} onDecrement={onDec} small /><Pressable onPress={onRemove} hitSlop={10} accessibilityRole="button" accessibilityLabel={removeLabel} style={({ pressed }) => [styles.removeBtn, pressed && styles.pressed]}><Text variant="caption" align="center" style={{ color: colors.danger }}>{removeLabel}</Text></Pressable></View>
   </View>;

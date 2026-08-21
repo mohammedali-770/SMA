@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**124 TypeScript test files declaring 1734 test blocks, plus 44 SQL suites.**
+**125 TypeScript test files declaring 1742 test blocks, plus 45 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -63,6 +63,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/order_flow_health_card_test.sql`
 - `supabase/tests/order_integrity_stranded_health_test.sql`
 - `supabase/tests/order_integrity_watchdog_test.sql`
+- `supabase/tests/order_item_notes_test.sql`
 - `supabase/tests/order_modifier_contract_test.sql`
 - `supabase/tests/order_note_length_test.sql`
 - `supabase/tests/order_read_contracts_test.sql`
@@ -89,7 +90,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-53 files, 762 declared test blocks.
+54 files, 770 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -117,6 +118,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 13 | shouldRequestFirstRunPermissions |
 | `apps/mobile/src/features/order/cartValidation.test.ts` | 6 | validateCartForBranch |
+| `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |

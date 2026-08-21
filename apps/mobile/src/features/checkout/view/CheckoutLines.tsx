@@ -77,6 +77,12 @@ export function CheckoutLines({
               {mods ? (
                 <Text variant="caption" tone="secondary" numberOfLines={2}>{mods}</Text>
               ) : null}
+              {/* The line's own instruction, in the ember ink the app reserves
+                  for "this does something": it is the one part of the row the
+                  kitchen acts on, and it must not read as another modifier. */}
+              {it.note ? (
+                <Text variant="caption" tone="ember" numberOfLines={2}>{it.note}</Text>
+              ) : null}
               <Price
                 amount={amountOf(it)}
                 size={typeScale.body.size}

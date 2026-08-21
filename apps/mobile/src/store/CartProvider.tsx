@@ -9,11 +9,11 @@ import type { CartItem, Modifier, Product } from '../types/models';
 
 export interface CartValue {
   items: CartItem[]; count: number; subtotal: number; idempotencyKey: string;
-  addItem: (product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number) => void;
-  updateItem: (cartItemId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number) => void;
+  addItem: (product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => void;
+  updateItem: (cartItemId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => void;
   incrementLine: (cartItemId: string) => void; decrementLine: (cartItemId: string) => void;
   removeLine: (cartItemId: string) => void; clear: () => void;
-  toOrderItems: () => { product_id: string; quantity: number; modifier_ids?: string[] }[];
+  toOrderItems: () => { product_id: string; quantity: number; modifier_ids?: string[]; note?: string }[];
 }
 export const CartContext = createContext<CartValue | null>(null);
 
@@ -35,29 +35,33 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIdempotencyKey(uuidv4());
   }, [items]);
 
-  const addItem = useCallback((product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number) => {
+  const addItem = useCallback((product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => {
     // Every add in the app funnels through here — menu one-tap, product page and
     // the cart suggestion strip — so this is the one place the on-device
     // suggestion model can learn from. Fire-and-forget and fully swallowed: it
     // cannot alter cart state, throw, or change timing.
     noteCartAdd(product, itemsRef.current);
-    const cartItemId = makeCartItemId(product.id, selected); const unitPrice = computeUnitPrice(product, selected);
+    // The note is part of the id, so two portions of the same dish with
+    // different instructions stay two lines instead of merging and losing one.
+    const trimmedNote = (note ?? '').trim() || undefined;
+    const cartItemId = makeCartItemId(product.id, selected, trimmedNote); const unitPrice = computeUnitPrice(product, selected);
     setItems((prev) => {
       const existing = prev.find((it) => it.cartItemId === cartItemId);
       return existing ? prev.map((it) => it.cartItemId === cartItemId ? { ...it, quantity: it.quantity + quantity } : it)
-        : [...prev, { cartItemId, product, selectedModifiers: selected, quantity, unitPrice }];
+        : [...prev, { cartItemId, product, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote }];
     });
   }, []);
 
-  const updateItem = useCallback((oldId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number) => {
+  const updateItem = useCallback((oldId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => {
     if (quantity <= 0) { setItems((prev) => prev.filter((it) => it.cartItemId !== oldId)); return; }
-    const newId = makeCartItemId(product.id, selected); const unitPrice = computeUnitPrice(product, selected);
+    const trimmedNote = (note ?? '').trim() || undefined;
+    const newId = makeCartItemId(product.id, selected, trimmedNote); const unitPrice = computeUnitPrice(product, selected);
     setItems((prev) => {
       if (!prev.some((it) => it.cartItemId === oldId)) return prev;
       if (newId !== oldId && prev.some((it) => it.cartItemId === newId)) {
         return prev.filter((it) => it.cartItemId !== oldId).map((it) => it.cartItemId === newId ? { ...it, quantity: it.quantity + quantity } : it);
       }
-      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, selectedModifiers: selected, quantity, unitPrice } : it);
+      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote } : it);
     });
   }, []);
 
@@ -65,7 +69,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const decrementLine = useCallback((id: string) => setItems((p) => p.flatMap((it) => it.cartItemId !== id ? [it] : it.quantity - 1 <= 0 ? [] : [{ ...it, quantity: it.quantity - 1 }])), []);
   const removeLine = useCallback((id: string) => setItems((p) => p.filter((it) => it.cartItemId !== id)), []);
   const clear = useCallback(() => setItems([]), []);
-  const toOrderItems = useCallback(() => items.map((it) => ({ product_id: it.product.id, quantity: it.quantity, modifier_ids: Object.values(it.selectedModifiers).flat().map((m) => m.id) })), [items]);
+  // `note` is omitted rather than sent as null when there is none: place_order
+  // reads it with `->> 'note'`, and an absent key and a JSON null both normalize
+  // to NULL server-side, but omitting keeps the submitted body honest.
+  const toOrderItems = useCallback(() => items.map((it) => ({
+    product_id: it.product.id,
+    quantity: it.quantity,
+    modifier_ids: Object.values(it.selectedModifiers).flat().map((m) => m.id),
+    ...(it.note ? { note: it.note } : {}),
+  })), [items]);
   const count = useMemo(() => items.reduce((n, it) => n + it.quantity, 0), [items]);
   const subtotal = useMemo(() => cartSubtotal(items), [items]);
   const value = useMemo<CartValue>(() => ({ items, count, subtotal, idempotencyKey, addItem, updateItem, incrementLine, decrementLine, removeLine, clear, toOrderItems }), [items, count, subtotal, idempotencyKey, addItem, updateItem, incrementLine, decrementLine, removeLine, clear, toOrderItems]);

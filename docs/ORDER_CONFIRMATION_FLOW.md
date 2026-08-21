@@ -444,11 +444,38 @@ nothing they do not already know, and withholding it meant the receipt could not
 confirm what the kitchen had actually been told. **Every other column in that
 list is unchanged, and the hostile-row contract test still proves it.**
 
-**Per-ITEM notes are not implemented and are not merely unrendered:** there is
-no column on `order_items`, no field on `CartItem`, and `toOrderItems()` does
-not carry one. `features/order/orderNote.ts` anticipates them ("once per-item
-notes arrive") but they have never existed. Adding them is a schema change and
-therefore an owner-approval action under CLAUDE.md §5.
+### Per-item notes
+
+A customer can now attach an instruction to a single line ("no onion") as well
+as to the whole order. The two are different things and stay separate: the order
+note is one instruction for the ticket, the line note is read by a cook
+assembling that row. The line note is entered on the item screen, beside the
+options it qualifies, rather than on Checkout — "no onion" belongs next to the
+onion, not on a screen three steps later that applies it to the drink too.
+
+**The note is part of the cart line's identity.** `makeCartItemId` folds the
+trimmed note into the id, so two portions of the same dish where one is "no
+onion" stay two lines. Without that they merge and whichever note was added
+last silently applies to both.
+
+**It is bounded at 140 characters, half the order note** (`ITEM_NOTE_MAX_LENGTH`,
+mirrored server-side by `order_item_note_is_acceptable`). That protects the
+kitchen's ability to read the ticket, not the database: ten lines each carrying
+280 characters is not something anybody can work from.
+
+**Three write paths carry it, and that is the fragile part.** A note is data the
+INSERT must carry, so — unlike the order note, which a trigger can bound after
+the fact — a trigger cannot supply it. `place_order` (cash), `compute_order_snapshot`
+(builds the online snapshot) and `insert_order_from_snapshot` (writes it after
+payment) each carry one line for the note. Those functions are copied wholesale
+into a new migration whenever any of them changes, so a future redefinition
+started from an older copy would silently drop notes on that path alone — cash
+orders keeping theirs while online orders lose them, with nothing failing.
+`supabase/tests/order_item_notes_test.sql` case C asserts all three, so that
+goes loud instead of quiet.
+
+`begin_checkout_session` is deliberately not redefined: it delegates item work
+to `compute_order_snapshot` and never touches a line itself.
 
 ### Directions, for pickup only
 
