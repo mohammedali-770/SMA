@@ -502,6 +502,50 @@ do not prove the deployed code matches the repository. Read a clean run as "the
 right set of functions exists", never as "production matches the default
 branch".
 
+## 16. Branch operations — five gated actions, none of them taken
+
+**Status:** OWNER DECISION ×5. Source is complete and merged-ready; every step
+that would make it *live* is listed here and none has been requested.
+
+The branch-operations feature (timed item and option availability, delivery
+control, the branch and call-centre consoles, and their health/alert surfaces)
+lands as source only. It **ships dark**: nothing in it is reachable until an
+account holding one of the two new roles exists, and none does.
+
+| # | Action | Why it is gated |
+| --- | --- | --- |
+| 1 | Apply the thirteen migrations to Production | CLAUDE.md §5, §8. Cumulative; apply in filename order. Catalogued with per-file notes in [`MIGRATIONS.md`](MIGRATIONS.md) §28. |
+| 2 | Add `ops_change_events` to the `supabase_realtime` publication | Changes what Realtime broadcasts. The table is deliberately narrow — branch id and change kind, nothing else — because `postgres_changes` re-evaluates RLS per subscriber. |
+| 3 | Deploy the `staff-accounts` Edge Function | The repository's first `auth.admin.createUser`. Also needs `verify_jwt = true` to remain set in `supabase/config.toml`. |
+| 4 | Create the first branch / call-centre accounts | The moment the feature stops being inert. |
+| 5 | Enable the branch-availability alert condition's outbound delivery | Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval. |
+
+**One step is irreversible.** `20260820100000_ops_roles_enum.sql` is
+`ALTER TYPE public.user_role ADD VALUE` twice. It is inert while unused and
+harmless to apply, but a rollback cannot take it back — it is the only line in
+this feature with that property, and it is called out again in `MIGRATIONS.md`
+§28.
+
+**The 2FA carve-out is a security-posture decision, not an implementation
+detail.** `branch_staff` and `call_center` authenticate with email and password
+and are deliberately NOT behind the TOTP gate: a cashier on shared shop-floor
+hardware has no authenticator app. `admin` and `accountant` keep AAL2 exactly as
+`20260810142000_staff_mfa_aal2.sql` left it, and the new predicates
+(`is_branch_operator`, `is_call_center`) do not call `jwt_has_aal2()`. If that
+trade is not acceptable, it is one line per predicate to change — but it should
+be changed deliberately rather than discovered.
+
+**Nothing here touches the payment freeze (§6) or push sending (§7).** No
+payment, refund or checkout-session function is modified; the
+`integration_settings` push row is untouched and still disabled.
+
+Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
+[`STAFF_MANUAL.md`](STAFF_MANUAL.md) §4–§5,
+[`OPERATIONS_HEALTH_CENTER.md`](OPERATIONS_HEALTH_CENTER.md),
+[`MIGRATIONS.md`](MIGRATIONS.md) §28.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { LogIn, UserPlus, Loader2, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { BrandMark } from '../design-system/ui/BrandMark';
+import { useOpsLang } from './ops/useOpsLang';
 
 /**
  * Email + password authentication gate (Supabase Auth / GoTrue). This replaces
@@ -16,6 +17,7 @@ import { BrandMark } from '../design-system/ui/BrandMark';
  * used here (out of scope for this build).
  */
 export const AuthScreen: React.FC = () => {
+  const { t, dir, toggle } = useOpsLang('en');
   const { signIn, signUp } = useApp();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
@@ -50,13 +52,26 @@ export const AuthScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen flex items-center justify-center p-4 font-sans" dir={dir}>
       <div className="w-full max-w-sm border border-con-line bg-con-surface rounded-[2rem] p-7">
+        {/* Branch and call-centre staff meet this screen before anything else,
+            and a cashier who cannot read it cannot sign in. Defaults to English
+            so existing admins see no change; the choice is remembered and
+            shared with the operations console. */}
+        <div className="flex justify-end mb-1">
+          <button
+            type="button"
+            onClick={toggle}
+            className="min-h-11 px-3 text-xs font-black text-con-text-2 hover:text-ember rounded-xl transition-colors"
+          >
+            {t('language')}
+          </button>
+        </div>
         <div className="flex flex-col items-center text-center mb-6">
           <BrandMark className="w-14 h-14 rounded-2xl object-contain bg-con-surface border border-con-line mb-3" />
           <h1 className="text-lg font-black text-ember tracking-tight">SPICY MEAL</h1>
           <p className="text-[11px] text-con-text-2 font-bold mt-1">
-            {mode === 'signin' ? 'Sign in to your account' : 'Create your account'}
+            {mode === 'signin' ? t('authSignInTitle') : t('authSignUpTitle')}
           </p>
         </div>
 
@@ -67,14 +82,14 @@ export const AuthScreen: React.FC = () => {
             onClick={() => { setMode('signin'); setError(null); setNotice(null); }}
             className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signin' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
           >
-            <LogIn className="w-3.5 h-3.5" /> Sign In
+            <LogIn className="w-3.5 h-3.5" /> {t('authSignIn')}
           </button>
           <button
             type="button"
             onClick={() => { setMode('signup'); setError(null); setNotice(null); }}
             className={`flex-1 text-xs font-black py-2 rounded-lg transition-all flex items-center justify-center gap-1.5 ${mode === 'signup' ? 'bg-con-surface text-ember shadow-sm' : 'text-con-text-2 hover:bg-con-surface/40'}`}
           >
-            <UserPlus className="w-3.5 h-3.5" /> Sign Up
+            <UserPlus className="w-3.5 h-3.5" /> {t('authSignUp')}
           </button>
         </div>
 
@@ -82,7 +97,7 @@ export const AuthScreen: React.FC = () => {
           {mode === 'signup' && (
             <>
               <div>
-                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Full Name</label>
+                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authFullName')}</label>
                 <input
                   type="text"
                   required
@@ -94,7 +109,7 @@ export const AuthScreen: React.FC = () => {
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Phone (optional)</label>
+                <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authPhone')}</label>
                 <input
                   type="tel"
                   value={phone}
@@ -108,7 +123,7 @@ export const AuthScreen: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Email</label>
+            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authEmail')}</label>
             <input
               type="email"
               required
@@ -121,7 +136,7 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">Password</label>
+            <label className="block text-[10px] font-black text-con-text-3 uppercase mb-1">{t('authPassword')}</label>
             <input
               type="password"
               required

@@ -7,14 +7,17 @@
  * selection screen before the menu is usable.
  */
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { catalog } from '../services/api';
 import { failureMessage } from '../lib/errors/reportFailure';
 import { useI18n } from '../i18n/I18nProvider';
 import {
-  buildAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory, mapDeliveryZone, mapLoyaltySettings,
+  buildAvailabilityMatrix, buildModifierAvailabilityMatrix, mapBranch, mapBrandSettings, mapCategory,
+  mapDeliveryZone, mapLoyaltySettings,
   mapModifierGroup, mapPaymentMethodSettings, mapProduct, mapSupportSettings,
 } from '../lib/mappers';
+import { productOrderable } from '../lib/orderability';
 import type { Branch, BrandSettings, Category, DeliveryZone, LoyaltySettings, ModifierGroup, Product } from '../types/models';
 import type { PaymentMethodSettings } from '../lib/payment';
 import type { SupportSettings } from '../lib/supportContact';
@@ -25,10 +28,38 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentMethodSettings = {
   onlineEnabled: false, cashEnabled: true, defaultMethod: 'cash', outageMode: false,
 };
 
+export type AvailabilityMatrix = { [productId: string]: { [branchId: string]: boolean } };
+
+/**
+ * Both availability axes as of one fetch. Products and options are closed
+ * independently, and a caller that acts on freshness (the checkout pre-check)
+ * has to see them together or it will clear a cart line for the wrong reason.
+ */
+export interface AvailabilitySnapshot {
+  products: AvailabilityMatrix;
+  /** modifierId -> branchId -> available. Same exception-only semantics. */
+  modifiers: AvailabilityMatrix;
+}
+
 export interface CatalogValue {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /**
+   * Re-read ONLY branch availability, without re-fetching the whole menu graph.
+   *
+   * The catalog otherwise loads once per mount, which meant a customer already
+   * browsing never learned that a branch had closed an item — they discovered it
+   * as a raw server error at checkout. This is cheap enough to run on every
+   * foreground and every return to the menu; prices, categories and modifiers
+   * still need the full `reload()`.
+   *
+   * Returns the freshly built matrix so a caller can act on it immediately —
+   * React state set inside this call is not visible to the awaiting closure,
+   * and the checkout pre-check has to decide with the values it just fetched.
+   * Null means the refresh failed and the caller should not draw conclusions.
+   */
+  refreshAvailability: () => Promise<AvailabilitySnapshot | null>;
 
   branches: Branch[];
   categories: Category[];
@@ -49,6 +80,14 @@ export interface CatalogValue {
   getProduct: (id: string) => Product | undefined;
   groupsForProduct: (product: Product) => ModifierGroup[];
   isAvailable: (productId: string, branchId: string) => boolean;
+  /** One OPTION's availability at a branch. Absent row means on sale. */
+  isModifierAvailable: (modifierId: string, branchId: string) => boolean;
+  /**
+   * `isAvailable` AND every required option group still satisfiable. This is
+   * what the menu and the product screen ask; `isAvailable` alone answers only
+   * "is the item itself closed", which is no longer the whole question.
+   */
+  isOrderable: (productId: string, branchId: string) => boolean;
   branchIsOpen: (branch: Branch | null | undefined) => boolean;
 }
 
@@ -73,10 +112,16 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
   const [payment, setPayment] = useState<PaymentMethodSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [support, setSupport] = useState<SupportSettings | null>(null);
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
-  const [availability, setAvailability] = useState<{ [p: string]: { [b: string]: boolean } }>({});
+  const [availability, setAvailability] = useState<AvailabilityMatrix>({});
+  const [modifierAvailability, setModifierAvailability] = useState<AvailabilityMatrix>({});
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [reloadTick, setReloadTick] = useState(0);
   const mounted = useRef(true);
+  // The matrix seeds every product x branch to available before applying stored
+  // exceptions, so a partial refresh needs the same id lists the full load used.
+  const matrixSeed = useRef<{
+    products: { id: string }[]; modifiers: { id: string }[]; branches: { id: string }[];
+  }>({ products: [], modifiers: [], branches: [] });
 
   // NOTE: the branch itself is not persisted here — OrderContextProvider owns
   // the persisted pickup/delivery decision and mirrors its (re-validated)
@@ -102,7 +147,10 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         setCategories(raw.categories.map(mapCategory));
         setProducts(mappedProducts);
         setModifierGroupsById(groups);
+        matrixSeed.current = { products: raw.products, modifiers: raw.modifiers, branches: raw.branches };
         setAvailability(buildAvailabilityMatrix(raw.products, raw.branches, raw.availability));
+        setModifierAvailability(
+          buildModifierAvailabilityMatrix(raw.modifiers, raw.branches, raw.modifierAvailability));
         setBrand(mapBrandSettings(raw.settings));
         setLoyalty(mapLoyaltySettings(raw.settings));
         setPayment(mapPaymentMethodSettings(raw.settings));
@@ -127,6 +175,47 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
 
   const reload = useCallback(() => setReloadTick((t) => t + 1), []);
 
+  const refreshAvailability = useCallback(async (): Promise<AvailabilitySnapshot | null> => {
+    const seed = matrixSeed.current;
+    if (seed.products.length === 0) return null;   // nothing loaded yet
+    try {
+      // Branches come too. A call-centre operator can pause delivery while the
+      // customer is mid-order, and `deliveryTemporarilyClosed` decides whether
+      // the delivery flow is offered at all (CheckoutScreen) and which branches
+      // are eligible (geo.deliveryEligibleBranches). Without this the customer
+      // kept the delivery option until place_order refused the order at the end.
+      const [rows, modRows, freshBranches] = await Promise.all([
+        catalog.availability(), catalog.modifierAvailability(), catalog.branches(),
+      ]);
+      const next: AvailabilitySnapshot = {
+        products: buildAvailabilityMatrix(seed.products, seed.branches, rows),
+        modifiers: buildModifierAvailabilityMatrix(seed.modifiers, seed.branches, modRows),
+      };
+      if (mounted.current) {
+        setAvailability(next.products);
+        setModifierAvailability(next.modifiers);
+        // Replaced wholesale rather than merged: this is the same read and the
+        // same mapper the initial load uses, so it cannot drift from it.
+        setBranches(freshBranches.map(mapBranch));
+      }
+      return next;
+    } catch {
+      // Deliberately silent. This is a freshness nicety on top of state the
+      // customer already has; a failed refresh must not replace a working menu
+      // with an error, and place_order re-checks availability regardless.
+      return null;
+    }
+  }, []);
+
+  // Foreground is the moment stale availability matters most: the app may have
+  // sat in the background for hours while the branch closed half the menu.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshAvailability();
+    });
+    return () => sub.remove();
+  }, [refreshAvailability]);
+
   const selectedBranch = useMemo(
     () => branches.find((b) => b.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -144,18 +233,37 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     [availability],
   );
 
+  const isModifierAvailable = useCallback(
+    (modifierId: string, branchId: string) => modifierAvailability[modifierId]?.[branchId] ?? true,
+    [modifierAvailability],
+  );
+
+  const isOrderable = useCallback(
+    (productId: string, branchId: string) => {
+      const product = products.find((p) => p.id === productId);
+      if (!product) return isAvailable(productId, branchId);
+      return productOrderable({
+        productAvailable: isAvailable(productId, branchId),
+        groups: groupsForProduct(product),
+        isModifierAvailable: (mid) => isModifierAvailable(mid, branchId),
+      });
+    },
+    [products, groupsForProduct, isAvailable, isModifierAvailable],
+  );
+
   // "Open" == the branch is active. There is no opening-hours schema yet, and
   // place_order re-checks is_active server-side, so this matches the backend.
   const branchIsOpen = useCallback((branch: Branch | null | undefined) => Boolean(branch?.isActive), []);
 
   const value = useMemo<CatalogValue>(() => ({
-    loading, error, reload,
+    loading, error, reload, refreshAvailability,
     branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
     selectedBranchId, selectedBranch, setSelectedBranch,
-    getProduct, groupsForProduct, isAvailable, branchIsOpen,
+    getProduct, groupsForProduct, isAvailable, isModifierAvailable, isOrderable, branchIsOpen,
   }), [
-    loading, error, reload, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
-    selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable, branchIsOpen,
+    loading, error, reload, refreshAvailability, branches, categories, products, modifierGroupsById, brand, loyalty, payment, support, deliveryZones,
+    selectedBranchId, selectedBranch, setSelectedBranch, getProduct, groupsForProduct, isAvailable,
+    isModifierAvailable, isOrderable, branchIsOpen,
   ]);
 
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;

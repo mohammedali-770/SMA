@@ -72,6 +72,12 @@ verify_jwt = false
 [functions.email-test-config]
 verify_jwt = true
 
+# Admin-only provisioning for the branch-operations roles. verify_jwt only
+# proves someone signed in, so the function re-checks profiles.role === 'admin'
+# and can touch branch_staff / call_center accounts only.
+[functions.staff-accounts]
+verify_jwt = true
+
 # ---- Provisional payment/refund functions (FROZEN) -----------------------
 # These functions remain in source for the existing checkout stack, but ordinary
 # work must not change/deploy/test them while the final payment provider is

@@ -165,6 +165,19 @@ describe('attentionText', () => {
       .toContain('سلامة الدفع');
   });
 
+  it('explains both branch-availability codes rather than showing the raw code', () => {
+    // Emitted by 20260820160000. These two are the ones an operator sees when
+    // closures stop reopening, so "BRANCH AVAILABILITY FAILING" is not enough.
+    expect(attentionText(item('BRANCH_AVAILABILITY_FAILING', 'branch_availability'), 'en'))
+      .toContain('stopped reopening');
+    expect(attentionText(item('BRANCH_AVAILABILITY_FAILING', 'branch_availability'), 'ar'))
+      .toContain('موعدها');
+    expect(attentionText(item('BRANCH_AVAILABILITY_DEGRADED', 'branch_availability'), 'en'))
+      .toContain('past their reopening time');
+    expect(attentionText(item('BRANCH_AVAILABILITY_DEGRADED', 'branch_availability'), 'ar'))
+      .toContain('مراجعة للإتاحة');
+  });
+
   it('falls back to the raw code for an unknown incident', () => {
     // A NEW backend code the UI has not learned yet must still appear. Dropping
     // unknown codes would hide exactly the incidents nobody has seen before.

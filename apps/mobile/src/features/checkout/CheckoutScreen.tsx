@@ -45,6 +45,7 @@ import {
 } from '../../lib/payment';
 import { pointInPolygon } from '../../lib/geo';
 import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
+import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
@@ -93,7 +94,7 @@ export function CheckoutScreen() {
   // branch on any other rate showed customers a FALSE tax rate. This
   // interpolates the configured rate into the label and changes nothing about
   // the calculation, the inclusivity or the totals.
-  const { selectedBranch, loyalty, payment, deliveryZones, branchIsOpen, brand } = useCatalog();
+  const { selectedBranch, loyalty, payment, deliveryZones, branchIsOpen, brand, refreshAvailability } = useCatalog();
   const cart = useCart();
 
   // Order type + branch are PRESELECTED from the order context (chosen in the
@@ -420,6 +421,27 @@ export function CheckoutScreen() {
     setError(null);
     setPlacing(true);
     try {
+      // Availability can change between browsing and paying — a cashier closes
+      // an item mid-order. Without this, the only signal was place_order's raw
+      // "A product in your cart is not available at the selected branch", at the
+      // very end of the flow and without saying WHICH product. Check first, and
+      // name them. Options count too: a line naming a closed modifier is just
+      // as unorderable as one naming a closed product. A failed refresh returns null; in that case say nothing and
+      // let the server remain the authority, rather than blocking a valid order
+      // on a flaky network.
+      const fresh = await refreshAvailability();
+      if (fresh) {
+        const soldOut = validateCartForBranch(
+          cart.items, selectedBranch.id,
+          availabilityLookup(fresh.products), availabilityLookup(fresh.modifiers),
+        ).invalid;
+        if (soldOut.length > 0) {
+          const names = soldOut.map((it) => pick(it.product.nameEn, it.product.nameAr)).join('، ');
+          setError(`${t('soldOutNow')}: ${names}. ${t('soldOutBody')}`);
+          return;
+        }
+      }
+
       // Resolve any interrupted online payment FIRST — before creating ANY new
       // order, cash included. Otherwise a customer with an unresolved online charge
       // could switch to cash and place a second order while that charge may still

@@ -369,6 +369,41 @@ was additionally mutation-checked — dropping the two triggers makes it fail at
 CASE 2 — so a green run means the guard is present, not merely that the file
 executed.
 
+## 10c-bis. Availability is re-checked before payment, not after
+
+`place_order` has always refused a cart containing something the branch has
+closed. Until the branch-operations work the customer met that refusal as a raw
+server exception at the very end of checkout, after choosing a payment method
+and without being told **which** item was the problem — and a customer already
+browsing never learned about a closure at all, because the mobile catalog loaded
+once per mount.
+
+Three things changed, all on the client, none of them a new rule:
+
+1. `CatalogProvider` re-reads branch availability — products **and** options — on
+   app foreground and on returning to the menu. Prices, categories and modifiers
+   still need a full `reload()`.
+2. `CheckoutScreen.placeOrder` re-reads availability **before anything
+   expensive** and names any line that has just sold out, including a line whose
+   chosen *option* was closed. A failed refresh returns null and the order
+   proceeds: the server stays the authority, and a flaky network must not block
+   a valid order.
+3. Snoozed items stay on the menu rendered as out of stock rather than
+   disappearing. A customer who cannot find yesterday's item assumes the app is
+   broken; a greyed row with a reason is an answer.
+
+**This adds no check the backend does not already make, and it deliberately does
+not move any check later.** `20260810132000_order_modifier_contract.sql` records
+why availability is validated at order *creation* and never re-validated at
+finalize: re-checking an authorized online snapshot against mutable menu data
+could leave a charged customer without an order. The pre-check above runs before
+payment is initiated, which is the same side of that boundary as the guard
+inside `place_order`.
+
+Details of the availability model itself — the keystone that keeps
+`is_available` authoritative, and why `begin_checkout_session` and
+`compute_order_snapshot` were never touched — are in `docs/ARCHITECTURE.md` §4.
+
 ## 10d. The confirmation screen — what the cashier is shown
 
 This screen exists to be **held up across a counter**. Its layout follows from

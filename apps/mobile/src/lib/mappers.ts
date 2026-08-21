@@ -4,7 +4,8 @@
  * the customer slice of the web app's src/lib/mappers.ts.
  */
 import type {
-  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone, DbCategory,
+  DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone,
+  DbBranchModifierAvailability, DbCategory,
   DbCustomerOrderWithItems, DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup,
   DbOrderItem, DbOrderItemModifier,
   DbProduct, DbProductModifierGroup, DbProfile,
@@ -120,18 +121,46 @@ export function mapModifierGroup(g: DbModifierGroup, modifiers: DbModifier[]): M
 /**
  * productId -> branchId -> available. The table stores only explicit rows; an
  * absent row means "available", so seed every pair true, then apply exceptions.
+ *
+ * The seed parameters are typed by what this actually reads — an id — rather
+ * than by the full DB rows. That lets a caller rebuild the matrix from ids it
+ * already holds (the availability-only refresh) without re-fetching the whole
+ * catalog just to satisfy the type. Full DbProduct/DbBranch rows still pass.
  */
 export function buildAvailabilityMatrix(
-  products: DbProduct[], branches: DbBranch[], rows: DbBranchAvailability[],
+  products: { id: string }[], branches: { id: string }[], rows: DbBranchAvailability[],
 ): { [productId: string]: { [branchId: string]: boolean } } {
-  const matrix: { [productId: string]: { [branchId: string]: boolean } } = {};
-  for (const p of products) {
-    matrix[p.id] = {};
-    for (const b of branches) matrix[p.id][b.id] = true;
+  return buildMatrix(products, branches, rows.map((r) => ({
+    id: r.product_id, branch_id: r.branch_id, is_available: r.is_available,
+  })));
+}
+
+/**
+ * The same, for individual OPTIONS. A branch that has run out of one sauce
+ * closes the option rather than the whole item, so this is a separate axis with
+ * identical semantics — exception rows only, absent means on sale.
+ */
+export function buildModifierAvailabilityMatrix(
+  modifiers: { id: string }[], branches: { id: string }[], rows: DbBranchModifierAvailability[],
+): { [modifierId: string]: { [branchId: string]: boolean } } {
+  return buildMatrix(modifiers, branches, rows.map((r) => ({
+    id: r.modifier_id, branch_id: r.branch_id, is_available: r.is_available,
+  })));
+}
+
+function buildMatrix(
+  entities: { id: string }[],
+  branches: { id: string }[],
+  rows: { id: string; branch_id: string; is_available: boolean }[],
+): { [id: string]: { [branchId: string]: boolean } } {
+  const matrix: { [id: string]: { [branchId: string]: boolean } } = {};
+  for (const e of entities) {
+    matrix[e.id] = {};
+    for (const b of branches) matrix[e.id][b.id] = true;
   }
   for (const r of rows) {
-    if (!matrix[r.product_id]) matrix[r.product_id] = {};
-    matrix[r.product_id][r.branch_id] = r.is_available;
+    if (!matrix[r.id]) matrix[r.id] = {};
+    matrix[r.id][r.branch_id] = r.is_available;
   }
   return matrix;
 }

@@ -13,6 +13,14 @@ export interface MenuSectionItem {
   product: Product;
   /** Precomputed once per rebuild — avoids groupsForProduct() per card per render. */
   hasModifiers: boolean;
+  /**
+   * Orderable at the selected branch right now. Unavailable items STAY in the
+   * list and render as out of stock rather than disappearing — a customer who
+   * cannot find yesterday's item assumes the app is broken, whereas a greyed
+   * row with a reason is an answer. Delisted products (`isActive` false) are a
+   * different thing and are still filtered out entirely.
+   */
+  available: boolean;
 }
 
 export interface MenuSection {
@@ -46,14 +54,21 @@ export function buildMenuSections(opts: {
   branchId: string | null;
   query: string;
   searchIndex: Map<string, string>;
-  isAvailable: (productId: string, branchId: string) => boolean;
+  /**
+   * Orderable, not merely "not closed" — a product whose required option group
+   * has been entirely closed at this branch has no valid selection left and is
+   * out of stock too. See lib/orderability.ts.
+   */
+  isOrderable: (productId: string, branchId: string) => boolean;
   hasModifiers: (product: Product) => boolean;
 }): MenuSection[] {
-  const { products, categories, branchId, query, searchIndex, isAvailable, hasModifiers } = opts;
+  const { products, categories, branchId, query, searchIndex, isOrderable, hasModifiers } = opts;
   if (!branchId) return [];
   const q = query.trim().toLowerCase();
+  // Only `isActive` filters here. Branch availability decorates the row instead
+  // of removing it (see MenuSectionItem.available).
   const visible = products.filter((p) => {
-    if (!p.isActive || !isAvailable(p.id, branchId)) return false;
+    if (!p.isActive) return false;
     if (!q) return true;
     return (searchIndex.get(p.id) ?? '').includes(q);
   });
@@ -63,7 +78,11 @@ export function buildMenuSections(opts: {
       category,
       data: visible
         .filter((p) => p.categoryId === category.id)
-        .map((product) => ({ product, hasModifiers: hasModifiers(product) })),
+        .map((product) => ({
+          product,
+          hasModifiers: hasModifiers(product),
+          available: isOrderable(product.id, branchId),
+        })),
     }))
     .filter((s) => s.data.length > 0);
 }

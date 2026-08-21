@@ -7,6 +7,8 @@ import { Notice } from '../../design-system/ui/Notice';
 import { StatusPill } from '../../design-system/ui/StatusPill';
 import { Text } from '../../design-system/ui/Text';
 import { RoleAuditEntry, StaffAccount, StaffRole, staffAccess } from '../../lib/staffAccessApi';
+import { isOpsConsoleRole } from '../../lib/roles';
+import { BranchOption, StaffAccountsSection } from './StaffAccountsSection';
 
 const SELECT = [
   'min-h-10 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-2.5',
@@ -18,13 +20,18 @@ const INPUT = [
   'text-[14px] text-con-text focus-visible:outline-2 focus-visible:outline-offset-2',
 ].join(' ');
 
-const roleTone = (role: StaffRole) => role === 'admin' ? 'danger' : role === 'accountant' ? 'info' : 'neutral';
+const roleTone = (role: StaffRole) =>
+  role === 'admin' ? 'danger' : role === 'accountant' ? 'info' : isOpsConsoleRole(role) ? 'success' : 'neutral';
 
 function displayName(user: StaffAccount) {
   return user.full_name?.trim() || user.email?.trim() || user.phone_number?.trim() || user.id;
 }
 
-export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: string }> = ({ lang, currentUserId }) => {
+export const StaffAccessPanel: React.FC<{
+  lang: 'en' | 'ar';
+  currentUserId: string;
+  branches?: BranchOption[];
+}> = ({ lang, currentUserId, branches = [] }) => {
   const isRTL = lang === 'ar';
   const [staff, setStaff] = useState<StaffAccount[]>([]);
   const [audit, setAudit] = useState<RoleAuditEntry[]>([]);
@@ -119,7 +126,13 @@ export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: stri
 
   const resultIds = useMemo(() => new Set(results.map((r) => r.id)), [results]);
   const currentStaff = staff.filter((s) => !resultIds.has(s.id));
-  const roleEditor = (user: StaffAccount) => (
+  const roleEditor = (user: StaffAccount) => {
+    // Operations accounts are provisioned and revoked in the Accounts section
+    // below, which also captures the branch. The dropdown here has no option
+    // for those roles, so editing one would silently demote it — show the row
+    // read-only instead.
+    const opsManaged = isOpsConsoleRole(user.role);
+    return (
     <div key={user.id} className="grid gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3 md:grid-cols-[minmax(180px,1.5fr)_120px_minmax(180px,1fr)_auto] md:items-center">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
@@ -136,7 +149,7 @@ export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: stri
         value={roles[user.id] ?? user.role}
         onChange={(e) => setRoles((p) => ({ ...p, [user.id]: e.target.value as StaffRole }))}
         className={SELECT}
-        disabled={busyId === user.id || user.id === currentUserId}
+        disabled={opsManaged || busyId === user.id || user.id === currentUserId}
       >
         <option value="customer">{isRTL ? 'عميل' : 'Customer'}</option>
         <option value="accountant">{isRTL ? 'محاسب' : 'Accountant'}</option>
@@ -146,18 +159,21 @@ export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: stri
         aria-label={`${displayName(user)} reason`}
         value={reasons[user.id] ?? ''}
         onChange={(e) => setReasons((p) => ({ ...p, [user.id]: e.target.value }))}
-        placeholder={isRTL ? 'سبب منح/إلغاء الصلاحية' : 'Reason for access change'}
+        placeholder={opsManaged
+          ? (isRTL ? 'يُدار من قسم الحسابات' : 'Managed in Accounts below')
+          : (isRTL ? 'سبب منح/إلغاء الصلاحية' : 'Reason for access change')}
         className={INPUT}
-        disabled={busyId === user.id || user.id === currentUserId}
+        disabled={opsManaged || busyId === user.id || user.id === currentUserId}
       />
       <Button
         label={busyId === user.id ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…') : (isRTL ? 'تطبيق' : 'Apply')}
         onClick={() => void applyRole(user)}
-        disabled={busyId !== null || user.id === currentUserId}
+        disabled={opsManaged || busyId !== null || user.id === currentUserId}
         variant="secondary"
       />
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-5" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -176,7 +192,9 @@ export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: stri
 
       <Notice
         title={isRTL ? 'لا يوجد إنشاء حسابات إدارية من هذه الشاشة' : 'No admin account creation on this screen'}
-        action={isRTL ? 'يجب أن يكون المستخدم مسجلاً بالفعل. الصلاحيات هنا عامة على النظام؛ صلاحيات الفروع المنفصلة ليست مفعلة بعد.' : 'The user must already have an account. Roles here are global; branch-scoped permissions are not enabled yet.'}
+        action={isRTL
+          ? 'لمنح صلاحية مشرف أو محاسب يجب أن يكون المستخدم مسجلاً بالفعل، وهذه الصلاحيات عامة على النظام. حسابات الفروع ومركز الاتصال تُنشأ من قسم الحسابات بالأسفل وهي مقيدة بفرع واحد.'
+          : 'Granting admin or accountant requires an existing account, and those roles are global. Branch and call-centre accounts are created in the Accounts section below and are scoped to a single branch.'}
         tone="warning"
       />
       {error ? <Notice title={isRTL ? 'تعذر تنفيذ العملية' : 'Action could not be completed'} action={error} tone="blocking" /> : null}
@@ -212,6 +230,8 @@ export const StaffAccessPanel: React.FC<{ lang: 'en' | 'ar'; currentUserId: stri
           ) : null}
         </div>
       </Card>
+
+      <StaffAccountsSection lang={lang} branches={branches} onChanged={() => void refresh()} />
 
       <Card flush className="overflow-hidden">
         <div className="border-b border-con-line p-3">

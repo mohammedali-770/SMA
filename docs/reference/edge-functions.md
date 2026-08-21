@@ -32,6 +32,7 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `payment-verify` | the app calls this after returning from Tap checkout. It is the ONLY thing the app trusts: it retrieves the charge from Tap server-to-server and… | workflow | service role |
 | `payment-webhook` | called by the PAYMENT GATEWAY (not the app) after a payment event. verify_jwt = false: the caller is the gateway, authenticated by its own… | workflow | service role |
 | `push-dispatch` | Expo Push sender (COMPLETE implementation; replaces the old 501 placeholder) | by hand | service role |
+| `staff-accounts` | ADMIN-only provisioning for the branch-operations roles | by hand | service role |
 | `tap-admin-test-return` | the HTTPS page Tap redirects the admin's browser to after the isolated admin TEST checkout (Tap requires an https redirect target for 3DS). It is… | by hand | caller JWT |
 | `whatsapp-send-otp` | signed-in customer phone-ownership verification send | by hand | service role |
 | `whatsapp-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |

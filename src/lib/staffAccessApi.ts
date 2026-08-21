@@ -1,6 +1,11 @@
 import { supabase } from './supabase';
 
-export type StaffRole = 'customer' | 'admin' | 'accountant';
+// The full role vocabulary. admin_search_role_candidates can return an
+// operations account, so this union must cover them even though the role
+// editor deliberately refuses to edit those (they are managed in Accounts).
+export type { UserRole } from './roles';
+import type { UserRole } from './roles';
+export type StaffRole = UserRole;
 
 export interface StaffAccount {
   id: string;

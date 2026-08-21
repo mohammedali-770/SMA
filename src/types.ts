@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type UserRole = 'customer' | 'admin' | 'accountant';
+import type { UserRole } from './lib/roles';
+
+export type { UserRole };
 
 export interface UserProfile {
   id: string;
@@ -23,6 +25,8 @@ export interface Branch {
   addressAr: string;
   addressEn: string;
   phone: string;
+  /** Public branch contact address. Readable by anonymous customers, like phone. */
+  email?: string;
   latitude: number;
   longitude: number;
   isActive: boolean;
@@ -35,6 +39,12 @@ export interface Branch {
   deliveryEnabled?: boolean;
   pickupEnabled?: boolean;
   deliveryTemporarilyClosed?: boolean;
+  /**
+   * When a timed delivery pause lifts itself. Null means the pause has no timer
+   * (the admin's plain toggle) — NOT that delivery is running; read
+   * `deliveryTemporarilyClosed` for that.
+   */
+  deliveryClosedUntil?: string | null;
   estimatedDeliveryMinutes?: number; // display-only ETA; not used in pricing
 }
 

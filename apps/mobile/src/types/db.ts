@@ -86,6 +86,7 @@ export interface DbModifier {
 }
 export interface DbProductModifierGroup { product_id: string; group_id: string; sort_order: number; }
 export interface DbBranchAvailability { branch_id: string; product_id: string; is_available: boolean; }
+export interface DbBranchModifierAvailability { branch_id: string; modifier_id: string; is_available: boolean; }
 export interface DbAppSettings {
   id: boolean; brand_name_en: string; brand_name_ar: string;
   primary_color: string; secondary_color: string; currency: string;
