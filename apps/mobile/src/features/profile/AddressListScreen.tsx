@@ -94,7 +94,7 @@ export function AddressListScreen() {
 
   return (
     <Screen background={colors.appBg}>
-      <Header title={t('addrTitle')} showBack safeTop />
+      <Header title={t('addrTitle')} showBack />
 
       {loading ? (
         <LoadingView label={t('addrLoading')} />

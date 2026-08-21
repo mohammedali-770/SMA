@@ -76,7 +76,7 @@ export function AddressEditScreen() {
   if (resolving) {
     return (
       <Screen background={colors.appBg}>
-        <Header title={t('addrEditTitle')} showBack safeTop />
+        <Header title={t('addrEditTitle')} showBack />
         <LoadingView label={t('addrLoading')} />
       </Screen>
     );
@@ -91,7 +91,7 @@ export function AddressEditScreen() {
   if (!creating && !existing) {
     return (
       <Screen background={colors.appBg}>
-        <Header title={t('addrEditTitle')} showBack safeTop />
+        <Header title={t('addrEditTitle')} showBack />
         <EmptyView
           title={t('addrNotFound')}
           subtitle={t('addrNotFoundSub')}
@@ -176,7 +176,7 @@ function AddressEditForm({ existing }: { existing: SavedAddress | null }) {
 
   return (
     <Screen background={colors.appBg}>
-      <Header title={isNew ? t('addrNewTitle') : t('addrEditTitle')} showBack safeTop />
+      <Header title={isNew ? t('addrNewTitle') : t('addrEditTitle')} showBack />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           contentContainerStyle={styles.scroll}
