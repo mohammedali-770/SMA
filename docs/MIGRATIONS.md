@@ -2357,9 +2357,14 @@ revision). Its ACL was captured before and after and is unchanged —
 `{postgres=X/postgres,service_role=X/postgres}`, with **no** `authenticated`
 grant, so the `20260724200000` hardening that wraps it in `place_customer_order`
 survived. Still exactly one overload; both new guards present. A line diff
-against the revision it replaces reports **three insertions and nothing else**:
-the lazy-expiry comment, the `bpa.snoozed_until > now()` clause, and the
-`branch_modifier_availability` check.
+of the function definition (`create or replace function public.place_order(`
+through the matching `end $$`) against the revision it replaces reports
+**18 lines added and none removed** — 305 lines to 323 — grouped into three
+insertions: the lazy-expiry comment (4 lines), the
+`bpa.snoozed_until > now()` clause (1 line), and the
+`branch_modifier_availability` check (13 lines). Hunk *grouping* depends on the
+extraction bounds, so the reproducible figure is the line count, not the number
+of hunks.
 
 **Operations Health.** 9 → **10 cards**, the new one `branch_availability`,
 state `healthy`. `critical_systems` is unchanged at five, `overall_state`
@@ -2441,26 +2446,43 @@ live `place_order` matched the repository revision the new one was built from.
 
 ### What was found
 
-`supabase/migrations/20260710120100_place_order_delivery_zone.sql` is 290 lines.
-The SQL actually applied to Production — live version `20260709151718`, the last
-history row to define `place_order` before §28 — was **283 lines**. The live
-function body matched that row exactly (`applied_equals_live: true`), so the
-*repository file* had been edited after it was applied, not the database after
-it was written.
+**Name the two artifacts precisely — the whole point of this section is that it
+must be reproducible.** They are:
 
-A per-line diff (`difflib.SequenceMatcher`) produced **five hunks, every one a
-deletion, no insertion and no replacement anywhere**: 7 lines, 474 characters,
-all of them `--` comments.
+1. the repository file
+   `supabase/migrations/20260710120100_place_order_delivery_zone.sql`, **336
+   lines** (335 plus the trailing newline the applier strips);
+2. the SQL actually applied to Production — the single statement stored on live
+   version `20260709151718`, the last history row to define `place_order` before
+   §28 — **304 lines**.
 
-| Repo line(s) | Content |
-| --- | --- |
-| 33 | `-- payment method` |
-| 56–58 | the three-line "Resolve + validate the payment method against admin settings" block |
-| 102 | `-- Coordinates come from the map picker; required for a delivery order.` |
-| 106 | `-- The branch must have a configured active delivery zone...` |
-| 113 | `-- ...and the customer point must fall inside it (GiST-indexed, boundary-inclusive).` |
+The live function body matched that row exactly, so the *repository file* had
+been edited after it was applied, not the database after it was written.
 
-**Zero behavioural difference.** No statement, guard, clause or literal differed.
+Compare them by per-line md5 (the line text never has to leave the database) and
+diff the hash sequences with `difflib.SequenceMatcher`. That yields **seven
+hunks, every one a deletion — no insertion and no replacement anywhere**:
+**32 repo lines absent from the applied text, 0 applied lines absent from the
+repo**, similarity 0.95.
+
+| Repo line(s) | Content | Where |
+| --- | --- | --- |
+| 1, 3–26 | the file-header comment block (24 comment lines and one blank) | above the function |
+| 74 | `-- payment method` | in the declare block |
+| 97–99 | the three-line "Resolve + validate the payment method against admin settings" block | in the body |
+| 143 | `-- Coordinates come from the map picker; required for a delivery order.` | in the body |
+| 147 | `-- The branch must have a configured active delivery zone...` | in the body |
+| 154 | `-- ...and the customer point must fall inside it (GiST-indexed, boundary-inclusive).` | in the body |
+
+Twenty-five of the 32 are the header block, which sits *outside* the function
+definition; the remaining **seven are in-body comments**. Measuring only the
+function region therefore reports 7 lines across 5 hunks, and measuring the
+whole file reports 32 across 7 — the same finding at two scopes. State which
+scope you mean; an unqualified line count is what made this record
+irreproducible in the first place, and PR #232 review caught exactly that.
+
+**Zero behavioural difference.** No statement, guard, clause or literal differed
+at either scope.
 
 ### Why it happened, and why it is worth a section
 
