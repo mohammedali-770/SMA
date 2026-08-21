@@ -375,6 +375,54 @@ name `Design system`. The authoritative list of emitted contexts is generated at
 
 ---
 
+## 15. `SUPABASE_ACCESS_TOKEN` — the secret that arms two workflows
+
+**Status:** OWNER DECISION.
+
+This section exists because two workflows told readers to consult "§0" and there
+was no §0 — the pointer was broken, so the warning it carried had nowhere to
+land. This is that content.
+
+**What the token unlocks.** One repository secret arms two very different
+workflows:
+
+| Workflow | What it does |
+| --- | --- |
+| `function-drift.yml` | **Read-only.** Runs `supabase functions list`, compares names against `supabase/functions/`, has no deploy step, declares `permissions: contents: read`. |
+| `deploy-functions.yml` | **Deploys Edge Functions to production.** |
+
+**Why the warning was written.** `deploy-functions.yml` once carried a `push:`
+trigger with no branch filter, a hardcoded production project ref, and a default
+function list of exactly the four payment functions frozen by CLAUDE.md §6. Any
+push on any branch that touched that file deployed frozen payment code to
+production — no pull request, no review, no approval. It fired for real: run #4,
+from an unrelated feature branch, on 2026-07-13.
+
+**It never actually deployed, and the only reason is that this secret has never
+existed.** All four runs died at the CLI with "Access token not provided". A
+missing secret has been doing the work of a control.
+
+**What has changed since.** The dangerous trigger is gone. A deploy now needs
+all of: a manual run from the Actions tab; an explicitly named function list
+(the default is empty — it used to default to the payment set, so opening the
+dialog and pressing Run deployed frozen code); and the literal string `DEPLOY`
+typed into a confirmation field. Deploying an Edge Function still requires
+explicit owner approval every time under CLAUDE.md §5, and the payment functions
+are frozen on top of that under §6.
+
+**The decision.** Adding the token does not recreate the 2026-07-13 exposure —
+that configuration no longer exists. It removes the last accidental barrier in
+front of a path that now has three deliberate ones. Against that, the drift
+report is currently the only way anyone could see what is deployed without
+asking an agent to query Supabase directly; its absence is what let two orphan
+diagnostic functions sit in production undetected until 2026-08-19.
+
+**Known limit, so a green report is not over-read:** the drift check compares
+function NAMES only. The Supabase CLI exposes no content hash, so matching names
+do not prove the deployed code matches the repository. Read a clean run as "the
+right set of functions exists", never as "production matches the default
+branch".
+
 ## Owner-action closeout rule
 
 When an item is completed:
