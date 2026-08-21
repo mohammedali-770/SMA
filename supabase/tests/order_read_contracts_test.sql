@@ -156,9 +156,17 @@ end $$;
 do $$
 declare
   v_c uuid; v_state text; v_col text;
+  -- The COMPLEMENT of CASE 1's list: every column a customer must be refused.
+  -- The two are one decision written twice, so they have to move together —
+  -- granting a column without removing it here fails as "could select X", which
+  -- is the guard doing its job rather than a broken test.
+  --
+  -- `notes` is absent deliberately (20260821170000). It is the customer's own
+  -- kitchen note, on their own RLS-scoped order, and the receipt shows it back
+  -- to them. Every other column here stays refused.
   v_excluded text[] := array[
     'order_number','pos_create_attempt_token','customer_id','customer_name',
-    'customer_phone','notes','coupon_code','address_snapshot','address_id',
+    'customer_phone','coupon_code','address_snapshot','address_id',
     'idempotency_key','payment_provider','paid_at','loyalty_points_redeemed',
     'loyalty_awarded_at','sync_status','sync_attempt_count','sync_last_error',
     'synced_at','lazywait_order_id','lazywait_status','first_pos_sync_failure_at',
@@ -171,7 +179,11 @@ begin
     v_state := pg_temp.err_as('authenticated', v_c, '', '',
                  format('select %I from public.orders', v_col));
     if v_state is distinct from '42501' then
-      raise exception 'CASE 2 FAILED: customer could select %s (sqlstate %s)',
+      -- plpgsql RAISE substitutes on `%`, not `%s`: the old text printed
+      -- "could select notess (sqlstate SUCCESSs)" — the trailing s of each
+      -- placeholder rendered literally, right where a reader is trying to read
+      -- a column name.
+      raise exception 'CASE 2 FAILED: customer could select % (sqlstate %)',
                       v_col, coalesce(v_state, 'SUCCESS');
     end if;
   end loop;
