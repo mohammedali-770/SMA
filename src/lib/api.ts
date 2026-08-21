@@ -36,6 +36,13 @@ export interface DbBranch {
   delivery_enabled?: boolean;
   pickup_enabled?: boolean;
   delivery_temporarily_closed?: boolean;
+  /**
+   * Scheduled resume time for a TIMED pause. Null on the admin's untimed toggle.
+   * `delivery_temporarily_closed` stays the authoritative flag; this is only when
+   * the sweeper will lift it. Public-safe by design — the reason code and the
+   * staff actor live on `branch_delivery_events`, which anon cannot read.
+   */
+  delivery_closed_until?: string | null;
   estimated_delivery_minutes?: number | null;
 }
 /** An active per-branch delivery coverage polygon (non-secret; safe columns only). */

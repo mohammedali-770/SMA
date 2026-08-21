@@ -91,6 +91,20 @@ export const BranchDetailPanel: React.FC<{
             />
           </div>
           {summary.deliveryPaused ? (
+            // The panel said delivery was off but never when it comes back, so
+            // an operator could not answer "can I call them back in an hour?".
+            // This IS a branch-set timer, so it keeps the branch-timer wording.
+            <Text variant="caption" tone="tertiary" as="p" numeric>
+              {(() => {
+                if (!summary.deliveryUntil) return t('deliveryPausedUntimed');
+                const remaining = returnLabel(summary.deliveryUntil, now);
+                return remaining
+                  ? `${t('deliveryResumesIn')} ${remaining}`
+                  : t('deliveryResumingNow');
+              })()}
+            </Text>
+          ) : null}
+          {summary.deliveryPaused ? (
             <Button label={t('resumeDelivery')} onClick={onResumeDelivery} disabled={busy} variant="secondary" />
           ) : (
             <Button label={t('pauseDelivery')} onClick={onPauseDelivery} disabled={busy} variant="secondary" />

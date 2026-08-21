@@ -281,6 +281,52 @@ describe('CallCentreConsole', () => {
     expect(screen.getByText('Garlic, Chilli')).toBeTruthy();
   });
 
+  it('says when a paused delivery resumes, on the tile and in the panel', async () => {
+    // The tile put delivery first: it is the only state that stops a customer
+    // ordering at all, and "when does it come back" is the question being asked
+    // while the tile is on screen.
+    mockApp({
+      branches: [branch('b1', 'Riyadh', {
+        deliveryTemporarilyClosed: true,
+        deliveryClosedUntil: new Date(Date.now() + 90_000).toISOString(),
+      })],
+    });
+    render(<CallCentreConsole i18n={i18n} />);
+    expect(await screen.findByText(/Delivery resumes in 1:(29|30)/)).toBeTruthy();
+    fireEvent.click(screen.getByText('Riyadh'));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText(/Delivery resumes in 1:(29|30)/)).toBeTruthy();
+  });
+
+  it('says a pause has no timer rather than showing an empty countdown', async () => {
+    mockApp({
+      branches: [branch('b1', 'Riyadh', { deliveryTemporarilyClosed: true })],
+    });
+    render(<CallCentreConsole i18n={i18n} />);
+    expect(await screen.findByText(/Paused with no timer/i)).toBeTruthy();
+    expect(screen.queryByText(/Delivery resumes in/i)).toBeNull();
+    // ...and in the panel, which is a separate branch of a separate component.
+    fireEvent.click(screen.getByText('Riyadh'));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText(/Paused with no timer/i)).toBeTruthy();
+  });
+
+  it('says "Resuming now" once the pause timer has lapsed', async () => {
+    // The sweeper resumes delivery once a minute, so there is a window where the
+    // timer is in the past and the branch is still paused.
+    mockApp({
+      branches: [branch('b1', 'Riyadh', {
+        deliveryTemporarilyClosed: true,
+        deliveryClosedUntil: new Date(Date.now() - 1_000).toISOString(),
+      })],
+    });
+    render(<CallCentreConsole i18n={i18n} />);
+    expect(await screen.findByText(/Resuming now/i)).toBeTruthy();
+    fireEvent.click(screen.getByText('Riyadh'));
+    const panel = within(await screen.findByRole('dialog'));
+    expect(panel.getByText(/Resuming now/i)).toBeTruthy();
+  });
+
   it('opens a branch panel with its contact, items and hours', async () => {
     ops.allAvailability.mockResolvedValue([
       { branchId: 'b1', productId: 'p1', isAvailable: false, snoozedUntil: null, reasonCode: null },

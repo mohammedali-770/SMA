@@ -252,6 +252,15 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
                     ) : null}
                     <Text variant="caption" tone="tertiary" as="p" numeric>
                       {(() => {
+                        // Delivery first. It is the only state that stops a
+                        // customer ordering at all, it is what makes this tile
+                        // red, and "when does delivery come back" is the
+                        // question being asked while the tile is on screen.
+                        if (s.deliveryPaused) {
+                          if (!s.deliveryUntil) return t('deliveryPausedUntimed');
+                          const r = returnLabel(s.deliveryUntil, now);
+                          return r ? `${t('deliveryResumesIn')} ${r}` : t('deliveryResumingNow');
+                        }
                         if (soonest) {
                           const r = returnLabel(soonest.snoozedUntil, now);
                           if (!soonest.snoozedUntil) return t('untimed');

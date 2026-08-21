@@ -39,6 +39,12 @@ export interface Branch {
   deliveryEnabled?: boolean;
   pickupEnabled?: boolean;
   deliveryTemporarilyClosed?: boolean;
+  /**
+   * When a timed delivery pause lifts itself. Null means the pause has no timer
+   * (the admin's plain toggle) — NOT that delivery is running; read
+   * `deliveryTemporarilyClosed` for that.
+   */
+  deliveryClosedUntil?: string | null;
   estimatedDeliveryMinutes?: number; // display-only ETA; not used in pricing
 }
 

@@ -142,6 +142,11 @@ not set by anyone. It is the soonest the item *could* come back, so treat it as
 an estimate rather than a promise — unlike **Back in**, which is a timer a
 person actually set.
 
+A paused branch now also says **when delivery resumes**, on the tile and in the
+panel — that is a timer a person set, so it is a fact, not an estimate. A pause
+made with the plain admin toggle has no timer and says so; it stays off until
+someone turns it back on.
+
 Branches whose only closed options still leave every item orderable are listed
 separately below the board, by option name. They are not a problem; that list is
 there to answer "can I still get garlic sauce at Jeddah?".

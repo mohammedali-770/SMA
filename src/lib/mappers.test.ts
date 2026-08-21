@@ -21,6 +21,19 @@ describe('catalog mappers', () => {
     expect(b).toMatchObject({ id: 'b1', nameEn: 'Olaya', nameAr: 'العليا', deliveryFee: 15, minDeliveryOrder: 40, isActive: true });
   });
 
+  it('carries the delivery pause timer through, defaulting to null', () => {
+    // It was mapped nowhere, so the call-centre panel could say delivery was off
+    // but never when it comes back.
+    const base: DbBranch = {
+      id: 'b1', name_en: 'Olaya', name_ar: 'العليا', address_en: null, address_ar: null,
+      phone: null, latitude: null, longitude: null,
+      delivery_fee: 15, min_delivery_order: 40, is_active: true,
+    };
+    expect(mapBranch(base).deliveryClosedUntil).toBeNull();
+    expect(mapBranch({ ...base, delivery_closed_until: '2026-08-20T18:00:00Z' }).deliveryClosedUntil)
+      .toBe('2026-08-20T18:00:00Z');
+  });
+
   it('maps a category row', () => {
     const row: DbCategory = { id: 'c1', name_en: 'Burgers', name_ar: 'برجر', sort_order: 2, is_active: true };
     expect(mapCategory(row)).toEqual({ id: 'c1', nameEn: 'Burgers', nameAr: 'برجر', sortOrder: 2 });
@@ -198,6 +211,15 @@ describe('reverse patch mappers (app -> DB)', () => {
   });
   it('omits branch fields that were not provided', () => {
     expect(branchPatchToDb({ nameEn: 'X' })).toEqual({ name_en: 'X' });
+  });
+  it('NEVER writes the delivery pause timer, unlike every other branch field', () => {
+    // Server-owned: set_branch_delivery_pause writes it, clear_branch_delivery_pause
+    // and the sweeper clear it, and a BEFORE trigger nulls it when the pause
+    // lifts. A client patch carrying it could strand a timer on a running branch
+    // or forge a resume time nothing will honour.
+    expect(branchPatchToDb({ deliveryClosedUntil: '2026-08-20T18:00:00Z' })).toEqual({});
+    expect(branchPatchToDb({ deliveryTemporarilyClosed: false, deliveryClosedUntil: '2026-08-20T18:00:00Z' }))
+      .toEqual({ delivery_temporarily_closed: false });
   });
   it('maps a product insert with sort order', () => {
     const ins = productToDbInsert({

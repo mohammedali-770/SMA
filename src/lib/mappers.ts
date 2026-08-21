@@ -42,6 +42,7 @@ export function mapBranch(b: DbBranch): Branch {
     deliveryEnabled: b.delivery_enabled ?? true,
     pickupEnabled: b.pickup_enabled ?? true,
     deliveryTemporarilyClosed: b.delivery_temporarily_closed ?? false,
+    deliveryClosedUntil: b.delivery_closed_until ?? null,
     estimatedDeliveryMinutes: b.estimated_delivery_minutes ?? undefined,
   };
 }
@@ -374,6 +375,12 @@ export function branchPatchToDb(patch: Partial<Branch>): Partial<DbBranch> {
   if (patch.deliveryEnabled !== undefined) out.delivery_enabled = patch.deliveryEnabled;
   if (patch.pickupEnabled !== undefined) out.pickup_enabled = patch.pickupEnabled;
   if (patch.deliveryTemporarilyClosed !== undefined) out.delivery_temporarily_closed = patch.deliveryTemporarilyClosed;
+  // `deliveryClosedUntil` is DELIBERATELY absent, unlike every other branch
+  // field above. The pause timer is server-owned: `set_branch_delivery_pause`
+  // writes it, `clear_branch_delivery_pause` and the sweeper clear it, and a
+  // BEFORE trigger nulls it whenever the pause lifts. Letting a client patch
+  // carry it would let a stale form strand a timer on a running branch, or
+  // forge a resume time nothing will honour. Read-only on this side, on purpose.
   if (patch.estimatedDeliveryMinutes !== undefined) {
     out.estimated_delivery_minutes = patch.estimatedDeliveryMinutes ?? null;
   }

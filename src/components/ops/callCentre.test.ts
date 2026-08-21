@@ -75,6 +75,44 @@ describe('buildClosureSummaries', () => {
     expect(out[0].deliveryPaused).toBe(true);
   });
 
+  it('carries the pause timer onto the summary', () => {
+    // It was hardcoded null, so the panel could say delivery was off but never
+    // when it comes back.
+    const until = '2026-08-20T18:00:00Z';
+    const out = buildClosureSummaries({
+      ...base,
+      branches: [branch('a', { deliveryTemporarilyClosed: true, deliveryClosedUntil: until })],
+      availability: [], areas: [],
+    });
+    expect(out[0].deliveryUntil).toBe(until);
+  });
+
+  it('reports no pause timer for the admin\u2019s untimed toggle', () => {
+    const out = buildClosureSummaries({
+      ...base,
+      branches: [branch('a', { deliveryTemporarilyClosed: true })],
+      availability: [], areas: [],
+    });
+    expect(out[0].deliveryPaused).toBe(true);
+    expect(out[0].deliveryUntil).toBeNull();
+  });
+
+  it('ignores a stale timer left on a branch whose delivery is RUNNING', () => {
+    // A countdown for something that already came back is worse than none. The
+    // branches trigger nulls the column on resume, but the board must not
+    // depend on that having happened yet.
+    const out = buildClosureSummaries({
+      ...base,
+      branches: [branch('a', {
+        deliveryTemporarilyClosed: false, deliveryClosedUntil: '2026-08-20T18:00:00Z',
+      })],
+      availability: [avail('a', 'p1', false)],
+      areas: [],
+    });
+    expect(out[0].deliveryPaused).toBe(false);
+    expect(out[0].deliveryUntil).toBeNull();
+  });
+
   it('includes a branch whose only problem is a disabled area', () => {
     const out = buildClosureSummaries({
       ...base, availability: [], areas: [area('ar1', 'a', true)],

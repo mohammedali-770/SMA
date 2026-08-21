@@ -82,6 +82,11 @@ export interface BranchClosureSummary {
   /** Every closed option at this branch, whether or not it blocks anything. */
   closedOptions: ClosedOption[];
   deliveryPaused: boolean;
+  /**
+   * When a timed pause resumes itself, or null for the admin's untimed one.
+   * Only meaningful while `deliveryPaused` — the branches trigger nulls it the
+   * moment delivery comes back.
+   */
   deliveryUntil: string | null;
   disabledAreas: DeliveryArea[];
   /**
@@ -218,6 +223,9 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
     const closedOptionIds = closedOptionIdsByBranch.get(branch.id) ?? new Set<string>();
     const disabledAreas = disabledByBranch.get(branch.id) ?? [];
     const deliveryPaused = branch.deliveryTemporarilyClosed ?? false;
+    // Only while paused. A stale timestamp on a running branch would render a
+    // countdown for something that already came back.
+    const deliveryUntil = deliveryPaused ? branch.deliveryClosedUntil ?? null : null;
 
     const { blockedProducts, blockingIncidents } = blockedAtBranch({
       products, modifierGroups, closedOptions, closedOptionIds,
@@ -234,7 +242,7 @@ export function buildClosureSummaries(input: BuildSummariesInput): BranchClosure
       blockingIncidents,
       closedOptions,
       deliveryPaused,
-      deliveryUntil: null,
+      deliveryUntil,
       disabledAreas,
       severity: closedProducts.length + blockedProducts.length + disabledAreas.length
         + (deliveryPaused ? 5 : 0),
