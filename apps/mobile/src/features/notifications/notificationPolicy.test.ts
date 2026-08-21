@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DEVICE_PREFS, deviceShouldStayActive, enableFlowPlan, NOTIFICATION_FALLBACK_ROUTE,
   notificationResponseKey, PUSH_CLIENT_ENABLED, resolveNotificationRoute, shouldHandleResponse,
-  toggleRequiresPermission,
+  shouldRegisterOnSignIn, toggleRequiresPermission,
 } from './notificationPolicy';
 
 const OID = 'a1b2c3d4-0000-4000-8000-000000000001';
@@ -63,8 +63,8 @@ describe('exactly-once tap handling (cold start + listener see the SAME response
 });
 
 describe('device preference defaults + lifecycle', () => {
-  it('order updates default ON, promotions default OFF (strict opt-in)', () => {
-    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: false });
+  it('both channels default ON — the OS permission grant is the consent moment', () => {
+    expect(DEFAULT_DEVICE_PREFS).toEqual({ orderUpdatesEnabled: true, promosEnabled: true });
   });
   it('device stays active while any channel is on; deactivates when both off', () => {
     expect(deviceShouldStayActive({ orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
@@ -76,6 +76,64 @@ describe('device preference defaults + lifecycle', () => {
     expect(toggleRequiresPermission(off, { orderUpdatesEnabled: true, promosEnabled: false })).toBe(true);
     expect(toggleRequiresPermission({ orderUpdatesEnabled: true, promosEnabled: false }, { orderUpdatesEnabled: true, promosEnabled: true })).toBe(false);
     expect(toggleRequiresPermission({ orderUpdatesEnabled: true, promosEnabled: true }, off)).toBe(false);
+  });
+});
+
+/**
+ * Deliberate tripwire, like the app.json coupling below — a source assertion,
+ * because the behaviour it guards is the ABSENCE of a call and nothing else can
+ * observe that.
+ *
+ * Sign-out used to call `deactivateThisDevice()`. Combined with a first-run
+ * permission flag that is device-scoped and never re-raised, that left push
+ * permanently dead after a single sign-out: the row went inactive and no path
+ * ever re-registered it. Re-adding the call would silently restore that bug,
+ * and no unit test of the pure rules would notice.
+ *
+ * Account DELETION still deactivates, in DeleteAccountScreen — that is a
+ * different screen and deliberately unaffected.
+ */
+describe('sign-out must not silence the device (CLAUDE.md §7)', () => {
+  const profileSource = readFileSync(
+    new URL('../profile/ProfileScreen.tsx', import.meta.url),
+    'utf8',
+  );
+
+  it('ProfileScreen never deactivates the push device on sign-out', () => {
+    expect(profileSource).not.toContain('deactivateThisDevice');
+  });
+
+  it('the account-deletion screen still does deactivate', () => {
+    const deleteSource = readFileSync(
+      new URL('../account/DeleteAccountScreen.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(deleteSource).toContain('deactivateThisDevice');
+  });
+});
+
+describe('shouldRegisterOnSignIn — surviving sign-out, and shared phones', () => {
+  it('claims the device on a DEFINITE absence of a row for this token', () => {
+    // Either a never-registered device, or a token still owned by a PREVIOUS
+    // account on a shared phone. Registering reassigns it to the caller.
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'absent' })).toBe(true);
+  });
+  it('never registers without OS permission, and never prompts for it here', () => {
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'absent' })).toBe(false);
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'found' })).toBe(false);
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'indeterminate' })).toBe(false);
+  });
+  it('leaves a row of my own alone — active or deliberately switched off', () => {
+    // "To stop notifications the customer turns them off" only holds if the
+    // next sign-in respects that, so 'found' never triggers a write either way.
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'found' })).toBe(false);
+  });
+  it('does NOT treat a failed lookup as an absent row', () => {
+    // The P1 this guards: pushDevices.mine() throws on a PostgREST error and
+    // the token fetch can fail offline. If that collapsed into "absent", a
+    // dropped request would reactivate a silenced device and flip promotions
+    // back on. Only a definite absence may cause a write.
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'indeterminate' })).toBe(false);
   });
 });
 

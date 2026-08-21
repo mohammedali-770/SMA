@@ -21,6 +21,16 @@ export async function getExpoPushToken(): Promise<string | null> {
   return null; // Expo push tokens are native-only
 }
 
+export type DeviceLookup =
+  | { status: 'found'; device: DbPushDevice }
+  | { status: 'absent' }
+  | { status: 'indeterminate' };
+
+/** Web has no device row and no token — never a definite "absent". */
+export async function lookupThisDevice(): Promise<DeviceLookup> {
+  return { status: 'indeterminate' };
+}
+
 export async function findThisDevice(): Promise<DbPushDevice | null> {
   return null;
 }

@@ -61,10 +61,12 @@ export function useFirstRunPermissions(signedIn: boolean, lang: 'en' | 'ar'): vo
           if (shouldRegisterOnFirstRun(await hasNotificationPermission())) {
             const granted = await ensureNotificationPermission();
             if (granted) {
-              // Promotions stay FALSE — marketing is a separate consent the
-              // customer gives in Profile, not something a system permission
-              // grant implies (CLAUDE.md section 7).
-              await registerThisDevice(lang, { orderUpdatesEnabled: true, promosEnabled: false });
+              // Both channels on. The OS grant IS the consent moment
+              // (DEFAULT_DEVICE_PREFS, owner decision 2026-08-20): nothing
+              // further has to be switched on inside the app. Switching a
+              // channel back OFF stays the customer's, in Profile or in
+              // iOS/Android Settings. See CLAUDE.md section 7.
+              await registerThisDevice(lang);
             }
           }
         } catch { /* a permission prompt must never break app start */ }
