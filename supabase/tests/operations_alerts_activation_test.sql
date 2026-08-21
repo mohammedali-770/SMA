@@ -93,18 +93,39 @@ begin
   end if;
 
   -- The three pre-existing jobs are untouched (name + schedule + own command).
-  if (select count(*) from cron.job) <> 5 then
-    raise exception 'expected exactly 5 cron jobs total, found %', (select count(*) from cron.job);
-  end if;
-  if not exists (select 1 from cron.job where jobname = 'account-deletion-processor' and schedule = '* * * * *') then
+  --
+  -- THIS DELIBERATELY NO LONGER ASSERTS A TOTAL cron.job COUNT. It used to
+  -- require exactly 5, which was true the day it was written and then wrong
+  -- twice over, on jobs that were supposed to be there: payment-refund-worker
+  -- (20260729090000) and branch-availability-sweep (20260820111000). A count
+  -- every unrelated feature has to re-bump is a tripwire that cries wolf, and
+  -- the cost was not theoretical — the suite sat quarantined and aborted HERE,
+  -- so everything below this point, case C included, asserted nothing at all.
+  --
+  -- What is asserted instead: each of the five jobs this suite actually knows
+  -- about exists exactly once, on its own schedule, running its own command.
+  -- Exactly-once is safe to require because cron.schedule(name, ...) upserts by
+  -- name, so a duplicate would mean something scheduled it by another route.
+  --
+  -- A sixth job from an unrelated feature is not this suite's business. A job
+  -- that smuggles in credentials or an outbound call still fails the scan at
+  -- the end of this block, which reads every row of cron.job and is unchanged.
+  if (select count(*) from cron.job
+      where jobname = 'account-deletion-processor'
+        and schedule = '* * * * *'
+        and command ilike '%invoke_account_deletion_processor%') <> 1 then
     raise exception 'account-deletion-processor job changed';
   end if;
-  if not exists (select 1 from cron.job where jobname = 'lazywait-sync' and schedule = '* * * * *') then
+  if (select count(*) from cron.job
+      where jobname = 'lazywait-sync'
+        and schedule = '* * * * *'
+        and command ilike '%invoke_lazywait_sync_processor%') <> 1 then
     raise exception 'lazywait-sync job changed';
   end if;
-  if not exists (select 1 from cron.job
-                 where jobname = 'order-integrity-watchdog' and schedule = '*/2 * * * *'
-                   and command ilike '%order_integrity_watchdog%') then
+  if (select count(*) from cron.job
+      where jobname = 'order-integrity-watchdog'
+        and schedule = '*/2 * * * *'
+        and command ilike '%order_integrity_watchdog%') <> 1 then
     raise exception 'order-integrity-watchdog job changed';
   end if;
 
