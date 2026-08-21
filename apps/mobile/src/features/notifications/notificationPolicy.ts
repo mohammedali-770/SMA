@@ -126,26 +126,37 @@ export function toggleRequiresPermission(before: DevicePrefs, after: DevicePrefs
  *  - no OS permission   → false. Never register what the OS will not deliver,
  *                         and never prompt from here: iOS allows a single ask
  *                         and `useFirstRunPermissions` owns it.
- *  - a row of my own    → false. The token is already mine, so whatever state
- *                         it is in is a state I chose — still active, or
- *                         switched off deliberately. Re-registering would
- *                         reactivate a device the customer had silenced and
- *                         overwrite their promotions choice. "To stop
- *                         notifications the customer turns them off" only
- *                         holds if the next sign-in respects that.
- *  - no row of my own   → true. Either this device has never registered, or
- *                         the token still belongs to a PREVIOUS account on a
- *                         shared phone. Both want a fresh registration under
- *                         the current customer — which is also what stops the
- *                         previous owner being targeted on a phone they no
- *                         longer hold.
+ *  - lookup 'found'        → false. The token is already mine, so whatever state
+ *                            it is in is a state I chose — still active, or
+ *                            switched off deliberately. Re-registering would
+ *                            reactivate a device the customer had silenced and
+ *                            overwrite their promotions choice. "To stop
+ *                            notifications the customer turns them off" only
+ *                            holds if the next sign-in respects that.
+ *  - lookup 'absent'       → true. Either this device has never registered, or
+ *                            the token still belongs to a PREVIOUS account on a
+ *                            shared phone. Both want a fresh registration under
+ *                            the current customer — which is also what stops the
+ *                            previous owner being targeted on a phone they no
+ *                            longer hold.
+ *  - lookup 'indeterminate'→ false. The lookup FAILED; it is not evidence of
+ *                            absence. Registering here would apply default
+ *                            preferences over a row we simply could not read —
+ *                            reactivating a silenced device and flipping
+ *                            promotions back on, from nothing worse than a
+ *                            dropped request. The caller retries instead.
+ *
+ * Note the asymmetry: only a DEFINITE absence justifies a write. Everything
+ * else does nothing, because every wrong answer here rewrites a consent choice.
  */
+export type DeviceLookupState = 'found' | 'absent' | 'indeterminate';
+
 export function shouldRegisterOnSignIn(input: {
   permissionGranted: boolean;
-  myDevice: { isActive: boolean } | null;
+  lookup: DeviceLookupState;
 }): boolean {
   if (!input.permissionGranted) return false;
-  return input.myDevice === null;
+  return input.lookup === 'absent';
 }
 
 export type RegistrationStep =

@@ -58,16 +58,45 @@ export async function getExpoPushToken(): Promise<string | null> {
   }
 }
 
-/** Find the row for THIS device among my registered devices. */
-export async function findThisDevice(): Promise<DbPushDevice | null> {
+/**
+ * Look up the row for THIS device, keeping "there is no row" DISTINCT from
+ * "I could not find out".
+ *
+ * `pushDevices.mine()` throws on a PostgREST error (`ok()` never returns a
+ * silent null) and the token fetch can fail offline. Collapsing those into the
+ * same `null` as a genuinely absent row is not survivable for a caller that
+ * REGISTERS on absence: a transient network failure would look like a fresh
+ * device, and the upsert would reactivate a row the customer had switched off
+ * and overwrite their promotions choice. Callers that only render state can
+ * still use `findThisDevice` below and treat both as "nothing to show".
+ */
+export type DeviceLookup =
+  | { status: 'found'; device: DbPushDevice }
+  | { status: 'absent' }
+  | { status: 'indeterminate' };
+
+export async function lookupThisDevice(): Promise<DeviceLookup> {
   const token = await getExpoPushToken();
-  if (!token) return null;
+  // No token: a simulator, or a failed fetch. Either way this says nothing
+  // about whether a row exists — and registration could not proceed anyway.
+  if (!token) return { status: 'indeterminate' };
   try {
     const mine = await pushDevices.mine();
-    return mine.find((d) => d.expo_push_token === token) ?? null;
+    const device = mine.find((d) => d.expo_push_token === token);
+    return device ? { status: 'found', device } : { status: 'absent' };
   } catch {
-    return null;
+    return { status: 'indeterminate' };
   }
+}
+
+/**
+ * Find the row for THIS device, or null. For display only — null here means
+ * "found nothing OR could not look up". Anything that WRITES on the answer must
+ * use `lookupThisDevice` and handle `indeterminate` explicitly.
+ */
+export async function findThisDevice(): Promise<DbPushDevice | null> {
+  const result = await lookupThisDevice();
+  return result.status === 'found' ? result.device : null;
 }
 
 /**

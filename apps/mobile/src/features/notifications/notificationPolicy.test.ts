@@ -113,22 +113,27 @@ describe('sign-out must not silence the device (CLAUDE.md §7)', () => {
 });
 
 describe('shouldRegisterOnSignIn — surviving sign-out, and shared phones', () => {
-  it('claims the device when the signed-in customer has no row for this token', () => {
+  it('claims the device on a DEFINITE absence of a row for this token', () => {
     // Either a never-registered device, or a token still owned by a PREVIOUS
     // account on a shared phone. Registering reassigns it to the caller.
-    expect(shouldRegisterOnSignIn({ permissionGranted: true, myDevice: null })).toBe(true);
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'absent' })).toBe(true);
   });
   it('never registers without OS permission, and never prompts for it here', () => {
-    expect(shouldRegisterOnSignIn({ permissionGranted: false, myDevice: null })).toBe(false);
-    expect(shouldRegisterOnSignIn({ permissionGranted: false, myDevice: { isActive: false } })).toBe(false);
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'absent' })).toBe(false);
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'found' })).toBe(false);
+    expect(shouldRegisterOnSignIn({ permissionGranted: false, lookup: 'indeterminate' })).toBe(false);
   });
-  it('leaves an active row of my own alone — re-registering it would be a no-op write', () => {
-    expect(shouldRegisterOnSignIn({ permissionGranted: true, myDevice: { isActive: true } })).toBe(false);
+  it('leaves a row of my own alone — active or deliberately switched off', () => {
+    // "To stop notifications the customer turns them off" only holds if the
+    // next sign-in respects that, so 'found' never triggers a write either way.
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'found' })).toBe(false);
   });
-  it('does NOT reactivate a row the customer switched off — signing back in must not undo that', () => {
-    // The regression this guards: "to stop notifications the customer turns
-    // them off" only holds if the next sign-in respects an inactive row.
-    expect(shouldRegisterOnSignIn({ permissionGranted: true, myDevice: { isActive: false } })).toBe(false);
+  it('does NOT treat a failed lookup as an absent row', () => {
+    // The P1 this guards: pushDevices.mine() throws on a PostgREST error and
+    // the token fetch can fail offline. If that collapsed into "absent", a
+    // dropped request would reactivate a silenced device and flip promotions
+    // back on. Only a definite absence may cause a write.
+    expect(shouldRegisterOnSignIn({ permissionGranted: true, lookup: 'indeterminate' })).toBe(false);
   });
 });
 
