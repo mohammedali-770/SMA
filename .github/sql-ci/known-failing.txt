@@ -40,10 +40,33 @@
 # 20260802120000_address_description_trim_all_whitespace.sql, so the suite is
 # no longer quarantined.
 
-# expected exactly 5 cron jobs total, found 6.
-# The chain schedules six jobs on a clean database. Either a job the suite does
-# not know about was added later without updating it, or production has one
-# disabled that CI does not. Needs a decision, not a harness change.
+# expected exactly 5 cron jobs total, found 7.
+#
+# ANSWERED — of the two possibilities this comment used to offer, it is the
+# first. Nothing is disabled in production that CI has: the chain genuinely
+# schedules seven jobs on a clean database, and the suite has simply never been
+# updated as jobs were added.
+#
+# The suite asserts its own two jobs plus "the three pre-existing jobs", so 5
+# was correct the day it was written:
+#   account-deletion-processor    20260716180000
+#   lazywait-sync                 20260720120000
+#   order-integrity-watchdog      20260721170000
+#   operations-alerts-evaluator   20260723120000  <- added by this suite's own feature
+#   operations-digest-generator   20260723120000  <- added by this suite's own feature
+# Two arrived afterwards and neither updated it:
+#   payment-refund-worker         20260729090000
+#   branch-availability-sweep     20260820111000  (PR #229)
+#
+# So the bare total-count assertion is doing exactly what it was put there for
+# — it is a tripwire for an unexpected cron job, and it has now tripped twice
+# on expected ones. The open decision is what to replace it with: bump 5 -> 7
+# and keep re-bumping on every new job, or assert that the five jobs this suite
+# knows about are present and unchanged and stop counting the rest. Still a
+# decision, not a harness change.
+#
+# Whoever takes it must DELETE this line in the same change: a quarantined
+# suite that starts passing fails the build (see the self-cleaning note above).
 operations_alerts_activation_test.sql
 
 # STATUS products.total — assertion about a products column.
