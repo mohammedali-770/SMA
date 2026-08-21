@@ -568,6 +568,30 @@ for the first time on the payment screen would be both surprising and easy to
 refuse, and a refusal must cost nothing when the whole feature is one advisory
 line.
 
+### An applied coupon is dropped when the basket changes
+
+`validate_coupon` is a function of (code, subtotal) — minimum-spend rules and
+percentage discounts both move with the basket — and both order-creation paths
+re-run it against the **recomputed** subtotal:
+`place_order` (`20260710120100_place_order_delivery_zone.sql:207-209`) and
+`begin_checkout_session` (`20260712160000_checkout_sessions.sql:240-242`) each
+`raise exception 'Coupon rejected: %'` when it no longer holds.
+
+So a coupon carried past a cart change is **not** a cosmetically wrong number on
+the totals card. It is an order that fails at submit, after the customer has
+committed to paying.
+
+Checkout tags the applied coupon with the subtotal it was validated against and
+drops it whenever that drifts (`appliedCouponSurvives` in `checkoutGuards.ts`,
+unit-tested). Watching the subtotal is the point: the cart can move from the
+stepper, the remove dialog, the product editor reached by tapping a line, or the
+Cart screen underneath — and Checkout stays mounted through all of it. The
+previous approach cleared the coupon by hand inside two mutation handlers, so it
+covered the stepper and the remove dialog and nothing else; every path nobody
+had thought of shipped a discount the server would later refuse. A rejection
+*message* is deliberately kept, because it describes the code the customer
+typed, not the basket.
+
 ### Tapping a line on Checkout opens the item
 
 The Cart screen has always routed a tapped line to

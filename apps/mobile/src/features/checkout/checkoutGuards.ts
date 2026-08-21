@@ -78,3 +78,32 @@ export function resolveBlockReason(input: {
   if (input.needsDescription) return 'need-description';
   return null;
 }
+
+/**
+ * Whether an applied coupon still describes the basket in front of the
+ * customer.
+ *
+ * `validate_coupon` is a function of (code, subtotal): minimum-spend rules and
+ * percentage discounts both move with the basket. `place_order` re-runs it
+ * against the RECOMPUTED subtotal and raises `Coupon rejected: %` when it no
+ * longer holds, as does `begin_checkout_session`. So a coupon carried past a
+ * cart change is not a cosmetically wrong number on the totals card — it is an
+ * order that fails at submit, after the customer has committed to paying.
+ *
+ * Only an APPLIED coupon (`ok`) is subject to this. A rejection message is
+ * about the code the customer typed, not about the basket, and dropping it
+ * would erase the explanation they are reading.
+ *
+ * The comparison is deliberately exact rather than tolerant. Cart subtotals are
+ * built from `round2`-ed unit prices, so equal baskets produce equal numbers;
+ * an epsilon here would only widen the window in which the client shows a
+ * discount the server will refuse.
+ */
+export function appliedCouponSurvives(
+  applied: { ok: boolean; subtotal: number } | null | undefined,
+  currentSubtotal: number,
+): boolean {
+  if (!applied) return false;
+  if (!applied.ok) return true; // a rejection message is about the code, not the cart
+  return applied.subtotal === currentSubtotal;
+}

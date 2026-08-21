@@ -33,7 +33,7 @@ import {
   orderNoteMessage,
   orderNoteRemainingMessage,
 } from '../order/orderNote';
-import { decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import { appliedCouponSurvives, decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -135,7 +135,26 @@ export function CheckoutScreen() {
   // never prompts — see the effect below.
   const [deviceFix, setDeviceFix] = useState<DeviceFix | null>(null);
   const [couponCode, setCouponCode] = useState('');
-  const [couponResult, setCouponResult] = useState<{ ok: boolean; message: string; discount: number } | null>(null);
+  /**
+   * The applied coupon, TAGGED WITH THE SUBTOTAL IT WAS VALIDATED AGAINST.
+   *
+   * `validate_coupon` is a function of (code, subtotal) — minimum-spend and
+   * percentage discounts both move with the basket — and `place_order`
+   * re-runs it against the recomputed subtotal, raising `Coupon rejected: %`
+   * on a mismatch (20260710120100_place_order_delivery_zone.sql:207-209, and
+   * the same check in begin_checkout_session). A stale result is therefore not
+   * a cosmetic wrong number on the totals card: it is an order that FAILS at
+   * submit, after the customer has committed.
+   *
+   * Tagging is what makes the invalidation reliable. It used to be cleared by
+   * hand in the two mutation handlers on this screen, which covered the
+   * stepper and the remove dialog and nothing else — a line edited on the
+   * product screen came back to a Checkout that had stayed mounted, holding a
+   * discount computed for a basket that no longer existed.
+   */
+  const [couponResult, setCouponResult] = useState<
+    { ok: boolean; message: string; discount: number; subtotal: number } | null
+  >(null);
   const [checkingCoupon, setCheckingCoupon] = useState(false);
   const [redeemPoints, setRedeemPoints] = useState(false);
   const [notes, setNotes] = useState('');
@@ -305,16 +324,39 @@ export function CheckoutScreen() {
     setCheckingCoupon(true);
     setCouponResult(null);
     try {
-      const res = await coupons.validate(code, cart.subtotal);
-      setCouponResult({ ok: res.valid, message: res.message, discount: Number(res.discount_amount) || 0 });
+      // Captured before the await so the tag is the basket actually sent, not
+      // whatever it has become by the time the response lands.
+      const validatedAgainst = cart.subtotal;
+      const res = await coupons.validate(code, validatedAgainst);
+      setCouponResult({
+        ok: res.valid, message: res.message,
+        discount: Number(res.discount_amount) || 0, subtotal: validatedAgainst,
+      });
     } catch (e) {
       // Transport only: a coupon that is expired/invalid comes back on the
       // SUCCESS path as res.message, so nothing meaningful is lost here.
-      setCouponResult({ ok: false, message: failureMessage(e, t, { subsystem: 'checkout', op: 'validate_coupon' }), discount: 0 });
+      setCouponResult({ ok: false, message: failureMessage(e, t, { subsystem: 'checkout', op: 'validate_coupon' }), discount: 0, subtotal: cart.subtotal });
     } finally {
       setCheckingCoupon(false);
     }
   };
+
+  /**
+   * Drop an applied coupon as soon as the basket it was priced against changes.
+   *
+   * Watching the SUBTOTAL rather than each mutation site is the point: the cart
+   * can move from the stepper, the remove dialog, the product editor reached by
+   * tapping a line, or the Cart screen behind this one — and this screen stays
+   * mounted through all of it. Every previous fix added another `setCouponResult(null)`
+   * to whichever handler had been noticed; the ones nobody thought of shipped a
+   * discount the server would later reject outright.
+   *
+   * An unapplied rejection message is left alone: it is about the code, not the
+   * basket, and clearing it would erase the explanation the customer is reading.
+   */
+  useEffect(() => {
+    setCouponResult((prev) => (appliedCouponSurvives(prev, cart.subtotal) ? prev : null));
+  }, [cart.subtotal]);
 
   // ---- Preview math (display only) ----
   // One tested function (previewTotals) owns every dependent number, so editing
@@ -478,9 +520,8 @@ export function CheckoutScreen() {
     setRecalcLine(cartItemId);
     if (direction === 1) cart.incrementLine(cartItemId);
     else cart.decrementLine(cartItemId);
-    // Coupons are validated against a subtotal that has just changed, so the
-    // previous result no longer applies and must be re-entered.
-    if (couponResult) setCouponResult(null);
+    // The coupon is invalidated by the effect below, which watches the subtotal
+    // rather than each mutation site.
   };
 
   // A quantity edit has settled once the cart — and therefore the preview totals
@@ -891,7 +932,6 @@ export function CheckoutScreen() {
         onConfirm={() => {
           if (confirmRemove) {
             cart.removeLine(confirmRemove.cartItemId);
-            if (couponResult) setCouponResult(null);
           }
           setConfirmRemove(null);
         }}

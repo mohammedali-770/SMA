@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**124 TypeScript test files declaring 1728 test blocks, plus 44 SQL suites.**
+**124 TypeScript test files declaring 1734 test blocks, plus 44 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -89,7 +89,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-53 files, 756 declared test blocks.
+53 files, 762 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 37 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
-| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 13 | decideQuantityChange |
+| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 19 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
 | `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentFlow.test.ts` | 3 | chooseCheckoutTransport |
