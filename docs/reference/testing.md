@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**134 TypeScript test files declaring 1922 test blocks, plus 50 SQL suites.**
+**136 TypeScript test files declaring 1934 test blocks, plus 50 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -155,11 +155,12 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-70 files, 951 declared test blocks.
+72 files, 963 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `src/components/admin/branchDeletion.test.ts` | 5 | branchDeletionConfirmation |
+| `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
 | `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
@@ -186,7 +187,8 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/ops/branchConsole.test.ts` | 31 | duration and reason vocabularies |
 | `src/components/ops/BranchConsole.test.tsx` | 15 | BranchConsole |
 | `src/components/ops/callCentre.test.ts` | 51 | buildClosureSummaries |
-| `src/components/ops/CallCentreConsole.test.tsx` | 25 | CallCentreConsole |
+| `src/components/ops/CallCentreConsole.test.tsx` | 28 | CallCentreConsole |
+| `src/components/ops/opsRefreshQueue.test.ts` | 5 | makeRefreshQueue |
 | `src/components/ops/opsStrings.test.ts` | 4 | ops console copy |
 | `src/components/Price.contract.test.tsx` | 13 | digits render mono |
 | `src/components/Price.test.tsx` | 6 | Price (web) |

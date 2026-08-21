@@ -39,6 +39,13 @@ export interface BranchAvailabilityRow {
   reasonCode: OpsReasonCode | null;
 }
 
+/** Live delivery state for one branch, read fresh rather than from the context. */
+export interface BranchDeliveryState {
+  branchId: string;
+  deliveryTemporarilyClosed: boolean;
+  deliveryClosedUntil: string | null;
+}
+
 /** The same, for one OPTION rather than a whole product. */
 export interface BranchModifierAvailabilityRow {
   modifierId: string;
@@ -136,6 +143,27 @@ export const opsApi = {
       isAvailable: r.is_available as boolean,
       snoozedUntil: (r.snoozed_until as string | null) ?? null,
       reasonCode: (r.reason_code as OpsReasonCode | null) ?? null,
+    }));
+  },
+
+  /**
+   * Live delivery state for every branch.
+   *
+   * The consoles otherwise read `branches` from the app context, which is
+   * loaded once at sign-in — so an operator who paused delivery saw the board
+   * stay all-clear, and one who resumed it saw the branch stay paused, until
+   * the whole application was reloaded. Safe columns only: the reason code and
+   * the staff actor live on `branch_delivery_events`, which anon cannot read.
+   */
+  async branchDeliveryState(): Promise<BranchDeliveryState[]> {
+    const { data, error } = await supabase
+      .from('branches')
+      .select('id, delivery_temporarily_closed, delivery_closed_until');
+    fail(error);
+    return (data ?? []).map((r) => ({
+      branchId: r.id as string,
+      deliveryTemporarilyClosed: (r.delivery_temporarily_closed as boolean | null) ?? false,
+      deliveryClosedUntil: (r.delivery_closed_until as string | null) ?? null,
     }));
   },
 

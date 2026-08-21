@@ -15,7 +15,8 @@ import { Text } from '../../design-system/ui/Text';
 import { LiveModeBadge } from '../admin/view/LiveModeBadge';
 import { DeliveryArea, WorkingHoursDay, branchConfig } from '../../lib/branchConfigApi';
 import {
-  BranchAvailabilityRow, BranchModifierAvailabilityRow, DeliveryReasonCode, opsApi,
+  BranchAvailabilityRow, BranchDeliveryState, BranchModifierAvailabilityRow, DeliveryReasonCode,
+  opsApi,
 } from '../../lib/opsApi';
 import {
   BranchClosureSummary, buildClosureSummaries, newlyClosedBranchIds, optionOnlyBranches,
@@ -55,6 +56,7 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
   const [modAvailability, setModAvailability] =
     useState<(BranchModifierAvailabilityRow & { branchId: string })[]>([]);
   const [areas, setAreas] = useState<DeliveryArea[]>([]);
+  const [deliveryState, setDeliveryState] = useState<BranchDeliveryState[]>([]);
   const [hours, setHours] = useState<WorkingHoursDay[]>([]);
   const [hoursBranchId, setHoursBranchId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -86,14 +88,20 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
       // One round of reads, and one failure mode. A partial board is worse than
       // an error here: an operator cannot tell "no options closed" from "the
       // option read failed", and would tell a customer the item is fine.
-      const [avail, modAvail, allAreas] = await Promise.all([
+      const [avail, modAvail, allAreas, delivery] = await Promise.all([
         opsApi.allAvailability(),
         opsApi.allModifierAvailability(),
         branchConfig.allAreas(),
+        // `branches` in the app context is loaded once at sign-in. Without this
+        // read, pausing delivery from this very console left the board showing
+        // all-clear, and resuming left the branch marked paused, until the
+        // whole application was reloaded.
+        opsApi.branchDeliveryState(),
       ]);
       setAvailability(avail);
       setModAvailability(modAvail);
       setAreas(allAreas);
+      setDeliveryState(delivery);
       setLastUpdated(Date.now());
       setError(null);
     } catch (e) {
@@ -107,12 +115,30 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
 
   const liveMode = useOpsChangeFeed(refresh, { channelKey: 'call-centre' });
 
+  // Branch identity and contact come from the context; delivery state comes from
+  // the live read above, because it is the one field an operator changes and
+  // then expects to see change.
+  const liveBranches = useMemo(() => {
+    if (deliveryState.length === 0) return branches;
+    const byId = new Map(deliveryState.map((d) => [d.branchId, d]));
+    return branches.map((b) => {
+      const live = byId.get(b.id);
+      return live
+        ? {
+            ...b,
+            deliveryTemporarilyClosed: live.deliveryTemporarilyClosed,
+            deliveryClosedUntil: live.deliveryClosedUntil,
+          }
+        : b;
+    });
+  }, [branches, deliveryState]);
+
   const boardInput = useMemo(
     () => ({
-      branches, products, availability, areas,
+      branches: liveBranches, products, availability, areas,
       modifierGroups, modifierAvailability: modAvailability,
     }),
-    [branches, products, availability, areas, modifierGroups, modAvailability],
+    [liveBranches, products, availability, areas, modifierGroups, modAvailability],
   );
   const summaries = useMemo(() => buildClosureSummaries(boardInput), [boardInput]);
   // Branches whose only issue is an option that blocks nothing. Not board-worthy
@@ -169,7 +195,7 @@ export const CallCentreConsole: React.FC<{ i18n: OpsLangValue }> = ({ i18n }) =>
   };
 
   const openSummary = summaries.find((s) => s.branch.id === openBranchId) ?? null;
-  const pauseBranch = branches.find((b) => b.id === pauseBranchId) ?? null;
+  const pauseBranch = liveBranches.find((b) => b.id === pauseBranchId) ?? null;
 
   return (
     <div className="space-y-4">

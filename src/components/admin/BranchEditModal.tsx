@@ -53,6 +53,9 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
   // branch patch — one Save button, not two.
   const [week, setWeek] = useState<WorkingHoursDay[]>(() => weekFrom([]));
   const [hoursLoaded, setHoursLoaded] = useState(false);
+  // A read that failed, as opposed to one that has not finished. The editor
+  // says so rather than showing seven closed days as if they were the truth.
+  const [hoursError, setHoursError] = useState(false);
   const [lat, setLat] = useState<number>(Number.isFinite(branch.latitude) ? branch.latitude : 0);
   const [lng, setLng] = useState<number>(Number.isFinite(branch.longitude) ? branch.longitude : 0);
   const [deliveryFee, setDeliveryFee] = useState<number>(branch.deliveryFee ?? 0);
@@ -106,12 +109,17 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
     void (async () => {
       try {
         const stored = await branchConfig.workingHours(branch.id);
-        if (!disposed) setWeek(weekFrom(stored));
+        // ONLY on success. `week` starts as seven closed days, and `hoursLoaded`
+        // is what authorizes Save to write it — so marking a FAILED read as
+        // loaded means an admin who came to fix a phone number silently
+        // overwrites the branch's real trading hours as closed all week. A
+        // failed read must leave hours untouched, not merely look empty.
+        if (!disposed) { setWeek(weekFrom(stored)); setHoursLoaded(true); }
       } catch {
         // Hours are supplementary; a failure here must not block editing the
-        // branch itself. The row simply shows every day closed until reload.
-      } finally {
-        if (!disposed) setHoursLoaded(true);
+        // branch itself. The rows show every day closed until reload, and Save
+        // leaves the stored schedule alone.
+        if (!disposed) setHoursError(true);
       }
     })();
     return () => { disposed = true; };
@@ -187,7 +195,20 @@ export const BranchEditModal: React.FC<Props> = ({ branch, disabled, isRTL, onCl
         <ToggleChip on={isActive} disabled={disabled} onToggle={() => setIsActive(v => !v)} label={label('Open', 'مفتوح')} />
       </div>
 
-      <WorkingHoursEditor week={week} disabled={disabled} isRTL={isRTL} onChange={setWeek} />
+      {hoursError ? (
+        <p className="text-xs font-bold text-danger-ds">
+          {label(
+            'Working hours could not be loaded. They are shown blank and will NOT be saved — reopen this branch to edit them.',
+            'تعذّر تحميل ساعات العمل. تظهر فارغة ولن يتم حفظها — أعد فتح الفرع لتعديلها.',
+          )}
+        </p>
+      ) : null}
+      <WorkingHoursEditor
+        week={week}
+        disabled={disabled || hoursError}
+        isRTL={isRTL}
+        onChange={setWeek}
+      />
 
       <DeliveryAreasEditor branchId={branch.id} disabled={disabled} isRTL={isRTL} />
 

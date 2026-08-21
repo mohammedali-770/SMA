@@ -13,6 +13,7 @@ vi.mock('../../context/AppContext', () => ({
 const ops = vi.hoisted(() => ({
   allAvailability: vi.fn(),
   allModifierAvailability: vi.fn(),
+  branchDeliveryState: vi.fn(),
   resumeDelivery: vi.fn(),
   pauseDelivery: vi.fn(),
   disableArea: vi.fn(),
@@ -93,6 +94,9 @@ beforeEach(() => {
   mockApp();
   ops.allAvailability.mockResolvedValue([]);
   ops.allModifierAvailability.mockResolvedValue([]);
+  // Empty means "no live override", so branches fall through to the context —
+  // which is what every test that sets deliveryTemporarilyClosed relies on.
+  ops.branchDeliveryState.mockResolvedValue([]);
   ops.resumeDelivery.mockResolvedValue(undefined);
   ops.pauseDelivery.mockResolvedValue(undefined);
   ops.disableArea.mockResolvedValue(undefined);
@@ -325,6 +329,36 @@ describe('CallCentreConsole', () => {
     fireEvent.click(screen.getByText('Riyadh'));
     const panel = within(await screen.findByRole('dialog'));
     expect(panel.getByText(/Resuming now/i)).toBeTruthy();
+  });
+
+  it('reads LIVE branch delivery state, not the sign-in snapshot', async () => {
+    // `branches` in the app context is loaded once at sign-in. Without a live
+    // read, pausing delivery from this very console left the board all-clear.
+    // The context here says delivery is running; the server says it is paused.
+    ops.branchDeliveryState.mockResolvedValue([
+      { branchId: 'b1', deliveryTemporarilyClosed: true, deliveryClosedUntil: null },
+    ]);
+    render(<CallCentreConsole i18n={i18n} />);
+    expect(await screen.findByText('Riyadh')).toBeTruthy();
+    expect(screen.getByText(/Delivery paused/i)).toBeTruthy();
+  });
+
+  it('a live RESUME clears a branch the context still thinks is paused', async () => {
+    mockApp({
+      branches: [branch('b1', 'Riyadh', { deliveryTemporarilyClosed: true }), jeddah],
+    });
+    ops.branchDeliveryState.mockResolvedValue([
+      { branchId: 'b1', deliveryTemporarilyClosed: false, deliveryClosedUntil: null },
+    ]);
+    render(<CallCentreConsole i18n={i18n} />);
+    expect(await screen.findByText(/Every branch is running normally/i)).toBeTruthy();
+  });
+
+  it('re-reads delivery state on every refresh', async () => {
+    render(<CallCentreConsole i18n={i18n} />);
+    await waitFor(() => expect(ops.branchDeliveryState).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
+    await waitFor(() => expect(ops.branchDeliveryState).toHaveBeenCalledTimes(2));
   });
 
   it('opens a branch panel with its contact, items and hours', async () => {

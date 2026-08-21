@@ -179,8 +179,13 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
     const seed = matrixSeed.current;
     if (seed.products.length === 0) return null;   // nothing loaded yet
     try {
-      const [rows, modRows] = await Promise.all([
-        catalog.availability(), catalog.modifierAvailability(),
+      // Branches come too. A call-centre operator can pause delivery while the
+      // customer is mid-order, and `deliveryTemporarilyClosed` decides whether
+      // the delivery flow is offered at all (CheckoutScreen) and which branches
+      // are eligible (geo.deliveryEligibleBranches). Without this the customer
+      // kept the delivery option until place_order refused the order at the end.
+      const [rows, modRows, freshBranches] = await Promise.all([
+        catalog.availability(), catalog.modifierAvailability(), catalog.branches(),
       ]);
       const next: AvailabilitySnapshot = {
         products: buildAvailabilityMatrix(seed.products, seed.branches, rows),
@@ -189,6 +194,9 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
       if (mounted.current) {
         setAvailability(next.products);
         setModifierAvailability(next.modifiers);
+        // Replaced wholesale rather than merged: this is the same read and the
+        // same mapper the initial load uses, so it cannot drift from it.
+        setBranches(freshBranches.map(mapBranch));
       }
       return next;
     } catch {

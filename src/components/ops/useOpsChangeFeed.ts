@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { makeRefreshQueue } from './opsRefreshQueue';
 
 export type OpsLiveMode = 'realtime' | 'polling' | 'off';
 
@@ -48,7 +49,6 @@ export function useOpsChangeFeed(
     if (!enabled) { setMode('off'); modeRef.current = 'off'; return; }
 
     let disposed = false;
-    let running = false;
     let bumpT: ReturnType<typeof setTimeout> | null = null;
     let connectT: ReturnType<typeof setTimeout> | null = null;
     let fastPoll: ReturnType<typeof setInterval> | null = null;
@@ -56,12 +56,11 @@ export function useOpsChangeFeed(
 
     const setLive = (next: OpsLiveMode) => { modeRef.current = next; setMode(next); };
 
-    const doRefresh = async () => {
-      if (disposed || running) return;
-      running = true;
-      try { await refreshRef.current(); } catch { /* a failed refresh must not kill the feed */ }
-      finally { running = false; }
-    };
+    // Serialisation and the single trailing run live in opsRefreshQueue, so the
+    // rule can be tested directly rather than through a websocket, three timers
+    // and a React effect.
+    const queue = makeRefreshQueue(() => refreshRef.current());
+    const doRefresh = () => { void queue.run(); };
 
     const bump = () => {
       if (bumpT) return;                       // a run is already scheduled
@@ -105,6 +104,7 @@ export function useOpsChangeFeed(
 
     return () => {
       disposed = true;
+      queue.dispose();
       document.removeEventListener('visibilitychange', onVisible);
       if (bumpT) clearTimeout(bumpT);
       if (connectT) clearTimeout(connectT);
