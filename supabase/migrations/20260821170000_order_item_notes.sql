@@ -40,6 +40,33 @@ comment on column public.order_items.note is
   'Optional customer instruction for THIS line ("no onion"), trimmed to NULL when empty. Bounded by enforce_order_item_note; mirrors ITEM_NOTE_MAX_LENGTH in apps/mobile/src/features/order/orderNote.ts.';
 
 -- ---------------------------------------------------------------------------
+-- 1b. COLUMN GRANTS — without these the customer app breaks outright
+--
+-- 20260724200000_order_read_contracts.sql revoked table-wide SELECT on `orders`,
+-- `order_items` and `order_item_modifiers` and replaced it with an EXPLICIT
+-- column list per table. A new column is therefore NOT readable by
+-- `authenticated` just because it exists.
+--
+-- This is not a partial-visibility failure, which is what makes it dangerous:
+-- PostgREST rejects the ENTIRE select with a privilege error rather than
+-- omitting the column it may not read. So the moment the customer app asks for
+-- `notes` / `note` without these grants, `orders.byId` and `orders.listWithItems`
+-- fail for every signed-in customer — the whole receipt and My Orders, not just
+-- the note. The app change and these grants must ship together.
+--
+-- `orders.notes` is granted for the same reason it was reclassified in
+-- lib/orderSelect.ts: it is text the customer typed themselves, on their own
+-- RLS-scoped order. The read_contracts comment lists it under "staff notes",
+-- but nothing writes a staff note there — `place_order` fills it from the
+-- customer's own `p_notes`.
+--
+-- ROW-level ownership is untouched: RLS policies are evaluated by the system and
+-- do not require the caller to hold a column privilege, so this widens WHICH
+-- COLUMNS an owner may read and never WHOSE rows.
+grant select (notes) on public.orders to authenticated;
+grant select (note)  on public.order_items to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- 2. The bound
 --
 -- Shorter than the 280-character ORDER note, and that is not arbitrary: an
@@ -691,4 +718,84 @@ begin
   end if;
 
   return v_order;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 6. admin_list_orders_with_items - the kitchen has to be able to READ it
+--
+-- Storing a note nobody serves is worse than not offering one: the customer is
+-- told their instruction was accepted, and no staff surface ever shows it. The
+-- ORDER-level note was already projected here; the ITEM-level one was not, so
+-- "no onion" on a single line reached the database and stopped there.
+--
+-- DELIBERATELY NOT SENT TO THE POS. `lazywait-sync` does not forward the note,
+-- and this migration does not change that. Whether Lazywait's Create Order
+-- accepts an order/item note at all is open question Q5 in
+-- docs/lazywait-delivery-open-questions.md, and the client only sends assumed
+-- fields behind `allowAssumedFields`. Inventing a field name to carry a note
+-- would be guessing at the vendor's schema, which is the exact thing that gate
+-- exists to prevent. Until Lazywait confirms it, the staff dashboard is the
+-- surface that carries per-item notes, and the POS ticket does not.
+-- ---------------------------------------------------------------------------
+create or replace function public.admin_list_orders_with_items(p_limit integer default null)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare v_rows jsonb;
+begin
+  if not public.is_staff() then
+    raise exception 'Only staff may list orders' using errcode = '42501';
+  end if;
+
+  select coalesce(jsonb_agg(to_jsonb(t)), '[]'::jsonb) into v_rows from (
+    select
+      o.id, o.order_number, o.customer_id, o.customer_name, o.customer_phone,
+      o.branch_id, o.branch_name_en, o.branch_name_ar,
+      o.status, o.order_type,
+      o.subtotal, o.delivery_fee, o.discount_amount, o.loyalty_discount_amount,
+      o.vat_amount, o.total,
+      o.loyalty_points_earned, o.loyalty_points_redeemed,
+      o.payment_status, o.payment_method, o.payment_provider, o.paid_at,
+      o.coupon_code, o.notes, o.created_at, o.updated_at,
+      o.sync_status, o.lazywait_sync_state, o.lazywait_ref,
+      o.lazywait_order_number, o.lazywait_status,
+      o.sync_attempt_count, o.sync_last_error, o.sync_blocked_reason,
+      o.synced_at, o.first_pos_sync_failure_at, o.sync_next_attempt_at,
+      o.pos_create_attempted_at, o.pos_customer_retry_count,
+      o.pos_confirmation_reason, o.refund_state,
+      o.address_snapshot,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', i.id, 'order_id', i.order_id, 'product_id', i.product_id,
+          'name_en', i.name_en, 'name_ar', i.name_ar,
+          'unit_price', i.unit_price, 'quantity', i.quantity,
+          'line_total', i.line_total, 'note', i.note,
+          'order_item_modifiers', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'id', m.id, 'order_item_id', m.order_item_id,
+              'modifier_id', m.modifier_id,
+              'name_en', m.name_en, 'name_ar', m.name_ar, 'price', m.price)
+              order by m.id)
+            from public.order_item_modifiers m where m.order_item_id = i.id
+          ), '[]'::jsonb))
+          order by i.id)
+        from public.order_items i where i.order_id = o.id
+      ), '[]'::jsonb) as order_items
+    from public.orders o
+    where p_limit is null
+       -- the recent window …
+       or o.id in (
+            select r.id from public.orders r
+             order by r.created_at desc
+             limit greatest(1, p_limit)
+          )
+       -- … plus everything still owed to a customer, however old.
+       or o.status not in ('delivered', 'cancelled')
+    order by o.created_at desc
+  ) t;
+
+  return v_rows;
 end $$;

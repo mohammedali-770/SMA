@@ -259,6 +259,15 @@ export function OrderReceiptModal({
                       + {item.selectedModifiers.map((m) => (isRTL ? m.nameAr : m.nameEn)).join(', ')}
                     </Text>
                   )}
+                  {/* The customer's instruction for this line. Deliberately NOT
+                      tone="tertiary" like the modifiers: a modifier is what they
+                      ordered, this is something the kitchen has to DO, and it
+                      must not read as more of the same grey list. */}
+                  {item.note && (
+                    <Text variant="caption" tone="danger" as="p" className="mt-0.5">
+                      {item.note}
+                    </Text>
+                  )}
                 </div>
                 <Text variant="label" as="span">
                   <Price amount={item.price * item.quantity} lang={adminLang} />

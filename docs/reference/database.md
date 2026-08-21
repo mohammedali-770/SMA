@@ -78,7 +78,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `adjust_loyalty_points` | 2 | `20260707120900_loyalty_audit.sql` |
 | `admin_list_orders` | 1 | `20260724200000_order_read_contracts.sql` |
 | `admin_list_orders_for_range` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
-| `admin_list_orders_with_items` | 2 | `20260806130000_admin_ranged_orders_and_stats.sql` |
+| `admin_list_orders_with_items` | 3 | `20260821170000_order_item_notes.sql` |
 | `admin_list_role_change_audit` | 1 | `20260810141000_staff_access_directory.sql` |
 | `admin_list_staff` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_order_stats` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |

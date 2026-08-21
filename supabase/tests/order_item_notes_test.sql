@@ -43,6 +43,62 @@ begin
   raise notice 'CASE A ok: column present and guarded by a trigger';
 end $$;
 
+-- ---- A2. The column GRANTS -------------------------------------------------
+-- The one that bites hardest, and the reason this case exists.
+-- 20260724200000 replaced table-wide SELECT with an explicit column list per
+-- table, so a new column is NOT readable by `authenticated` merely because it
+-- exists. PostgREST does not omit a column it may not read — it rejects the
+-- WHOLE select — so a missing grant here does not hide the note, it breaks the
+-- entire receipt and My Orders for every signed-in customer.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.column_privileges
+    where table_schema = 'public' and table_name = 'orders'
+      and column_name = 'notes' and grantee = 'authenticated' and privilege_type = 'SELECT'
+  ) then
+    raise exception 'FAIL A3: authenticated cannot select orders.notes — the customer order read will fail outright';
+  end if;
+
+  if not exists (
+    select 1 from information_schema.column_privileges
+    where table_schema = 'public' and table_name = 'order_items'
+      and column_name = 'note' and grantee = 'authenticated' and privilege_type = 'SELECT'
+  ) then
+    raise exception 'FAIL A4: authenticated cannot select order_items.note — the customer order read will fail outright';
+  end if;
+
+  -- The grant must WIDEN nothing else. These stayed internal on purpose.
+  if exists (
+    select 1 from information_schema.column_privileges
+    where table_schema = 'public' and table_name = 'orders'
+      and grantee = 'authenticated' and privilege_type = 'SELECT'
+      and column_name in ('order_number', 'customer_phone', 'pos_create_attempt_token', 'address_snapshot')
+  ) then
+    raise exception 'FAIL A5: an internal orders column became selectable by authenticated';
+  end if;
+  raise notice 'CASE A2 ok: both note columns are readable by their owner, nothing else widened';
+end $$;
+
+-- ---- A3. Staff can actually READ the item note -----------------------------
+-- Storing a note nobody serves is worse than not offering one: the customer is
+-- told the instruction was accepted and no staff surface shows it.
+do $$
+declare
+  v_src text;
+begin
+  select p.prosrc into v_src
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'admin_list_orders_with_items';
+  if v_src is null then
+    raise exception 'FAIL A6: admin_list_orders_with_items is missing';
+  end if;
+  if v_src not like '%''note'', i.note%' then
+    raise exception 'FAIL A6: the staff order projection dropped the per-item note — the kitchen cannot see it';
+  end if;
+  raise notice 'CASE A3 ok: the staff projection carries the per-item note';
+end $$;
+
 -- ---- B. The bound, and the shared normalizer -------------------------------
 do $$
 declare

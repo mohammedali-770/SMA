@@ -477,6 +477,24 @@ goes loud instead of quiet.
 `begin_checkout_session` is deliberately not redefined: it delegates item work
 to `compute_order_snapshot` and never touches a line itself.
 
+**A new column is not readable just because it exists.** `20260724200000`
+replaced table-wide SELECT on `orders` / `order_items` with an explicit column
+list per table, and PostgREST rejects the WHOLE select rather than omitting a
+column the caller may not read. So shipping `notes` / `note` in the customer
+selector without `grant select (…) to authenticated` does not hide the note — it
+breaks the entire receipt and My Orders for every signed-in customer. The app
+change and the grants must ship together; case A2 of the suite pins both, and
+also asserts the grant widened nothing else.
+
+**Staff can read the item note; the POS cannot.** `admin_list_orders_with_items`
+projects it and the receipt modal renders it, in the danger tone rather than the
+modifiers' grey — a modifier is what was ordered, a note is something the kitchen
+has to *do*. It is deliberately **not** forwarded to Lazywait: whether Create
+Order accepts a note at all is open question Q5, and inventing a field name is
+exactly what the `allowAssumedFields` gate exists to prevent. Until the vendor
+confirms it, the staff dashboard carries per-item notes and the POS ticket does
+not.
+
 ### Directions, for pickup only
 
 A **Directions to branch** control appears only when the order is `pickup`, the
