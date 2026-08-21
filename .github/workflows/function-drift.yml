@@ -21,8 +21,11 @@ name: Edge Function drift (read-only)
 #
 # Requires a SUPABASE_ACCESS_TOKEN secret. Until that exists this workflow will
 # fail at the list step, which is honest: without it, nobody can see what is
-# deployed. See docs/OWNER_ACTIONS.md §15 BEFORE adding that secret — it also arms
-# a much more dangerous path in deploy-functions.yml.
+# deployed. See docs/OWNER_ACTIONS.md §15 BEFORE adding that secret. It arms a
+# much more dangerous path in deploy-functions.yml, and — the larger point — a
+# Supabase access token CANNOT be scoped to one project: it carries the whole
+# account, every organisation and every project, into a PUBLIC repository's
+# secrets. §15 recommends against adding it and gives the safer alternative.
 
 on:
   schedule:

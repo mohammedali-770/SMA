@@ -22,7 +22,8 @@ name: Deploy Supabase Functions
 # CLI with "Access token not provided".
 #
 # The trigger is gone. Deploys are deliberate only: Actions tab → Run workflow.
-# See docs/OWNER_ACTIONS.md §15.
+# See docs/OWNER_ACTIONS.md §15 — which also records that a Supabase access token
+# cannot be scoped to one project, and recommends against creating this secret.
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # Deploying an Edge Function requires explicit owner approval every time
