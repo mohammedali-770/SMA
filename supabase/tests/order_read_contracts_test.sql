@@ -102,11 +102,22 @@ end $$;
 -- ---- CASE 1: the customer GRANT is exactly the safe column set --------------
 do $$
 declare
+  -- The customer-readable column set, pinned EXACTLY. Adding to this list is a
+  -- deliberate act, not a formality: PostgREST rejects a whole select that names
+  -- an ungranted column, so a column reaching the customer selector without its
+  -- grant breaks every order read — and a column granted without being wanted
+  -- here is a quiet widening of the customer surface. Both directions fail below.
+  --
+  -- `notes` was added by 20260821170000_order_item_notes.sql. It is the
+  -- customer's OWN kitchen note, typed by them at checkout on their own
+  -- RLS-scoped order, and the receipt shows it back to them. The read-contracts
+  -- comment filed it under "staff notes", but nothing writes a staff note there:
+  -- place_order fills it from the customer's own p_notes.
   v_expected text[] := array[
     'id','status','order_type','created_at','branch_id','branch_name_en',
     'branch_name_ar','subtotal','delivery_fee','discount_amount',
     'loyalty_discount_amount','vat_amount','total','loyalty_points_earned',
-    'payment_status','payment_method','lazywait_order_number',
+    'payment_status','payment_method','notes','lazywait_order_number',
     'lazywait_sync_state','lazywait_ref','sync_blocked_reason',
     'sync_next_attempt_at','pos_create_attempted_at','pos_customer_retry_count',
     'refund_state'];
@@ -138,7 +149,7 @@ begin
   if has_table_privilege('authenticated', 'public.orders', 'update') then
     raise exception 'CASE 1 FAILED: table-wide UPDATE on orders is still granted';
   end if;
-  raise notice 'CASE 1 ok: customer grant is exactly the 24 safe columns, no table-wide privilege';
+  raise notice 'CASE 1 ok: customer grant is exactly the 25 safe columns, no table-wide privilege';
 end $$;
 
 -- ---- CASE 2: excluded columns are UNREADABLE by explicit selection ----------
