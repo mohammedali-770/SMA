@@ -124,6 +124,8 @@ export interface OrderItemModifier {
 
 export interface OrderItem {
   id: string;
+  /** The customer's instruction for this line, when they left one. */
+  note?: string;
   // productId / modifierId are NOT fetched for a customer order (they are catalog
   // joins the receipt never uses) — see lib/orderSelect.ts.
   nameEn: string;
@@ -135,9 +137,10 @@ export interface OrderItem {
 
 /**
  * The CUSTOMER view of an order. Deliberately narrower than the table: the
- * internal `SM-…` order number, customer-identity copies, coupon/notes,
+ * internal `SM-…` order number, customer-identity copies, the coupon code, the
  * address snapshot and every operational column are neither fetched nor
- * representable here (Issue #94). See lib/orderSelect.ts.
+ * representable here (Issue #94). See lib/orderSelect.ts. The customer's own
+ * kitchen note IS carried — it is their text, on their order.
  */
 export interface Order {
   id: string;
@@ -156,6 +159,8 @@ export interface Order {
   paymentStatus: 'pending' | 'paid';
   paymentMethod?: string; // 'online' | 'cash' (admin-configured availability)
   createdAt: string;
+  /** The kitchen note the customer attached at checkout, shown back on the receipt. */
+  notes?: string;
   /** Branch (POS) order number once accepted — the ONLY number ever shown. */
   lazywaitOrderNumber?: string;
   // Confirmation state-machine inputs (see features/orders/orderConfirmation.ts).
@@ -175,11 +180,17 @@ export interface Order {
 
 /** A configured product in the cart (product + the modifiers chosen per group). */
 export interface CartItem {
-  cartItemId: string; // product.id + sorted modifier ids
+  cartItemId: string; // product.id + sorted modifier ids + the note
   product: Product;
   selectedModifiers: { [groupId: string]: Modifier[] };
   quantity: number;
   unitPrice: number; // base price + selected modifier prices (per single item)
+  /**
+   * Optional instruction for THIS line ("no onion"). Part of `cartItemId`, so
+   * the same dish ordered twice with different notes stays two lines.
+   * Bounded by ITEM_NOTE_MAX_LENGTH; absent rather than '' when there is none.
+   */
+  note?: string;
 }
 
 export interface BrandSettings {

@@ -11,6 +11,29 @@ required" hint instead of a map, and the caller's manual coordinate entry keeps
 working. That is a deliberate degrade, not a crash — but it also means a
 missing key looks exactly like a broken feature to the customer.
 
+## Two modes: picker and preview
+
+`LocationPickerMap` renders in one of two modes, and both variants
+(`LocationPickerMap.tsx` and `LocationPickerMap.web.tsx`) implement both — they
+must stay in lockstep, because the same screens ship in the Vercel web export.
+
+| Mode | Prop | Pin | Zoom cluster | Locate button | `locateHint` line | `onChange` |
+| --- | --- | --- | --- | --- | --- | --- |
+| Picker (default) | — | Draggable, tap-to-set | shown | shown | shown | fires |
+| Preview | `readOnly` | Fixed | hidden | hidden | hidden | never fires |
+
+Preview mode also turns off map gestures (`gestureHandling: 'none'`) and
+keyboard shortcuts, and accepts an optional `height` so a preview can be shorter
+than the full picker.
+
+**Why every affordance goes, not just the drag.** Preview mode exists for
+Checkout, which CONFIRMS the delivery location chosen earlier rather than asking
+for it again (see `docs/ORDER_CONFIRMATION_FLOW.md` §10e). A map that still
+offered a zoom cluster and a "use my location" button would read as editable
+while silently discarding every interaction — worse than no map. Nothing the
+customer does in preview mode can move the coordinate, so nothing in preview
+mode suggests it can.
+
 ## Provider
 
 Google Maps. `EXPO_PUBLIC_MAP_PROVIDER=google` selects it; Mapbox remains

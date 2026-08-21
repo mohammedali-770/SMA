@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { decideQuantityChange, resolveBlockReason } from './checkoutGuards';
+import { appliedCouponSurvives, decideQuantityChange, resolveBlockReason } from './checkoutGuards';
 
 /**
  * Replays a sequence of stepper taps the way CheckoutScreen does: a synchronous
@@ -126,5 +126,48 @@ describe('resolveBlockReason — footer priority', () => {
       .toBe('delivery-unserviceable');
     expect(resolveBlockReason({ ...ok, needsDescription: true }))
       .toBe('need-description');
+  });
+});
+
+/**
+ * A coupon carried past a cart change is not a display bug: place_order re-runs
+ * validate_coupon against the recomputed subtotal and raises
+ * "Coupon rejected: …", so the order fails at submit. These pin the rule that
+ * decides when the applied coupon is dropped.
+ */
+describe('appliedCouponSurvives', () => {
+  const applied = (subtotal: number) => ({ ok: true, subtotal });
+
+  it('survives while the basket it was priced against is unchanged', () => {
+    expect(appliedCouponSurvives(applied(104), 104)).toBe(true);
+  });
+
+  it('does not survive a basket that grew or shrank', () => {
+    expect(appliedCouponSurvives(applied(104), 120)).toBe(false);
+    expect(appliedCouponSurvives(applied(104), 88)).toBe(false);
+    // The case the stepper never covered: a line edited on the product screen
+    // while Checkout stayed mounted.
+    expect(appliedCouponSurvives(applied(104), 104.5)).toBe(false);
+  });
+
+  it('keeps a rejection message, which is about the code and not the cart', () => {
+    const rejected = { ok: false, subtotal: 104 };
+    expect(appliedCouponSurvives(rejected, 104)).toBe(true);
+    expect(appliedCouponSurvives(rejected, 999)).toBe(true);
+  });
+
+  it('treats "no coupon" as nothing to keep', () => {
+    expect(appliedCouponSurvives(null, 104)).toBe(false);
+    expect(appliedCouponSurvives(undefined, 104)).toBe(false);
+  });
+
+  it('is exact — a sub-riyal drift still drops it', () => {
+    // An epsilon here would only widen the window where the client shows a
+    // discount the server refuses.
+    expect(appliedCouponSurvives(applied(104), 104.01)).toBe(false);
+  });
+
+  it('drops the coupon when the cart empties', () => {
+    expect(appliedCouponSurvives(applied(104), 0)).toBe(false);
   });
 });

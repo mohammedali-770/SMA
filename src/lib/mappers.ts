@@ -198,6 +198,7 @@ function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModif
     // so `price * quantity` matches the persisted line_total on receipts.
     price: Number(i.unit_price),
     quantity: i.quantity,
+    note: (i as { note?: string | null }).note?.trim() || undefined,
     selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
   };
 }

@@ -98,15 +98,33 @@ export type ConfirmationBodyKey =
   | 'oc_failed_refund_failed_body' | 'oc_failed_unpaid_body';
 export interface ConfirmationPresentation {
   titleKey: ConfirmationTitleKey; bodyKey: ConfirmationBodyKey; tone: ConfirmationTone;
-  success: boolean; canResend: boolean; showBranchNumber: boolean;
+  success: boolean; canResend: boolean;
+  /**
+   * Whether the branch-order-number card is MEANINGFUL for this state — not
+   * whether a number is already known.
+   *
+   * True for the three states on an active POS channel: the number is either
+   * present (`confirmed_by_branch`) or still expected (`sending_to_branch`,
+   * `verifying_with_branch`), so "it will appear here once the branch issues
+   * it" is a true statement.
+   *
+   * False everywhere else, and that is the point. A channel with no POS step
+   * (`accepted_no_pos_channel*` — delivery today) will NEVER be issued a
+   * number, so promising one is a lie the customer cannot act on. The card was
+   * previously rendered unconditionally and this flag had no consumer at all,
+   * which is exactly how a delivery customer came to be shown
+   * "not issued yet / it will appear here as soon as the branch issues it"
+   * for an order no branch would ever see.
+   */
+  showBranchNumber: boolean;
 }
 const PRESENTATION: Record<CustomerOrderState, ConfirmationPresentation> = {
   payment_pending:{titleKey:'oc_payment_pending',bodyKey:'oc_payment_pending_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
   accepted_no_pos_channel:{titleKey:'oc_payment_received',bodyKey:'oc_no_pos_channel_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
   accepted_no_pos_channel_unpaid:{titleKey:'oc_received',bodyKey:'oc_no_pos_channel_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
-  sending_to_branch:{titleKey:'oc_sending',bodyKey:'oc_sending_body',tone:'info',success:false,canResend:false,showBranchNumber:false},
+  sending_to_branch:{titleKey:'oc_sending',bodyKey:'oc_sending_body',tone:'info',success:false,canResend:false,showBranchNumber:true},
   confirmed_by_branch:{titleKey:'oc_confirmed',bodyKey:'oc_confirmed_body',tone:'success',success:true,canResend:false,showBranchNumber:true},
-  verifying_with_branch:{titleKey:'oc_verifying',bodyKey:'oc_verifying_body',tone:'warning',success:false,canResend:false,showBranchNumber:false},
+  verifying_with_branch:{titleKey:'oc_verifying',bodyKey:'oc_verifying_body',tone:'warning',success:false,canResend:false,showBranchNumber:true},
   branch_failed_retry_available:{titleKey:'oc_not_sent',bodyKey:'oc_not_sent_paid_body',tone:'warning',success:false,canResend:true,showBranchNumber:false},
   unpaid_branch_failed_retry_available:{titleKey:'oc_not_sent',bodyKey:'oc_not_sent_unpaid_body',tone:'warning',success:false,canResend:true,showBranchNumber:false},
   final_failure_refund_pending:{titleKey:'oc_failed',bodyKey:'oc_failed_refund_pending_body',tone:'danger',success:false,canResend:false,showBranchNumber:false},

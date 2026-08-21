@@ -40,11 +40,24 @@
 # 20260802120000_address_description_trim_all_whitespace.sql, so the suite is
 # no longer quarantined.
 
-# expected exactly 5 cron jobs total, found 6.
-# The chain schedules six jobs on a clean database. Either a job the suite does
-# not know about was added later without updating it, or production has one
-# disabled that CI does not. Needs a decision, not a harness change.
-operations_alerts_activation_test.sql
+# operations_alerts_activation_test.sql was here, failing on "expected exactly
+# 5 cron jobs total". The comment used to leave two possibilities open; it was
+# the first of them. The chain schedules seven jobs on a clean database and the
+# suite had simply never been updated:
+#   account-deletion-processor    20260716180000
+#   lazywait-sync                 20260720120000
+#   order-integrity-watchdog      20260721170000
+#   operations-alerts-evaluator   20260723120000  <- this suite's own feature
+#   operations-digest-generator   20260723120000  <- this suite's own feature
+#   payment-refund-worker         20260729090000
+#   branch-availability-sweep     20260820111000
+#
+# So 5 was right the day it was written, and every unrelated feature that adds
+# a cron job broke it again. The total-count assertion is gone; the suite now
+# asserts that each of the five jobs it knows about exists exactly once on its
+# own schedule with its own command, and the existing scan over every cron
+# command for credentials or outbound calls is untouched. Fixed, not
+# re-quarantined.
 
 # STATUS products.total — assertion about a products column.
 lazywait_mapping_test.sql

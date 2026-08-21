@@ -27,10 +27,26 @@ name: Design system
 #
 # `push:` stays filtered. A push run on every feature branch would double the
 # work for no signal — the pull_request run already covers it.
+#
+# `workflow_dispatch:` exists for the case where GitHub drops the event rather
+# than the workflow declining it. On 2026-08-21 a push to a pull request head
+# created NO workflow runs at all — no `pull_request` synchronize event fired,
+# confirmed against the run list, seventeen minutes after the push and with no
+# `paths:` filter that could explain it. The other three workflows already
+# declared `workflow_dispatch` and could be re-run by hand; this one could not,
+# so `design-system` — one of the always-required contexts in CLAUDE.md §12 —
+# was left with no run on that commit and no way to give it one short of
+# pushing a commit that existed only to nudge CI.
+#
+# That is the whole reason this is here: it makes a dropped event recoverable
+# without a fake commit. It does NOT weaken the gate. A manual run still runs
+# every step, and because `pull_request` is unfiltered above, the ordinary path
+# is unchanged — this is a manual fallback, never the normal trigger.
 on:
   pull_request:
   push:
     branches: [claude/project-build-ie4b56, main]
+  workflow_dispatch:
 
 # Read-only. This workflow only inspects the checkout — it never comments,
 # pushes, publishes or touches releases. Declared explicitly rather than

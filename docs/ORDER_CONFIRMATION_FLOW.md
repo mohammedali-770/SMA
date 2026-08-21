@@ -40,9 +40,9 @@ contract. Change one, change the other in the same commit.
 | `payment_pending` | Online payment not verified | no | no | no |
 | `accepted_no_pos_channel` | PAID; this channel has no branch step | **no** | no | no |
 | `accepted_no_pos_channel_unpaid` | Unpaid (cash); no branch step | **no** | no | no |
-| `sending_to_branch` | Send in flight, or an automatic retry is queued | no | no | no |
+| `sending_to_branch` | Send in flight, or an automatic retry is queued | no | no | **yes** |
 | `confirmed_by_branch` | Lazywait accepted it | **yes** | no | **yes** |
-| `verifying_with_branch` | Ambiguous — a ticket may exist | no | **no** | no |
+| `verifying_with_branch` | Ambiguous — a ticket may exist | no | **no** | **yes** |
 | `branch_failed_retry_available` | PAID, proven not sent | no | **yes** | no |
 | `unpaid_branch_failed_retry_available` | CASH, proven not sent | no | **yes** | no |
 | `final_failure_refund_pending` | PAID, budget spent, refund in progress | no | no | no |
@@ -54,6 +54,28 @@ contract. Change one, change the other in the same commit.
 `lazywait_pos_ref_is_usable(lazywait_ref)`. A `'synced'` row without a usable
 reference is an inconsistent DB state and is presented as `verifying_with_branch`
 — never as confirmed.
+
+### What "Branch number?" in that column means
+
+It is **whether the number card is shown**, not whether a number is known.
+
+The three `yes` rows are the states on an ACTIVE POS channel: the number is
+either already issued (`confirmed_by_branch`) or still expected
+(`sending_to_branch`, `verifying_with_branch`), so the card's "it will appear
+here as soon as the branch issues it" is a true statement.
+
+Every other row is `no`, and the two `accepted_no_pos_channel*` rows are the
+reason the flag exists. That channel has no POS step at all, so no branch will
+ever issue a number for it — promising one is a claim the customer can only sit
+and wait on. Delivery is exactly that case today (see §7), which is how a real
+delivery customer came to be shown **"لم يصدر بعد"** above **"سيظهر هنا فور
+إصداره من الفرع"** for an order no branch would ever see.
+
+This was a live bug until it was fixed: `showBranchNumber` had **no consumer**.
+`ConfirmationHero` rendered the card unconditionally and never read the flag,
+while a unit test asserted the flag's values over every state — so the suite
+stayed green over a field nothing used. The card is now gated on it, and the
+test asserts the gate rather than the constant.
 
 **`confirmed_by_branch` is the ONLY state that renders the green success check.**
 The two no-POS-channel states are deliberately neutral (informational tone, clock
@@ -428,9 +450,85 @@ already prefixed** — `#1`, `#2`, `#10` — and that exact string is what the
 branch's own screens display. Stripping it printed something the cashier could
 not match against their system, which defeats the purpose of the screen.
 
-When the number has not been issued yet, the card says so and explains that it
-will appear as soon as the branch issues it, rather than showing a blank or a
-placeholder that could be mistaken for a real number.
+When the number has not been issued yet **on a channel that will issue one**,
+the card says so and explains that it will appear as soon as the branch issues
+it, rather than showing a blank or a placeholder that could be mistaken for a
+real number.
+
+On a channel with **no POS step** the card is not rendered at all — see
+"What 'Branch number?' means" in §3. The screen-reader label follows the same
+gate, so a delivery customer is no longer read "branch order number, not issued
+yet" on an order that has no branch number to wait for.
+
+### The customer's own kitchen note
+
+The receipt renders `orders.notes` — the free-text note the customer attached at
+checkout — inside the order-summary card, directly under the item lines and
+above the totals. It sits with the food rather than in the metadata card
+because it is an instruction about the food: someone checking "did I remember to
+say no onion?" looks where the items are. It is rendered only when a note
+exists, and never truncated, following the same rule as the modifier lines.
+
+This required reclassifying one column. `notes` was swept into
+`INTERNAL_ONLY_ORDER_COLUMNS` (`apps/mobile/src/lib/orderSelect.ts`) when Issue
+#94 replaced `select('*')` — a blanket narrowing rather than a judgement about
+this column, which sat alongside `coupon_code` and `address_snapshot`. It holds
+text the customer typed themselves, on their own RLS-scoped order, bounded to
+`ORDER_NOTE_MAX_LENGTH`. Showing someone their own instruction back discloses
+nothing they do not already know, and withholding it meant the receipt could not
+confirm what the kitchen had actually been told. **Every other column in that
+list is unchanged, and the hostile-row contract test still proves it.**
+
+### Per-item notes
+
+A customer can now attach an instruction to a single line ("no onion") as well
+as to the whole order. The two are different things and stay separate: the order
+note is one instruction for the ticket, the line note is read by a cook
+assembling that row. The line note is entered on the item screen, beside the
+options it qualifies, rather than on Checkout — "no onion" belongs next to the
+onion, not on a screen three steps later that applies it to the drink too.
+
+**The note is part of the cart line's identity.** `makeCartItemId` folds the
+trimmed note into the id, so two portions of the same dish where one is "no
+onion" stay two lines. Without that they merge and whichever note was added
+last silently applies to both.
+
+**It is bounded at 140 characters, half the order note** (`ITEM_NOTE_MAX_LENGTH`,
+mirrored server-side by `order_item_note_is_acceptable`). That protects the
+kitchen's ability to read the ticket, not the database: ten lines each carrying
+280 characters is not something anybody can work from.
+
+**Three write paths carry it, and that is the fragile part.** A note is data the
+INSERT must carry, so — unlike the order note, which a trigger can bound after
+the fact — a trigger cannot supply it. `place_order` (cash), `compute_order_snapshot`
+(builds the online snapshot) and `insert_order_from_snapshot` (writes it after
+payment) each carry one line for the note. Those functions are copied wholesale
+into a new migration whenever any of them changes, so a future redefinition
+started from an older copy would silently drop notes on that path alone — cash
+orders keeping theirs while online orders lose them, with nothing failing.
+`supabase/tests/order_item_notes_test.sql` case C asserts all three, so that
+goes loud instead of quiet.
+
+`begin_checkout_session` is deliberately not redefined: it delegates item work
+to `compute_order_snapshot` and never touches a line itself.
+
+**A new column is not readable just because it exists.** `20260724200000`
+replaced table-wide SELECT on `orders` / `order_items` with an explicit column
+list per table, and PostgREST rejects the WHOLE select rather than omitting a
+column the caller may not read. So shipping `notes` / `note` in the customer
+selector without `grant select (…) to authenticated` does not hide the note — it
+breaks the entire receipt and My Orders for every signed-in customer. The app
+change and the grants must ship together; case A2 of the suite pins both, and
+also asserts the grant widened nothing else.
+
+**Staff can read the item note; the POS cannot.** `admin_list_orders_with_items`
+projects it and the receipt modal renders it, in the danger tone rather than the
+modifiers' grey — a modifier is what was ordered, a note is something the kitchen
+has to *do*. It is deliberately **not** forwarded to Lazywait: whether Create
+Order accepts a note at all is open question Q5, and inventing a field name is
+exactly what the `allowAssumedFields` gate exists to prevent. Until the vendor
+confirms it, the staff dashboard carries per-item notes and the POS ticket does
+not.
 
 ### Directions, for pickup only
 
@@ -490,6 +588,100 @@ message in the body — but a non-2xx `invoke` yields `FunctionsHttpError`, whos
 `.message` is the generic *"Edge Function returned a non-2xx status code"*.
 `invokePaymentFn` already recovers the body via `error.context.json()`;
 `placeAndSync` has never had the same treatment.
+
+## 10e. Checkout confirms the delivery location, it does not ask for it
+
+The order-type gate (`features/order/OrderTypeSelectScreen`) is **blocking**: a
+customer cannot reach Checkout for a delivery order without resolving a
+location, and `confirmNewAddress` there always persists the chosen point through
+`addressBook.create`. So by the time Checkout renders, a saved address always
+exists behind the order context.
+
+Checkout used to re-present the entire picker anyway — a draggable map, the
+mandatory guidance field, an optional building line and the saved list — asking
+the customer to redo a decision they had already made. Worse, it made Checkout a
+**second place the landmark could be written**, which is the exact duplication
+`features/order/locationDescription` was created to end: that module's own
+header records the era when the field was labelled differently on the two
+screens and Checkout dropped it entirely when creating the address, so a driver
+could receive an order with no landmark at all.
+
+Checkout now only ever SELECTS:
+
+| View | What it shows | What it can change |
+| --- | --- | --- |
+| Default | A read-only map preview, the location's label and its landmark | Nothing — one action, "change location" |
+| Change | The other **saved** locations as radio rows, plus a row that leaves for location settings | Which saved location the order uses |
+| Location settings (`/profile/addresses`) | The full editor | Creating and editing locations — the only place that does |
+
+Consequences worth stating:
+
+- **Checkout never writes an address.** The create/update/reuse branch in
+  `placeOrder` is gone; `place_order` receives the id of a saved address that
+  already carries a validated landmark. The landmark has exactly one owner
+  again.
+- **The pin is seeded from the order context** (`deliveryLat` / `deliveryLng`),
+  not only from a saved-address lookup. The context point is what the branch was
+  resolved against, so what the customer sees is what the order uses even while
+  the address book is still loading. The preselect effect fills the pin only
+  when the context did not supply one, so a fallback address can never silently
+  move a delivery.
+- **`need-description` still guards**, but now means "the SAVED location has no
+  usable landmark" — an address written before the landmark became mandatory.
+  Its copy points at location settings instead of asking for a retype.
+
+### The device-position warning is a warning
+
+`features/checkout/deliveryLocationWarning.ts` compares the device's position
+with the delivery pin and, beyond `GPS_MISMATCH_THRESHOLD_KM`, states the
+distance. It **never blocks**, and that is a product rule rather than a
+threshold to tune: ordering to somewhere you are not standing is the ordinary
+case — home while at work, a parent's house, an office. Blocking on distance
+would reject the majority of legitimate delivery orders. `checkoutGuards` is
+where blocking lives; this module returns copy.
+
+Silence is the default output. No permission, no fix, the null island, a
+non-finite coordinate, or an accuracy worse than `MIN_TRUSTED_ACCURACY_M` all
+mean "no opinion", never "warn". Checkout reads the position with
+`getForegroundPermissionsAsync` and so **never prompts** — asking for location
+for the first time on the payment screen would be both surprising and easy to
+refuse, and a refusal must cost nothing when the whole feature is one advisory
+line.
+
+### An applied coupon is dropped when the basket changes
+
+`validate_coupon` is a function of (code, subtotal) — minimum-spend rules and
+percentage discounts both move with the basket — and both order-creation paths
+re-run it against the **recomputed** subtotal:
+`place_order` (`20260710120100_place_order_delivery_zone.sql:207-209`) and
+`begin_checkout_session` (`20260712160000_checkout_sessions.sql:240-242`) each
+`raise exception 'Coupon rejected: %'` when it no longer holds.
+
+So a coupon carried past a cart change is **not** a cosmetically wrong number on
+the totals card. It is an order that fails at submit, after the customer has
+committed to paying.
+
+Checkout tags the applied coupon with the subtotal it was validated against and
+drops it whenever that drifts (`appliedCouponSurvives` in `checkoutGuards.ts`,
+unit-tested). Watching the subtotal is the point: the cart can move from the
+stepper, the remove dialog, the product editor reached by tapping a line, or the
+Cart screen underneath — and Checkout stays mounted through all of it. The
+previous approach cleared the coupon by hand inside two mutation handlers, so it
+covered the stepper and the remove dialog and nothing else; every path nobody
+had thought of shipped a discount the server would later refuse. A rejection
+*message* is deliberately kept, because it describes the code the customer
+typed, not the basket.
+
+### Tapping a line on Checkout opens the item
+
+The Cart screen has always routed a tapped line to
+`/product/[id]?cartItemId=…`, and `ProductDetailScreen` has always supported
+editing an existing line through `cart.updateItem`. Checkout showed the same
+rows but reached none of it: a customer who had picked the wrong size could
+change how many they were getting but not which one, and the only way to fix it
+was to go back to the cart — losing the location, coupon and payment method
+that Checkout's editable lines exist to preserve. Both screens now use the one
+editor and the one `cart.updateItem`.
 
 ## 11. Known gaps
 

@@ -148,6 +148,8 @@ export interface DbOrder {
 export interface DbOrderItem {
   id: string; order_id: string; product_id: string | null;
   name_en: string; name_ar: string; unit_price: number; quantity: number; line_total: number;
+  /** The customer's instruction for this line. See migration 20260821170000. */
+  note: string | null;
 }
 export interface DbOrderItemModifier {
   id: string; order_item_id: string; modifier_id: string | null;
@@ -181,6 +183,8 @@ export interface DbCustomerOrder {
   loyalty_points_earned: number;
   payment_status: 'pending' | 'paid';
   payment_method: string | null;
+  /** The customer's own kitchen note. See lib/orderSelect.ts. */
+  notes?: string | null;
   lazywait_order_number?: string | null;
   lazywait_sync_state?: string | null;
   lazywait_ref?: string | null;
@@ -193,6 +197,7 @@ export interface DbCustomerOrder {
 
 export type DbCustomerOrderWithItems = DbCustomerOrder & {
   order_items: (Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'> & {
+    note?: string | null;
     order_item_modifiers: Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>[];
   })[];
 };

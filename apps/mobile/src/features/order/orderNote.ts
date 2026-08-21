@@ -26,6 +26,21 @@
 export const ORDER_NOTE_MAX_LENGTH = 280;
 
 /**
+ * Maximum stored length of a PER-ITEM note, after trimming.
+ *
+ * Half the order note, and that is not arbitrary. An order note is one
+ * instruction for the whole ticket; a line note is read by a cook glancing at a
+ * single row while assembling it. Ten lines each carrying 280 characters is not
+ * a ticket anybody can work from — the limit protects the kitchen's ability to
+ * read the order at all, not the database.
+ *
+ * The backend mirrors this in `order_item_note_is_acceptable`
+ * (supabase/migrations/20260821170000_order_item_notes.sql) — change both
+ * together, and never widen this one alone.
+ */
+export const ITEM_NOTE_MAX_LENGTH = 140;
+
+/**
  * Show the remaining-character counter only once the customer is close to the
  * limit. A counter that is visible from the first keystroke reads as a target
  * to fill rather than a bound to respect.

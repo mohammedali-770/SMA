@@ -207,7 +207,8 @@ function mapAddressSnapshot(snap: Record<string, unknown>): SavedAddress {
 // order_id / product_id / modifier_id / line_total are not fetched, so they are
 // not readable here either.
 type CustomerOrderItemModifier = Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>;
-type CustomerOrderItem = Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'>;
+type CustomerOrderItem = Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'>
+  & { note?: string | null };
 
 function mapOrderItemModifier(m: CustomerOrderItemModifier): OrderItemModifier {
   return { id: m.id, nameEn: m.name_en, nameAr: m.name_ar, price: Number(m.price) };
@@ -221,15 +222,18 @@ function mapOrderItem(i: CustomerOrderItem & { order_item_modifiers?: CustomerOr
     // unit_price already includes the selected modifiers (place_order sums them).
     price: Number(i.unit_price),
     quantity: i.quantity,
+    note: i.note?.trim() || undefined,
     selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
   };
 }
 
 export function mapOrder(o: DbCustomerOrderWithItems): Order {
   return {
-    // NOTE: order_number (the internal SM-â€¦ id), customer_* copies, coupon/notes,
+    // NOTE: order_number (the internal SM-â€¦ id), customer_* copies, coupon_code,
     // address_snapshot and every operational column are deliberately NOT mapped â€”
     // they are no longer fetched either (see lib/orderSelect.ts). Issue #94.
+    // `notes` IS mapped: it is the customer's own kitchen note, shown back to
+    // them on their own receipt.
     id: o.id,
     branchId: o.branch_id,
     branchNameEn: o.branch_name_en ?? '',
@@ -246,6 +250,7 @@ export function mapOrder(o: DbCustomerOrderWithItems): Order {
     paymentStatus: o.payment_status,
     paymentMethod: o.payment_method ?? undefined,
     createdAt: o.created_at,
+    notes: o.notes?.trim() || undefined,
     lazywaitOrderNumber: o.lazywait_order_number ?? undefined,
     lazywaitSyncState: o.lazywait_sync_state ?? undefined,
     lazywaitRef: o.lazywait_ref ?? undefined,

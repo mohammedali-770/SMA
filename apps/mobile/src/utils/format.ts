@@ -50,9 +50,21 @@ export function computeUnitPrice(product: Product, selected: { [groupId: string]
  * lines with the same product and same modifiers merge (quantity increments);
  * different modifier choices stay separate.
  */
-export function makeCartItemId(productId: string, selected: { [groupId: string]: Modifier[] }): string {
+export function makeCartItemId(
+  productId: string,
+  selected: { [groupId: string]: Modifier[] },
+  /**
+   * The line's own kitchen note. Part of the IDENTITY, not decoration: two
+   * portions of the same dish where one is "no onion" are two different things
+   * to a cook. Without this they collapse into one line and whichever note was
+   * added last silently wins for both.
+   */
+  note?: string | null,
+): string {
   const ids = flattenModifiers(selected).map((m) => m.id).sort();
-  return ids.length ? `${productId}::${ids.join(',')}` : productId;
+  const base = ids.length ? `${productId}::${ids.join(',')}` : productId;
+  const trimmed = (note ?? '').trim();
+  return trimmed ? `${base}##${trimmed}` : base;
 }
 
 /** Cart subtotal preview (sum of line totals). Server recomputes on checkout. */

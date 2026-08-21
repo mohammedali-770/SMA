@@ -10,7 +10,9 @@ import { QtyStepper } from '../../components/QtyStepper';
 import { ErrorView, LoadingView } from '../../components/StateViews';
 import { radius, space, type as typeScale } from '../../design-system/generated/tokens';
 import { StatusPill } from '../../design-system/ui/Chip';
+import { Field } from '../../design-system/ui/Field';
 import { Text } from '../../design-system/ui/Text';
+import { ITEM_NOTE_MAX_LENGTH } from '../order/orderNote';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
@@ -45,6 +47,9 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
     return kept;
   });
   const [qty, setQty] = useState(() => editingLine?.quantity ?? 1);
+  // The line's own instruction. Seeded from the line being edited so reopening
+  // an item shows what the customer already asked for rather than a blank box.
+  const [note, setNote] = useState<string>(() => editingLine?.note ?? '');
   const [showErrors, setShowErrors] = useState(false);
 
   if (loading && !product) return <View style={styles.root}><Header showBack safeTop /><LoadingView label={t('loading')} /></View>;
@@ -71,7 +76,7 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   const isEditing = Boolean(cartItemId && editingLine);
   const save = () => {
     if (!canSave) { setShowErrors(true); return; }
-    if (isEditing && cartItemId) cart.updateItem(cartItemId, product, selected, qty); else cart.addItem(product, selected, qty);
+    if (isEditing && cartItemId) cart.updateItem(cartItemId, product, selected, qty, note); else cart.addItem(product, selected, qty, note);
     router.back();
   };
 
@@ -113,6 +118,21 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
               })}</View>
             </View>;
           })}
+          {/* Per-LINE instruction, distinct from the order-wide note on
+              Checkout. It sits with the options because it is part of choosing
+              THIS dish — "no onion" belongs next to the onion, not on a screen
+              three steps later that applies it to the drink as well. */}
+          <View style={styles.noteBlock}>
+            <Field
+              id="product-item-note"
+              label={pick('Note for this item (optional)', 'ملاحظة لهذا الصنف (اختياري)')}
+              value={note}
+              onChangeText={(v) => setNote(v.slice(0, ITEM_NOTE_MAX_LENGTH))}
+              placeholder={pick('Example: no onion', 'مثال: بدون بصل')}
+              multiline
+              inputStyle={styles.noteInput}
+            />
+          </View>
           <View style={[styles.qtyRow, rtlRow]}><Text variant="heading">{t('quantity')}</Text><QtyStepper value={qty} onIncrement={() => setQty((q) => q + 1)} onDecrement={() => setQty((q) => Math.max(1, q - 1))} /></View>
         </View>
       </ScrollView>
@@ -132,6 +152,8 @@ const useStyles = makeStyles((colors) => ({
   modRow: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: space.s3, backgroundColor: colors.appSurface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.appLine, padding: space.s3, minHeight: 48 }, modRowOn: { borderColor: colors.ember, backgroundColor: colors.appSurface2 }, modRowOff: { backgroundColor: colors.disabledBg, opacity: 0.6 },
   blockedNotice: { marginTop: space.s3, backgroundColor: colors.dangerTint, borderRadius: radius.md, borderWidth: 1, borderColor: colors.dangerLine, padding: space.s3 },
   check: { width: 24, height: 24, borderRadius: radius.sm, borderWidth: 2, borderColor: colors.appLine, alignItems: 'center' as const, justifyContent: 'center' as const }, radio: { borderRadius: 12 }, checkOn: { backgroundColor: colors.ember, borderColor: colors.ember },
+  noteBlock: { marginTop: space.s4 },
+  noteInput: { minHeight: 72, paddingTop: space.s3, textAlignVertical: 'top' as const },
   qtyRow: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, marginTop: space.s5 },
   footer: { position: 'absolute' as const, left: 0, right: 0, bottom: 0, backgroundColor: colors.appSurface, borderTopWidth: 1, borderTopColor: colors.appLine, paddingHorizontal: space.s4, paddingTop: space.s3 },
   addBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, justifyContent: 'space-between' as const, backgroundColor: colors.ember, borderRadius: radius.lg, paddingHorizontal: space.s5, paddingVertical: space.s4, minHeight: 54 }, addBtnDim: { backgroundColor: colors.disabledBg },

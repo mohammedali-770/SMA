@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**136 TypeScript test files declaring 1940 test blocks, plus 50 SQL suites.**
+**139 TypeScript test files declaring 1978 test blocks, plus 51 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -68,6 +68,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/order_flow_health_card_test.sql`
 - `supabase/tests/order_integrity_stranded_health_test.sql`
 - `supabase/tests/order_integrity_watchdog_test.sql`
+- `supabase/tests/order_item_notes_test.sql`
 - `supabase/tests/order_modifier_contract_test.sql`
 - `supabase/tests/order_note_length_test.sql`
 - `supabase/tests/order_read_contracts_test.sql`
@@ -95,10 +96,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-53 files, 765 declared test blocks.
+56 files, 803 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
+| `apps/mobile/src/components/headerInset.test.ts` | 6 | header top inset — exactly one source per screen |
 | `apps/mobile/src/components/legacyButtonBehaviour.test.ts` | 5 | legacy Button — behaviour is unchanged by the consolidation |
 | `apps/mobile/src/components/locationControl.test.ts` | 25 | shouldStartLocate |
 | `apps/mobile/src/components/stateHierarchy.test.ts` | 9 | looksTechnical |
@@ -109,8 +111,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
 | `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 37 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
-| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 13 | decideQuantityChange |
+| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 19 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
+| `apps/mobile/src/features/checkout/deliveryLocationWarning.test.ts` | 14 | mismatchDistanceKm — silence is the default |
 | `apps/mobile/src/features/checkout/paymentFlow.test.ts` | 3 | chooseCheckoutTransport |
 | `apps/mobile/src/features/checkout/pendingSession.test.ts` | 16 | parsePendingSession |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 24 | lineTotal |
@@ -122,10 +125,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
 | `apps/mobile/src/features/onboarding/firstRun.test.ts` | 13 | shouldRequestFirstRunPermissions |
 | `apps/mobile/src/features/order/cartValidation.test.ts` | 15 | validateCartForBranch |
+| `apps/mobile/src/features/order/itemNote.test.ts` | 8 | makeCartItemId — the note is part of the identity |
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 14 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 16 | reference and channel safety |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 2 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
@@ -143,7 +147,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/observability/webConfig.test.ts` | 14 | web Sentry identity |
 | `apps/mobile/src/lib/observability/webRoutes.test.ts` | 9 | normalizeWebRoute |
 | `apps/mobile/src/lib/orderability.test.ts` | 15 | requiredCount |
-| `apps/mobile/src/lib/orderSelect.test.ts` | 11 | customer order select — no internal columns |
+| `apps/mobile/src/lib/orderSelect.test.ts` | 13 | customer order select — no internal columns |
 | `apps/mobile/src/lib/phone.test.ts` | 20 | toSaudiE164 — accepts every Saudi input pattern |
 | `apps/mobile/src/lib/storageKeys.test.ts` | 4 | storageKeys |
 | `apps/mobile/src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |

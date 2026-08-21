@@ -51,9 +51,25 @@ interface LocationPickerMapProps {
    * resolve one. Callers use it to prefill the location description.
    */
   onAddressResolved?: (text: string) => void;
+  /**
+   * PREVIEW mode: show where the location is, do not let the customer move it.
+   *
+   * The pin is not draggable, map clicks do not move it, the zoom cluster and
+   * the locate control are gone, gestures are off, and `locateHint` is not
+   * rendered — every affordance that says "adjust this" is removed, because in
+   * preview mode nothing the customer does here can change the coordinate.
+   *
+   * Checkout uses this to CONFIRM the location already chosen at the order-type
+   * gate. Changing it there means selecting a different saved location; editing
+   * a location's pin or landmark happens in location settings, on the one screen
+   * that owns it. `onChange` is never called in this mode.
+   */
+  readOnly?: boolean;
+  /** Preview height. Defaults to the full picker height. */
+  height?: number;
 }
 
-function buildGoogleHtml(key: string, lat: number, lng: number): string {
+function buildGoogleHtml(key: string, lat: number, lng: number, readOnly: boolean): string {
   // Google Maps JS API in the WebView. Arabic street names are shaped natively.
   // The key must be referrer-restricted; the WebView is loaded with a baseUrl
   // from an allowed domain so requests carry that referrer.
@@ -79,11 +95,11 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
     map = new google.maps.Map(document.getElementById('map'), {
       center: {lat:${lat}, lng:${lng}}, zoom: 14,
       clickableIcons: false, streetViewControl: false, mapTypeControl: false, fullscreenControl: false, disableDefaultUI: true,
-      zoomControl: true, zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER }
+      zoomControl: ${readOnly ? 'false' : 'true'}, zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
+      gestureHandling: ${readOnly ? "'none'" : "'auto'"}, keyboardShortcuts: ${readOnly ? 'false' : 'true'}
     });
-    marker = new google.maps.Marker({ position: {lat:${lat}, lng:${lng}}, map: map, draggable: true });
-    marker.addListener('dragend', post);
-    map.addListener('click', function(e){ marker.setPosition(e.latLng); post(); });
+    marker = new google.maps.Marker({ position: {lat:${lat}, lng:${lng}}, map: map, draggable: ${readOnly ? 'false' : 'true'} });
+    ${readOnly ? '' : "marker.addListener('dragend', post); map.addListener('click', function(e){ marker.setPosition(e.latLng); post(); });"}
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapReady:true}));
   };
   window.recenter = function(la, ln){ if (map && marker) { map.panTo({lat:la, lng:ln}); marker.setPosition({lat:la, lng:ln}); post(); } };
@@ -92,7 +108,7 @@ function buildGoogleHtml(key: string, lat: number, lng: number): string {
 </body></html>`;
 }
 
-function buildHtml(token: string, style: string, lat: number, lng: number): string {
+function buildHtml(token: string, style: string, lat: number, lng: number, readOnly: boolean): string {
   // Mapbox GL JS is loaded from the Mapbox CDN (the WebView has network access).
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -101,21 +117,20 @@ function buildHtml(token: string, style: string, lat: number, lng: number): stri
 <style>html,body,#map{margin:0;padding:0;height:100%;width:100%}</style>
 </head><body><div id="map"></div><script>
   mapboxgl.accessToken = ${JSON.stringify(token)};
-  var map = new mapboxgl.Map({ container:'map', style:${JSON.stringify(style)}, center:[${lng},${lat}], zoom:14 });
-  var marker = new mapboxgl.Marker({ color:'#7c3aed', draggable:true }).setLngLat([${lng},${lat}]).addTo(map);
+  var map = new mapboxgl.Map({ container:'map', style:${JSON.stringify(style)}, center:[${lng},${lat}], zoom:14, interactive:${readOnly ? 'false' : 'true'} });
+  var marker = new mapboxgl.Marker({ color:'#7c3aed', draggable:${readOnly ? 'false' : 'true'} }).setLngLat([${lng},${lat}]).addTo(map);
   function post(){ var p = marker.getLngLat(); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({lat:p.lat,lng:p.lng})); }
   function fail(reason){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapError:reason})); }
   // A rejected/URL-restricted token surfaces here as a 401 rather than throwing.
   map.on('error', function(e){ fail('mapbox_error: ' + String((e && e.error && e.error.message) || 'unknown').slice(0,120)); });
   map.on('load', function(){ if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({__mapReady:true})); });
-  marker.on('dragend', post);
-  map.on('click', function(e){ marker.setLngLat(e.lngLat); post(); });
+  ${readOnly ? '' : "marker.on('dragend', post); map.on('click', function(e){ marker.setLngLat(e.lngLat); post(); });"}
   window.recenter = function(la, ln){ map.flyTo({center:[ln,la]}); marker.setLngLat([ln,la]); post(); };
 </script></body></html>`;
 }
 
 export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
-  lat, lng, onChange, lang, labels, onAddressResolved,
+  lat, lng, onChange, lang, labels, onAddressResolved, readOnly = false, height,
 }) => {
   const styles = useStyles();
   const colors = useThemeColors();
@@ -155,8 +170,8 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
   // Build the HTML once from the initial coords; further updates go through
   // injectJavaScript so the WebView is not reloaded on every pin move.
   const htmlRef = useRef(mapConfig.provider === 'google'
-    ? buildGoogleHtml(mapConfig.googleKey, lat, lng)
-    : buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng));
+    ? buildGoogleHtml(mapConfig.googleKey, lat, lng, readOnly)
+    : buildHtml(mapConfig.publicToken, mapConfig.styleUrl, lat, lng, readOnly));
 
   /** Move camera + pin, publish the coordinates, and try to name the place. */
   const applyFix = useCallback((la: number, ln: number, reverseGeocode: boolean) => {
@@ -242,7 +257,7 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
 
   return (
     <View>
-      <View style={styles.mapWrap}>
+      <View style={[styles.mapWrap, height != null && { height }]}>
         <WebView
           ref={webRef}
           originWhitelist={['*']}
@@ -283,8 +298,9 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
         />
 
         {/* In-map current-location control. Bottom-right, clear of the zoom
-            cluster (RIGHT_CENTER) and of the map attribution strip. */}
-        <Pressable
+            cluster (RIGHT_CENTER) and of the map attribution strip. Absent in
+            preview mode: it moves the pin, and in preview the pin does not move. */}
+        {readOnly ? null : <Pressable
           onPress={useMyLocation}
           accessibilityRole="button"
           accessibilityLabel={labels.useMyLocation}
@@ -296,12 +312,13 @@ export const LocationPickerMap: React.FC<LocationPickerMapProps> = ({
           {locating
             ? <ActivityIndicator size="small" color={colors.ember} />
             : <CrosshairIcon size={22} color={colors.ember} />}
-        </Pressable>
+        </Pressable>}
       </View>
 
       {/* Quiet hint — the loud message on these screens is the description
-          field's own validation, which must not have to compete with this. */}
-      <Text style={styles.hint}>{labels.locateHint}</Text>
+          field's own validation, which must not have to compete with this.
+          Preview mode has nothing to hint at: the pin cannot be moved. */}
+      {readOnly ? null : <Text style={styles.hint}>{labels.locateHint}</Text>}
       {locateError ? <Text style={styles.locateError}>{locateError}</Text> : null}
     </View>
   );

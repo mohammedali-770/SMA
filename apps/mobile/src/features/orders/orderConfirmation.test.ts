@@ -13,7 +13,12 @@ describe('reference and channel safety',()=>{
 });
 
 describe('presentation invariants',()=>{
-  it('shows success and branch number only after a usable branch confirmation',()=>{for(const s of ALL){expect(confirmationPresentation(s).success,s).toBe(s==='confirmed_by_branch');expect(confirmationPresentation(s).showBranchNumber,s).toBe(s==='confirmed_by_branch');}});
+  it('claims success only after a usable branch confirmation',()=>{for(const s of ALL)expect(confirmationPresentation(s).success,s).toBe(s==='confirmed_by_branch');});
+  // The number card is shown when a POS number is present OR still expected.
+  // It must stay hidden on a channel with no POS step, which will never issue
+  // one — promising it there is the delivery-confirmation copy bug.
+  it('shows the branch-number card only where a number can exist',()=>{const numbered=new Set<CustomerOrderState>(['sending_to_branch','confirmed_by_branch','verifying_with_branch']);for(const s of ALL)expect(confirmationPresentation(s).showBranchNumber,s).toBe(numbered.has(s));});
+  it('never promises a branch number on a channel with no POS step',()=>{for(const s of ['accepted_no_pos_channel','accepted_no_pos_channel_unpaid'] as CustomerOrderState[])expect(confirmationPresentation(s).showBranchNumber,s).toBe(false);});
   it('offers resend only from proven-not-sent states',()=>{const resendable=new Set<CustomerOrderState>(['branch_failed_retry_available','unpaid_branch_failed_retry_available']);for(const s of ALL)expect(confirmationPresentation(s).canResend,s).toBe(resendable.has(s));});
 });
 

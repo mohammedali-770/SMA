@@ -6,9 +6,18 @@
  * payment method. The stepper's `busy` guard is what makes that safe: while a
  * change settles, both controls stop firing and submission is blocked, so the
  * server can never be handed a cart the customer has not seen priced.
+ *
+ * TAPPING THE LINE OPENS THE ITEM, exactly as it already does on the Cart
+ * screen (`CartLine`, which routes to `/product/[id]?cartItemId=…`). The two
+ * screens showed the same rows but only one of them could reach the options:
+ * on Checkout a customer who had picked the wrong size could change HOW MANY
+ * they were getting but not WHICH one, and the only way out was to go back to
+ * the cart — losing the pin, coupon and payment method this screen exists to
+ * preserve. The stepper keeps its own hit area, so tapping the row edits and
+ * tapping ± still counts.
  */
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Price } from '../../../components/Price';
 import { QtyStepper } from '../../../components/QtyStepper';
@@ -27,6 +36,8 @@ export function CheckoutLines({
   amountOf,
   onIncrement,
   onDecrement,
+  onEdit,
+  editLabel,
 }: {
   items: CartItem[];
   recalcLineId: string | null;
@@ -35,6 +46,8 @@ export function CheckoutLines({
   amountOf: (it: CartItem) => number;
   onIncrement: (cartItemId: string) => void;
   onDecrement: (cartItemId: string) => void;
+  onEdit: (it: CartItem) => void;
+  editLabel: string;
 }) {
   const styles = useStyles();
   const colors = useThemeColors();
@@ -47,10 +60,28 @@ export function CheckoutLines({
         const mods = modifierSummaryOf(it);
         return (
           <View key={it.cartItemId} style={[styles.line, rtlRow]}>
-            <View style={styles.body}>
+            {/* The whole text block is the edit target — a row that is only
+                tappable on a small chevron reads as decoration. Disabled while
+                that line's change is still settling, for the same reason the
+                stepper is: the edit screen must not open on a quantity the
+                cart has not committed yet. */}
+            <Pressable
+              onPress={() => onEdit(it)}
+              disabled={recalcLineId === it.cartItemId}
+              accessibilityRole="button"
+              accessibilityLabel={`${editLabel}: ${name}`}
+              accessibilityHint={editLabel}
+              style={({ pressed }) => [styles.body, pressed && styles.pressed]}
+            >
               <Text variant="label" numberOfLines={2}>{name}</Text>
               {mods ? (
                 <Text variant="caption" tone="secondary" numberOfLines={2}>{mods}</Text>
+              ) : null}
+              {/* The line's own instruction, in the ember ink the app reserves
+                  for "this does something": it is the one part of the row the
+                  kitchen acts on, and it must not read as another modifier. */}
+              {it.note ? (
+                <Text variant="caption" tone="ember" numberOfLines={2}>{it.note}</Text>
               ) : null}
               <Price
                 amount={amountOf(it)}
@@ -58,7 +89,7 @@ export function CheckoutLines({
                 color={colors.appText}
                 weight="600"
               />
-            </View>
+            </Pressable>
             <QtyStepper
               value={it.quantity}
               // 0, not the default 1: at one unit, minus means "remove this
@@ -85,4 +116,5 @@ const useStyles = makeStyles((colors) => ({
     paddingHorizontal: space.s3, paddingVertical: space.s3,
   },
   body: { flex: 1, gap: 2, alignItems: 'flex-start' },
+  pressed: { opacity: 0.8 },
 }));

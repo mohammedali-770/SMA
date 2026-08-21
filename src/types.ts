@@ -131,6 +131,8 @@ export interface OrderItem {
   nameAr: string;
   price: number;
   quantity: number;
+  /** The customer's instruction for THIS line ("no onion"), when they left one. */
+  note?: string;
   selectedModifiers: OrderItemModifier[];
 }
 
