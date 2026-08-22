@@ -2646,11 +2646,20 @@ record. It was volunteered by the owner after this section first went in reading
 "outside this session"; the placeholder is kept in the history rather than
 pretended away.
 
-It also explains the shape of the deviation without excusing it. A person pasting
-a long migration into a SQL console will naturally trim a sixty-line header,
-which is exactly how §24's deviation happened too. The rule below is therefore
-addressed to humans and agents alike — it is not an agent-discipline problem, and
-writing it up as one would have aimed the fix at the wrong target.
+**The mechanism is not known and is not recorded here.** The confirmation
+establishes *who*, not *how*: nothing states how these two were submitted or why
+their headers were trimmed, and `schema_migrations` cannot supply either — it
+stores what ran and when, never how it was composed. An earlier draft of this
+section asserted a console-paste explanation. That was invented, it was removed
+on review, and it is mentioned so the absence reads as a known gap rather than an
+oversight.
+
+What the ledger *does* establish is narrower and more useful. §24's condensation
+was "the applying **agent's** own editorial choice while composing the call";
+this one was the **owner**, applying directly. Two different kinds of actor have
+now produced the same deviation, which is the whole basis for the rule below
+being addressed to humans and agents alike. Treating it as an agent-discipline
+problem would aim the fix at one of the two actors who have actually caused it.
 
 **The `skel` fingerprint proves the schema is right and nothing more.** It says
 no statement was added, removed or altered. It says nothing about the comment
