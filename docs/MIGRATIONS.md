@@ -2234,7 +2234,7 @@ volume that does not exist yet. §25's closing note applies unchanged.
 | --- | --- |
 | Repository file | `20260819120000_order_note_length_limit.sql` (**182** lines) |
 | Live version | `20260822123620` |
-| Applied | 2026-08-22 12:36:20 UTC, **outside this session** |
+| Applied | 2026-08-22 12:36:20 UTC, **by the repository owner**, outside the agent session |
 | From | PR for `feat/order-note-length-limit` (`aff65ce`, #222) |
 | Evidence | executable SQL identical to the repository file; the stored text is condensed — see §31 |
 
@@ -2608,8 +2608,8 @@ actors, and the difference between them is the point of this section.
 | # | Repository file | Live version | Applied (UTC) | By |
 | --- | --- | --- | --- | --- |
 | 1 | `20260822090000_branch_availability_retention` (204 lines) | `20260822115505` | 11:55:05 | this session, on explicit owner approval |
-| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | **outside this session** |
-| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | **outside this session** |
+| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | **the repository owner**, directly |
+| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | **the repository owner**, directly |
 
 Order matters and was respected: #3 calls `order_note_normalized` seven times, so
 it depends on #2. Filename order gives the right sequence.
@@ -2638,6 +2638,20 @@ files carry, and anyone diffing file against row will find a mismatch that looks
 alarming and is not. §29 exists to defuse exactly that confusion; this section
 extends it to two more versions.
 
+**Who applied them, confirmed 2026-08-22.** The owner, working directly against
+Production rather than through an agent session. That was not recoverable from
+`schema_migrations`, which records what ran and when but not who ran it, and it
+is written down here because a ledger that cannot answer "who" is only half a
+record. It was volunteered by the owner after this section first went in reading
+"outside this session"; the placeholder is kept in the history rather than
+pretended away.
+
+It also explains the shape of the deviation without excusing it. A person pasting
+a long migration into a SQL console will naturally trim a sixty-line header,
+which is exactly how §24's deviation happened too. The rule below is therefore
+addressed to humans and agents alike — it is not an agent-discipline problem, and
+writing it up as one would have aimed the fix at the wrong target.
+
 **The `skel` fingerprint proves the schema is right and nothing more.** It says
 no statement was added, removed or altered. It says nothing about the comment
 text, which is where these two differ. It is evidence the deviation is harmless,
@@ -2647,7 +2661,7 @@ not evidence that §9-C1 was satisfied.
 
 The order path was the exposure: #3 re-emits `place_order`,
 `compute_order_snapshot` and `insert_order_from_snapshot`, and #3 was applied by
-someone other than the author of the revision it replaced. Checked directly
+the owner rather than the author of the revision it replaced. Checked directly
 against the live catalog afterwards:
 
 - `place_order` ACL still `{postgres, service_role}` — **no `authenticated`
