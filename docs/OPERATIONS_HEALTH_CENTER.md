@@ -78,6 +78,17 @@ configuration error has the highest precedence.
   while every sweep failed. Only the ledger plus the availability state can see
   that.
 
+  **The ledger is bounded.** Since `20260822090000` the sweeper prunes
+  `branch_availability_runs` to 14 days on every productive tick, matching what
+  `lazywait_sync_requests` has always done — a once-a-minute ledger otherwise
+  grows by ~1,440 rows a day forever. The card is unaffected either way: it
+  reads only the newest run and the newest success, both index-served. The
+  prune is separately guarded so a housekeeping failure can never stop a sweep,
+  and `rows_pruned` on each ledger row records what it removed. Nothing alerts
+  on that column; a table growing while it sits at 0 is the signal. The audit
+  table `branch_availability_events` is never pruned — that is a business
+  record and its retention is an open question, not a housekeeping one.
+
   Non-critical: a stalled sweeper leaves things closed longer than intended,
   which over-blocks and never over-sells. It is absent from `critical_systems`
   and cannot move the overall platform state.

@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **96**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260821170000_order_item_notes.sql`.
+Migration files in the repository: **97**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260822090000_branch_availability_retention.sql`.
 
 ## Tables
 
@@ -25,7 +25,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `addresses` | `20260707120300_addresses.sql` | 0 | 2 |
 | `app_settings` | `20260707120600_app_settings.sql` | 2 | 2 |
 | `branch_availability_events` | `20260820110000_branch_availability_snooze.sql` | 0 | 1 |
-| `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 2 | **none declared** |
+| `branch_availability_runs` | `20260820111000_branch_availability_sweeper.sql` | 3 | **none declared** |
 | `branch_delivery_areas` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branch_delivery_events` | `20260820120000_branch_delivery_control.sql` | 0 | 1 |
 | `branch_delivery_zones` | `20260710120000_delivery_zones.sql` | 0 | 3 |
@@ -103,7 +103,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
-| `branch_availability_sweep` | 3 | `20260820140000_branch_modifier_availability.sql` |
+| `branch_availability_sweep` | 4 | `20260822090000_branch_availability_retention.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |

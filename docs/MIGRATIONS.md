@@ -2285,29 +2285,135 @@ is strictly narrowing — every value accepted after it was accepted before.
 
 ---
 
-## 28. Branch operations — NOT APPLIED (as of 2026-08-20)
+## 28. Branch operations — APPLIED 2026-08-21 (thirteen migrations)
 
-Thirteen migrations on `claude/item-snooze-architecture-hwbgp9`, grouped into
-the nine ordered steps below, implement the
-branch-operations feature (timed item/option availability, delivery control,
-the two operations consoles, and the health/alert surfaces). **None has been
-applied to Production**, and applying any of them is a separate owner-approval
-action under CLAUDE.md §5.
+Thirteen migrations implementing the branch-operations feature (timed
+item/option availability, delivery control, the two operations consoles, and the
+health/alert surfaces) were applied to Production on **2026-08-21** with explicit
+owner approval ("apply the migrations if safe", then "fix it first then apply all
+thirteen", then "Apply all 13 now"), following §9: pre-live gate (§9-B), one
+`apply_migration` call per file in filename order, then verification (§9-E). No
+`db push`, no batch replay, no unrelated SQL.
 
-They are cumulative and must be applied in filename order. Two of them are
-irreversible in one specific respect, noted below.
+They shipped as PR #229, squash-merged to `claude/project-build-ie4b56` as
+`49fcf88`. Repository files were confirmed identical to that merged base by
+`git diff` before applying.
 
-| Order | File | Notes |
-|---|---|---|
-| 1 | `20260820100000_ops_roles_enum.sql` | `ALTER TYPE user_role ADD VALUE` ×2. **Irreversible** — inert while unused, but a rollback cannot take it back. Alone in its own file because PG16 forbids using a new enum value in the transaction that adds it. |
-| 2 | `20260820100500_ops_branch_scoping.sql` | `staff_branch_assignments` + the branch predicates. |
-| 3 | `20260820110000_branch_availability_snooze.sql` | Snooze columns on `branch_product_availability`, the events table, normalize + audit triggers. |
-| 4 | `20260820110500_branch_availability_rpcs.sql` | `set_product_snooze` / `clear_product_snooze`. |
-| 5 | `20260820111000_branch_availability_sweeper.sql` | The sweeper, its run ledger, and the `branch-availability-sweep` cron registration. **Schedules a pg_cron job.** |
-| 6 | `20260820120000_branch_delivery_control.sql` + `20260820120500_branch_delivery_rpcs.sql` + `20260820121000_sweeper_delivery_resume.sql` | Delivery pause, advisory areas, working hours; the sweeper gains delivery counters **without being re-scheduled**. |
-| 7 | `20260820130000_ops_change_events.sql` | Realtime signal table. **Adds a table to the `supabase_realtime` publication** — a separate owner approval. |
-| 8 | `20260820140000` + `20260820140500` | Modifier availability, and the ONE re-emission of `place_order` in this work (8th revision; 18 lines added, 0 removed, machine-verified). |
-| 9 | `20260820150000` + `20260820160000` | Operations Health: the sweeper joins the cron allowlist, then the `branch_availability` card and its alert condition. Function re-emissions only — no table, policy, grant or cron change. |
+### §9-C1 was met in full — unlike §24
+
+Every one of the thirteen `apply_migration` calls carried the repository file's
+**complete** text, header comments included. That is verifiable from the database
+alone: `md5(array_to_string(statements, E'\n'))` on each live
+`supabase_migrations.schema_migrations` row equals the md5 of the repository file
+with its single trailing newline stripped (the MCP tool stores the whole
+migration as one statement, and strips that newline).
+
+This is the check §24 could not make. A `skel` fingerprint proves the executable
+SQL matches; a full-text md5 proves **nothing at all differs**, which is what
+§9-C1 actually requires. Use this method for future applications.
+
+| # | Repository file | Live version | md5 (repo = live) |
+| --- | --- | --- | --- |
+| 1 | `20260820100000_ops_roles_enum` | `20260821200452` | `94cd6fdb63ee9617ab267c859d421f11` |
+| 2 | `20260820100500_ops_branch_scoping` | `20260821200622` | `76cad20a77c22ce03e926a70406ead27` |
+| 3 | `20260820110000_branch_availability_snooze` | `20260821200742` | `a20a4d2f55471dda84fa48c3838e7717` |
+| 4 | `20260820110500_branch_availability_rpcs` | `20260821200822` | `b4f5c72352ca8eb4cafc9e8354b3fd59` |
+| 5 | `20260820111000_branch_availability_sweeper` | `20260821200916` | `529130becdd3d1f0a6a021f0b4b35dc6` |
+| 6 | `20260820120000_branch_delivery_control` | `20260821201035` | `a7417abee68823bb193f0f0830db22ac` |
+| 7 | `20260820120500_branch_delivery_rpcs` | `20260821201133` | `eef40d46fcbcf0e3bd6d2804dd165b0c` |
+| 8 | `20260820121000_sweeper_delivery_resume` | `20260821201208` | `21359679d8608195c7eb5089e4c71380` |
+| 9 | `20260820130000_ops_change_events` | `20260821201250` | `98c9fa1fdfdf789b557db590e467cb66` |
+| 10 | `20260820140000_branch_modifier_availability` | `20260821201409` | `b0d38148ccb30941e9f9e3b426ad03b4` |
+| 11 | `20260820140500_place_order_modifier_availability` | `20260821201535` | `38b08403a9f875e11baf576a2b564b26` |
+| 12 | `20260820150000_sweeper_operations_health` | `20260821201911` | `1e214e37781cb8bfb5941fa5b46dc616` |
+| 13 | `20260820160000_branch_availability_health_card` | `20260821202429` | `655d75ca9189b5da71e5af2cce051547` |
+
+**Live migration-history rows: 87 → 100.** The thirteen live versions are dated
+`20260821`, not `20260820`: the MCP tool stamps its own timestamp, so live
+versions are ordered by *application* time and will never match repository
+filename prefixes. That is the same repo/live version skew §12 already records —
+it is not drift, and nothing should be "repaired" to make the two sets look
+alike (CLAUDE.md §8).
+
+### Two of the thirteen do more than define objects
+
+- **#1 is irreversible.** `ALTER TYPE public.user_role ADD VALUE` twice.
+  PostgreSQL cannot drop an enum value. It was inert on application — zero
+  profiles hold either role — but a rollback cannot take it back. It is alone in
+  its own file because a new enum value cannot be *used* in the transaction that
+  adds it.
+- **#5 schedules a pg_cron job** and **#9 changes what Realtime broadcasts.**
+  `branch-availability-sweep` began running one minute after application;
+  `supabase_realtime` went from one published table to two
+  (`order_change_events`, `ops_change_events`). Both were named in the approval.
+
+`#8`, `#12` and `#13` deliberately re-emit function bodies **without**
+re-scheduling the cron job or re-granting anything.
+
+### Verification (§9-E), after applying
+
+**The order path.** `place_order` is the one order-path change (its 8th
+revision). Its ACL was captured before and after and is unchanged —
+`{postgres=X/postgres,service_role=X/postgres}`, with **no** `authenticated`
+grant, so the `20260724200000` hardening that wraps it in `place_customer_order`
+survived. Still exactly one overload; both new guards present. A line diff
+of the function definition (`create or replace function public.place_order(`
+through the matching `end $$`) against the revision it replaces reports
+**18 lines added and none removed** — 305 lines to 323 — grouped into three
+insertions: the lazy-expiry comment (4 lines), the
+`bpa.snoozed_until > now()` clause (1 line), and the
+`branch_modifier_availability` check (13 lines). Hunk *grouping* depends on the
+extraction bounds, so the reproducible figure is the line count, not the number
+of hunks.
+
+**Operations Health.** 9 → **10 cards**, the new one `branch_availability`,
+state `healthy`. `critical_systems` is unchanged at five, `overall_state`
+`healthy`, `expected_jobs` 5 → 6, and all six allowlisted cron jobs read
+`healthy`. `operations_alerts_derive` emits **zero** conditions against the live
+snapshot, so nothing spurious opened.
+
+**No branch identity in the payload.** A `::text` scan of the whole snapshot
+against every live branch's `name_en`, `name_ar` and `id` returns **0** matches
+on all three.
+
+**The sweeper.** 17 runs in the first 25 minutes, 17 `success`, 0 `failed`, and
+0 non-`succeeded` pg_cron run rows.
+
+**Exposure.** The new ops tables all have RLS on with `authenticated:SELECT`
+only and no `anon` grant: `staff_branch_assignments`,
+`branch_availability_events`, `branch_delivery_events`, `branch_delivery_areas`,
+`ops_change_events`. `branch_working_hours` is `anon:SELECT` by design (public
+trading hours). `branch_availability_runs` has RLS on with **no policy and no
+client grant** — fail-closed, matching the 13 pre-existing internal ledgers
+(`operations_alert_runs`, `order_integrity_runs`, `lazywait_sync_requests`, …)
+that the platform advisor lists the same way.
+
+**Advisors.** 19 of 82 findings name objects this work created: one
+`rls_enabled_no_policy` (the ledger above, deliberate) and 18
+`authenticated_security_definer_function_executable` — the house pattern of a
+`SECURITY DEFINER` RPC granted to `authenticated` and authorized in its own body.
+48 further instances of that warning pre-date this work. **No new finding class
+was introduced.**
+
+### A later migration re-emits `place_order` again
+
+`20260821170000_order_item_notes.sql` (#231, merged after this application and
+**not** applied to Production) is the 9th revision of `place_order`. It was
+written on top of the 8th, so it carries both additions this work made — the
+`branch_modifier_availability` check and the `bpa.snoozed_until > now()` lazy
+expiry. Applying it will not silently revert the modifier guard.
+
+That is worth stating because the reverse is the easy mistake: a re-emission
+built from an older file would drop the guard without any test noticing, since
+the guard's own suite exercises the RPCs rather than this specific function
+body. Confirm the same before applying any future `place_order` revision.
+
+### Still gated after this application
+
+Applying the schema did **not** make the feature reachable. It stays dark until
+an account holding `branch_staff` or `call_center` exists, and none does — see
+[`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16 for the three actions that remain.
+
 
 **Do not recompute the §4 classification counts from this list.** Those are a
 dated full-fingerprint snapshot (CLAUDE.md §8); adding rows here does not extend
@@ -2329,3 +2435,159 @@ The general rule: before re-emitting any function, confirm which migration holds
 its **current** definition — `grep -ln 'create or replace function public.<name>'
 supabase/migrations/*.sql | sort | tail -1` — rather than the one you happen to
 remember.
+
+---
+
+## 29. Repo/live divergence in `place_order` — comments only, resolved 2026-08-21
+
+Recorded so nobody repeats the investigation. Applying §28 required proving the
+live `place_order` matched the repository revision the new one was built from.
+**It did not**, and the first look at that is alarming enough to stop a release.
+
+### What was found
+
+**Name the two artifacts precisely — the whole point of this section is that it
+must be reproducible.** They are:
+
+1. the repository file
+   `supabase/migrations/20260710120100_place_order_delivery_zone.sql`, **336
+   lines** (335 plus the trailing newline the applier strips);
+2. the SQL actually applied to Production — the single statement stored on live
+   version `20260709151718`, the last history row to define `place_order` before
+   §28 — **304 lines**.
+
+The live function body matched that row exactly, so the *repository file* had
+been edited after it was applied, not the database after it was written.
+
+Compare them by per-line md5 (the line text never has to leave the database) and
+diff the hash sequences with `difflib.SequenceMatcher`. That yields **seven
+hunks, every one a deletion — no insertion and no replacement anywhere**:
+**32 repo lines absent from the applied text, 0 applied lines absent from the
+repo**, similarity 0.95.
+
+| Repo line(s) | Content | Where |
+| --- | --- | --- |
+| 1, 3–26 | the file-header comment block (24 comment lines and one blank) | above the function |
+| 74 | `-- payment method` | in the declare block |
+| 97–99 | the three-line "Resolve + validate the payment method against admin settings" block | in the body |
+| 143 | `-- Coordinates come from the map picker; required for a delivery order.` | in the body |
+| 147 | `-- The branch must have a configured active delivery zone...` | in the body |
+| 154 | `-- ...and the customer point must fall inside it (GiST-indexed, boundary-inclusive).` | in the body |
+
+Twenty-five of the 32 are the header block, which sits *outside* the function
+definition; the remaining **seven are in-body comments**. Measuring only the
+function region therefore reports 7 lines across 5 hunks, and measuring the
+whole file reports 32 across 7 — the same finding at two scopes. State which
+scope you mean; an unqualified line count is what made this record
+irreproducible in the first place, and PR #232 review caught exactly that.
+
+**Zero behavioural difference.** No statement, guard, clause or literal differed
+at either scope.
+
+### Why it happened, and why it is worth a section
+
+The same class of thing §24 records in the other direction. There, the applying
+agent condensed a header on the way *in*, so the live row lost rationale the file
+kept. Here, comments were added to the file *after* application, so the file
+gained rationale the live row never had. Both leave the repository and the
+database describing the same schema in different words, and both are invisible
+until someone tries to prove equality.
+
+A `skel` fingerprint would have called these two identical and moved on. That is
+the right answer for "is the schema the same" and the wrong answer for "is this
+file what ran" — which is the question §9-C1 asks.
+
+### Current state
+
+Resolved as a side-effect of §28. Migration 11 re-emits `place_order` from the
+repository file, so the **live function now carries all seven comment lines**
+(verified with `pg_get_functiondef`), and live version `20260821201535` is a
+history row whose text is byte-identical to its repository file.
+
+What remains, permanently: the historical row `20260709151718` still holds the
+283-line text that actually ran in July 2026. That is correct — it is a record of
+what happened, not a copy of the file, and it must not be rewritten. Anyone
+diffing that row against
+`20260710120100_place_order_delivery_zone.sql` will find the seven comment lines
+missing, and this section is the explanation.
+
+### The rule
+
+Do not edit a migration file after it has been applied — not even a comment. If
+the rationale needs improving, put it in a follow-up migration's header or in
+this document, where it can be read without implying that the edited text is
+what ran.
+
+---
+
+## 30. Unapplied migration: branch-availability ledger retention (NOT applied)
+
+`supabase/migrations/20260822090000_branch_availability_retention.sql`. **Not
+applied to Production**; applying it is a separate owner-approval action under
+CLAUDE.md §5.
+
+### Why
+
+`branch_availability_runs` takes one row per minute and §28 put it live with no
+retention at all. Measured in Production the day after: ~245 bytes/row, so
+~1,440 rows/day, ~526,000 rows and ~130 MB a year, growing without bound.
+
+The house already answers this. `lazywait_sync_requests` is the other
+once-per-minute run ledger and `20260720120000:150-159` prunes it to 14 days on
+every tick — Production held **exactly 20,160** of those rows when this was
+written, which is 14 × 1,440. This migration gives the availability ledger the
+same window and the same steady state.
+
+Nothing about the feature's behaviour changes. The `branch_availability` health
+card reads only the newest run and the newest success, both index-served, so it
+was never at risk from ledger size; this is housekeeping, not a fix.
+
+### What it does, and deliberately does not
+
+| | |
+| --- | --- |
+| Prunes | `branch_availability_runs`, rows older than 14 days |
+| Never prunes | `branch_availability_events` — the append-only audit of who closed what. A business record whose retention nobody has decided; deleting from it needs its own owner decision. |
+| Re-schedules the cron job | **No.** `branch-availability-sweep` keeps the exact name, schedule and command `20260820111000` asserts. |
+| Adds an index | **No.** `bar_started_idx` on `(started_at desc)` already serves the range delete. |
+| Adds a column | `rows_pruned` on the ledger, so each tick records what it removed |
+
+### Two deliberate divergences from the lazywait precedent
+
+**The prune is separately guarded.** lazywait's is not. Here it gets its own
+`begin ... exception when others`, because an unguarded prune that threw would
+abort the whole transaction and nothing would reopen that tick — a 30-minute
+closure becoming indefinite because a DELETE hit a lock timeout. Restores are
+customer-facing; retention is housekeeping, and housekeeping must never cost
+that. The price is that a persistently failing prune is silent, so `rows_pruned`
+makes it inspectable: nothing alerts on it, and a table growing while it stays 0
+is the signal.
+
+**It sits inside the advisory lock**, not before it, so two runs never contend
+on the same delete — serialising this function is what the lock is for. The only
+path that skips retention is `overlap_skipped`, which happens only when another
+run holds the lock and is itself pruning.
+
+It is in the OUTER block, above the sweep's own `begin ... exception`, because
+that handler is a savepoint: a prune inside it is rolled back whenever the sweep
+fails, and a database whose sweeps are all failing is precisely the one that
+must keep pruning.
+
+### Verification
+
+`supabase/tests/branch_availability_retention_test.sql`, run against a fresh
+97-migration database: 50/52 suites pass, 0 new failures, chain replays clean.
+
+Mutation-checked, and the first attempt was **not** good enough — recorded
+because the lesson generalises. A text-position assertion ("the delete appears
+before the reopen work") passed against a mutant that moved the prune *inside*
+the sweep's exception block, since that is still textually above the reopen. The
+property is behavioural, so the test is now behavioural: force the sweep to fail
+with a temporary trigger and assert the old rows are gone anyway.
+
+| Mutant | Caught by |
+| --- | --- |
+| retention removed entirely | case 1 |
+| window widened to 400 days | case 1 |
+| prune moved inside the sweep's exception block | case 5b (behavioural) |
+| prune also deletes from `branch_availability_events` | case 4 |
