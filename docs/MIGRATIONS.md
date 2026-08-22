@@ -2517,3 +2517,77 @@ Do not edit a migration file after it has been applied — not even a comment. I
 the rationale needs improving, put it in a follow-up migration's header or in
 this document, where it can be read without implying that the edited text is
 what ran.
+
+---
+
+## 30. Unapplied migration: branch-availability ledger retention (NOT applied)
+
+`supabase/migrations/20260822090000_branch_availability_retention.sql`. **Not
+applied to Production**; applying it is a separate owner-approval action under
+CLAUDE.md §5.
+
+### Why
+
+`branch_availability_runs` takes one row per minute and §28 put it live with no
+retention at all. Measured in Production the day after: ~245 bytes/row, so
+~1,440 rows/day, ~526,000 rows and ~130 MB a year, growing without bound.
+
+The house already answers this. `lazywait_sync_requests` is the other
+once-per-minute run ledger and `20260720120000:150-159` prunes it to 14 days on
+every tick — Production held **exactly 20,160** of those rows when this was
+written, which is 14 × 1,440. This migration gives the availability ledger the
+same window and the same steady state.
+
+Nothing about the feature's behaviour changes. The `branch_availability` health
+card reads only the newest run and the newest success, both index-served, so it
+was never at risk from ledger size; this is housekeeping, not a fix.
+
+### What it does, and deliberately does not
+
+| | |
+| --- | --- |
+| Prunes | `branch_availability_runs`, rows older than 14 days |
+| Never prunes | `branch_availability_events` — the append-only audit of who closed what. A business record whose retention nobody has decided; deleting from it needs its own owner decision. |
+| Re-schedules the cron job | **No.** `branch-availability-sweep` keeps the exact name, schedule and command `20260820111000` asserts. |
+| Adds an index | **No.** `bar_started_idx` on `(started_at desc)` already serves the range delete. |
+| Adds a column | `rows_pruned` on the ledger, so each tick records what it removed |
+
+### Two deliberate divergences from the lazywait precedent
+
+**The prune is separately guarded.** lazywait's is not. Here it gets its own
+`begin ... exception when others`, because an unguarded prune that threw would
+abort the whole transaction and nothing would reopen that tick — a 30-minute
+closure becoming indefinite because a DELETE hit a lock timeout. Restores are
+customer-facing; retention is housekeeping, and housekeeping must never cost
+that. The price is that a persistently failing prune is silent, so `rows_pruned`
+makes it inspectable: nothing alerts on it, and a table growing while it stays 0
+is the signal.
+
+**It sits inside the advisory lock**, not before it, so two runs never contend
+on the same delete — serialising this function is what the lock is for. The only
+path that skips retention is `overlap_skipped`, which happens only when another
+run holds the lock and is itself pruning.
+
+It is in the OUTER block, above the sweep's own `begin ... exception`, because
+that handler is a savepoint: a prune inside it is rolled back whenever the sweep
+fails, and a database whose sweeps are all failing is precisely the one that
+must keep pruning.
+
+### Verification
+
+`supabase/tests/branch_availability_retention_test.sql`, run against a fresh
+97-migration database: 50/52 suites pass, 0 new failures, chain replays clean.
+
+Mutation-checked, and the first attempt was **not** good enough — recorded
+because the lesson generalises. A text-position assertion ("the delete appears
+before the reopen work") passed against a mutant that moved the prune *inside*
+the sweep's exception block, since that is still textually above the reopen. The
+property is behavioural, so the test is now behavioural: force the sweep to fail
+with a temporary trigger and assert the old rows are gone anyway.
+
+| Mutant | Caught by |
+| --- | --- |
+| retention removed entirely | case 1 |
+| window widened to 400 days | case 1 |
+| prune moved inside the sweep's exception block | case 5b (behavioural) |
+| prune also deletes from `branch_availability_events` | case 4 |
