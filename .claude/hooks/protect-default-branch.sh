@@ -19,7 +19,9 @@
 #      --abort`, which permanently locked the session out of git. The branch
 #      is now recovered from the rebase state when git recorded it, and when
 #      it genuinely cannot be recovered a short allowlist of abort/reset
-#      commands is permitted so the state can be ended. See section 5b.
+#      commands is permitted so the state can be ended — plus an escape to a
+#      new, non-protected branch, which is the only thing that re-attaches a
+#      PLAIN detached HEAD. See section 5b.
 #
 # Protected branches:
 #   - claude/project-build-ie4b56   (default / production branch)
@@ -667,21 +669,57 @@ fi
 #     section 4 have already run against this command. Anything carrying a
 #     shell operator, quote or substitution is rejected before the allowlist,
 #     so nothing can be chained onto a permitted command.
+#
+#     THE ABORT LIST IS NOT ENOUGH ON ITS OWN, and that gap was a real
+#     lockout. Every command in it ends an operation that RECORDED state;
+#     none re-attaches HEAD. `git bisect reset` outside a bisect merely prints
+#     "We are not bisecting." So a PLAIN detached HEAD — `git checkout
+#     --detach`, or a checkout of a remote-tracking ref — left the session
+#     with every file write denied, Bash restricted to commands that could not
+#     help, and no way to edit this script to fix it. That happened on
+#     2026-08-22.
+#
+#     So one more thing is allowed: creating and switching to a NEW,
+#     NON-PROTECTED branch — the same escape hatch section 7 already sanctions
+#     from a protected checkout. It cannot advance, delete or force-move any
+#     ref; it starts at the current commit and attaches HEAD to a fresh name.
+#     The form is deliberately rigid (exactly four tokens: git, subcommand,
+#     create flag, name) so there is no start-point, no extra flag and no
+#     pathspec to vet, and a protected name is refused outright.
 # ---------------------------------------------------------------------------
 
 if [ "$BRANCH_UNKNOWN" -eq 1 ]; then
   [ "$TOOL_NAME" = "Bash" ] \
-    || deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); file-writing tool calls are denied. End the in-progress git operation first: git rebase --abort, git merge --abort, git cherry-pick --abort, or git bisect reset."
+    || deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); file-writing tool calls are denied. Re-attach HEAD first with git checkout -b <new-feature-branch> (or git switch -c <new-feature-branch>), or end the in-progress git operation with git rebase --abort, git merge --abort, git cherry-pick --abort, or git bisect reset."
 
   case "$TOOL_COMMAND" in
     *';'*|*'&'*|*'|'*|*'>'*|*'<'*|*'`'*|*'$'*|*'('*|*')'*|*"'"*|*'"'*|*'\'*)
-      deny "change-control guard: the current branch cannot be determined; only a single plain recovery command is allowed here — no operators, quoting or substitution. Allowed: git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only." ;;
+      deny "change-control guard: the current branch cannot be determined; only a single plain recovery command is allowed here — no operators, quoting or substitution. Allowed: git checkout -b <new-branch>, git switch -c <new-branch>, git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only." ;;
   esac
 
   RECOVERY_CMD='^[[:space:]]*git[[:space:]]+((rebase|cherry-pick|revert|am)[[:space:]]+--(abort|quit)|merge[[:space:]]+--abort|bisect[[:space:]]+reset|status|branch[[:space:]]+--show-current|rev-parse[[:space:]]+--git-dir|log[[:space:]]+--oneline[[:space:]]+-[0-9][0-9]*|diff[[:space:]]+--name-only)[[:space:]]*$'
   printf '%s' "$TOOL_COMMAND" | grep -Eq "$RECOVERY_CMD" && allow
 
-  deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); failing closed. Allowed here: git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only."
+  # The escape to a new, non-protected branch. Tokenized with `set --` (set -f
+  # is active, so no globbing) and required to be EXACTLY four words, which
+  # rules out a start-point argument, extra flags and pathspecs. The branch
+  # name pattern is spelled out here rather than reusing $REFISH: REFISH is
+  # assigned in section 7, which has not run yet at this point, and under
+  # `set -u` referencing it would abort the hook without emitting a decision.
+  # shellcheck disable=SC2086
+  set -- $TOOL_COMMAND
+  if [ "${1:-}" = "git" ] && [ "$#" -eq 4 ]; then
+    case "$2 $3" in
+      'checkout -b'|'switch -c')
+        printf '%s' "$4" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9._/-]*$' \
+          || deny "change-control guard: the detached-HEAD escape needs a plain branch name (letters, digits, dot, underscore, slash, dash). ${WORKFLOW_HINT}"
+        is_protected "$4" \
+          && deny "change-control guard: the detached-HEAD escape may not create a protected branch name (claude/project-build-ie4b56 or main). Choose a purpose-specific feature branch. ${WORKFLOW_HINT}"
+        allow ;;
+    esac
+  fi
+
+  deny "change-control guard: the current branch cannot be determined (detached HEAD with no recoverable rebase state); failing closed. Allowed here: git checkout -b <new-branch>, git switch -c <new-branch>, git rebase/cherry-pick/revert/am --abort or --quit, git merge --abort, git bisect reset, git status, git branch --show-current, git rev-parse --git-dir, git log --oneline -N, git diff --name-only."
 fi
 
 # ---------------------------------------------------------------------------
