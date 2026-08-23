@@ -686,6 +686,21 @@ fi
 #     The form is deliberately rigid (exactly four tokens: git, subcommand,
 #     create flag, name) so there is no start-point, no extra flag and no
 #     pathspec to vet, and a protected name is refused outright.
+#
+#     WHY NO START POINT, when WORKFLOW_HINT suggests the five-token form.
+#     That hint describes section 7's escape from a PROTECTED checkout, where
+#     check_git_checkout_args vets a start point against $REFISH. It is not
+#     mirrored here, for three reasons. From a detached HEAD the current commit
+#     already IS the right start point — re-attaching HEAD is the entire
+#     purpose, and a start point would instead repoint the working tree while
+#     the guard is failed closed. Vetting one would mean inlining a second copy
+#     of the $REFISH pattern in a path that cannot see section 7's, and two
+#     copies of a security check drift. And nothing is lost: once HEAD is
+#     attached to a feature branch, section 5 allows ordinary work, so the
+#     five-token form is one command away. An agent that follows the hint
+#     verbatim from this state is denied once and told the accepted form by the
+#     deny reason below, which names it explicitly. Pinned by the
+#     "Detached HEAD, escaping to a new feature branch" cases in the test suite.
 # ---------------------------------------------------------------------------
 
 if [ "$BRANCH_UNKNOWN" -eq 1 ]; then
