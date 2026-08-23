@@ -1,0 +1,83 @@
+name: Change control
+
+# Runs the test suite for .claude/hooks/protect-default-branch.sh, the
+# defence-in-depth guard described in CLAUDE.md §11.
+#
+# WHY THIS WORKFLOW EXISTS. Until 2026-08-23 nothing ran that suite. A change to
+# the guard could only be checked by reasoning about it, which is the wrong
+# footing for a security control and had a real cost: a fix to the detached-HEAD
+# recovery path (PR #233) sat unexecuted, and the session that wrote it was the
+# one the bug had locked out of every file write.
+#
+# DELIBERATELY NOT PATH-FILTERED. It would be tempting to run this only when
+# `.claude/**` changes. Do not. A path-gated job never reports on the pull
+# requests it skips, so if this context is ever added to the branch ruleset as
+# required, every unrelated pull request would wait forever for a check that is
+# never going to arrive — the trap CLAUDE.md §12 already calls out for the
+# path-gated migration job. The suite runs in seconds, so always reporting costs
+# almost nothing and keeps the context safe to require.
+#
+# The emitted check context is the job name below: `Change-control guard`.
+# Making it *blocking* is a separate, owner-only change to the GitHub ruleset
+# (CLAUDE.md §12) — this workflow only makes it report.
+on:
+  pull_request:
+  push:
+    branches: [claude/project-build-ie4b56, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: change-control-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Change-control guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      # A guard that passes its own tests but is no longer wired into the
+      # harness protects nothing. Assert the registration before the behaviour.
+      - name: The guard is still registered, and still covers every writing tool
+        run: |
+          set -euo pipefail
+          SETTINGS=.claude/settings.json
+          test -f "$SETTINGS" || { echo "::error::$SETTINGS is missing — the guard would not run at all"; exit 1; }
+
+          COMMAND="$(jq -r '.hooks.PreToolUse[]?.hooks[]?.command // empty' "$SETTINGS")"
+          printf '%s' "$COMMAND" | grep -q 'protect-default-branch\.sh' || {
+            echo "::error::$SETTINGS no longer registers protect-default-branch.sh as a PreToolUse hook"
+            exit 1
+          }
+
+          # Dropping a tool from the matcher silently disables protection for it,
+          # and no behavioural test in the suite below would notice.
+          MATCHER="$(jq -r '.hooks.PreToolUse[]?.matcher // empty' "$SETTINGS")"
+          for TOOL in Bash Edit Write MultiEdit NotebookEdit; do
+            printf '%s' "$MATCHER" | grep -q "$TOOL" || {
+              echo "::error::the PreToolUse matcher no longer covers $TOOL — writes through it would be unguarded"
+              exit 1
+            }
+          done
+          echo "registered for: $MATCHER"
+
+      - name: Both scripts parse
+        run: |
+          set -euo pipefail
+          bash -n .claude/hooks/protect-default-branch.sh
+          bash -n .claude/hooks/protect-default-branch.test.sh
+          echo "guard and test suite both parse"
+
+      # The suite needs bash, git (>= 2.28 for `git init -b`) and one of
+      # jq / python3 / node for the hook's own JSON parsing. ubuntu-latest
+      # provides all of them, so there is nothing to install.
+      - name: Guard behaviour
+        run: bash .claude/hooks/protect-default-branch.test.sh

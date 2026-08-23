@@ -16,6 +16,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 
 | File | Workflow | Triggers | Jobs (status check contexts) |
 | --- | --- | --- | --- |
+| `change-control.yml` | Change control | pull request, push, manual | `Change-control guard` |
 | `deploy-functions.yml` | Deploy Supabase Functions | manual | `deploy` |
 | `design-system.yml` | Design system | pull request, push, manual | `design-system` |
 | `docs.yml` | Documentation | pull request, push, manual | `Documentation (generated + ownership)` |
