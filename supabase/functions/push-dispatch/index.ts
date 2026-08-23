@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 
@@ -195,13 +196,67 @@ function isServiceRoleCall(req: Request): boolean {
   return Boolean(key) && auth === `Bearer ${key}`;
 }
 
-async function callingAdminId(req: Request, admin: ReturnType<typeof adminClient>): Promise<string | null> {
+/** Either the caller's admin id, or the refusal to return verbatim. */
+type AdminCaller =
+  | { ok: true; userId: string }
+  | { ok: false; status: number; error: string; code: string };
+
+/**
+ * Resolve the caller as an administrator — role AND MFA assurance level.
+ *
+ * THIS USED TO CHECK THE ROLE ALONE:
+ *
+ *     return profile?.role === 'admin' ? user.id : null;
+ *
+ * which admitted an administrator signed in with email and password who had not
+ * completed TOTP. Everywhere in SQL, admin authority is
+ * `is_admin() = current_app_role() = 'admin' AND jwt_has_aal2()`
+ * (20260810142000_staff_mfa_aal2.sql) — and this function acts through the
+ * SERVICE-ROLE client, which bypasses RLS, so that work ran at AAL1.
+ *
+ * THAT MATTERED MORE HERE THAN ANYWHERE ELSE. `config.toml` sets
+ * `verify_jwt = false` for this function, so this check is the ONLY gate on the
+ * path; push has been live since 2026-08-17; and `broadcast` reaches every
+ * device with `is_active` and `promos_enabled` — since the 2026-08-20 opt-out
+ * decision, close to the whole active base — immediately and with no recall.
+ *
+ * `order_status` and `pos_sync` were less exposed but not safe: both re-read the
+ * order's REAL status before sending, and `admin_set_order_status` already
+ * required `is_admin()`, so an AAL1 caller could not invent a transition — only
+ * re-announce one that had genuinely happened.
+ *
+ * The decision is the same pure predicate the other admin functions use, so
+ * there is one implementation of "may this caller act as an admin" and one place
+ * to change it. See _shared/adminAuth.ts for why it asks Postgres rather than
+ * decoding the JWT here.
+ */
+async function callingAdmin(
+  req: Request,
+  admin: ReturnType<typeof adminClient>,
+): Promise<AdminCaller> {
+  const unauthorized = { ok: false, status: 401, error: 'unauthorized', code: 'unauthorized' } as const;
   const authHeader = req.headers.get('Authorization');
-  if (!authHeader) return null;
-  const { data: { user } } = await userClient(authHeader).auth.getUser();
-  if (!user) return null;
-  const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  return profile?.role === 'admin' ? user.id : null;
+  if (!authHeader) return unauthorized;
+
+  // Resolve the user FIRST: supabase-js sends the anon key when a session
+  // refresh fails, so gating earlier would report an expired session as
+  // "two-factor required" and send the admin to the wrong remedy.
+  const caller = userClient(authHeader);
+  const { data: { user } } = await caller.auth.getUser();
+  if (!user) return unauthorized;
+
+  const [profileRes, rpcRes] = await Promise.all([
+    admin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+    caller.rpc('is_admin'),
+  ]);
+  const decision = decideAdminAuthorization(
+    { data: rpcRes.data, error: rpcRes.error },
+    profileRes.data?.role,
+  );
+  if (!decision.allowed) {
+    return { ok: false, status: decision.status, error: decision.error, code: decision.code };
+  }
+  return { ok: true, userId: user.id };
 }
 
 Deno.serve(async (req: Request) => {
@@ -228,8 +283,12 @@ Deno.serve(async (req: Request) => {
   // ---------------------------------------------------------------- order_status
   if (body.action === 'order_status') {
     const fromService = isServiceRoleCall(req);
-    const adminId = fromService ? null : await callingAdminId(req, admin);
-    if (!fromService && !adminId) return json({ error: 'forbidden' }, 403);
+    let adminId: string | null = null;
+    if (!fromService) {
+      const who = await callingAdmin(req, admin);
+      if (!who.ok) return json({ error: who.error, code: who.code }, who.status);
+      adminId = who.userId;
+    }
 
     const status = String(body.status ?? '') as OrderStatus;
     if (!(status in STATUS_COPY)) return json({ error: 'unknown status' }, 400);
@@ -352,8 +411,9 @@ Deno.serve(async (req: Request) => {
 
   // ------------------------------------------------------------------------ test
   if (body.action === 'test') {
-    const adminId = await callingAdminId(req, admin);
-    if (!adminId) return json({ error: 'forbidden' }, 403);
+    const who = await callingAdmin(req, admin);
+    if (!who.ok) return json({ error: who.error, code: who.code }, who.status);
+    const adminId = who.userId;
 
     const { data: devices, error: devicesError } = await admin.from('push_devices')
       .select('id, expo_push_token, lang')
@@ -376,8 +436,9 @@ Deno.serve(async (req: Request) => {
 
   // ------------------------------------------------------------------- broadcast
   if (body.action === 'broadcast') {
-    const adminId = await callingAdminId(req, admin);
-    if (!adminId) return json({ error: 'forbidden' }, 403);
+    const who = await callingAdmin(req, admin);
+    if (!who.ok) return json({ error: who.error, code: who.code }, who.status);
+    const adminId = who.userId;
 
     const titleEn = String(body.titleEn ?? '').trim();
     const titleAr = String(body.titleAr ?? '').trim();
@@ -413,8 +474,12 @@ Deno.serve(async (req: Request) => {
   // dispatchers race. Push is live, so this path now delivers in prod.
   if (body.action === 'pos_sync') {
     const fromService = isServiceRoleCall(req);
-    const adminId = fromService ? null : await callingAdminId(req, admin);
-    if (!fromService && !adminId) return json({ error: 'forbidden' }, 403);
+    let adminId: string | null = null;
+    if (!fromService) {
+      const who = await callingAdmin(req, admin);
+      if (!who.ok) return json({ error: who.error, code: who.code }, who.status);
+      adminId = who.userId;
+    }
 
     const status = String(body.status ?? '') as PosSyncStatus;
     if (!(status in POS_SYNC_COPY)) return json({ error: 'unknown status' }, 400);
