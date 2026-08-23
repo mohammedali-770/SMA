@@ -145,6 +145,20 @@ The hook is intended to:
 - deny commands from any branch that push/update/delete/force-move a protected ref, including explicit refspecs;
 - fail closed on malformed input/unknown branch state/unverifiable repository root.
 
+Those intentions are now **tested, and the tests run in CI**.
+`.claude/hooks/protect-default-branch.test.sh` is executed by
+`.github/workflows/change-control.yml`, which also asserts that the hook is still
+registered in `.claude/settings.json` and that the PreToolUse matcher still
+covers every writing tool — a guard that passes its own tests but is no longer
+wired into the harness protects nothing. Until 2026-08-23 nothing ran that suite
+at all, which is how a fix to the detached-HEAD recovery path reached a pull
+request unexecuted (#233).
+
+The job is deliberately **not** path-filtered, so the `Change-control guard`
+context always reports and is therefore safe to require. Whether it actually
+blocks a merge is GitHub ruleset state, not source: adding it is a separate
+owner decision under §12, and this repository does not currently claim it.
+
 Do not weaken/remove/bypass the hook without explicit owner approval.
 
 ## 12. GitHub server-side controls — verify live settings
