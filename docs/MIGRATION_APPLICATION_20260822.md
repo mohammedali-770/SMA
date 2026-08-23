@@ -7,12 +7,14 @@
 **Project:** `spicy-meal-ordering` (`wxfmmnihidsdyemasstf`)
 **Repository base:** `0eeb66d` (squash-merge of PR #231) on `claude/project-build-ie4b56`
 **Approval:** explicit owner approval in session, for **both** applications, given after the blocker in §2 was reported.
+**Applied by:** the **repository owner**, who applied both, one after the other — stated by the owner on 2026-08-23.
 
 ---
 
 ## 1. What was applied
 
 Two migrations, via MCP `apply_migration`, one call per file, in this order.
+The **repository owner** applied both, one after the other.
 
 | # | Repository file | Migration name | Applied version | Class |
 | --- | --- | --- | --- | --- |
@@ -21,6 +23,15 @@ Two migrations, via MCP `apply_migration`, one call per file, in this order.
 
 Ledger movement: **101 → 102 → 103** rows. Latest live version before the
 application was `20260822115505` (`branch_availability_retention`).
+
+> **Who applied these was not recoverable from the ledger.**
+> `schema_migrations` records what ran and when, never who ran it, and this
+> record originally left the actor out — which is why §31 of
+> `docs/MIGRATIONS.md` could say only "outside this session". The owner
+> stated it on 2026-08-23 and it is written down here rather than left to
+> be re-derived. The **mechanism** remains unrecorded, per §31: nothing
+> establishes how the two calls were composed, and §31 documents an earlier
+> draft that invented an explanation and had to have it removed on review.
 
 Both are **class B**: `apply_migration` stamps an apply-time version that
 differs from the repository filename. **§9-D version alignment was deliberately
