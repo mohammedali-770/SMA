@@ -41,20 +41,50 @@ owner approval.
 ## 2. The blocker the pre-live gate caught
 
 The owner approved applying **one** migration: `order_item_notes`. Applying it
-alone would have broken order placement in Production.
+alone would have failed.
 
-`order_item_notes` calls `public.order_note_normalized(text)` in all three write
-paths (`place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`)
-and inside `enforce_order_item_note`. **That function did not exist in
-Production** — a query for any function matching `%note%` returned zero rows.
+`order_item_notes` calls `public.order_note_normalized(text)` in five places:
+`public.order_item_note_is_acceptable` (line 102), `enforce_order_item_note`,
+and the three write paths `place_order`, `compute_order_snapshot` and
+`insert_order_from_snapshot`. **That function did not exist in Production** — a
+query for any function matching `%note%` returned zero rows.
 It is defined by `20260819120000_order_note_length_limit`, which was in the
 repository but had never been applied.
 
-This would not have failed at apply time. **plpgsql resolves function calls at
-RUNTIME, not at `create or replace` time**, so the migration would have reported
-success and every subsequent order placement would have raised
-`function public.order_note_normalized(text) does not exist`. The failure would
-have appeared at the first customer order, not in the apply output.
+**It would have failed at apply time, loudly.** An earlier version of this
+record claimed the opposite — that `create or replace` would report success and
+the breakage would surface at the first customer order. That was wrong. It was
+caught in review of PR #233 and is corrected here rather than quietly amended,
+because §29 of `docs/MIGRATIONS.md` exists for this class of error.
+
+The **first** reference to `order_note_normalized` in the migration is not in a
+plpgsql body. It is line 102, inside `public.order_item_note_is_acceptable`,
+which is `language sql`. PostgreSQL parses and analyses a SQL-language function
+body at `create function` time whenever `check_function_bodies` is `on` — its
+default — so the missing function is resolved, and refused, right there:
+
+```
+ERROR:  function public.order_note_normalized(text) does not exist
+```
+
+Verified on PostgreSQL 16.13 against a disposable local cluster (CLAUDE.md §10 —
+never Production): with `order_note_normalized` absent, the `language sql`
+predicate is **rejected at creation**; an otherwise identical `language plpgsql`
+function is **accepted** and fails only when called; and the predicate creates
+cleanly once `order_note_normalized` exists.
+
+The four plpgsql bodies would indeed have been accepted, because plpgsql defers
+resolution to runtime — that half of the original reasoning holds. The migration
+simply never reaches them: the `language sql` predicate at line 93 comes first,
+ahead of every one of them.
+
+**What this changes, and what it does not.** The dependency was real and the
+order was right; the pre-live gate established both before anything ran, which
+is the work that mattered. What it does change is the severity: the outcome
+avoided was a loud abort in the apply output, with the `alter table` ahead of it
+rolled back in the same transaction — not a silent success followed by every
+order placement failing in Production. The record overstated the danger, and an
+audit record that overstates is as much a defect as one that understates.
 
 Work stopped, the dependency was reported, and the owner approved both
 applications in dependency order.
