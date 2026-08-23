@@ -549,9 +549,9 @@ be changed deliberately rather than discovered. **Action 4 is the last point at
 which refusing it costs nothing:** once accounts exist, changing the rule locks
 real people out mid-shift.
 
-**The admin gate was checking role without assurance level — fixed in source,
-not yet live.** Deploying `staff-accounts` turned a latent defect into a reachable
-one, so it was audited on the way in. Four Edge Functions authorized callers with
+**The admin gate was checking role without assurance level — fixed and deployed
+2026-08-23 (action 6).** Deploying `staff-accounts` turned a latent defect into a
+reachable one, so it was audited on the way in. Four Edge Functions authorized callers with
 `profile.role !== 'admin'` alone — `staff-accounts`, `email-test-config`,
 `whatsapp-test-config` and `payment-test-config`. This was **not** universal:
 `lazywait-catalog` (`index.ts:36-39`) has asked `is_admin()` since 20260807 and is
@@ -630,13 +630,21 @@ Three consequences the owner should hold:
   gate before it is enabled. It was enabled on 2026-08-17 (§7). It is a dated
   audit, so a correction note now sits at the top of it rather than its findings
   being rewritten in place. The rate-limiting recommendation there is still open.
-- **One of the two admin accounts has no verified TOTP factor** (verified read-only
-  on 2026-08-23: 2 admins, 1 with a verified factor; no accountant accounts exist).
-  That account's session is AAL1, so once the redeploy happens it will receive a
-  403 `mfa_required` from these functions until a TOTP factor is enrolled. The
-  admin console already demands TOTP at sign-in, so this affects direct/API calls,
-  not the normal UI path — but it is a real lockout for that account and should be
-  resolved before the redeploy, not discovered after it.
+- **One of the two admin accounts has no TOTP factor at all** (verified read-only
+  on 2026-08-23, re-checked immediately before the redeploy: 2 admins, 1 with a
+  verified factor, the other with **zero** factors of any status; no accountant
+  accounts exist). Since the redeploy that account receives a 403 `mfa_required`
+  from these four functions until it enrols one.
+
+  **This is not a lockout, and an earlier draft of this section overstated it.**
+  `StaffMfaGate` (`src/components/StaffMfaGate.tsx:35-54`) handles the
+  no-verified-factor case as `needs_enrollment` and walks the account through QR
+  enrolment at sign-in — there is no chicken-and-egg. And that account was already
+  refused by every RLS policy and admin RPC, which have required AAL2 since
+  `20260810142000`; what the redeploy closed was the Edge Function **side-door**
+  that let it act at AAL1 through the service-role client. So the account lost a
+  capability it was never supposed to have, and can restore the legitimate one
+  itself at any sign-in. Worth enrolling regardless.
 
 **Nothing here touched the payment freeze (§6) or push (§7).** No payment,
 refund or checkout-session function was modified — `compute_order_snapshot` and
