@@ -52,18 +52,31 @@ jobs:
           SETTINGS=.claude/settings.json
           test -f "$SETTINGS" || { echo "::error::$SETTINGS is missing — the guard would not run at all"; exit 1; }
 
-          COMMAND="$(jq -r '.hooks.PreToolUse[]?.hooks[]?.command // empty' "$SETTINGS")"
-          printf '%s' "$COMMAND" | grep -q 'protect-default-branch\.sh' || {
+          # Take the matcher from the PreToolUse entry that actually registers
+          # THIS guard. Selecting by command rather than by position means an
+          # added or reordered hook entry cannot leave this assertion reading
+          # some other entry's matcher, and an empty result here is itself the
+          # registration failure.
+          MATCHER="$(jq -r '
+            .hooks.PreToolUse[]?
+            | select(any(.hooks[]?; (.command // "") | test("protect-default-branch[.]sh")))
+            | .matcher // empty
+          ' "$SETTINGS")"
+
+          test -n "$MATCHER" || {
             echo "::error::$SETTINGS no longer registers protect-default-branch.sh as a PreToolUse hook"
             exit 1
           }
 
-          # Dropping a tool from the matcher silently disables protection for it,
-          # and no behavioural test in the suite below would notice.
-          MATCHER="$(jq -r '.hooks.PreToolUse[]?.matcher // empty' "$SETTINGS")"
+          # Compare whole alternatives, never substrings. A plain `grep -q Edit`
+          # also matches MultiEdit and NotebookEdit, so a matcher that had
+          # dropped the standalone Edit alternative would sail through this
+          # check while every Edit call went unguarded. Split on `|` and match
+          # each expected tool as a complete line.
+          ALTERNATIVES="$(printf '%s' "$MATCHER" | tr '|' '\n')"
           for TOOL in Bash Edit Write MultiEdit NotebookEdit; do
-            printf '%s' "$MATCHER" | grep -q "$TOOL" || {
-              echo "::error::the PreToolUse matcher no longer covers $TOOL — writes through it would be unguarded"
+            printf '%s\n' "$ALTERNATIVES" | grep -qx "$TOOL" || {
+              echo "::error::the PreToolUse matcher ($MATCHER) does not cover $TOOL as its own alternative — writes through it would be unguarded"
               exit 1
             }
           done
