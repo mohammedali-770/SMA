@@ -45,6 +45,28 @@ describe.each(FUNCTIONS)('%s admin gate wiring', (fn) => {
     expect(src).toMatch(/if \(!\w+\.allowed\) return json\(/);
   });
 
+  // INVOCATION IS NOT USE, either — the second half of the same lesson, and it
+  // cost a real surviving mutant to learn. This passes every assertion above:
+  //
+  //     const { data: isAdmin, error: adminErr } = await caller.rpc('is_admin');
+  //     const gate = decideAdminAuthorization({ data: true, error: null }, profile?.role);
+  //
+  // The RPC is called, the decision is computed, the denial is returned — and
+  // the answer is thrown away, restoring the exact AAL1 hole this file exists to
+  // prevent. `deno check` does not object: an unused local is not a type error,
+  // and CI runs `deno check`, never `deno lint`. So pin the DATA FLOW: the
+  // decision's first argument must be built from identifiers, never literals.
+  it('feeds the RPC RESULT into the decision, not a hardcoded value', () => {
+    expect(src).not.toMatch(
+      /decideAdminAuthorization\(\s*\{\s*data:\s*(?:true|false|null|undefined|\d)/,
+    );
+    // `data:` must be an identifier or member expression (isAdmin, rpcRes.data).
+    expect(src).toMatch(/decideAdminAuthorization\(\s*\{\s*data:\s*[A-Za-z_$][\w$.]*\s*,/);
+    // ...and the error channel must be wired too, or a failed check reads as a
+    // clean denial instead of the 500 it is.
+    expect(src).not.toMatch(/decideAdminAuthorization\(\s*\{[^}]*error:\s*(?:null|undefined|false)\s*[},]/);
+  });
+
   it('never decides admin authorization from the profile role by itself', () => {
     // The exact shape of the original defect. If this string comes back, the
     // AAL2 check has been bypassed.
@@ -89,6 +111,23 @@ describe('staff-accounts privileged actions', () => {
     // -1 would otherwise satisfy `create > gate` if the gate were deleted.
     expect(gate).toBeGreaterThan(-1);
     expect(create).toBeGreaterThan(gate);
+  });
+});
+
+// KNOWN, UNFIXED, AND DELIBERATELY PINNED. These are not endorsements — each
+// asserts that a function still has the defect, so that the day someone fixes it
+// this test fails and forces the owner-facing record to be updated with it.
+describe('admin functions this fix did NOT cover', () => {
+  it('push-dispatch still gates on the role alone (owner decision pending)', () => {
+    // Missed by the original sweep because it spells the check as a ternary
+    // rather than `role !== 'admin'`, and the sweep was lexical. Unlike the
+    // frozen payment function this one is LIVE (CLAUDE.md §7) and its `broadcast`
+    // action reaches every opted-in device immediately, with no recall — so an
+    // AAL1 admin session can currently send a push to the whole customer base.
+    // Fixing it is a separate owner decision; redeploying it is gated again.
+    const src = source('push-dispatch');
+    expect(src).toContain("profile?.role === 'admin' ? user.id : null");
+    expect(src).not.toContain('decideAdminAuthorization');
   });
 });
 

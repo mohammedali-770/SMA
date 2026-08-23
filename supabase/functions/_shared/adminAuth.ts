@@ -2,10 +2,18 @@
  * The admin authorization decision for Edge Functions, as a PURE function.
  *
  * THE BUG THIS EXISTS FOR
- * Every admin Edge Function authorized callers like this:
+ * Four admin Edge Functions authorized callers like this:
  *
  *     const { data: profile } = await admin.from('profiles').select('role')…
  *     if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
+ *
+ * — staff-accounts, email-test-config, whatsapp-test-config (all fixed here) and
+ * payment-test-config (identical defect, left alone under the CLAUDE.md §6 payment
+ * freeze). A fifth, push-dispatch/index.ts:198-204, spells it
+ * `profile?.role === 'admin' ? user.id : null` and is NOT fixed here — see
+ * adminAuthWiring.test.ts and docs/OWNER_ACTIONS.md §16. It is NOT universal:
+ * lazywait-catalog/index.ts:36-39 has asked is_admin() since 20260807, and is the
+ * precedent this file follows.
  *
  * That checks the ROLE and not the MFA assurance level. Everywhere in SQL,
  * admin authority additionally requires AAL2:

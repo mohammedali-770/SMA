@@ -13,9 +13,12 @@
 //
 // SECURITY BOUNDARIES — all four matter, none is optional:
 //
-//  1. verify_jwt = true (supabase/config.toml) AND an explicit
-//     profiles.role === 'admin' re-check, matching email-test-config and
-//     whatsapp-test-config. The JWT check alone only proves *someone* signed in.
+//  1. verify_jwt = true (supabase/config.toml) AND public.is_admin() asked of
+//     Postgres as the CALLER — role 'admin' AND AAL2, the same predicate every
+//     RLS policy uses — matching email-test-config and whatsapp-test-config.
+//     The JWT check alone only proves *someone* signed in, and a profiles.role
+//     check alone proves nothing about the MFA assurance level: that was the
+//     defect this function shipped with. See _shared/adminAuth.ts.
 //
 //  2. MANAGEABLE_ROLES is an allow-list, not a deny-list. This function can
 //     only ever create or touch branch_staff / call_center accounts. It cannot

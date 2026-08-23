@@ -550,8 +550,11 @@ real people out mid-shift.
 
 **The admin gate was checking role without assurance level — fixed in source,
 not yet live.** Deploying `staff-accounts` turned a latent defect into a reachable
-one, so it was audited on the way in. Every admin Edge Function authorized callers
-with `profile.role !== 'admin'` alone. Everywhere in SQL, admin authority is
+one, so it was audited on the way in. Four Edge Functions authorized callers with
+`profile.role !== 'admin'` alone — `staff-accounts`, `email-test-config`,
+`whatsapp-test-config` and `payment-test-config`. This was **not** universal:
+`lazywait-catalog` (`index.ts:36-39`) has asked `is_admin()` since 20260807 and is
+the precedent the fix follows. Everywhere in SQL, admin authority is
 `is_admin()` = role `admin` **and** `jwt_has_aal2()`
 (`20260810142000_staff_mfa_aal2.sql`). So an administrator signed in with email and
 password but **without** completing TOTP passed a function's own gate while being
@@ -579,6 +582,25 @@ Three consequences the owner should hold:
 - **`payment-test-config` has the identical defect and was deliberately left
   alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
   omission is visible rather than forgotten.
+- **`push-dispatch` is a fifth instance and is NOT fixed — this is the one to read
+  twice.** The first sweep missed it because it spells the check
+  `profile?.role === 'admin' ? user.id : null` (`index.ts:198-204`) rather than
+  `role !== 'admin'`, and the sweep was lexical. It gates `order_status`
+  (`:231`), `test` (`:355`), `broadcast` (`:379`) and `pos_sync` (`:416`), and
+  `supabase/config.toml:43-44` sets `verify_jwt = false`, so that role check is the
+  **only** gate on the path. Unlike the four above it is **already live** (§7), and
+  `broadcast` sends immediately, to every device with `is_active` and
+  `promos_enabled` — since the 2026-08-20 opt-out decision, close to the whole
+  active base — with no recall. So an admin holding an AAL1 session can currently
+  send an unrecallable push to every customer. Fixing its gate is a source change
+  and a **separate owner decision**, because bundling a live customer channel into
+  this change would alter what is being approved; redeploying it is separately
+  gated again under §5/§7. Recorded here rather than fixed silently.
+- **`docs/SECURITY_REVIEW.md` is wrong about `push-dispatch`** (`:107`, `:181`,
+  `:206`, `:295`): it still calls it an inert `501` stub needing a caller auth
+  gate before it is enabled. It was enabled on 2026-08-17 (§7). That document is
+  the repository's only other account of this function's authorization, and it
+  describes code that no longer exists.
 - **One of the two admin accounts has no verified TOTP factor** (verified read-only
   on 2026-08-23: 2 admins, 1 with a verified factor; no accountant accounts exist).
   That account's session is AAL1, so once the redeploy happens it will receive a

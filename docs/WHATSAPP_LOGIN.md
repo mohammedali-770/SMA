@@ -223,7 +223,8 @@ Nothing about **customer** login changed here. This is about the admin diagnosti
 endpoint behind the WhatsApp card — the one that reads the provider's readiness and
 sends a test OTP.
 
-It used to authorize like every other admin function in the repository:
+It used to authorize the way three sibling admin functions did — `staff-accounts`,
+`email-test-config` and the still-frozen `payment-test-config`:
 
 ```ts
 if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
