@@ -106,7 +106,7 @@ What did **not** change, and still needs a separate explicit owner decision:
 
 Production schema changes go only through the owner-approved migration workflow documented in `docs/MIGRATIONS.md`.
 
-Current read-only migration snapshot (2026-08-12): **79 repository migration files / 85 live migration-history rows**, latest live version **`20260810115029`**, with all 11 source migration names added after the Aug 7 ledger snapshot represented in live Production history. Evidence: `docs/MIGRATION_RECONCILIATION_20260812.md`.
+Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files. Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
