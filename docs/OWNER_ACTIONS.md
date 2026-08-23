@@ -502,10 +502,10 @@ do not prove the deployed code matches the repository. Read a clean run as "the
 right set of functions exists", never as "production matches the default
 branch".
 
-## 16. Branch operations — two actions taken 2026-08-21, three still gated
+## 16. Branch operations — three actions taken, two still gated
 
-**Status:** OWNER DECISION ×5 — actions 1 and 2 are **done**; 3, 4 and 5 have not
-been requested.
+**Status:** OWNER DECISION ×5 — actions 1 and 2 are **done** (2026-08-21),
+action 3 is **done** (2026-08-23); 4 and 5 have not been requested.
 
 The branch-operations feature (timed item and option availability, delivery
 control, the branch and call-centre consoles, and their health/alert surfaces)
@@ -517,7 +517,7 @@ does.
 | --- | --- | --- |
 | 1 | Apply the thirteen migrations to Production | **DONE 2026-08-21.** Owner approval in-conversation; applied one per file in filename order via MCP `apply_migration`. Every live row is full-text md5-identical to its repository file. Evidence, per-file versions and the §9-E verification are in [`MIGRATIONS.md`](MIGRATIONS.md) §28. |
 | 2 | Add `ops_change_events` to the `supabase_realtime` publication | **DONE 2026-08-21**, as part of migration 9 and named in the same approval. The publication went from one table to two (`order_change_events`, `ops_change_events`). The new table is deliberately narrow — branch id and change kind, nothing else — because `postgres_changes` re-evaluates RLS per subscriber, and its policy is ops-roles-only rather than `using (true)`. |
-| 3 | Deploy the `staff-accounts` Edge Function | **Not requested.** The repository's first `auth.admin.createUser`. Also needs `verify_jwt = true` to remain set in `supabase/config.toml`. |
+| 3 | Deploy the `staff-accounts` Edge Function | **DONE 2026-08-23 07:31:46 UTC.** Owner approval in-conversation. Version 1, status `ACTIVE`, `verify_jwt = true` confirmed on the deployed function, matching `supabase/config.toml`. The repository's first `auth.admin.createUser`. It is still inert in practice: every action it exposes is admin-gated, and the accounts it exists to create (action 4) have not been requested. **The deployed build predates the AAL2 fix below** — see *The admin gate was checking role without assurance level*. |
 | 4 | Create the first branch / call-centre accounts | **Not requested.** The moment the feature stops being inert. Until then the roles exist in the enum and nothing holds them. |
 | 5 | Enable the branch-availability alert condition's outbound delivery | **Not requested.** Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval and is already populated by the live card. |
 
@@ -547,6 +547,45 @@ trade is not acceptable, it is one line per predicate to change — but it shoul
 be changed deliberately rather than discovered. **Action 4 is the last point at
 which refusing it costs nothing:** once accounts exist, changing the rule locks
 real people out mid-shift.
+
+**The admin gate was checking role without assurance level — fixed in source,
+not yet live.** Deploying `staff-accounts` turned a latent defect into a reachable
+one, so it was audited on the way in. Every admin Edge Function authorized callers
+with `profile.role !== 'admin'` alone. Everywhere in SQL, admin authority is
+`is_admin()` = role `admin` **and** `jwt_has_aal2()`
+(`20260810142000_staff_mfa_aal2.sql`). So an administrator signed in with email and
+password but **without** completing TOTP passed a function's own gate while being
+refused by every RLS policy and admin RPC — and anything the function then did with
+the service-role client bypasses RLS, so it ran at AAL1. For `staff-accounts` that
+means creating accounts, resetting passwords and deleting users.
+
+The fix asks Postgres rather than decoding the JWT in TypeScript: the caller-scoped
+client calls `public.is_admin()`, which is already granted to `authenticated`
+(`20260810143000:92`, pinned by `anon_role_helper_exposure_test.sql:25-28`) and
+already evaluates AAL2 through exactly the SQL the rest of the schema uses.
+PostgREST populates `request.jwt.claims` only after verifying the signature, so a
+forged token cannot reach the comparison. The decision itself is a pure function,
+`supabase/functions/_shared/adminAuth.ts`, shared by `staff-accounts`,
+`email-test-config` and `whatsapp-test-config`, and unit-tested — including the case
+that would have caught the original bug.
+
+Three consequences the owner should hold:
+
+- **Source is fixed; Production is not.** The deployed builds all predate the fix —
+  `staff-accounts` v1 (2026-08-23), `email-test-config` v1 (2026-07-10),
+  `whatsapp-test-config` v2 (2026-07-09). Closing the gap live means **redeploying
+  those three functions, which is a separate §5 approval** and has not been
+  requested.
+- **`payment-test-config` has the identical defect and was deliberately left
+  alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
+  omission is visible rather than forgotten.
+- **One of the two admin accounts has no verified TOTP factor** (verified read-only
+  on 2026-08-23: 2 admins, 1 with a verified factor; no accountant accounts exist).
+  That account's session is AAL1, so once the redeploy happens it will receive a
+  403 `mfa_required` from these functions until a TOTP factor is enrolled. The
+  admin console already demands TOTP at sign-in, so this affects direct/API calls,
+  not the normal UI path — but it is a real lockout for that account and should be
+  resolved before the redeploy, not discovered after it.
 
 **Nothing here touched the payment freeze (§6) or push (§7).** No payment,
 refund or checkout-session function was modified — `compute_order_snapshot` and

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**139 TypeScript test files declaring 1978 test blocks, plus 52 SQL suites.**
+**141 TypeScript test files declaring 1994 test blocks, plus 52 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -239,11 +239,13 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-10 files, 205 declared test blocks.
+12 files, 221 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
 | `supabase/functions/_shared/accountDeletion.test.ts` | 21 | classifyBlockers — only real, prioritized states |
+| `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
+| `supabase/functions/_shared/adminAuthWiring.test.ts` | 7 | staff-accounts privileged actions |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/lazywait.test.ts` | 30 | buildCreateOrderPayload |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 41 | request serialization — paths/methods/query |

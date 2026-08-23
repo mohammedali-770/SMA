@@ -45,6 +45,9 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 
 - `_shared/accountDeletion.test.ts`
 - `_shared/accountDeletion.ts`
+- `_shared/adminAuth.test.ts`
+- `_shared/adminAuth.ts`
+- `_shared/adminAuthWiring.test.ts`
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
 - `_shared/cors.ts`
