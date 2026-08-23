@@ -17,13 +17,13 @@ permission behavior was changed except to fix a confirmed security bug.
 > level, so an administrator on an AAL1 session could send an unrecallable
 > broadcast.
 >
-> **That is fixed IN SOURCE ONLY, and Production still runs the vulnerable
-> build.** The repository gate now asks Postgres for `is_admin()` (role **and**
-> AAL2), the same predicate every RLS policy uses — but the deployed function is
-> **v3 from 2026-07-21**, which predates the fix. Redeploying it is a separate
-> owner approval (CLAUDE.md §5/§7) and has not been requested, so **do not read
-> this correction as remediation complete**: the live AAL1 broadcast path is open
-> until that redeploy happens.
+> **That is now fixed in Production.** The gate asks Postgres for `is_admin()`
+> (role **and** AAL2), the same predicate every RLS policy uses. Owner-approved
+> and deployed 2026-08-23: `push-dispatch` **v4** at 11:57:36 UTC, alongside
+> `staff-accounts` v2, `email-test-config` v2 and `whatsapp-test-config` v3, all
+> of which carried the same defect. `verify_jwt = false` is preserved on
+> `push-dispatch`, so the service-role callers (`order-intake`,
+> `lazywait-webhook`) are unaffected. The live AAL1 broadcast path is closed.
 >
 > The rate-limiting recommendation in §4 still stands and is still open.
 > Current state of record: [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16 and
