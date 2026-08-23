@@ -576,31 +576,40 @@ Three consequences the owner should hold:
 
 - **Source is fixed; Production is not.** The deployed builds all predate the fix —
   `staff-accounts` v1 (2026-08-23), `email-test-config` v1 (2026-07-10),
-  `whatsapp-test-config` v2 (2026-07-09). Closing the gap live means **redeploying
-  those three functions, which is a separate §5 approval** and has not been
-  requested.
+  `whatsapp-test-config` v2 (2026-07-09) and `push-dispatch` v3 (2026-07-21).
+  Closing the gap live means **redeploying those four functions, which is a
+  separate §5 approval** (§7 as well, for `push-dispatch`) and has not been
+  requested. Until then every one of them still runs the role-only gate — and for
+  `push-dispatch` that means the unrecallable broadcast is still reachable at
+  AAL1.
 - **`payment-test-config` has the identical defect and was deliberately left
   alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
   omission is visible rather than forgotten.
-- **`push-dispatch` is a fifth instance and is NOT fixed — this is the one to read
-  twice.** The first sweep missed it because it spells the check
+- **`push-dispatch` was a fifth instance, and the most exposed one. Fixed in
+  SOURCE on 2026-08-23 in a separate change, on the owner's decision — the
+  deployed function is still v3 (2026-07-21) and the live AAL1 broadcast path is
+  open until it is redeployed.** The first sweep
+  missed it because it spelled the check
   `profile?.role === 'admin' ? user.id : null` (`index.ts:198-204`) rather than
-  `role !== 'admin'`, and the sweep was lexical. It gates `order_status`
-  (`:231`), `test` (`:355`), `broadcast` (`:379`) and `pos_sync` (`:416`), and
-  `supabase/config.toml:43-44` sets `verify_jwt = false`, so that role check is the
-  **only** gate on the path. Unlike the four above it is **already live** (§7), and
-  `broadcast` sends immediately, to every device with `is_active` and
-  `promos_enabled` — since the 2026-08-20 opt-out decision, close to the whole
-  active base — with no recall. So an admin holding an AAL1 session can currently
-  send an unrecallable push to every customer. Fixing its gate is a source change
-  and a **separate owner decision**, because bundling a live customer channel into
-  this change would alter what is being approved; redeploying it is separately
-  gated again under §5/§7. Recorded here rather than fixed silently.
-- **`docs/SECURITY_REVIEW.md` is wrong about `push-dispatch`** (`:107`, `:181`,
-  `:206`, `:295`): it still calls it an inert `501` stub needing a caller auth
-  gate before it is enabled. It was enabled on 2026-08-17 (§7). That document is
-  the repository's only other account of this function's authorization, and it
-  describes code that no longer exists.
+  `role !== 'admin'`, and the sweep was lexical. It gates `order_status`, `test`,
+  `broadcast` and `pos_sync`, and `supabase/config.toml:43-44` sets
+  `verify_jwt = false`, so that role check was the **only** gate on the path.
+  Unlike the four above it is **already live** (§7), and `broadcast` sends
+  immediately to every device with `is_active` and `promos_enabled` — since the
+  2026-08-20 opt-out decision, close to the whole active base — with no recall.
+  So an admin on an AAL1 session could send an unrecallable push to every
+  customer. It now calls the same `is_admin()` predicate through the caller's
+  own client. Two of the four actions still accept a service-role call without a
+  JWT, unchanged: `order-intake` and `lazywait-webhook` depend on that path.
+  **`order_status` and `pos_sync` were less exposed than `broadcast`, though not
+  safe** — both re-read the order's real status before sending, and
+  `admin_set_order_status` already required `is_admin()`, so an AAL1 caller could
+  not invent a transition, only re-announce a real one.
+- **`docs/SECURITY_REVIEW.md` was wrong about `push-dispatch`** (`:107`, `:181`,
+  `:206`, `:295`): it still called it an inert `501` stub needing a caller auth
+  gate before it is enabled. It was enabled on 2026-08-17 (§7). It is a dated
+  audit, so a correction note now sits at the top of it rather than its findings
+  being rewritten in place. The rate-limiting recommendation there is still open.
 - **One of the two admin accounts has no verified TOTP factor** (verified read-only
   on 2026-08-23: 2 admins, 1 with a verified factor; no accountant accounts exist).
   That account's session is AAL1, so once the redeploy happens it will receive a

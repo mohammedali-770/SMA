@@ -1007,22 +1007,37 @@ export const legalDocs = {
 
 // ---------------------------------------------------------------------------
 // Push notifications (admin tools). All calls hit the push-dispatch Edge
-// Function with the ADMIN's JWT; the function re-verifies the role server-side.
+// Function with the ADMIN's JWT; the function re-verifies role AND MFA
+// assurance level server-side by asking Postgres for is_admin().
 // Push is LIVE: `broadcast` reaches every opted-in customer device immediately
 // and cannot be recalled. The master flag remains the server-side kill switch.
 // ---------------------------------------------------------------------------
 export interface PushSendResult { status: string; targeted?: number; sent?: number; failed?: number; deactivated?: number; hint?: string; reason?: string }
 
+/**
+ * Edge Function errors arrive as a generic "non-2xx status" message with the
+ * useful text in the response BODY, so unwrap it — the same way
+ * staffAccountsApi.ts does. Without this the panel shows "Edge Function returned
+ * a non-2xx status code" instead of the server's actual sentence, which now
+ * includes the one telling an admin to complete their two-factor step.
+ */
+async function invokePush(body: Record<string, unknown>): Promise<PushSendResult> {
+  const { data, error } = await supabase.functions.invoke('push-dispatch', { body });
+  if (error) {
+    let msg = error.message;
+    const ctx = (error as { context?: { json?: () => Promise<{ error?: string }> } }).context;
+    try { const b = ctx?.json ? await ctx.json() : null; if (b?.error) msg = b.error; } catch { /* keep msg */ }
+    throw new Error(msg);
+  }
+  return data as PushSendResult;
+}
+
 export const pushAdmin = {
   async test(): Promise<PushSendResult> {
-    const { data, error } = await supabase.functions.invoke('push-dispatch', { body: { action: 'test' } });
-    if (error) throw new Error(error.message);
-    return data as PushSendResult;
+    return invokePush({ action: 'test' });
   },
   async broadcast(input: { titleEn: string; titleAr: string; bodyEn: string; bodyAr: string }): Promise<PushSendResult> {
-    const { data, error } = await supabase.functions.invoke('push-dispatch', { body: { action: 'broadcast', ...input } });
-    if (error) throw new Error(error.message);
-    return data as PushSendResult;
+    return invokePush({ action: 'broadcast', ...input });
   },
   /** Device / opt-in counts for the panel (admin-only RLS select). */
   async deviceCounts(): Promise<{ activeDevices: number; promoOptIns: number }> {

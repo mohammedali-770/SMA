@@ -7,13 +7,16 @@
  *     const { data: profile } = await admin.from('profiles').select('role')…
  *     if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
  *
- * — staff-accounts, email-test-config, whatsapp-test-config (all fixed here) and
- * payment-test-config (identical defect, left alone under the CLAUDE.md §6 payment
- * freeze). A fifth, push-dispatch/index.ts:198-204, spells it
- * `profile?.role === 'admin' ? user.id : null` and is NOT fixed here — see
- * adminAuthWiring.test.ts and docs/OWNER_ACTIONS.md §16. It is NOT universal:
- * lazywait-catalog/index.ts:36-39 has asked is_admin() since 20260807, and is the
- * precedent this file follows.
+ * — staff-accounts, email-test-config and whatsapp-test-config. A fourth,
+ * push-dispatch, spelled the same test as a ternary
+ * (`profile?.role === 'admin' ? user.id : null`) and so survived a lexical sweep
+ * for `role !== 'admin'`; it is fixed too, and is the one that mattered most —
+ * `verify_jwt = false` makes that check its only gate, and its broadcast cannot
+ * be recalled. Only payment-test-config keeps the defect, deliberately, under the
+ * CLAUDE.md §6 payment freeze.
+ *
+ * It was NOT universal: lazywait-catalog/index.ts:36-39 has asked is_admin()
+ * since 20260807, and is the precedent this file follows.
  *
  * That checks the ROLE and not the MFA assurance level. Everywhere in SQL,
  * admin authority additionally requires AAL2:
