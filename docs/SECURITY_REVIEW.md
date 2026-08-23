@@ -15,8 +15,16 @@ permission behavior was changed except to fix a confirmed security bug.
 > on 2026-08-17**; it has reached real customer devices since. It did gain a
 > caller gate, but that gate checked the profile role only, not the MFA assurance
 > level, so an administrator on an AAL1 session could send an unrecallable
-> broadcast. That is fixed as of this correction — the gate now asks Postgres for
-> `is_admin()` (role **and** AAL2), the same predicate every RLS policy uses.
+> broadcast.
+>
+> **That is fixed IN SOURCE ONLY, and Production still runs the vulnerable
+> build.** The repository gate now asks Postgres for `is_admin()` (role **and**
+> AAL2), the same predicate every RLS policy uses — but the deployed function is
+> **v3 from 2026-07-21**, which predates the fix. Redeploying it is a separate
+> owner approval (CLAUDE.md §5/§7) and has not been requested, so **do not read
+> this correction as remediation complete**: the live AAL1 broadcast path is open
+> until that redeploy happens.
+>
 > The rate-limiting recommendation in §4 still stands and is still open.
 > Current state of record: [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §16 and
 > CLAUDE.md §7. The findings below are preserved as the 2026-07-08 snapshot they

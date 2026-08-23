@@ -576,14 +576,19 @@ Three consequences the owner should hold:
 
 - **Source is fixed; Production is not.** The deployed builds all predate the fix —
   `staff-accounts` v1 (2026-08-23), `email-test-config` v1 (2026-07-10),
-  `whatsapp-test-config` v2 (2026-07-09). Closing the gap live means **redeploying
-  those three functions, which is a separate §5 approval** and has not been
-  requested.
+  `whatsapp-test-config` v2 (2026-07-09) and `push-dispatch` v3 (2026-07-21).
+  Closing the gap live means **redeploying those four functions, which is a
+  separate §5 approval** (§7 as well, for `push-dispatch`) and has not been
+  requested. Until then every one of them still runs the role-only gate — and for
+  `push-dispatch` that means the unrecallable broadcast is still reachable at
+  AAL1.
 - **`payment-test-config` has the identical defect and was deliberately left
   alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
   omission is visible rather than forgotten.
-- **`push-dispatch` was a fifth instance, and the most exposed one. Fixed
-  2026-08-23 in a separate change, on the owner's decision.** The first sweep
+- **`push-dispatch` was a fifth instance, and the most exposed one. Fixed in
+  SOURCE on 2026-08-23 in a separate change, on the owner's decision — the
+  deployed function is still v3 (2026-07-21) and the live AAL1 broadcast path is
+  open until it is redeployed.** The first sweep
   missed it because it spelled the check
   `profile?.role === 'admin' ? user.id : null` (`index.ts:198-204`) rather than
   `role !== 'admin'`, and the sweep was lexical. It gates `order_status`, `test`,
