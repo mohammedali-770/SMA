@@ -29,6 +29,24 @@ function source(fn: string): string {
   return readFileSync(new URL(`../${fn}/index.ts`, import.meta.url), 'utf8');
 }
 
+/**
+ * The same source with comments removed.
+ *
+ * Needed because these files DOCUMENT the defect they fixed by quoting the old
+ * line, and an assertion that the old line is gone will otherwise match the
+ * explanation of its removal. That has now happened twice in this suite — once
+ * against `auth.admin.createUser` in prose, once against push-dispatch's
+ * `profile?.role === 'admin' ? ...` quote. Keeping the quote is right; the
+ * assertion is what has to be precise.
+ */
+function code(fn: string): string {
+  return source(fn)
+    .replace(/\/\*[\s\S]*?\*\//g, '')       // block comments, including /** */
+    .split('\n')
+    .filter((line) => !/^\s*\/\//.test(line)) // whole-line // comments
+    .join('\n');
+}
+
 describe.each(FUNCTIONS)('%s admin gate wiring', (fn) => {
   const src = source(fn);
 
@@ -114,20 +132,60 @@ describe('staff-accounts privileged actions', () => {
   });
 });
 
-// KNOWN, UNFIXED, AND DELIBERATELY PINNED. These are not endorsements — each
-// asserts that a function still has the defect, so that the day someone fixes it
-// this test fails and forces the owner-facing record to be updated with it.
-describe('admin functions this fix did NOT cover', () => {
-  it('push-dispatch still gates on the role alone (owner decision pending)', () => {
-    // Missed by the original sweep because it spells the check as a ternary
-    // rather than `role !== 'admin'`, and the sweep was lexical. Unlike the
-    // frozen payment function this one is LIVE (CLAUDE.md §7) and its `broadcast`
-    // action reaches every opted-in device immediately, with no recall — so an
-    // AAL1 admin session can currently send a push to the whole customer base.
-    // Fixing it is a separate owner decision; redeploying it is gated again.
-    const src = source('push-dispatch');
-    expect(src).toContain("profile?.role === 'admin' ? user.id : null");
-    expect(src).not.toContain('decideAdminAuthorization');
+// push-dispatch does not fit the shape above: its gate lives in a helper that
+// returns the caller's id for attribution, and two of its four actions accept a
+// service-role call instead. It gets its own assertions rather than a loosened
+// shared one — this is the LIVE function, and its broadcast cannot be recalled.
+describe('push-dispatch admin gate wiring', () => {
+  const src = source('push-dispatch');
+
+  it('asks Postgres for is_admin() rather than trusting the role alone', () => {
+    expect(src).toContain("rpc('is_admin')");
+    expect(src).toContain('decideAdminAuthorization');
+  });
+
+  it('no longer decides admin authority from the profile role by itself', () => {
+    // The exact shape of the original defect in this file. It was missed by a
+    // sweep for `role !== 'admin'` because it spells the same test as a ternary,
+    // so pin THIS spelling too — a lexical sweep will not find it again either.
+    // Checked against CODE: the header deliberately quotes the old line.
+    expect(code('push-dispatch')).not.toContain("profile?.role === 'admin' ? user.id : null");
+    expect(source('push-dispatch')).toContain("profile?.role === 'admin' ? user.id : null");
+  });
+
+  it('feeds the RPC RESULT into the decision, not a hardcoded value', () => {
+    expect(src).not.toMatch(
+      /decideAdminAuthorization\(\s*\{\s*data:\s*(?:true|false|null|undefined|\d)/,
+    );
+    expect(src).toMatch(/decideAdminAuthorization\(\s*\{\s*data:\s*[A-Za-z_$][\w$.]*\s*[,.]/);
+  });
+
+  it('gates AFTER resolving the user, so an expired session reads as 401', () => {
+    const getUser = src.indexOf('auth.getUser()');
+    const gate = src.indexOf("rpc('is_admin')");
+    expect(getUser).toBeGreaterThan(-1);
+    expect(gate).toBeGreaterThan(getUser);
+  });
+
+  it('gates EVERY action, including the two that also accept a service call', () => {
+    // broadcast is the one that cannot be recalled, but a missed gate on any of
+    // the four is an unauthorized send. Assert the helper is consulted four
+    // times and that no call site was left on the old helper name.
+    expect(code('push-dispatch')).not.toContain('callingAdminId');
+    const calls = src.match(/await callingAdmin\(req, admin\)/g) ?? [];
+    expect(calls.length).toBe(4);
+    // The two service-or-admin actions must still let the service role through
+    // without a JWT — order-intake and lazywait-webhook depend on it.
+    expect(src).toMatch(/const fromService = isServiceRoleCall\(req\);/);
+    expect((src.match(/if \(!fromService\) \{/g) ?? []).length).toBe(2);
+  });
+
+  it('returns the decision\'s own status and message, not a flat 403', () => {
+    // A caller told "forbidden" when the real answer is "complete two-factor"
+    // has no way to know what to do. Four call sites, all returning the
+    // decision verbatim.
+    const returns = src.match(/return json\(\{ error: who\.error, code: who\.code \}, who\.status\)/g) ?? [];
+    expect(returns.length).toBe(4);
   });
 });
 
