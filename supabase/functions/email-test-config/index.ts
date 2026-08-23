@@ -4,6 +4,7 @@
 // The SMTP password is read server-side from integration_settings.secret_config
 // and never returned to the browser; errors are sanitized before returning.
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
@@ -24,10 +25,20 @@ Deno.serve(async (req: Request) => {
   if (!authHeader) return json({ error: 'unauthorized' }, 401);
 
   const admin = adminClient();
-  const { data: { user } } = await userClient(authHeader).auth.getUser();
+
+  // Admin gate: resolve the caller and confirm their profile role is 'admin'.
+  const caller = userClient(authHeader);
+  const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: 'unauthorized' }, 401);
+  // Admin AND AAL2 — asked of Postgres as the CALLER so the assurance level is
+  // evaluated by the same SQL every RLS policy uses. See _shared/adminAuth.ts.
+  // Placed after getUser() on purpose: a failed session refresh makes
+  // supabase-js send the anon key, and gating earlier would report that as
+  // "two-factor required" instead of the truthful "unauthorized".
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
+  const { data: isAdmin, error: adminErr } = await caller.rpc('is_admin');
+  const gate = decideAdminAuthorization({ data: isAdmin, error: adminErr }, profile?.role);
+  if (!gate.allowed) return json({ error: gate.error, code: gate.code }, gate.status);
 
   let payload: { action?: string; to?: string };
   try { payload = await req.json(); } catch { payload = {}; }

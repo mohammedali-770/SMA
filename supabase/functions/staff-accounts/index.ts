@@ -13,9 +13,12 @@
 //
 // SECURITY BOUNDARIES — all four matter, none is optional:
 //
-//  1. verify_jwt = true (supabase/config.toml) AND an explicit
-//     profiles.role === 'admin' re-check, matching email-test-config and
-//     whatsapp-test-config. The JWT check alone only proves *someone* signed in.
+//  1. verify_jwt = true (supabase/config.toml) AND public.is_admin() asked of
+//     Postgres as the CALLER — role 'admin' AND AAL2, the same predicate every
+//     RLS policy uses — matching email-test-config and whatsapp-test-config.
+//     The JWT check alone only proves *someone* signed in, and a profiles.role
+//     check alone proves nothing about the MFA assurance level: that was the
+//     defect this function shipped with. See _shared/adminAuth.ts.
 //
 //  2. MANAGEABLE_ROLES is an allow-list, not a deny-list. This function can
 //     only ever create or touch branch_staff / call_center accounts. It cannot
@@ -33,6 +36,7 @@
 //  4. Passwords are never logged, never echoed back, and never stored anywhere
 //     by this function. They exist only in the request body and the GoTrue call.
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import {
   MANAGEABLE_ROLES,
@@ -59,9 +63,30 @@ Deno.serve(async (req: Request) => {
   const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: 'unauthorized' }, 401);
 
-  const { data: profile } = await admin
-    .from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
+  // Admin AND AAL2. `is_admin()` is asked of Postgres as the CALLER, so the MFA
+  // assurance level is evaluated by the same SQL every RLS policy uses rather
+  // than by a second implementation here. See _shared/adminAuth.ts.
+  //
+  // PLACEMENT IS DELIBERATE: after getUser(), not before it. supabase-js's
+  // _getAccessToken() discards its error and falls back to sending the ANON KEY
+  // when a session refresh fails; the anon key is a valid JWT with no `aal`
+  // claim. Gating earlier would turn "your session expired" into "two-factor
+  // required" and send the admin to the wrong remedy. An AAL1 admin has a real
+  // session and passes getUser() anyway, so nothing is lost: they are still
+  // stopped before admin.auth.admin.createUser and its rollback churn.
+  const authorize = async () => {
+    const [profileRes, rpcRes] = await Promise.all([
+      admin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
+      caller.rpc('is_admin'),
+    ]);
+    return decideAdminAuthorization(
+      { data: rpcRes.data, error: rpcRes.error },
+      profileRes.data?.role,
+    );
+  };
+
+  const entry = await authorize();
+  if (!entry.allowed) return json({ error: entry.error, code: entry.code }, entry.status);
 
   let payload: Record<string, unknown>;
   try { payload = await req.json(); } catch { payload = {}; }
@@ -173,6 +198,12 @@ Deno.serve(async (req: Request) => {
       if (!isAcceptablePassword(password)) {
         return json({ error: `Password must be at least ${MIN_PASSWORD} characters.` }, 400);
       }
+      // Re-assert immediately before the service-role mutation. The entry gate
+      // above is correct today, but it is ONE lexical guard in a file no unit
+      // test can execute; a refactor that moves or drops it would leave this
+      // call naked. Two independent assertions mean one deletion is not enough.
+      const stillOk = await authorize();
+      if (!stillOk.allowed) return json({ error: stillOk.error, code: stillOk.code }, stillOk.status);
       const { error } = await admin.auth.admin.updateUserById(targetId, { password });
       if (error) return json({ error: sanitize(error.message) }, 400);
       return json({ id: targetId, updated: true }, 200);
@@ -180,6 +211,10 @@ Deno.serve(async (req: Request) => {
 
     // Deleting the auth user cascades to profiles and, through it, to the
     // branch assignment.
+    // Re-asserted for the same reason as reset_password above: deleting an
+    // account is irreversible, so it does not rest on a single guard.
+    const stillAdmin = await authorize();
+    if (!stillAdmin.allowed) return json({ error: stillAdmin.error, code: stillAdmin.code }, stillAdmin.status);
     const { error } = await admin.auth.admin.deleteUser(targetId);
     if (error) return json({ error: sanitize(error.message) }, 400);
     return json({ id: targetId, deleted: true }, 200);

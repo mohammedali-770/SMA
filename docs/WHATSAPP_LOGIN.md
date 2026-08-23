@@ -217,6 +217,67 @@ off).
 email/password only and was not touched. There is no WhatsApp login on the admin
 screen. Existing admin/accountant accounts keep working exactly as before.
 
+### 7.1 `whatsapp-test-config` now requires AAL2, not just the admin role
+
+Nothing about **customer** login changed here. This is about the admin diagnostics
+endpoint behind the WhatsApp card — the one that reads the provider's readiness and
+sends a test OTP.
+
+It used to authorize the way three sibling admin functions did — `staff-accounts`,
+`email-test-config` and the still-frozen `payment-test-config`:
+
+```ts
+if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
+```
+
+That checks the **role** and not the MFA assurance level. Everywhere in SQL, admin
+authority is `is_admin()` = role `admin` **and** `jwt_has_aal2()`
+(`20260810142000_staff_mfa_aal2.sql`). An administrator signed in with email and
+password but without completing TOTP therefore passed this gate while every RLS
+policy and admin RPC refused them — and `whatsapp-test-config` then works through
+the **service-role** client, which bypasses RLS. At AAL1 that endpoint could read
+`integration_settings` readiness and fire a real WhatsApp template send.
+
+It now calls `public.is_admin()` **as the caller** and judges the answer with the
+shared pure predicate in `supabase/functions/_shared/adminAuth.ts`:
+
+```ts
+const caller = userClient(authHeader);
+const { data: { user } } = await caller.auth.getUser();
+if (!user) return json({ error: 'unauthorized' }, 401);
+const { data: profile } = await admin.from('profiles').select('role')…
+const { data: isAdmin, error: adminErr } = await caller.rpc('is_admin');
+const gate = decideAdminAuthorization({ data: isAdmin, error: adminErr }, profile?.role);
+if (!gate.allowed) return json({ error: gate.error, code: gate.code }, gate.status);
+```
+
+Three details that are deliberate rather than incidental:
+
+- **Postgres decides, not TypeScript.** Decoding `aal` from the JWT here would be a
+  second implementation of the predicate in a second language with nothing in CI
+  comparing them, so the next auth migration would diverge silently. PostgREST also
+  populates `request.jwt.claims` only after verifying the signature, so a forged
+  token cannot reach the comparison — a property a local decode does not have.
+- **The gate sits *after* `getUser()`.** `supabase-js` falls back to sending the
+  anon key when a session refresh fails, so gating earlier would report an expired
+  session as "two-factor required" and send the admin to the wrong remedy.
+- **The new failure mode is `403` with `code: 'mfa_required'`**, distinct from the
+  plain `forbidden` a non-admin gets. The admin console surfaces the `error`
+  sentence verbatim, so it reads as an instruction to complete the two-factor step.
+
+**Who this affects.** The admin console already demands TOTP at sign-in
+(`StaffMfaGate`), so the normal UI path is unchanged. It bites an admin account
+with no enrolled TOTP factor calling the function directly. As of 2026-08-23 one of
+the two admin accounts has no verified factor.
+
+**Not live yet.** The deployed `whatsapp-test-config` is v2 from 2026-07-09 and
+predates this change; redeploying it is a separate owner approval
+([`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §5, recorded in §16).
+
+`auth-send-sms-whatsapp`, `whatsapp-send-otp`, `whatsapp-verify-otp` and
+`whatsapp-webhook` are **untouched** — none of them is admin-gated, and the customer
+login path in §2 is unaffected in every respect.
+
 ---
 
 ## 8. Customer profile behavior

@@ -73,8 +73,9 @@ verify_jwt = false
 verify_jwt = true
 
 # Admin-only provisioning for the branch-operations roles. verify_jwt only
-# proves someone signed in, so the function re-checks profiles.role === 'admin'
-# and can touch branch_staff / call_center accounts only.
+# proves someone signed in, so the function additionally calls public.is_admin()
+# as the caller — role 'admin' AND AAL2 — and can touch branch_staff /
+# call_center accounts only.
 [functions.staff-accounts]
 verify_jwt = true
 

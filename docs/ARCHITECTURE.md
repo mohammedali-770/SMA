@@ -191,8 +191,9 @@ already exists. Branch and call-centre accounts are different: they are handed
 out and revoked by an administrator through the `staff-accounts` Edge Function,
 the only place in the repository that calls `auth.admin.createUser`.
 
-Its guards are the point: `verify_jwt` plus an explicit `profiles.role === 'admin'`
-re-check, and an allow-list that restricts every action to `branch_staff` /
+Its guards are the point: `verify_jwt` plus `public.is_admin()` asked of Postgres
+as the caller — role `admin` **and** AAL2, the same predicate every RLS policy uses
+— and an allow-list that restricts every action to `branch_staff` /
 `call_center` targets, so it can neither mint an administrator nor touch a
 customer. Role and branch assignment run through the existing audited RPCs using
 the caller's JWT, so `role_change_audit` records the human who acted rather than
