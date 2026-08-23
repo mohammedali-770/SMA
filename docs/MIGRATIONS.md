@@ -2228,15 +2228,20 @@ volume that does not exist yet. §25's closing note applies unchanged.
 >   suite, where someone reasoning about the arms will look.
 
 
-## 27. Unapplied migration: order-note length limit (NOT applied, awaiting owner approval)
+## 27. Applied migration: order-note length limit (applied 2026-08-22)
 
 | | |
 | --- | --- |
-| Repository file | `20260819120000_order_note_length_limit.sql` (145 lines) |
-| Live version | **none — not applied** |
-| Class | n/a until applied |
-| From | PR for `feat/order-note-length-limit` |
-| Approval | owner approved *building* it on its own branch; applying it to Production is a separate §5 decision and has **not** been given |
+| Repository file | `20260819120000_order_note_length_limit.sql` (**182** lines) |
+| Live version | `20260822123620` |
+| Applied | 2026-08-22 12:36:20 UTC, **by the repository owner**, outside the agent session |
+| From | PR for `feat/order-note-length-limit` (`aff65ce`, #222) |
+| Evidence | executable SQL identical to the repository file; the stored text is condensed — see §31 |
+
+> The line count above read **145** until 2026-08-22 and was wrong on the day it
+> was written: the file has 182 lines and has only ever had one commit. Corrected
+> rather than quietly dropped, because §29 exists for exactly this — a count with
+> no stated method is the thing that makes a record irreproducible.
 
 **What it does.** Adds `public.order_note_normalized(text)`,
 `public.order_note_is_acceptable(text)` and `public.enforce_order_note()`, plus
@@ -2520,11 +2525,11 @@ what ran.
 
 ---
 
-## 30. Unapplied migration: branch-availability ledger retention (NOT applied)
+## 30. Applied migration: branch-availability ledger retention (applied 2026-08-22)
 
-`supabase/migrations/20260822090000_branch_availability_retention.sql`. **Not
-applied to Production**; applying it is a separate owner-approval action under
-CLAUDE.md §5.
+`supabase/migrations/20260822090000_branch_availability_retention.sql`, live
+version `20260822115505`, applied 2026-08-22 11:55:05 UTC with explicit owner
+approval. Full-text md5-identical to the repository file — see §31.
 
 ### Why
 
@@ -2591,3 +2596,111 @@ with a temporary trigger and assert the old rows are gone anyway.
 | window widened to 400 days | case 1 |
 | prune moved inside the sweep's exception block | case 5b (behavioural) |
 | prune also deletes from `branch_availability_events` | case 4 |
+
+---
+
+## 31. The 2026-08-22 application (§30 + §27 + order item notes)
+
+Three migrations reached Production on 2026-08-22, taking live history from
+**100 to 103 rows**. They were applied in two separate acts by two different
+actors, and the difference between them is the point of this section.
+
+| # | Repository file | Live version | Applied (UTC) | By |
+| --- | --- | --- | --- | --- |
+| 1 | `20260822090000_branch_availability_retention` (204 lines) | `20260822115505` | 11:55:05 | this session, on explicit owner approval |
+| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | **the repository owner**, directly |
+| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | **the repository owner**, directly |
+
+Order matters and was respected: #3 calls `order_note_normalized` seven times, so
+it depends on #2. Filename order gives the right sequence.
+
+### The evidence, and where it differs
+
+| # | repo md5 (full text) | applied md5 | full text | executable SQL (`skel`) |
+| --- | --- | --- | --- | --- |
+| 1 | `9e225cf8247940059ff982473b6b5a37` | `9e225cf8247940059ff982473b6b5a37` | **identical** | — |
+| 2 | `90ac03009e71ae9b6e9f5aa73875b56c` | `3982d6167ff005c5aa23f252930eae8d` | differs | `0262280dd19823dcf85ab2b8b125d10b` both sides |
+| 3 | `d5a7c98d65641aee808f0f9a76d055a4` | `6cc898dd6b17d432dd08b2c0d6b5a7e5` | differs | `89e6adeef95a6ff70b73a6298c672103` both sides |
+
+Migration 1 met §9-C1 in full: the `apply_migration` call carried the file's
+complete text, so the live row is md5-identical to the file.
+
+**Migrations 2 and 3 did not.** Their stored text is condensed — 182 lines → 86,
+and 833 → 721, so roughly **200 comment lines were stripped on the way in**. The
+executable SQL is untouched: strip `--` lines and blank lines from both sides,
+normalise whitespace, and the fingerprints match exactly, to the character.
+
+That is the same deviation §24 records, in the same direction, four migrations
+later — and §28 wrote down the full-text md5 method two days earlier precisely to
+prevent it. Recording it rather than smoothing it over, because the consequence
+is specific: the live rows for #2 and #3 carry the SQL without the rationale the
+files carry, and anyone diffing file against row will find a mismatch that looks
+alarming and is not. §29 exists to defuse exactly that confusion; this section
+extends it to two more versions.
+
+**Who applied them, confirmed 2026-08-22.** The owner, working directly against
+Production rather than through an agent session. That was not recoverable from
+`schema_migrations`, which records what ran and when but not who ran it, and it
+is written down here because a ledger that cannot answer "who" is only half a
+record. It was volunteered by the owner after this section first went in reading
+"outside this session"; the placeholder is kept in the history rather than
+pretended away.
+
+**The mechanism is not known and is not recorded here.** The confirmation
+establishes *who*, not *how*: nothing states how these two were submitted or why
+their headers were trimmed, and `schema_migrations` cannot supply either — it
+stores what ran and when, never how it was composed. An earlier draft of this
+section asserted a console-paste explanation. That was invented, it was removed
+on review, and it is mentioned so the absence reads as a known gap rather than an
+oversight.
+
+What the ledger *does* establish is narrower and more useful. §24's condensation
+was "the applying **agent's** own editorial choice while composing the call";
+this one was the **owner**, applying directly. Two different kinds of actor have
+now produced the same deviation, which is the whole basis for the rule below
+being addressed to humans and agents alike. Treating it as an agent-discipline
+problem would aim the fix at one of the two actors who have actually caused it.
+
+**The `skel` fingerprint proves the schema is right and nothing more.** It says
+no statement was added, removed or altered. It says nothing about the comment
+text, which is where these two differ. It is evidence the deviation is harmless,
+not evidence that §9-C1 was satisfied.
+
+### Verification after all three
+
+The order path was the exposure: #3 re-emits `place_order`,
+`compute_order_snapshot` and `insert_order_from_snapshot`, and #3 was applied by
+the owner rather than the author of the revision it replaced. Checked directly
+against the live catalog afterwards:
+
+- `place_order` ACL still `{postgres, service_role}` — **no `authenticated`
+  grant**, so the `20260724200000` hardening that wraps it in
+  `place_customer_order` survived a third-party re-emission;
+- still exactly **one** `place_order` overload;
+- the modifier-availability guard and the `bpa.snoozed_until > now()` lazy
+  expiry from §28 are **both still present** — a re-emission built from an older
+  file would have dropped them silently, and no test would have caught it;
+- the note plumbing is present in all three functions;
+- `branch_availability_sweep` still carries its advisory-lock guard, 0 failed
+  runs, 7 cron jobs, `overall_state` healthy.
+
+The three re-emissions in #3 are pure note plumbing — `place_order` +3/−2,
+`compute_order_snapshot` +1/−0, `insert_order_from_snapshot` +3/−2 — and touch no
+payment logic, which is why they sit outside the CLAUDE.md §6 freeze despite
+`compute_order_snapshot` being the online-checkout twin.
+
+### Retention is live but will read zero until 2026-09-04
+
+Migration 1's prune deletes ledger rows older than 14 days. The ledger's oldest
+row dates from 2026-08-21 20:10, so **nothing is beyond the window yet** and
+`rows_pruned` correctly reads 0 on every tick until roughly 2026-09-04. A zero
+there is the window working, not retention failing. The signal for a broken
+prune is the table growing *past* that date while `rows_pruned` stays 0.
+
+### The rule, restated because it has now been missed twice
+
+Paste the migration file verbatim. If it is too long for one call, that is a
+reason to split the migration, not to edit its text on the way in. Verify with a
+full-text md5 of the live `schema_migrations` row against the file with its
+single trailing newline stripped — not a `skel` fingerprint, which cannot see
+this class of drift at all.
