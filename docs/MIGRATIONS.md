@@ -10,43 +10,45 @@
 
 ## 1. Purpose and production status
 
-**As of 2026-08-07 class E is empty again: every repository migration is applied
+**As of 2026-08-22 class E is empty again: every repository migration is applied
 to Production.**
 
-Four files were applied on 2026-08-07 with explicit owner approval, via the MCP
-`apply_migration` workflow, one call per file. The first two came from PR #166
-and PR #167 (§24); the third from PR #169, corrected by PR #170 before it was
-applied (§25); the fourth from PR #172 (§26).
-
-| Repository file | Applied version | skel | Result |
-| --- | --- | --- | --- |
-| `20260806120000_erasure_phone_normalization` | `20260807140050` | `8759892535b7` | applied |
-| `20260806130000_admin_ranged_orders_and_stats` | `20260807140206` | `a92bb07e58c7` | applied |
-| `20260807150000_order_flow_health_card` | `20260807152347` | `f4df8ad27e85` | applied |
-| `20260807170000_order_flow_alert_condition` | `20260807172027` | `0156c74bbf8d` | applied |
-
-The three files unapplied before them — two from PR #142, one from PR #146 —
-were applied on 2026-08-05, the same way.
+Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
+`apply_migration` workflow, one call per file. Full evidence — pre-live gate,
+drift check, verification, advisors and rollback — is in
+`docs/MIGRATION_APPLICATION_20260822.md`.
 
 | Repository file | Applied version | Result |
 | --- | --- | --- |
-| `20260801120000_address_single_default` | `20260805061621` | applied |
-| `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
-| `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
+| `20260819120000_order_note_length_limit` | `20260822123620` | applied |
+| `20260821170000_order_item_notes` | `20260822123940` | applied |
 
-- Repository migration files (default branch `claude/project-build-ie4b56`): **68**
-- Live `schema_migrations` rows: **70**
+The first was a **dependency the second could not run without**:
+`order_item_notes` calls `public.order_note_normalized`, which did not exist in
+Production because `20260819120000` had never been applied. plpgsql resolves
+function calls at runtime, so applying only the second would have succeeded
+silently and then failed on every order placement.
+
+- Repository migration files (default branch `claude/project-build-ie4b56`): **97**
+- Live `schema_migrations` rows: **103**
 - Unapplied repository files: **0**
-- Latest live version: **`20260807172027`**
-  (`order_flow_alert_condition`; repository version `20260807170000`)
+- Latest live version: **`20260822123940`**
+  (`order_item_notes`; repository version `20260821170000`)
 
-The 68 / 70 difference is the long-standing **history** divergence, not a
-*schema* divergence: **five** live-only F-class rows carry no repository file,
-and **three** H-class repository files (`place_order`, `loyalty`,
-`order_idempotency`) were superseded by later consolidated migrations.
-`68 files − 3 H-class + 5 F-class = 70 rows`. §4 carries the full
-class-by-class algebra, recomputed from live data on 2026-08-07 and reconciling
-both sides exactly; §5 maps a subset of the rows.
+The 97 / 103 difference is the long-standing **history** divergence, not a
+*schema* divergence. It has held at **6** since the 2026-08-12 reconciliation
+(79 files / 85 rows) — see `docs/MIGRATION_RECONCILIATION_20260812.md`, and §28
+for the 2026-08-21 application. The class-by-class algebra in §4 was last
+recomputed from live data on 2026-08-07 and is **not** extended here by
+arithmetic alone.
+
+That divergence was **2** when §4 was last recomputed from live data on
+2026-08-07, at 68 files / 70 rows: **five** live-only F-class rows carry no
+repository file, and **three** H-class repository files (`place_order`,
+`loyalty`, `order_idempotency`) were superseded by later consolidated
+migrations. `68 files − 3 H-class + 5 F-class = 70 rows`. §4 carries that full
+class-by-class algebra, reconciling both sides exactly **as of that date**;
+§5 maps a subset of the rows.
 
 > **One of those five F-class rows was discovered during the 2026-08-07 pre-live
 > gate and had never been recorded here:** version `20260806045142`, name `noop`, whose
@@ -61,11 +63,20 @@ both sides exactly; §5 maps a subset of the rows.
 
 > **Version alignment was deliberately NOT performed** (run-book Step 3, §9-D).
 > `apply_migration` stamped apply-time versions that differ from the repository
-> filenames, so these three are class **B**, which is what most of the ledger
-> already looks like. Aligning them is a separate live history write needing its
-> own explicit owner approval.
+> filenames, so the three applied on 2026-08-05 are class **B**, which is what
+> most of the ledger already looks like. Aligning them is a separate live
+> history write needing its own explicit owner approval.
 
 ### The 2026-08-05 application
+
+The three files unapplied before the 2026-08-07 wave — two from PR #142, one
+from PR #146 — were applied on 2026-08-05, the same way.
+
+| Repository file | Applied version | Result |
+| --- | --- | --- |
+| `20260801120000_address_single_default` | `20260805061621` | applied |
+| `20260801120100_checkout_session_address_fk_set_null` | `20260805061912` | applied |
+| `20260802120000_address_description_trim_all_whitespace` | `20260805061955` | applied |
 
 Pre-live gate (§9-B), recorded before applying:
 
@@ -404,18 +415,24 @@ production.
 | 53 | 20260724170000 | require_address_description | — | 20260729075631 | require_address_description | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Requires a delivery-address description. Applied 2026-07-29 (Wave B, §20) |
 | 54 | 20260724180000 | tap_reference_order_opaque | — | 20260729080617 | tap_reference_order_opaque | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Makes the provider-facing order reference opaque. Applied 2026-07-29 (Wave B, §20). **Payment area — frozen (§21)** |
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
-| 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). **Current latest live version** |
+| 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). Latest live version until the 2026-08-05 application |
+| 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. **Who applied it is recorded differently by the two records** (§31: the owner, directly, mechanism unknown; `docs/MIGRATION_APPLICATION_20260822.md`: an agent session via MCP `apply_migration` after the §2 blocker was reported) — unresolved. Detail in §27 and §31 |
+| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot` and `enforce_order_item_note`, and plpgsql resolves those calls at runtime, so applying this one alone would have reported success and then failed on every order placement. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Same attribution conflict as row 57. Detail in §31. **Current latest live version** |
 
-Reconciliation check: the rows above detail **56 repository / 57 live** rows.
-That is a **subset**, not the whole picture — it predates the five
-account-deletion migrations, the three applied 2026-08-05, the four applied
-2026-08-07, and the `noop` probe.
+Reconciliation check: the rows above detail **58 repository / 59 live** rows.
+That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
+omit the five account-deletion migrations, the three applied 2026-08-05, the
+four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–58
+are appended out of that sequence because §1 now turns on them.
 
-**§4 is authoritative for totals** and reconciles the full set exactly:
-`A 8 + B 54 + C 3 + H 3 = 68` repository files, `A 8 + B 54 + C 3 + F 5 = 70`
-live rows. The per-row table above has deliberately **not** been re-derived —
+**§4 is authoritative for the class algebra**, and reconciled the full set
+exactly **as of 2026-08-07**: `A 8 + B 54 + C 3 + H 3 = 68` repository files,
+`A 8 + B 54 + C 3 + F 5 = 70` live rows. It has not been recomputed from live
+data since; §1 carries the current totals (97 files / 103 rows). The rows
+between 2026-07-29 and 2026-08-22 have deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
-would produce are already stated in §4.
+would produce are already stated in §1 and §4.
 
 **There is no repository-only/UNAPPLIED file** (class E is empty). The live-only
 F-class rows carry no repository file. This is a history divergence, not drift.
