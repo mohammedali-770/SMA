@@ -195,13 +195,42 @@ export function extractCatalogRecord(
 }
 
 /**
+ * Envelope keys tried BEFORE the generic list, per entity.
+ *
+ * Only `addon_group` is listed, deliberately. The generic keys below cover the
+ * plural of every other entity (`branches`, `categories`, `items`, `addons`),
+ * and those four demonstrably parse — but nothing in the generic list matches
+ * the add-on-GROUP endpoint's plural, so `/menu/addons-groups` produced zero
+ * records on every catalog pull since the importer was written, reported as a
+ * clean success with no error. Adding the group keys to the generic list would
+ * also work, but a group envelope may itself carry an `addons` key (the add-ons
+ * belonging to each group), and `addons` sits ahead of `groups` in the generic
+ * order — so a group response would be at risk of being read as an add-on list.
+ * Trying the entity's own keys first removes that ambiguity.
+ */
+const ENTITY_LIST_KEYS: Partial<Record<CatalogEntityType, string[]>> = {
+  addon_group: ['addons_groups', 'addon_groups', 'addonsGroups', 'addonGroups', 'groups'],
+};
+
+/**
  * Pull the record array out of a catalog response envelope. Accepts a bare
  * array, or a `{ data | results | items | records | <plural> }` wrapper.
+ *
+ * `entity` is optional and only narrows the search: when given, that entity's
+ * own envelope keys are tried first (see ENTITY_LIST_KEYS). Callers that omit
+ * it get exactly the previous behaviour.
  */
-export function extractCatalogList(payload: unknown): Record<string, unknown>[] {
+export function extractCatalogList(
+  payload: unknown, entity?: CatalogEntityType,
+): Record<string, unknown>[] {
   if (Array.isArray(payload)) return payload.filter(isObj) as Record<string, unknown>[];
   if (isObj(payload)) {
-    for (const k of ['data', 'results', 'items', 'records', 'branches', 'categories', 'addons', 'groups', 'list']) {
+    const preferred = entity ? (ENTITY_LIST_KEYS[entity] ?? []) : [];
+    const keys = [
+      ...preferred,
+      'data', 'results', 'items', 'records', 'branches', 'categories', 'addons', 'groups', 'list',
+    ];
+    for (const k of keys) {
       const v = payload[k];
       if (Array.isArray(v)) return v.filter(isObj) as Record<string, unknown>[];
     }
@@ -213,7 +242,7 @@ export function extractCatalogList(payload: unknown): Record<string, unknown>[] 
 export function normalizeCatalogPayload(
   entity: CatalogEntityType, payload: unknown,
 ): NormalizedCatalogRecord[] {
-  return extractCatalogList(payload)
+  return extractCatalogList(payload, entity)
     .map((r) => extractCatalogRecord(entity, r))
     .filter((r): r is NormalizedCatalogRecord => r !== null);
 }

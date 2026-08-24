@@ -75,6 +75,25 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    errors); records removed from Lazywait are pruned on the next successful pull.
    Parsing is **defensive**: handles en/ar/Turkish-only names, multi-price items,
    `branches_ids`, and null addon prices / null group min/max/multi safely.
+
+   **Add-on groups imported zero records until 2026-08-24.** The envelope
+   unwrapper (`extractCatalogList`) tried a fixed key list that carried the
+   plural of every entity except this one — no `addons_groups` / `addon_groups`
+   — so `/menu/addons-groups` yielded an empty list on every pull since the
+   importer was written, and, because an empty parse is not an error, each run
+   still recorded `status: "success"` with `addon_groups: 0` and no error. Every
+   `lazywait_catalog_pulls` row in Production shows exactly that. The unwrapper
+   now takes the entity and tries that entity's own envelope keys **first**;
+   only `addon_group` needs it, since the generic list already covers the other
+   four. Trying them first rather than appending them matters: a group envelope
+   may itself carry an `addons` key listing each group's add-ons, and `addons`
+   precedes `groups` in the generic order, so a group response could otherwise
+   be read as an add-on list. Pinned by `lazywaitCatalog.test.ts`, including a
+   regression case asserting the old path returned nothing for the same body.
+
+   A zero count from a healthy endpoint is indistinguishable from an empty
+   catalog in the pull log. If a future entity starts reporting 0 where records
+   are expected, suspect the envelope key before the vendor.
 2. **Suggest (client-side, pure):** `src/lib/lazywaitMatch.ts` normalizes names
    (Arabic alef/hamza/taa-marbuta/tashkeel, Latin diacritics, Turkish letters)
    and scores each local record against the pulled candidates →

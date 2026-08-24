@@ -11,6 +11,65 @@ describe('extractCatalogList (response envelope)', () => {
     expect(extractCatalogList(null)).toEqual([]);
     expect(extractCatalogList({ nope: 1 })).toEqual([]);
   });
+
+  it('reads an add-on GROUP envelope, whatever plural it uses', () => {
+    // The generic key list has no plural for this endpoint, so every one of
+    // these parsed to ZERO records before — silently, as a clean success.
+    for (const key of ['addons_groups', 'addon_groups', 'addonsGroups', 'addonGroups', 'groups']) {
+      expect(extractCatalogList({ [key]: [{ id: 'G1' }, { id: 'G2' }] }, 'addon_group').length).toBe(2);
+    }
+  });
+
+  it('prefers the group envelope over an `addons` key on the same body', () => {
+    // A group response may carry the add-ons belonging to each group. `addons`
+    // sits ahead of `groups` in the generic order, so without the entity hint
+    // the group list would be read as an add-on list.
+    const body = { addons_groups: [{ id: 'G1' }], addons: [{ id: 'A1' }, { id: 'A2' }] };
+    expect(extractCatalogList(body, 'addon_group')).toEqual([{ id: 'G1' }]);
+    expect(extractCatalogList(body, 'addon')).toEqual([{ id: 'A1' }, { id: 'A2' }]);
+  });
+
+  it('is unchanged for every other entity, and when no entity is given', () => {
+    const bodies: Array<[Parameters<typeof extractCatalogList>[1], Record<string, unknown>]> = [
+      ['branch', { branches: [{ id: '1' }] }],
+      ['category', { categories: [{ id: '1' }] }],
+      ['item', { items: [{ id: '1' }] }],
+      ['addon', { addons: [{ id: '1' }] }],
+    ];
+    for (const [entity, body] of bodies) {
+      expect(extractCatalogList(body, entity).length).toBe(1);
+      expect(extractCatalogList(body).length).toBe(1);      // no hint -> same answer
+    }
+    // The hint never invents a list where there is none.
+    expect(extractCatalogList({ nope: 1 }, 'addon_group')).toEqual([]);
+  });
+});
+
+describe('normalizeCatalogPayload — add-on groups reach the catalog cache', () => {
+  it('normalizes a group list that only the entity-aware keys can find', () => {
+    const records = normalizeCatalogPayload('addon_group', {
+      addons_groups: [
+        { addons_group_id: 'G_HEAT', names: { en: 'Heat Level', ar: 'مستوى الحرارة' },
+          min_selection: 1, max_selection: 1, multi_max: 1 },
+        { addons_group_id: 'G_DRINKS', name_en: 'Drinks', name_ar: 'مشروبات' },
+      ],
+    });
+    expect(records.length).toBe(2);
+    expect(records[0].entity_type).toBe('addon_group');
+    expect(records[0].lazywait_id).toBe('G_HEAT');
+    expect(records[0].name_en).toBe('Heat Level');
+    expect(records[0].name_ar).toBe('مستوى الحرارة');
+    expect(records[0].min_selection).toBe(1);
+    expect(records[1].lazywait_id).toBe('G_DRINKS');
+  });
+
+  it('REGRESSION: the same body returned nothing before the entity hint', () => {
+    // Exactly the shape the importer was handed; the generic key list has no
+    // `addons_groups`, so this produced 0 records and a success with no error.
+    const body = { addons_groups: [{ addons_group_id: 'G1', name_en: 'Test' }] };
+    expect(extractCatalogList(body).length).toBe(0);            // old path
+    expect(normalizeCatalogPayload('addon_group', body).length).toBe(1); // fixed path
+  });
 });
 
 describe('extractCatalogRecord — ids + names', () => {
