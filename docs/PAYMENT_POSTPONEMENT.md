@@ -327,6 +327,7 @@ deliberately turns it on.
 | `supabase/functions/_shared/moyasarRefund.ts` | Refund body, response classification, resolve-before-retry |
 | `supabase/migrations/20260824100000_moyasar_payment_provider.sql` | `payment_records.provider_checkout_ref`, provider-generic `begin_payment_attempt` / `begin_session_attempt` |
 | `src/components/admin/MoyasarPaymentPanel.tsx`, `src/lib/moyasarAdminTest.ts` | Admin readiness + sandbox test |
+| `supabase/tests/moyasar_begin_attempt_test.sql` | Ten cases against a fresh 98-migration database: the double-charge guard, provider scoping, expiry, fail-closed preconditions, service-role-only grants |
 | `docs/integrations/Moyasar_API_Reference.md` | The researched API reference |
 | Moyasar branches in `payment-initiate`, `payment-verify`, `payment-webhook`, `payment-refund`, `payment-test-config` | Dispatch only |
 
