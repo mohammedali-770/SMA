@@ -690,21 +690,30 @@ Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
 
 ## 17. Lazywait add-on mapping — heat level has no POS counterpart
 
-**Status:** OWNER DECISION. **The `lazywait-sync` deploy is held pending this.**
+**Status:** OWNER DECISION, narrowed. **The `lazywait-sync` deploy remains held —
+that is unchanged** — but the deploy is no longer *blocked* by this gap.
 
 PR #246 (`536a6cb`) brought the Create Order payload up to the vendor contract of
-2026-08-24. Part of that change: an order line whose modifier carries no
-`modifiers.lazywait_addon_id` now blocks the order with `missing_addon_mapping`
-rather than dropping the add-on silently — a silent drop would hide the add-on
-from the kitchen *and* undercharge the ticket, because the add-on money is
+2026-08-24. Part of that change: an order line whose modifier carried no
+`modifiers.lazywait_addon_id` blocked the whole order with
+`missing_addon_mapping`, on the reasoning that a silent drop would hide the
+add-on from the kitchen *and* undercharge the ticket, because the add-on money is
 subtracted out of the item price.
 
-A read-only Production check the same day found the precondition **entirely
+A read-only Production check the same day found that precondition **entirely
 unmet**: 0 of 3 modifiers mapped, all three active. Every active product, price
 and category *is* mapped — add-ons are the only gap. In the preceding 90 days,
 7 of 38 pickup orders (18.4%) carried a modifier and 5 synced fine under the
-older worker, so deploying as-is would block roughly one pickup order in five.
-Full numbers and method: `docs/LAZYWAIT.md`, "Operational precondition".
+older worker, so deploying as-is would have blocked roughly one pickup order in
+five, permanently, with no mapping available to fix it.
+
+**The block has since been replaced** (repository code; nothing deployed): an
+unmapped modifier is folded into `order_items[].details` and its money is left
+inside `price`, which is byte-for-byte what the still-live July worker sends.
+Both objections above are answered rather than waived — the choice is on the
+ticket in text, and the line is charged exactly what the customer paid, so
+**option 2 below no longer drops the 2 SAR** it was priced at. Full numbers,
+method and the two catalog searches: `docs/LAZYWAIT.md`, "Unmapped modifiers".
 
 **Why this is a decision and not a task.** The three modifiers are Mild, Hot and
 Volcano (+2), one "Heat Level" group on two active products. Lazywait's catalog
@@ -717,22 +726,25 @@ Options, with the money consequence stated:
    and correct in every case. Requires a vendor catalog write, which is an owner
    action.
 2. **Treat heat level as an instruction rather than a purchase**, carrying it in
-   `order_items[].details` — a field the same PR enabled. Free *today*: only Mild
-   and Hot have ever been ordered, both at 0.00. But **Volcano (+2.00) has never
-   been ordered**, and the first time it is, this option drops 2 SAR from the POS
-   ticket. It is only safe if Volcano is separately handled as a real add-on or
-   as a priced item variant.
+   `order_items[].details` — a field the same PR enabled. This is what the code
+   now does. The 2 SAR objection recorded here on 2026-08-24 assumed the add-on
+   money would still be subtracted out of `price`; it is not, so Volcano's 2.00
+   stays on the line and no money moves. What this option does *not* give is a
+   separately priced add-on line the POS can report on — heat level arrives as
+   text.
 3. **Hold the deploy** until 1 or 2 is settled. Costs nothing: the merged code is
    inert in Production until `lazywait-sync` is redeployed, and the running
    function continues to sync pickup orders exactly as before.
 
-Option 3 is the current state, chosen by the owner on 2026-08-24. Option 1 is the
-only one that keeps the money right unconditionally.
+Option 3 remains the current state, chosen by the owner on 2026-08-24 and not
+revisited here. Option 2 is now implemented in the repository, which removes the
+"deploying breaks one order in five" hazard; option 1 is still the only one that
+puts heat level on the ticket as a structured, separately priced add-on.
 
-Nothing here is a defect in the blocking behaviour — it surfaced a real catalog
-gap before it could become a wrong ticket. Deploying `lazywait-sync`, writing
-mapping rows and creating add-ons in the vendor catalog are each separate §5
-actions.
+The blocking behaviour was not wasted — it surfaced a real catalog gap before it
+could become a wrong ticket. It was the wrong *response* to the gap, because no
+mapping exists to recover with. Deploying `lazywait-sync`, writing mapping rows
+and creating add-ons in the vendor catalog are each separate §5 actions.
 
 ## Owner-action closeout rule
 
