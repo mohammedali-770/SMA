@@ -7,14 +7,15 @@
 **Project:** `spicy-meal-ordering` (`wxfmmnihidsdyemasstf`)
 **Repository base:** `0eeb66d` (squash-merge of PR #231) on `claude/project-build-ie4b56`
 **Approval:** explicit owner approval in session, for **both** applications, given after the blocker in §2 was reported.
-**Applied by:** the **repository owner**, who applied both, one after the other — stated by the owner on 2026-08-23.
+**Applied by:** a **Claude Code session** — `session_01VXmTcJDSWXVD9qm7irPbpV` — acting on the owner's explicit in-conversation approval. **Corrected 2026-08-24**; this line previously named the repository owner as the applier. See the correction in §1.
+**Mechanism:** MCP `apply_migration` via the Supabase MCP server, one call per file, in dependency order, each call followed by read-only verification.
 
 ---
 
 ## 1. What was applied
 
 Two migrations, via MCP `apply_migration`, one call per file, in this order.
-The **repository owner** applied both, one after the other.
+A single **Claude Code session** issued both calls, one after the other, each followed by read-only verification — see the correction below.
 
 | # | Repository file | Migration name | Applied version | Class |
 | --- | --- | --- | --- | --- |
@@ -24,14 +25,35 @@ The **repository owner** applied both, one after the other.
 Ledger movement: **101 → 102 → 103** rows. Latest live version before the
 application was `20260822115505` (`branch_availability_retention`).
 
-> **Who applied these was not recoverable from the ledger.**
-> `schema_migrations` records what ran and when, never who ran it, and this
-> record originally left the actor out — which is why §31 of
-> `docs/MIGRATIONS.md` could say only "outside this session". The owner
-> stated it on 2026-08-23 and it is written down here rather than left to
-> be re-derived. The **mechanism** remains unrecorded, per §31: nothing
-> establishes how the two calls were composed, and §31 documents an earlier
-> draft that invented an explanation and had to have it removed on review.
+> **Corrected 2026-08-24 — the actor named here was wrong.** This record, and
+> §31 of `docs/MIGRATIONS.md`, previously said the **repository owner** applied
+> both migrations directly, sourced to a statement the owner made on 2026-08-23.
+> A **Claude Code session** applied them: `session_01VXmTcJDSWXVD9qm7irPbpV`,
+> via two MCP `apply_migration` calls. The owner's statement is best read as
+> describing the authorisation and direction of the work — which is exactly what
+> happened, and the **Approval** line in the header is unchanged — not the
+> execution of the calls. Corrected visibly rather than swapped quietly, because
+> §29 of `docs/MIGRATIONS.md` sets that standard and because PR #233 gave its
+> own corrected claim the same treatment.
+>
+> **The ledger still cannot supply the actor; the applying session's transcript
+> can, and does.** `schema_migrations` records what ran and when, never who ran
+> it — that has not changed, and it is why §31 could originally say only
+> "outside this session". What closes the gap is the transcript of the session
+> that made the calls: it called `apply_migration` for `order_note_length_limit`
+> and verified it read-only, then called `apply_migration` for `order_item_notes`
+> and verified that read-only. Those two calls produced exactly the versions this
+> record carries — `20260822123620` and `20260822123940` — and moved
+> `schema_migrations` 101 → 102 → 103, leaving no room for a second actor.
+>
+> **Unlike the actor, the mechanism was never in the ledger either — but it is
+> recoverable, and is now stated plainly:** MCP `apply_migration` via the
+> Supabase MCP server, one call per file, in dependency order, each call followed
+> by read-only verification. What remains unrecorded is why the stored text was
+> condensed on the way in; §31 documents an earlier draft that invented a
+> console-paste explanation for that and had to have it removed on review.
+> Getting *who* wrong is the same class of defect, which is why it is corrected
+> here in the same visible way rather than amended in place.
 
 Both are **class B**: `apply_migration` stamps an apply-time version that
 differs from the repository filename. **§9-D version alignment was deliberately
