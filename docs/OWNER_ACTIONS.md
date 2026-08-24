@@ -108,6 +108,27 @@ Also verify review-thread resolution / pull-request / linear-history rules remai
 
 If GitHub settings differ from this list, update `CLAUDE.md` and `docs/RELEASE_CHECKLIST.md` in the same change so source documentation does not claim a control that is absent.
 
+### Required status checks are enforced — evidence, 2026-08-24
+
+Server-side required status checks **are** configured and enforced on `claude/project-build-ie4b56`. On 2026-08-24 at ~12:09 UTC, merging PR #243 through the GitHub API was refused by the server:
+
+```
+PUT /repos/mohammedali-770/sma/pulls/243/merge -> 405
+Repository rule violations found
+
+5 of 5 required status checks are expected.
+```
+
+The branch was behind its base, so none of the required contexts had reported for the head being merged. Re-running CI via `update_pull_request_branch` cleared the refusal and the merge proceeded. Earlier the same day PRs #249, #250 and #241 merged normally with green checks.
+
+This supersedes the 2026-08-07 record — repeated in [`CLAUDE.md`](../CLAUDE.md) §12 — that required CI status checks were **not** proven or enforced. A required context that has not reported blocks the merge; that is precisely what refused #243.
+
+**Five required, six intended.** The rule expects **five** contexts. The list above names **six**. Which five are configured cannot be read from here: the GitHub tool surface available to an agent session has no branch-protection or ruleset read tool. They are therefore **not recorded here and not guessed at** — §12 exists precisely because dashboard state must not be asserted from source.
+
+**Inference, not established fact.** The likeliest missing context is `Documentation (generated + ownership)`. §14 of this file still records adding that context in **Settings → Rules** as an outstanding owner action, and six intended minus that one is five. **If that inference is correct**, the documentation gate that enforces `docs/ownership.json` — the mechanism behind [`CLAUDE.md`](../CLAUDE.md) §14 — currently runs and reports but does **not** block a merge. This is unconfirmed and cannot be confirmed from source.
+
+**Action needed:** the owner opens **Settings → Rules**, reads the configured required check contexts, and records which five they are. That one reading either confirms or refutes the inference above and closes the five-versus-six discrepancy.
+
 ## 6. Production deployment gating
 
 **Status:** LIVE VERIFY / SETTINGS.
@@ -412,6 +433,11 @@ The workflow reports the status check context:
 **Making it actually block a merge is dashboard state, not source** (§12). Add that context in
 **Settings → Rules** alongside the other intended required contexts. Until it is added, the check
 runs and reports but a red result does not prevent merging.
+
+**Still outstanding as of 2026-08-24, on inference.** The merge refusal recorded in §5 names
+**five** required contexts where the intended list has six, which points at this action not having
+been done. That is read off a count, not off the dashboard — see §5 for the evidence and for the
+single check that would settle it.
 
 Use the emitted job name exactly as written above. The equivalent mistake has been made before with
 the design-system job, whose context is the job ID `design-system` rather than the workflow display
