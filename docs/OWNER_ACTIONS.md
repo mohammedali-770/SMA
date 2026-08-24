@@ -1,6 +1,6 @@
 # Owner Actions — Current Decision Register
 
-> **Updated 2026-08-18.** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
+> **Updated 2026-08-24.** This file lists work that cannot be completed safely from repository source alone because it needs an owner decision, a live-dashboard check, business/legal input, spending approval, or an explicitly approved production action.
 
 Historical solved items remain available in Git/PR history; they are not repeated here as if they were still open.
 
@@ -687,6 +687,52 @@ Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
 [`MIGRATIONS.md`](MIGRATIONS.md) §28–§29.
 
 ---
+
+## 17. Lazywait add-on mapping — heat level has no POS counterpart
+
+**Status:** OWNER DECISION. **The `lazywait-sync` deploy is held pending this.**
+
+PR #246 (`536a6cb`) brought the Create Order payload up to the vendor contract of
+2026-08-24. Part of that change: an order line whose modifier carries no
+`modifiers.lazywait_addon_id` now blocks the order with `missing_addon_mapping`
+rather than dropping the add-on silently — a silent drop would hide the add-on
+from the kitchen *and* undercharge the ticket, because the add-on money is
+subtracted out of the item price.
+
+A read-only Production check the same day found the precondition **entirely
+unmet**: 0 of 3 modifiers mapped, all three active. Every active product, price
+and category *is* mapped — add-ons are the only gap. In the preceding 90 days,
+7 of 38 pickup orders (18.4%) carried a modifier and 5 synced fine under the
+older worker, so deploying as-is would block roughly one pickup order in five.
+Full numbers and method: `docs/LAZYWAIT.md`, "Operational precondition".
+
+**Why this is a decision and not a task.** The three modifiers are Mild, Hot and
+Volcano (+2), one "Heat Level" group on two active products. Lazywait's catalog
+holds 27 add-ons — toppings and drinks — and **none of them is a heat level**.
+There is nothing to map them *to*.
+
+Options, with the money consequence stated:
+
+1. **Create the three heat-level add-ons in Lazywait, then map them.** Complete
+   and correct in every case. Requires a vendor catalog write, which is an owner
+   action.
+2. **Treat heat level as an instruction rather than a purchase**, carrying it in
+   `order_items[].details` — a field the same PR enabled. Free *today*: only Mild
+   and Hot have ever been ordered, both at 0.00. But **Volcano (+2.00) has never
+   been ordered**, and the first time it is, this option drops 2 SAR from the POS
+   ticket. It is only safe if Volcano is separately handled as a real add-on or
+   as a priced item variant.
+3. **Hold the deploy** until 1 or 2 is settled. Costs nothing: the merged code is
+   inert in Production until `lazywait-sync` is redeployed, and the running
+   function continues to sync pickup orders exactly as before.
+
+Option 3 is the current state, chosen by the owner on 2026-08-24. Option 1 is the
+only one that keeps the money right unconditionally.
+
+Nothing here is a defect in the blocking behaviour — it surfaced a real catalog
+gap before it could become a wrong ticket. Deploying `lazywait-sync`, writing
+mapping rows and creating add-ons in the vendor catalog are each separate §5
+actions.
 
 ## Owner-action closeout rule
 

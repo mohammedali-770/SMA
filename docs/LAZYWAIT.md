@@ -131,13 +131,41 @@ between the two is **unverified**. Field-by-field state:
   frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
 
 ### Operational precondition — add-on mapping must be complete
-An order line whose modifier has no `modifiers.lazywait_addon_id` now **blocks**
-the whole order with `missing_addon_mapping` instead of syncing. That is
-deliberate: the add-on money is subtracted out of the item price, so dropping an
-unmapped add-on would both hide it from the kitchen and undercharge the ticket.
-Check `lazywait_mapping_status()` (or the admin **Lazywait catalog mapping**
-card) for unmapped modifiers before this reaches Production — any gap turns into
-blocked orders rather than wrong ones, but it is still a queue to watch.
+An order line whose modifier has no `modifiers.lazywait_addon_id` **blocks** the
+whole order with `missing_addon_mapping` instead of syncing. That is deliberate:
+the add-on money is subtracted out of the item price, so dropping an unmapped
+add-on would both hide it from the kitchen and undercharge the ticket.
+
+**This precondition is NOT met, and the deploy is on hold (owner decision,
+2026-08-24).** The check was run read-only against Production the day the
+payload change merged (`536a6cb`), and the answer is not "a few rows to map":
+
+| Entity | Total | Mapped | Active unmapped |
+|---|---|---|---|
+| `modifiers.lazywait_addon_id` | 3 | **0** | **3** |
+| `products.lazywait_item_id` | 70 | 65 | 0 |
+| `products.lazywait_price_id` | 70 | 65 | 0 |
+| `categories.lazywait_category_id` | 9 | 6 | 0 |
+
+Every active product, price and category is mapped. **No modifier is.** All three
+— Mild, Hot, Volcano (+2) — are active, sit in one "Heat Level" group and are
+offered by two active products. In the 90 days to 2026-08-24, **7 of 38 pickup
+orders (18.4%) carried a modifier**, and 5 of those synced successfully under the
+older worker that ignored modifiers. Deploying the current worker without
+resolving this would send roughly one pickup order in five to `blocked` instead
+of to the kitchen.
+
+**It cannot be fixed by mapping alone.** `lazywait_catalog_items` holds 27
+Lazywait add-ons — Cheese, Lettuce, Onion, tomato, Coleslaw, Wedges, juices,
+Kinza drinks — and **none is a heat level**, in either language. Our three
+modifiers are local rows that never had a POS counterpart, which is why the
+catalog import left them null. Resolving this needs a decision, not a mapping
+click; the options and their money implications are in `docs/OWNER_ACTIONS.md`
+§17.
+
+Re-run the check before any future deploy — `lazywait_mapping_status()` (staff
+role required) or the admin **Lazywait catalog mapping** card. The numbers above
+are a dated snapshot, not a standing fact.
 
 ### Intentionally NOT sent (schemas unconfirmed — do not invent)
 Delivery address/fields, `latitude`/`longitude` (the contract has **no**
