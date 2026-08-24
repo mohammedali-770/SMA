@@ -235,6 +235,87 @@ Never hand-edit a file in `docs/reference/`; fix the generator instead. The exem
 is for changes that genuinely do not affect documented behaviour — not for deferring
 documentation.
 
+## 15. Two sessions on one branch — verify the artifact, not the description
+
+More than one agent session can hold the same branch at the same time, and a
+session's picture of what its branch contains **goes stale the moment another
+session pushes to it**. On 2026-08-24 that produced a merge commit describing
+changes it did not contain and a correct pull request closed as a duplicate.
+The details are below, because the rule only makes sense with them.
+
+**The rule, in one line: before you merge or close, read the diff — not the pull
+request body, not your own memory of what you wrote.**
+
+Concretely, and each of these is cheap:
+
+- **Before merging**, diff the head against the base and write the merge message
+  from *that*. `git diff <base>...<head> --stat` and the hunk headers are enough.
+  A pull-request description is a claim made at some earlier moment; the diff is
+  the artifact. Where they disagree, the description is wrong.
+- **Before closing anything as superseded, duplicate or already-merged**, prove
+  it against the merged commit: `git show <sha> --stat`, and grep the file on the
+  base branch for the text you believe has landed. "It was in the branch when I
+  wrote it" is not proof. Neither is a merge message — including your own.
+- **Before assuming a branch is yours**, check whether it has moved:
+  `git log <your-last-sha>..origin/<branch>`. A branch you pushed an hour ago may
+  have been re-scoped, rebased or narrowed since.
+- **A stale plan is not authorisation.** An offer or intention recorded in a pull
+  request body ("I can split this out if you prefer") is not an instruction, and
+  acting on one you did not receive is the §3 problem wearing different clothes.
+
+**When two sessions do collide**, do not resolve it by widening your own change to
+cover the other. Narrow to your stated scope, say in the pull request what moved
+and where it went, and leave the other session's work to the other pull request.
+
+### What happened, 2026-08-24
+
+Pull request #241 corrected the actor recorded for the two 2026-08-22 migration
+applications. It originally also corrected §27 and §31 of `docs/MIGRATIONS.md`,
+flagged that as beyond its stated scope, and offered to split them out. The owner
+asked for the split; the §27/§31 hunks moved to #243, and #241 was narrowed —
+by an added commit, not a force-push — to rows 57/58 plus
+`docs/MIGRATION_APPLICATION_20260822.md`.
+
+A second session was working the same branch and did not see the narrowing. It
+then:
+
+1. **merged #241 from the pre-split description.** The squash message on
+   `a5d5cb7` states "Beyond rows 57/58: §27's Applied cell and §31's By column,
+   'who applied them' paragraph and 'mechanism is not known' paragraph carried
+   the same claim". `git show a5d5cb7 -- docs/MIGRATIONS.md` contains one hunk,
+   `@@ -420,8 +420,8 @@`. The commit describes work it does not contain, and that
+   message is now permanent history on the default branch;
+2. **closed #243 as superseded**, stating that #241 "already contains every
+   change in this PR" and that "the two diffs match essentially word for word".
+   They did not overlap at all. The claim was checked against the intent recorded
+   in #241's stale description — the same belief that produced the merge message
+   — rather than against the merged diff, which would have refuted it in one
+   command;
+3. **read #241's offer to split as the instruction to split**, and described the
+   duplication as its own doing, when the two pull requests were by then disjoint.
+
+The cost was not the wasted work. It was that `docs/MIGRATIONS.md` sat on the
+default branch **contradicting itself**: rows 57 and 58 named a Claude Code
+session and pointed the reader at "§27 and §31" for detail, where §27 and §31
+still said the repository owner applied the migrations directly and that the
+mechanism was unrecorded. A reader following the cross-reference landed on
+exactly the claim the correction existed to retract — worse than the consistent
+error it replaced, and precisely what §14 exists to prevent.
+
+Two things made it survivable rather than silent: the split was an added commit
+rather than a force-push, so nothing was lost and the history stayed readable;
+and #243 could be reopened with the diff as evidence. Neither is a substitute for
+checking first.
+
+### The narrow lesson, stated separately
+
+Merging and closing are the two moments where an agent's belief about a branch
+becomes a fact about the repository. Both are cheap to verify and neither is
+reversible in the ordinary sense — a bad merge message cannot be edited out of a
+protected branch's history, and a wrongly closed pull request is only recovered
+if somebody notices. **Verify at those two moments even when nothing feels
+uncertain**, because a stale picture does not feel stale.
+
 ---
 
 **Fail safe.** When a repository/dashboard fact is uncertain, verify read-only or report it as unknown. Do not fill the gap with a write, a guessed deployment, or a weaker control.
