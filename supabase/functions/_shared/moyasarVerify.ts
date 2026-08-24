@@ -177,20 +177,26 @@ export async function validateAndConfirmMoyasarPayment(
       // Moyasar only issues a payment id once the customer pays. Stamp it onto
       // THIS attempt first, so the upsert updates the row we already own instead
       // of inserting a second one beside it.
-      const { error: stampErr } = await admin.from('payment_records')
+      await admin.from('payment_records')
         .update({ provider_ref: paymentId })
         .eq('id', attempt.id)
-        .is('provider_ref', null);
-      if (stampErr) {
-        // A concurrent webhook/verify may have stamped it already — that is fine
-        // and idempotent. Anything else means we cannot safely attribute the
-        // payment to this attempt, so we stop rather than risk a duplicate row.
-        const { data: current } = await admin.from('payment_records')
-          .select('provider_ref').eq('id', attempt.id).maybeSingle();
-        if (String(current?.provider_ref ?? '') !== paymentId) {
-          console.error('moyasar provider_ref stamp failed', String(stampErr.message ?? '').slice(0, 200));
-          return { outcome: 'failed', paid: false, reason: 'stamp_failed' };
-        }
+        .is('provider_ref', null)
+        .then(() => {}, () => {});
+
+      // READ BACK, ALWAYS. The `.is('provider_ref', null)` filter means a row
+      // already stamped by a concurrent run matches ZERO rows — and a zero-row
+      // PostgREST update is not an error. Keying the guard on the error therefore
+      // skipped it in exactly the case it existed for: an attempt already carrying
+      // a DIFFERENT payment id would fall through to confirm_order_payment, whose
+      // upsert is on (provider, provider_ref), and insert a SECOND paid row for
+      // the order. Only the row's actual state settles this.
+      const { data: current } = await admin.from('payment_records')
+        .select('provider_ref').eq('id', attempt.id).maybeSingle();
+      if (String(current?.provider_ref ?? '') !== paymentId) {
+        console.error('moyasar provider_ref stamp did not land', JSON.stringify({
+          attempt: String(attempt.id).slice(0, 36),
+        }));
+        return { outcome: 'failed', paid: false, reason: 'stamp_failed' };
       }
 
       const { data, error } = await admin.rpc('confirm_order_payment', {

@@ -343,10 +343,25 @@ describe('parseWebhookEnvelope', () => {
       createdAt: '2026-08-24T10:00:00Z', data: { id: 'pay_1' },
     });
   });
-  it('defaults live to false and never throws on junk', () => {
-    expect(parseWebhookEnvelope({}).live).toBe(false);
-    expect(parseWebhookEnvelope({ live: 'true' }).live).toBe(false); // only a real boolean counts
+  /**
+   * An ABSENT flag must stay distinct from `false`. Coercing it made
+   * checkPaymentBinding compare a mode it had no information about, so a live
+   * event that omitted `live` marked a genuinely PAID attempt as a mismatch.
+   */
+  it('keeps an absent or mistyped live flag as null, not false', () => {
+    expect(parseWebhookEnvelope({}).live).toBeNull();
+    expect(parseWebhookEnvelope({ live: 'true' }).live).toBeNull(); // only a real boolean counts
+    expect(parseWebhookEnvelope({ live: 1 }).live).toBeNull();
+    expect(parseWebhookEnvelope({ live: false }).live).toBe(false);
+    expect(parseWebhookEnvelope({ live: true }).live).toBe(true);
     expect(parseWebhookEnvelope(null).data).toEqual({});
+  });
+
+  it('so a live payment with no flag still binds', () => {
+    const attempt = { provider_checkout_ref: 'inv_1', amount: 45.5, currency: 'SAR', mode: 'live' };
+    const payment = { id: 'pay_1', invoice_id: 'inv_1', amount: 4550, currency: 'SAR' };
+    const evt = parseWebhookEnvelope({ type: 'payment_paid', data: payment });
+    expect(checkPaymentBinding(attempt, payment, { liveMode: evt.live }).allMatch).toBe(true);
   });
 });
 
@@ -593,18 +608,22 @@ describe('resolveMoyasarConfig key namespacing', () => {
 });
 
 describe('decideCrossProviderAttempt', () => {
+  const NOW = Date.parse('2026-08-24T12:00:00.000Z');
+  const FUTURE = '2026-08-24T12:30:00.000Z';
+  const PAST = '2026-08-24T11:30:00.000Z';
   const live = (over = {}) => ({
-    id: 'att_1', provider: 'tap', provider_ref: null, provider_checkout_ref: null, ...over,
+    id: 'att_1', provider: 'tap', provider_ref: null, provider_checkout_ref: null,
+    expires_at: FUTURE, ...over,
   });
 
   it('proceeds when there is no live attempt at all', () => {
-    expect(decideCrossProviderAttempt(null, 'moyasar')).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(undefined, 'moyasar')).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(null, 'moyasar', NOW)).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(undefined, 'moyasar', NOW)).toEqual({ action: 'proceed' });
   });
 
   it('proceeds when the live attempt is the SAME provider (normal reuse)', () => {
-    expect(decideCrossProviderAttempt(live({ provider: 'moyasar' }), 'moyasar')).toEqual({ action: 'proceed' });
-    expect(decideCrossProviderAttempt(live({ provider: 'MOYASAR' }), 'moyasar')).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(live({ provider: 'moyasar' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(live({ provider: 'MOYASAR' }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
   });
 
   /**
@@ -613,19 +632,45 @@ describe('decideCrossProviderAttempt', () => {
    * and only one of the two charges could ever be enrolled for refund.
    */
   it('refuses a second checkout when the other provider already has a payable one', () => {
-    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1' }), 'moyasar'))
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1' }), 'moyasar', NOW))
       .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
-    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1' }), 'moyasar'))
+    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1' }), 'moyasar', NOW))
       .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
   });
 
   /** Nothing exists at the other gateway, so nothing is payable — safe to close. */
   it('closes a stale other-provider attempt that never reached its gateway', () => {
-    expect(decideCrossProviderAttempt(live(), 'moyasar'))
+    expect(decideCrossProviderAttempt(live(), 'moyasar', NOW))
       .toEqual({ action: 'close_stale', attemptId: 'att_1' });
   });
 
   it('treats a blank provider on the row as nothing to guard against', () => {
-    expect(decideCrossProviderAttempt(live({ provider: null }), 'moyasar')).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(live({ provider: null }), 'moyasar', NOW)).toEqual({ action: 'proceed' });
+  });
+
+  /**
+   * THE LOCK-OUT. `status='initiated'` does not mean payable: nothing sweeps
+   * stale attempts, and only the owning provider's RPC ever closes one. Refusing
+   * on an EXPIRED other-provider attempt would 409 that order's online payment
+   * permanently — while the error text tells the customer to wait for an expiry
+   * that is never processed.
+   */
+  it('closes an EXPIRED other-provider attempt instead of refusing forever', () => {
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: PAST }), 'moyasar', NOW))
+      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
+    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1', expires_at: PAST }), 'moyasar', NOW))
+      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
+  });
+
+  it('still refuses while the other page is genuinely live', () => {
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: FUTURE }), 'moyasar', NOW).action)
+      .toBe('refuse');
+  });
+
+  it('refuses on a null expiry rather than assuming it lapsed', () => {
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: null }), 'moyasar', NOW).action)
+      .toBe('refuse');
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1', expires_at: 'not-a-date' }), 'moyasar', NOW).action)
+      .toBe('refuse');
   });
 });

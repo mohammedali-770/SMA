@@ -461,7 +461,17 @@ export interface MoyasarWebhookEnvelope {
   id: string;
   type: string;
   secretToken: string;
-  live: boolean;
+  /**
+   * NULL when the event carried no boolean `live` field.
+   *
+   * Coercing an absent flag to `false` made `checkPaymentBinding` compare it
+   * anyway — its "compared only when the caller actually has one" contract was
+   * never reachable from the webhook path — so a live event that omitted or
+   * mistyped `live` marked a genuinely PAID attempt `verification_mismatch`.
+   * Keeping the absence distinct restores the intended behaviour: no flag, no
+   * comparison. Which secret to try is decided separately, and still
+   * fail-closed. */
+  live: boolean | null;
   createdAt: string;
   data: Record<string, unknown>;
 }
@@ -472,7 +482,7 @@ export function parseWebhookEnvelope(body: unknown): MoyasarWebhookEnvelope {
     id: String(b.id ?? ''),
     type: String(b.type ?? ''),
     secretToken: b.secret_token != null ? String(b.secret_token) : '',
-    live: b.live === true,
+    live: typeof b.live === 'boolean' ? b.live : null,
     createdAt: b.created_at != null ? String(b.created_at) : '',
     data: (b.data ?? {}) as Record<string, unknown>,
   };
@@ -729,6 +739,8 @@ export interface LiveAttempt {
   provider: string | null;
   provider_ref: string | null;
   provider_checkout_ref: string | null;
+  /** ISO instant the attempt stops being payable; null means no expiry was set. */
+  expires_at: string | null;
 }
 
 export type CrossProviderDecision =
@@ -766,10 +778,26 @@ export type CrossProviderDecision =
 export function decideCrossProviderAttempt(
   existing: LiveAttempt | null | undefined,
   wantedProvider: string,
+  nowMs: number,
 ): CrossProviderDecision {
   if (!existing) return { action: 'proceed' };
   const other = String(existing.provider ?? '').toLowerCase();
   if (!other || other === String(wantedProvider ?? '').toLowerCase()) return { action: 'proceed' };
+
+  // EXPIRY IS CHECKED FIRST, and leaving it out was a live lock-out.
+  //
+  // `status = 'initiated'` does NOT mean "still payable". An attempt is only
+  // moved off 'initiated' by its own provider's begin_*_attempt RPC, and there
+  // is no sweeper that closes stale rows. So an abandoned attempt at the other
+  // gateway keeps `status='initiated'` forever — and refusing on it would 409
+  // that order's online payment permanently, while telling the customer to wait
+  // for an expiry that is never going to be processed.
+  //
+  // An expired attempt is not payable, so it cannot be double-charged against:
+  // close it and move on, exactly as if it had never reached its gateway.
+  const expiresAt = existing.expires_at ? Date.parse(existing.expires_at) : NaN;
+  const expired = Number.isFinite(expiresAt) && expiresAt <= nowMs;
+  if (expired) return { action: 'close_stale', attemptId: existing.id };
 
   const hasProviderSideCheckout =
     Boolean(existing.provider_ref) || Boolean(existing.provider_checkout_ref);

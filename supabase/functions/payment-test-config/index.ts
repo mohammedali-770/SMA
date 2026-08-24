@@ -412,8 +412,13 @@ async function handleMoyasar(
   }
 
   // Default: status booleans (never any secret values).
-  const testKey = String(sec.test_secret_key ?? '').trim();
-  const liveKey = String(sec.live_secret_key ?? '').trim();
+  // Moyasar's OWN namespaced names. Reading Tap's (`test_secret_key`) meant a
+  // correctly configured Moyasar gateway reported "no key" and disabled the test
+  // buttons — and, worse, a leftover Tap key is also `sk_test_`-prefixed, so the
+  // panel would report Moyasar fully ready, `key_prefix_ok` included, on a
+  // credential belonging to a different gateway.
+  const testKey = String(sec.moyasar_test_secret_key ?? '').trim();
+  const liveKey = String(sec.moyasar_live_secret_key ?? '').trim();
   const activeKey = mode === 'live' ? liveKey : testKey;
   const m = resolveMoyasarConfig(enabled, providerName, pub, sec, mode);
   return json({

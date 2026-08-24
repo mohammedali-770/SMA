@@ -47,6 +47,16 @@ Deno.serve(async (req: Request) => {
   // only after this charge is verified). Tap-only. RLS scopes the session read to
   // its owner.
   if (sessionId) {
+    // OWNERSHIP FIRST. `checkoutSessionId` is raw client input, and everything
+    // below it runs on the SERVICE-ROLE client, which bypasses RLS. Guarding
+    // before this check let a signed-in customer pass someone else's session id
+    // and drive a `close_stale` write on their in-flight attempt, or probe
+    // whether a session existed from the 409. The initiate functions re-read the
+    // full row through the user's client; this is only the gate.
+    const { data: owned } = await supaUser
+      .from('checkout_sessions').select('id').eq('id', sessionId).maybeSingle();
+    if (!owned) return json({ error: 'Checkout session not found' }, 404);
+
     const admin0 = adminClient();
     const cfg0 = await getProviderConfig(admin0, 'payment');
     const sessionProvider = (cfg0?.providerName ?? '').toLowerCase();
@@ -103,12 +113,12 @@ async function guardCrossProviderAttempt(
 ): Promise<Response | null> {
   if (!value || !wantedProvider) return null;
   const { data } = await admin.from('payment_records')
-    .select('id, provider, provider_ref, provider_checkout_ref')
+    .select('id, provider, provider_ref, provider_checkout_ref, expires_at')
     .eq(column, value).eq('status', 'initiated')
     .order('created_at', { ascending: false }).limit(1);
   const existing = (Array.isArray(data) ? data[0] : null) as LiveAttempt | null;
 
-  const decision = decideCrossProviderAttempt(existing, wantedProvider);
+  const decision = decideCrossProviderAttempt(existing, wantedProvider, Date.now());
   if (decision.action === 'proceed') return null;
 
   if (decision.action === 'close_stale') {
@@ -116,7 +126,7 @@ async function guardCrossProviderAttempt(
     await admin.from('payment_records').update({
       status: 'failed',
       failure_code: 'provider_switched',
-      failure_message_safe: 'The payment provider changed before checkout started.',
+      failure_message_safe: 'The payment provider changed, or this attempt expired.',
     }).eq('id', decision.attemptId).eq('status', 'initiated').then(() => {}, () => {});
     return null;
   }

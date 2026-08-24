@@ -197,7 +197,17 @@ async function handleMoyasarWebhook(
   const invoiceId = String(payment.invoice_id ?? '');
 
   // The admin dashboard's isolated test invoice is NOT linked to any order.
-  // Recognise it and acknowledge WITHOUT touching order/payment state.
+  //
+  // BE HONEST ABOUT WHAT PROTECTS US HERE. This check reads `metadata.purpose`
+  // off the PAYMENT, and Moyasar does not document metadata propagating from an
+  // invoice to the payment that settles it — which is the same reason
+  // checkPaymentBinding deliberately does not bind on metadata. So this will
+  // usually not fire. What actually keeps an admin test payment away from order
+  // state is that no `payment_records` row exists for it, so the lookup below
+  // falls through to 'unknown payment' and acknowledges.
+  //
+  // The check is kept because it costs nothing and would work if Moyasar ever
+  // does propagate metadata; it is defence in depth, not the defence.
   if (isAdminTestInvoice(payment)) {
     await admin.from('integration_sync_logs').insert({
       provider: 'moyasar', order_id: null, direction: 'webhook', status: 'skipped',
