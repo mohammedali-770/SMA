@@ -280,6 +280,58 @@ function addonsTotal(addons: CreateOrderAddonInput[]): number {
 }
 
 /**
+ * An add-on line may only be sent as a contract `addons[]` entry when it carries
+ * a real `modifiers.lazywait_addon_id`. Anything else (null, undefined, '') is
+ * UNMAPPED and is described in the item's `details` text instead.
+ */
+function isMappedAddon(a: CreateOrderAddonInput): boolean {
+  return typeof a.addonId === 'string' && a.addonId.length > 0;
+}
+
+/** Split an item's add-on lines into the ones we can send and the ones we cannot. */
+function partitionAddons(
+  addons: CreateOrderAddonInput[],
+): { mapped: CreateOrderAddonInput[]; unmapped: CreateOrderAddonInput[] } {
+  const mapped: CreateOrderAddonInput[] = [];
+  const unmapped: CreateOrderAddonInput[] = [];
+  for (const a of addons) (isMappedAddon(a) ? mapped : unmapped).push(a);
+  return { mapped, unmapped };
+}
+
+/**
+ * Compose an item's `details` string from its kitchen note and any UNMAPPED
+ * modifiers.
+ *
+ * A modifier with no `lazywait_addon_id` has nowhere to go in the contract's
+ * `addons[]`, but the kitchen still has to see the customer's choice — a
+ * "Volcano" burger cooked mild is a wrong order. So the choice is written into
+ * the same free-text field the note uses, and its money stays inside the item
+ * `price` (which is exactly what the pre-add-on worker did in Production).
+ *
+ * Shape: `"Volcano ×2, Extra Hot — No onions"` — choices joined by `', '`, then
+ * the note after an em dash. Either half alone is emitted alone; a line with
+ * neither returns null so the caller can OMIT the key.
+ */
+export function composeItemDetails(
+  note: string | null | undefined,
+  unmappedAddons: CreateOrderAddonInput[],
+): string | null {
+  const choices = unmappedAddons
+    .map((a) => {
+      // Arabic-only modifiers exist; fall back rather than print nothing.
+      const name = trimToNull(a.nameEn) ?? trimToNull(a.nameAr);
+      if (!name) return null;
+      const quantity = Math.max(1, Number(a.quantity ?? 1));
+      return quantity > 1 ? `${name} ×${quantity}` : name;
+    })
+    .filter((s): s is string => s !== null)
+    .join(', ');
+  const trimmedNote = trimToNull(note);
+  if (choices && trimmedNote) return `${choices} — ${trimmedNote}`;
+  return choices || trimmedNote;
+}
+
+/**
  * Split a stored phone into the two fields the contract wants:
  * `customer_cell` = the LOCAL subscriber number ("541234567") and
  * `country_code` = the dialling prefix ("+966") — NOT one E.164 string.
@@ -314,9 +366,16 @@ export function splitPhoneForPos(
  * the add-on lines would charge the add-ons twice on the POS ticket. We
  * therefore emit the bare item price and let the add-on lines carry their own
  * money, which leaves the line's implied total exactly what it is today.
+ *
+ * MAPPED vs UNMAPPED modifiers. Only a modifier carrying a real
+ * `lazywait_addon_id` can become an `addons[]` entry, and ONLY those are
+ * subtracted out of `price`. A modifier with no mapping is folded into
+ * `details` and its money stays inside `price` — which is precisely what the
+ * pre-add-on worker sent, so the ticket's implied total is unchanged either
+ * way: `price + Σ(mapped addon.price × quantity) === unitPrice`.
  */
 export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<string, unknown> {
-  const addons = it.addons ?? [];
+  const { mapped, unmapped } = partitionAddons(it.addons ?? []);
   const names: Record<string, string> = {};
   const nameEn = trimToNull(it.name);
   const nameAr = trimToNull(it.nameAr);
@@ -329,22 +388,23 @@ export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<strin
     name: it.name,
     names,
     quantity: it.quantity,
-    // Server-trusted, VAT-inclusive, add-ons subtracted back out (see above).
+    // Server-trusted, VAT-inclusive, MAPPED add-ons subtracted back out (see
+    // above). An unmapped modifier's money stays here, where it already is.
     // The Lazywait response total is NOT trusted.
-    price: round2(round2(it.unitPrice) - addonsTotal(addons)),
+    price: round2(round2(it.unitPrice) - addonsTotal(mapped)),
   };
   if (it.menuCategoryId != null && String(it.menuCategoryId) !== '') {
     item.menu_category_id = it.menuCategoryId;
   }
   if (it.priceId != null && String(it.priceId) !== '') item.price_id = it.priceId;
 
-  // Per-item kitchen note. The key is OMITTED (not null) when there is no note,
-  // matching how every other optional field on this body behaves.
-  const details = trimToNull(it.note);
+  // Per-item kitchen note PLUS any unmapped modifier. The key is OMITTED (not
+  // null) when there is neither, matching every other optional field here.
+  const details = composeItemDetails(it.note, unmapped);
   if (details) item.details = details;
 
-  if (addons.length) {
-    item.addons = addons.map((a) => {
+  if (mapped.length) {
+    item.addons = mapped.map((a) => {
       const addonNames: Record<string, string> = {};
       const addonEn = trimToNull(a.nameEn);
       const addonAr = trimToNull(a.nameAr);
@@ -380,9 +440,9 @@ export const ORDER_ITEM_SELECT =
  * Map rows returned by `ORDER_ITEM_SELECT` onto Create Order items.
  *
  * PURE, so the join that feeds the POS ticket is unit-testable without a
- * database. An unmapped modifier produces `addonId: null`, which
- * `buildCreateOrderPayload` turns into `missing_addon_mapping` — never a
- * silently dropped add-on.
+ * database. An unmapped modifier produces `addonId: null`, which the serializer
+ * folds into the item's `details` text — never a silently dropped add-on, and
+ * never money that disappears off the line.
  */
 export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOrderItemInput[] {
   return rows.map((it) => {
@@ -432,17 +492,21 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   if (input.items.some((it) => !it.menuItemId)) {
     return { ok: false, blockedReason: 'missing_item_mapping' };
   }
-  // An add-on line must carry its mapped addon_id. Dropping an unmapped modifier
-  // instead would send the kitchen an incomplete ticket AND (because the add-on
-  // money is subtracted out of the item price) undercharge the line. Blocking is
-  // loud and recoverable; a silent drop is neither.
-  if (input.items.some((it) => (it.addons ?? []).some((a) => !a.addonId))) {
-    return { ok: false, blockedReason: 'missing_addon_mapping' };
-  }
-  // Defensive: the add-on prices are the same snapshots that were added into
-  // unit_price, so this cannot go negative on well-formed data. If it ever does,
-  // the decomposition is unsafe and we refuse rather than post a wrong price.
-  if (input.items.some((it) => round2(it.unitPrice) - addonsTotal(it.addons ?? []) < -0.005)) {
+  // An add-on line without a mapped addon_id is NOT a blocker. It is folded into
+  // the item's `details` and its money is left inside `price` — the kitchen sees
+  // the choice and the line is charged exactly what the customer paid. Blocking
+  // here (as this builder briefly did) would strand every order carrying one of
+  // the three unmapped "Heat Level" modifiers, which have no Lazywait add-on to
+  // map to at all. See docs/LAZYWAIT.md.
+  //
+  // Defensive: the MAPPED add-on prices are the same snapshots that were added
+  // into unit_price, so this cannot go negative on well-formed data. If it ever
+  // does, the decomposition is unsafe and we refuse rather than post a wrong
+  // price. Unmapped add-ons are never subtracted, so they cannot trip it.
+  if (input.items.some((it) => {
+    const { mapped } = partitionAddons(it.addons ?? []);
+    return round2(it.unitPrice) - addonsTotal(mapped) < -0.005;
+  })) {
     return { ok: false, blockedReason: 'addon_price_exceeds_item_price' };
   }
 
