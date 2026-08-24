@@ -21,13 +21,22 @@
   "rules": [
     {
       "id": "payments",
-      "why": "Payment work is frozen and the provider is unchosen. Any change here has to be reconciled against the freeze document in the same pull request, or the freeze silently stops describing reality. The mobile paths are listed because the rule originally covered only Edge Functions, and a change to the app's own payment surface — the Tap WebView, the hosted-checkout handoff, the interrupted-payment recovery — fired no rule at all. A branch took a self-declared 'scoped exception' to the freeze in CheckoutScreen and CI had nothing to say about it.",
+      "why": "Payment work is frozen and the provider is unchosen. Any change here has to be reconciled against the freeze document in the same pull request, or the freeze silently stops describing reality. The mobile paths are listed because the rule originally covered only Edge Functions, and a change to the app's own payment surface — the Tap WebView, the hosted-checkout handoff, the interrupted-payment recovery — fired no rule at all. A branch took a self-declared 'scoped exception' to the freeze in CheckoutScreen and CI had nothing to say about it. The Moyasar helpers, the shared Tap verify/refund helpers and the two admin readiness panels were added to this rule on 2026-08-24, when a second candidate provider arrived: a change can now be payment-critical without touching a single file with 'tap' in its name, and an admin panel is where an operator points real customers at a gateway.",
       "sources": [
         "supabase/functions/payment-*/**",
         "supabase/functions/tap-*/**",
         "supabase/functions/_shared/tap.ts",
+        "supabase/functions/_shared/tapVerify.ts",
+        "supabase/functions/_shared/tapRefund.ts",
+        "supabase/functions/_shared/moyasar.ts",
+        "supabase/functions/_shared/moyasarVerify.ts",
+        "supabase/functions/_shared/moyasarRefund.ts",
         "supabase/functions/_shared/geidea.ts",
         "supabase/functions/_shared/paymentSync.ts",
+        "src/components/admin/TapPaymentPanel.tsx",
+        "src/components/admin/MoyasarPaymentPanel.tsx",
+        "src/lib/tapAdminTest.ts",
+        "src/lib/moyasarAdminTest.ts",
         "apps/mobile/src/app/payment/**",
         "apps/mobile/src/components/TapWebView*.tsx",
         "apps/mobile/src/features/checkout/paymentFlow*.ts",
@@ -36,7 +45,12 @@
         "apps/mobile/src/features/checkout/webviewPolicy*.ts",
         "apps/mobile/src/lib/payment.ts"
       ],
-      "docs": ["docs/PAYMENT_POSTPONEMENT.md", "CLAUDE.md"]
+      "docs": [
+        "docs/PAYMENT_POSTPONEMENT.md",
+        "docs/integrations/Moyasar_API_Reference.md",
+        "docs/integrations/Tap_API_Reference.md",
+        "CLAUDE.md"
+      ]
     },
     {
       "id": "push-notifications",
