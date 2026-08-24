@@ -520,7 +520,7 @@ does.
 | 3 | Deploy the `staff-accounts` Edge Function | **DONE 2026-08-23 07:31:46 UTC.** Owner approval in-conversation. Version 1, status `ACTIVE`, `verify_jwt = true` confirmed on the deployed function, matching `supabase/config.toml`. The repository's first `auth.admin.createUser`. It is still inert in practice: every action it exposes is admin-gated, and the accounts it exists to create (action 4) have not been requested. That first build carried the role-only admin gate described below; **action 6 replaced it with v2 the same day**. |
 | 4 | Create the first branch / call-centre accounts | **Not requested.** The moment the feature stops being inert. Until then the roles exist in the enum and nothing holds them. |
 | 5 | Enable the branch-availability alert condition's outbound delivery | **Not requested.** Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval and is already populated by the live card. |
-| 6 | Redeploy the four Edge Functions carrying the role-only admin gate | **DONE 2026-08-23.** Owner approval in-conversation. `staff-accounts` v2, `email-test-config` v2, `whatsapp-test-config` v3, `push-dispatch` v4 — see the AAL2 section below for the verification either side of the write. `payment-test-config` was deliberately excluded (§6 freeze) and remains at v3 with the defect. |
+| 6 | Redeploy the four Edge Functions carrying the role-only admin gate | **DONE 2026-08-23.** Owner approval in-conversation. `staff-accounts` v2, `email-test-config` v2, `whatsapp-test-config` v3, `push-dispatch` v4 — see the AAL2 section below for the verification either side of the write. `payment-test-config` was deliberately excluded (§6 freeze) and remains at v3 with the defect — a later deploy attempt on 2026-08-24 was approved, then stopped and abandoned; see the bullet below. |
 
 **The irreversible step has been taken.** `20260820100000_ops_roles_enum.sql`
 ran on 2026-08-21: `ALTER TYPE public.user_role ADD VALUE` twice. PostgreSQL
@@ -604,9 +604,36 @@ Three consequences the owner should hold:
   reply: the nested file layout resolved (`_shared/adminAuth.ts` and
   `staff-accounts/guards.ts` both present under the new versions) and the shared
   predicate round-tripped intact.
-- **`payment-test-config` has the identical defect and was deliberately left
-  alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
-  omission is visible rather than forgotten.
+- **`payment-test-config` — fixed in source 2026-08-24 under an owner-approved
+  §6 exception, and DELIBERATELY LEFT UNDEPLOYED.** The gate now calls
+  `is_admin()` like the others, but Production still runs the role-only version,
+  by decision rather than by omission.
+
+  The deploy was approved, attempted, and stopped during the pre-deploy check.
+  **Supabase bundles a function's dependencies at deploy time**, so what is live
+  for a function is the repository *as of that function's last deploy* —
+  2026-07-10 here. Two shared payment helpers have gained real logic since:
+  `_shared/tapVerify.ts` acquired the session-first branch that calls
+  `finalize_checkout_session` (which *creates the paid order*), and
+  `_shared/lazywait.ts` went from 6 exports to 30+, including the whole POS
+  confirmation lifecycle. Redeploying would have pushed both into Production as a
+  side effect of a four-line auth change — squarely inside the freeze.
+
+  The owner chose to leave it undeployed on 2026-08-24. Reopening needs the
+  freeze lifted, or an explicit decision to ship the current payment helpers with
+  it, which is a payment-behaviour decision and not an authorization one. Detail
+  in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) §2.
+
+  **The same risk applies to the four redeployed on 2026-08-23, and the answer is
+  partly verified and partly not.** `push-dispatch` and `email-test-config` had
+  their pre-redeploy bundles **inspected** before being overwritten — helpers
+  structurally identical to the repository, verified. `whatsapp-test-config` and
+  `staff-accounts` did **not**, and a deployed bundle cannot be recovered once
+  overwritten, so those two rest on inference: a same-day sibling
+  (`whatsapp-send-otp`, still on its 2026-07-09 bundle, read back and identical)
+  for the first, and a few-hours window on the same repository state for the
+  second. Strong, but not inspection. Detail and the correction of an earlier
+  overstatement are in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) §2.
 - **`push-dispatch` was a fifth instance, and the most exposed one. Fixed and
   deployed 2026-08-23 (v4); the live AAL1 broadcast path is closed.** The first sweep
   missed it because it spelled the check
