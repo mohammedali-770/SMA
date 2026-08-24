@@ -2,9 +2,10 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
-  buildCreateOrderPayload, classifyCreateOrderResult, computePosNextAttempt, DEFAULT_BASE_URL,
-  lazywaitFetch, mapOrderItemRows, MAX_POS_ATTEMPTS, normalizePhone, ORDER_ITEM_SELECT,
-  shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES, timingSafeEqual, type LazywaitConfig,
+  buildCreateOrderPayload, classifyCreateOrderResult, computePosNextAttempt, lazywaitFetch,
+  mapOrderItemRows, MAX_POS_ATTEMPTS, normalizePhone, ORDER_ITEM_SELECT,
+  resolveLazywaitBaseUrl, shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES,
+  timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 
 /**
@@ -46,8 +47,24 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'unauthorized' }, 401);
   }
 
+  // ---- Base URL: FAIL CLOSED, before anything is claimed or sent -----------
+  // A missing/blank base_url used to fall back to DEFAULT_BASE_URL — the
+  // PRODUCTION POS — which would have started POSTing live customer orders to a
+  // host nobody is watching. There is no fallback now. This runs BEFORE the
+  // reaper and BEFORE claim_lazywait_sync_batch, so on a blank config no order
+  // is claimed, no order changes state, and no HTTP request is attempted; the
+  // queue simply waits for the config to be fixed. It is deliberately NOT
+  // routed through lazywaitFetch: `status: 0` would be classified as a
+  // retryable/ambiguous NETWORK error and would either retry forever or mark
+  // real orders confirmation_required over a config typo.
+  const resolvedBase = resolveLazywaitBaseUrl((cfg.publicConfig as Record<string, unknown>).base_url);
+  if (!resolvedBase.ok) {
+    console.error('lazywait-sync refusing to run:', resolvedBase.reason);
+    return json({ status: 'blocked', error: resolvedBase.reason }, 500);
+  }
+
   const lw: LazywaitConfig = {
-    baseUrl: String((cfg.publicConfig as Record<string, unknown>).base_url ?? DEFAULT_BASE_URL),
+    baseUrl: resolvedBase.baseUrl,
     clientId: String((cfg.publicConfig as Record<string, unknown>).client_id ?? ''),
     apiToken: String((cfg.secretConfig as Record<string, unknown>).api_token ?? ''),
   };

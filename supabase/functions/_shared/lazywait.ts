@@ -20,6 +20,26 @@ export interface LazywaitConfig {
   apiToken: string;  // SECRET — Bearer token
 }
 
+/**
+ * The Lazywait PRODUCTION host. This is the value migration `20260708130000`
+ * seeds into `integration_settings.public_config.base_url`, and it is kept here
+ * as that reference — NOT as a fallback.
+ *
+ * It must NEVER be substituted for a missing/blank configured base URL. The
+ * live pilot points at `https://apiv2-dev.lazywait.com/v1`, so silently
+ * defaulting to this constant would send live customer orders to a production
+ * POS nobody is watching. Every resolution now goes through
+ * `resolveLazywaitBaseUrl`, which fails closed instead.
+ *
+ * The constant is KEPT rather than deleted: migration `20260708130000` seeds
+ * exactly this string and is applied history, so naming it here documents what
+ * Production holds. Its one remaining consumer as a `??` default is
+ * `paymentSync.ts`, which is under the CLAUDE.md §6 payment freeze and was not
+ * touched — see the PR body. That path is best-effort and only ever runs for an
+ * order that ALREADY has a `lazywait_ref`, so it cannot create a POS ticket; a
+ * whitespace/empty base URL now throws out of `lazywaitFetch` there instead of
+ * reaching production, and every caller already swallows it with `.catch()`.
+ */
 export const DEFAULT_BASE_URL = 'https://apiv2.lazywait.com/v1';
 export const MAX_SYNC_ATTEMPTS = 8;
 export const SOURCE = 'LWAPI';
@@ -54,6 +74,50 @@ export const POS_RETRY_OFFSETS_MIN = [0, 1, 3, 6, 9] as const;
 export const STALE_SYNC_TIMEOUT_MINUTES = 10;
 
 const enc = new TextEncoder();
+
+// ---------------------------------------------------------------------------
+// Base-URL resolution — FAIL CLOSED
+// ---------------------------------------------------------------------------
+/**
+ * Stable machine reason for "the Lazywait base URL is not configured". Terminal
+ * and distinct on purpose: it is a CONFIGURATION fault, not a network fault, and
+ * must never be laundered through the HTTP paths.
+ *
+ * Specifically it must NOT become `status: 0`. `classifyLazywaitError(0)` is
+ * `retryable` and `classifyCreateOrderResult({ status: 0 })` is `ambiguous ->
+ * confirmation_required`, so routing a blank config through the transport would
+ * either retry a config mistake forever or flag real customer orders as needing
+ * manual confirmation. Config is validated BEFORE any request is attempted and
+ * recorded under this reason instead.
+ */
+export const LAZYWAIT_BASE_URL_NOT_CONFIGURED = 'lazywait_base_url_not_configured';
+
+/** Thrown when a Lazywait call is attempted with no usable base URL. */
+export class LazywaitConfigError extends Error {
+  readonly reason: string;
+  constructor(reason: string = LAZYWAIT_BASE_URL_NOT_CONFIGURED) {
+    super(reason);
+    this.name = 'LazywaitConfigError';
+    this.reason = reason;
+  }
+}
+
+export type ResolvedBaseUrl =
+  | { ok: true; baseUrl: string }
+  | { ok: false; reason: typeof LAZYWAIT_BASE_URL_NOT_CONFIGURED };
+
+/**
+ * Resolve a configured Lazywait base URL, or fail. Absent, empty and
+ * whitespace-only all fail — there is deliberately NO fallback to
+ * `DEFAULT_BASE_URL` (see the note on that constant). The returned value is
+ * trimmed with trailing slashes stripped, exactly as `lazywaitFetch` needs it.
+ */
+export function resolveLazywaitBaseUrl(raw: unknown): ResolvedBaseUrl {
+  if (raw == null) return { ok: false, reason: LAZYWAIT_BASE_URL_NOT_CONFIGURED };
+  const trimmed = String(raw).trim();
+  if (!trimmed) return { ok: false, reason: LAZYWAIT_BASE_URL_NOT_CONFIGURED };
+  return { ok: true, baseUrl: trimmed.replace(/\/+$/, '') };
+}
 
 // ---------------------------------------------------------------------------
 // Error classification
@@ -184,9 +248,20 @@ export function computePosNextAttempt(
 // ---------------------------------------------------------------------------
 // Create Order payload mapping (PICKUP ONLY)
 //
-// Grounded in the owner-supplied Lazywait Create Order contract of 2026-08-24
-// (read from the DEV host `apiv2-dev.lazywait.com`; field-level parity with the
-// production host we actually POST to is UNVERIFIED — see docs/LAZYWAIT.md).
+// Grounded in the owner-supplied Lazywait Create Order contract of 2026-08-24,
+// read from the DEV host `apiv2-dev.lazywait.com`.
+//
+// CORRECTION (2026-08-24): this block used to add "field-level parity with the
+// production host we actually POST to is UNVERIFIED". That clause was false. We
+// do NOT post to `apiv2.lazywait.com`: `integration_settings.public_config
+// .base_url` for `provider_type='lazywait'` has been
+// `https://apiv2-dev.lazywait.com/v1` since 2026-07-24, and the owner confirmed
+// on 2026-08-24 that the dev host IS the real POS for this branch — every
+// pickup order that has synced went there, correctly. The contract therefore
+// describes the exact host we post to, which makes it MORE directly
+// applicable, not less. Nothing about the mapping below changed; only the
+// claim about it did. See docs/LAZYWAIT.md.
+//
 // That document states only `client_id`, `branch_id` and a non-empty
 // `order_items` are required and everything else is optional, and that the
 // identity fields (order_ref/order_id/order_number/order_date) are generated
@@ -677,7 +752,15 @@ export async function lazywaitFetch<T = unknown>(
     timeoutMs?: number;
   },
 ): Promise<LazywaitResponse<T>> {
-  const base = (cfg.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  // Transport-level backstop. Callers are expected to validate config first
+  // (they can then record the failure as its own terminal outcome), but if one
+  // ever slips through we THROW rather than fall back to DEFAULT_BASE_URL —
+  // and rather than return `status: 0`, which the classifiers read as a
+  // retryable/ambiguous NETWORK fault. Nothing has left the process yet at this
+  // point, so a throw here is provably "not sent".
+  const resolved = resolveLazywaitBaseUrl(cfg.baseUrl);
+  if (!resolved.ok) throw new LazywaitConfigError(resolved.reason);
+  const base = resolved.baseUrl;
   const params = new URLSearchParams();
   // client_id is required on every call.
   params.set('client_id', cfg.clientId);

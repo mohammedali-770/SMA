@@ -26,19 +26,74 @@ by the owner on **2026-08-24** and matching the live
 `integration_settings.public_config.base_url` in Production, last written
 2026-07-24. Every pickup order that has synced went there.
 
-Two things in source still name the **production** host and are now traps:
+Two things in source still name the **production** host. The first was a trap
+until 2026-08-24; the second still is:
 
 - `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
-  `https://apiv2.lazywait.com/v1`. It is only a **fallback** — the worker prefers
-  `public_config.base_url` — but if that key were ever cleared, the worker would
-  silently start POSTing real customer orders to a POS nobody watches. It is
-  deliberately left unchanged here; changing it is a separate decision.
+  `https://apiv2.lazywait.com/v1`. It **used to be a fallback**: the worker
+  preferred `public_config.base_url`, and if that key were ever cleared it would
+  silently start POSTing real customer orders to a POS nobody watches. That
+  fallback is **gone** — see "Missing `base_url` fails closed" below. The
+  constant itself is deliberately left unchanged, because it names what the
+  applied `20260708130000` migration seeded into Production.
 - The admin Integrations card shows the production URL as its input
   **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
   wrong host could get typed back in.
 
 The `20260708130000` migration also seeds the production URL as a default. That
 file is applied history and must never be edited; the live row overrides it.
+
+## Missing `base_url` fails closed
+Added 2026-08-24, alongside the host correction above.
+
+Because the live POS is the **dev** host, an implicit fallback to
+`DEFAULT_BASE_URL` was not a safe default — it was a silent redirect of live
+customer orders to the **production** POS. A cleared, blank or whitespace-only
+`public_config.base_url` now **fails closed** instead:
+
+- `resolveLazywaitBaseUrl()` (`_shared/lazywait.ts`) is the single resolution
+  point. Absent / empty / whitespace-only all fail with the terminal reason
+  **`lazywait_base_url_not_configured`**. There is no fallback.
+- `lazywait-sync` resolves it **before** the stale reaper and **before**
+  `claim_lazywait_sync_batch`, and returns `500 lazywait_base_url_not_configured`
+  without claiming anything. No order is claimed, no order changes state, and no
+  HTTP request is attempted; the queue simply waits for the config to be fixed.
+- `lazywait-catalog` refuses the same way (`400`).
+- `createLazywaitApiClient()` throws `LazywaitConfigError` at construction.
+- `lazywaitFetch()` is the transport backstop: it throws `LazywaitConfigError`
+  before building a request, rather than falling back.
+- `lazywait-webhook` makes no outbound Lazywait call, so it needs no guard.
+
+**Why it is not reported as `status: 0`.** That was the tempting shortcut and it
+would have been an order-integrity bug. `classifyLazywaitError(0)` is
+`retryable`, and `classifyCreateOrderResult({status: 0})` is `ambiguous →
+confirmation_required`. Routing a configuration mistake through the network path
+would therefore either retry it forever or mark real customer orders as needing
+manual confirmation. Config is validated **before** any request is attempted and
+recorded as its own terminal reason; the retry budget
+(`MAX_POS_ATTEMPTS` / `POS_DEADLINE_MINUTES` / `POS_RETRY_OFFSETS_MIN`) and the
+create-order confirmation classification are unchanged, and tests pin that.
+
+Coverage: `_shared/lazywait.test.ts` (resolver + transport),
+`_shared/lazywaitApi.test.ts` (client construction), and
+`_shared/lazywaitBaseUrlWiring.test.ts` (a source-shape tripwire that the
+handlers call the guard *before* claiming or sending — the handlers import
+Deno-only modules, so Vitest cannot execute them).
+
+**Still open (not changed here):**
+
+- The admin Integrations card still offers the production host as its input
+  **placeholder** (`src/components/admin/IntegrationCard.tsx`) — the most likely
+  way a wrong value gets typed back in. Changing it is a separate UI decision the
+  owner has not asked for.
+- `_shared/paymentSync.ts` still reads `base_url ?? DEFAULT_BASE_URL`. It is
+  under the CLAUDE.md §6 payment freeze and was not touched. The residual risk is
+  small and bounded: `pushLazywaitOnlinePayment` only runs for an order that
+  **already** carries a `lazywait_ref`, so it cannot create a POS ticket, and an
+  empty/whitespace value now throws out of `lazywaitFetch` (every caller already
+  wraps it in `.catch()`). The one uncovered case is an entirely **absent**
+  `base_url` key, which `??` still resolves to the production host for that one
+  best-effort call. Closing it is a one-line change to a frozen file.
 
 ## Configuration (never committed)
 Set with the admin **Lazywait POS** card, or via SQL (service role / SQL editor):

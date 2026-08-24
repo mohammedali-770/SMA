@@ -1,7 +1,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
-import { DEFAULT_BASE_URL, lazywaitFetch, type LazywaitConfig } from '../_shared/lazywait.ts';
+import { lazywaitFetch, resolveLazywaitBaseUrl, type LazywaitConfig } from '../_shared/lazywait.ts';
 import {
   type CatalogEntityType, normalizeCatalogPayload,
 } from '../_shared/lazywaitCatalog.ts';
@@ -42,8 +42,14 @@ Deno.serve(async (req: Request) => {
   const cfg = await getProviderConfig(admin, 'lazywait');
   if (!cfg) return json({ error: 'lazywait not configured' }, 400);
 
+  // Base URL: FAIL CLOSED. No fallback to the production host — a blank
+  // base_url must not silently point catalog pulls (and the admin mapping UI
+  // built from them) at a POS this branch does not use.
+  const resolvedBase = resolveLazywaitBaseUrl((cfg.publicConfig as Record<string, unknown>).base_url);
+  if (!resolvedBase.ok) return json({ error: resolvedBase.reason }, 400);
+
   const lw: LazywaitConfig = {
-    baseUrl: String((cfg.publicConfig as Record<string, unknown>).base_url ?? DEFAULT_BASE_URL),
+    baseUrl: resolvedBase.baseUrl,
     clientId: String((cfg.publicConfig as Record<string, unknown>).client_id ?? ''),
     apiToken: String((cfg.secretConfig as Record<string, unknown>).api_token ?? ''),
   };
