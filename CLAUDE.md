@@ -70,6 +70,8 @@ Unless the owner separately approves a specific exception, the freeze covers:
 
 Automated refund processing is intended to remain disabled while the freeze is active.
 
+**Exception granted 2026-08-24 — `payment-test-config`'s admin gate, and nothing else.** That function authorized callers on `profile.role = 'admin'` alone, the same defect fixed in the four non-frozen admin Edge Functions on 2026-08-23. It is not a read-only diagnostics endpoint: its `verify_order` action reaches `validateAndConfirmTapCharge`, which can mark a real order paid — it cannot invent a payment, since it confirms only on a genuine CAPTURED charge retrieved from Tap, but an AAL1 caller could drive payment-state writes on real orders through the service-role client, which bypasses RLS. The gate now calls `public.is_admin()` (role **and** AAL2). **No provider behaviour, charge construction, verification logic or configuration was touched**, and `adminAuthWiring.test.ts` pins that surface — the four actions, the forced TEST key, the TEST-mode guard on charge creation, and the confirm call — so a payment change cannot ride in under an auth fix. Deploying it is still a separate §5 action and is NOT covered by this exception.
+
 Authoritative product decision: `docs/PAYMENT_POSTPONEMENT.md`.
 
 ## 7. Push notifications — LIVE
