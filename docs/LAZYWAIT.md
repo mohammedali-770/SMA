@@ -38,8 +38,8 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
 | `branches.lazywait_branch_id` | `branch_id` | `GET /platform/branches` |
 | `categories.lazywait_category_id` | `category_id` | `GET /menu/products/categories` |
 | `products.lazywait_item_id` | `menu_item_id` | `GET /menu/products/items` |
-| `products.lazywait_price_id` + `lazywait_price_ref` | `price_id` + price snapshot (**reference only, NOT sent in Create Order**) | `GET /menu/products/items` |
-| `modifier_groups.lazywait_group_id` | `addons_group_id` | `GET /menu/addons-groups` |
+| `products.lazywait_price_id` + `lazywait_price_ref` | `price_id` + price snapshot (**now SENT in Create Order** — confirmed 2026-08-24) | `GET /menu/products/items` |
+| `modifier_groups.lazywait_group_id` | `addons_group_id` (**catalog only** — NOT on a create-order add-on) | `GET /menu/addons-groups` |
 | `modifiers.lazywait_addon_id` | `addon_id` | `GET /menu/addons` |
 | `profiles.lazywait_customer_id` | CRM `id` (matched by phone) | set automatically on CRM match |
 
@@ -84,18 +84,51 @@ no blocked orders).
    an `integration_sync_logs` row via `record_lazywait_sync`.
 
 ### Create Order payload (only CONFIRMED fields)
+Expanded 2026-08-24 from the owner-supplied Lazywait Create Order contract. Full
+field-by-field mapping in `docs/integrations/Lazywait_API_Reference.md`.
+
 ```json
 { "client_id": "…", "branch_id": "<lazywait_branch_id>", "order_type": "pickup",
   "order_items": [{ "menu_item_id": "<lazywait_item_id>", "name": "<server name>",
-                    "quantity": 2, "price": 25.00 }],
-  "customer_name": "<profile.full_name|Guest>", "source": "LWAPI" }
+                    "names": { "en": "Burger", "ar": "برجر" },
+                    "menu_category_id": "<lazywait_category_id>",
+                    "price_id": "<lazywait_price_id>",
+                    "quantity": 2, "price": 25.00,
+                    "details": "<order_items.note>",
+                    "addons": [{ "addon_id": "<lazywait_addon_id>", "name": "Extra Cheese",
+                                 "names": { "en": "Extra Cheese", "ar": "جبنة إضافية" },
+                                 "price": 5, "quantity": 1 }] }],
+  "customer_name": "<profile.full_name|Guest>", "source": "LWAPI",
+  "customer_id": "<profiles.lazywait_customer_id>",
+  "customer_cell": "541234567", "country_code": "+966",
+  "order_details": "<orders.notes>", "is_paid": false }
 ```
 - `price` = the **server-trusted, VAT-inclusive** unit price (KSA prices are
   VAT-inclusive). The Lazywait response total is **ignored** (test returned 0).
+- `name` is sent **in addition to** `names{en,ar}`: it is not in the contract,
+  but pickup sync has worked with it in Production since the pilot, which is
+  evidence the API tolerates undocumented fields. Dropping it on the strength of
+  one dev-host document would risk unnamed live tickets.
+- `details` / `order_details` carry the per-item and order-level notes. The
+  `details` key is **absent** when a line has no note.
+- An item whose modifier has **no** mapped `lazywait_addon_id` **blocks** the
+  order (`missing_addon_mapping`) — it is never silently dropped, because a
+  ticket missing "extra cheese" is a ticket the kitchen cooks wrong.
+- The phone is **split**: local subscriber in `customer_cell`, dialling code in
+  `country_code`. E.164 is **not** sent in `customer_cell`.
 
-### Intentionally NOT sent (schemas unconfirmed — do not invent)
-`price_id`, addons/modifiers, delivery address/fields, `customer_cell`/`customer_id`.
-Delivery orders are **blocked** (not synced) until Lazywait confirms the schema.
+### Intentionally NOT sent
+- **All order-level money/totals** — `subtotal`, `discount`, `tax`,
+  `tax_percentage`, `taxes_charges`, `tip`, `total`, `order_delivery_fee`. The
+  contract's example is exclusive-VAT (30 + 4.5 = 34.5) while our prices are
+  VAT-inclusive, and it does not say whether the POS trusts or recomputes these.
+  Open question Q9 — see `docs/lazywait-delivery-open-questions.md`.
+- **Delivery fields** — `order_type: "delivery"`, `order_deliveries[]`,
+  `latitude`/`longitude` (the last two are **absent from the contract
+  entirely**). Delivery orders remain **blocked** (not synced) until Lazywait
+  confirms the schema.
+- `is_included_in_custom_addons`, `order_status_id`, `created_by`,
+  `order_pickup_date` — names confirmed, but we hold no data that means them.
 
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
@@ -222,13 +255,16 @@ The reference scaffold + the field-casing table + the assumptions to confirm are
 in `docs/integrations/Lazywait_API_Reference.md` (the verbatim vendor reference
 is owner-supplied and replaces it once provided).
 
-- **Create Order** implements the confirmed pickup body AND the full
-  delivery/add-on body — but the delivery/add-on/customer/`price_id`
-  **assumptions** are assembled ONLY when the caller passes
-  `allowAssumedFields: true` (default OFF). The live `lazywait-sync` worker is
-  intentionally **unchanged** (still pickup-only via `buildCreateOrderPayload`,
-  delivery blocked). Assumed field names are listed in the reference doc's
-  "ASSUMPTIONS TO CONFIRM WITH LAZYWAIT" section.
+- **Create Order** builds the confirmed body through the audited
+  `buildCreateOrderPayload`, which BOTH the worker and the v2 client call — so
+  the gated path cannot drift from the confirmed one. Since the 2026-08-24
+  contract, add-ons / `price_id` / customer / note fields are **confirmed and no
+  longer gated**. What remains behind `allowAssumedFields: true` (default OFF) is
+  only what that contract does not settle: `order_type: "delivery"`, the element
+  shape of `order_deliveries[]`, and `latitude`/`longitude`. The live
+  `lazywait-sync` worker still calls `buildCreateOrderPayload` and delivery stays
+  **blocked**. Remaining assumed names are in the reference doc's "ASSUMPTIONS TO
+  CONFIRM WITH LAZYWAIT" section.
 - **Payment endpoints** (`update-cash-payment`, `update-online-payment`) are
   typed/serialized/validated only; live wiring stays **frozen** (CLAUDE.md §6).
 - The client never re-POSTs Create Order once an `order_ref` exists and never
@@ -278,8 +314,15 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
 ```
 
 ## Known limitations (confirm with Lazywait)
-- Delivery Create Order schema, addons/modifiers, `price_id`, and
-  `customer_cell`/`customer_id` in Create Order are **not confirmed** → not sent.
+- Delivery Create Order schema is **still not confirmed** → delivery not sent.
+  The 2026-08-24 contract documents a PICKUP order; `order_deliveries[]` is empty
+  in it and its element shape is unknown, and `latitude`/`longitude` do not
+  appear in it at all. (Add-ons/modifiers, `price_id`, `customer_cell` +
+  `country_code` and `customer_id` **are** now confirmed and sent.)
+- **Money/totals are not sent** pending the inclusive-vs-exclusive VAT question
+  (Q9). Our prices are VAT-inclusive; the contract's example is exclusive.
+- The 2026-08-24 contract was read from the **dev** host `apiv2-dev.lazywait.com`;
+  `DEFAULT_BASE_URL` is still production and field-level parity is **unverified**.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
 - **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line

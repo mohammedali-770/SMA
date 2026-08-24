@@ -123,22 +123,67 @@ Deno.serve(async (req: Request) => {
       }
 
       // ---- Load branch mapping + items (server-trusted) --------------------
+      // The select carries everything the CONFIRMED 2026-08-24 Create Order
+      // contract can use: the Arabic name (-> names{en,ar}), the per-item note
+      // (-> details), the category + price mappings (-> menu_category_id,
+      // price_id) and the item's modifiers joined to their Lazywait addon ids
+      // (-> addons[]). Before that contract this query selected four columns and
+      // none of this was reachable.
       const { data: branch } = await admin
         .from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle();
       const { data: items } = await admin
         .from('order_items')
-        .select('name_en, quantity, unit_price, product_id, products(lazywait_item_id)')
+        .select(
+          'name_en, name_ar, quantity, unit_price, note, product_id, '
+          + 'products(lazywait_item_id, lazywait_price_id, categories(lazywait_category_id)), '
+          + 'order_item_modifiers(name_en, name_ar, price, modifiers(lazywait_addon_id))',
+        )
         .eq('order_id', orderId);
 
-      const mappedItems = (items ?? []).map((it: Record<string, unknown>) => ({
-        menuItemId: (it.products as { lazywait_item_id?: string } | null)?.lazywait_item_id ?? null,
-        name: String(it.name_en ?? 'Item'),
-        quantity: Number(it.quantity ?? 1),
-        unitPrice: Number(it.unit_price ?? 0),
-      }));
+      // Cast at the boundary: with the nested product/category/modifier embeds
+      // the generated PostgREST row type widens to include GenericStringError,
+      // which is not indexable. Every field below is read defensively anyway.
+      const itemRows = (items ?? []) as unknown as Array<Record<string, unknown>>;
+      const mappedItems = itemRows.map((it) => {
+        const product = it.products as {
+          lazywait_item_id?: string | null;
+          lazywait_price_id?: string | null;
+          categories?: { lazywait_category_id?: string | null } | null;
+        } | null;
+        const modifiers = (it.order_item_modifiers ?? []) as Array<Record<string, unknown>>;
+        return {
+          menuItemId: product?.lazywait_item_id ?? null,
+          name: String(it.name_en ?? 'Item'),
+          names: { en: String(it.name_en ?? ''), ar: String(it.name_ar ?? '') },
+          menuCategoryId: product?.categories?.lazywait_category_id ?? null,
+          priceId: product?.lazywait_price_id ?? null,
+          quantity: Number(it.quantity ?? 1),
+          unitPrice: Number(it.unit_price ?? 0),
+          details: (it.note as string | null) ?? null,
+          addons: modifiers.map((m) => ({
+            // A modifier with no mapped addon_id yields addonId '' — the builder
+            // BLOCKS on that (missing_addon_mapping) rather than dropping the
+            // line, so the kitchen never gets a ticket missing an add-on.
+            addonId: (m.modifiers as { lazywait_addon_id?: string | null } | null)?.lazywait_addon_id ?? '',
+            name: String(m.name_en ?? 'Addon'),
+            names: { en: String(m.name_en ?? ''), ar: String(m.name_ar ?? '') },
+            price: m.price != null ? Number(m.price) : null,
+          })),
+        };
+      });
 
       // ---- Optional CRM match by phone (best-effort, never blocks) ---------
+      // `lazywait_customer_id` lives on profiles, NOT on orders, so it is read
+      // here rather than off the claimed row: the stored value first, then the
+      // fresh CRM match if one comes back. It feeds `customer_id`, CONFIRMED by
+      // the 2026-08-24 contract. A miss simply omits the field.
+      let lazywaitCustomerId: string | null = null;
       const phone = normalizePhone(order.customer_phone as string | null);
+      if (order.customer_id) {
+        const { data: profile } = await admin
+          .from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle();
+        lazywaitCustomerId = (profile as { lazywait_customer_id?: string | null } | null)?.lazywait_customer_id ?? null;
+      }
       if (phone && order.customer_id) {
         try {
           const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
@@ -147,17 +192,25 @@ Deno.serve(async (req: Request) => {
           const match = Array.isArray(crm.data) ? crm.data[0] : null;
           if (crm.ok && match?.id) {
             await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', order.customer_id);
+            lazywaitCustomerId = String(match.id);
           }
         } catch { /* CRM match is optional; ignore */ }
       }
 
       // ---- Build the confirmed Create Order payload ------------------------
+      // Delivery still returns 'delivery_schema_unconfirmed' here — the
+      // 2026-08-24 contract documents a PICKUP order and does not settle
+      // delivery (see the builder's comment). Totals are deliberately not sent.
       const built = buildCreateOrderPayload({
         clientId: lw.clientId,
         branchId: (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id ?? null,
         orderType: String(order.order_type),
         customerName: String(order.customer_name ?? 'Guest'),
         items: mappedItems,
+        customerId: lazywaitCustomerId,
+        customerPhone: (order.customer_phone as string | null) ?? null,
+        orderDetails: (order.notes as string | null) ?? null,
+        isPaid: order.payment_status === 'paid',
       });
 
       if (!built.ok) {

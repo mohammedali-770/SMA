@@ -725,13 +725,21 @@ editor and the one `cart.updateItem`.
   is latent rather than active for the note limit specifically — the client
   `maxLength` stops a customer reaching the server bound at all — but any future
   server-side order rule will hit it.
-- **Per-item notes do not exist.** There is no `order_items.notes` column, no UI
-  and no field for one in `serializeOrderItem`
-  (`supabase/functions/_shared/lazywaitApi.ts`). Adding them is blocked on the
-  same Lazywait question as §10c: the confirmed Create Order body has no note
-  field of any kind, `delivery_notes` is `[ASSUMPTION]`-tagged and gated behind
-  `allowAssumedFields` (default off), and per-item notes are not even on the
-  question list.
+- **Per-item notes: CLOSED 2026-08-24.** This previously read "per-item notes do
+  not exist". Both halves have since landed. Storage arrived with
+  `order_items.note` (migration `20260821170000_order_item_notes.sql`, live in
+  Production since 2026-08-22) — the half PR #231 shipped for the staff
+  dashboard. The **POS half** that PR deliberately left open is now closed too:
+  the owner-supplied Lazywait Create Order contract (2026-08-24) confirms a
+  per-item note field, `order_items[].details`, and an order-level
+  `order_details`. `buildCreateOrderPayload` sends both, and the `lazywait-sync`
+  order query — which selected four columns and could not see a note at all —
+  now reads `order_items.note`. A line note therefore reaches the kitchen ticket
+  rather than stopping at the dashboard.
+
+  The old reasoning here named `delivery_notes` as the gated candidate. That
+  field **does not exist**; it was a repo assumption the contract disproved and
+  it has been removed. See `docs/lazywait-delivery-open-questions.md` Q5.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Tap sandbox.** The pure
   classifier is unit-tested; the transport path is not exercised.

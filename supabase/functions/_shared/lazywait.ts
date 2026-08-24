@@ -183,32 +183,163 @@ export function computePosNextAttempt(
 
 // ---------------------------------------------------------------------------
 // Create Order payload mapping (PICKUP ONLY — confirmed schema)
+//
+// CONTRACT SOURCE: the owner-supplied Lazywait "Create Order" document
+// (2026-08-24). It was read from the DEV host `apiv2-dev.lazywait.com`.
+// DEFAULT_BASE_URL above still points at Production (`apiv2.lazywait.com`) and
+// is deliberately UNCHANGED — field-level parity between the two hosts is
+// UNVERIFIED. See docs/integrations/Lazywait_API_Reference.md.
+//
+// Per that document only `client_id`, `branch_id` and a non-empty `order_items`
+// are required; every other field is optional. The identity fields
+// (`order_ref`, `order_id`, `order_number`, `order_date`) are generated
+// server-side and must never be sent.
 // ---------------------------------------------------------------------------
+
+/** Localized name pair. The contract spells this `names: { en, ar }`. */
+export interface LocalizedNames { en: string; ar: string }
+
+/**
+ * An add-on line on an order item. CONFIRMED 2026-08-24 as
+ * `{ addon_id, names{en,ar}, price, quantity, is_included_in_custom_addons }`.
+ *
+ * `is_included_in_custom_addons` is NOT sent. The field NAME is confirmed but
+ * its semantics are not, and we hold no column that means it; emitting a guessed
+ * `false` would be inventing a claim about how the POS prices a bundled add-on.
+ * Recorded as an open question instead.
+ *
+ * NOTE: there is no `addons_group_id` here. That was a repo assumption and the
+ * contract disproves it — the add-on object carries no group id. (The catalog
+ * endpoints `/menu/addons` and `/menu/addons-groups` DO use `addons_group_id`;
+ * that is a different, still-valid field and is untouched.)
+ */
+export interface CreateOrderAddonLine {
+  addonId: string;                 // modifiers.lazywait_addon_id -> addon_id
+  name: string;                    // snapshot name (order_item_modifiers.name_en)
+  names?: LocalizedNames | null;   // -> names { en, ar }
+  price?: number | null;           // server-trusted, VAT-inclusive
+  quantity?: number;               // order_item_modifiers has no qty column -> 1
+}
+
 export interface CreateOrderItemInput {
   menuItemId: string | null;   // products.lazywait_item_id
   name: string;                // server-trusted item name
   quantity: number;
   unitPrice: number;           // server-trusted, VAT-INCLUSIVE unit price
+  /** order_items.name_en/name_ar -> `names { en, ar }` (CONFIRMED 2026-08-24). */
+  names?: LocalizedNames | null;
+  /** categories.lazywait_category_id -> `menu_category_id` (CONFIRMED). */
+  menuCategoryId?: string | null;
+  /** products.lazywait_price_id -> `price_id` (CONFIRMED 2026-08-24). */
+  priceId?: string | null;
+  /** order_items.note -> `details` (CONFIRMED 2026-08-24). */
+  details?: string | null;
+  /** order_item_modifiers x modifiers.lazywait_addon_id (CONFIRMED 2026-08-24). */
+  addons?: CreateOrderAddonLine[];
 }
+
 export interface CreateOrderInput {
   clientId: string;
   branchId: string | null;     // branches.lazywait_branch_id
   orderType: 'pickup' | 'delivery' | string;
   customerName: string;
   items: CreateOrderItemInput[];
+  /** profiles.lazywait_customer_id -> `customer_id` (CONFIRMED 2026-08-24). */
+  customerId?: string | null;
+  /**
+   * Raw customer phone. Split into `customer_cell` + `country_code` — the
+   * contract does NOT take E.164 in customer_cell. See splitPhoneForPos.
+   */
+  customerPhone?: string | null;
+  /** orders.notes -> `order_details` (CONFIRMED 2026-08-24). */
+  orderDetails?: string | null;
+  /** orders.payment_status === 'paid' -> `is_paid` (CONFIRMED 2026-08-24). */
+  isPaid?: boolean;
 }
+
 export type BuildResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; blockedReason: string };
 
+function nonEmpty(v: unknown): boolean {
+  return v != null && String(v) !== '';
+}
+
+function buildNames(n: LocalizedNames | null | undefined): LocalizedNames | null {
+  if (!n) return null;
+  const en = String(n.en ?? '').trim();
+  const ar = String(n.ar ?? '').trim();
+  if (!en && !ar) return null;
+  return { en, ar };
+}
+
+function buildOrderAddon(a: CreateOrderAddonLine): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    addon_id: a.addonId,
+    // Undocumented but kept, for the same reason as the item-level `name` below.
+    name: a.name,
+    quantity: a.quantity ?? 1,
+  };
+  const names = buildNames(a.names);
+  if (names) out.names = names;
+  if (a.price != null) out.price = round2(a.price);
+  return out;
+}
+
+export function buildConfirmedOrderItem(it: CreateOrderItemInput): Record<string, unknown> {
+  const line: Record<string, unknown> = {
+    menu_item_id: it.menuItemId,
+    // `name` is NOT in the 2026-08-24 contract, yet pickup sync has worked in
+    // Production with it since the pilot — which is evidence the API tolerates
+    // undocumented fields. So `names{en,ar}` is sent IN ADDITION to `name`, not
+    // instead of it: dropping the field the POS may actually be reading, on the
+    // strength of one dev-host document, risks unnamed tickets on a live
+    // customer path. If a later Production check shows `names` is what the POS
+    // reads, `name` can be removed then.
+    name: it.name,
+    quantity: it.quantity,
+    // server-trusted, VAT-inclusive unit price (Lazywait response total is NOT trusted)
+    price: round2(it.unitPrice),
+  };
+  const names = buildNames(it.names);
+  if (names) line.names = names;
+  if (nonEmpty(it.menuCategoryId)) line.menu_category_id = it.menuCategoryId;
+  if (nonEmpty(it.priceId)) line.price_id = it.priceId;
+  // Per-item note -> `details`. The key is ABSENT when there is no note (never
+  // an empty string, never null). Pinned by test.
+  const details = String(it.details ?? '').trim();
+  if (details) line.details = details;
+  const addons = it.addons ?? [];
+  if (addons.length) line.addons = addons.map(buildOrderAddon);
+  return line;
+}
+
 /**
- * Build the confirmed Create Order body. Only the CONFIRMED fields are sent —
- * no price_id, no addons, no delivery/customer_phone (schemas unconfirmed).
- * Returns a blockedReason instead of throwing so the worker can record it.
+ * Build the confirmed Create Order body (PICKUP only).
+ *
+ * Everything emitted here is grounded in the 2026-08-24 contract, except `name`
+ * (see buildOrderItem). Delivery remains BLOCKED — see below. Returns a
+ * blockedReason instead of throwing so the worker can record it.
+ *
+ * MONEY AND TOTALS ARE DELIBERATELY NOT SENT — no `subtotal`, `discount`, `tax`,
+ * `tax_percentage`, `taxes_charges`, `tip`, `total` or `order_delivery_fee`.
+ * The contract's own example is EXCLUSIVE-VAT: subtotal 30 + tax 4.5 = total
+ * 34.5 at tax_percentage 15. Our prices are VAT-INCLUSIVE, so our `subtotal`
+ * for that same basket is 34.5, not 30. The document does not say whether the
+ * POS trusts these fields or recomputes from them, so any mapping we chose
+ * would be a guess about a real-money figure: send ours as-is and the ticket
+ * overstates by the VAT; convert to exclusive and we assert a tax split the
+ * vendor never confirmed. The per-item `price` we already send is VAT-inclusive
+ * and is what the POS ticket has priced from throughout the pilot. Recorded as
+ * an open question (Q9) rather than guessed.
  */
 export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   if (input.orderType !== 'pickup') {
-    // Delivery Create Order schema is not confirmed by Lazywait; do not invent it.
+    // Delivery Create Order schema is STILL unconfirmed after the 2026-08-24
+    // contract. That document describes a PICKUP order and leaves
+    // `order_deliveries: []` empty; it does not say whether `order_type` accepts
+    // "delivery", which `order_status_id` a delivery ticket takes, or what an
+    // `order_deliveries[]` element looks like. Do not invent it.
     return { ok: false, blockedReason: 'delivery_schema_unconfirmed' };
   }
   if (!input.branchId) return { ok: false, blockedReason: 'missing_branch_mapping' };
@@ -216,20 +347,37 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   if (input.items.some((it) => !it.menuItemId)) {
     return { ok: false, blockedReason: 'missing_item_mapping' };
   }
-  const payload = {
+  // An add-on line that arrived without its mapped addon_id BLOCKS the order.
+  // It is never silently dropped: a POS ticket missing "extra cheese" is a wrong
+  // ticket the kitchen would cook from.
+  if (input.items.some((it) => (it.addons ?? []).some((a) => !a.addonId))) {
+    return { ok: false, blockedReason: 'missing_addon_mapping' };
+  }
+
+  const payload: Record<string, unknown> = {
     client_id: input.clientId,
     branch_id: input.branchId,
     order_type: 'pickup',
-    order_items: input.items.map((it) => ({
-      menu_item_id: it.menuItemId,
-      name: it.name,
-      quantity: it.quantity,
-      // server-trusted, VAT-inclusive unit price (Lazywait response total is NOT trusted)
-      price: round2(it.unitPrice),
-    })),
+    order_items: input.items.map(buildConfirmedOrderItem),
     customer_name: input.customerName || 'Guest',
     source: SOURCE,
   };
+
+  if (nonEmpty(input.customerId)) payload.customer_id = input.customerId;
+  // CORRECTED 2026-08-24: the contract splits the phone — local subscriber
+  // number in `customer_cell` ("541234567") and dialling code in `country_code`
+  // ("+966"). Sending E.164 in customer_cell was a repo assumption and is wrong.
+  const phone = splitPhoneForPos(input.customerPhone);
+  if (phone) {
+    payload.customer_cell = phone.subscriber;
+    payload.country_code = phone.countryCode;
+  }
+  // CORRECTED 2026-08-24: the order-level note is `order_details`. There is no
+  // `delivery_notes` field in the contract at all.
+  const orderDetails = String(input.orderDetails ?? '').trim();
+  if (orderDetails) payload.order_details = orderDetails;
+  if (typeof input.isPaid === 'boolean') payload.is_paid = input.isPaid;
+
   return { ok: true, payload };
 }
 
@@ -301,6 +449,31 @@ export function computeBackoffMs(attempt: number, rand: () => number = Math.rand
 // ---------------------------------------------------------------------------
 // Phone normalization (best-effort E.164 for KSA CRM matching)
 // ---------------------------------------------------------------------------
+
+/** The only dialling code this app serves; see splitPhoneForPos. */
+export const KSA_COUNTRY_CODE = '+966';
+
+export interface SplitPhone { countryCode: string; subscriber: string }
+
+/**
+ * Split a phone into the shape the Create Order contract wants: the LOCAL
+ * subscriber number in `customer_cell` ("541234567") and the dialling code in
+ * `country_code` ("+966"). CORRECTED 2026-08-24 — E.164 in `customer_cell` was
+ * a repo assumption and the contract disproves it.
+ *
+ * Only +966 is split, deliberately. Splitting an arbitrary E.164 number needs a
+ * dialling-plan table this repo does not have, and a wrong split puts a wrong
+ * number on a live POS ticket. Every customer phone here is normalized to +966
+ * by `normalizePhone`, so anything else is already out-of-market: return null
+ * and let the caller omit BOTH fields rather than send a guess.
+ */
+export function splitPhoneForPos(phone: string | null | undefined): SplitPhone | null {
+  const e164 = normalizePhone(phone);
+  if (!e164 || !e164.startsWith(KSA_COUNTRY_CODE)) return null;
+  const subscriber = e164.slice(KSA_COUNTRY_CODE.length);
+  if (!/^\d{6,12}$/.test(subscriber)) return null;
+  return { countryCode: KSA_COUNTRY_CODE, subscriber };
+}
 export function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   let d = phone.replace(/[^\d+]/g, '');

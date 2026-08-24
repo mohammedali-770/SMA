@@ -4,7 +4,7 @@ import {
   buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, computeBackoffMs,
   computePosNextAttempt, extractOrderRef, hmacSha256Hex, MAX_POS_ATTEMPTS, MAX_SYNC_ATTEMPTS,
   normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN, round2,
-  shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature,
+  shouldResendCreateOrder, splitPhoneForPos, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature,
 } from './lazywait';
 
 const items = [{ menuItemId: 'ITEM_1', name: 'Burger', quantity: 2, unitPrice: 25 }];
@@ -19,7 +19,9 @@ describe('buildCreateOrderPayload', () => {
       order_items: [{ menu_item_id: 'ITEM_1', name: 'Burger', quantity: 2, price: 25 }],
       customer_name: 'Ahmed', source: 'LWAPI',
     });
-    // never sends price_id / addons / delivery / customer phone
+    // With no optional data supplied, NOTHING optional is invented. (price_id,
+    // addons, customer_cell/customer_id ARE confirmed as of 2026-08-24 and are
+    // sent when we hold them — see the contract-fields suite below.)
     expect(JSON.stringify(r.payload)).not.toMatch(/price_id|addon|delivery|customer_cell|customer_id/i);
   });
 
@@ -45,6 +47,247 @@ describe('buildCreateOrderPayload', () => {
     const r = buildCreateOrderPayload({ clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
       items: [{ menuItemId: 'I', name: 'N', quantity: 1, unitPrice: 25.005 }] });
     expect(r.ok && (r.payload.order_items as { price: number }[])[0].price).toBe(25.01);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The CONFIRMED contract body (owner-supplied Lazywait document, 2026-08-24).
+// This is the live customer-order path: the lazywait-sync worker calls
+// buildCreateOrderPayload directly, so these assertions pin what a real POS
+// ticket receives.
+// ---------------------------------------------------------------------------
+describe('buildCreateOrderPayload — confirmed 2026-08-24 contract fields', () => {
+  const richItems = [{
+    menuItemId: 'ITEM_1',
+    name: 'Burger',
+    names: { en: 'Burger', ar: 'برجر' },
+    menuCategoryId: 'CAT_MAIN',
+    priceId: 'PRICE_1',
+    quantity: 1,
+    unitPrice: 25,
+    details: 'No onions',
+    addons: [{
+      addonId: 'AD_CHEESE',
+      name: 'Extra Cheese',
+      names: { en: 'Extra Cheese', ar: 'جبنة إضافية' },
+      price: 5,
+    }],
+  }];
+
+  it('builds the EXACT pickup payload — names, category, price_id, details, addons', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'Ahmed',
+      items: richItems,
+      customerId: 'CRM_9',
+      customerPhone: '0541234567',
+      orderDetails: 'Ring the bell',
+      isPaid: true,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload).toEqual({
+      client_id: 'C',
+      branch_id: 'B',
+      order_type: 'pickup',
+      order_items: [{
+        menu_item_id: 'ITEM_1',
+        // `name` is kept ALONGSIDE `names` on purpose — see buildConfirmedOrderItem.
+        name: 'Burger',
+        names: { en: 'Burger', ar: 'برجر' },
+        menu_category_id: 'CAT_MAIN',
+        price_id: 'PRICE_1',
+        quantity: 1,
+        price: 25,
+        details: 'No onions',
+        addons: [{
+          addon_id: 'AD_CHEESE',
+          name: 'Extra Cheese',
+          names: { en: 'Extra Cheese', ar: 'جبنة إضافية' },
+          quantity: 1,
+          price: 5,
+        }],
+      }],
+      customer_name: 'Ahmed',
+      source: 'LWAPI',
+      customer_id: 'CRM_9',
+      customer_cell: '541234567',
+      country_code: '+966',
+      order_details: 'Ring the bell',
+      is_paid: true,
+    });
+  });
+
+  it('keeps `name` as well as `names` (API tolerates undocumented fields)', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items: richItems,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const line = (r.payload.order_items as Array<Record<string, unknown>>)[0];
+    expect(line.name).toBe('Burger');
+    expect(line.names).toEqual({ en: 'Burger', ar: 'برجر' });
+  });
+
+  // ---- per-item note -> details -------------------------------------------
+  it('an item WITH a note emits `details`; one WITHOUT emits NO `details` key', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [
+        { menuItemId: 'I1', name: 'A', quantity: 1, unitPrice: 5, details: 'No onions' },
+        { menuItemId: 'I2', name: 'B', quantity: 1, unitPrice: 5 },
+        { menuItemId: 'I3', name: 'C', quantity: 1, unitPrice: 5, details: '   ' },
+        { menuItemId: 'I4', name: 'D', quantity: 1, unitPrice: 5, details: null },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const lines = r.payload.order_items as Array<Record<string, unknown>>;
+    expect(lines[0].details).toBe('No onions');
+    // PINNED: absent key, not null and not ''. A whitespace-only or null note is
+    // the same as no note.
+    expect('details' in lines[1]).toBe(false);
+    expect('details' in lines[2]).toBe(false);
+    expect('details' in lines[3]).toBe(false);
+  });
+
+  it('order-level note maps to `order_details` (there is no delivery_notes field)', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      orderDetails: 'Extra napkins',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.order_details).toBe('Extra napkins');
+    expect(JSON.stringify(r.payload)).not.toMatch(/delivery_notes/);
+  });
+
+  it('omits order_details when the order has no note', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items, orderDetails: '  ',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect('order_details' in r.payload).toBe(false);
+  });
+
+  // ---- add-ons -------------------------------------------------------------
+  it('modifiers become addons[] carrying addon_id from the mapping', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I1', name: 'A', quantity: 1, unitPrice: 5,
+        addons: [
+          { addonId: 'AD_1', name: 'Cheese', price: 5 },
+          { addonId: 'AD_2', name: 'Bacon', price: 7, quantity: 2 },
+        ],
+      }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const line = (r.payload.order_items as Array<Record<string, unknown>>)[0];
+    expect(line.addons).toEqual([
+      { addon_id: 'AD_1', name: 'Cheese', quantity: 1, price: 5 },
+      { addon_id: 'AD_2', name: 'Bacon', quantity: 2, price: 7 },
+    ]);
+  });
+
+  it('an UNMAPPED modifier BLOCKS the order — never a silent drop', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I1', name: 'A', quantity: 1, unitPrice: 5,
+        // The worker maps a modifier with no lazywait_addon_id to addonId ''.
+        addons: [{ addonId: 'AD_1', name: 'Cheese' }, { addonId: '', name: 'Unmapped' }],
+      }],
+    });
+    // A ticket that silently lost "Unmapped" is a ticket the kitchen cooks wrong.
+    expect(r).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
+  });
+
+  it('never emits addons_group_id on an order (that is a CATALOG field)', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items: richItems,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(JSON.stringify(r.payload)).not.toMatch(/addons_group_id/);
+  });
+
+  // ---- phone: split, NOT E.164 --------------------------------------------
+  it('customer_cell is the LOCAL subscriber number and country_code is separate', () => {
+    for (const input of ['0541234567', '+966541234567', '966541234567', '541234567']) {
+      const r = buildCreateOrderPayload({
+        clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+        customerPhone: input,
+      });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      expect(r.payload.customer_cell).toBe('541234567');
+      expect(r.payload.country_code).toBe('+966');
+      // The contract does NOT take E.164 in customer_cell.
+      expect(String(r.payload.customer_cell)).not.toMatch(/^\+/);
+      expect(String(r.payload.customer_cell)).not.toContain('966');
+    }
+  });
+
+  it('omits BOTH phone fields when the number cannot be split confidently', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      customerPhone: '+14155550123',   // out of market: no dialling plan to split on
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect('customer_cell' in r.payload).toBe(false);
+    expect('country_code' in r.payload).toBe(false);
+  });
+
+  // ---- money / totals ------------------------------------------------------
+  it('sends NO order-level money or totals fields (inclusive-vs-exclusive open)', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items: richItems,
+      isPaid: false,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    for (const k of ['subtotal', 'discount', 'tax', 'tax_percentage', 'taxes_charges',
+                     'tip', 'tip_percentage', 'total', 'order_delivery_fee']) {
+      expect(k in r.payload).toBe(false);
+    }
+    // is_paid is a state flag, not an amount — it IS confirmed and IS sent.
+    expect(r.payload.is_paid).toBe(false);
+  });
+
+  it('never emits the server-owned identity fields', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items: richItems,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(JSON.stringify(r.payload)).not.toMatch(/order_ref|order_id|order_number|order_date/);
+  });
+
+  // ---- the gate that must NOT move ----------------------------------------
+  it('DELIVERY is still blocked — the gate is provably untouched', () => {
+    expect(buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items: richItems,
+      customerId: 'CRM_9', customerPhone: '0541234567', orderDetails: 'x', isPaid: true,
+    })).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
+  });
+});
+
+describe('splitPhoneForPos', () => {
+  it('splits KSA numbers in every stored form', () => {
+    expect(splitPhoneForPos('0541234567')).toEqual({ countryCode: '+966', subscriber: '541234567' });
+    expect(splitPhoneForPos('+966541234567')).toEqual({ countryCode: '+966', subscriber: '541234567' });
+    expect(splitPhoneForPos('00966541234567')).toEqual({ countryCode: '+966', subscriber: '541234567' });
+    expect(splitPhoneForPos('054 123 4567')).toEqual({ countryCode: '+966', subscriber: '541234567' });
+  });
+
+  it('returns null rather than guessing a split it cannot justify', () => {
+    expect(splitPhoneForPos(null)).toBeNull();
+    expect(splitPhoneForPos('')).toBeNull();
+    expect(splitPhoneForPos('+14155550123')).toBeNull();   // non-KSA dialling code
+    expect(splitPhoneForPos('+9661')).toBeNull();          // too short to be real
   });
 });
 

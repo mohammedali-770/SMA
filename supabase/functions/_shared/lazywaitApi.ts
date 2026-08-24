@@ -20,13 +20,19 @@
  * (below) scrubs token/Bearer, customer phone/email, and payment card fields out
  * of any object before it is logged or returned.
  *
- * SAFETY (Create Order): the CONFIRMED pickup body is always available. The
- * ASSUMED delivery / add-on / customer / price_id fields (the 8 open questions
- * in docs/lazywait-delivery-open-questions.md) are assembled ONLY when the
- * caller passes `allowAssumedFields: true`. Default OFF — nothing invented can
- * reach the live POS until Lazywait confirms the schema. The live
- * `lazywait-sync` worker is intentionally NOT rewired: it keeps using the
- * pickup-only `buildCreateOrderPayload` and blocks delivery.
+ * SAFETY (Create Order): the CONFIRMED body is always available. As of the
+ * owner-supplied contract (2026-08-24) the add-on / customer / price_id /
+ * per-item-note fields are CONFIRMED and no longer gated — they are built by the
+ * audited `buildCreateOrderPayload` in `lazywait.ts`, which both modes call, so
+ * the gated path cannot drift from the confirmed one. What REMAINS gated behind
+ * `allowAssumedFields: true` (default OFF) is only what that contract still does
+ * not settle: `order_type:"delivery"` and its status id, the element shape of
+ * `order_deliveries[]`, and `latitude`/`longitude` — which are absent from the
+ * contract entirely. The live `lazywait-sync` worker keeps calling
+ * `buildCreateOrderPayload` directly and delivery stays BLOCKED.
+ *
+ * The contract was read from the DEV host `apiv2-dev.lazywait.com`; field-level
+ * parity with Production is UNVERIFIED and DEFAULT_BASE_URL is unchanged.
  *
  * PAYMENTS (Tap freeze — CLAUDE.md §6): the cash/online payment endpoints are
  * TYPED + serialized + validated here, but this client does not wire them into
@@ -34,14 +40,16 @@
  */
 
 import {
+  buildConfirmedOrderItem,
   buildCreateOrderPayload,
   classifyCreateOrderResult,
   DEFAULT_BASE_URL,
   lazywaitFetch,
-  normalizePhone,
   round2,
   SOURCE,
   shouldResendCreateOrder,
+  type CreateOrderAddonLine,
+  type CreateOrderInput,
   type CreateOrderItemInput,
   type CreateOrderOutcome,
   type BuildResult,
@@ -311,44 +319,47 @@ export function parseOrderListResponse(data: unknown): ValidationResult<OrderLis
 }
 
 // ===========================================================================
-// Create Order — CONFIRMED pickup + GATED assumed full/delivery/add-on body
+// Create Order — CONFIRMED body + GATED still-unconfirmed delivery fields
 // ===========================================================================
 /**
- * An add-on line on an order item. GATED — only serialized when the request
- * carries `allowAssumedFields: true`.
+ * An add-on line on an order item. As of the owner-supplied contract
+ * (2026-08-24) this is CONFIRMED and NO LONGER GATED — see
+ * `CreateOrderAddonLine` in `lazywait.ts` for the shape and for why
+ * `is_included_in_custom_addons` is still not sent.
  *
- * ASSUMPTION (pending Lazywait confirmation): create-order add-ons reuse the
- * catalog mapping field names — `addon_id` (modifiers.lazywait_addon_id) and
- * `addons_group_id` (modifier_groups.lazywait_group_id).
+ * CORRECTED 2026-08-24: the previous `addons_group_id` assumption is WRONG for
+ * create-order — the contract's add-on object carries no group id. (The catalog
+ * endpoints `/menu/addons` + `/menu/addons-groups` genuinely do use
+ * `addons_group_id`; that is a different field and is untouched below.)
  */
-export interface CreateOrderAddonInput {
-  addonId: string;                 // -> addon_id            [ASSUMPTION]
-  addonsGroupId?: string | null;   // -> addons_group_id     [ASSUMPTION]
-  name: string;
-  price?: number | null;           // -> price (server-trusted, VAT-inclusive)
-  quantity?: number;
-}
+export type CreateOrderAddonInput = CreateOrderAddonLine;
 
-/** Order item, extending the confirmed pickup item with GATED assumed fields. */
-export interface CreateOrderItemInputV2 extends CreateOrderItemInput {
-  priceId?: string | null;              // -> price_id        [ASSUMPTION]
-  addons?: CreateOrderAddonInput[];     // -> addons: [...]   [ASSUMPTION]
-}
+/**
+ * Order item. Now identical to the confirmed `CreateOrderItemInput`: `price_id`
+ * and `addons` were promoted out of the assumed gate on 2026-08-24, and
+ * `names{en,ar}`, `menu_category_id` and `details` were added from the contract.
+ * Kept as a named alias so existing call sites keep reading clearly.
+ */
+export type CreateOrderItemInputV2 = CreateOrderItemInput;
 
 /**
  * Create Order request.
  *
- * CONFIRMED (always sent): client_id, branch_id, order_type:"pickup",
- * order_items[{menu_item_id,name,quantity,price}], customer_name, source.
+ * CONFIRMED (always sent when present — grounded in the 2026-08-24 contract):
+ * client_id, branch_id, order_type:"pickup", source, customer_name,
+ * order_items[{menu_item_id, name, names{en,ar}, menu_category_id, price_id,
+ * quantity, price, details, addons[{addon_id, names{en,ar}, price, quantity}]}],
+ * customer_id, customer_cell + country_code, order_details, is_paid.
  *
- * ASSUMED (sent ONLY when `allowAssumedFields === true`) — every field below is
- * an assumption pending the owner-supplied Lazywait reference; see the
- * "ASSUMPTIONS TO CONFIRM WITH LAZYWAIT" section in
- * docs/integrations/Lazywait_API_Reference.md:
- *   - order_type:"delivery"
- *   - price_id per item, addons[] per item
- *   - customer_id (CRM id), customer_cell (E.164 phone)
- *   - delivery_address, latitude, longitude, delivery_notes, delivery_fee, is_paid
+ * STILL ASSUMED (sent ONLY when `allowAssumedFields === true`) — the contract
+ * does NOT settle these; see docs/lazywait-delivery-open-questions.md:
+ *   - order_type:"delivery" and its order_status_id (Q1)
+ *   - the element shape of `order_deliveries[]`, which is almost certainly where
+ *     delivery actually lives (Q2/Q3) — empty in the contract's example
+ *   - latitude / longitude: ABSENT from the contract entirely. These are NOT
+ *     confirmed by that document and stay gated (Q3).
+ *   - `order_delivery_fee` as a value: the NAME is corrected/confirmed, but the
+ *     contract's totals are exclusive-VAT while ours are inclusive (Q9).
  */
 export interface CreateOrderRequest {
   clientId: string;
@@ -357,119 +368,92 @@ export interface CreateOrderRequest {
   customerName: string;
   items: CreateOrderItemInputV2[];
 
-  /** Master gate. Default OFF — nothing assumed reaches the POS unless true. */
+  /** Master gate. Default OFF — nothing unconfirmed reaches the POS unless true. */
   allowAssumedFields?: boolean;
 
-  // --- assumed customer fields (gated) ---
-  customerId?: string | null;      // -> customer_id     [ASSUMPTION]
-  customerCell?: string | null;    // -> customer_cell   [ASSUMPTION] (normalized to E.164)
+  // --- CONFIRMED customer/order fields (NOT gated as of 2026-08-24) ---
+  customerId?: string | null;      // -> customer_id
+  /**
+   * Raw customer phone. Split into `customer_cell` (local subscriber) +
+   * `country_code` — the contract does NOT take E.164 in customer_cell.
+   */
+  customerCell?: string | null;
+  orderDetails?: string | null;    // -> order_details (orders.notes)
+  isPaid?: boolean;                // -> is_paid
 
-  // --- assumed delivery fields (gated) ---
+  // --- STILL-UNCONFIRMED delivery fields (gated) ---
   delivery?: {
-    address?: string | null;       // -> delivery_address [ASSUMPTION]
-    latitude?: number | null;      // -> latitude         [ASSUMPTION]
-    longitude?: number | null;     // -> longitude        [ASSUMPTION]
-    notes?: string | null;         // -> delivery_notes   [ASSUMPTION]
-    fee?: number | null;           // -> delivery_fee     [ASSUMPTION]
+    /**
+     * -> delivery_address. The field NAME is confirmed (it appears, empty, on
+     * the contract's pickup example); using it to carry a real delivery is what
+     * remains unconfirmed, so it stays behind the gate with the rest.
+     */
+    address?: string | null;
+    latitude?: number | null;      // -> latitude   [ASSUMPTION — absent from the contract]
+    longitude?: number | null;     // -> longitude  [ASSUMPTION — absent from the contract]
+    fee?: number | null;           // -> order_delivery_fee (name CORRECTED 2026-08-24)
   };
-  isPaid?: boolean;                // -> is_paid          [ASSUMPTION]
 
   /**
-   * Escape hatch for any other assumed field name. Also GATED and always
+   * Escape hatch for any other unconfirmed field name. Also GATED and always
    * identity-stripped (order_ref/order_id/order_number/order_date removed).
    */
   extraAssumedFields?: Record<string, unknown>;
 }
 
-function checkOrderMappings(branchId: string | null, items: CreateOrderItemInputV2[]): string | null {
-  if (!branchId) return 'missing_branch_mapping';
-  if (!items.length) return 'no_items';
-  if (items.some((it) => !it.menuItemId)) return 'missing_item_mapping';
-  // An add-on line, when present, must carry its mapped addon_id.
-  if (items.some((it) => (it.addons ?? []).some((a) => !a.addonId))) return 'missing_addon_mapping';
-  return null;
-}
-
-function serializeOrderItem(it: CreateOrderItemInputV2, assumed: boolean): Record<string, unknown> {
-  const base: Record<string, unknown> = {
-    menu_item_id: it.menuItemId,
-    name: it.name,
-    quantity: it.quantity,
-    // server-trusted, VAT-inclusive unit price (Lazywait response total is NOT trusted)
-    price: round2(it.unitPrice),
+/** Map the v2 request onto the audited confirmed-builder input. */
+function toConfirmedInput(req: CreateOrderRequest): CreateOrderInput {
+  return {
+    clientId: req.clientId,
+    branchId: req.branchId,
+    orderType: req.orderType,
+    customerName: req.customerName,
+    items: req.items,
+    customerId: req.customerId,
+    customerPhone: req.customerCell,
+    orderDetails: req.orderDetails,
+    isPaid: req.isPaid,
   };
-  if (!assumed) return base;
-  // GATED assumed per-item fields.
-  if (it.priceId != null && String(it.priceId) !== '') base.price_id = it.priceId;      // [ASSUMPTION]
-  const addons = it.addons ?? [];
-  if (addons.length) {
-    base.addons = addons.map((a) => {                                                    // [ASSUMPTION]
-      const ad: Record<string, unknown> = {
-        addon_id: a.addonId,                                                             // [ASSUMPTION]
-        name: a.name,
-        quantity: a.quantity ?? 1,
-      };
-      if (a.addonsGroupId != null && String(a.addonsGroupId) !== '') ad.addons_group_id = a.addonsGroupId; // [ASSUMPTION]
-      if (a.price != null) ad.price = round2(a.price);
-      return ad;
-    });
-  }
-  return base;
 }
 
 /**
  * Build the Create Order body.
  *
- * Default (allowAssumedFields falsy) → EXACTLY the confirmed pickup body from
- * the audited `buildCreateOrderPayload` (so the confirmed shape can never drift),
+ * Default (allowAssumedFields falsy) → EXACTLY the audited
+ * `buildCreateOrderPayload` output (so the confirmed shape can never drift),
  * and delivery stays BLOCKED (`delivery_schema_unconfirmed`).
  *
- * With `allowAssumedFields: true` → the full pickup/delivery/add-on body is
- * assembled from the documented-assumption field names, always excluding the
- * server-owned identity fields.
+ * With `allowAssumedFields: true` → the SAME confirmed body, plus the fields the
+ * 2026-08-24 contract still does not settle. The confirmed half is built by the
+ * one audited function in both modes, so the gated path cannot drift from it.
  */
 export function serializeCreateOrder(req: CreateOrderRequest): BuildResult {
   const assumed = req.allowAssumedFields === true;
 
   if (!assumed) {
     // Confirmed, audited path. Pickup → payload; delivery → blocked.
-    return buildCreateOrderPayload({
-      clientId: req.clientId,
-      branchId: req.branchId,
-      orderType: req.orderType,
-      customerName: req.customerName,
-      items: req.items,
-    });
+    return buildCreateOrderPayload(toConfirmedInput(req));
   }
 
-  // ---- Assumed path (owner-authorized capability; still gated + safe) -------
-  const blocked = checkOrderMappings(req.branchId, req.items);
-  if (blocked) return { ok: false, blockedReason: blocked };
+  // ---- Gated path (owner-authorized capability; still safe) ----------------
+  // Build the confirmed body through the audited builder. `orderType` is forced
+  // to 'pickup' ONLY so that builder's delivery block does not reject a
+  // deliberately-gated delivery build; the caller's real order_type is restored
+  // immediately below. Every mapping/validation check still runs.
+  const confirmed = buildCreateOrderPayload({ ...toConfirmedInput(req), orderType: 'pickup' });
+  if (!confirmed.ok) return confirmed;
 
-  const payload: Record<string, unknown> = {
-    client_id: req.clientId,
-    branch_id: req.branchId,
-    order_type: req.orderType,                                   // pickup OR delivery [ASSUMPTION for delivery]
-    order_items: req.items.map((it) => serializeOrderItem(it, true)),
-    customer_name: req.customerName || 'Guest',
-    source: SOURCE,
-  };
+  const payload: Record<string, unknown> = { ...confirmed.payload };
+  // May be "delivery" here — STILL UNCONFIRMED (Q1).
+  payload.order_type = req.orderType;
 
-  // Assumed customer fields.
-  if (req.customerId != null && String(req.customerId) !== '') payload.customer_id = req.customerId;   // [ASSUMPTION]
-  if (req.customerCell != null && String(req.customerCell) !== '') {
-    payload.customer_cell = normalizePhone(req.customerCell) ?? req.customerCell;                       // [ASSUMPTION]
-  }
-  if (typeof req.isPaid === 'boolean') payload.is_paid = req.isPaid;                                     // [ASSUMPTION]
-
-  // Assumed delivery fields.
   const d = req.delivery;
   if (d) {
-    if (d.address != null && String(d.address) !== '') payload.delivery_address = d.address;             // [ASSUMPTION]
-    if (d.latitude != null) payload.latitude = d.latitude;                                               // [ASSUMPTION]
-    if (d.longitude != null) payload.longitude = d.longitude;                                            // [ASSUMPTION]
-    if (d.notes != null && String(d.notes) !== '') payload.delivery_notes = d.notes;                     // [ASSUMPTION]
-    if (d.fee != null) payload.delivery_fee = round2(d.fee);                                             // [ASSUMPTION]
+    if (d.address != null && String(d.address) !== '') payload.delivery_address = d.address;
+    if (d.latitude != null) payload.latitude = d.latitude;                    // [ASSUMPTION]
+    if (d.longitude != null) payload.longitude = d.longitude;                 // [ASSUMPTION]
+    // CORRECTED 2026-08-24: the field is `order_delivery_fee`, not `delivery_fee`.
+    if (d.fee != null) payload.order_delivery_fee = round2(d.fee);
   }
 
   // Escape hatch — identity fields can never be injected.
@@ -519,7 +503,7 @@ export function buildUpdateOrderRequest(req: UpdateOrderRequest): LazywaitReques
   const body: Record<string, unknown> = {
     client_id: req.clientId,
     // order_items is a FULL replacement (see interface doc).
-    order_items: req.orderItems.map((it) => serializeOrderItem(it, assumed)),
+    order_items: req.orderItems.map(buildConfirmedOrderItem),
   };
   if (req.branchId != null && String(req.branchId) !== '') body.branch_id = req.branchId;
   if (req.customerName != null) body.customer_name = req.customerName;

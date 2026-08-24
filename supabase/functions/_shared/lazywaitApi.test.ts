@@ -181,16 +181,55 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
     expect(serializeCreateOrder(req)).toEqual(confirmed);
   });
 
-  it('sends NO assumed fields by default even when assumed data is present', () => {
+  // The invariant above is only meaningful if the v2 request actually FORWARDS
+  // the confirmed fields to the audited builder. Without this, a dropped field
+  // would still "equal" the audited output and the invariant would pass blind.
+  it('still equals it once every CONFIRMED field is populated', () => {
+    const rich = [{
+      menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 2, unitPrice: 28.75,
+      names: { en: 'Beef Burger', ar: 'برجر لحم' }, menuCategoryId: 'CAT_MAIN',
+      priceId: 'PR_SINGLE', details: 'No pickles',
+      addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', names: { en: 'Extra Cheese', ar: 'جبنة' }, price: 5 }],
+    }];
+    const v2 = serializeCreateOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed', items: rich,
+      customerId: 'CRM_9', customerCell: '0541234567', orderDetails: 'Ring the bell', isPaid: true,
+    });
+    const confirmed = buildCreateOrderPayload({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed', items: rich,
+      customerId: 'CRM_9', customerPhone: '0541234567', orderDetails: 'Ring the bell', isPaid: true,
+    });
+    expect(v2).toEqual(confirmed);
+    expect(confirmed.ok).toBe(true);
+    if (!confirmed.ok) return;
+    // Not a vacuous pass: the confirmed extras really are in there.
+    expect(confirmed.payload.customer_cell).toBe('541234567');
+    expect(confirmed.payload.order_details).toBe('Ring the bell');
+  });
+
+  it('sends the CONFIRMED fields by default but NO still-unconfirmed ones', () => {
     const req: CreateOrderRequest = {
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
       items: [{ ...pickupItems[0], priceId: 'PR_SINGLE', addons: [{ addonId: 'AD1', name: 'Cheese', price: 5 }] }],
-      customerId: 'CRM_9', customerCell: '0501234567', delivery: { address: 'Riyadh' }, isPaid: true,
+      customerId: 'CRM_9', customerCell: '0501234567', delivery: { address: 'Riyadh', latitude: 24.7 }, isPaid: true,
     };
     const built = serializeCreateOrder(req);
     expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    // Confirmed by the 2026-08-24 contract -> present with the gate OFF.
+    const line = (built.payload.order_items as Array<Record<string, unknown>>)[0];
+    expect(line.price_id).toBe('PR_SINGLE');
+    expect(line.addons).toEqual([{ addon_id: 'AD1', name: 'Cheese', quantity: 1, price: 5 }]);
+    expect(built.payload.customer_id).toBe('CRM_9');
+    expect(built.payload.customer_cell).toBe('501234567');
+    expect(built.payload.country_code).toBe('+966');
+    expect(built.payload.is_paid).toBe(true);
+    // STILL unconfirmed -> absent even though the caller supplied them.
     const s = JSON.stringify(built);
-    expect(s).not.toMatch(/price_id|addons|customer_id|customer_cell|delivery|latitude|longitude|is_paid/);
+    expect(s).not.toMatch(/delivery_address|latitude|longitude/);
+    // And the corrected/removed names must never appear anywhere.
+    expect(s).not.toMatch(/delivery_notes|addons_group_id/);
+    expect(s).not.toMatch(/"delivery_fee"/);
   });
 
   it('BLOCKS delivery by default (schema unconfirmed) — the safe result', () => {
@@ -207,14 +246,17 @@ describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: tru
       allowAssumedFields: true,
       items: [{
         menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 1, unitPrice: 28.75, priceId: 'PR_SINGLE',
-        addons: [{ addonId: 'AD_CHEESE', addonsGroupId: 'GRP_TOPPINGS', name: 'Extra Cheese', price: 5, quantity: 2 }],
+        names: { en: 'Beef Burger', ar: 'برجر لحم' }, menuCategoryId: 'CAT_MAIN', details: 'Well done',
+        addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', price: 5, quantity: 2 }],
       }],
     });
     expect(built.ok).toBe(true);
     if (!built.ok) return;
+    // CORRECTED 2026-08-24: no addons_group_id on a create-order add-on.
     expect(built.payload.order_items).toEqual([{
-      menu_item_id: 'IT_BURGER', name: 'Beef Burger', quantity: 1, price: 28.75, price_id: 'PR_SINGLE',
-      addons: [{ addon_id: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2, addons_group_id: 'GRP_TOPPINGS', price: 5 }],
+      menu_item_id: 'IT_BURGER', name: 'Beef Burger', names: { en: 'Beef Burger', ar: 'برجر لحم' },
+      menu_category_id: 'CAT_MAIN', price_id: 'PR_SINGLE', quantity: 1, price: 28.75, details: 'Well done',
+      addons: [{ addon_id: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2, price: 5 }],
     }]);
   });
 
@@ -222,21 +264,27 @@ describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: tru
     const built = serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'Sara',
       allowAssumedFields: true, items: pickupItems,
-      customerId: 'CRM_42', customerCell: '0501234567', isPaid: true,
-      delivery: { address: 'King Fahd Rd, Riyadh', latitude: 24.7136, longitude: 46.6753, notes: 'Gate 3', fee: 12.5 },
+      customerId: 'CRM_42', customerCell: '0501234567', isPaid: true, orderDetails: 'Gate 3',
+      delivery: { address: 'King Fahd Rd, Riyadh', latitude: 24.7136, longitude: 46.6753, fee: 12.5 },
     });
     expect(built.ok).toBe(true);
     if (!built.ok) return;
     const p = built.payload;
     expect(p.order_type).toBe('delivery');
     expect(p.customer_id).toBe('CRM_42');
-    expect(p.customer_cell).toBe('+966501234567'); // normalized E.164 (reuses normalizePhone)
+    // CORRECTED 2026-08-24: split, NOT E.164.
+    expect(p.customer_cell).toBe('501234567');
+    expect(p.country_code).toBe('+966');
     expect(p.is_paid).toBe(true);
     expect(p.delivery_address).toBe('King Fahd Rd, Riyadh');
+    // Still gated: absent from the contract entirely.
     expect(p.latitude).toBe(24.7136);
     expect(p.longitude).toBe(46.6753);
-    expect(p.delivery_notes).toBe('Gate 3');
-    expect(p.delivery_fee).toBe(12.5);
+    // CORRECTED: the order-level note is `order_details`; `delivery_notes` does
+    // not exist, and the fee field is `order_delivery_fee`.
+    expect(p.order_details).toBe('Gate 3');
+    expect(p.order_delivery_fee).toBe(12.5);
+    expect(JSON.stringify(p)).not.toMatch(/delivery_notes|"delivery_fee"|addons_group_id/);
     expect(p.source).toBe('LWAPI');
   });
 
