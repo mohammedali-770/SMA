@@ -89,12 +89,23 @@ export const StaffMfaGate: React.FC<React.PropsWithChildren> = ({ children }) =>
    * (still AAL2) must cause NO state change at all.
    */
   const revalidate = useCallback(async () => {
-    const assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     // A failed check is not proof of a lost session. Leave the console up and
     // let the next event decide: tearing it down on a network blip would be the
     // same disruption this function exists to avoid, and the real enforcement is
     // server-side anyway — RLS and the admin RPCs refuse an AAL1 caller whatever
     // this component renders. This gate is the explanation, not the boundary.
+    //
+    // That applies to a THROW as much as to a returned error. getAuthenticator-
+    // AssuranceLevel() rejects rather than returning when it cannot read the
+    // stored session or acquire the auth lock, and neither says anything about
+    // the caller's assurance level. Only a successful, genuinely-below-AAL2
+    // reading may close the console.
+    let assurance;
+    try {
+      assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    } catch {
+      return;
+    }
     if (assurance.error) return;
     if (assurance.data.currentLevel === 'aal2') return;
 
@@ -115,6 +126,10 @@ export const StaffMfaGate: React.FC<React.PropsWithChildren> = ({ children }) =>
       // would race that. SIGNED_OUT is handled by AppContext, which unmounts us.
       if (event === 'MFA_CHALLENGE_VERIFIED' || event === 'SIGNED_OUT') return;
 
+      // Anything reaching here threw out of inspect(), which has already set
+      // mode='checking' — the console is gone either way, and leaving it there
+      // would hang on the spinner. Resolve to the same state the mount path
+      // uses for the same failure.
       void revalidate().catch((e) => {
         setError(e instanceof Error ? e.message : String(e));
         setMode('needs_enrollment');

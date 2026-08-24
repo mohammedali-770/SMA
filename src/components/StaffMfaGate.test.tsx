@@ -223,6 +223,25 @@ describe('StaffMfaGate', () => {
     expect(screen.queryByText('MFA unavailable')).toBeNull();
   });
 
+  it('keeps the console up when the re-check throws rather than returning an error', async () => {
+    mocks.getAal
+      .mockResolvedValueOnce(aal('aal2'))
+      // getAuthenticatorAssuranceLevel() rejects — rather than returning an
+      // error — when it cannot read the stored session or take the auth lock.
+      // Neither says anything about the caller's assurance level, so this must
+      // be as non-destructive as the returned-error case above.
+      .mockRejectedValueOnce(new Error('Acquiring an exclusive Navigator LockManager lock timed out'));
+
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    const before = await screen.findByText('Protected staff console');
+
+    await act(async () => { emitAuthEvent('TOKEN_REFRESHED'); });
+
+    await waitFor(() => expect(mocks.getAal).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Protected staff console')).toBe(before);
+    expect(screen.queryByText('Set up authenticator')).toBeNull();
+  });
+
   it('unsubscribes the auth listener on unmount', async () => {
     mocks.getAal.mockResolvedValue(aal('aal2'));
     const { unmount } = render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
