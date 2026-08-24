@@ -170,7 +170,7 @@ describe('exact case-sensitive field names', () => {
 // ===========================================================================
 // 2) Create Order — confirmed pickup + gated assumed delivery/add-on body
 // ===========================================================================
-describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => {
+describe('serializeCreateOrder — confirmed body (default, delivery gate OFF)', () => {
   it('equals the audited buildCreateOrderPayload output exactly', () => {
     const req: CreateOrderRequest = {
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed', items: pickupItems,
@@ -181,16 +181,60 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
     expect(serializeCreateOrder(req)).toEqual(confirmed);
   });
 
-  it('sends NO assumed fields by default even when assumed data is present', () => {
-    const req: CreateOrderRequest = {
-      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
-      items: [{ ...pickupItems[0], priceId: 'PR_SINGLE', addons: [{ addonId: 'AD1', name: 'Cheese', price: 5 }] }],
-      customerId: 'CRM_9', customerCell: '0501234567', delivery: { address: 'Riyadh' }, isPaid: true,
+  it('still equals it when EVERY confirmed field is supplied — the two builders cannot drift', () => {
+    const full = {
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup' as const, customerName: 'Ahmed',
+      orderDetails: 'Ring the bell', customerId: 'CRM_9', customerPhone: '0541234567', isPaid: false,
+      items: [{
+        menuItemId: 'IT_BURGER', name: 'Beef Burger', nameAr: 'برجر', quantity: 1, unitPrice: 30,
+        menuCategoryId: 'CAT_MAIN', priceId: 'PR_SINGLE', note: 'No onions',
+        addons: [{ addonId: 'AD_CHEESE', nameEn: 'Extra Cheese', nameAr: 'جبن', price: 5 }],
+      }],
     };
-    const built = serializeCreateOrder(req);
+    expect(serializeCreateOrder(full)).toEqual(buildCreateOrderPayload(full));
+  });
+
+  it('serializes the confirmed per-item fields with exact contract casing', () => {
+    const built = serializeCreateOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
+      items: [{
+        menuItemId: 'IT_BURGER', name: 'Beef Burger', nameAr: 'برجر لحم', quantity: 1, unitPrice: 33.75,
+        menuCategoryId: 'CAT_MAIN', priceId: 'PR_SINGLE', note: 'No onions',
+        addons: [{ addonId: 'AD_CHEESE', nameEn: 'Extra Cheese', nameAr: 'جبن إضافي', price: 5, quantity: 1 }],
+      }],
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.payload.order_items).toEqual([{
+      menu_item_id: 'IT_BURGER',
+      name: 'Beef Burger',
+      names: { en: 'Beef Burger', ar: 'برجر لحم' },
+      quantity: 1,
+      price: 28.75,                         // 33.75 − the 5.00 add-on
+      menu_category_id: 'CAT_MAIN',
+      price_id: 'PR_SINGLE',
+      details: 'No onions',
+      addons: [{
+        addon_id: 'AD_CHEESE', name: 'Extra Cheese',
+        names: { en: 'Extra Cheese', ar: 'جبن إضافي' }, quantity: 1, price: 5,
+      }],
+    }]);
+    // `addons_group_id` was a WRONG assumption — it is not part of the order
+    // add-on object in the contract and must not reappear.
+    expect(JSON.stringify(built.payload)).not.toContain('addons_group_id');
+  });
+
+  it('sends NO delivery assumption by default even when delivery data is present', () => {
+    const built = serializeCreateOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
+      items: [{ ...pickupItems[0], priceId: 'PR_SINGLE' }],
+      delivery: { address: 'Riyadh', latitude: 24.7, longitude: 46.6, fee: 12.5 },
+    });
     expect(built.ok).toBe(true);
     const s = JSON.stringify(built);
-    expect(s).not.toMatch(/price_id|addons|customer_id|customer_cell|delivery|latitude|longitude|is_paid/);
+    expect(s).not.toMatch(/delivery_address|latitude|longitude|order_delivery_fee|order_deliveries/);
+    // ...while the CONFIRMED fields do go out.
+    expect(s).toContain('price_id');
   });
 
   it('BLOCKS delivery by default (schema unconfirmed) — the safe result', () => {
@@ -198,45 +242,47 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems,
     })).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
   });
-});
 
-describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: true)', () => {
-  it('serializes per-item price_id + addons with exact casing', () => {
+  it('never sends a totals field — the contract cannot settle VAT-inclusive vs exclusive (Q9)', () => {
     const built = serializeCreateOrder({
-      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
-      allowAssumedFields: true,
-      items: [{
-        menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 1, unitPrice: 28.75, priceId: 'PR_SINGLE',
-        addons: [{ addonId: 'AD_CHEESE', addonsGroupId: 'GRP_TOPPINGS', name: 'Extra Cheese', price: 5, quantity: 2 }],
-      }],
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'A', items: pickupItems,
     });
     expect(built.ok).toBe(true);
-    if (!built.ok) return;
-    expect(built.payload.order_items).toEqual([{
-      menu_item_id: 'IT_BURGER', name: 'Beef Burger', quantity: 1, price: 28.75, price_id: 'PR_SINGLE',
-      addons: [{ addon_id: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2, addons_group_id: 'GRP_TOPPINGS', price: 5 }],
-    }]);
+    const keys = built.ok ? Object.keys(built.payload) : [];
+    for (const k of ['subtotal', 'discount', 'tax', 'tax_percentage', 'total', 'order_delivery_fee']) {
+      expect(keys).not.toContain(k);
+    }
   });
+});
 
-  it('builds a full DELIVERY payload from documented-assumption field names', () => {
+describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedFields: true)', () => {
+  it('builds a delivery payload using the CORRECTED field names', () => {
     const built = serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'Sara',
       allowAssumedFields: true, items: pickupItems,
-      customerId: 'CRM_42', customerCell: '0501234567', isPaid: true,
-      delivery: { address: 'King Fahd Rd, Riyadh', latitude: 24.7136, longitude: 46.6753, notes: 'Gate 3', fee: 12.5 },
+      customerId: 'CRM_42', customerPhone: '0501234567', isPaid: true,
+      orderDetails: 'Gate 3',
+      delivery: { address: 'King Fahd Rd, Riyadh', latitude: 24.7136, longitude: 46.6753, fee: 12.5 },
     });
     expect(built.ok).toBe(true);
     if (!built.ok) return;
     const p = built.payload;
     expect(p.order_type).toBe('delivery');
     expect(p.customer_id).toBe('CRM_42');
-    expect(p.customer_cell).toBe('+966501234567'); // normalized E.164 (reuses normalizePhone)
+    // CORRECTED: the contract splits the phone; E.164 must never be the cell.
+    expect(p.customer_cell).toBe('501234567');
+    expect(p.country_code).toBe('+966');
     expect(p.is_paid).toBe(true);
     expect(p.delivery_address).toBe('King Fahd Rd, Riyadh');
+    // CORRECTED: `order_delivery_fee`, not `delivery_fee`.
+    expect(p.order_delivery_fee).toBe(12.5);
+    expect('delivery_fee' in p).toBe(false);
+    // CORRECTED: there is no `delivery_notes` field; the order note is `order_details`.
+    expect('delivery_notes' in p).toBe(false);
+    expect(p.order_details).toBe('Gate 3');
+    // Still an invention — the contract has no coordinate field at all.
     expect(p.latitude).toBe(24.7136);
     expect(p.longitude).toBe(46.6753);
-    expect(p.delivery_notes).toBe('Gate 3');
-    expect(p.delivery_fee).toBe(12.5);
     expect(p.source).toBe('LWAPI');
   });
 
@@ -266,7 +312,7 @@ describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: tru
       .toEqual({ ok: false, blockedReason: 'missing_item_mapping' });
     expect(serializeCreateOrder({
       ...base, branchId: 'BR_RUH',
-      items: [{ menuItemId: 'IT_1', name: 'X', quantity: 1, unitPrice: 5, addons: [{ addonId: '', name: 'bad' }] }],
+      items: [{ menuItemId: 'IT_1', name: 'X', quantity: 1, unitPrice: 5, addons: [{ addonId: '', nameEn: 'bad' }] }],
     })).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
   });
 });
@@ -294,7 +340,8 @@ describe('update order — order_items is a FULL replacement, order_ref in path'
     expect(spec.method).toBe('PUT');
     expect(spec.path).toBe('/pos/orders/REF%207%2Fx'); // order_ref path-encoded, never in the body
     expect(spec.body).toEqual({
-      client_id: 'CID_1', order_items: [{ menu_item_id: 'IT_1', name: 'A', quantity: 3, price: 10 }],
+      client_id: 'CID_1',
+      order_items: [{ menu_item_id: 'IT_1', name: 'A', names: { en: 'A' }, quantity: 3, price: 10 }],
       branch_id: 'BR_RUH', customer_name: 'A',
     });
     expect(JSON.stringify(spec.body)).not.toMatch(/order_ref|order_id|order_number|order_date/);

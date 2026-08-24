@@ -182,28 +182,244 @@ export function computePosNextAttempt(
 }
 
 // ---------------------------------------------------------------------------
-// Create Order payload mapping (PICKUP ONLY — confirmed schema)
+// Create Order payload mapping (PICKUP ONLY)
+//
+// Grounded in the owner-supplied Lazywait Create Order contract of 2026-08-24
+// (read from the DEV host `apiv2-dev.lazywait.com`; field-level parity with the
+// production host we actually POST to is UNVERIFIED — see docs/LAZYWAIT.md).
+// That document states only `client_id`, `branch_id` and a non-empty
+// `order_items` are required and everything else is optional, and that the
+// identity fields (order_ref/order_id/order_number/order_date) are generated
+// server-side. Delivery is still NOT confirmed by it and stays blocked.
 // ---------------------------------------------------------------------------
+
+/**
+ * One add-on line on an order item — `order_item_modifiers` joined to
+ * `modifiers.lazywait_addon_id`.
+ *
+ * Contract shape: `{ addon_id, names{en,ar}, price, quantity,
+ * is_included_in_custom_addons }`. We do not send
+ * `is_included_in_custom_addons`: nothing in our data model says whether a
+ * modifier arrived through a custom-addons group, and the contract makes the
+ * field optional. We do NOT send `addons_group_id` either — it appears in the
+ * catalog add-on-GROUP endpoints, but it is not part of the order add-on object
+ * in the contract, so the earlier assumption that Create Order accepts it was
+ * wrong and has been removed.
+ */
+export interface CreateOrderAddonInput {
+  addonId: string | null;      // -> addon_id  (modifiers.lazywait_addon_id)
+  nameEn: string;              // -> names.en
+  nameAr?: string | null;      // -> names.ar
+  /** Server-trusted snapshot price (order_item_modifiers.price), VAT-inclusive. */
+  price?: number | null;
+  quantity?: number;           // we have no per-add-on quantity column; defaults to 1
+}
+
 export interface CreateOrderItemInput {
   menuItemId: string | null;   // products.lazywait_item_id
   name: string;                // server-trusted item name
+  nameAr?: string | null;      // order_items.name_ar -> names.ar
   quantity: number;
-  unitPrice: number;           // server-trusted, VAT-INCLUSIVE unit price
+  /**
+   * Server-trusted, VAT-INCLUSIVE unit price as stored on `order_items` — which
+   * by construction ALREADY INCLUDES every selected modifier's price
+   * (`place_order`: `v_unit_price := product.price + Σ modifier.price`).
+   *
+   * When `addons` are present the serializer subtracts them back out, so the
+   * emitted `price` is the bare item price and
+   * `price + Σ(addon.price × addon.quantity) === unitPrice` exactly. See
+   * `serializeCreateOrderItem` for why that decomposition is mandatory.
+   */
+  unitPrice: number;
+  menuCategoryId?: string | null;  // categories.lazywait_category_id -> menu_category_id
+  priceId?: string | null;         // products.lazywait_price_id     -> price_id
+  note?: string | null;            // order_items.note               -> details
+  addons?: CreateOrderAddonInput[];
 }
+
 export interface CreateOrderInput {
   clientId: string;
   branchId: string | null;     // branches.lazywait_branch_id
   orderType: 'pickup' | 'delivery' | string;
   customerName: string;
   items: CreateOrderItemInput[];
+  /** orders.notes — the order-level kitchen note. Contract field: `order_details`. */
+  orderDetails?: string | null;
+  /** profiles.lazywait_customer_id — the CRM link. Contract field: `customer_id`. */
+  customerId?: string | null;
+  /**
+   * Raw stored customer phone. Split into `customer_cell` (local subscriber
+   * number) + `country_code` by `splitPhoneForPos` — the contract keeps them
+   * apart, so E.164 must NEVER be sent in `customer_cell`.
+   */
+  customerPhone?: string | null;
+  /**
+   * Contract field `is_paid`. Supported here, but the live worker deliberately
+   * does not set it: telling a cashier an order needs no cash is a financial
+   * signal, and payment work is frozen (CLAUDE.md §6). Wiring it is a separate
+   * owner decision.
+   */
+  isPaid?: boolean;
 }
 export type BuildResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; blockedReason: string };
 
+function trimToNull(v: string | null | undefined): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+/** Total money carried by an item's add-on lines (round2 per line, then summed). */
+function addonsTotal(addons: CreateOrderAddonInput[]): number {
+  return addons.reduce(
+    (sum, a) => sum + round2(Number(a.price ?? 0)) * Math.max(1, Number(a.quantity ?? 1)),
+    0,
+  );
+}
+
 /**
- * Build the confirmed Create Order body. Only the CONFIRMED fields are sent —
- * no price_id, no addons, no delivery/customer_phone (schemas unconfirmed).
+ * Split a stored phone into the two fields the contract wants:
+ * `customer_cell` = the LOCAL subscriber number ("541234567") and
+ * `country_code` = the dialling prefix ("+966") — NOT one E.164 string.
+ *
+ * Only Saudi numbers are split. For anything else we return null and send
+ * neither field: guessing where a foreign country code ends would put a
+ * wrong number in front of a branch, which is worse than sending none.
+ */
+export function splitPhoneForPos(
+  phone: string | null | undefined,
+): { countryCode: string; cell: string } | null {
+  const e164 = normalizePhone(phone);
+  if (!e164 || !e164.startsWith('+966')) return null;
+  const local = e164.slice(4).replace(/^0+/, '');
+  if (!/^\d{6,12}$/.test(local)) return null;
+  return { countryCode: '+966', cell: local };
+}
+
+/**
+ * Serialize ONE order item into the contract's order_items element.
+ *
+ * `name` is sent ALONGSIDE `names{en,ar}`, not replaced by it. `name` is not in
+ * the documented contract at all, yet pickup sync has worked in Production with
+ * it since the integration went live — which is evidence the API tolerates
+ * undocumented fields, and no evidence at all that dropping `name` is safe. If a
+ * later Production check shows the POS reads `names`, `name` can go then.
+ *
+ * MONEY — why `price` is decomposed. `unitPrice` already contains the modifier
+ * prices (`place_order` adds them into `order_items.unit_price`). The contract's
+ * own example sums the add-on prices into the order: item `price` 25 + addon
+ * `price` 5 = `subtotal` 30. So emitting the modifier-inclusive unit price AND
+ * the add-on lines would charge the add-ons twice on the POS ticket. We
+ * therefore emit the bare item price and let the add-on lines carry their own
+ * money, which leaves the line's implied total exactly what it is today.
+ */
+export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<string, unknown> {
+  const addons = it.addons ?? [];
+  const names: Record<string, string> = {};
+  const nameEn = trimToNull(it.name);
+  const nameAr = trimToNull(it.nameAr);
+  if (nameEn) names.en = nameEn;
+  if (nameAr) names.ar = nameAr;
+
+  const item: Record<string, unknown> = {
+    menu_item_id: it.menuItemId,
+    // Undocumented but Production-proven — kept in addition to `names`.
+    name: it.name,
+    names,
+    quantity: it.quantity,
+    // Server-trusted, VAT-inclusive, add-ons subtracted back out (see above).
+    // The Lazywait response total is NOT trusted.
+    price: round2(round2(it.unitPrice) - addonsTotal(addons)),
+  };
+  if (it.menuCategoryId != null && String(it.menuCategoryId) !== '') {
+    item.menu_category_id = it.menuCategoryId;
+  }
+  if (it.priceId != null && String(it.priceId) !== '') item.price_id = it.priceId;
+
+  // Per-item kitchen note. The key is OMITTED (not null) when there is no note,
+  // matching how every other optional field on this body behaves.
+  const details = trimToNull(it.note);
+  if (details) item.details = details;
+
+  if (addons.length) {
+    item.addons = addons.map((a) => {
+      const addonNames: Record<string, string> = {};
+      const addonEn = trimToNull(a.nameEn);
+      const addonAr = trimToNull(a.nameAr);
+      if (addonEn) addonNames.en = addonEn;
+      if (addonAr) addonNames.ar = addonAr;
+      const addon: Record<string, unknown> = {
+        addon_id: a.addonId,
+        // Same rationale as the item-level `name`; removable at the same check.
+        name: a.nameEn,
+        names: addonNames,
+        quantity: Math.max(1, Number(a.quantity ?? 1)),
+      };
+      if (a.price != null) addon.price = round2(a.price);
+      return addon;
+    });
+  }
+  return item;
+}
+
+/**
+ * Column list the sync worker selects from `order_items` to build a Create
+ * Order body. Kept here, next to the mapper that consumes it, so the query and
+ * the mapping cannot drift apart — before the 2026-08-24 contract the worker
+ * selected only name/quantity/unit_price/lazywait_item_id, and the add-on,
+ * category and price mappings were simply unreachable from the worker.
+ */
+export const ORDER_ITEM_SELECT =
+  'id, name_en, name_ar, note, quantity, unit_price, product_id,'
+  + ' products(lazywait_item_id, lazywait_price_id, categories(lazywait_category_id)),'
+  + ' order_item_modifiers(modifier_id, name_en, name_ar, price, modifiers(lazywait_addon_id))';
+
+/**
+ * Map rows returned by `ORDER_ITEM_SELECT` onto Create Order items.
+ *
+ * PURE, so the join that feeds the POS ticket is unit-testable without a
+ * database. An unmapped modifier produces `addonId: null`, which
+ * `buildCreateOrderPayload` turns into `missing_addon_mapping` — never a
+ * silently dropped add-on.
+ */
+export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOrderItemInput[] {
+  return rows.map((it) => {
+    const product = it.products as {
+      lazywait_item_id?: string | null;
+      lazywait_price_id?: string | null;
+      categories?: { lazywait_category_id?: string | null } | null;
+    } | null;
+    const modifiers = (it.order_item_modifiers ?? []) as Array<Record<string, unknown>>;
+    return {
+      menuItemId: product?.lazywait_item_id ?? null,
+      name: String(it.name_en ?? 'Item'),
+      nameAr: (it.name_ar as string | null) ?? null,
+      quantity: Number(it.quantity ?? 1),
+      // VAT-inclusive AND modifier-inclusive; the serializer subtracts the
+      // add-on lines back out so the POS cannot charge them twice.
+      unitPrice: Number(it.unit_price ?? 0),
+      menuCategoryId: product?.categories?.lazywait_category_id ?? null,
+      priceId: product?.lazywait_price_id ?? null,
+      note: (it.note as string | null) ?? null,
+      addons: modifiers.map((m) => ({
+        addonId: (m.modifiers as { lazywait_addon_id?: string | null } | null)?.lazywait_addon_id ?? null,
+        nameEn: String(m.name_en ?? 'Option'),
+        nameAr: (m.name_ar as string | null) ?? null,
+        price: Number(m.price ?? 0),
+      })),
+    };
+  });
+}
+
+/**
+ * Build the confirmed Create Order body.
+ *
+ * Delivery stays BLOCKED: the contract documents a pickup order and says
+ * nothing about `order_type: "delivery"`, its `order_status_id`, or the shape of
+ * `order_deliveries[]` — so nothing here enables delivery sync.
+ *
  * Returns a blockedReason instead of throwing so the worker can record it.
  */
 export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
@@ -216,20 +432,57 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   if (input.items.some((it) => !it.menuItemId)) {
     return { ok: false, blockedReason: 'missing_item_mapping' };
   }
-  const payload = {
+  // An add-on line must carry its mapped addon_id. Dropping an unmapped modifier
+  // instead would send the kitchen an incomplete ticket AND (because the add-on
+  // money is subtracted out of the item price) undercharge the line. Blocking is
+  // loud and recoverable; a silent drop is neither.
+  if (input.items.some((it) => (it.addons ?? []).some((a) => !a.addonId))) {
+    return { ok: false, blockedReason: 'missing_addon_mapping' };
+  }
+  // Defensive: the add-on prices are the same snapshots that were added into
+  // unit_price, so this cannot go negative on well-formed data. If it ever does,
+  // the decomposition is unsafe and we refuse rather than post a wrong price.
+  if (input.items.some((it) => round2(it.unitPrice) - addonsTotal(it.addons ?? []) < -0.005)) {
+    return { ok: false, blockedReason: 'addon_price_exceeds_item_price' };
+  }
+
+  const payload: Record<string, unknown> = {
     client_id: input.clientId,
     branch_id: input.branchId,
     order_type: 'pickup',
-    order_items: input.items.map((it) => ({
-      menu_item_id: it.menuItemId,
-      name: it.name,
-      quantity: it.quantity,
-      // server-trusted, VAT-inclusive unit price (Lazywait response total is NOT trusted)
-      price: round2(it.unitPrice),
-    })),
+    order_items: input.items.map(serializeCreateOrderItem),
     customer_name: input.customerName || 'Guest',
     source: SOURCE,
   };
+
+  // Order-level kitchen note (orders.notes).
+  const orderDetails = trimToNull(input.orderDetails);
+  if (orderDetails) payload.order_details = orderDetails;
+
+  // CRM link.
+  if (input.customerId != null && String(input.customerId) !== '') {
+    payload.customer_id = input.customerId;
+  }
+
+  // Phone: local subscriber number and dialling prefix are SEPARATE fields.
+  const phone = splitPhoneForPos(input.customerPhone);
+  if (phone) {
+    payload.customer_cell = phone.cell;
+    payload.country_code = phone.countryCode;
+  }
+
+  if (typeof input.isPaid === 'boolean') payload.is_paid = input.isPaid;
+
+  // MONEY, deliberately absent. The contract carries subtotal/discount/tax/
+  // tax_percentage/total/order_delivery_fee, and its example computes
+  // total = subtotal × 1.15 — i.e. tax ADDED ON TOP of the item prices. Ours are
+  // VAT-INCLUSIVE, so those fields cannot be filled from our numbers without
+  // deciding a question the document does not answer: what the POS does with
+  // prices when the tax fields are absent (which is the case today, and pickup
+  // tickets are correct). Sending a guessed subtotal/tax/total would disagree
+  // with what the customer was charged. Recorded as Q9 in
+  // docs/lazywait-delivery-open-questions.md instead.
+
   return { ok: true, payload };
 }
 

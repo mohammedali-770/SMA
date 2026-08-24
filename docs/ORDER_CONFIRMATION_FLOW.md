@@ -379,10 +379,13 @@ halves, and re-introducing the escape string makes CASE 1 fail.
 whitespace-only note is stored as NULL rather than as a blank instruction line.
 
 **Where 280 came from.** A kitchen note is an instruction, not a message. It is
-**not** derived from any POS capability — whether Lazywait accepts an order note
-at all is still open question Q5 (`docs/lazywait-delivery-open-questions.md`),
-and `lazywait-sync` does not forward notes today. If Lazywait confirms a shorter
-maximum this number narrows; it should never silently widen.
+**not** derived from any POS capability — it was chosen before Lazywait had
+answered Q5 (`docs/lazywait-delivery-open-questions.md`). Q5 is now answered
+(the order note is `order_details`, the per-item note `order_items[].details`,
+and `lazywait-sync` forwards both), but the contract states **no** maximum
+length, so 280 still rests on readability rather than on a POS limit. If Lazywait
+later confirms a shorter maximum this number narrows; it should never silently
+widen.
 
 Proven on a disposable PostgreSQL 16 + PostGIS 3.4 cluster on 2026-08-19: the
 full 82-migration chain applied from empty, and **41/44 SQL suites passed with 0
@@ -521,14 +524,17 @@ breaks the entire receipt and My Orders for every signed-in customer. The app
 change and the grants must ship together; case A2 of the suite pins both, and
 also asserts the grant widened nothing else.
 
-**Staff can read the item note; the POS cannot.** `admin_list_orders_with_items`
-projects it and the receipt modal renders it, in the danger tone rather than the
-modifiers' grey — a modifier is what was ordered, a note is something the kitchen
-has to *do*. It is deliberately **not** forwarded to Lazywait: whether Create
-Order accepts a note at all is open question Q5, and inventing a field name is
-exactly what the `allowAssumedFields` gate exists to prevent. Until the vendor
-confirms it, the staff dashboard carries per-item notes and the POS ticket does
-not.
+**Staff read the item note, and since 2026-08-24 so does the POS.**
+`admin_list_orders_with_items` projects it and the receipt modal renders it, in
+the danger tone rather than the modifiers' grey — a modifier is what was ordered,
+a note is something the kitchen has to *do*. When PR #231 shipped, the note
+stopped at the staff dashboard: open question Q5 asked whether Create Order
+accepted a note at all, and inventing a field name is exactly what the
+`allowAssumedFields` gate exists to prevent. The owner-supplied Create Order
+contract answered Q5 — the per-item note is **`order_items[].details`** and the
+order-level note is **`order_details`** — so `lazywait-sync` now forwards both
+and the POS ticket carries what the dashboard shows. The gap PR #231 left open
+is closed.
 
 ### Directions, for pickup only
 
@@ -725,13 +731,12 @@ editor and the one `cart.updateItem`.
   is latent rather than active for the note limit specifically — the client
   `maxLength` stops a customer reaching the server bound at all — but any future
   server-side order rule will hit it.
-- **Per-item notes do not exist.** There is no `order_items.notes` column, no UI
-  and no field for one in `serializeOrderItem`
-  (`supabase/functions/_shared/lazywaitApi.ts`). Adding them is blocked on the
-  same Lazywait question as §10c: the confirmed Create Order body has no note
-  field of any kind, `delivery_notes` is `[ASSUMPTION]`-tagged and gated behind
-  `allowAssumedFields` (default off), and per-item notes are not even on the
-  question list.
+- ~~**Per-item notes do not exist.**~~ **Closed.** `order_items.note` shipped in
+  PR #231 (migration `20260821170000`, live `20260822123940`) with the item-screen
+  UI, and the POS half followed once the vendor contract answered Q5: the field
+  is `order_items[].details`, the order-level note is `order_details`, and both
+  are forwarded by `lazywait-sync`. The assumed `delivery_notes` name this bullet
+  worried about turned out not to exist at all.
 - **Refund worker scheduling is manual.** See §8.
 - **`payment-refund` has no integration test against a Tap sandbox.** The pure
   classifier is unit-tested; the transport path is not exercised.

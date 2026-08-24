@@ -75,8 +75,12 @@ no blocked orders).
 2. `lazywait-sync` (cron/scheduled) calls `claim_lazywait_sync_batch(N)` —
    `FOR UPDATE SKIP LOCKED` so concurrent workers never double-send — flipping
    claimed rows to `'syncing'`.
-3. Per order: load branch mapping + items + `products.lazywait_item_id`
-   (server-trusted name/qty/price), optional CRM match by phone, then
+3. Per order: load branch mapping + items via `ORDER_ITEM_SELECT` — the
+   server-trusted snapshots (`name_en`, `name_ar`, `note`, qty, `unit_price`)
+   joined to `products.lazywait_item_id` / `lazywait_price_id`, the product's
+   `categories.lazywait_category_id`, and `order_item_modifiers` joined to
+   `modifiers.lazywait_addon_id` — map them with `mapOrderItemRows`, read the
+   stored CRM link and optionally refresh it by phone, then
    `buildCreateOrderPayload` (pickup-only, validates mapping).
 4. `POST /pos/orders/create`; on success save `order_ref`→`lazywait_ref`,
    `order_id`, `order_number`, `order_status_id`→`lazywait_status`, mark
@@ -84,18 +88,62 @@ no blocked orders).
    an `integration_sync_logs` row via `record_lazywait_sync`.
 
 ### Create Order payload (only CONFIRMED fields)
+The owner supplied the vendor Create Order contract on **2026-08-24**. It was
+read from the **dev** host `apiv2-dev.lazywait.com`; `DEFAULT_BASE_URL` is the
+**production** host and was deliberately not changed, so field-level parity
+between the two is **unverified**. Field-by-field state:
+`docs/integrations/Lazywait_API_Reference.md`.
+
 ```json
 { "client_id": "…", "branch_id": "<lazywait_branch_id>", "order_type": "pickup",
-  "order_items": [{ "menu_item_id": "<lazywait_item_id>", "name": "<server name>",
-                    "quantity": 2, "price": 25.00 }],
-  "customer_name": "<profile.full_name|Guest>", "source": "LWAPI" }
+  "order_items": [{
+    "menu_item_id": "<lazywait_item_id>", "name": "<server name>",
+    "names": { "en": "Beef Burger", "ar": "برجر لحم" },
+    "quantity": 2, "price": 25.00,
+    "menu_category_id": "<lazywait_category_id>", "price_id": "<lazywait_price_id>",
+    "details": "No onions",
+    "addons": [{ "addon_id": "<lazywait_addon_id>", "name": "Extra Cheese",
+                 "names": { "en": "Extra Cheese", "ar": "جبن إضافي" },
+                 "quantity": 1, "price": 5.00 }]
+  }],
+  "customer_name": "<profile.full_name|Guest>",
+  "customer_id": "<profiles.lazywait_customer_id>",
+  "customer_cell": "541234567", "country_code": "+966",
+  "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
-- `price` = the **server-trusted, VAT-inclusive** unit price (KSA prices are
-  VAT-inclusive). The Lazywait response total is **ignored** (test returned 0).
+- `price` is the **server-trusted, VAT-inclusive** item price with the add-on
+  money subtracted back out. `order_items.unit_price` already includes every
+  selected modifier (`place_order` adds them in) and the contract sums add-on
+  prices into the order, so sending both un-decomposed would charge add-ons
+  twice. The invariant `price + Σ(addon.price × addon.quantity) === unit_price`
+  is pinned by `lazywait.test.ts`. The Lazywait response total is still
+  **ignored** (test returned 0).
+- `details` is **omitted entirely** when a line has no note — never sent as null.
+- `customer_cell` is the **local subscriber number**; the dialling prefix travels
+  separately in `country_code`. E.164 is never sent in `customer_cell`. A number
+  we cannot split confidently (non-Saudi, unparseable) sends **neither** field.
+- **No totals are sent** — not `subtotal`, `tax`, `total` or
+  `order_delivery_fee`. The contract's example adds tax on top of the item
+  prices; ours are VAT-inclusive, and the document does not say what the POS does
+  when the tax fields are absent. Open question **Q9**.
+- **`is_paid` is supported but not wired.** It is a confirmed field, but telling
+  a cashier an order needs no cash is a financial signal and payment work is
+  frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
+
+### Operational precondition — add-on mapping must be complete
+An order line whose modifier has no `modifiers.lazywait_addon_id` now **blocks**
+the whole order with `missing_addon_mapping` instead of syncing. That is
+deliberate: the add-on money is subtracted out of the item price, so dropping an
+unmapped add-on would both hide it from the kitchen and undercharge the ticket.
+Check `lazywait_mapping_status()` (or the admin **Lazywait catalog mapping**
+card) for unmapped modifiers before this reaches Production — any gap turns into
+blocked orders rather than wrong ones, but it is still a queue to watch.
 
 ### Intentionally NOT sent (schemas unconfirmed — do not invent)
-`price_id`, addons/modifiers, delivery address/fields, `customer_cell`/`customer_id`.
-Delivery orders are **blocked** (not synced) until Lazywait confirms the schema.
+Delivery address/fields, `latitude`/`longitude` (the contract has **no**
+coordinate field), the `order_deliveries[]` element shape, and every money field
+(Q9). Delivery orders are **blocked** (not synced) until Lazywait confirms the
+schema — unchanged by the 2026-08-24 contract, which documents a pickup order.
 
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
@@ -222,13 +270,14 @@ The reference scaffold + the field-casing table + the assumptions to confirm are
 in `docs/integrations/Lazywait_API_Reference.md` (the verbatim vendor reference
 is owner-supplied and replaces it once provided).
 
-- **Create Order** implements the confirmed pickup body AND the full
-  delivery/add-on body — but the delivery/add-on/customer/`price_id`
-  **assumptions** are assembled ONLY when the caller passes
-  `allowAssumedFields: true` (default OFF). The live `lazywait-sync` worker is
-  intentionally **unchanged** (still pickup-only via `buildCreateOrderPayload`,
-  delivery blocked). Assumed field names are listed in the reference doc's
-  "ASSUMPTIONS TO CONFIRM WITH LAZYWAIT" section.
+- **Create Order** produces the confirmed body from the single audited builder
+  in `lazywait.ts`; `serializeCreateOrder` calls it and then adds only the
+  **delivery** assumptions, which are assembled ONLY when the caller passes
+  `allowAssumedFields: true` (default OFF). Because the confirmed body has one
+  source, the typed client cannot drift from the worker's payload — a test
+  asserts the two are equal. The live `lazywait-sync` worker is pickup-only and
+  delivery stays blocked. Remaining assumed field names are in the reference
+  doc's "STILL ASSUMED" section.
 - **Payment endpoints** (`update-cash-payment`, `update-online-payment`) are
   typed/serialized/validated only; live wiring stays **frozen** (CLAUDE.md §6).
 - The client never re-POSTs Create Order once an `order_ref` exists and never
@@ -237,7 +286,12 @@ is owner-supplied and replaces it once provided).
 
 ## Testing
 `supabase/functions/_shared/lazywait.test.ts` (Vitest) covers: Create Order
-payload mapping, delivery/missing-branch/missing-item blocking, price rounding,
+payload mapping (the full confirmed body — names/details/price_id/
+menu_category_id/addons, the phone split, the add-on price decomposition, and
+`details` being absent rather than null when a line has no note), the
+`order_items` join via `mapOrderItemRows` (including an unmapped modifier
+producing `missing_addon_mapping` rather than a silent drop),
+delivery/missing-branch/missing-item blocking, price rounding,
 error classification (401/403 terminal, 429/5xx retryable), webhook HMAC verify
 (valid/tampered/missing, cross-checked vs Node crypto), backoff, phone
 normalization, the `shouldResendCreateOrder` duplicate-send guard, and

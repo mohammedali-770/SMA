@@ -2,9 +2,18 @@
 
 > **This is a repo-maintained SCAFFOLD, not the vendor document.** The verbatim
 > **Lazywait API Reference** is **owner-supplied** and, when provided, MUST be
-> committed here to **replace/augment** this file. Every field marked
+> committed here to **replace/augment** this file. Every field still marked
 > **[ASSUMPTION]** below is a documented guess that Lazywait must confirm — see
-> the "ASSUMPTIONS TO CONFIRM WITH LAZYWAIT" section at the end.
+> the "STILL ASSUMED" section at the end.
+>
+> **Partial confirmation, 2026-08-24.** The owner supplied the vendor contract
+> for **one endpoint** — `POST /pos/orders/create` — and the Create Order
+> sections below now reflect it. That does not make this file the vendor's
+> reference: it covers 1 of the 27 endpoints, it describes a **pickup** order and
+> says nothing about delivery, and it was read from the **dev** host
+> `apiv2-dev.lazywait.com` while we POST to production `apiv2.lazywait.com`.
+> Field-level parity between the two hosts is **unverified**. The scaffold
+> warning stands; one dev-host document is not the vendor reference.
 
 Typed client: `supabase/functions/_shared/lazywaitApi.ts`
 (request interfaces + pure serializers + runtime validators for all 27 endpoints,
@@ -30,7 +39,7 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | GET | `/pos/orders/active-orders` | `getActiveOrders` | optional `branch_id`, `user_id`, `lookback` |
 | GET | `/pos/orders/search` | `searchOrders` | `query` (+ pagination when both) |
 | POST | `/pos/orders` | `fetchOrders` | body `order_refs: string[]` **[A]** |
-| POST | `/pos/orders/create` | `createOrder` | confirmed pickup **C**; delivery/add-on **[A]**, gated |
+| POST | `/pos/orders/create` | `createOrder` | pickup body **C** (vendor contract 2026-08-24, dev host); delivery **[A]**, gated |
 | PUT | `/pos/orders/:order_ref` | `updateOrder` | `order_items` = **full replacement** **[A]**; `order_ref` in path only |
 | POST | `/pos/orders/update-cash-payment` | `updateCashPayment` | `Trans_Amount` **C** — Tap-frozen, typed only |
 | POST | `/pos/orders/update-online-payment` | `updateOnlinePayment` | `Trans_Amount`/`Approval_No`/`Card_Type`/`Card_Number` **C** — Tap-frozen, typed only |
@@ -83,7 +92,14 @@ Legend: **C** = confirmed/known casing · **A** = assumption pending Lazywait.
 | `consumption` | addon | **object** (not scalar) |
 | `auto_selected_addons` | addon group | **string[]** |
 | `included_custom_addons_ids` | addon group | **string[]** |
-| `menu_item_id` / `category_id` / `branch_id` / `addon_id` / `addons_group_id` / `price_id` | catalog + orders | string |
+| `menu_item_id` / `category_id` / `branch_id` / `addon_id` / `price_id` | catalog + orders | string |
+| `addons_group_id` | catalog add-on **groups** only — **not** an order add-on field | string |
+| `names` | order item + order add-on | **object** `{ en, ar }` (not a string) |
+| `details` | order **item** | string (per-item note) |
+| `order_details` | order | string (order-level note) |
+| `customer_cell` | order | string — **local subscriber number**, never E.164 |
+| `country_code` | order | string — dialling prefix, e.g. `"+966"` |
+| `order_delivery_fee` | order | number (**not** `delivery_fee`) |
 
 ## Create Order — server-owned identity fields (NEVER sent in create/update)
 `order_ref`, `order_id`, `order_number`, `order_date` are owned by the POS and are
@@ -99,31 +115,99 @@ resend).
 
 ---
 
-## ASSUMPTIONS TO CONFIRM WITH LAZYWAIT
+## Create Order — the confirmed pickup body (contract 2026-08-24)
 
-The full pickup **+ delivery + add-on** Create Order body is implemented and
-tested, but every field below is an **assumption** the client will only send when
-the caller passes **`allowAssumedFields: true`** (default **OFF** — nothing here
-reaches the live POS until confirmed). The live `lazywait-sync` worker is **not**
-rewired: it stays pickup-only and blocks delivery. These map 1:1 to the 8 open
-questions in `docs/lazywait-delivery-open-questions.md`.
+Only `client_id`, `branch_id` and a non-empty `order_items` are **required**;
+every other field is optional. What `buildCreateOrderPayload` sends today:
+
+```json
+{ "client_id": "…", "branch_id": "<lazywait_branch_id>", "order_type": "pickup",
+  "order_items": [{
+    "menu_item_id": "<products.lazywait_item_id>",
+    "name": "<server name>",
+    "names": { "en": "Beef Burger", "ar": "برجر لحم" },
+    "quantity": 2, "price": 25.00,
+    "menu_category_id": "<categories.lazywait_category_id>",
+    "price_id": "<products.lazywait_price_id>",
+    "details": "No onions",
+    "addons": [{ "addon_id": "<modifiers.lazywait_addon_id>", "name": "Extra Cheese",
+                 "names": { "en": "Extra Cheese", "ar": "جبن إضافي" },
+                 "quantity": 1, "price": 5.00 }]
+  }],
+  "customer_name": "<profile.full_name|Guest>",
+  "customer_id": "<profiles.lazywait_customer_id>",
+  "customer_cell": "541234567", "country_code": "+966",
+  "order_details": "<orders.notes>",
+  "source": "LWAPI" }
+```
+
+### Confirmed by the contract, promoted out of the assumed gate
+| Field | Source in our data |
+|---|---|
+| `order_items[].price_id` | `products.lazywait_price_id` |
+| `order_items[].menu_category_id` | `products.category_id` → `categories.lazywait_category_id` |
+| `order_items[].names{en,ar}` | `order_items.name_en` / `name_ar` |
+| `order_items[].details` | `order_items.note` (per-item kitchen note) |
+| `order_items[].addons[].addon_id` | `order_item_modifiers` → `modifiers.lazywait_addon_id` |
+| `order_details` | `orders.notes` (order-level note) |
+| `customer_id` | `profiles.lazywait_customer_id` |
+| `customer_cell` + `country_code` | `orders.customer_phone`, split |
+| `is_paid` | supported by the builder; **not wired** to the live worker (CLAUDE.md §6) |
+| `delivery_address` | **name only** — what a delivery order needs in it is still Q2 |
+
+### Corrections — assumptions the contract proved WRONG
+| Was assumed | Actually | Where fixed |
+|---|---|---|
+| `delivery_fee` | **`order_delivery_fee`** | `serializeCreateOrder` |
+| `delivery_notes` | **no such field**; order note is `order_details`, per-item note is `order_items[].details` | removed from `CreateOrderRequest` |
+| `addons[].addons_group_id` | not part of the order add-on object; it belongs to the catalog add-on-**group** endpoints. The add-on object is `{addon_id, names{en,ar}, price, quantity, is_included_in_custom_addons}` | `serializeCreateOrderItem` |
+| `customer_cell` as E.164 | **split**: local subscriber number in `customer_cell`, prefix in `country_code` | `splitPhoneForPos` |
+
+### Deliberate omissions (confirmed field, not sent)
+| Field | Why not |
+|---|---|
+| `subtotal`, `discount`, `tax`, `tax_percentage`, `total`, `order_delivery_fee` | The contract's example computes `total = subtotal × 1.15` — tax **added on top**. Our prices are VAT-**inclusive**, and the document does not say what the POS does when the tax fields are absent (today's case). Sending a guessed total would disagree with what the customer was charged. Open question **Q9**. |
+| `is_included_in_custom_addons` | Nothing in our data model says whether a modifier came through a custom-addons group. Optional, so omitted rather than guessed. |
+| `order_status_id`, `created_by`, `order_pickup_date`, `people_count`, `total_calories`, `printer_ids`, `metadata`, `table_*`, `area_*`, `user_*`, `customer_email` | Available and optional; nothing in the current flow needs them, and pickup tickets are correct without them. |
+| `name` (item and add-on) | The inverse case: **not** in the contract, but sent anyway. Pickup sync has worked in Production with it, which is evidence the API tolerates undocumented fields and no evidence that dropping it is safe. `names` is sent **in addition to** `name`, not instead of it. If a Production check shows the POS reads `names`, `name` can go then. |
+
+### Money — how a line adds up
+`order_items[].price` is the **bare item price**: `order_items.unit_price` already
+includes the selected modifiers (`place_order` adds them in), and the contract's
+example sums the add-on prices into the order (`25 + 5 = subtotal 30`). Emitting
+the modifier-inclusive price *and* the add-on lines would charge add-ons twice, so
+the serializer subtracts them back out. The invariant
+`price + Σ(addon.price × addon.quantity) === unit_price` is asserted in
+`lazywait.test.ts`. The Lazywait response total remains **untrusted**.
+
+---
+
+## STILL ASSUMED
+
+What remains an assumption is the **delivery half**, which the contract does not
+describe at all. The client assembles it only when the caller passes
+**`allowAssumedFields: true`** (default **OFF**). The live `lazywait-sync` worker
+is **not** rewired for delivery: it stays pickup-only, and delivery orders are
+still held at `blocked` / `delivery_schema_unconfirmed`. These map to the
+remaining open questions Q1, Q2, Q3, Q8 and Q9 in
+`docs/lazywait-delivery-open-questions.md`.
 
 ### Assumed field names/shapes (please correct)
-| Assumed field | Assumed shape | Used for | Source of the guess |
+| Assumed field | Assumed shape | Used for | Status |
 |---|---|---|---|
-| `order_type: "delivery"` | string | delivery create | Q1 — does create support delivery? |
-| `delivery_address` | string (full formatted address) | delivery | Q2 — required address fields? |
-| `latitude`, `longitude` | number | delivery | Q3 — lat/long accepted? |
-| `customer_cell` | string, E.164 (via `normalizePhone`) | delivery/customer | Q4 — customer phone accepted? |
-| `delivery_notes` | string | delivery | Q5 — notes/instructions accepted? |
-| `delivery_fee` | number | delivery | Q6 — delivery fee accepted? |
-| `is_paid` | boolean | order | Q7 — can the POS show paid vs cash-required? |
-| (address/lat-long visibility) | n/a | delivery | Q8 — can the driver/cashier see the location clearly? |
-| `customer_id` | string (CRM id) | customer link | catalog mapping `profiles.lazywait_customer_id` |
-| per-item `price_id` | string | order item | catalog mapping `products.lazywait_price_id` (was "reference only") |
-| per-item `addons` | `[{ addon_id, addons_group_id, name, price, quantity }]` | order item add-ons | catalog mapping `modifiers.lazywait_addon_id` + `modifier_groups.lazywait_group_id` |
+| `order_type: "delivery"` | string | delivery create | Q1 — the contract documents `"pickup"` only |
+| `order_status_id` for a new delivery order | string | delivery create | Q1 — `"new-order"` is the documented *pickup* value |
+| `order_deliveries[]` element shape | unknown | delivery | Q2 — empty array in the example; almost certainly where delivery lives. **Not implemented** — we do not guess an element |
+| `delivery_address` contents | string | delivery | Q2 — field name confirmed, required contents are not |
+| `latitude`, `longitude` | number, top-level | delivery | Q3 — **the contract has no coordinate field anywhere**; ours is an invention and stays gated |
+| `order_delivery_fee` on a delivery order | number | delivery | Q6 — name corrected and confirmed, but only meaningful once Q1 is answered; see Q9 before sending any money field |
+| (address/lat-long visibility) | n/a | delivery | Q8 — needs a look at a real delivery ticket |
 
 ### Other items to confirm
+- **Dev-vs-production parity for Create Order.** The contract was read from
+  `apiv2-dev.lazywait.com`; `DEFAULT_BASE_URL` is production `apiv2.lazywait.com`
+  and was deliberately **not** changed. Whether the two hosts accept identical
+  fields is unverified.
 - Dev vs prod base URL + compatible API-key prefix (`lw_live_` vs `lw_test_`).
 - `POST /menu/products/item` create/upsert **vs** `PUT` update-only semantics.
 - The `user` object schema for product updates.
@@ -132,6 +216,6 @@ questions in `docs/lazywait-delivery-open-questions.md`.
   currently sent as a query param (`menu_item_id` / `category_id`).
 - `POST /pos/orders` reference-list field name (assumed `order_refs`).
 
-When Lazywait confirms, update this file (or replace it with the vendor
+When Lazywait confirms the rest, update this file (or replace it with the vendor
 reference), then relax the gate/worker per
 `docs/lazywait-delivery-open-questions.md`.

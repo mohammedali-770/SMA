@@ -3,8 +3,8 @@ import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import {
   buildCreateOrderPayload, classifyCreateOrderResult, computePosNextAttempt, DEFAULT_BASE_URL,
-  lazywaitFetch, MAX_POS_ATTEMPTS, normalizePhone, shouldResendCreateOrder,
-  STALE_SYNC_TIMEOUT_MINUTES, timingSafeEqual, type LazywaitConfig,
+  lazywaitFetch, mapOrderItemRows, MAX_POS_ATTEMPTS, normalizePhone, ORDER_ITEM_SELECT,
+  shouldResendCreateOrder, STALE_SYNC_TIMEOUT_MINUTES, timingSafeEqual, type LazywaitConfig,
 } from '../_shared/lazywait.ts';
 
 /**
@@ -123,21 +123,32 @@ Deno.serve(async (req: Request) => {
       }
 
       // ---- Load branch mapping + items (server-trusted) --------------------
+      // The item select carries everything the confirmed Create Order body can
+      // use: the bilingual snapshot names, the per-item note, the catalog
+      // mappings (item / price / category) and the selected modifiers joined to
+      // their `modifiers.lazywait_addon_id`. Before the 2026-08-24 contract this
+      // query fetched only name/qty/price/lazywait_item_id, so the add-on and
+      // category mappings were unreachable from here at all.
       const { data: branch } = await admin
         .from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle();
       const { data: items } = await admin
-        .from('order_items')
-        .select('name_en, quantity, unit_price, product_id, products(lazywait_item_id)')
-        .eq('order_id', orderId);
+        .from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', orderId);
 
-      const mappedItems = (items ?? []).map((it: Record<string, unknown>) => ({
-        menuItemId: (it.products as { lazywait_item_id?: string } | null)?.lazywait_item_id ?? null,
-        name: String(it.name_en ?? 'Item'),
-        quantity: Number(it.quantity ?? 1),
-        unitPrice: Number(it.unit_price ?? 0),
-      }));
+      // `ORDER_ITEM_SELECT` is a plain string, so supabase-js cannot parse the
+      // select at the type level and infers its GenericStringError fallback.
+      // The runtime shape is exactly what `mapOrderItemRows` reads, and that
+      // mapping is unit-tested against this select in `lazywait.test.ts`.
+      const mappedItems = mapOrderItemRows((items ?? []) as unknown as Array<Record<string, unknown>>);
 
-      // ---- Optional CRM match by phone (best-effort, never blocks) ---------
+      // ---- CRM customer link (best-effort, never blocks) -------------------
+      // Read the stored link first so a CRM outage does not drop `customer_id`
+      // from the ticket; a fresh match supersedes it.
+      let crmCustomerId: string | null = null;
+      if (order.customer_id) {
+        const { data: profile } = await admin
+          .from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle();
+        crmCustomerId = (profile as { lazywait_customer_id?: string | null } | null)?.lazywait_customer_id ?? null;
+      }
       const phone = normalizePhone(order.customer_phone as string | null);
       if (phone && order.customer_id) {
         try {
@@ -146,18 +157,27 @@ Deno.serve(async (req: Request) => {
           });
           const match = Array.isArray(crm.data) ? crm.data[0] : null;
           if (crm.ok && match?.id) {
+            crmCustomerId = String(match.id);
             await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', order.customer_id);
           }
         } catch { /* CRM match is optional; ignore */ }
       }
 
       // ---- Build the confirmed Create Order payload ------------------------
+      // `isPaid` is deliberately NOT passed: `is_paid` is a confirmed contract
+      // field, but telling a cashier an order needs no cash is a financial
+      // signal and payment work is frozen (CLAUDE.md §6). Wiring it is a
+      // separate owner decision. Totals are omitted too — see the money note in
+      // `buildCreateOrderPayload` and Q9 in the open-questions document.
       const built = buildCreateOrderPayload({
         clientId: lw.clientId,
         branchId: (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id ?? null,
         orderType: String(order.order_type),
         customerName: String(order.customer_name ?? 'Guest'),
         items: mappedItems,
+        orderDetails: (order.notes as string | null) ?? null,
+        customerId: crmCustomerId,
+        customerPhone: (order.customer_phone as string | null) ?? null,
       });
 
       if (!built.ok) {
