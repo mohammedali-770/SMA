@@ -420,8 +420,8 @@ production.
 | 54 | 20260724180000 | tap_reference_order_opaque | — | 20260729080617 | tap_reference_order_opaque | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | Makes the provider-facing order reference opaque. Applied 2026-07-29 (Wave B, §20). **Payment area — frozen (§21)** |
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
 | 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). Latest live version until the 2026-08-05 application |
-| 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. Applied by the **repository owner**, who applied this and row 58 one after the other — stated by the owner on 2026-08-23, closing the gap §31 recorded as "outside this session"; the mechanism stays unrecorded, per §31. Detail in §27 and §31 |
-| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the **repository owner** immediately after row 57, one after the other — see row 57. Detail in §31. **Current latest live version** |
+| 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. Applied by a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), which applied this and row 58 one after the other via MCP `apply_migration` — one call per file, in dependency order, each followed by read-only verification — on the owner's explicit in-conversation approval. **Corrected 2026-08-24:** this row previously credited the **repository owner** directly, sourced to an owner statement of 2026-08-23; the owner authorised and drove both applications but did not issue the calls, and the mechanism is no longer unrecorded. Detail in §27 and §31 |
+| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the same **Claude Code session** as row 57, immediately after it, one after the other — see row 57, including the 2026-08-24 attribution correction. Detail in §31. **Current latest live version** |
 
 Reconciliation check: the rows above detail **58 repository / 59 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
@@ -2255,7 +2255,7 @@ volume that does not exist yet. §25's closing note applies unchanged.
 | --- | --- |
 | Repository file | `20260819120000_order_note_length_limit.sql` (**182** lines) |
 | Live version | `20260822123620` |
-| Applied | 2026-08-22 12:36:20 UTC, **by the repository owner**, outside the agent session |
+| Applied | 2026-08-22 12:36:20 UTC, **by a Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`) via MCP `apply_migration`, on explicit owner approval — corrected 2026-08-24, see §31 |
 | From | PR for `feat/order-note-length-limit` (`aff65ce`, #222) |
 | Evidence | executable SQL identical to the repository file; the stored text is condensed — see §31 |
 
@@ -2624,13 +2624,13 @@ with a temporary trigger and assert the old rows are gone anyway.
 
 Three migrations reached Production on 2026-08-22, taking live history from
 **100 to 103 rows**. They were applied in two separate acts by two different
-actors, and the difference between them is the point of this section.
+sessions, and the difference between them is the point of this section.
 
 | # | Repository file | Live version | Applied (UTC) | By |
 | --- | --- | --- | --- | --- |
 | 1 | `20260822090000_branch_availability_retention` (204 lines) | `20260822115505` | 11:55:05 | this session, on explicit owner approval |
-| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | **the repository owner**, directly |
-| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | **the repository owner**, directly |
+| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
+| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
 
 Order matters and was respected: #3 calls `order_note_normalized` seven times, so
 it depends on #2. Filename order gives the right sequence.
@@ -2659,28 +2659,52 @@ files carry, and anyone diffing file against row will find a mismatch that looks
 alarming and is not. §29 exists to defuse exactly that confusion; this section
 extends it to two more versions.
 
-**Who applied them, confirmed 2026-08-22.** The owner, working directly against
-Production rather than through an agent session. That was not recoverable from
-`schema_migrations`, which records what ran and when but not who ran it, and it
-is written down here because a ledger that cannot answer "who" is only half a
-record. It was volunteered by the owner after this section first went in reading
-"outside this session"; the placeholder is kept in the history rather than
+**Who applied them — corrected 2026-08-24.** A **Claude Code session**,
+`session_01VXmTcJDSWXVD9qm7irPbpV`, via two MCP `apply_migration` calls made on the
+owner's explicit in-conversation approval. **This paragraph previously said the
+owner applied them directly, working against Production rather than through an
+agent session. That was wrong.** It rested on a statement the owner made on
+2026-08-23, after this section first went in reading "outside this session". The
+owner authorised and drove both applications — that much is true, and is what the
+statement is best read as describing — but did not issue the calls.
+
+`schema_migrations` still cannot answer "who": it records what ran and when,
+never who ran it, and a ledger that cannot answer "who" is still only half a
+record. What answers it is the applying session's transcript, which the ledger
+cannot see but which does exist — `apply_migration` for
+`order_note_length_limit`, read-only verification, `apply_migration` for
+`order_item_notes`, read-only verification — producing exactly versions
+`20260822123620` and `20260822123940` and moving live history 101 → 102 → 103,
+which leaves no room for a second actor. Both the "outside this session"
+placeholder and the incorrect owner attribution are recorded here rather than
 pretended away.
 
-**The mechanism is not known and is not recorded here.** The confirmation
-establishes *who*, not *how*: nothing states how these two were submitted or why
-their headers were trimmed, and `schema_migrations` cannot supply either — it
-stores what ran and when, never how it was composed. An earlier draft of this
-section asserted a console-paste explanation. That was invented, it was removed
-on review, and it is mentioned so the absence reads as a known gap rather than an
-oversight.
+**The mechanism, now recorded.** MCP `apply_migration` via the Supabase MCP
+server, one call per file, in dependency order, each call followed by read-only
+verification. This paragraph previously read "the mechanism is not known and is
+not recorded here", which followed from the actor being wrong: with the owner
+believed to be working directly against Production, nothing established how the
+calls were submitted. Identifying the applying session supplies it.
 
-What the ledger *does* establish is narrower and more useful. §24's condensation
-was "the applying **agent's** own editorial choice while composing the call";
-this one was the **owner**, applying directly. Two different kinds of actor have
-now produced the same deviation, which is the whole basis for the rule below
-being addressed to humans and agents alike. Treating it as an agent-discipline
-problem would aim the fix at one of the two actors who have actually caused it.
+What is still **not** established is why the stored headers were trimmed;
+`schema_migrations` stores what ran and when, never how it was composed. An
+earlier draft of this section asserted a console-paste explanation for that. It
+was invented, it was removed on review, and it is mentioned so the remaining
+absence reads as a known gap rather than an oversight — and so this correction is
+not mistaken for licence to fill the rest of it by inference.
+
+**What the correction costs this section.** The paragraph that stood here argued
+that §24's condensation was "the applying **agent's** own editorial choice while
+composing the call" whereas this one was the **owner** applying directly, and
+concluded that two different *kinds* of actor had produced the same deviation —
+offering that as the whole basis for the rule below being addressed to humans and
+agents alike. With the actor corrected, that basis is gone: both known instances
+were produced by an agent session composing an `apply_migration` call. The rule
+below is still addressed to humans and agents alike, because nothing about it
+depends on who has tripped it so far and narrowing it to agents would be a fix
+aimed at the evidence rather than at the failure. But it is now supported by one
+kind of actor, twice, and that is written down so a future reader does not
+rediscover the "two kinds of actor" claim and take it as established.
 
 **The `skel` fingerprint proves the schema is right and nothing more.** It says
 no statement was added, removed or altered. It says nothing about the comment
@@ -2691,7 +2715,7 @@ not evidence that §9-C1 was satisfied.
 
 The order path was the exposure: #3 re-emits `place_order`,
 `compute_order_snapshot` and `insert_order_from_snapshot`, and #3 was applied by
-the owner rather than the author of the revision it replaced. Checked directly
+an actor other than the author of the revision it replaced. Checked directly
 against the live catalog afterwards:
 
 - `place_order` ACL still `{postgres, service_role}` — **no `authenticated`
