@@ -70,7 +70,6 @@ describe('buildCreateOrderPayload — confirmed 2026-08-24 contract fields', () 
       addonId: 'AD_CHEESE',
       name: 'Extra Cheese',
       names: { en: 'Extra Cheese', ar: 'جبنة إضافية' },
-      price: 5,
     }],
   }];
 
@@ -104,7 +103,8 @@ describe('buildCreateOrderPayload — confirmed 2026-08-24 contract fields', () 
           name: 'Extra Cheese',
           names: { en: 'Extra Cheese', ar: 'جبنة إضافية' },
           quantity: 1,
-          price: 5,
+          // 0: the add-on's cost is already inside the item price.
+          price: 0,
         }],
       }],
       customer_name: 'Ahmed',
@@ -177,8 +177,8 @@ describe('buildCreateOrderPayload — confirmed 2026-08-24 contract fields', () 
       items: [{
         menuItemId: 'I1', name: 'A', quantity: 1, unitPrice: 5,
         addons: [
-          { addonId: 'AD_1', name: 'Cheese', price: 5 },
-          { addonId: 'AD_2', name: 'Bacon', price: 7, quantity: 2 },
+          { addonId: 'AD_1', name: 'Cheese' },
+          { addonId: 'AD_2', name: 'Bacon', quantity: 2 },
         ],
       }],
     });
@@ -186,9 +186,32 @@ describe('buildCreateOrderPayload — confirmed 2026-08-24 contract fields', () 
     if (!r.ok) return;
     const line = (r.payload.order_items as Array<Record<string, unknown>>)[0];
     expect(line.addons).toEqual([
-      { addon_id: 'AD_1', name: 'Cheese', quantity: 1, price: 5 },
-      { addon_id: 'AD_2', name: 'Bacon', quantity: 2, price: 7 },
+      { addon_id: 'AD_1', name: 'Cheese', quantity: 1, price: 0 },
+      { addon_id: 'AD_2', name: 'Bacon', quantity: 2, price: 0 },
     ]);
+  });
+
+  it('add-on price is ALWAYS 0 — the item price already includes it', () => {
+    // place_order folds modifier prices into order_items.unit_price
+    // (v_unit_price := v_unit_price + v_modifier.price), and unit_price is what
+    // we send as `price`. Echoing the add-on's own price would let a POS that
+    // sums item + add-ons charge it twice. A 27.00 "Volcano (+2)" burger must
+    // reach the POS as 27.00 + a 0-priced add-on line, never 27.00 + 2.00.
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I1', name: 'Burger', quantity: 1, unitPrice: 27,
+        addons: [{ addonId: 'AD_VOLCANO', name: 'Volcano (+2)' }],
+      }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const line = (r.payload.order_items as Array<Record<string, unknown>>)[0];
+    expect(line.price).toBe(27);
+    const addons = line.addons as Array<Record<string, unknown>>;
+    expect(addons[0].price).toBe(0);
+    // The whole ticket's money is the item price alone.
+    expect(Number(line.price) + Number(addons[0].price)).toBe(27);
   });
 
   it('an UNMAPPED modifier BLOCKS the order — never a silent drop', () => {

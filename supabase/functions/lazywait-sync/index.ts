@@ -167,7 +167,9 @@ Deno.serve(async (req: Request) => {
             addonId: (m.modifiers as { lazywait_addon_id?: string | null } | null)?.lazywait_addon_id ?? '',
             name: String(m.name_en ?? 'Addon'),
             names: { en: String(m.name_en ?? ''), ar: String(m.name_ar ?? '') },
-            price: m.price != null ? Number(m.price) : null,
+            // No price passed: order_items.unit_price ALREADY includes this
+            // modifier's price (place_order folds it in), and the builder emits
+            // addons[].price = 0 so the POS cannot charge it twice.
           })),
         };
       });

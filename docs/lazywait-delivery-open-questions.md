@@ -51,6 +51,19 @@ blocked pending Lazywait delivery payload confirmation."
    we do send is VAT-inclusive and is what the POS has priced from throughout
    the pilot. See `buildCreateOrderPayload` for the reasoning in code.
 
+10. **OPEN (new, 2026-08-24) — Does the POS ADD `addons[].price` to
+   `order_items[].price`, or is the item price taken as inclusive of its
+   add-ons?** This matters because `place_order` folds modifier prices into
+   `order_items.unit_price`
+   (`v_unit_price := v_unit_price + v_modifier.price`), and `unit_price` is what
+   we send as `price`. A "Volcano (+2)" burger therefore already reaches the POS
+   at the +2 price. Echoing the add-on's own price would let a POS that sums
+   item + add-ons charge the +2 **twice**. Until this is answered we send
+   **`addons[].price = 0`** — explicitly 0 rather than an omitted key, so the POS
+   cannot substitute its own catalog price and add that instead. The add-on is
+   still itemised by name so the kitchen sees it. This is the reading that
+   cannot overcharge a customer.
+
 ### ANSWERED by the 2026-08-24 contract
 
 4. **ANSWERED — Can we send the customer phone number?** Yes, and it is

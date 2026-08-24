@@ -144,7 +144,7 @@ which the live `lazywait-sync` worker calls directly.
 | `order_items[].price_id` | `products.lazywait_price_id` | no longer "reference only" |
 | `order_items[].quantity`, `.price` | `order_items` | `price` is VAT-**inclusive** |
 | `order_items[].details` | `order_items.note` | **key absent when there is no note** |
-| `order_items[].addons[]` | `order_item_modifiers` × `modifiers.lazywait_addon_id` | `{addon_id, name, names{en,ar}, price, quantity}` |
+| `order_items[].addons[]` | `order_item_modifiers` × `modifiers.lazywait_addon_id` | `{addon_id, name, names{en,ar}, quantity, price: 0}` — **price is always 0**, see below |
 
 **`name` is sent IN ADDITION to `names{en,ar}`, deliberately.** `name` is not in
 the contract, yet pickup sync has worked in Production with it since the pilot —
@@ -158,6 +158,16 @@ confirmed, semantics not — we hold no column that means it), `order_status_id`
 `created_by`, `order_pickup_date`, `total_calories`, `printer_ids`,
 `customer_email`, `user_*`, `table_*`, `area_*`, `people_count`, and all
 order-level **money** fields (see below).
+
+### Add-on prices are always 0 (open question Q10)
+`place_order` folds modifier prices into `order_items.unit_price`
+(`v_unit_price := v_unit_price + v_modifier.price`), and `unit_price` is what we
+send as `price`. A "Volcano (+2)" burger therefore already reaches the POS at the
++2 price. Echoing the add-on's own price would let a POS that sums item +
+add-ons charge the +2 **twice**, so `addons[].price` is always **`0`** —
+explicitly 0 rather than an omitted key, so the POS cannot substitute its own
+catalog price and add that instead. The add-on is still itemised by name for the
+kitchen. Pinned by test.
 
 ### Money and totals — deliberately NOT sent (open question Q9)
 The contract's example is **exclusive-VAT**: `subtotal: 30` + `tax: 4.5`

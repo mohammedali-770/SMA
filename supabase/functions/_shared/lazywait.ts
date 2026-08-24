@@ -217,8 +217,8 @@ export interface CreateOrderAddonLine {
   addonId: string;                 // modifiers.lazywait_addon_id -> addon_id
   name: string;                    // snapshot name (order_item_modifiers.name_en)
   names?: LocalizedNames | null;   // -> names { en, ar }
-  price?: number | null;           // server-trusted, VAT-inclusive
   quantity?: number;               // order_item_modifiers has no qty column -> 1
+  // NOTE: there is deliberately NO `price` input. See buildOrderAddon.
 }
 
 export interface CreateOrderItemInput {
@@ -279,10 +279,25 @@ function buildOrderAddon(a: CreateOrderAddonLine): Record<string, unknown> {
     // Undocumented but kept, for the same reason as the item-level `name` below.
     name: a.name,
     quantity: a.quantity ?? 1,
+    // ALWAYS 0 — an add-on's cost is ALREADY inside the item's `price`.
+    //
+    // `place_order` folds modifier prices into order_items.unit_price
+    // (`v_unit_price := v_unit_price + v_modifier.price`), and unit_price is
+    // what we send as `price`. So a "Volcano (+2)" burger already reaches the
+    // POS at the +2 price. Echoing the add-on's own price here would let a POS
+    // that sums item + add-ons charge the +2 twice.
+    //
+    // 0 rather than an omitted key on purpose: an absent price could invite the
+    // POS to substitute its own catalog price and add THAT. 0 says "adds
+    // nothing" explicitly. The add-on is still itemised by name for the kitchen.
+    //
+    // OPEN QUESTION Q10: does the POS add `addons[].price` to
+    // `order_items[].price`, or is the item price taken as inclusive? Until
+    // Lazywait answers, this stays 0 — the reading that cannot overcharge.
+    price: 0,
   };
   const names = buildNames(a.names);
   if (names) out.names = names;
-  if (a.price != null) out.price = round2(a.price);
   return out;
 }
 

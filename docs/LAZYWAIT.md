@@ -97,7 +97,7 @@ field-by-field mapping in `docs/integrations/Lazywait_API_Reference.md`.
                     "details": "<order_items.note>",
                     "addons": [{ "addon_id": "<lazywait_addon_id>", "name": "Extra Cheese",
                                  "names": { "en": "Extra Cheese", "ar": "جبنة إضافية" },
-                                 "price": 5, "quantity": 1 }] }],
+                                 "quantity": 1, "price": 0 }] }],
   "customer_name": "<profile.full_name|Guest>", "source": "LWAPI",
   "customer_id": "<profiles.lazywait_customer_id>",
   "customer_cell": "541234567", "country_code": "+966",
@@ -114,6 +114,10 @@ field-by-field mapping in `docs/integrations/Lazywait_API_Reference.md`.
 - An item whose modifier has **no** mapped `lazywait_addon_id` **blocks** the
   order (`missing_addon_mapping`) — it is never silently dropped, because a
   ticket missing "extra cheese" is a ticket the kitchen cooks wrong.
+- **`addons[].price` is always `0`.** `place_order` folds modifier prices into
+  `order_items.unit_price`, which is what we send as `price`, so the add-on's
+  cost is already in the line. Echoing it would let the POS charge it twice.
+  Open question Q10.
 - The phone is **split**: local subscriber in `customer_cell`, dialling code in
   `country_code`. E.164 is **not** sent in `customer_cell`.
 

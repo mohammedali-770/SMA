@@ -189,7 +189,7 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
       menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 2, unitPrice: 28.75,
       names: { en: 'Beef Burger', ar: 'برجر لحم' }, menuCategoryId: 'CAT_MAIN',
       priceId: 'PR_SINGLE', details: 'No pickles',
-      addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', names: { en: 'Extra Cheese', ar: 'جبنة' }, price: 5 }],
+      addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', names: { en: 'Extra Cheese', ar: 'جبنة' } }],
     }];
     const v2 = serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed', items: rich,
@@ -210,7 +210,7 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
   it('sends the CONFIRMED fields by default but NO still-unconfirmed ones', () => {
     const req: CreateOrderRequest = {
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed',
-      items: [{ ...pickupItems[0], priceId: 'PR_SINGLE', addons: [{ addonId: 'AD1', name: 'Cheese', price: 5 }] }],
+      items: [{ ...pickupItems[0], priceId: 'PR_SINGLE', addons: [{ addonId: 'AD1', name: 'Cheese' }] }],
       customerId: 'CRM_9', customerCell: '0501234567', delivery: { address: 'Riyadh', latitude: 24.7 }, isPaid: true,
     };
     const built = serializeCreateOrder(req);
@@ -219,7 +219,7 @@ describe('serializeCreateOrder — confirmed pickup (default, gate OFF)', () => 
     // Confirmed by the 2026-08-24 contract -> present with the gate OFF.
     const line = (built.payload.order_items as Array<Record<string, unknown>>)[0];
     expect(line.price_id).toBe('PR_SINGLE');
-    expect(line.addons).toEqual([{ addon_id: 'AD1', name: 'Cheese', quantity: 1, price: 5 }]);
+    expect(line.addons).toEqual([{ addon_id: 'AD1', name: 'Cheese', quantity: 1, price: 0 }]);
     expect(built.payload.customer_id).toBe('CRM_9');
     expect(built.payload.customer_cell).toBe('501234567');
     expect(built.payload.country_code).toBe('+966');
@@ -247,7 +247,7 @@ describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: tru
       items: [{
         menuItemId: 'IT_BURGER', name: 'Beef Burger', quantity: 1, unitPrice: 28.75, priceId: 'PR_SINGLE',
         names: { en: 'Beef Burger', ar: 'برجر لحم' }, menuCategoryId: 'CAT_MAIN', details: 'Well done',
-        addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', price: 5, quantity: 2 }],
+        addons: [{ addonId: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2 }],
       }],
     });
     expect(built.ok).toBe(true);
@@ -256,7 +256,7 @@ describe('serializeCreateOrder — GATED assumed fields (allowAssumedFields: tru
     expect(built.payload.order_items).toEqual([{
       menu_item_id: 'IT_BURGER', name: 'Beef Burger', names: { en: 'Beef Burger', ar: 'برجر لحم' },
       menu_category_id: 'CAT_MAIN', price_id: 'PR_SINGLE', quantity: 1, price: 28.75, details: 'Well done',
-      addons: [{ addon_id: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2, price: 5 }],
+      addons: [{ addon_id: 'AD_CHEESE', name: 'Extra Cheese', quantity: 2, price: 0 }],
     }]);
   });
 
