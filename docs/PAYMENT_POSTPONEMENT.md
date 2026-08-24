@@ -88,6 +88,48 @@ mobile row below was added for.
 version it had before this change until a separate §5 approval, so Production
 still runs the role-only gate for it.
 
+### Deployment was ATTEMPTED on 2026-08-24 and DELIBERATELY ABANDONED
+
+The owner approved the deploy; it was stopped during the pre-deploy check and,
+on being shown why, the owner chose to leave the function undeployed. The reason
+is worth recording because it is not obvious and it applies to every future
+payment deploy.
+
+**Supabase bundles a function's dependencies at deploy time.** What is live for a
+function is not "the repository" — it is the repository *as it was on the day
+that function was last deployed*. `payment-test-config` was last deployed
+**2026-07-10**, so its bundle carries July-era copies of the shared payment
+helpers. Redeploying it would replace those with today's, as an unavoidable side
+effect of shipping a four-line auth change.
+
+Two of them have gained real logic since:
+
+| helper | deployed bundle (2026-07-10) | repository today |
+| --- | --- | --- |
+| `_shared/tapVerify.ts` | confirms via `confirm_order_payment` only | adds the **session-first branch**: when `attempt.checkout_session_id` is set it calls `finalize_checkout_session`, which *creates the paid order* from the frozen snapshot |
+| `_shared/lazywait.ts` | 6 exports (`lazywaitFetch`, `round2`, `parseRetryAfterMs`, …) | 30+, including `buildCreateOrderPayload`, `classifyCreateOrderResult`, `computePosNextAttempt`, `verifyWebhookSignature`, `POS_DEADLINE_MINUTES` — the whole POS confirmation lifecycle |
+
+So the deploy would have pushed **checkout-session finalization and the POS
+retry/deadline machinery into Production** under cover of an authorization fix.
+That is squarely what §2 of this document freezes, and precisely the pattern the
+mobile-row note below was written about. The auth exception above says "no
+verification logic was touched" — true of the *diff*, and false of the *deploy*.
+Those are different claims and this document should not let them blur.
+
+**The other four functions were checked and were NOT affected.** They were
+redeployed on 2026-08-23 with fresh shared helpers, so the same question applies
+to them. `whatsapp-send-otp` — never redeployed, still on its 2026-07-09 bundle —
+was read back and its `whatsapp.ts`, `whatsappSend.ts`, `cors.ts`,
+`supabaseClient.ts` and `secrets.ts` are comment-stripped but structurally
+identical to today's: same exports, same rate-limit constants, same send path.
+Those helpers had not diverged. The payment helpers are the exception, not the
+rule.
+
+**Current state:** `payment-test-config` is fixed in the repository and still
+runs the role-only gate in Production. Reopening this needs the freeze lifted, or
+an explicit decision to ship the current payment helpers with it — a
+payment-behaviour decision, not an authorization one.
+
 **The mobile row is new (2026-08-19), and it was added because the omission had
 already cost something.** The freeze table and the `payments` ownership rule both
 listed only Edge Functions and database objects, so a change to the app's own
