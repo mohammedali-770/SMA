@@ -2255,7 +2255,7 @@ volume that does not exist yet. §25's closing note applies unchanged.
 | --- | --- |
 | Repository file | `20260819120000_order_note_length_limit.sql` (**182** lines) |
 | Live version | `20260822123620` |
-| Applied | 2026-08-22 12:36:20 UTC, **by the repository owner**, outside the agent session |
+| Applied | 2026-08-22 12:36:20 UTC, **by a Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`) via MCP `apply_migration`, on explicit owner approval — corrected 2026-08-24, see §31 |
 | From | PR for `feat/order-note-length-limit` (`aff65ce`, #222) |
 | Evidence | executable SQL identical to the repository file; the stored text is condensed — see §31 |
 
@@ -2624,13 +2624,13 @@ with a temporary trigger and assert the old rows are gone anyway.
 
 Three migrations reached Production on 2026-08-22, taking live history from
 **100 to 103 rows**. They were applied in two separate acts by two different
-actors, and the difference between them is the point of this section.
+sessions, and the difference between them is the point of this section.
 
 | # | Repository file | Live version | Applied (UTC) | By |
 | --- | --- | --- | --- | --- |
 | 1 | `20260822090000_branch_availability_retention` (204 lines) | `20260822115505` | 11:55:05 | this session, on explicit owner approval |
-| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | **the repository owner**, directly |
-| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | **the repository owner**, directly |
+| 2 | `20260819120000_order_note_length_limit` (182 lines) | `20260822123620` | 12:36:20 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
+| 3 | `20260821170000_order_item_notes` (833 lines) | `20260822123940` | 12:39:40 | a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), via MCP `apply_migration`, on explicit owner approval |
 
 Order matters and was respected: #3 calls `order_note_normalized` seven times, so
 it depends on #2. Filename order gives the right sequence.
@@ -2659,28 +2659,52 @@ files carry, and anyone diffing file against row will find a mismatch that looks
 alarming and is not. §29 exists to defuse exactly that confusion; this section
 extends it to two more versions.
 
-**Who applied them, confirmed 2026-08-22.** The owner, working directly against
-Production rather than through an agent session. That was not recoverable from
-`schema_migrations`, which records what ran and when but not who ran it, and it
-is written down here because a ledger that cannot answer "who" is only half a
-record. It was volunteered by the owner after this section first went in reading
-"outside this session"; the placeholder is kept in the history rather than
+**Who applied them — corrected 2026-08-24.** A **Claude Code session**,
+`session_01VXmTcJDSWXVD9qm7irPbpV`, via two MCP `apply_migration` calls made on the
+owner's explicit in-conversation approval. **This paragraph previously said the
+owner applied them directly, working against Production rather than through an
+agent session. That was wrong.** It rested on a statement the owner made on
+2026-08-23, after this section first went in reading "outside this session". The
+owner authorised and drove both applications — that much is true, and is what the
+statement is best read as describing — but did not issue the calls.
+
+`schema_migrations` still cannot answer "who": it records what ran and when,
+never who ran it, and a ledger that cannot answer "who" is still only half a
+record. What answers it is the applying session's transcript, which the ledger
+cannot see but which does exist — `apply_migration` for
+`order_note_length_limit`, read-only verification, `apply_migration` for
+`order_item_notes`, read-only verification — producing exactly versions
+`20260822123620` and `20260822123940` and moving live history 101 → 102 → 103,
+which leaves no room for a second actor. Both the "outside this session"
+placeholder and the incorrect owner attribution are recorded here rather than
 pretended away.
 
-**The mechanism is not known and is not recorded here.** The confirmation
-establishes *who*, not *how*: nothing states how these two were submitted or why
-their headers were trimmed, and `schema_migrations` cannot supply either — it
-stores what ran and when, never how it was composed. An earlier draft of this
-section asserted a console-paste explanation. That was invented, it was removed
-on review, and it is mentioned so the absence reads as a known gap rather than an
-oversight.
+**The mechanism, now recorded.** MCP `apply_migration` via the Supabase MCP
+server, one call per file, in dependency order, each call followed by read-only
+verification. This paragraph previously read "the mechanism is not known and is
+not recorded here", which followed from the actor being wrong: with the owner
+believed to be working directly against Production, nothing established how the
+calls were submitted. Identifying the applying session supplies it.
 
-What the ledger *does* establish is narrower and more useful. §24's condensation
-was "the applying **agent's** own editorial choice while composing the call";
-this one was the **owner**, applying directly. Two different kinds of actor have
-now produced the same deviation, which is the whole basis for the rule below
-being addressed to humans and agents alike. Treating it as an agent-discipline
-problem would aim the fix at one of the two actors who have actually caused it.
+What is still **not** established is why the stored headers were trimmed;
+`schema_migrations` stores what ran and when, never how it was composed. An
+earlier draft of this section asserted a console-paste explanation for that. It
+was invented, it was removed on review, and it is mentioned so the remaining
+absence reads as a known gap rather than an oversight — and so this correction is
+not mistaken for licence to fill the rest of it by inference.
+
+**What the correction costs this section.** The paragraph that stood here argued
+that §24's condensation was "the applying **agent's** own editorial choice while
+composing the call" whereas this one was the **owner** applying directly, and
+concluded that two different *kinds* of actor had produced the same deviation —
+offering that as the whole basis for the rule below being addressed to humans and
+agents alike. With the actor corrected, that basis is gone: both known instances
+were produced by an agent session composing an `apply_migration` call. The rule
+below is still addressed to humans and agents alike, because nothing about it
+depends on who has tripped it so far and narrowing it to agents would be a fix
+aimed at the evidence rather than at the failure. But it is now supported by one
+kind of actor, twice, and that is written down so a future reader does not
+rediscover the "two kinds of actor" claim and take it as established.
 
 **The `skel` fingerprint proves the schema is right and nothing more.** It says
 no statement was added, removed or altered. It says nothing about the comment
@@ -2691,7 +2715,7 @@ not evidence that §9-C1 was satisfied.
 
 The order path was the exposure: #3 re-emits `place_order`,
 `compute_order_snapshot` and `insert_order_from_snapshot`, and #3 was applied by
-the owner rather than the author of the revision it replaced. Checked directly
+an actor other than the author of the revision it replaced. Checked directly
 against the live catalog afterwards:
 
 - `place_order` ACL still `{postgres, service_role}` — **no `authenticated`
