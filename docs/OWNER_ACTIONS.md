@@ -502,10 +502,10 @@ do not prove the deployed code matches the repository. Read a clean run as "the
 right set of functions exists", never as "production matches the default
 branch".
 
-## 16. Branch operations — three actions taken, two still gated
+## 16. Branch operations — four actions taken, two still gated
 
-**Status:** OWNER DECISION ×5 — actions 1 and 2 are **done** (2026-08-21),
-action 3 is **done** (2026-08-23); 4 and 5 have not been requested.
+**Status:** OWNER DECISION ×6 — actions 1 and 2 are **done** (2026-08-21),
+actions 3 and 6 are **done** (2026-08-23); 4 and 5 have not been requested.
 
 The branch-operations feature (timed item and option availability, delivery
 control, the branch and call-centre consoles, and their health/alert surfaces)
@@ -517,9 +517,10 @@ does.
 | --- | --- | --- |
 | 1 | Apply the thirteen migrations to Production | **DONE 2026-08-21.** Owner approval in-conversation; applied one per file in filename order via MCP `apply_migration`. Every live row is full-text md5-identical to its repository file. Evidence, per-file versions and the §9-E verification are in [`MIGRATIONS.md`](MIGRATIONS.md) §28. |
 | 2 | Add `ops_change_events` to the `supabase_realtime` publication | **DONE 2026-08-21**, as part of migration 9 and named in the same approval. The publication went from one table to two (`order_change_events`, `ops_change_events`). The new table is deliberately narrow — branch id and change kind, nothing else — because `postgres_changes` re-evaluates RLS per subscriber, and its policy is ops-roles-only rather than `using (true)`. |
-| 3 | Deploy the `staff-accounts` Edge Function | **DONE 2026-08-23 07:31:46 UTC.** Owner approval in-conversation. Version 1, status `ACTIVE`, `verify_jwt = true` confirmed on the deployed function, matching `supabase/config.toml`. The repository's first `auth.admin.createUser`. It is still inert in practice: every action it exposes is admin-gated, and the accounts it exists to create (action 4) have not been requested. **The deployed build predates the AAL2 fix below** — see *The admin gate was checking role without assurance level*. |
+| 3 | Deploy the `staff-accounts` Edge Function | **DONE 2026-08-23 07:31:46 UTC.** Owner approval in-conversation. Version 1, status `ACTIVE`, `verify_jwt = true` confirmed on the deployed function, matching `supabase/config.toml`. The repository's first `auth.admin.createUser`. It is still inert in practice: every action it exposes is admin-gated, and the accounts it exists to create (action 4) have not been requested. That first build carried the role-only admin gate described below; **action 6 replaced it with v2 the same day**. |
 | 4 | Create the first branch / call-centre accounts | **Not requested.** The moment the feature stops being inert. Until then the roles exist in the enum and nothing holds them. |
 | 5 | Enable the branch-availability alert condition's outbound delivery | **Not requested.** Only if and when external dispatch is turned on at all; the in-dashboard inbox needs no approval and is already populated by the live card. |
+| 6 | Redeploy the four Edge Functions carrying the role-only admin gate | **DONE 2026-08-23.** Owner approval in-conversation. `staff-accounts` v2, `email-test-config` v2, `whatsapp-test-config` v3, `push-dispatch` v4 — see the AAL2 section below for the verification either side of the write. `payment-test-config` was deliberately excluded (§6 freeze) and remains at v3 with the defect. |
 
 **The irreversible step has been taken.** `20260820100000_ops_roles_enum.sql`
 ran on 2026-08-21: `ALTER TYPE public.user_role ADD VALUE` twice. PostgreSQL
@@ -548,9 +549,9 @@ be changed deliberately rather than discovered. **Action 4 is the last point at
 which refusing it costs nothing:** once accounts exist, changing the rule locks
 real people out mid-shift.
 
-**The admin gate was checking role without assurance level — fixed in source,
-not yet live.** Deploying `staff-accounts` turned a latent defect into a reachable
-one, so it was audited on the way in. Four Edge Functions authorized callers with
+**The admin gate was checking role without assurance level — fixed and deployed
+2026-08-23 (action 6).** Deploying `staff-accounts` turned a latent defect into a
+reachable one, so it was audited on the way in. Four Edge Functions authorized callers with
 `profile.role !== 'admin'` alone — `staff-accounts`, `email-test-config`,
 `whatsapp-test-config` and `payment-test-config`. This was **not** universal:
 `lazywait-catalog` (`index.ts:36-39`) has asked `is_admin()` since 20260807 and is
@@ -574,21 +575,40 @@ that would have caught the original bug.
 
 Three consequences the owner should hold:
 
-- **Source is fixed; Production is not.** The deployed builds all predate the fix —
-  `staff-accounts` v1 (2026-08-23), `email-test-config` v1 (2026-07-10),
-  `whatsapp-test-config` v2 (2026-07-09) and `push-dispatch` v3 (2026-07-21).
-  Closing the gap live means **redeploying those four functions, which is a
-  separate §5 approval** (§7 as well, for `push-dispatch`) and has not been
-  requested. Until then every one of them still runs the role-only gate — and for
-  `push-dispatch` that means the unrecallable broadcast is still reachable at
-  AAL1.
+- **Fixed in Production — DONE 2026-08-23.** Owner-approved redeploy of all four
+  functions, verified against the live API:
+
+  | function | before | after | deployed (UTC) | `verify_jwt` |
+  | --- | --- | --- | --- | --- |
+  | `staff-accounts` | v1 | **v2** | 11:49:01 | `true` (unchanged) |
+  | `email-test-config` | v1 | **v2** | 11:50:14 | `true` (unchanged) |
+  | `whatsapp-test-config` | v2 | **v3** | 11:53:01 | `true` (unchanged) |
+  | `push-dispatch` | v3 | **v4** | 11:57:36 | **`false` (deliberately unchanged)** |
+
+  `push-dispatch` keeps `verify_jwt = false` because `order-intake` and
+  `lazywait-webhook` call `order_status`/`pos_sync` with the service key and no
+  user JWT; `isServiceRoleCall` still short-circuits ahead of the admin gate for
+  exactly those two actions. Enabling `verify_jwt` there would have been a
+  behaviour change nobody approved.
+
+  **Verified before overwriting live code**, because a deployed function is not
+  guaranteed to match the repository: the deployed `push-dispatch` v3 was a
+  comment-stripped variant of the repository file, so every distinctive construct
+  in it (the send-attempt bound, the processing lease, all four `pos_sync` claim
+  RPCs, `DeviceNotRegistered` handling, the audience selector) was checked to
+  exist in the repository version first, and the broadcast audience selector
+  `.eq('promos_enabled', true)` was confirmed byte-identical before and after.
+  Nothing that was live was lost.
+
+  **Verified after**, from the deployed artifact rather than the API's success
+  reply: the nested file layout resolved (`_shared/adminAuth.ts` and
+  `staff-accounts/guards.ts` both present under the new versions) and the shared
+  predicate round-tripped intact.
 - **`payment-test-config` has the identical defect and was deliberately left
   alone** under the §6 payment freeze. A test asserts it stays unmodified, so the
   omission is visible rather than forgotten.
-- **`push-dispatch` was a fifth instance, and the most exposed one. Fixed in
-  SOURCE on 2026-08-23 in a separate change, on the owner's decision — the
-  deployed function is still v3 (2026-07-21) and the live AAL1 broadcast path is
-  open until it is redeployed.** The first sweep
+- **`push-dispatch` was a fifth instance, and the most exposed one. Fixed and
+  deployed 2026-08-23 (v4); the live AAL1 broadcast path is closed.** The first sweep
   missed it because it spelled the check
   `profile?.role === 'admin' ? user.id : null` (`index.ts:198-204`) rather than
   `role !== 'admin'`, and the sweep was lexical. It gates `order_status`, `test`,
@@ -610,13 +630,21 @@ Three consequences the owner should hold:
   gate before it is enabled. It was enabled on 2026-08-17 (§7). It is a dated
   audit, so a correction note now sits at the top of it rather than its findings
   being rewritten in place. The rate-limiting recommendation there is still open.
-- **One of the two admin accounts has no verified TOTP factor** (verified read-only
-  on 2026-08-23: 2 admins, 1 with a verified factor; no accountant accounts exist).
-  That account's session is AAL1, so once the redeploy happens it will receive a
-  403 `mfa_required` from these functions until a TOTP factor is enrolled. The
-  admin console already demands TOTP at sign-in, so this affects direct/API calls,
-  not the normal UI path — but it is a real lockout for that account and should be
-  resolved before the redeploy, not discovered after it.
+- **One of the two admin accounts has no TOTP factor at all** (verified read-only
+  on 2026-08-23, re-checked immediately before the redeploy: 2 admins, 1 with a
+  verified factor, the other with **zero** factors of any status; no accountant
+  accounts exist). Since the redeploy that account receives a 403 `mfa_required`
+  from these four functions until it enrols one.
+
+  **This is not a lockout, and an earlier draft of this section overstated it.**
+  `StaffMfaGate` (`src/components/StaffMfaGate.tsx:35-54`) handles the
+  no-verified-factor case as `needs_enrollment` and walks the account through QR
+  enrolment at sign-in — there is no chicken-and-egg. And that account was already
+  refused by every RLS policy and admin RPC, which have required AAL2 since
+  `20260810142000`; what the redeploy closed was the Edge Function **side-door**
+  that let it act at AAL1 through the service-role client. So the account lost a
+  capability it was never supposed to have, and can restore the legitimate one
+  itself at any sign-in. Worth enrolling regardless.
 
 **Nothing here touched the payment freeze (§6) or push (§7).** No payment,
 refund or checkout-session function was modified — `compute_order_snapshot` and
