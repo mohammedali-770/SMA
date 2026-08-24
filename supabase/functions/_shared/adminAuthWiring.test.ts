@@ -189,14 +189,63 @@ describe('push-dispatch admin gate wiring', () => {
   });
 });
 
-describe('the frozen payment function is not touched by this fix', () => {
-  it('payment-test-config keeps its own gate (CLAUDE.md §6 freeze)', () => {
-    // Deliberately asserts the OPPOSITE of the others. payment-test-config has
-    // the identical defect and a worse blast radius, but it is under the payment
-    // freeze and must not be modified without a separate owner decision. If this
-    // test starts failing, someone has changed frozen code — check that it was
-    // approved before making the test pass.
-    const src = source('payment-test-config');
-    expect(src).not.toContain('decideAdminAuthorization');
+// This describe used to assert the OPPOSITE — that payment-test-config still
+// carried the defect — because CLAUDE.md §6 froze it. That test did its job: it
+// kept the omission visible for a day instead of letting it be forgotten, and it
+// failed the moment the code changed, which is exactly when someone should have
+// to check whether the change was approved. It was: the owner approved a §6
+// exception for the gate on 2026-08-24. So the assertion is inverted rather than
+// deleted, and the freeze is now pinned where it still applies — the Tap
+// behaviour this function wraps.
+describe('payment-test-config admin gate wiring (§6 exception, 2026-08-24)', () => {
+  const src = source('payment-test-config');
+
+  it('asks Postgres for is_admin() rather than trusting the role alone', () => {
+    expect(src).toContain("rpc('is_admin')");
+    expect(src).toContain('decideAdminAuthorization');
+  });
+
+  it('feeds the RPC RESULT into the decision, not a hardcoded value', () => {
+    expect(src).not.toMatch(
+      /decideAdminAuthorization\(\s*\{\s*data:\s*(?:true|false|null|undefined|\d)/,
+    );
+    expect(src).toMatch(/decideAdminAuthorization\(\s*\{\s*data:\s*[A-Za-z_$][\w$.]*\s*,/);
+  });
+
+  it('gates AFTER resolving the user, so an expired session reads as 401', () => {
+    const getUser = src.indexOf('auth.getUser()');
+    const gate = src.indexOf("rpc('is_admin')");
+    expect(getUser).toBeGreaterThan(-1);
+    expect(gate).toBeGreaterThan(getUser);
+  });
+
+  it('no longer decides admin authority from the profile role by itself', () => {
+    expect(code('payment-test-config'))
+      .not.toMatch(/if \(!profile \|\| profile\.role !== 'admin'\) return json/);
+  });
+
+  // THE FREEZE, PINNED WHERE IT STILL APPLIES. The exception covered the gate
+  // and nothing else, so the Tap surface must be exactly as it was: same
+  // actions, same charge construction, same verification path. If one of these
+  // changes, a payment behaviour changed under cover of an auth fix.
+  it('leaves the Tap behaviour untouched (CLAUDE.md §6 still applies to it)', () => {
+    for (const marker of [
+      "payload.action === 'test_connection'",
+      "payload.action === 'verify_order'",
+      "payload.action === 'test_checkout'",
+      "payload.action === 'test_checkout_result'",
+      // CALLS, not imports. A first version of this listed the bare identifiers
+      // and a mutant that replaced the confirm call with a stub survived — the
+      // marker matched the import line. Pin the invocation.
+      'await validateAndConfirmTapCharge(admin, rec, retrieved.charge, tap.merchantId)',
+      'buildTapChargePayload({',
+      'isAdminTestCharge(c)',
+      "resolveTapConfig(true, 'tap', pub, sec, 'test')", // the forced TEST key
+    ]) {
+      expect(src).toContain(marker);
+    }
+    // And no live-mode charge creation was introduced: test_checkout still
+    // refuses outside TEST mode.
+    expect(src).toContain("if (mode !== 'test') return json({ ok: false, message: 'Admin test checkout is only available in TEST mode.' }, 200);");
   });
 });

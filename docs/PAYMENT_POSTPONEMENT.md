@@ -61,6 +61,42 @@ to:
 Reopening any of the above requires **separate, explicit owner approval**
 (`CLAUDE.md` §5 and §6).
 
+### Exception granted 2026-08-24 — the `payment-test-config` admin gate
+
+**One narrow exception has been approved, and it is worth reading precisely so it
+is not later cited as broader than it was.** `payment-test-config` authorized its
+callers on `profile.role = 'admin'` alone, with no check of the MFA assurance
+level. That is the same defect fixed in `staff-accounts`, `email-test-config`,
+`whatsapp-test-config` and `push-dispatch` on 2026-08-23; those four were fixed
+then and this one was deliberately left, with a test asserting it stayed
+unmodified, precisely because this table freezes it.
+
+**Why it was worth an exception rather than waiting for the provider decision.**
+This function is not the read-only diagnostics endpoint its name suggests. Its
+`verify_order` action reaches `validateAndConfirmTapCharge`, which can mark a
+real order paid. It cannot invent a payment — it confirms only on a genuine
+CAPTURED charge retrieved from Tap — but an administrator who had never completed
+TOTP could still drive payment-state writes on real orders, through the
+service-role client, which bypasses RLS. Waiting for the provider decision would
+have left that open indefinitely, and the fix touches no provider behaviour.
+
+**What the exception covers:** the authorization gate. The function now calls
+`public.is_admin()` (role **and** AAL2) through the caller's own client.
+
+**What it does not cover, and what proves it:** no provider behaviour, charge
+construction, verification logic, credential handling or configuration was
+changed. The code-only diff — comments stripped — is the import, the caller
+client, and the three gate lines. `supabase/functions/_shared/adminAuthWiring.test.ts`
+now pins the Tap surface as a freeze tripwire: the four actions, the forced TEST
+key, the TEST-mode guard on charge creation, and the `validateAndConfirmTapCharge`
+call site. If a payment behaviour changes, that test fails — so the next change
+here cannot ride in under an auth fix, which is exactly the failure mode the
+mobile row below was added for.
+
+**Deployment is NOT covered.** `payment-test-config` remains at the deployed
+version it had before this change until a separate §5 approval, so Production
+still runs the role-only gate for it.
+
 **The mobile row is new (2026-08-19), and it was added because the omission had
 already cost something.** The freeze table and the `payments` ownership rule both
 listed only Edge Functions and database objects, so a change to the app's own

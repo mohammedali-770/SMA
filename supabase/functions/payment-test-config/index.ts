@@ -1,4 +1,5 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
+import { decideAdminAuthorization } from '../_shared/adminAuth.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { resolveTapConfig, mapTapStatus, buildTapChargePayload, sanitizeTapResponse, isAdminTestCharge, extractTapError } from '../_shared/tap.ts';
@@ -14,7 +15,26 @@ import {
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
- * payment-test-config — ADMIN-only (verify_jwt=true + is_admin check).
+ * payment-test-config — ADMIN-only (verify_jwt=true + is_admin(), role AND AAL2).
+ *
+ * THE GATE. This function used to test `profile.role !== 'admin'` alone, which
+ * admitted an administrator who had not completed TOTP — the same defect fixed
+ * in staff-accounts, email-test-config, whatsapp-test-config and push-dispatch
+ * on 2026-08-23. It was held back then because CLAUDE.md §6 freezes payment
+ * code; the owner approved that specific exception on 2026-08-24 (#240).
+ *
+ * It matters here for a reason worth stating: `verify_order` is not a read. It
+ * reaches `validateAndConfirmTapCharge` — and now `verifyMoyasarAttempt` — either
+ * of which can mark a real order paid. Neither can invent a payment; each
+ * confirms only on a genuine settled charge retrieved from the provider. But an
+ * AAL1 caller could still drive payment-state writes on real orders through the
+ * service-role client, which bypasses RLS.
+ *
+ * That reasoning now covers a second provider, which is the only thing the
+ * Moyasar work changed about the gate: `handleMoyasar()` is dispatched AFTER
+ * this check, so it inherits role-AND-AAL2 with nothing provider-specific to get
+ * right. No part of the gate itself was modified by that work.
+ *
  *   action 'status'          → readiness booleans for the active provider's
  *                              config (no secrets).
  *   action 'test_connection' → validate the SELECTED-mode secret key against the
@@ -39,10 +59,19 @@ Deno.serve(async (req: Request) => {
   if (!authHeader) return json({ error: 'unauthorized' }, 401);
 
   const admin = adminClient();
-  const { data: { user } } = await userClient(authHeader).auth.getUser();
+
+  // Admin AND AAL2 — asked of Postgres as the CALLER so the assurance level is
+  // evaluated by the same SQL every RLS policy uses. See _shared/adminAuth.ts.
+  // Placed after getUser() on purpose: a failed session refresh makes
+  // supabase-js send the anon key, and gating earlier would report that as
+  // "two-factor required" instead of the truthful "unauthorized".
+  const caller = userClient(authHeader);
+  const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: 'unauthorized' }, 401);
   const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).maybeSingle();
-  if (!profile || profile.role !== 'admin') return json({ error: 'forbidden' }, 403);
+  const { data: isAdmin, error: adminErr } = await caller.rpc('is_admin');
+  const gate = decideAdminAuthorization({ data: isAdmin, error: adminErr }, profile?.role);
+  if (!gate.allowed) return json({ error: gate.error, code: gate.code }, gate.status);
 
   let payload: { action?: string; orderId?: string; chargeId?: string; invoiceId?: string };
   try { payload = await req.json(); } catch { payload = {}; }
