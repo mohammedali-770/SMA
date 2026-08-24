@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -12,11 +12,19 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   reload: vi.fn(),
   signOut: vi.fn(),
+  onAuthStateChange: vi.fn(),
+  unsubscribe: vi.fn(),
 }));
+
+/** Fires the auth event the component subscribed to, as Supabase would. */
+let emitAuthEvent: (event: string) => void = () => {
+  throw new Error('the component did not subscribe to onAuthStateChange');
+};
 
 vi.mock('../lib/supabase', () => ({
   supabase: {
     auth: {
+      onAuthStateChange: mocks.onAuthStateChange,
       mfa: {
         getAuthenticatorAssuranceLevel: mocks.getAal,
         listFactors: mocks.listFactors,
@@ -50,6 +58,10 @@ const factors = (totp: Array<{ id: string; status: 'verified' | 'unverified' }>)
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.onAuthStateChange.mockImplementation((cb: (event: string, session: unknown) => void) => {
+    emitAuthEvent = (event: string) => { cb(event, null); };
+    return { data: { subscription: { unsubscribe: mocks.unsubscribe } } };
+  });
   mocks.unenroll.mockResolvedValue({ data: {}, error: null });
   mocks.challenge.mockResolvedValue({ data: { id: 'challenge-1', expires_at: 0 }, error: null });
   mocks.verify.mockResolvedValue({ data: {}, error: null });
@@ -126,5 +138,98 @@ describe('StaffMfaGate', () => {
     expect(await screen.findByText('MFA unavailable')).toBeTruthy();
     expect(screen.queryByText('Protected staff console')).toBeNull();
     expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Re-checking assurance after an auth change.
+  //
+  // The gate inspects once on mount. These cases pin the listener that keeps a
+  // rendered console honest afterwards, and — just as important — pin that the
+  // ordinary case does NOT disturb it. A token refresh happens on a timer; if
+  // it remounted `children` the admin would lose open forms for no reason.
+  // ---------------------------------------------------------------------------
+
+  it('re-checks assurance on a token refresh without disturbing the open console', async () => {
+    mocks.getAal.mockResolvedValue(aal('aal2'));
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    const before = await screen.findByText('Protected staff console');
+    expect(mocks.getAal).toHaveBeenCalledTimes(1);
+
+    await act(async () => { emitAuthEvent('TOKEN_REFRESHED'); });
+
+    await waitFor(() => expect(mocks.getAal).toHaveBeenCalledTimes(2));
+    // The SAME DOM node, not an equal one: passing through mode='checking'
+    // would have unmounted and remounted the subtree.
+    expect(screen.getByText('Protected staff console')).toBe(before);
+    expect(screen.queryByText('Checking session assurance…')).toBeNull();
+    expect(mocks.listFactors).not.toHaveBeenCalled();
+  });
+
+  it('closes the console and challenges again when a refresh comes back below AAL2', async () => {
+    mocks.getAal
+      .mockResolvedValueOnce(aal('aal2'))
+      .mockResolvedValueOnce(aal('aal1', 'aal2'))
+      .mockResolvedValueOnce(aal('aal1', 'aal2'));
+    mocks.listFactors.mockResolvedValue(factors([{ id: 'factor-1', status: 'verified' }]));
+
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    expect(await screen.findByText('Protected staff console')).toBeTruthy();
+
+    await act(async () => { emitAuthEvent('TOKEN_REFRESHED'); });
+
+    expect(await screen.findByText('Enter the current code from your authenticator app.')).toBeTruthy();
+    expect(screen.queryByText('Protected staff console')).toBeNull();
+  });
+
+  it('ignores MFA_CHALLENGE_VERIFIED, which is this component\'s own verify() completing', async () => {
+    mocks.getAal.mockResolvedValue(aal('aal2'));
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    expect(await screen.findByText('Protected staff console')).toBeTruthy();
+
+    await act(async () => { emitAuthEvent('MFA_CHALLENGE_VERIFIED'); });
+
+    expect(mocks.getAal).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Protected staff console')).toBeTruthy();
+  });
+
+  it('leaves a half-typed code alone when an auth event arrives while the gate is showing', async () => {
+    mocks.getAal.mockResolvedValue(aal('aal1', 'aal2'));
+    mocks.listFactors.mockResolvedValue(factors([{ id: 'factor-1', status: 'verified' }]));
+
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    const input = await screen.findByLabelText('Authenticator code');
+    fireEvent.change(input, { target: { value: '123456' } });
+
+    await act(async () => { emitAuthEvent('TOKEN_REFRESHED'); });
+
+    expect((screen.getByLabelText('Authenticator code') as HTMLInputElement).value).toBe('123456');
+    expect(mocks.getAal).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the console up when the re-check itself fails', async () => {
+    mocks.getAal
+      .mockResolvedValueOnce(aal('aal2'))
+      .mockResolvedValueOnce({ data: null, error: new Error('MFA unavailable') });
+
+    render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    const before = await screen.findByText('Protected staff console');
+
+    await act(async () => { emitAuthEvent('TOKEN_REFRESHED'); });
+
+    await waitFor(() => expect(mocks.getAal).toHaveBeenCalledTimes(2));
+    // A failed check is not proof of a lost session, and this gate is not the
+    // security boundary — RLS and the admin RPCs refuse an AAL1 caller anyway.
+    expect(screen.getByText('Protected staff console')).toBe(before);
+    expect(screen.queryByText('MFA unavailable')).toBeNull();
+  });
+
+  it('unsubscribes the auth listener on unmount', async () => {
+    mocks.getAal.mockResolvedValue(aal('aal2'));
+    const { unmount } = render(<StaffMfaGate><div>Protected staff console</div></StaffMfaGate>);
+    expect(await screen.findByText('Protected staff console')).toBeTruthy();
+
+    expect(mocks.unsubscribe).not.toHaveBeenCalled();
+    unmount();
+    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });
