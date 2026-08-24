@@ -93,7 +93,7 @@ supabase functions deploy lazywait-sync lazywait-catalog lazywait-webhook
 
 **Preferred — Admin UI:** sign in as an **admin**, go to
 Settings → Integrations → **Lazywait POS** card, enter:
-- `base_url` = `https://apiv2.lazywait.com/v1`  (public)
+- `base_url` = `https://apiv2-dev.lazywait.com/v1`  (public) — **the dev host is the live POS**, see `LAZYWAIT.md` "Which host is live"
 - `client_id` = `<CLIENT_ID>`  (public)
 - `api_token` = `<ROTATED_API_TOKEN>`  (secret)
 - `webhook_secret` = `<WEBHOOK_SECRET>`  (secret; optional for pilot)
@@ -108,7 +108,7 @@ Leave **Enabled OFF** for now (map first, enable last).
 update public.integration_settings
    set enabled       = false,   -- flip to true only at GO (§8)
        public_config = jsonb_build_object(
-         'base_url','https://apiv2.lazywait.com/v1','client_id','<CLIENT_ID>'),
+         'base_url','https://apiv2-dev.lazywait.com/v1','client_id','<CLIENT_ID>'),
        secret_config = jsonb_build_object(
          'api_token','<ROTATED_API_TOKEN>',
          'webhook_secret','<WEBHOOK_SECRET>',
