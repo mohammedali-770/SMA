@@ -224,7 +224,7 @@ describe('reverse patch mappers (app -> DB)', () => {
   it('maps a product insert with sort order', () => {
     const ins = productToDbInsert({
       categoryId: 'c1', nameEn: 'X', nameAr: 'س', descriptionEn: 'd', descriptionAr: 'د',
-      price: 10, imageUrl: 'u', calories: 5, isActive: true, modifierGroupIds: [],
+      price: 10, imageUrl: 'u', calories: 5, isActive: true, modifierGroupIds: [], variants: [],
     }, 3);
     expect(ins).toMatchObject({ category_id: 'c1', name_en: 'X', price: 10, sort_order: 3, is_active: true });
   });

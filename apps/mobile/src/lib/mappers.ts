@@ -8,11 +8,11 @@ import type {
   DbBranchModifierAvailability, DbCategory,
   DbCustomerOrderWithItems, DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup,
   DbOrderItem, DbOrderItemModifier,
-  DbProduct, DbProductModifierGroup, DbProfile,
+  DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile,
 } from '../types/db';
 import type {
   Branch, BrandSettings, Category, DeliveryZone, HomeBanner, LegalDoc, LoyaltySettings, Modifier, ModifierGroup,
-  Order, OrderItem, OrderItemModifier, Product, SavedAddress, UserProfile,
+  Order, OrderItem, OrderItemModifier, Product, ProductVariant, SavedAddress, UserProfile,
 } from '../types/models';
 import type { PaymentMethodSettings } from './payment';
 import type { SupportSettings } from './supportContact';
@@ -84,7 +84,28 @@ export function mapCategory(c: DbCategory): Category {
   return { id: c.id, nameEn: c.name_en, nameAr: c.name_ar, sortOrder: c.sort_order };
 }
 
-export function mapProduct(p: DbProduct, links: DbProductModifierGroup[]): Product {
+export function mapProductVariant(v: DbProductVariant): ProductVariant {
+  return {
+    id: v.id,
+    productId: v.product_id,
+    nameEn: v.name_en,
+    nameAr: v.name_ar,
+    price: Number(v.price),
+    calories: v.calories,
+  };
+}
+
+export function mapProduct(
+  p: DbProduct,
+  links: DbProductModifierGroup[],
+  variants: DbProductVariant[] = [],
+): Product {
+  // RLS already withholds inactive tiers from a customer; filtering again keeps
+  // a staff session (which CAN see them) from offering one for sale.
+  const tiers = variants
+    .filter((v) => v.product_id === p.id && v.is_active)
+    .sort((a, b) => a.sort_order - b.sort_order || Number(a.price) - Number(b.price))
+    .map(mapProductVariant);
   return {
     id: p.id,
     categoryId: p.category_id,
@@ -97,6 +118,7 @@ export function mapProduct(p: DbProduct, links: DbProductModifierGroup[]): Produ
     calories: p.calories ?? 0,
     isActive: p.is_active,
     modifierGroupIds: links.filter((l) => l.product_id === p.id).map((l) => l.group_id),
+    variants: tiers,
   };
 }
 

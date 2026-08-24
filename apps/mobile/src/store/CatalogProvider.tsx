@@ -138,7 +138,7 @@ export function CatalogProvider({ children }: { children: React.ReactNode }) {
         const raw = await catalog.all();
         if (!mounted.current) return;
         const mappedBranches = raw.branches.map(mapBranch);
-        const mappedProducts = raw.products.map((p) => mapProduct(p, raw.links));
+        const mappedProducts = raw.products.map((p) => mapProduct(p, raw.links, raw.productVariants));
         const groups: Record<string, ModifierGroup> = {};
         for (const g of raw.modifierGroups) {
           groups[g.id] = mapModifierGroup(g, raw.modifiers);

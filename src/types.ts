@@ -64,6 +64,25 @@ export interface Category {
   sortOrder: number;
 }
 
+/**
+ * A named price tier of a product — "Small"/"Large", "Spicy"/"Regular".
+ *
+ * The local mirror of a Lazywait item PRICE. Lazywait models a menu as
+ * category -> item -> price, and this is that third level: it is what carries
+ * `lazywait_price_id`, the id the POS ticket must name.
+ */
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  nameAr: string;
+  nameEn: string;
+  price: number; // VAT-inclusive, like Product.price
+  calories: number | null;
+  sortOrder: number;
+  isActive: boolean;
+  lazywaitPriceId?: string | null;
+}
+
 export interface Product {
   id: string;
   categoryId: string;
@@ -71,11 +90,17 @@ export interface Product {
   nameEn: string;
   descriptionAr: string;
   descriptionEn: string;
-  price: number; // VAT-inclusive in Saudi Arabia (15% VAT)
+  /**
+   * VAT-inclusive. With variants this is the CHEAPEST tier — the "from" price —
+   * and an order line is priced from the chosen variant instead.
+   */
+  price: number;
   imageUrl: string;
   calories: number;
   isActive: boolean;
   modifierGroupIds: string[]; // Association to modifier groups
+  /** Orderable price tiers. Empty means the product has a single price. */
+  variants: ProductVariant[];
 }
 
 export interface ProductBranchAvailability {

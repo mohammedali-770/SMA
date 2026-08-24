@@ -372,8 +372,9 @@ export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<strin
  * category and price mappings were simply unreachable from the worker.
  */
 export const ORDER_ITEM_SELECT =
-  'id, name_en, name_ar, note, quantity, unit_price, product_id,'
+  'id, name_en, name_ar, note, quantity, unit_price, product_id, variant_id,'
   + ' products(lazywait_item_id, lazywait_price_id, categories(lazywait_category_id)),'
+  + ' product_variants(lazywait_price_id),'
   + ' order_item_modifiers(modifier_id, name_en, name_ar, price, modifiers(lazywait_addon_id))';
 
 /**
@@ -391,6 +392,10 @@ export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOr
       lazywait_price_id?: string | null;
       categories?: { lazywait_category_id?: string | null } | null;
     } | null;
+    // The TIER the customer chose, when the product has tiers. Its price id is
+    // the one Lazywait needs: `products.lazywait_price_id` names only the
+    // cheapest tier, so a Large would have been ticketed as a Small.
+    const variant = it.product_variants as { lazywait_price_id?: string | null } | null;
     const modifiers = (it.order_item_modifiers ?? []) as Array<Record<string, unknown>>;
     return {
       menuItemId: product?.lazywait_item_id ?? null,
@@ -401,7 +406,9 @@ export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOr
       // add-on lines back out so the POS cannot charge them twice.
       unitPrice: Number(it.unit_price ?? 0),
       menuCategoryId: product?.categories?.lazywait_category_id ?? null,
-      priceId: product?.lazywait_price_id ?? null,
+      // Variant first, product second. The fallback keeps a pre-variant line
+      // (and any untiered product) syncing exactly as it does today.
+      priceId: variant?.lazywait_price_id ?? product?.lazywait_price_id ?? null,
       note: (it.note as string | null) ?? null,
       addons: modifiers.map((m) => ({
         addonId: (m.modifiers as { lazywait_addon_id?: string | null } | null)?.lazywait_addon_id ?? null,

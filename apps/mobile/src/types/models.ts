@@ -73,6 +73,22 @@ export interface LegalDoc {
   effectiveDate: string | null;
 }
 
+/**
+ * A named price tier of a product — "Small"/"Large", "Spicy"/"Regular".
+ *
+ * This is the level Lazywait has always had and the app did not: a POS item
+ * carries a list of PRICES, each with its own id, and the id of the one the
+ * customer chose is what the POS ticket must name.
+ */
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  nameEn: string;
+  nameAr: string;
+  price: number; // VAT-inclusive, like Product.price
+  calories: number | null;
+}
+
 export interface Product {
   id: string;
   categoryId: string;
@@ -80,11 +96,18 @@ export interface Product {
   nameAr: string;
   descriptionEn: string;
   descriptionAr: string;
-  price: number; // VAT-inclusive (Saudi 15% VAT)
+  /**
+   * VAT-inclusive. When `variants` is non-empty this is the CHEAPEST tier —
+   * the "from" price on a menu card — and the line is priced from the chosen
+   * variant instead. With no variants it is the price, as it always was.
+   */
+  price: number;
   imageUrl: string;
   calories: number;
   isActive: boolean;
   modifierGroupIds: string[];
+  /** Orderable price tiers, cheapest-relevant order. Empty = a single price. */
+  variants: ProductVariant[];
 }
 
 export interface Modifier {
@@ -180,8 +203,13 @@ export interface Order {
 
 /** A configured product in the cart (product + the modifiers chosen per group). */
 export interface CartItem {
-  cartItemId: string; // product.id + sorted modifier ids + the note
+  cartItemId: string; // product.id + variant id + sorted modifier ids + the note
   product: Product;
+  /**
+   * The chosen price tier, when the product has any. Part of `cartItemId`, so
+   * a Small and a Large of the same dish are two lines rather than one.
+   */
+  variant?: ProductVariant;
   selectedModifiers: { [groupId: string]: Modifier[] };
   quantity: number;
   unitPrice: number; // base price + selected modifier prices (per single item)

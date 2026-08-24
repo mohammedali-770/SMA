@@ -17,7 +17,7 @@ import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
-import type { Modifier, ModifierGroup } from '../../types/models';
+import type { Modifier, ModifierGroup, ProductVariant } from '../../types/models';
 import { blockingGroups, requiredCount } from '../../lib/orderability';
 import { computeUnitPrice } from '../../utils/format';
 
@@ -46,6 +46,16 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
     }
     return kept;
   });
+  // The chosen price tier. Lazywait sells "Chicken Wings / Large", so this is a
+  // choice about WHAT is being bought, not a modifier on top of it — hence its
+  // own state and its own picker above the option groups.
+  //
+  // Pre-selected rather than left empty: place_order REFUSES a tiered product
+  // sent without a tier, so an empty default would build a line that fails at
+  // checkout. The cheapest tier is first (the importer sorts them), which is
+  // also the price the menu card advertised.
+  const [variant, setVariant] = useState<ProductVariant | null>(
+    () => editingLine?.variant ?? product?.variants[0] ?? null);
   const [qty, setQty] = useState(() => editingLine?.quantity ?? 1);
   // The line's own instruction. Seeded from the line being edited so reopening
   // an item shows what the customer already asked for rather than a blank box.
@@ -72,11 +82,17 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   const productClosed = Boolean(selectedBranchId) && !isAvailable(product.id, selectedBranchId as string);
   const orderable = !productClosed && blocked.length === 0;
   const canSave = orderable && missingGroups.length === 0;
-  const total = Number((computeUnitPrice(product, selected) * qty).toFixed(2));
+  // A single unnamed tier is just the item's price (most sauces are like this),
+  // so only offer a choice when there is genuinely more than one.
+  const tiers = product.variants;
+  const showTierPicker = tiers.length > 1;
+  const activeTier = variant ?? tiers[0] ?? null;
+  const total = Number((computeUnitPrice(product, selected, activeTier) * qty).toFixed(2));
   const isEditing = Boolean(cartItemId && editingLine);
   const save = () => {
     if (!canSave) { setShowErrors(true); return; }
-    if (isEditing && cartItemId) cart.updateItem(cartItemId, product, selected, qty, note); else cart.addItem(product, selected, qty, note);
+    if (isEditing && cartItemId) cart.updateItem(cartItemId, product, selected, qty, note, activeTier);
+    else cart.addItem(product, selected, qty, note, activeTier);
     router.back();
   };
 
@@ -88,11 +104,37 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
         <View style={styles.body}>
           <Text variant="display">{pick(product.nameEn, product.nameAr)}</Text>
           {pick(product.descriptionEn, product.descriptionAr) ? <Text variant="body" tone="secondary" style={{ marginTop: space.s1 }}>{pick(product.descriptionEn, product.descriptionAr)}</Text> : null}
-          <View style={[styles.metaRow, rtlRow]}><Price amount={product.price} size={typeScale.title.size} color={colors.appText} weight="700" />{product.calories ? <Text variant="caption" tone="tertiary">{product.calories} {t('kcal')}</Text> : null}</View>
+          <View style={[styles.metaRow, rtlRow]}><Price amount={activeTier?.price ?? product.price} size={typeScale.title.size} color={colors.appText} weight="700" />{(activeTier?.calories ?? product.calories) ? <Text variant="caption" tone="tertiary">{activeTier?.calories ?? product.calories} {t('kcal')}</Text> : null}</View>
           {!orderable ? <View style={styles.blockedNotice}>
             <Text variant="label" tone="danger">{t('outOfStock')}</Text>
             {productClosed ? null : <Text variant="caption" tone="secondary" style={{ marginTop: space.s1 }}>{t('productBlockedByOptions')}</Text>}
           </View> : null}
+          {showTierPicker ? (
+            <View style={styles.group}>
+              <View style={[styles.groupHead, rtlRow]}>
+                <Text variant="heading" style={{ flex: 1 }}>{pick('Choose your option', 'اختر الحجم أو النوع')}</Text>
+                <StatusPill label={t('required')} tone="danger" />
+              </View>
+              <View style={{ gap: space.s2 }}>{tiers.map((v) => {
+                const checked = activeTier?.id === v.id;
+                return (
+                  <Pressable
+                    key={v.id}
+                    style={[styles.modRow, rtlRow, checked && styles.modRowOn]}
+                    onPress={() => setVariant(v)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked }}
+                  >
+                    <View style={[styles.check, styles.radio, checked && styles.checkOn]}>
+                      {checked ? <Text variant="label" tone="onEmber" align="center">✓</Text> : null}
+                    </View>
+                    <Text variant="body" style={{ flex: 1 }}>{pick(v.nameEn, v.nameAr)}</Text>
+                    <Price amount={v.price} size={typeScale.label.size} color={colors.appText} weight="700" />
+                  </Pressable>
+                );
+              })}</View>
+            </View>
+          ) : null}
           {groups.map((g) => {
             const count = (selected[g.id] ?? []).length; const min = requiredCount(g); const unmet = showErrors && count < min;
             return <View key={g.id} style={[styles.group, unmet && styles.groupUnmet]}>

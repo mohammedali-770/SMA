@@ -17,6 +17,7 @@ import { useCart, useOrderContext } from '../../store';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { CartItem } from '../../types/models';
+import { cartLineLabel } from '../../utils/format';
 import { SuggestionStrip, type SuggestionCardModel } from './SuggestionStrip';
 import { useCartSuggestions } from './useCartSuggestions';
 
@@ -67,7 +68,7 @@ export function CartScreen() {
         scrollEventThrottle={16}
         onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height; evaluateStripVisible(); }}
         onScroll={(e) => { scrollY.current = e.nativeEvent.contentOffset.y; evaluateStripVisible(); }}><View style={{ gap: space.s3 }}>
-        {cart.items.map((it) => <CartLine key={it.cartItemId} item={it} name={pick(it.product.nameEn, it.product.nameAr)} modifierSummary={modifierSummary(it, pick)} lineAmount={it.unitPrice * it.quantity}
+        {cart.items.map((it) => <CartLine key={it.cartItemId} item={it} name={cartLineLabel(it, pick)} modifierSummary={modifierSummary(it, pick)} lineAmount={it.unitPrice * it.quantity}
           removeLabel={t('remove')} editLabel={pick('Edit item', 'تعديل المنتج')}
           onEdit={() => router.push({ pathname: '/product/[id]', params: { id: it.product.id, cartItemId: it.cartItemId } })}
           onInc={() => cart.incrementLine(it.cartItemId)}

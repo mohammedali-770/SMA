@@ -22,7 +22,7 @@ const product = (id: string, over: Partial<Product> = {}): Product => ({
   nameEn: `Item ${id}`,
   descriptionAr: '', descriptionEn: '',
   price: 10, imageUrl: '', calories: 0,
-  isActive: true, modifierGroupIds: [],
+  isActive: true, modifierGroupIds: [], variants: [],
   ...over,
 });
 

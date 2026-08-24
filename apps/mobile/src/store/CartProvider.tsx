@@ -5,15 +5,15 @@ import { CART_STORAGE_KEY as CART_KEY } from '../lib/storageKeys';
 import { noteCartAdd } from '../features/cart/suggestionStore';
 import { computeUnitPrice, makeCartItemId, cartSubtotal } from '../utils/format';
 import { uuidv4 } from '../utils/uuid';
-import type { CartItem, Modifier, Product } from '../types/models';
+import type { CartItem, Modifier, Product, ProductVariant } from '../types/models';
 
 export interface CartValue {
   items: CartItem[]; count: number; subtotal: number; idempotencyKey: string;
-  addItem: (product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => void;
-  updateItem: (cartItemId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => void;
+  addItem: (product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null, variant?: ProductVariant | null) => void;
+  updateItem: (cartItemId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null, variant?: ProductVariant | null) => void;
   incrementLine: (cartItemId: string) => void; decrementLine: (cartItemId: string) => void;
   removeLine: (cartItemId: string) => void; clear: () => void;
-  toOrderItems: () => { product_id: string; quantity: number; modifier_ids?: string[]; note?: string }[];
+  toOrderItems: () => { product_id: string; quantity: number; variant_id?: string; modifier_ids?: string[]; note?: string }[];
 }
 export const CartContext = createContext<CartValue | null>(null);
 
@@ -35,7 +35,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIdempotencyKey(uuidv4());
   }, [items]);
 
-  const addItem = useCallback((product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => {
+  const addItem = useCallback((product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null, variant?: ProductVariant | null) => {
     // Every add in the app funnels through here — menu one-tap, product page and
     // the cart suggestion strip — so this is the one place the on-device
     // suggestion model can learn from. Fire-and-forget and fully swallowed: it
@@ -44,24 +44,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     // The note is part of the id, so two portions of the same dish with
     // different instructions stay two lines instead of merging and losing one.
     const trimmedNote = (note ?? '').trim() || undefined;
-    const cartItemId = makeCartItemId(product.id, selected, trimmedNote); const unitPrice = computeUnitPrice(product, selected);
+    // A product with tiers and none chosen would be refused by place_order, so
+    // default to the first (cheapest) tier rather than building a line the
+    // server will reject at checkout.
+    const tier = variant ?? product.variants[0] ?? null;
+    const cartItemId = makeCartItemId(product.id, selected, trimmedNote, tier?.id);
+    const unitPrice = computeUnitPrice(product, selected, tier);
     setItems((prev) => {
       const existing = prev.find((it) => it.cartItemId === cartItemId);
       return existing ? prev.map((it) => it.cartItemId === cartItemId ? { ...it, quantity: it.quantity + quantity } : it)
-        : [...prev, { cartItemId, product, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote }];
+        : [...prev, { cartItemId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote }];
     });
   }, []);
 
-  const updateItem = useCallback((oldId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null) => {
+  const updateItem = useCallback((oldId: string, product: Product, selected: { [groupId: string]: Modifier[] }, quantity: number, note?: string | null, variant?: ProductVariant | null) => {
     if (quantity <= 0) { setItems((prev) => prev.filter((it) => it.cartItemId !== oldId)); return; }
     const trimmedNote = (note ?? '').trim() || undefined;
-    const newId = makeCartItemId(product.id, selected, trimmedNote); const unitPrice = computeUnitPrice(product, selected);
+    const tier = variant ?? product.variants[0] ?? null;
+    const newId = makeCartItemId(product.id, selected, trimmedNote, tier?.id);
+    const unitPrice = computeUnitPrice(product, selected, tier);
     setItems((prev) => {
       if (!prev.some((it) => it.cartItemId === oldId)) return prev;
       if (newId !== oldId && prev.some((it) => it.cartItemId === newId)) {
         return prev.filter((it) => it.cartItemId !== oldId).map((it) => it.cartItemId === newId ? { ...it, quantity: it.quantity + quantity } : it);
       }
-      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote } : it);
+      return prev.map((it) => it.cartItemId === oldId ? { cartItemId: newId, product, variant: tier ?? undefined, selectedModifiers: selected, quantity, unitPrice, note: trimmedNote } : it);
     });
   }, []);
 
@@ -75,6 +82,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const toOrderItems = useCallback(() => items.map((it) => ({
     product_id: it.product.id,
     quantity: it.quantity,
+    // Omitted, not null, when the product has no tiers — same convention as the
+    // note, and place_order reads it with `->> 'variant_id'`.
+    ...(it.variant ? { variant_id: it.variant.id } : {}),
     modifier_ids: Object.values(it.selectedModifiers).flat().map((m) => m.id),
     ...(it.note ? { note: it.note } : {}),
   })), [items]);

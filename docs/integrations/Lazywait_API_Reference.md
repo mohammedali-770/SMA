@@ -144,7 +144,7 @@ every other field is optional. What `buildCreateOrderPayload` sends today:
 ### Confirmed by the contract, promoted out of the assumed gate
 | Field | Source in our data |
 |---|---|
-| `order_items[].price_id` | `products.lazywait_price_id` |
+| `order_items[].price_id` | `product_variants.lazywait_price_id` (the ordered tier), falling back to `products.lazywait_price_id` for an untiered line |
 | `order_items[].menu_category_id` | `products.category_id` → `categories.lazywait_category_id` |
 | `order_items[].names{en,ar}` | `order_items.name_en` / `name_ar` |
 | `order_items[].details` | `order_items.note` (per-item kitchen note) |
@@ -181,6 +181,54 @@ the serializer subtracts them back out. The invariant
 `lazywait.test.ts`. The Lazywait response total remains **untrusted**.
 
 ---
+
+## `GET /menu/products/items` — the confirmed response shape (observed 2026-08-24)
+
+Not from the contract document: read directly off the **production** host's own
+response, cached in `lazywait_catalog_items.raw`. Recorded because the field
+names here are what the catalog import depends on, and getting one wrong emptied
+the entire app menu without any endpoint reporting an error.
+
+```jsonc
+{
+  "menu_item_id": "92dd15fb-…", "id": "92dd15fb-…",
+  "names":   { "en": "Chicken Wings", "ar": "أجنحة الدجاج" },
+  "details": { "en": "Five or ten pieces…", "ar": "خمس أو عشر قطع…" },
+  "menu_category_id": "be06eeb9-…",     // NOT `category_id`
+  "active": true, "show_online": true, "photo": null, "sort_id": null,
+  "source": "XLS",                       // or "DASHBOARD"
+  "branches_ids": ["0dDRHGE1hSBZjDvgg1bN", …],
+  "prices": [
+    { "price_id": "20005a3e-…",
+      "names": { "en": "Small", "ar": "صغير" },
+      "price": 6.086956521739131,        // <- THE MONEY. EXCLUDES VAT.
+      "active": true, "show_online": true, "taxable": true, "calories": 0,
+      "menu_item_id": "92dd15fb-…", "menu_category_id": "be06eeb9-…" },
+    { "price_id": "85b9b63d-…", "names": { "en": "Large", "ar": "كبير" },
+      "price": 11.304347826086957, "active": true, "show_online": true }
+  ]
+}
+```
+
+| Fact | Evidence |
+|---|---|
+| The price key is **`price`**, not `price_with_vat` / `price_excluding_vat` / `net_price` | all 147 Production price rows carry `price`; only 21 carry `price_with_vat` |
+| `price` is **VAT-EXCLUSIVE** | on every row that has both, `price_with_vat === price × 1.15` exactly (45.21739130434783 → 52; 66.08695652173914 → 76). For spreadsheet rows the shelf price is likewise `price × 1.15` (6.086956521739131 → 7.00) |
+| An item names its category **`menu_category_id`** | `category_id` is absent from every item |
+| The description is **`details{en,ar}`** | same shape as `names` |
+| `show_online` appears on the **category, the item AND the price** | e.g. the "Offers" category and the "Change to Wedgez" price are both `false` |
+| One item can carry **many** prices | 30 of 61 Production items are multi-price; "Coral" has 11 |
+
+**Two menu generations coexist in the live catalog.** Items carry
+`source: "XLS"` (uploaded from a spreadsheet) or `source: "DASHBOARD"` (authored
+in the portal). As of 2026-08-24 Production held 57 XLS items **plus 4 leftover
+DASHBOARD items at older prices** — "Dinner Family Meal" (52/64/76 vs the XLS
+"Diner Family Meal" at 65/80/95), "Slices Family Meal" (44/56/68 vs 55/68/85),
+a second "Extreme" (25 vs 29), and "Macaroni Béchamel" whose `menu_category_id`
+resolves to no returned category. Three sit in the hidden "Offers" category, so
+honouring `show_online` keeps them off the menu; the orphan lands in an inactive
+"Uncategorized" bucket. **Cleaning them up is the owner's call inside Lazywait —
+the import deliberately does not guess which price is current.**
 
 ## STILL ASSUMED
 

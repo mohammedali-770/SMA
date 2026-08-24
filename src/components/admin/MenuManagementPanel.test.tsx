@@ -32,10 +32,18 @@ vi.mock('../../context/AppContext', () => ({
 import { MenuManagementPanel } from './MenuManagementPanel';
 
 const category = { id: 'c1', nameEn: 'Sides', nameAr: 'مقبلات' } as Category;
+// Two price tiers, as a Lazywait-imported product has: `price` is the CHEAPEST
+// one and the table must present it as a "from" price, not as the price.
 const product = {
   id: 'p1', categoryId: 'c1', nameEn: 'Fries', nameAr: 'بطاطس',
-  descriptionEn: '', descriptionAr: '', price: 12, calories: 300,
+  descriptionEn: '', descriptionAr: '', price: 5, calories: 300,
   imageUrl: 'https://example.test/f.jpg', isActive: true, modifierGroupIds: [],
+  variants: [
+    { id: 'v1', productId: 'p1', nameEn: 'Small', nameAr: 'صغير', price: 5,
+      calories: 300, sortOrder: 1, isActive: true, lazywaitPriceId: 'LW_S' },
+    { id: 'v2', productId: 'p1', nameEn: 'Large', nameAr: 'كبير', price: 13,
+      calories: 600, sortOrder: 2, isActive: true, lazywaitPriceId: 'LW_L' },
+  ],
 } as Product;
 
 const addProduct = vi.fn();

@@ -39,7 +39,7 @@ const category: Category = { id: 'c1', nameAr: 'برجر', nameEn: 'Burgers', so
 const product = (id: string, nameEn: string): Product => ({
   id, categoryId: 'c1', nameAr: nameEn, nameEn,
   descriptionAr: '', descriptionEn: '', price: 10,
-  imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [],
+  imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [], variants: [],
 });
 
 const heat: ModifierGroup = {

@@ -92,14 +92,72 @@ describe('extractCatalogRecord — items with multiple prices', () => {
     expect(r?.parent_id).toBe('CAT1');
     expect(r?.branches_ids).toEqual(['B1', 'B2']);
     expect(r?.prices?.length).toBe(2);
-    expect(r?.prices?.[0]).toEqual({ price_id: 'P_S', name: 'Small', price_with_vat: 25, price_excl_vat: 21.74 });
-    expect(r?.prices?.[1]).toEqual({ price_id: null, name: 'Large', price_with_vat: 40, price_excl_vat: null });
+    expect(r?.prices?.[0]).toMatchObject({
+      price_id: 'P_S', name: 'Small', price_with_vat: 25, price_excl_vat: 21.74,
+    });
+    expect(r?.prices?.[1]).toMatchObject({
+      price_id: null, name: 'Large', price_with_vat: 40, price_excl_vat: null,
+    });
   });
 
-  it('falls back to a single flat numeric price', () => {
+  // The regression that emptied the menu: Lazywait puts the money in `price`,
+  // and it is the NET figure. Reading it as gross would overcharge nobody but
+  // would under-price every line by the VAT, so it must land in price_excl_vat
+  // and leave price_with_vat null for the importer to gross up.
+  it('reads the plain `price` field as the VAT-EXCLUSIVE price', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I_CW', names: { en: 'Chicken Wings' },
+      menu_category_id: 'CAT_SIDES',
+      prices: [
+        { price_id: 'P1', names: { en: 'Small', ar: 'صغير' }, price: 6.086956521739131,
+          show_online: true, active: true, calories: 0 },
+      ],
+    });
+    expect(r?.prices?.[0].price_excl_vat).toBe(6.086956521739131);
+    expect(r?.prices?.[0].price_with_vat).toBeNull();
+    expect(r?.prices?.[0].name_ar).toBe('صغير');
+    expect(r?.prices?.[0].show_online).toBe(true);
+  });
+
+  // Dashboard-authored items send both, and the gross one is authoritative.
+  it('keeps an explicitly supplied price_with_vat alongside `price`', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I_EX', names: { en: 'Extreme' },
+      prices: [{ price_id: 'P2', price: 21.73913043478261, price_with_vat: 25 }],
+    });
+    expect(r?.prices?.[0].price_excl_vat).toBe(21.73913043478261);
+    expect(r?.prices?.[0].price_with_vat).toBe(25);
+  });
+
+  it('reads menu_category_id as the item parent', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I9', names: { en: 'X' }, menu_category_id: 'CAT_9',
+    });
+    expect(r?.parent_id).toBe('CAT_9');
+  });
+
+  it('reads details{en,ar} as the item description', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I10', names: { en: 'Wings' },
+      details: { en: 'Five or ten pieces.', ar: 'خمس أو عشر قطع' },
+    });
+    expect(r?.description_en).toBe('Five or ten pieces.');
+    expect(r?.description_ar).toBe('خمس أو عشر قطع');
+  });
+
+  it('carries record-level show_online / active', () => {
+    const r = extractCatalogRecord('item', {
+      menu_item_id: 'I11', names: { en: 'Extra Bread' }, show_online: false, active: true,
+    });
+    expect(r?.show_online).toBe(false);
+    expect(r?.active).toBe(true);
+  });
+
+  it('falls back to a single flat numeric price, read as net', () => {
     const r = extractCatalogRecord('item', { id: 'I2', name_en: 'Water', price: 3 });
     expect(r?.prices?.length).toBe(1);
-    expect(r?.prices?.[0].price_with_vat).toBe(3);
+    expect(r?.prices?.[0].price_excl_vat).toBe(3);
+    expect(r?.prices?.[0].price_with_vat).toBeNull();
   });
 
   it('single branch_id becomes a one-element branches_ids', () => {

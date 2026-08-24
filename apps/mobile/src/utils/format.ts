@@ -4,7 +4,7 @@
  * in place_order — these are for DISPLAY only (cart preview, receipts).
  */
 import { formatAmount } from '../design-system/generated/money';
-import type { CartItem, Modifier, Product } from '../types/models';
+import type { CartItem, Modifier, Product, ProductVariant } from '../types/models';
 
 /**
  * "123.00 SAR" (en) / "123.00 ر.س" (ar).
@@ -39,10 +39,20 @@ export function flattenModifiers(selected: { [groupId: string]: Modifier[] }): M
   return Object.values(selected).flat();
 }
 
-/** Per-item price = base product price + all selected modifier prices. */
-export function computeUnitPrice(product: Product, selected: { [groupId: string]: Modifier[] }): number {
+/**
+ * Per-item price = the chosen tier's price (or the product's, when it has no
+ * tiers) + all selected modifier prices.
+ *
+ * Preview only — `place_order` recomputes this server-side from the same rows,
+ * so a tampered client cannot underprice a line.
+ */
+export function computeUnitPrice(
+  product: Product,
+  selected: { [groupId: string]: Modifier[] },
+  variant?: ProductVariant | null,
+): number {
   const mods = flattenModifiers(selected).reduce((sum, m) => sum + m.price, 0);
-  return Number((product.price + mods).toFixed(2));
+  return Number(((variant?.price ?? product.price) + mods).toFixed(2));
 }
 
 /**
@@ -60,11 +70,36 @@ export function makeCartItemId(
    * added last silently wins for both.
    */
   note?: string | null,
+  /**
+   * The chosen price tier. Part of the identity for the same reason and with
+   * higher stakes: a Small and a Large are different products at different
+   * prices, and merging them would charge one and deliver the other.
+   */
+  variantId?: string | null,
 ): string {
   const ids = flattenModifiers(selected).map((m) => m.id).sort();
-  const base = ids.length ? `${productId}::${ids.join(',')}` : productId;
+  const withVariant = variantId ? `${productId}@@${variantId}` : productId;
+  const base = ids.length ? `${withVariant}::${ids.join(',')}` : withVariant;
   const trimmed = (note ?? '').trim();
   return trimmed ? `${base}##${trimmed}` : base;
+}
+
+/**
+ * What a cart line is CALLED, tier included: "Chicken Wings — Large".
+ *
+ * The tier is part of the identity of what was bought, so it belongs in the
+ * name and not in the option summary underneath. It is omitted when the tier
+ * just repeats the product name — the importer names a single unnamed Lazywait
+ * price after its item, and "Grill Sauce — Grill Sauce" helps nobody.
+ */
+export function cartLineLabel(
+  item: CartItem,
+  pick: (en: string, ar: string) => string,
+): string {
+  const base = pick(item.product.nameEn, item.product.nameAr);
+  if (!item.variant) return base;
+  const tier = pick(item.variant.nameEn, item.variant.nameAr);
+  return !tier || tier === base ? base : `${base} — ${tier}`;
 }
 
 /** Cart subtotal preview (sum of line totals). Server recomputes on checkout. */
