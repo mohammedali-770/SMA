@@ -116,14 +116,37 @@ mobile-row note below was written about. The auth exception above says "no
 verification logic was touched" — true of the *diff*, and false of the *deploy*.
 Those are different claims and this document should not let them blur.
 
-**The other four functions were checked and were NOT affected.** They were
-redeployed on 2026-08-23 with fresh shared helpers, so the same question applies
-to them. `whatsapp-send-otp` — never redeployed, still on its 2026-07-09 bundle —
-was read back and its `whatsapp.ts`, `whatsappSend.ts`, `cors.ts`,
-`supabaseClient.ts` and `secrets.ts` are comment-stripped but structurally
-identical to today's: same exports, same rate-limit constants, same send path.
-Those helpers had not diverged. The payment helpers are the exception, not the
-rule.
+**The same question applies to the four functions redeployed on 2026-08-23, and
+the answer is partly verified and partly not.** Stating it precisely, because an
+earlier draft of this paragraph claimed all four were "checked and NOT affected",
+which the evidence does not support:
+
+| function | pre-redeploy bundle | status |
+| --- | --- | --- |
+| `push-dispatch` | **inspected** before the write | `cors.ts`, `supabaseClient.ts`, `secrets.ts` were comment-stripped but structurally identical to the repository. **Verified.** |
+| `email-test-config` | **inspected** before the write | same three helpers, same result. **Verified.** |
+| `whatsapp-test-config` | **not inspected**, now unrecoverable | its `whatsapp.ts` / `whatsappSend.ts` were never read before being overwritten. |
+| `staff-accounts` | **not inspected**, now unrecoverable | deployed 2026-08-23, hours before the redeploy, from the same repository state. |
+
+For `whatsapp-test-config` the best available evidence is indirect but strong:
+`whatsapp-send-otp` was deployed the **same day** (2026-07-09), bundles the same
+two helpers, has never been redeployed, and was read back — its `whatsapp.ts` and
+`whatsappSend.ts` are comment-stripped but structurally identical to today's,
+same exports, same rate-limit constants (`maxPerHour: 5, maxPerDay: 10`), same
+send path. That makes an unnoticed change to those helpers between the two
+same-day deploys very unlikely. It is not the same as having read the artifact,
+and it is recorded as inference rather than verification.
+
+For `staff-accounts` the window between its first deploy and its redeploy was a
+few hours of the same repository state, so there is no meaningful room for the
+bundle to differ — but that too is reasoning, not inspection.
+
+**A deployed bundle cannot be recovered once overwritten.** Supabase exposes only
+the current version, so the pre-redeploy artifacts for those two are gone. The
+lesson for next time is to read a function's bundle *before* overwriting it,
+which is what caught the payment divergence here and what was not done for those
+two. The payment helpers remain the only case where a divergence was actually
+found.
 
 **Current state:** `payment-test-config` is fixed in the repository and still
 runs the role-only gate in Production. Reopening this needs the freeze lifted, or

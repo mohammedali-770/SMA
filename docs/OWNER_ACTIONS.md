@@ -624,13 +624,16 @@ Three consequences the owner should hold:
   it, which is a payment-behaviour decision and not an authorization one. Detail
   in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) §2.
 
-  **The other four were checked against this same risk and are clean.** They were
-  redeployed with fresh shared helpers on 2026-08-23, so the same question
-  applies. `whatsapp-send-otp` — never redeployed, still on its 2026-07-09
-  bundle — was read back: its `whatsapp.ts`, `whatsappSend.ts`, `cors.ts`,
-  `supabaseClient.ts` and `secrets.ts` are comment-stripped but structurally
-  identical to today's, same exports and same rate-limit constants. Those helpers
-  had not diverged; the payment helpers are the exception.
+  **The same risk applies to the four redeployed on 2026-08-23, and the answer is
+  partly verified and partly not.** `push-dispatch` and `email-test-config` had
+  their pre-redeploy bundles **inspected** before being overwritten — helpers
+  structurally identical to the repository, verified. `whatsapp-test-config` and
+  `staff-accounts` did **not**, and a deployed bundle cannot be recovered once
+  overwritten, so those two rest on inference: a same-day sibling
+  (`whatsapp-send-otp`, still on its 2026-07-09 bundle, read back and identical)
+  for the first, and a few-hours window on the same repository state for the
+  second. Strong, but not inspection. Detail and the correction of an earlier
+  overstatement are in [`PAYMENT_POSTPONEMENT.md`](PAYMENT_POSTPONEMENT.md) §2.
 - **`push-dispatch` was a fifth instance, and the most exposed one. Fixed and
   deployed 2026-08-23 (v4); the live AAL1 broadcast path is closed.** The first sweep
   missed it because it spelled the check
