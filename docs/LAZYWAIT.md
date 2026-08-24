@@ -190,7 +190,8 @@ Production the day the payload change merged (`536a6cb`):
 | `products.lazywait_price_id` | 70 | 65 | 0 |
 | `categories.lazywait_category_id` | 9 | 6 | 0 |
 
-Every active product, price and category is mapped. **No modifier is.** All three
+Every active product, price and category is mapped — *non-null*, which is not the
+same as *resolvable*; see the caveat below. **No modifier is.** All three
 — Mild, Hot, Volcano (+2) — are active, sit in one "Heat Level" group and are
 offered by two active products. Lazywait's own catalog has no heat-level add-on
 in either language: two independent pulls (2026-07-23, 27 add-ons; 2026-08-24,
@@ -206,6 +207,23 @@ precondition can never be met by mapping alone, and the deploy no longer depends
 on it. `lazywait_mapping_status()` (staff role required) and the admin
 **Lazywait catalog mapping** card remain the right way to check *item*, *price*
 and *category* mappings, which do still block.
+
+**Those gates test presence, not resolvability — and that is now the live risk.**
+`missing_item_mapping` fires only on a NULL `lazywait_item_id`
+(`!it.menuItemId`), so a mapping that exists in our rows but no longer resolves
+in the vendor catalog passes every gate and is POSTed unchanged. The table above
+says our rows are non-null; it says nothing about whether Lazywait still knows
+those ids.
+
+That distinction stopped being academic on **2026-08-24**. Three clean catalog
+re-pulls that day found the Lazywait catalog far smaller than the 2026-07-23
+snapshot the table was built from — items 64 → 4, categories 7 → 1, add-ons
+27 → 10 — and **53 of 57 active products now map to item ids the catalog no
+longer contains**. Nothing in this worker detects that: a stale id is
+indistinguishable from a good one until the POS rejects it, which surfaces as a
+terminal `client_error_4xx` per order rather than as a mapping problem. Read
+`docs/OWNER_ACTIONS.md` §17 before reading "every product is mapped" as "every
+product will be accepted".
 
 Creating the three add-ons in the Lazywait catalog and mapping them is still the
 only way to get heat level onto the ticket as a **structured, separately priced**

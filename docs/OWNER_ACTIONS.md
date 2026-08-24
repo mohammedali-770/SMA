@@ -717,8 +717,10 @@ method and the two catalog searches: `docs/LAZYWAIT.md`, "Unmapped modifiers".
 
 **Why this is a decision and not a task.** The three modifiers are Mild, Hot and
 Volcano (+2), one "Heat Level" group on two active products. Lazywait's catalog
-holds 27 add-ons — toppings and drinks — and **none of them is a heat level**.
-There is nothing to map them *to*.
+held 27 add-ons — toppings and drinks — at the 2026-07-23 snapshot this section
+was written from, and **none of them was a heat level**; the 2026-08-24 re-pull
+shows 10 add-ons, still with no heat level (see the two facts below). There is
+nothing to map them *to*.
 
 Options, with the money consequence stated:
 
