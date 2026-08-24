@@ -55,14 +55,16 @@ Approval for one action is not blanket approval for later actions.
 
 ## 6. Payment / refund / provider freeze
 
-The final payment provider has **not been selected**. The repository still contains provisional Tap/payment/refund code and older Geidea scaffold/history, but none of it is the approved final architecture.
+The final payment provider has **not been selected**. The repository contains provisional Tap/payment/refund code, older Geidea scaffold/history, and — since 2026-08-24 — a complete but **inert** Moyasar integration. None of it is the approved final architecture.
+
+**Moyasar (added 2026-08-24).** The owner said "maybe we will go with MOYASAR" and supplied the API documentation, so the integration was built to make the choice concrete. It is not a selection. `provider_name` is not `moyasar`, no credential exists, **no function was deployed and `20260824100000_moyasar_payment_provider.sql` was not applied**, so the RPC it needs does not exist in Production. Selecting the provider, configuring a key, deploying a payment function or applying that migration are each separate owner actions under §5. Detail: `docs/PAYMENT_POSTPONEMENT.md` §9; API contract and open questions: `docs/integrations/Moyasar_API_Reference.md`.
 
 Unless the owner separately approves a specific exception, the freeze covers:
 
 - payment initiation/verification/webhook/return behavior;
 - checkout-session behavior when the change is payment-specific;
 - payment provider settings/configuration/credentials;
-- Tap/Geidea/provider-specific behavior;
+- Tap/Moyasar/Geidea/provider-specific behavior;
 - payment/refund Edge Function deployment/testing;
 - refund worker/scheduler behavior;
 - automatic/manual refund implementation changes;
@@ -109,7 +111,9 @@ What did **not** change, and still needs a separate explicit owner decision:
 
 Production schema changes go only through the owner-approved migration workflow documented in `docs/MIGRATIONS.md`.
 
-Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files. Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files **as of that date**.
+
+**That count is now 98, and the 98th is deliberately unapplied.** `20260824100000_moyasar_payment_provider.sql` was added on 2026-08-24 for the Moyasar evaluation (§6) and has **not** been applied to Production. Do not "reconcile" it: applying it is an owner action under §5, and the payment freeze covers it besides. Until it is applied, the honest statement is 98 repository files / 103 live rows / **one** unapplied file, and that one is unapplied on purpose. Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
@@ -211,7 +215,7 @@ Do not leave old screenshots/README text describing:
 - the prototype/localStorage emulator as current;
 - the mobile app as a WebView wrapper;
 - a retired branch as production;
-- Tap/Geidea as the final payment provider;
+- Tap, Moyasar or Geidea as the final payment provider;
 - direct SQL staff-role promotion as routine onboarding;
 - direct Production CLI deploy/db-push shortcuts;
 - dated dashboard counts/settings as current without re-verification.

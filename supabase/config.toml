@@ -14,14 +14,18 @@ major_version = 15
 verify_jwt = true
 
 # PROVISIONAL/FROZEN payment surface. The signed-in customer initiates payment
-# for their own order/session. Current source supports Tap and retains older
-# Geidea scaffold code, but the final provider has not been selected.
+# for their own order/session. Current source supports Tap (hosted charge) and
+# Moyasar (hosted invoice), and retains older Geidea scaffold code, but the final
+# provider has NOT been selected and Moyasar is inert — see CLAUDE.md §6.
 [functions.payment-initiate]
 verify_jwt = true
 
 # PROVISIONAL/FROZEN provider webhook surface. No user JWT; provider authenticity
-# is verified inside the function. See docs/PAYMENT_POSTPONEMENT.md before
-# touching any payment function or provider configuration.
+# is verified inside the function — Tap by its HMAC hashstring, Moyasar by the
+# `secret_token` in the body. Neither is trusted as evidence of payment: both
+# paths re-fetch server-to-server before confirming anything. See
+# docs/PAYMENT_POSTPONEMENT.md before touching any payment function or provider
+# configuration.
 [functions.payment-webhook]
 verify_jwt = false
 
