@@ -741,6 +741,16 @@ revisited here. Option 2 is now implemented in the repository, which removes the
 "deploying breaks one order in five" hazard; option 1 is still the only one that
 puts heat level on the ticket as a structured, separately priced add-on.
 
+**Two facts before acting on option 1.** Any add-ons would be created on the
+**dev host**, which the owner confirmed on 2026-08-24 is the live POS for this
+branch (`docs/LAZYWAIT.md`, "Which host is live"). And the catalog was re-pulled
+three times on 2026-08-24 — all clean, zero errors — showing it far smaller than
+the 2026-07-23 snapshot this section was written from (items 64 → 4, categories
+7 → 1, addons 27 → 10). **Option 1 should not be acted on until that is
+explained**: creating add-ons into a catalog that has just lost most of its menu
+would be building on sand, and 53 of 57 active products currently map to item
+ids the catalog no longer contains.
+
 The blocking behaviour was not wasted — it surfaced a real catalog gap before it
 could become a wrong ticket. It was the wrong *response* to the gap, because no
 mapping exists to recover with. Deploying `lazywait-sync`, writing mapping rows
