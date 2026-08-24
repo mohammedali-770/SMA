@@ -18,3 +18,34 @@ export function initialProviderName(
   if (opts.length > 0 && !opts.includes(stored)) return opts[0];
   return stored || (opts[0] ?? '');
 }
+
+/**
+ * Pick the field set an IntegrationCard should render for the currently selected
+ * provider.
+ *
+ * A provider slot used to mean one provider, so one field list per slot was
+ * enough. The payment slot now offers two, and they need genuinely different
+ * inputs: Tap wants a merchant id, a source id and `sk_`-prefixed keys; Moyasar
+ * wants no merchant id at all, a webhook secret token (its only webhook
+ * authentication) and both `sk_` and `pk_` keys. Rendering the union of both
+ * would present an administrator with four boxes that do nothing for the
+ * provider they picked, which is how a "configured" gateway ends up missing the
+ * one field that mattered.
+ *
+ * Falls back to the slot's own fields when the selected provider has no override,
+ * so every other integration keeps behaving exactly as it did.
+ */
+export interface ProviderFieldSet<P, S> {
+  publicFields: readonly P[];
+  secretFields: readonly S[];
+}
+
+export function providerFieldSet<P, S>(
+  base: ProviderFieldSet<P, S>,
+  byProvider: Record<string, ProviderFieldSet<P, S>> | undefined,
+  providerName: string | null | undefined,
+): ProviderFieldSet<P, S> {
+  const key = (providerName ?? '').toLowerCase();
+  const override = byProvider?.[key];
+  return override ?? base;
+}

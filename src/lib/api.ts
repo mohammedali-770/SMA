@@ -455,6 +455,15 @@ export interface PaymentGatewayStatus {
   live_key_set: boolean;
   active_key_set: boolean;
   expiry_minutes: number;
+  /**
+   * Moyasar-only readiness. Optional because the Tap branch of
+   * payment-test-config does not emit them; a Tap status simply leaves them
+   * undefined rather than reporting a value that would mean nothing.
+   */
+  webhook_secret_set?: boolean;
+  key_prefix_ok?: boolean;
+  config_ok?: boolean;
+  config_reason?: string | null;
 }
 export interface DbPaymentRecord {
   id: string;
@@ -484,19 +493,24 @@ async function invokePaymentTestConfig<T>(body: Record<string, unknown>): Promis
   return data as T;
 }
 export const paymentGateway = {
-  /** Admin-only: Tap config readiness booleans (no secret values). */
+  /** Admin-only: active payment provider's config readiness booleans (no secret values). */
   status: () => invokePaymentTestConfig<PaymentGatewayStatus>({ action: 'status' }),
   /** Admin-only: validate the selected-mode key against Tap (never creates a charge). */
   testConnection: () => invokePaymentTestConfig<{ ok: boolean; message?: string }>({ action: 'test_connection' }),
   /** Admin-only: re-verify an order's payment via Tap Retrieve Charge (only CAPTURED confirms). */
   adminVerify: (orderId: string) =>
     invokePaymentTestConfig<{ status: string; message?: string }>({ action: 'verify_order', orderId }),
-  /** Admin-only: create an isolated 1 SAR Tap TEST checkout (no order created). Returns the hosted URL. */
+  /**
+   * Admin-only: create an isolated 1 SAR TEST checkout (no order created).
+   * Returns the hosted URL. Tap creates a charge; Moyasar creates an invoice and
+   * echoes its id in BOTH `chargeId` and `invoiceId`, so the result lookup below
+   * takes the same argument for either provider.
+   */
   testCheckout: () =>
-    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; checkoutUrl?: string; mode?: string; tapErrorCode?: string | null; tapErrorDescription?: string | null; httpStatus?: number }>({ action: 'test_checkout' }),
-  /** Admin-only: verify the admin test charge via Retrieve Charge (display only — never confirms an order). */
+    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; invoiceId?: string; checkoutUrl?: string; mode?: string; tapErrorCode?: string | null; tapErrorDescription?: string | null; providerErrorCode?: string | null; providerErrorDescription?: string | null; httpStatus?: number }>({ action: 'test_checkout' }),
+  /** Admin-only: verify the admin test charge/invoice server-side (display only — never confirms an order). */
   testCheckoutResult: (chargeId: string) =>
-    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; status?: string; amount?: number; currency?: string; mode?: string; messageKey?: string }>({ action: 'test_checkout_result', chargeId }),
+    invokePaymentTestConfig<{ ok: boolean; message?: string; chargeId?: string; invoiceId?: string; status?: string; amount?: number; currency?: string; mode?: string; messageKey?: string }>({ action: 'test_checkout_result', chargeId }),
   /** Staff read of the latest safe payment record for an order (no raw/secret). */
   async record(orderId: string): Promise<DbPaymentRecord | null> {
     const rows = ok<DbPaymentRecord[]>(await supabase

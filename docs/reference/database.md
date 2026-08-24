@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **97**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260822090000_branch_availability_retention.sql`.
+Migration files in the repository: **98**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260824100000_moyasar_payment_provider.sql`.
 
 ## Tables
 
@@ -66,7 +66,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `order_refunds` | `20260724120000_order_confirmation_state_machine.sql` | 0 | 1 |
 | `orders` | `20260707120500_orders.sql` | 6 | 2 |
 | `otp_challenges` | `20260710140000_whatsapp_otp.sql` | 1 | **none declared** |
-| `payment_records` | `20260707121300_payments_and_sync.sql` | 2 | 1 |
+| `payment_records` | `20260707121300_payments_and_sync.sql` | 3 | 1 |
 | `product_modifier_groups` | `20260707120200_catalog.sql` | 0 | 1 |
 | `products` | `20260707120200_catalog.sql` | 2 | 3 |
 | `profiles` | `20260707120100_profiles.sql` | 2 | 2 |
@@ -103,6 +103,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
+| `begin_payment_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
+| `begin_session_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
 | `branch_availability_sweep` | 4 | `20260822090000_branch_availability_retention.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |

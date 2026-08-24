@@ -1,16 +1,21 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient, userClient } from '../_shared/supabaseClient.ts';
-import { getProviderConfig } from '../_shared/secrets.ts';
+import { getProviderConfig, type ProviderConfig } from '../_shared/secrets.ts';
 import { resolveTapConfig, mapTapStatus } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
+import { resolveMoyasarConfig } from '../_shared/moyasar.ts';
+import { verifyMoyasarAttempt, type MoyasarAttempt } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
- * payment-verify — the app calls this after returning from Tap checkout. It is
- * the ONLY thing the app trusts: it retrieves the charge from Tap server-to-server
- * and confirms the order paid only on a clean CAPTURED. The redirect params the
- * app saw are never trusted. verify_jwt = true and the order is read via the
- * user's RLS, so a customer can only ever verify their OWN order.
+ * payment-verify — the app calls this after returning from the provider's hosted
+ * checkout. It is the ONLY thing the app trusts: it retrieves the charge (Tap) or
+ * the invoice and its payment (Moyasar) server-to-server and confirms the order
+ * paid only on a clean success. The redirect params the app saw are never
+ * trusted — Moyasar's redirect in particular appends only an unsigned `id`, and
+ * Moyasar's own guide requires this server-side fetch before fulfilling an order.
+ * verify_jwt = true and the order is read via the user's RLS, so a customer can
+ * only ever verify their OWN order.
  *
  * The secret key is chosen by the STORED attempt's mode (not the current Admin
  * mode), so flipping Admin test↔live never breaks verification of older attempts.
@@ -47,7 +52,9 @@ Deno.serve(async (req: Request) => {
   if (order.payment_status === 'paid') return json({ status: 'paid', orderId }, 200);
 
   const cfg = await getProviderConfig(admin, 'payment');
-  if (!cfg || (cfg.providerName ?? '').toLowerCase() !== 'tap') {
+  const providerName = (cfg?.providerName ?? '').toLowerCase();
+  if (providerName === 'moyasar') return await verifyMoyasarOrder(admin, cfg!, orderId);
+  if (!cfg || providerName !== 'tap') {
     return json({ status: 'pending' }, 200);
   }
 
@@ -86,7 +93,9 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
   }
 
   const cfg = await getProviderConfig(admin, 'payment');
-  if (!cfg || (cfg.providerName ?? '').toLowerCase() !== 'tap') return json({ status: 'pending' }, 200);
+  const providerName = (cfg?.providerName ?? '').toLowerCase();
+  if (providerName === 'moyasar') return await verifyMoyasarSession(supaUser, admin, cfg!, sessionId);
+  if (!cfg || providerName !== 'tap') return json({ status: 'pending' }, 200);
 
   const { data: recs } = await admin.from('payment_records')
     .select('id, order_id, checkout_session_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
@@ -111,4 +120,67 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
     outOrderId = String(s2?.order_id ?? '');
   }
   return json({ status: outcome, messageKey, orderId: outOrderId || null }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Moyasar verification.
+//
+// Same shape as the Tap paths and the same guarantees: the attempt's STORED mode
+// picks the secret key (so flipping Admin test<->live never breaks verification
+// of an older attempt), the provider is asked directly, and confirmation runs
+// through the shared idempotent RPCs. A transient failure returns 'pending' so
+// the app retries rather than showing a customer a failure that did not happen.
+// ---------------------------------------------------------------------------
+function moyasarSelect(): string {
+  return 'id, order_id, checkout_session_id, provider_ref, provider_checkout_ref, reference_transaction, reference_order, amount, currency, mode, status';
+}
+
+async function latestMoyasarAttempt(
+  admin: SupabaseClient, column: 'order_id' | 'checkout_session_id', value: string,
+): Promise<MoyasarAttempt | null> {
+  const { data } = await admin.from('payment_records')
+    .select(moyasarSelect())
+    .eq(column, value).eq('provider', 'moyasar')
+    .order('created_at', { ascending: false }).limit(1);
+  return (Array.isArray(data) ? data[0] : null) as MoyasarAttempt | null;
+}
+
+async function verifyMoyasarOrder(
+  admin: SupabaseClient, cfg: ProviderConfig, orderId: string,
+): Promise<Response> {
+  const rec = await latestMoyasarAttempt(admin, 'order_id', orderId);
+  if (!rec || !rec.provider_checkout_ref) return json({ status: 'pending' }, 200);
+
+  const m = resolveMoyasarConfig(
+    cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig,
+    (rec.mode as 'test' | 'live') ?? undefined,
+  );
+  if (!m.secretKey) return json({ status: 'pending' }, 200);
+
+  const result = await verifyMoyasarAttempt(admin, rec, m.secretKey);
+  const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
+  return json({ status: outcome, messageKey: result.messageKey, orderId }, 200);
+}
+
+async function verifyMoyasarSession(
+  supaUser: SupabaseClient, admin: SupabaseClient, cfg: ProviderConfig, sessionId: string,
+): Promise<Response> {
+  const rec = await latestMoyasarAttempt(admin, 'checkout_session_id', sessionId);
+  if (!rec || !rec.provider_checkout_ref) return json({ status: 'pending' }, 200);
+
+  const m = resolveMoyasarConfig(
+    cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig,
+    (rec.mode as 'test' | 'live') ?? undefined,
+  );
+  if (!m.secretKey) return json({ status: 'pending' }, 200);
+
+  const result = await verifyMoyasarAttempt(admin, rec, m.secretKey);
+  const outcome = result.paid ? 'paid' : (result.outcome === 'mismatch' ? 'failed' : result.outcome);
+
+  let outOrderId = result.orderId ?? '';
+  if (outcome === 'paid' && !outOrderId) {
+    const { data: s2 } = await supaUser.from('checkout_sessions').select('order_id').eq('id', sessionId).maybeSingle();
+    outOrderId = String(s2?.order_id ?? '');
+  }
+  return json({ status: outcome, messageKey: result.messageKey, orderId: outOrderId || null }, 200);
 }

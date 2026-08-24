@@ -2,15 +2,21 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { buildReturnDeepLink, escapeHtmlAttr } from './returnLink.ts';
 
 /**
- * payment-return — the HTTPS URL Tap redirects the customer's browser to after
- * checkout (Tap requires a real https redirect target; a raw app scheme is not
- * reliable). This page marks NOTHING paid: it only bounces back into the app via
- * the fixed spicymeal:// deep link so the app can run the authoritative server
+ * payment-return — the HTTPS URL the payment provider redirects the customer's
+ * browser to after checkout (providers require a real https redirect target; a
+ * raw app scheme is not reliable). Tap uses it as the charge `redirect.url`;
+ * Moyasar uses it as both the invoice `success_url` and `back_url`. This page
+ * marks NOTHING paid: it only bounces back into the app via the fixed
+ * spicymeal:// deep link so the app can run the authoritative server
  * verification (payment-verify).
  *
  * Open-redirect safe: it only ever navigates to our own fixed scheme + path, and
  * the single `order` / `session` parameter is passed through only after strict
- * UUID validation. Tap's tap_id and any other query params are IGNORED (untrusted).
+ * UUID validation. EVERY provider-supplied query parameter is IGNORED as
+ * untrusted — Tap's `tap_id`, and the unsigned `id` Moyasar appends, alike. The
+ * `id` in particular is exactly the value Moyasar's own guide says must be
+ * re-fetched server-side before an order is accepted, and payment-verify is
+ * where that happens; nothing here reads it.
  *
  * RENDER FIX (content-type CASE — verified live): the Supabase shared *.functions
  * edge rewrites the exact lowercase token `text/html` to `text/plain` + a

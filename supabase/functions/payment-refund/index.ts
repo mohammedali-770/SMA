@@ -5,6 +5,12 @@ import { resolveTapConfig, timingSafeEqual } from '../_shared/tap.ts';
 import {
   buildRefundBody, classifyRefundResponse, decideRefundLogging, refundRequestIsValid,
 } from '../_shared/tapRefund.ts';
+import { basicAuthHeader, resolveMoyasarConfig, toMinorUnits } from '../_shared/moyasar.ts';
+import {
+  buildMoyasarRefundBody, classifyMoyasarRefundResponse, moyasarPaymentUrl, moyasarRefundUrl,
+  needsHumanReview, refundRequestIsValid as moyasarRefundRequestIsValid,
+  resolveRefundFromPayment, type RefundClassification,
+} from '../_shared/moyasarRefund.ts';
 
 /**
  * payment-refund — the automatic refund worker for orders that were PAID but
@@ -45,7 +51,8 @@ Deno.serve(async (req: Request) => {
   if (!cfg || !cfg.enabled) {
     return json({ status: 'disabled', reason: 'payment provider not configured' }, 200);
   }
-  if ((cfg.providerName ?? '').toLowerCase() !== 'tap') {
+  const providerName = (cfg.providerName ?? '').toLowerCase();
+  if (providerName !== 'tap' && providerName !== 'moyasar') {
     return json({ status: 'ignored', reason: `provider is '${cfg.providerName}'` }, 200);
   }
 
@@ -88,6 +95,18 @@ Deno.serve(async (req: Request) => {
       reference: String(row.idempotency_key),
       reason: 'order_could_not_be_delivered_to_branch',
     };
+    // Moyasar refunds POST to /payments/:id/refund, so the provider reference we
+    // need IS the payment id — which is exactly what provider_ref holds for a
+    // confirmed Moyasar attempt and therefore what order_refunds.charge_ref was
+    // populated from. Same field, same meaning, no translation.
+    const moyasarRequest = {
+      paymentId: String(row.charge_ref ?? ''),
+      amount: Number(row.amount),
+      currency: String(row.currency ?? 'SAR'),
+    };
+    const requestValid = providerName === 'moyasar'
+      ? moyasarRefundRequestIsValid(moyasarRequest)
+      : refundRequestIsValid(request);
 
     // No captured charge reference recorded → nothing can be refunded through the
     // provider. This is a definitive operational failure needing a human, not a
@@ -95,7 +114,7 @@ Deno.serve(async (req: Request) => {
     // (This and the key-unavailable path below finalize IMMEDIATELY after the
     // claim with no external call in between, so there is no window in which the
     // lease could have been lost — unlike the provider path further down.)
-    if (!refundRequestIsValid(request)) {
+    if (!requestValid) {
       await admin.rpc('finalize_order_refund', {
         p_refund_id: row.refund_id, p_claim_token: claimToken, p_status: 'failed',
         p_provider_ref: null, p_failure_code: 'missing_charge_reference',
@@ -111,11 +130,11 @@ Deno.serve(async (req: Request) => {
     const { data: pay } = await admin.from('payment_records')
       .select('mode').eq('order_id', row.order_id).eq('status', 'paid')
       .order('created_at', { ascending: false }).limit(1).maybeSingle();
-    const tap = resolveTapConfig(
-      cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig,
-      ((pay?.mode as 'test' | 'live' | undefined) ?? undefined),
-    );
-    if (!tap.secretKey) {
+    const attemptMode = (pay?.mode as 'test' | 'live' | undefined) ?? undefined;
+    const secretKey = providerName === 'moyasar'
+      ? resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode).secretKey
+      : resolveTapConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode).secretKey;
+    if (!secretKey) {
       // Cannot authenticate to the provider → release for a later run. Never
       // resolve a money movement we could not even attempt.
       await admin.rpc('finalize_order_refund', {
@@ -126,27 +145,87 @@ Deno.serve(async (req: Request) => {
       continue;
     }
 
-    let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
-    try {
-      const res = await fetch(TAP_REFUNDS_URL, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${tap.secretKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(buildRefundBody(request)),
-        signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
-      });
-      ok = res.ok;
-      httpStatus = res.status;
-      body = await res.json().catch(() => ({}));
-    } catch {
-      // Timeout / network: the refund MAY have been accepted by Tap. Treat it as
-      // pending so the next run reconciles, never as failed or succeeded.
-      ok = false; httpStatus = 0; body = {};
-    }
+    let verdict: RefundClassification;
 
-    const verdict = classifyRefundResponse(ok, httpStatus, body);
+    if (providerName === 'moyasar') {
+      let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
+      try {
+        const res = await fetch(moyasarRefundUrl(moyasarRequest.paymentId), {
+          method: 'POST',
+          headers: {
+            Authorization: basicAuthHeader(secretKey),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(buildMoyasarRefundBody(moyasarRequest)),
+          signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
+        });
+        ok = res.ok;
+        httpStatus = res.status;
+        body = await res.json().catch(() => ({}));
+      } catch {
+        // Timeout / network: the refund MAY have been accepted. Treat it as
+        // ambiguous, never as failed or succeeded.
+        ok = false; httpStatus = 0; body = {};
+      }
+
+      verdict = classifyMoyasarRefundResponse(ok, httpStatus, body);
+
+      // RESOLVE BEFORE ANY RETRY. Moyasar documents no idempotency on the refund
+      // endpoint (given_id covers payment creation only), so re-POSTing an
+      // ambiguous refund on a later run could send the money twice. Instead ask
+      // Moyasar what actually happened: GET the payment and read its cumulative
+      // `refunded` amount and `refunded_at`. This is the resolution path that
+      // docs/PAYMENT_POSTPONEMENT.md §7 requires of any provider before
+      // automated refunds may ever be re-enabled.
+      if (verdict.outcome === 'pending') {
+        try {
+          const lookup = await fetch(moyasarPaymentUrl(moyasarRequest.paymentId), {
+            method: 'GET',
+            headers: { Authorization: basicAuthHeader(secretKey), 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
+          });
+          if (lookup.ok) {
+            const payment = await lookup.json().catch(() => ({})) as Record<string, unknown>;
+            const expectedMinor = toMinorUnits(moyasarRequest.amount, moyasarRequest.currency);
+            verdict = resolveRefundFromPayment(payment, expectedMinor);
+          }
+        } catch {
+          // The resolution attempt itself failed. Leave the verdict pending —
+          // the next run resolves before it retries, so nothing is sent twice.
+        }
+      }
+
+      if (needsHumanReview(verdict)) {
+        // Moyasar reports a refund timestamp but no amount we can reconcile
+        // against. Retrying here is the one action that could double-refund, so
+        // this is deliberately parked for a person instead.
+        console.warn('moyasar refund ambiguous; parked for review', JSON.stringify({
+          refund: String(row.refund_id).slice(0, 36),
+        }));
+      }
+    } else {
+      let ok = false; let httpStatus = 0; let body: Record<string, unknown> = {};
+      try {
+        const res = await fetch(TAP_REFUNDS_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(buildRefundBody(request)),
+          signal: AbortSignal.timeout(REFUND_TIMEOUT_MS),
+        });
+        ok = res.ok;
+        httpStatus = res.status;
+        body = await res.json().catch(() => ({}));
+      } catch {
+        // Timeout / network: the refund MAY have been accepted by Tap. Treat it as
+        // pending so the next run reconciles, never as failed or succeeded.
+        ok = false; httpStatus = 0; body = {};
+      }
+
+      verdict = classifyRefundResponse(ok, httpStatus, body);
+    }
     const { data: finalized } = await admin.rpc('finalize_order_refund', {
       p_refund_id: row.refund_id,
       p_claim_token: claimToken,
@@ -172,7 +251,7 @@ Deno.serve(async (req: Request) => {
 
     // Operational trail only — no provider payload, no card data, no full charge id.
     await admin.from('integration_sync_logs').insert({
-      provider: 'tap', order_id: row.order_id, direction: 'push',
+      provider: providerName, order_id: row.order_id, direction: 'push',
       status: decision.logStatus,
       request: { action: 'refund', attempt: row.attempt_count },
       error: verdict.failureCode,

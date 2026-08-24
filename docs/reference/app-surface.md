@@ -75,6 +75,7 @@ The admin console is panel-based rather than routed: one component per operation
 | LegalDocumentsPanel | Admin-only Legal Documents editor. Admins edit the AR/EN title + content, version, effective date, active flag, and requires_acceptance for each… |
 | LiveOrdersPanel | Live Orders — the console's busiest surface |
 | MenuManagementPanel | — |
+| MoyasarPaymentPanel | Admin Moyasar readiness + connection test. Reads config-presence booleans from the `payment-test-config` Edge Function (never any secret key) and… |
 | OperationsAlertsPanel | The three filter selects. Native <select> is deliberate — it gives the OS picker on a phone and keyboard type-ahead on a desktop, neither of which a… |
 | OperationsHealthPanel | Operations Health Center — READ-ONLY observability |
 | OrderIntegrityPanel | Order Integrity Watchdog — admin monitoring (READ + acknowledge/suppress only) |

@@ -5,6 +5,11 @@ import { createSessionSignature, formatAmount, geideaApiBase, geideaHppBase } fr
 import {
   buildTapChargePayload, resolveTapConfig, normalizeSaudiPhone, mapTapStatus, sanitizeTapResponse,
 } from '../_shared/tap.ts';
+import {
+  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, extractMoyasarError,
+  invoiceExpiryIso, mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
+} from '../_shared/moyasar.ts';
+import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 /**
@@ -15,7 +20,9 @@ import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
  * through the USER's client so RLS proves ownership and hands us the server-
  * trusted total; the provider secret is read server-side and never returned. The
  * active provider is selected by integration_settings('payment').provider_name —
- * 'tap' (Tap Hosted Checkout) or the pre-existing 'geidea' scaffold.
+ * 'tap' (Tap Hosted Checkout), 'moyasar' (Moyasar hosted Invoice), or the
+ * pre-existing 'geidea' scaffold. Each provider is a separate branch; adding
+ * Moyasar changed no Tap code path.
  */
 const TAP_CHARGES = 'https://api.tap.company/v2/charges';
 
@@ -41,8 +48,10 @@ Deno.serve(async (req: Request) => {
   if (sessionId) {
     const admin0 = adminClient();
     const cfg0 = await getProviderConfig(admin0, 'payment');
-    if ((cfg0?.providerName ?? '').toLowerCase() !== 'tap') return json({ error: 'Online payment is not enabled' }, 400);
-    return await initiateTapForSession(admin0, supaUser, sessionId, cfg0!, lang);
+    const sessionProvider = (cfg0?.providerName ?? '').toLowerCase();
+    if (sessionProvider === 'tap') return await initiateTapForSession(admin0, supaUser, sessionId, cfg0!, lang);
+    if (sessionProvider === 'moyasar') return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0!, lang);
+    return json({ error: 'Online payment is not enabled' }, 400);
   }
 
   // Legacy flow: pay for an already-created order. Read it AS THE USER — RLS
@@ -64,6 +73,7 @@ Deno.serve(async (req: Request) => {
   const providerName = (cfg?.providerName ?? '').toLowerCase();
 
   if (providerName === 'tap') return await initiateTap(admin, supaUser, order, cfg!, lang);
+  if (providerName === 'moyasar') return await initiateMoyasar(admin, order, cfg!);
   if (providerName === 'geidea') return await initiateGeidea(admin, order, cfg!);
   return json({ error: 'Online payment is not enabled' }, 400);
 });
@@ -384,6 +394,259 @@ async function initiateTapForSession(
     provider: 'tap', mode: tap.mode, chargeId, checkoutUrl: checkoutUrl || null,
     checkoutSessionId: session.id, needsVerify: true,
   }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Moyasar hosted Invoice checkout.
+//
+// Moyasar prohibits cardholder data reaching the merchant backend
+// (https://docs.moyasar.com/api/authentication), so `POST /v1/payments` with a
+// creditcard source is not something this server may do. The equivalent of Tap's
+// hosted charge is `POST /v1/invoices`: it returns a hosted checkout `url` on
+// Moyasar's own domain, and the card never touches our infrastructure.
+//
+// Two ids, not one. The invoice id is what we get now and store in
+// `provider_checkout_ref`; the payment id only exists once the customer pays and
+// is stamped into `provider_ref` at confirmation, so the refund stack and the
+// (provider, provider_ref) confirmation idempotency work unchanged.
+// ---------------------------------------------------------------------------
+const MOYASAR_INVOICES = `${MOYASAR_API_BASE}/invoices`;
+
+/** Shared invoice-create + persist step for both the order and session flows. */
+async function createMoyasarInvoice(
+  admin: SupabaseClient,
+  m: ReturnType<typeof resolveMoyasarConfig>,
+  attempt: Record<string, unknown>,
+  params: {
+    amount: number;
+    description: string;
+    returnQuery: string;              // e.g. `order=<uuid>` or `session=<uuid>`
+    extra: Record<string, unknown>;   // extra fields echoed back to the client
+  },
+): Promise<Response> {
+  const attemptId = attempt.attempt_id;
+  const referenceTransaction = String(attempt.reference_transaction ?? '');
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+
+  const persistAndReturn = async (invoice: Record<string, unknown>): Promise<Response> => {
+    const invoiceId = String(invoice.id ?? '');
+    const checkoutUrl = String(invoice.url ?? '');
+    if (!invoiceId || !checkoutUrl) {
+      await admin.from('payment_records').update({
+        status: 'failed', failure_code: 'no_invoice_url', raw: sanitizeMoyasarInvoice(invoice),
+      }).eq('id', attemptId).then(() => {}, () => {});
+      return json({ error: 'Could not start the payment. Please try again.' }, 502);
+    }
+
+    // Persist the invoice id BEFORE handing out any checkout URL. The webhook and
+    // payment-verify both locate the attempt by provider_checkout_ref, so a URL
+    // for an invoice we failed to store would let the customer pay something we
+    // can never match back to their order.
+    const { error: persistErr } = await admin.from('payment_records').update({
+      provider_checkout_ref: invoiceId,
+      checkout_url: checkoutUrl,
+      raw: sanitizeMoyasarInvoice(invoice),
+      last_verified_at: new Date().toISOString(),
+      failure_code: null,
+      failure_message_safe: null,
+    }).eq('id', attemptId);
+    if (persistErr) {
+      console.error('Moyasar invoice persist failed', String(persistErr.message ?? '').slice(0, 200));
+      // The invoice exists at Moyasar. A retry reuses THIS attempt, whose
+      // reference_transaction is already in that invoice's metadata, so the
+      // reconciliation lookup below will adopt it rather than create a second one.
+      return json({ error: 'Could not start the payment. Please try again.' }, 502);
+    }
+
+    const { outcome } = mapMoyasarInvoiceStatus(invoice.status);
+    return json({
+      provider: 'moyasar', mode: m.mode, invoiceId, checkoutUrl,
+      expiryMinutes: m.expiryMinutes,
+      ...(outcome === 'pending' ? {} : { needsVerify: true }),
+      ...params.extra,
+    }, 200);
+  };
+
+  // A reused attempt with no stored invoice means an EARLIER create left us
+  // uncertain. Reconcile before creating anything: Moyasar documents no
+  // idempotency on invoice creation, so a blind retry could open a second
+  // invoice for the same order (see findInvoiceByReference).
+  if (attempt.reused === true && !attempt.provider_checkout_ref) {
+    const found = await findInvoiceByReference(m.secretKey, referenceTransaction);
+    if (found.ok && found.invoice) return await persistAndReturn(found.invoice);
+    if (!found.ok) {
+      // We could not establish whether an invoice already exists. Creating one
+      // now risks a duplicate, so refuse and let the customer try again — the
+      // next attempt re-runs this same lookup.
+      await admin.from('payment_records').update({
+        failure_code: 'reconcile_unavailable',
+        failure_message_safe: 'Could not reach the payment provider.',
+        last_verified_at: new Date().toISOString(),
+      }).eq('id', attemptId).then(() => {}, () => {});
+      return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
+    }
+    // found.ok && !found.invoice: Moyasar positively reports no such invoice, so
+    // creating one now is safe.
+  }
+
+  const payload = buildInvoicePayload({
+    amount: params.amount,
+    currency: m.currency,
+    description: params.description,
+    referenceTransaction,
+    referenceOrder: String(attempt.reference_order ?? ''),
+    expiryMinutes: m.expiryMinutes,
+    successUrl: `${supabaseUrl}/functions/v1/payment-return?${params.returnQuery}`,
+    backUrl: `${supabaseUrl}/functions/v1/payment-return?${params.returnQuery}`,
+    expiresAtIso: invoiceExpiryIso(Date.now(), m.expiryMinutes),
+  });
+
+  let resp: Response;
+  try {
+    resp = await fetch(MOYASAR_INVOICES, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: basicAuthHeader(m.secretKey) },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch (e) {
+    // DELIBERATELY NOT RETRIED. The Tap path retries because its payload carries
+    // an idempotency reference; this one has none, so a retry could create a
+    // second invoice. Reconcile instead.
+    console.error('Moyasar invoice request error', e instanceof Error ? e.message : 'error');
+    const found = await findInvoiceByReference(m.secretKey, referenceTransaction);
+    if (found.ok && found.invoice) return await persistAndReturn(found.invoice);
+    await admin.from('payment_records').update({
+      failure_code: 'network_unreachable',
+      failure_message_safe: 'Could not reach the payment provider.',
+      last_verified_at: new Date().toISOString(),
+    }).eq('id', attemptId).then(() => {}, () => {});
+    return json({ error: 'Could not reach the payment provider. Please try again.' }, 502);
+  }
+
+  const result = await resp.json().catch(() => ({})) as Record<string, unknown>;
+  if (!resp.ok) {
+    const err = extractMoyasarError(result);
+    console.error('Moyasar invoice create failed', { httpStatus: resp.status, type: err.type });
+    await admin.from('payment_records').update({
+      status: 'failed', failure_code: `create_${resp.status}`,
+      failure_message_safe: 'Could not start payment.',
+      raw: sanitizeMoyasarInvoice(result),
+    }).eq('id', attemptId).then(() => {}, () => {});
+    return json({ error: 'Could not start the payment. Please try again.' }, 502);
+  }
+
+  return await persistAndReturn(result);
+}
+
+async function initiateMoyasar(
+  admin: SupabaseClient,
+  order: Record<string, unknown>,
+  cfg: ProviderConfig,
+): Promise<Response> {
+  if (String(order.payment_method ?? '') !== 'online') {
+    return json({ error: 'This order is not an online-payment order' }, 400);
+  }
+  const total = Number(order.total ?? 0);
+  if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+
+  const m = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
+  if (!m.ok) {
+    // Fail closed. 'disabled' is a global state (safe to reveal); everything else
+    // — a missing key, a key filed under the wrong mode, a missing webhook secret
+    // — is treated the same to the client: online payment simply isn't offered.
+    if (m.reason === 'disabled') return json({ status: 'disabled' }, 200);
+    console.error('Moyasar config unusable', m.reason);
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
+  const { data: rows, error: beginErr } = await admin.rpc('begin_payment_attempt', {
+    p_order_id: order.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
+  });
+  if (beginErr) {
+    console.error('begin_payment_attempt failed', String(beginErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+  const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!attempt || !attempt.attempt_id) {
+    console.error('begin_payment_attempt returned no attempt_id');
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+
+  if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
+    return json({
+      provider: 'moyasar', mode: m.mode, invoiceId: attempt.provider_checkout_ref,
+      checkoutUrl: attempt.checkout_url, expiryMinutes: m.expiryMinutes,
+    }, 200);
+  }
+
+  return await createMoyasarInvoice(admin, m, attempt, {
+    amount: total,
+    // CUSTOMER-SAFE. Moyasar renders `description` on the hosted checkout page,
+    // so it must never carry the internal SM-… order number (Issue #94). The
+    // verification binding is payment.invoice_id, not this string.
+    description: 'Spicy Meal order',
+    returnQuery: `order=${encodeURIComponent(String(order.id))}`,
+    extra: {},
+  });
+}
+
+async function initiateMoyasarForSession(
+  admin: SupabaseClient,
+  supaUser: SupabaseClient,
+  sessionId: string,
+  cfg: ProviderConfig,
+  _lang: 'ar' | 'en',
+): Promise<Response> {
+  // Read the session AS THE USER — RLS returns it only if they own it; its
+  // `total` is the server-computed amount we charge (never a client value).
+  const { data: session, error: sErr } = await supaUser
+    .from('checkout_sessions')
+    .select('id, status, total, currency, order_id, snapshot')
+    .eq('id', sessionId)
+    .maybeSingle();
+  if (sErr) return json({ error: sErr.message }, 400);
+  if (!session) return json({ error: 'Checkout session not found' }, 404);
+  if (session.order_id) return json({ status: 'already_paid', orderId: session.order_id }, 200);
+  if (session.status !== 'pending_payment') return json({ error: 'This checkout can no longer be paid.' }, 400);
+
+  const total = Number(session.total ?? 0);
+  if (!(total > 0)) return json({ error: 'Order total must be greater than zero' }, 400);
+
+  const m = resolveMoyasarConfig(cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig);
+  if (!m.ok) {
+    if (m.reason === 'disabled') return json({ status: 'disabled' }, 200);
+    console.error('Moyasar config unusable', m.reason);
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
+  const { data: rows, error: beginErr } = await admin.rpc('begin_session_attempt', {
+    p_session_id: session.id, p_provider: 'moyasar', p_mode: m.mode, p_expiry_minutes: m.expiryMinutes,
+  });
+  if (beginErr) {
+    console.error('begin_session_attempt failed', String(beginErr.message ?? '').slice(0, 200));
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+  const attempt = (Array.isArray(rows) ? rows[0] : rows) as Record<string, unknown> | undefined;
+  if (!attempt || !attempt.attempt_id) {
+    console.error('begin_session_attempt returned no attempt_id');
+    return json({ error: 'Could not start the payment. Please try again.' }, 400);
+  }
+
+  if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
+    return json({
+      provider: 'moyasar', mode: m.mode, invoiceId: attempt.provider_checkout_ref,
+      checkoutUrl: attempt.checkout_url, checkoutSessionId: session.id,
+      expiryMinutes: m.expiryMinutes,
+    }, 200);
+  }
+
+  return await createMoyasarInvoice(admin, m, attempt, {
+    amount: total,
+    description: 'Spicy Meal order',
+    returnQuery: `session=${encodeURIComponent(String(session.id))}`,
+    extra: { checkoutSessionId: session.id },
+  });
 }
 
 // ---------------------------------------------------------------------------

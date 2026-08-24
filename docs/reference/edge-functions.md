@@ -27,9 +27,9 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `order-intake` | authenticated "create order + sync to POS" orchestration | by hand | service role |
 | `payment-initiate` | the authenticated customer starts paying for an order they already created (place_order left it payment_status='pending') | workflow | service role |
 | `payment-refund` | the automatic refund worker for orders that were PAID but provably never reached the branch (Issue #94, step 7) | by hand | service role |
-| `payment-return` | the HTTPS URL Tap redirects the customer's browser to after checkout (Tap requires a real https redirect target; a raw app scheme is not reliable).… | workflow | caller JWT |
+| `payment-return` | the HTTPS URL the payment provider redirects the customer's browser to after checkout (providers require a real https redirect target; a raw app… | workflow | caller JWT |
 | `payment-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |
-| `payment-verify` | the app calls this after returning from Tap checkout. It is the ONLY thing the app trusts: it retrieves the charge from Tap server-to-server and… | workflow | service role |
+| `payment-verify` | the app calls this after returning from the provider's hosted checkout. It is the ONLY thing the app trusts: it retrieves the charge (Tap) or the… | workflow | service role |
 | `payment-webhook` | called by the PAYMENT GATEWAY (not the app) after a payment event. verify_jwt = false: the caller is the gateway, authenticated by its own… | workflow | service role |
 | `push-dispatch` | Expo Push sender (COMPLETE implementation; replaces the old 501 placeholder) | by hand | service role |
 | `staff-accounts` | ADMIN-only provisioning for the branch-operations roles | by hand | service role |
@@ -58,6 +58,11 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/lazywaitApi.ts`
 - `_shared/lazywaitCatalog.test.ts`
 - `_shared/lazywaitCatalog.ts`
+- `_shared/moyasar.test.ts`
+- `_shared/moyasar.ts`
+- `_shared/moyasarRefund.test.ts`
+- `_shared/moyasarRefund.ts`
+- `_shared/moyasarVerify.ts`
 - `_shared/paymentSync.ts`
 - `_shared/secrets.ts`
 - `_shared/supabaseClient.ts`

@@ -13,6 +13,14 @@
 This document is the authoritative record of the postponement. It supplements
 — and does not replace — the standing freeze in `CLAUDE.md` §6.
 
+> **UPDATE 2026-08-24 — a SECOND candidate provider now exists in the
+> repository.** The owner said "maybe we will go with MOYASAR" and pointed at
+> Moyasar's API documentation. A complete, tested, **inert** Moyasar integration
+> was built on `claude/moyasar-payment-api-jy3gwb` so the choice can be made
+> against real code instead of a brochure. **The postponement below still
+> stands**: no provider has been selected, nothing was deployed, no migration was
+> applied, no credential exists, and Moyasar is not enabled anywhere. See §9.
+
 ---
 
 ## 1. The decision
@@ -41,7 +49,8 @@ to:
 | --- | --- |
 | Payment Edge Functions | `payment-initiate`, `payment-verify`, `payment-webhook`, `payment-return`, `payment-test-config`, `payment-refund` |
 | Tap diagnostic functions | `tap-admin-test-return`, `tap-diag-temp`, `tap-return-probe` |
-| Shared payment helpers | `supabase/functions/_shared/tap.ts`, `supabase/functions/_shared/tapRefund.ts` |
+| Shared payment helpers | `supabase/functions/_shared/tap.ts`, `supabase/functions/_shared/tapVerify.ts`, `supabase/functions/_shared/tapRefund.ts`, `supabase/functions/_shared/moyasar.ts`, `supabase/functions/_shared/moyasarVerify.ts`, `supabase/functions/_shared/moyasarRefund.ts` |
+| Admin payment surface | `src/components/admin/TapPaymentPanel.tsx`, `src/components/admin/MoyasarPaymentPanel.tsx`, `src/lib/tapAdminTest.ts`, `src/lib/moyasarAdminTest.ts`, and the `payment` slot of `src/components/admin/IntegrationCard.tsx` |
 | Checkout sessions | `checkout_sessions` table, its RPCs, and the checkout/session functions |
 | Refund stack | `order_refunds`, `orders.refund_state` and its timestamp/failure columns, `claim_order_refund`, `finalize_order_refund`, `list_failed_order_refunds`, `order_refund_due`, `enforce_refund_state_transition`, `expire_stale_order_refund_claims`, `invoke_payment_refund_processor` |
 | Scheduling | The `payment-refund-worker` cron job (and any new payment/refund schedule) |
@@ -214,6 +223,44 @@ reliable refund-status lookup that can resolve an ambiguous attempt before a
 retry. If neither exists, ambiguous refunds must route to human review instead
 of being retried automatically.
 
+### UPDATE 2026-08-24 — Moyasar answers this the OTHER way, and better
+
+Researched from Moyasar's public documentation
+(`docs/integrations/Moyasar_API_Reference.md` §4). **Not confirmed by Moyasar and
+not tested against a live account.**
+
+Moyasar takes the two halves of the requirement above and swaps which one it
+satisfies.
+
+1. **It has no refund idempotency key at all.** `given_id` is documented for
+   `POST /v1/payments` only; no idempotency parameter is documented on
+   `POST /v1/payments/{id}/refund` — nor on `POST /v1/invoices`, which is the
+   call our checkout actually makes. On that axis Moyasar is **worse than Tap**,
+   which at least offers a 24-hour `reference.idempotent` on refunds.
+2. **It has the reliable status lookup that Tap only maybe had.**
+   `GET /v1/payments/{id}` returns `status`, the cumulative `refunded` amount in
+   minor units, and `refunded_at`. Those three fields answer "did my ambiguous
+   attempt actually land?" precisely, which is exactly the second option this
+   section demands.
+
+`resolveRefundFromPayment()` in `supabase/functions/_shared/moyasarRefund.ts`
+implements that resolution, and `payment-refund` runs it **before any retry**
+rather than re-POSTing blind. A refund whose timestamp is set but whose amount
+does not reconcile resolves to `refund_ambiguous_needs_review` and is parked for
+a person — never retried, because a retry is the one action that could send the
+money twice.
+
+The missing invoice idempotency is handled the same way, one step earlier: the
+initiate path never retries a failed invoice create. It looks the invoice up by
+the per-attempt reference in its metadata and adopts the existing one, and if
+that lookup fails it creates nothing at all.
+
+**This section still stands and the worker stays disabled.** What has changed is
+that for Moyasar the §7 blocker is now a *code review* rather than an open
+question about the API. Re-enabling the worker remains a separate, explicit owner
+action under §5, and would additionally need the provider to be chosen, the
+account to exist, and the behaviour to be proven in the sandbox.
+
 ### Committed but DORMANT — the Tap card interop plugin (2026-08-19)
 
 `apps/mobile/plugins/withTapCardInterop.js` exists and is unit-tested, and is
@@ -243,7 +290,9 @@ device — neither can be settled from source.
 Each item requires its own explicit owner approval — none of it is authorized
 by this document.
 
-1. Record the selected provider and supersede this document.
+1. Record the selected provider and supersede this document. Two candidates now
+   have working code: Tap (§5, already wired to Production) and Moyasar (§9).
+   §9.4 is the comparison to decide from.
 2. Decide the migration path for the provisional Tap integration (keep,
    replace, or run both during a transition).
 3. Resolve §7: confirm provider idempotency / status-lookup guarantees, and
@@ -261,11 +310,120 @@ by this document.
    refund is allowed to flow.
 8. Update `docs/MIGRATIONS.md`, `PROJECT_STATUS.md` and `CLAUDE.md` §6.
 
-## 9. Related documents
+## 9. Moyasar — the second candidate (2026-08-24)
+
+**Status: BUILT, INERT, NOT CHOSEN.** The owner said "maybe we will go with
+MOYASAR" and supplied `https://docs.moyasar.com/api/api-introduction`. That is an
+instruction to build the integration, not a decision to adopt the provider, so
+what exists is a complete implementation that does nothing until somebody
+deliberately turns it on.
+
+### 9.1 What was added, and what it cannot do
+
+| Added | |
+| --- | --- |
+| `supabase/functions/_shared/moyasar.ts` | Amounts, config resolution, invoice payload, status maps, webhook token check, verification binding, sanitizers |
+| `supabase/functions/_shared/moyasarVerify.ts` | Invoice + payment retrieval, validate-and-confirm, invoice reconciliation |
+| `supabase/functions/_shared/moyasarRefund.ts` | Refund body, response classification, resolve-before-retry |
+| `supabase/migrations/20260824100000_moyasar_payment_provider.sql` | `payment_records.provider_checkout_ref`, provider-generic `begin_payment_attempt` / `begin_session_attempt` |
+| `src/components/admin/MoyasarPaymentPanel.tsx`, `src/lib/moyasarAdminTest.ts` | Admin readiness + sandbox test |
+| `docs/integrations/Moyasar_API_Reference.md` | The researched API reference |
+| Moyasar branches in `payment-initiate`, `payment-verify`, `payment-webhook`, `payment-refund`, `payment-test-config` | Dispatch only |
+
+**Nothing about this is live, and four independent things keep it that way:**
+
+1. `integration_settings.provider_name` is not `'moyasar'`, so every payment
+   function falls through its Moyasar branch without entering it.
+2. No Moyasar credential exists — not in the repository, not in
+   `integration_settings`, not in Vault.
+3. **No Edge Function was deployed** and **the migration was not applied**, so
+   `begin_payment_attempt` does not exist in Production. Even a fully configured
+   provider row would fail at the first RPC.
+4. `resolveMoyasarConfig()` fails closed on a missing key, a key whose prefix
+   does not match its slot, or a missing webhook secret.
+
+Turning any of that around is an owner action under `CLAUDE.md` §5.
+
+**No Tap code path was changed.** The Tap functions, the Tap migrations and
+`tap_begin_payment_attempt` / `tap_begin_session_attempt` are untouched; the new
+generic RPCs sit beside them and nothing was migrated onto them.
+
+### 9.2 The three differences that shaped the implementation
+
+These are not stylistic. Each one is a place where copying the Tap approach would
+have been wrong.
+
+**Cardholder data may not reach our backend.** Moyasar states that sending it
+"will result in canceling the agreement … in addition to the immediate
+termination of the service". So `POST /v1/payments` with a card source is not an
+option, and the integration uses the **hosted Invoice** instead. The card never
+touches our infrastructure.
+
+**Amounts are minor units.** Moyasar wants halalas (`100` = 1.00 SAR); Tap wants
+major units (`1` = 1.00 SAR). Getting this wrong is a 100× charge. The conversion
+lives in one tested function and is never inlined.
+
+**The webhook has no signature.** Tap HMACs the charge fields; Moyasar sends a
+`secret_token` in the body, which proves the sender knows a secret but is not
+bound to the payload. The webhook is therefore treated as a nudge — it decides
+whether we look, never what we conclude — and confirmation always comes from a
+server-to-server fetch bound on `payment.invoice_id`. A forged webhook that
+guessed the token confirms nothing.
+
+### 9.3 Two ids, and why the refund stack needed no change
+
+Tap issues one id: a charge, created up front and refunded later. Moyasar issues
+two: an **invoice** id, known when the attempt opens and owning the hosted URL,
+and a **payment** id, which exists only once the customer pays and which is what
+`POST /v1/payments/{id}/refund` takes.
+
+So `provider_ref` keeps holding the thing that gets confirmed and refunded (the
+payment), exactly as it does for a Tap charge, and the new
+`provider_checkout_ref` column holds the invoice. Because
+`order_refunds.charge_ref` is populated from `provider_ref`, the entire refund
+stack — `claim_order_refund`, `finalize_order_refund`, the partial unique index,
+`order_refund_due` — receives a refundable Moyasar payment id with **no change to
+any existing RPC**.
+
+### 9.4 Tap versus Moyasar, on the axes that decide it
+
+| | Tap | Moyasar |
+| --- | --- | --- |
+| Card data on our server | Hosted checkout — no | Prohibited by contract; hosted invoice — no |
+| Amount units | major | **minor (halalas)** |
+| Webhook authentication | HMAC over charge fields | **shared token in the body, no signature** |
+| Checkout idempotency | `reference.idempotent`, 24h | **none documented** → reconcile-before-create |
+| Refund idempotency | `reference.idempotent`, 24h | **none documented** |
+| Refund status lookup | assumed, unproven (§7 Q3) | **`refunded` + `refunded_at` on the payment** |
+| Key/mode confusion detectable | no (opaque keys) | **yes (`sk_test_` / `sk_live_`)** |
+| Declined card HTTP code | non-2xx | **201** — status field, not the code, decides |
+| Currently wired to Production | yes (provisional) | no |
+| Agreement signed | **no** | **no** |
+
+Neither column is a recommendation. The honest summary: Moyasar's webhook
+authentication and idempotency story are weaker and had to be compensated for in
+our code; its refund-status lookup and self-describing keys are stronger and let
+us build two controls Tap could not support.
+
+### 9.5 What is NOT established
+
+- That Moyasar is the provider. **The decision is open.**
+- That any of it works. Nothing has been run against a Moyasar account, sandbox
+  or live. No account exists.
+- The seven open questions in `docs/integrations/Moyasar_API_Reference.md` §11 —
+  including which spelling of the failure webhook event is actually sent, and
+  whether a metadata list filter fails loudly or silently.
+- Anything about fees, settlement or onboarding.
+
+---
+
+## 10. Related documents
 
 | Doc | Owns |
 | --- | --- |
 | `CLAUDE.md` §5, §6 | The standing payment/Tap freeze and approval rules |
 | `docs/MIGRATIONS.md` | Migration ledger and the only approved Production schema workflow |
 | `docs/ORDER_CONFIRMATION_FLOW.md` | Order confirmation lifecycle and refund enrolment rules |
+| `docs/integrations/Moyasar_API_Reference.md` | The researched Moyasar API contract and its seven open questions |
+| `docs/integrations/Tap_API_Reference.md` | The researched Tap API contract |
 | `PROJECT_STATUS.md` | Overall project state and onboarding |
