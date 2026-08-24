@@ -280,3 +280,77 @@ export function decideRefundLogging(
     logStatus: outcome === 'succeeded' ? 'success' : outcome === 'failed' ? 'failed' : 'skipped',
   };
 }
+
+// ---------------------------------------------------------------------------
+// The retry decision, extracted so the safety property is TESTED, not just
+// asserted in a comment.
+// ---------------------------------------------------------------------------
+
+/**
+ * Must this run ask Moyasar what happened before it sends another refund?
+ *
+ * `claim_order_refund` increments `attempt_count` BEFORE returning it, so the
+ * first ever attempt arrives as 1. Anything greater means this refund has
+ * already been POSTed at least once — and since Moyasar documents no idempotency
+ * on the refund endpoint, a second POST is a second movement of money. Those
+ * runs must reconcile first.
+ *
+ * Written as a named predicate because the off-by-one is exactly the kind of
+ * thing that gets "simplified" to `> 0` by someone who assumes the counter is
+ * incremented afterwards — which would make every first attempt do a pointless
+ * lookup, and, far worse, would look correct.
+ */
+export function mustReconcileBeforePost(attemptCount: unknown): boolean {
+  const n = Number(attemptCount);
+  return Number.isFinite(n) && n > 1;
+}
+
+export type RetryDecision =
+  | { action: 'post' }
+  | { action: 'settle'; verdict: RefundClassification }
+  | { action: 'release'; reason: 'reconcile_unavailable' };
+
+/**
+ * Given what the provider now says about a refund that was already attempted,
+ * decide whether this run may send another one.
+ *
+ * `prior` is null when the reconciliation lookup itself could not be completed —
+ * a timeout, a 5xx, an unparseable body. That is NOT the same as "nothing was
+ * refunded", and treating it as permission to POST is precisely how a customer
+ * gets paid twice. It releases the row instead, so a later run can ask again.
+ *
+ * Only one answer permits another POST: the provider positively reporting that
+ * nothing has been refunded.
+ */
+export function decideAfterReconcile(prior: RefundClassification | null): RetryDecision {
+  if (prior === null) return { action: 'release', reason: 'reconcile_unavailable' };
+  if (prior.outcome !== 'pending') return { action: 'settle', verdict: prior };
+  if (needsHumanReview(prior)) return { action: 'settle', verdict: prior };
+  return { action: 'post' };
+}
+
+/**
+ * The `order_refunds.status` to write for a finished attempt.
+ *
+ * The interesting case is the third one. An unreconcilable refund — Moyasar
+ * reports a `refunded_at` we cannot match to an amount — must NOT be written as
+ * 'pending', because `finalize_order_refund` documents 'pending' as "releases
+ * the refund so a later run can re-claim it". That would loop forever: every
+ * run reconciles, gets the same unreconcilable answer, releases, and re-claims.
+ * The refund never completes and never reaches anybody who could look at it.
+ *
+ * Writing 'failed' with a machine reason parks it instead: it frees the
+ * one-live-refund-per-order slot and surfaces the row in
+ * `list_failed_order_refunds()`. That is precisely how
+ * `expire_stale_order_refund_claims()` already treats a lease it cannot resolve,
+ * and for the same stated reason — "we cannot know whether the dead worker
+ * already sent the refund … an automatic re-send could double-refund".
+ *
+ * A Tap verdict never carries this failure code, so this is a no-op there.
+ */
+export function refundFinalStatus(v: RefundClassification): 'succeeded' | 'failed' | 'pending' {
+  if (v.outcome === 'succeeded') return 'succeeded';
+  if (v.outcome === 'failed') return 'failed';
+  if (needsHumanReview(v)) return 'failed';
+  return 'pending';
+}

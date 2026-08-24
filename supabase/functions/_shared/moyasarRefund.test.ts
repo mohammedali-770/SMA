@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideRefundLogging, moyasarPaymentUrl,
-  moyasarRefundUrl, needsHumanReview, refundRequestIsValid, resolveRefundFromPayment, safeMessage,
+  buildMoyasarRefundBody, classifyMoyasarRefundResponse, decideAfterReconcile, decideRefundLogging,
+  moyasarPaymentUrl, moyasarRefundUrl, mustReconcileBeforePost, needsHumanReview,
+  refundFinalStatus, refundRequestIsValid, resolveRefundFromPayment, safeMessage,
 } from './moyasarRefund.ts';
 
 describe('moyasarRefundUrl / moyasarPaymentUrl', () => {
@@ -166,5 +167,95 @@ describe('decideRefundLogging', () => {
     for (const v of [false, null, undefined, 0, '', 'true', {}]) {
       expect(decideRefundLogging(v, 'succeeded')).toEqual({ record: false, reason: 'lost_lease' });
     }
+  });
+});
+
+describe('mustReconcileBeforePost', () => {
+  /**
+   * claim_order_refund increments attempt_count BEFORE returning it, so the
+   * first ever attempt arrives as 1. The boundary is > 1, not > 0.
+   */
+  it('lets the FIRST attempt post without a lookup', () => {
+    expect(mustReconcileBeforePost(1)).toBe(false);
+  });
+  it('demands reconciliation on every retry', () => {
+    expect(mustReconcileBeforePost(2)).toBe(true);
+    expect(mustReconcileBeforePost(7)).toBe(true);
+  });
+  it('is safe on junk', () => {
+    expect(mustReconcileBeforePost(undefined)).toBe(false);
+    expect(mustReconcileBeforePost('x')).toBe(false);
+    expect(mustReconcileBeforePost(NaN)).toBe(false);
+  });
+});
+
+describe('decideAfterReconcile', () => {
+  const refunded = { outcome: 'succeeded' as const, providerRef: 'p', failureCode: null, errorSafe: null };
+  const nothingYet = { outcome: 'pending' as const, providerRef: 'p', failureCode: null, errorSafe: null };
+  const ambiguous = { outcome: 'pending' as const, providerRef: 'p', failureCode: 'refund_ambiguous_needs_review', errorSafe: null };
+  const dead = { outcome: 'failed' as const, providerRef: 'p', failureCode: 'payment_voided', errorSafe: null };
+
+  /**
+   * THE property this whole ordering exists for. A failed lookup is NOT
+   * evidence that nothing was refunded, and treating it as permission to POST
+   * is exactly how a customer gets paid twice.
+   */
+  it('refuses to post when the lookup could not be completed', () => {
+    expect(decideAfterReconcile(null)).toEqual({ action: 'release', reason: 'reconcile_unavailable' });
+  });
+
+  it('posts ONLY when the provider positively reports nothing refunded', () => {
+    expect(decideAfterReconcile(nothingYet)).toEqual({ action: 'post' });
+  });
+
+  it('settles rather than re-sending when money already moved', () => {
+    expect(decideAfterReconcile(refunded)).toEqual({ action: 'settle', verdict: refunded });
+  });
+
+  it('settles rather than re-sending when the payment can never be refunded', () => {
+    expect(decideAfterReconcile(dead)).toEqual({ action: 'settle', verdict: dead });
+  });
+
+  /** Unreconcilable is an answer too — and the answer is not "send it again". */
+  it('settles an unreconcilable refund for human review instead of retrying', () => {
+    const d = decideAfterReconcile(ambiguous);
+    expect(d.action).toBe('settle');
+    expect(needsHumanReview((d as { verdict: typeof ambiguous }).verdict)).toBe(true);
+  });
+
+  it('never returns post for anything except a clean nothing-refunded', () => {
+    for (const prior of [null, refunded, dead, ambiguous]) {
+      expect(decideAfterReconcile(prior).action).not.toBe('post');
+    }
+  });
+});
+
+describe('refundFinalStatus', () => {
+  const mk = (outcome: 'succeeded' | 'failed' | 'pending', failureCode: string | null = null) =>
+    ({ outcome, providerRef: 'p', failureCode, errorSafe: null });
+
+  it('maps the two terminal outcomes straight through', () => {
+    expect(refundFinalStatus(mk('succeeded'))).toBe('succeeded');
+    expect(refundFinalStatus(mk('failed', 'http_400'))).toBe('failed');
+  });
+
+  it('releases an ordinary pending so a later run can re-claim it', () => {
+    expect(refundFinalStatus(mk('pending'))).toBe('pending');
+  });
+
+  /**
+   * The loop this prevents: 'pending' RELEASES the row, so writing it for an
+   * unresolvable refund means every run reconciles, gets the same unresolvable
+   * answer, releases, re-claims — forever, and nobody ever sees it. 'failed'
+   * frees the one-live-refund slot and surfaces the row in
+   * list_failed_order_refunds(), which is how expire_stale_order_refund_claims()
+   * already handles a lease it cannot resolve.
+   */
+  it('parks an unresolvable refund as failed rather than releasing it', () => {
+    expect(refundFinalStatus(mk('pending', 'refund_ambiguous_needs_review'))).toBe('failed');
+  });
+
+  it('never parks a Tap-shaped pending verdict, which carries no such code', () => {
+    expect(refundFinalStatus(mk('pending', null))).toBe('pending');
   });
 });

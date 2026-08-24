@@ -118,7 +118,16 @@ Deno.serve(async (req: Request) => {
       .eq('order_id', orderId).eq('provider', 'tap')
       .order('created_at', { ascending: false }).limit(1);
     const rec = (Array.isArray(recs) ? recs[0] : null) as TapAttempt | null;
-    if (!rec || !rec.provider_ref) return json({ status: 'pending', message: 'No Tap charge to verify yet.' }, 200);
+    if (!rec || !rec.provider_ref) {
+      const other = await otherProviderAttempt(admin, orderId, 'tap');
+      if (other) {
+        return json({
+          status: 'unavailable',
+          message: `This order was paid through ${other}, which is not the configured gateway. Switch the payment provider back to ${other} to verify it.`,
+        }, 200);
+      }
+      return json({ status: 'pending', message: 'No Tap charge to verify yet.' }, 200);
+    }
     const tap = resolveTapConfig(Boolean(cfg?.enabled), cfg?.providerName ?? null, pub, sec, (rec.mode as 'test' | 'live') ?? undefined);
     if (!tap.secretKey) return json({ status: 'pending', message: `No ${rec.mode ?? mode} key configured.` }, 200);
     const retrieved = await retrieveTapCharge(tap.secretKey, String(rec.provider_ref));
@@ -237,6 +246,27 @@ Deno.serve(async (req: Request) => {
 // ---------------------------------------------------------------------------
 const MOYASAR_TEST_CONNECTION_ID = '00000000-0000-4000-8000-000000000000';
 
+/**
+ * Does this order's payment belong to a gateway other than the configured one?
+ *
+ * `verify_order` is the single manual lever an administrator has to rescue an
+ * order that was paid but never confirmed. Routing it by the configured provider
+ * meant that after a provider switch it looked in the wrong gateway's records,
+ * found nothing, and answered "No … to verify yet" — telling the operator the
+ * customer had not paid, while a paid attempt for that exact order sat in
+ * payment_records under the other provider. That is worse than no answer.
+ */
+async function otherProviderAttempt(
+  admin: SupabaseClient, orderId: string, configured: string,
+): Promise<string | null> {
+  const { data } = await admin.from('payment_records')
+    .select('provider').eq('order_id', orderId)
+    .order('created_at', { ascending: false }).limit(1);
+  const row = (Array.isArray(data) ? data[0] : null) as { provider?: string } | null;
+  const p = row?.provider ? String(row.provider).toLowerCase() : '';
+  return p && p !== configured ? p : null;
+}
+
 async function handleMoyasar(
   admin: SupabaseClient,
   payload: { action?: string; orderId?: string; chargeId?: string; invoiceId?: string },
@@ -283,7 +313,16 @@ async function handleMoyasar(
       .eq('order_id', orderId).eq('provider', 'moyasar')
       .order('created_at', { ascending: false }).limit(1);
     const rec = (Array.isArray(recs) ? recs[0] : null) as MoyasarAttempt | null;
-    if (!rec || !rec.provider_checkout_ref) return json({ status: 'pending', message: 'No Moyasar invoice to verify yet.' }, 200);
+    if (!rec || !rec.provider_checkout_ref) {
+      const other = await otherProviderAttempt(admin, orderId, 'moyasar');
+      if (other) {
+        return json({
+          status: 'unavailable',
+          message: `This order was paid through ${other}, which is not the configured gateway. Switch the payment provider back to ${other} to verify it.`,
+        }, 200);
+      }
+      return json({ status: 'pending', message: 'No Moyasar invoice to verify yet.' }, 200);
+    }
 
     const m = resolveMoyasarConfig(enabled, providerName, pub, sec, (rec.mode as 'test' | 'live') ?? undefined);
     if (!m.secretKey) return json({ status: 'pending', message: `No ${rec.mode ?? mode} key configured.` }, 200);

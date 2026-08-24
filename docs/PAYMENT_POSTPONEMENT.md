@@ -442,7 +442,36 @@ authentication and idempotency story are weaker and had to be compensated for in
 our code; its refund-status lookup and self-describing keys are stronger and let
 us build two controls Tap could not support.
 
-### 9.5 What is NOT established
+### 9.5 What automated review caught, and what it changed
+
+An automated reviewer raised four P1 findings on the first push. Each was checked
+against the code rather than accepted; **two were real**, one described a bug that
+had already been fixed, and one described a pre-existing shape rather than a new
+defect. Verifying them then surfaced four more, all of the same family. They are
+recorded because the family is the interesting part.
+
+**Every one was a variant of "the code asked the settings page instead of the
+row".** A refund POSTed to whichever gateway is configured now rather than the one
+that took the money; a key mode read from the settings rather than from the
+attempt; verification and webhooks routed by configuration rather than by the
+attempt or the event. With one provider those are the same question. With two
+they are not, and the gap between them is where a customer gets charged twice or
+never refunded.
+
+The rule the code now follows: **the configured provider decides only what a NEW
+payment uses. Everything touching money that already exists follows the row.**
+`docs/integrations/Moyasar_API_Reference.md` §10a records the consequences in
+full, including the cross-provider checkout guard and why credential field names
+are namespaced.
+
+Two limits worth stating plainly. Three of the eight verification agents died on
+a session limit before finishing, so the sweep is **not** exhaustive — the
+auth/secrets and money-units lenses did not complete. And an attempt belonging to
+a de-configured gateway still cannot be verified; that is reported honestly
+rather than fixed, because draining in-flight attempts before switching provider
+is an operational requirement no code change removes.
+
+### 9.6 What is NOT established
 
 - That Moyasar is the provider. **The decision is open.**
 - That any of it works. Nothing has been run against a Moyasar account, sandbox

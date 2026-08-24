@@ -6,8 +6,9 @@ import {
   buildTapChargePayload, resolveTapConfig, normalizeSaudiPhone, mapTapStatus, sanitizeTapResponse,
 } from '../_shared/tap.ts';
 import {
-  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, extractMoyasarError,
-  invoiceExpiryIso, mapMoyasarInvoiceStatus, resolveMoyasarConfig, sanitizeMoyasarInvoice,
+  MOYASAR_API_BASE, basicAuthHeader, buildInvoicePayload, decideCrossProviderAttempt,
+  extractMoyasarError, invoiceExpiryIso, mapMoyasarInvoiceStatus, resolveMoyasarConfig,
+  sanitizeMoyasarInvoice, type LiveAttempt,
 } from '../_shared/moyasar.ts';
 import { findInvoiceByReference } from '../_shared/moyasarVerify.ts';
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2';
@@ -49,6 +50,8 @@ Deno.serve(async (req: Request) => {
     const admin0 = adminClient();
     const cfg0 = await getProviderConfig(admin0, 'payment');
     const sessionProvider = (cfg0?.providerName ?? '').toLowerCase();
+    const blocked0 = await guardCrossProviderAttempt(admin0, 'checkout_session_id', sessionId, sessionProvider);
+    if (blocked0) return blocked0;
     if (sessionProvider === 'tap') return await initiateTapForSession(admin0, supaUser, sessionId, cfg0!, lang);
     if (sessionProvider === 'moyasar') return await initiateMoyasarForSession(admin0, supaUser, sessionId, cfg0!, lang);
     return json({ error: 'Online payment is not enabled' }, 400);
@@ -72,11 +75,67 @@ Deno.serve(async (req: Request) => {
   const cfg = await getProviderConfig(admin, 'payment');
   const providerName = (cfg?.providerName ?? '').toLowerCase();
 
+  // Refuse to open a second payable checkout on an order that already has a live
+  // attempt at a DIFFERENT gateway — see decideCrossProviderAttempt().
+  const blocked = await guardCrossProviderAttempt(admin, 'order_id', String(order.id), providerName);
+  if (blocked) return blocked;
+
   if (providerName === 'tap') return await initiateTap(admin, supaUser, order, cfg!, lang);
   if (providerName === 'moyasar') return await initiateMoyasar(admin, order, cfg!);
   if (providerName === 'geidea') return await initiateGeidea(admin, order, cfg!);
   return json({ error: 'Online payment is not enabled' }, 400);
 });
+
+/**
+ * Enforce ONE live checkout per order/session across ALL providers.
+ *
+ * The database guard is provider-scoped ((order_id, provider)), so it cannot see
+ * this case; and it cannot be widened without redefining the frozen Tap RPCs.
+ * This is the one place that knows about every gateway, so the check lives here.
+ *
+ * Returns a Response when the caller must stop, or null to continue.
+ */
+async function guardCrossProviderAttempt(
+  admin: SupabaseClient,
+  column: 'order_id' | 'checkout_session_id',
+  value: string,
+  wantedProvider: string,
+): Promise<Response | null> {
+  if (!value || !wantedProvider) return null;
+  const { data } = await admin.from('payment_records')
+    .select('id, provider, provider_ref, provider_checkout_ref')
+    .eq(column, value).eq('status', 'initiated')
+    .order('created_at', { ascending: false }).limit(1);
+  const existing = (Array.isArray(data) ? data[0] : null) as LiveAttempt | null;
+
+  const decision = decideCrossProviderAttempt(existing, wantedProvider);
+  if (decision.action === 'proceed') return null;
+
+  if (decision.action === 'close_stale') {
+    // Nothing was ever created at the other gateway, so nothing is payable there.
+    await admin.from('payment_records').update({
+      status: 'failed',
+      failure_code: 'provider_switched',
+      failure_message_safe: 'The payment provider changed before checkout started.',
+    }).eq('id', decision.attemptId).eq('status', 'initiated').then(() => {}, () => {});
+    return null;
+  }
+
+  // A checkout page at the other gateway is live and payable. We cannot close it
+  // from here, and opening a second one is how a customer gets charged twice for
+  // one order — with only one of the two charges refundable.
+  console.error('refusing a second checkout: a live attempt exists at another provider', JSON.stringify({
+    other: decision.provider, wanted: wantedProvider,
+  }));
+  await admin.from('integration_sync_logs').insert({
+    provider: decision.provider, order_id: column === 'order_id' ? value : null,
+    direction: 'push', status: 'skipped',
+    request: { action: 'initiate' }, error: 'cross_provider_attempt_open',
+  }).then(() => {}, () => {});
+  return json({
+    error: 'A payment for this order is already in progress. Please finish it, or wait for it to expire before trying again.',
+  }, 409);
+}
 
 // ---------------------------------------------------------------------------
 // Tap Hosted Checkout
@@ -428,6 +487,26 @@ async function createMoyasarInvoice(
   const referenceTransaction = String(attempt.reference_transaction ?? '');
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
 
+  // CHARGE IN THE CURRENCY THE ATTEMPT WAS OPENED IN, not the configured one.
+  //
+  // The attempt row is the single source of truth for verification:
+  // checkPaymentBinding compares the settled payment's currency against
+  // `payment_records.currency`. Building the invoice from `m.currency` instead
+  // would let an administrator who sets a non-SAR currency in the payment card
+  // create an invoice the binding then rejects — a customer charged, and an
+  // order that never confirms, from a single settings field.
+  //
+  // The attempt's currency is also the one the order was actually priced in
+  // (`orders.total` is SAR-denominated), so this is the correct amount as well
+  // as the verifiable one. A configured value that disagrees is a
+  // misconfiguration; it is surfaced rather than silently honoured.
+  const attemptCurrency = String(attempt.currency ?? 'SAR').toUpperCase() || 'SAR';
+  if (attemptCurrency !== m.currency) {
+    console.warn('Moyasar configured currency ignored in favour of the attempt currency', JSON.stringify({
+      configured: m.currency, attempt: attemptCurrency,
+    }));
+  }
+
   const persistAndReturn = async (invoice: Record<string, unknown>): Promise<Response> => {
     const invoiceId = String(invoice.id ?? '');
     const checkoutUrl = String(invoice.url ?? '');
@@ -491,7 +570,7 @@ async function createMoyasarInvoice(
 
   const payload = buildInvoicePayload({
     amount: params.amount,
-    currency: m.currency,
+    currency: attemptCurrency,
     description: params.description,
     referenceTransaction,
     referenceOrder: String(attempt.reference_order ?? ''),
@@ -539,6 +618,32 @@ async function createMoyasarInvoice(
   return await persistAndReturn(result);
 }
 
+/**
+ * Re-resolve the config for the mode the ATTEMPT is actually stored under.
+ *
+ * `begin_payment_attempt` / `begin_session_attempt` ignore `p_mode` when they
+ * reuse a live attempt — they return the row's existing `mode`. So after an
+ * administrator flips test↔live, a reused attempt still belongs to the OLD
+ * mode, and creating its invoice with the newly configured key would put a live
+ * invoice id on a row stamped `mode='test'`. Verification then resolves its key
+ * from the row (payment-verify and payment-webhook both do), looks the invoice
+ * up in the wrong key namespace, 404s, and returns 'pending' forever — a real
+ * card charged against an order that can never confirm.
+ *
+ * Moyasar's test and live spaces are disjoint, so the only key that can ever
+ * verify this attempt is the one for its own stored mode. Use that key to
+ * create it too. Returns null when that mode has no usable credentials.
+ */
+function configForAttempt(
+  cfg: ProviderConfig, attempt: Record<string, unknown>,
+): ReturnType<typeof resolveMoyasarConfig> | null {
+  const attemptMode = attempt.mode === 'live' ? 'live' : attempt.mode === 'test' ? 'test' : undefined;
+  const resolved = resolveMoyasarConfig(
+    cfg.enabled, cfg.providerName, cfg.publicConfig, cfg.secretConfig, attemptMode,
+  );
+  return resolved.ok ? resolved : null;
+}
+
 async function initiateMoyasar(
   admin: SupabaseClient,
   order: Record<string, unknown>,
@@ -573,14 +678,22 @@ async function initiateMoyasar(
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
 
+  // The attempt's stored mode is authoritative from here on — a reused attempt
+  // may predate a mode switch. See configForAttempt().
+  const mAttempt = configForAttempt(cfg, attempt);
+  if (!mAttempt) {
+    console.error('Moyasar config unusable for the attempt mode', String(attempt.mode ?? ''));
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
   if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
     return json({
-      provider: 'moyasar', mode: m.mode, invoiceId: attempt.provider_checkout_ref,
-      checkoutUrl: attempt.checkout_url, expiryMinutes: m.expiryMinutes,
+      provider: 'moyasar', mode: mAttempt.mode, invoiceId: attempt.provider_checkout_ref,
+      checkoutUrl: attempt.checkout_url, expiryMinutes: mAttempt.expiryMinutes,
     }, 200);
   }
 
-  return await createMoyasarInvoice(admin, m, attempt, {
+  return await createMoyasarInvoice(admin, mAttempt, attempt, {
     amount: total,
     // CUSTOMER-SAFE. Moyasar renders `description` on the hosted checkout page,
     // so it must never carry the internal SM-… order number (Issue #94). The
@@ -633,15 +746,21 @@ async function initiateMoyasarForSession(
     return json({ error: 'Could not start the payment. Please try again.' }, 400);
   }
 
+  const mAttempt = configForAttempt(cfg, attempt);
+  if (!mAttempt) {
+    console.error('Moyasar config unusable for the attempt mode', String(attempt.mode ?? ''));
+    return json({ error: 'Online payment is not available' }, 400);
+  }
+
   if (attempt.reused && attempt.checkout_url && attempt.provider_checkout_ref) {
     return json({
-      provider: 'moyasar', mode: m.mode, invoiceId: attempt.provider_checkout_ref,
+      provider: 'moyasar', mode: mAttempt.mode, invoiceId: attempt.provider_checkout_ref,
       checkoutUrl: attempt.checkout_url, checkoutSessionId: session.id,
-      expiryMinutes: m.expiryMinutes,
+      expiryMinutes: mAttempt.expiryMinutes,
     }, 200);
   }
 
-  return await createMoyasarInvoice(admin, m, attempt, {
+  return await createMoyasarInvoice(admin, mAttempt, attempt, {
     amount: total,
     description: 'Spicy Meal order',
     returnQuery: `session=${encodeURIComponent(String(session.id))}`,

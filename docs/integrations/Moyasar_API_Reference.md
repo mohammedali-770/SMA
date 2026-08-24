@@ -216,8 +216,24 @@ the worker runs it before any retry rather than re-POSTing blind:
 | `status = refunded` | **succeeded** — do not retry |
 | cumulative `refunded` ≥ the amount we sent | **succeeded** — do not retry |
 | nothing refunded, no `refunded_at` | **pending** — a retry is safe |
-| `refunded_at` set but the amount does not reconcile | **pending + `refund_ambiguous_needs_review`** — parked for a human, never retried |
+| `refunded_at` set but the amount does not reconcile | **parked** — written `failed` with `refund_ambiguous_needs_review`, never retried |
 | `status` `failed` / `voided` | **failed** |
+
+**The ordering is what makes this safe, and it is the part worth reviewing.** The
+reconciliation runs *before* the POST on every re-attempt, not only after an
+ambiguous one: `claim_order_refund` increments `attempt_count` before returning
+it, so anything above 1 means this refund has already been sent once, and those
+runs ask before they act. A reconciliation that cannot be completed is **not**
+treated as "nothing was refunded" — it releases the row untouched, because a
+failed lookup is exactly the state in which re-POSTing pays a customer twice.
+
+An unreconcilable refund is written `failed` with
+`refund_ambiguous_needs_review` rather than released as `pending`. `pending`
+means "release for re-claim", so parking one there would loop forever and never
+reach a person; `failed` frees the one-live-refund slot and surfaces the row in
+`list_failed_order_refunds()`. That is the same treatment
+`expire_stale_order_refund_claims()` already gives a lease it cannot resolve,
+for the same stated reason.
 
 This answers §7 for this provider. It does **not** authorise re-enabling the
 refund worker, which stays disabled.
@@ -397,6 +413,46 @@ they belong: no card value is ever typed into, stored by, or transmitted through
 this repository.
 
 ---
+
+## 10a. Operational consequences of having two gateways
+
+These are not Moyasar facts; they are what having a *second* provider does to
+this system, and they are recorded here because each one caused a defect that had
+to be fixed during review.
+
+**One live checkout per order, across providers.** The database double-charge
+guard is keyed `(order_id, provider)` and `(checkout_session_id, provider)` — it
+is provider-scoped, so a Tap attempt does not block a Moyasar attempt on the same
+order. Switch the provider while a customer has a hosted page open, let them tap
+Pay again, and they hold two payable pages for one order; both would settle,
+because `confirm_order_payment` de-duplicates on `(provider, provider_ref)`, and
+`open_order_refund_record` can only ever enrol **one** of the two charges for
+refund. `decideCrossProviderAttempt()` closes this in `payment-initiate`, which is
+the only place that knows about both gateways: an other-provider attempt with no
+provider-side object yet is closed, and one that already has a payable page
+refuses the second checkout outright.
+
+**Everything follows the row, never the current configuration.** A refund is
+executed with the gateway stored on `order_refunds.provider`; verification routes
+by `payment_records.provider`; the webhook routes by the event's own shape; the
+secret key and the *mode* both come from the attempt row, not from the settings
+page. The configured provider only decides what a NEW payment uses. Any place
+that reads the configuration to decide what to do with existing money is a bug —
+that pattern produced four separate defects, including a refund POSTed to the
+wrong gateway and an invoice created with the wrong mode's key.
+
+**Credential names are namespaced (`moyasar_*`).** `upsert_integration_settings`
+merges `secret_config`, so distinct field names let both gateways' credentials
+live in the one row. Had Moyasar reused Tap's `test_secret_key` /
+`live_secret_key`, saving Moyasar credentials would have destroyed Tap's by
+collision and made every refund still queued for Tap impossible to execute.
+
+**What still cannot be fixed in code:** an attempt belonging to a de-configured
+gateway. `provider_name` gates `resolve*Config().ok`, so such an attempt is
+reported honestly — `provider_not_configured` in the logs, `pending` to the app,
+a named gateway in the admin verify action — rather than being silently mis-paid
+or mis-verified. Draining in-flight attempts before switching provider is an
+operational requirement, not something the code can remove.
 
 ## 11. Open questions for Moyasar
 

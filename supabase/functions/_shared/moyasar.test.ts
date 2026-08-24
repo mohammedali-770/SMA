@@ -4,7 +4,7 @@ import {
   fromMinorUnits, HANDLED_WEBHOOK_TYPES, invoiceExpiryIso, isAdminTestInvoice, keyMatchesMode,
   lastFourOf, mapMoyasarInvoiceStatus, mapMoyasarPaymentStatus, parseWebhookEnvelope,
   paymentFailureMessage, resolveMoyasarConfig, sanitizeMoyasarInvoice, sanitizeMoyasarPayment,
-  selectInvoicePayment, checkPaymentBinding,
+  selectInvoicePayment, checkPaymentBinding, looksLikeMoyasarWebhook, decideCrossProviderAttempt,
   timingSafeEqual, toMinorUnits, verifyWebhookSecretToken,
 } from './moyasar.ts';
 
@@ -111,7 +111,7 @@ describe('keyMatchesMode', () => {
 
 describe('resolveMoyasarConfig', () => {
   const pub = { mode: 'test', currency: 'SAR', invoice_expiry_minutes: 30 };
-  const sec = { test_secret_key: 'sk_test_abc', webhook_secret_token: 'wh_secret' };
+  const sec = { moyasar_test_secret_key: 'sk_test_abc', moyasar_webhook_secret_token: 'wh_secret' };
 
   it('resolves a complete test config', () => {
     const c = resolveMoyasarConfig(true, 'moyasar', pub, sec);
@@ -136,7 +136,7 @@ describe('resolveMoyasarConfig', () => {
   });
 
   it('refuses a key whose prefix does not match its slot', () => {
-    const c = resolveMoyasarConfig(true, 'moyasar', pub, { ...sec, test_secret_key: 'sk_live_oops' });
+    const c = resolveMoyasarConfig(true, 'moyasar', pub, { ...sec, moyasar_test_secret_key: 'sk_live_oops' });
     expect(c.ok).toBe(false);
     expect(c.reason).toBe('key_mode_mismatch');
   });
@@ -147,21 +147,21 @@ describe('resolveMoyasarConfig', () => {
    * rather than leaving a gateway that silently never confirms an order.
    */
   it('requires a webhook secret', () => {
-    const c = resolveMoyasarConfig(true, 'moyasar', pub, { test_secret_key: 'sk_test_abc' });
+    const c = resolveMoyasarConfig(true, 'moyasar', pub, { moyasar_test_secret_key: 'sk_test_abc' });
     expect(c.ok).toBe(false);
     expect(c.reason).toBe('missing_webhook_secret');
   });
 
   it('prefers a mode-specific webhook secret over the shared one', () => {
     const c = resolveMoyasarConfig(true, 'moyasar', pub, {
-      ...sec, test_webhook_secret_token: 'wh_test_specific',
+      ...sec, moyasar_test_webhook_secret_token: 'wh_test_specific',
     });
     expect(c.webhookSecret).toBe('wh_test_specific');
   });
 
   it('honours an explicit mode override for verifying an older attempt', () => {
     const c = resolveMoyasarConfig(true, 'moyasar', { ...pub, mode: 'live' }, {
-      ...sec, live_secret_key: 'sk_live_xyz',
+      ...sec, moyasar_live_secret_key: 'sk_live_xyz',
     }, 'test');
     expect(c.mode).toBe('test');
     expect(c.secretKey).toBe('sk_test_abc');
@@ -535,5 +535,97 @@ describe('selectInvoicePayment', () => {
     expect(selectInvoicePayment({ payments: [] })).toBeNull();
     expect(selectInvoicePayment({})).toBeNull();
     expect(selectInvoicePayment({ payments: 'nope' } as unknown as Record<string, unknown>)).toBeNull();
+  });
+});
+
+describe('looksLikeMoyasarWebhook', () => {
+  it('recognises the documented Moyasar envelope', () => {
+    expect(looksLikeMoyasarWebhook({
+      id: 'evt_1', type: 'payment_paid', secret_token: 'wh', live: true, data: { id: 'pay_1' },
+    })).toBe(true);
+  });
+
+  /**
+   * The case this exists for: during a provider switch a Tap charge body must
+   * not be routed into the Moyasar handler, where it would fail the
+   * secret-token check and leave a paid order unconfirmed.
+   */
+  it('does not mistake a Tap charge body for a Moyasar event', () => {
+    expect(looksLikeMoyasarWebhook({
+      id: 'chg_123', status: 'CAPTURED', amount: 45.5, currency: 'SAR', live_mode: false,
+      reference: { transaction: 'sm_x', order: 'ORD-x' },
+    })).toBe(false);
+  });
+
+  it('rejects junk and partial shapes rather than guessing', () => {
+    expect(looksLikeMoyasarWebhook({})).toBe(false);
+    expect(looksLikeMoyasarWebhook(null)).toBe(false);
+    expect(looksLikeMoyasarWebhook({ type: 'payment_paid' })).toBe(false);      // no data
+    expect(looksLikeMoyasarWebhook({ data: { id: 'x' } })).toBe(false);          // no type
+    expect(looksLikeMoyasarWebhook({ type: '', data: {} })).toBe(false);         // empty type
+    expect(looksLikeMoyasarWebhook({ type: 'x', data: null })).toBe(false);
+  });
+});
+
+describe('resolveMoyasarConfig key namespacing', () => {
+  /**
+   * secret_config is MERGED on save, so distinct field names let Tap and
+   * Moyasar credentials coexist in the one integration_settings row. Reading
+   * Tap's names would defeat that: saving Moyasar keys would overwrite Tap's by
+   * collision and strand every refund still queued for Tap.
+   */
+  it('does not read Tap-shaped key names', () => {
+    const c = resolveMoyasarConfig(true, 'moyasar',
+      { mode: 'test' },
+      { test_secret_key: 'sk_test_tap_key', webhook_secret_token: 'wh' });
+    expect(c.secretKey).toBe('');
+    expect(c.ok).toBe(false);
+    expect(c.reason).toBe('missing_key');
+  });
+
+  it('reads its own namespaced names', () => {
+    const c = resolveMoyasarConfig(true, 'moyasar',
+      { mode: 'test' },
+      { moyasar_test_secret_key: 'sk_test_x', moyasar_webhook_secret_token: 'wh' });
+    expect(c.ok).toBe(true);
+    expect(c.secretKey).toBe('sk_test_x');
+  });
+});
+
+describe('decideCrossProviderAttempt', () => {
+  const live = (over = {}) => ({
+    id: 'att_1', provider: 'tap', provider_ref: null, provider_checkout_ref: null, ...over,
+  });
+
+  it('proceeds when there is no live attempt at all', () => {
+    expect(decideCrossProviderAttempt(null, 'moyasar')).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(undefined, 'moyasar')).toEqual({ action: 'proceed' });
+  });
+
+  it('proceeds when the live attempt is the SAME provider (normal reuse)', () => {
+    expect(decideCrossProviderAttempt(live({ provider: 'moyasar' }), 'moyasar')).toEqual({ action: 'proceed' });
+    expect(decideCrossProviderAttempt(live({ provider: 'MOYASAR' }), 'moyasar')).toEqual({ action: 'proceed' });
+  });
+
+  /**
+   * THE double-charge case. A Tap hosted page is open and payable; opening a
+   * Moyasar invoice too would give the customer two payable pages for one order,
+   * and only one of the two charges could ever be enrolled for refund.
+   */
+  it('refuses a second checkout when the other provider already has a payable one', () => {
+    expect(decideCrossProviderAttempt(live({ provider_ref: 'chg_1' }), 'moyasar'))
+      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
+    expect(decideCrossProviderAttempt(live({ provider_checkout_ref: 'inv_1' }), 'moyasar'))
+      .toEqual({ action: 'refuse', attemptId: 'att_1', provider: 'tap' });
+  });
+
+  /** Nothing exists at the other gateway, so nothing is payable — safe to close. */
+  it('closes a stale other-provider attempt that never reached its gateway', () => {
+    expect(decideCrossProviderAttempt(live(), 'moyasar'))
+      .toEqual({ action: 'close_stale', attemptId: 'att_1' });
+  });
+
+  it('treats a blank provider on the row as nothing to guard against', () => {
+    expect(decideCrossProviderAttempt(live({ provider: null }), 'moyasar')).toEqual({ action: 'proceed' });
   });
 });

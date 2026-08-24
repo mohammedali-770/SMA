@@ -205,11 +205,27 @@ export function resolveMoyasarConfig(
 ): ResolvedMoyasarConfig {
   const mode: MoyasarMode =
     modeOverride ?? (String(publicConfig.mode ?? 'test').toLowerCase() === 'live' ? 'live' : 'test');
+  // NAMESPACED KEY NAMES, and the reason matters.
+  //
+  // `integration_settings` holds ONE row per provider_type, and
+  // upsert_integration_settings MERGES secret_config (`old || new`) rather than
+  // replacing it — so keys the new payload does not mention survive a save.
+  // That merge only helps if the two gateways use DIFFERENT names: had Moyasar
+  // reused Tap's `test_secret_key` / `live_secret_key`, saving Moyasar
+  // credentials would overwrite Tap's by collision, and every refund still
+  // queued for Tap would become impossible to execute.
+  //
+  // With these names both gateways' credentials coexist in the one row, so
+  // switching the provider is reversible and in-flight work at the old gateway
+  // stays serviceable. Nothing is stored under the old names — no Moyasar
+  // credential exists anywhere — so this costs nothing to adopt.
   const secretKey = String(
-    (mode === 'live' ? secretConfig.live_secret_key : secretConfig.test_secret_key) ?? '',
+    (mode === 'live' ? secretConfig.moyasar_live_secret_key : secretConfig.moyasar_test_secret_key) ?? '',
   ).trim();
   const publishableKey = String(
-    (mode === 'live' ? publicConfig.live_publishable_key : publicConfig.test_publishable_key) ?? '',
+    (mode === 'live'
+      ? publicConfig.moyasar_live_publishable_key
+      : publicConfig.moyasar_test_publishable_key) ?? '',
   ).trim();
   // Moyasar's dashboard keeps test and live entirely separate, so a webhook
   // registered against the live account carries a different secret from the test
@@ -217,8 +233,10 @@ export function resolveMoyasarConfig(
   // fall back to a single shared value, so a merchant who only runs one webhook
   // is not forced to fill both slots.
   const webhookSecret = String(
-    (mode === 'live' ? secretConfig.live_webhook_secret_token : secretConfig.test_webhook_secret_token)
-    ?? secretConfig.webhook_secret_token
+    (mode === 'live'
+      ? secretConfig.moyasar_live_webhook_secret_token
+      : secretConfig.moyasar_test_webhook_secret_token)
+    ?? secretConfig.moyasar_webhook_secret_token
     ?? '',
   ).trim();
   const currency = String(publicConfig.currency ?? 'SAR').trim().toUpperCase() || 'SAR';
@@ -673,4 +691,89 @@ export function selectInvoicePayment(invoice: Record<string, unknown>): Record<s
   const sorted = [...payments].sort((a, b) =>
     String(b?.created_at ?? '').localeCompare(String(a?.created_at ?? '')));
   return sorted[0] ?? null;
+}
+
+/**
+ * Does this webhook body look like a Moyasar event rather than another
+ * gateway's?
+ *
+ * WHY SHAPE AND NOT CONFIGURATION. payment-webhook used to pick its handler
+ * from `integration_settings.provider_name` — whatever an administrator
+ * selected most recently. That is the wrong question when a customer is
+ * mid-checkout during a provider switch: the event that arrives belongs to the
+ * gateway that took the money, not to the one now configured. Routing a Tap
+ * charge into the Moyasar handler makes it fail the secret-token check and
+ * return 401, so a paid order silently never confirms.
+ *
+ * The test is deliberately structural and cheap: Moyasar's envelope is
+ * `{ id, type, created_at, secret_token, account_name, live, data }`
+ * (https://docs.moyasar.com/api/other/webhooks/webhook-reference), and a Tap
+ * charge body has no `type`/`data` pair. This only chooses which handler looks
+ * at the body — each one still authenticates independently and fails closed, so
+ * a wrong guess cannot confirm anything.
+ */
+export function looksLikeMoyasarWebhook(body: unknown): boolean {
+  const b = (body ?? {}) as Record<string, unknown>;
+  return typeof b.type === 'string'
+    && b.type.length > 0
+    && typeof b.data === 'object'
+    && b.data !== null;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-provider attempt guard.
+// ---------------------------------------------------------------------------
+
+export interface LiveAttempt {
+  id: string;
+  provider: string | null;
+  provider_ref: string | null;
+  provider_checkout_ref: string | null;
+}
+
+export type CrossProviderDecision =
+  | { action: 'proceed' }
+  | { action: 'close_stale'; attemptId: string }
+  | { action: 'refuse'; attemptId: string; provider: string };
+
+/**
+ * Decide what to do when an order (or checkout session) already has a LIVE
+ * payment attempt belonging to a DIFFERENT provider than the one about to be
+ * used.
+ *
+ * WHY THIS IS NEEDED AT ALL. The database's double-charge guard is two partial
+ * unique indexes keyed on (order_id, provider) and
+ * (checkout_session_id, provider) — they are provider-SCOPED. That was correct
+ * when one gateway existed. With two, a Tap attempt does not block a Moyasar
+ * attempt on the same order: switch the configured provider while a customer has
+ * a hosted checkout page open, let them tap Pay again, and they end up holding
+ * TWO payable pages for one order. If both are paid, `confirm_order_payment`
+ * de-duplicates on (provider, provider_ref) — which differ — so both settle, and
+ * `open_order_refund_record` can only ever enrol ONE of the two charges for
+ * refund. The second charge is money we took and cannot automatically give back.
+ *
+ * The check cannot live in the SQL RPCs without touching the frozen Tap ones, so
+ * it lives at the one place that knows about both gateways: payment-initiate.
+ *
+ * The two outcomes are deliberately different:
+ *  - The other attempt has NO provider-side object yet (no charge, no invoice) —
+ *    nothing is payable anywhere, so it is safe to close it and move on.
+ *  - The other attempt already has one. That page IS payable and we cannot close
+ *    it from here, so opening a second one is refused outright. The customer
+ *    waits for it to expire; that is a worse checkout and a far better outcome
+ *    than being charged twice.
+ */
+export function decideCrossProviderAttempt(
+  existing: LiveAttempt | null | undefined,
+  wantedProvider: string,
+): CrossProviderDecision {
+  if (!existing) return { action: 'proceed' };
+  const other = String(existing.provider ?? '').toLowerCase();
+  if (!other || other === String(wantedProvider ?? '').toLowerCase()) return { action: 'proceed' };
+
+  const hasProviderSideCheckout =
+    Boolean(existing.provider_ref) || Boolean(existing.provider_checkout_ref);
+  return hasProviderSideCheckout
+    ? { action: 'refuse', attemptId: existing.id, provider: other }
+    : { action: 'close_stale', attemptId: existing.id };
 }

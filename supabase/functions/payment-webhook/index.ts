@@ -7,8 +7,8 @@ import {
 } from '../_shared/tap.ts';
 import { retrieveTapCharge, validateAndConfirmTapCharge, type TapAttempt } from '../_shared/tapVerify.ts';
 import {
-  HANDLED_WEBHOOK_TYPES, isAdminTestInvoice, parseWebhookEnvelope, resolveMoyasarConfig,
-  verifyWebhookSecretToken,
+  HANDLED_WEBHOOK_TYPES, isAdminTestInvoice, looksLikeMoyasarWebhook, parseWebhookEnvelope,
+  resolveMoyasarConfig, verifyWebhookSecretToken,
 } from '../_shared/moyasar.ts';
 import {
   retrieveMoyasarPayment, validateAndConfirmMoyasarPayment, type MoyasarAttempt,
@@ -43,6 +43,40 @@ Deno.serve(async (req: Request) => {
 
   const providerName = (cfg.providerName ?? '').toLowerCase();
   const rawBody = await req.text();
+
+  // ROUTE BY THE EVENT, NOT BY THE CURRENT CONFIGURATION.
+  //
+  // An event belongs to the gateway that took the money, which is not
+  // necessarily the gateway configured right now. Picking the handler from
+  // `provider_name` alone meant that during a provider switch a Tap charge was
+  // fed to the Moyasar handler, failed its secret-token check, and returned 401
+  // — so a customer who had already paid never had their order confirmed.
+  //
+  // Detection only chooses which handler reads the body. Each one still
+  // authenticates independently and fails closed, so a wrong guess can never
+  // confirm anything. Geidea keeps its original configuration-driven path:
+  // it is dormant scaffold and has no detector.
+  const detected: 'tap' | 'moyasar' | null =
+    (providerName === 'tap' || providerName === 'moyasar')
+      ? (looksLikeMoyasarWebhook(safeParse(rawBody)) ? 'moyasar' : 'tap')
+      : null;
+
+  if (detected && detected !== providerName) {
+    // We hold exactly ONE credential slot for provider_type='payment', so a
+    // switch overwrites the previous gateway's keys: this event cannot be
+    // verified at all, and guessing would be worse than admitting it. Return a
+    // retryable status so the provider's redelivery schedule gives an operator a
+    // window to put the original gateway back, and record it where the admin
+    // feed will show it.
+    console.warn('payment webhook for a provider that is no longer configured', JSON.stringify({
+      detected, configured: providerName, body_bytes: rawBody.length,
+    }));
+    await admin.from('integration_sync_logs').insert({
+      provider: detected, order_id: null, direction: 'webhook', status: 'failed',
+      request: { body_bytes: rawBody.length }, error: 'provider_not_configured',
+    }).then(() => {}, () => {});
+    return json({ status: 'retry', reason: 'provider_not_configured' }, 503);
+  }
 
   if (providerName === 'tap') return await handleTapWebhook(admin, req, cfg, rawBody);
   if (providerName === 'moyasar') return await handleMoyasarWebhook(admin, cfg, rawBody);
@@ -279,6 +313,11 @@ async function handleGeideaWebhook(
   await pushLazywaitOnlinePayment(admin, (fresh ?? data) as Record<string, unknown> | null, orderId).catch(() => {});
 
   return json({ status: 'paid', order: data }, 200);
+}
+
+/** Parse a webhook body for ROUTING only; both handlers re-parse and validate. */
+function safeParse(raw: string): unknown {
+  try { return JSON.parse(raw); } catch { return {}; }
 }
 
 function isUuid(v: string): boolean {

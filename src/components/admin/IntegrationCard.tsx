@@ -66,19 +66,22 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
       moyasar: {
         publicFields: [
           { key: 'mode', label: 'Mode (test / live)', type: 'text', placeholder: 'test' },
-          { key: 'currency', label: 'Currency', type: 'text', placeholder: 'SAR' },
           { key: 'invoice_expiry_minutes', label: 'Invoice expiry (minutes, 5–60)', type: 'text', placeholder: '30' },
-          { key: 'test_publishable_key', label: 'Test Publishable Key (pk_test_…)', type: 'text', placeholder: 'pk_test_…' },
-          { key: 'live_publishable_key', label: 'Live Publishable Key (pk_live_…)', type: 'text', placeholder: 'pk_live_…' },
+          { key: 'moyasar_test_publishable_key', label: 'Test Publishable Key (pk_test_…)', type: 'text', placeholder: 'pk_test_…' },
+          { key: 'moyasar_live_publishable_key', label: 'Live Publishable Key (pk_live_…)', type: 'text', placeholder: 'pk_live_…' },
         ],
+        // Namespaced so they do NOT collide with Tap's key names. secret_config
+        // is merged on save, so distinct names let both gateways' credentials
+        // live in the one row — which is what keeps a refund still queued for
+        // the previous provider executable after a switch.
         secretFields: [
-          { key: 'test_secret_key', label: 'Test Secret Key (sk_test_…)' },
-          { key: 'live_secret_key', label: 'Live Secret Key (sk_live_…)' },
+          { key: 'moyasar_test_secret_key', label: 'Test Secret Key (sk_test_…)' },
+          { key: 'moyasar_live_secret_key', label: 'Live Secret Key (sk_live_…)' },
           // Moyasar signs nothing: the webhook's only authentication is this
           // shared token echoed in the request body. Without it the webhook
           // cannot be authenticated at all, so the server refuses to act on one.
-          { key: 'test_webhook_secret_token', label: 'Test Webhook Secret Token' },
-          { key: 'live_webhook_secret_token', label: 'Live Webhook Secret Token' },
+          { key: 'moyasar_test_webhook_secret_token', label: 'Test Webhook Secret Token' },
+          { key: 'moyasar_live_webhook_secret_token', label: 'Live Webhook Secret Token' },
         ],
       },
     },

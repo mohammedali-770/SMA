@@ -53,8 +53,12 @@ Deno.serve(async (req: Request) => {
 
   const cfg = await getProviderConfig(admin, 'payment');
   const providerName = (cfg?.providerName ?? '').toLowerCase();
-  if (providerName === 'moyasar') return await verifyMoyasarOrder(admin, cfg!, orderId);
-  if (!cfg || providerName !== 'tap') {
+  // Route by the provider of the attempt that is actually in flight, not by the
+  // one configured right now — see attemptProvider().
+  const route = (await attemptProvider(admin, 'order_id', orderId)) || providerName;
+  if (route && route !== providerName) return await unverifiableProvider(admin, route, providerName);
+  if (route === 'moyasar') return await verifyMoyasarOrder(admin, cfg!, orderId);
+  if (!cfg || route !== 'tap') {
     return json({ status: 'pending' }, 200);
   }
 
@@ -94,8 +98,10 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
 
   const cfg = await getProviderConfig(admin, 'payment');
   const providerName = (cfg?.providerName ?? '').toLowerCase();
-  if (providerName === 'moyasar') return await verifyMoyasarSession(supaUser, admin, cfg!, sessionId);
-  if (!cfg || providerName !== 'tap') return json({ status: 'pending' }, 200);
+  const route = (await attemptProvider(admin, 'checkout_session_id', sessionId)) || providerName;
+  if (route && route !== providerName) return await unverifiableProvider(admin, route, providerName);
+  if (route === 'moyasar') return await verifyMoyasarSession(supaUser, admin, cfg!, sessionId);
+  if (!cfg || route !== 'tap') return json({ status: 'pending' }, 200);
 
   const { data: recs } = await admin.from('payment_records')
     .select('id, order_id, checkout_session_id, provider_ref, reference_transaction, reference_order, amount, mode, status')
@@ -120,6 +126,51 @@ async function verifySession(supaUser: SupabaseClient, admin: SupabaseClient, se
     outOrderId = String(s2?.order_id ?? '');
   }
   return json({ status: outcome, messageKey, orderId: outOrderId || null }, 200);
+}
+
+// ---------------------------------------------------------------------------
+// Provider routing.
+//
+// An in-flight attempt belongs to the gateway that opened it. Routing
+// verification by `integration_settings.provider_name` — whatever is configured
+// at the moment the app asks — means that after a provider switch a customer
+// with an open Tap checkout is looked up in the Moyasar tables, found absent,
+// and told 'pending' forever even after they pay.
+//
+// So: find the attempt first, and let IT choose the path.
+// ---------------------------------------------------------------------------
+async function attemptProvider(
+  admin: SupabaseClient, column: 'order_id' | 'checkout_session_id', value: string,
+): Promise<string | null> {
+  const { data } = await admin.from('payment_records')
+    .select('provider')
+    .eq(column, value)
+    .order('created_at', { ascending: false }).limit(1);
+  const row = (Array.isArray(data) ? data[0] : null) as { provider?: string } | null;
+  return row?.provider ? String(row.provider).toLowerCase() : null;
+}
+
+/**
+ * The attempt belongs to a gateway that is not the configured one. There is a
+ * single credential slot for provider_type='payment', so switching overwrites
+ * the previous gateway's keys and this attempt genuinely cannot be verified.
+ *
+ * Reported as 'pending' because that is the truth from the app's point of view —
+ * it keeps polling and the order is not falsely failed — and logged so the
+ * situation is visible to an operator rather than presenting as a customer who
+ * "never finished paying".
+ */
+async function unverifiableProvider(
+  admin: SupabaseClient, attemptProviderName: string, configured: string,
+): Promise<Response> {
+  console.warn('payment attempt for a provider that is no longer configured', JSON.stringify({
+    attempt: attemptProviderName, configured,
+  }));
+  await admin.from('integration_sync_logs').insert({
+    provider: attemptProviderName, order_id: null, direction: 'webhook', status: 'skipped',
+    request: { action: 'verify' }, error: 'provider_not_configured',
+  }).then(() => {}, () => {});
+  return json({ status: 'pending', reason: 'provider_not_configured' }, 200);
 }
 
 // ---------------------------------------------------------------------------
