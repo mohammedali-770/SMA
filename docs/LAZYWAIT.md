@@ -1,6 +1,8 @@
 # Spicy Meal — Lazywait POS Integration
 
-Server-side order sync to the **Lazywait POS** (`https://apiv2.lazywait.com/v1`).
+Server-side order sync to the **Lazywait POS**. The POS this integration talks
+to is the **dev host `https://apiv2-dev.lazywait.com/v1`** — see "Which host is
+live" below; it is the real POS for this branch, not a staging convenience.
 Supabase / `place_order` stays the **source of truth** for order creation,
 pricing, VAT, coupon, loyalty and order state. Lazywait is a sync **destination**
 only — a Lazywait failure NEVER blocks or alters a customer order.
@@ -18,13 +20,34 @@ only — a Lazywait failure NEVER blocks or alters a customer order.
   pasted into a chat/playground as compromised. Generate a fresh `lw_live_…` key
   in the Lazywait portal and store it via the admin card / SQL below.
 
+## Which host is live — read before changing `base_url`
+**The live POS is the DEV host** (`https://apiv2-dev.lazywait.com/v1`). Confirmed
+by the owner on **2026-08-24** and matching the live
+`integration_settings.public_config.base_url` in Production, last written
+2026-07-24. Every pickup order that has synced went there.
+
+Two things in source still name the **production** host and are now traps:
+
+- `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
+  `https://apiv2.lazywait.com/v1`. It is only a **fallback** — the worker prefers
+  `public_config.base_url` — but if that key were ever cleared, the worker would
+  silently start POSTing real customer orders to a POS nobody watches. It is
+  deliberately left unchanged here; changing it is a separate decision.
+- The admin Integrations card shows the production URL as its input
+  **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
+  wrong host could get typed back in.
+
+The `20260708130000` migration also seeds the production URL as a default. That
+file is applied history and must never be edited; the live row overrides it.
+
 ## Configuration (never committed)
 Set with the admin **Lazywait POS** card, or via SQL (service role / SQL editor):
 ```sql
 select public.upsert_integration_settings(
   'lazywait', 'lazywait', true,
   -- public_config (non-secret): base URL + client id
-  '{"base_url":"https://apiv2.lazywait.com/v1","client_id":"vAK1AmUr7Xhoa6KsYNhU"}'::jsonb,
+  -- base_url is the DEV host — that is the live POS (see "Which host is live")
+  '{"base_url":"https://apiv2-dev.lazywait.com/v1","client_id":"<CLIENT_ID>"}'::jsonb,
   -- secret_config (server-only): API token + webhook secret (+ optional cron gate)
   '{"api_token":"lw_live_…","webhook_secret":"whsec_…","sync_trigger_secret":"…"}'::jsonb
 );
@@ -88,10 +111,12 @@ no blocked orders).
    an `integration_sync_logs` row via `record_lazywait_sync`.
 
 ### Create Order payload (only CONFIRMED fields)
-The owner supplied the vendor Create Order contract on **2026-08-24**. It was
-read from the **dev** host `apiv2-dev.lazywait.com`; `DEFAULT_BASE_URL` is the
-**production** host and was deliberately not changed, so field-level parity
-between the two is **unverified**. Field-by-field state:
+The owner supplied the vendor Create Order contract on **2026-08-24**, read from
+`apiv2-dev.lazywait.com` — **the same host this integration actually posts to**,
+so it describes the endpoint we use rather than a different environment's. (An
+earlier revision of this section claimed we post to production and called
+dev-vs-prod parity unverified; that was wrong — it read `DEFAULT_BASE_URL`
+instead of the live config row.) Field-by-field state:
 `docs/integrations/Lazywait_API_Reference.md`.
 
 ```json
