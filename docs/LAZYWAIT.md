@@ -264,7 +264,8 @@ Production the day the payload change merged (`536a6cb`):
 | `products.lazywait_price_id` | 70 | 65 | 0 |
 | `categories.lazywait_category_id` | 9 | 6 | 0 |
 
-Every active product, price and category is mapped. **No modifier is.** All three
+Every active product, price and category is mapped — *non-null*, which is not the
+same as *resolvable*; see the caveat below. **No modifier is.** All three
 — Mild, Hot, Volcano (+2) — are active, sit in one "Heat Level" group and are
 offered by two active products. Lazywait's own catalog has no heat-level add-on
 in either language: two independent pulls (2026-07-23, 27 add-ons; 2026-08-24,
@@ -280,6 +281,28 @@ precondition can never be met by mapping alone, and the deploy no longer depends
 on it. `lazywait_mapping_status()` (staff role required) and the admin
 **Lazywait catalog mapping** card remain the right way to check *item*, *price*
 and *category* mappings, which do still block.
+
+**Those gates test presence, not resolvability.** `missing_item_mapping` fires
+only on a NULL `lazywait_item_id` (`!it.menuItemId`), so a mapping that exists in
+our rows but no longer resolves in the vendor catalog passes every gate and is
+POSTed unchanged. The table above says our rows are non-null; it says nothing
+about whether Lazywait still knows those ids.
+
+Nothing in this worker detects a stale id, and the POS answer is not reliably
+legible either. A rejection *can* land as a terminal `client_error_4xx`, but a
+5xx is classified ambiguous and left for confirmation, and a 2xx is recorded as
+delivered — so a stale id can equally surface as a silently wrong ticket rather
+than as a mapping error. Do not read "every product is mapped" as "every product
+will be accepted"; see `docs/OWNER_ACTIONS.md` §17.
+
+**Catalog size moves between pulls, so a single pull is not evidence of drift.**
+Six `lazywait-catalog` pulls ran on 2026-08-24, all logging `success` with an
+empty `errors` array. The first three (10:45, 10:57, 11:02 UTC) recorded 4 items
+and 1 category; the next three (11:06, 11:15, 11:16 UTC) recorded 61 items and 6
+categories, against 64 items and 7 categories on 2026-07-23. Add-ons read 10 in
+all six. Whatever produced the four-item reads was transient and had cleared
+within about twenty minutes. Size the catalog — and judge whether mappings have
+gone stale — from the latest pull and a repeat, never from one reading.
 
 Creating the three add-ons in the Lazywait catalog and mapping them is still the
 only way to get heat level onto the ticket as a **structured, separately priced**
