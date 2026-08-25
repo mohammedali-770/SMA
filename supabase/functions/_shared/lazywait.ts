@@ -92,6 +92,28 @@ const enc = new TextEncoder();
  */
 export const LAZYWAIT_BASE_URL_NOT_CONFIGURED = 'lazywait_base_url_not_configured';
 
+/**
+ * Stable machine reason for "the Lazywait base URL is set, but is not a usable
+ * absolute http(s) URL".
+ *
+ * Kept DISTINCT from `..._NOT_CONFIGURED` because the operator response differs:
+ * one means nobody filled the field in, the other means somebody filled it in
+ * wrongly. Both are terminal configuration faults, and neither may reach the
+ * network.
+ *
+ * Why this exists at all: a blank check alone leaves the PR's own failure mode
+ * open. `lazywaitFetch` builds `${base}${path}?${params}` and hands it to
+ * `fetch`, which THROWS on a malformed URL; the catch there returns
+ * `status: 0`, and `classifyCreateOrderResult({ status: 0 })` is
+ * `ambiguous -> confirmation_required`. So a mistyped host would mark real
+ * customer orders as needing manual confirmation — exactly the outcome the
+ * fail-closed guard exists to prevent, reached by a typo instead of a blank.
+ * That is not hypothetical: the admin Integrations card still offers the
+ * PRODUCTION host as its input placeholder, so hand-editing that field is the
+ * likeliest way a bad value arrives.
+ */
+export const LAZYWAIT_BASE_URL_INVALID = 'lazywait_base_url_invalid';
+
 /** Thrown when a Lazywait call is attempted with no usable base URL. */
 export class LazywaitConfigError extends Error {
   readonly reason: string;
@@ -102,20 +124,48 @@ export class LazywaitConfigError extends Error {
   }
 }
 
+export type LazywaitBaseUrlFailure =
+  | typeof LAZYWAIT_BASE_URL_NOT_CONFIGURED
+  | typeof LAZYWAIT_BASE_URL_INVALID;
+
 export type ResolvedBaseUrl =
   | { ok: true; baseUrl: string }
-  | { ok: false; reason: typeof LAZYWAIT_BASE_URL_NOT_CONFIGURED };
+  | { ok: false; reason: LazywaitBaseUrlFailure };
 
 /**
- * Resolve a configured Lazywait base URL, or fail. Absent, empty and
- * whitespace-only all fail — there is deliberately NO fallback to
- * `DEFAULT_BASE_URL` (see the note on that constant). The returned value is
- * trimmed with trailing slashes stripped, exactly as `lazywaitFetch` needs it.
+ * Resolve a configured Lazywait base URL, or fail. There is deliberately NO
+ * fallback to `DEFAULT_BASE_URL` (see the note on that constant).
+ *
+ * Two distinct failures, both terminal and both before any request is built:
+ * - absent / empty / whitespace-only -> `LAZYWAIT_BASE_URL_NOT_CONFIGURED`;
+ * - present but not an absolute http(s) URL -> `LAZYWAIT_BASE_URL_INVALID`.
+ *
+ * The shape check is deliberately narrow — it asks only "would `fetch` accept
+ * this?", via the same `URL` parse the platform performs, plus an http/https
+ * protocol requirement. It does NOT check the host, path or reachability, so it
+ * cannot reject a legitimately reconfigured POS. `https://apiv2-dev.lazywait
+ * .com/v1`, the live value, is pinned as passing in `lazywait.test.ts`.
+ *
+ * The returned value is trimmed with trailing slashes stripped, exactly as
+ * `lazywaitFetch` needs it. Note the trim is load-bearing and slightly more
+ * permissive than the pre-2026-08-24 transport, which passed surrounding
+ * whitespace straight into the request URL: `'  https://host  '` used to
+ * produce a failed request and now resolves cleanly.
  */
 export function resolveLazywaitBaseUrl(raw: unknown): ResolvedBaseUrl {
   if (raw == null) return { ok: false, reason: LAZYWAIT_BASE_URL_NOT_CONFIGURED };
   const trimmed = String(raw).trim();
   if (!trimmed) return { ok: false, reason: LAZYWAIT_BASE_URL_NOT_CONFIGURED };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { ok: false, reason: LAZYWAIT_BASE_URL_INVALID };
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { ok: false, reason: LAZYWAIT_BASE_URL_INVALID };
+  }
   return { ok: true, baseUrl: trimmed.replace(/\/+$/, '') };
 }
 

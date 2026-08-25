@@ -48,12 +48,42 @@ Added 2026-08-24, alongside the host correction above.
 
 Because the live POS is the **dev** host, an implicit fallback to
 `DEFAULT_BASE_URL` was not a safe default — it was a silent redirect of live
-customer orders to the **production** POS. A cleared, blank or whitespace-only
-`public_config.base_url` now **fails closed** instead:
+customer orders to the **production** POS. A cleared, blank, whitespace-only or
+**malformed** `public_config.base_url` now **fails closed** instead:
 
 - `resolveLazywaitBaseUrl()` (`_shared/lazywait.ts`) is the single resolution
-  point. Absent / empty / whitespace-only all fail with the terminal reason
-  **`lazywait_base_url_not_configured`**. There is no fallback.
+  point, and it reports **two distinct terminal reasons**, because the operator
+  response differs — one means nobody filled the field in, the other means
+  somebody filled it in wrongly:
+  - absent / empty / whitespace-only → **`lazywait_base_url_not_configured`**;
+  - present but not an absolute `http(s)` URL →
+    **`lazywait_base_url_invalid`**.
+
+  There is no fallback in either case.
+
+**Why the shape check is not optional.** Rejecting only blanks would have left
+this PR's own failure mode open one keystroke away. `lazywaitFetch` builds
+`` `${base}${path}?${params}` `` and hands it to `fetch`, which **throws** on a
+malformed URL; the catch there returns `status: 0`, and
+`classifyCreateOrderResult({status: 0})` is `ambiguous → confirmation_required`.
+So a mistyped host would mark real customer orders as needing manual
+confirmation — the exact outcome this guard exists to prevent, reached by a typo
+instead of a blank. That is not hypothetical while the admin card still offers
+the *production* host as its input placeholder (see "Still open" below).
+
+The check is deliberately **narrow**: it asks only "would `fetch` accept this?",
+via the same `URL` parse the platform performs plus an `http`/`https` protocol
+requirement. It does not check host, path or reachability, so it cannot reject a
+legitimately reconfigured POS. `lazywait.test.ts` pins both directions — the
+live value and four other plausible hosts resolve; no-scheme, misspelled-scheme,
+free text, bare path and non-http schemes are rejected as
+`lazywait_base_url_invalid`.
+
+**One deliberate loosening.** `resolveLazywaitBaseUrl` trims before validating,
+which the pre-2026-08-24 transport did not: `'  https://host  '` used to be
+passed into the request URL verbatim and fail, and now resolves cleanly and
+sends. That is the desirable behaviour for a hand-edited config field, but it is
+a live-path change and is recorded rather than glossed.
 - `lazywait-sync` resolves it **before** the stale reaper and **before**
   `claim_lazywait_sync_batch`, and returns `500 lazywait_base_url_not_configured`
   without claiming anything. No order is claimed, no order changes state, and no

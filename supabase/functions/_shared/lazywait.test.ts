@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails,
   computeBackoffMs, computePosNextAttempt, DEFAULT_BASE_URL, extractOrderRef, hmacSha256Hex,
-  LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
+  LAZYWAIT_BASE_URL_INVALID, LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
   MAX_SYNC_ATTEMPTS, normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN,
   resolveLazywaitBaseUrl, round2, mapOrderItemRows, ORDER_ITEM_SELECT, shouldResendCreateOrder,
   splitPhoneForPos, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature, type LazywaitConfig,
@@ -710,6 +710,56 @@ describe('resolveLazywaitBaseUrl (fail closed)', () => {
     for (const blank of [undefined, null, '', '   ']) {
       const r = resolveLazywaitBaseUrl(blank);
       expect(r).not.toEqual({ ok: true, baseUrl: DEFAULT_BASE_URL });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Shape, not just emptiness. A non-blank but unusable value would otherwise
+  // reach `fetch`, throw, and come back as `status: 0` — which
+  // classifyCreateOrderResult reads as ambiguous -> confirmation_required on a
+  // REAL customer order. Same bad outcome as the blank case, reached by a typo.
+  // -------------------------------------------------------------------------
+  it('names the malformed reason as a stable machine string, distinct from blank', () => {
+    expect(LAZYWAIT_BASE_URL_INVALID).toBe('lazywait_base_url_invalid');
+    expect(LAZYWAIT_BASE_URL_INVALID).not.toBe(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
+  });
+
+  it.each([
+    ['no scheme (the likeliest typo)', 'apiv2-dev.lazywait.com/v1'],
+    ['misspelled scheme', 'htp://apiv2-dev.lazywait.com/v1'],
+    ['free text', 'not a url'],
+    ['scheme only', 'https://'],
+    ['a bare path', '/v1'],
+    ['a number', 12345],
+    ['non-http scheme', 'ftp://apiv2-dev.lazywait.com/v1'],
+    ['javascript scheme', 'javascript:alert(1)'],
+  ])('rejects %s as INVALID, so it never reaches fetch', (_label, raw) => {
+    const r = resolveLazywaitBaseUrl(raw);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe(LAZYWAIT_BASE_URL_INVALID);
+    expect(JSON.stringify(r)).not.toContain('apiv2.lazywait.com');
+  });
+
+  it('does NOT reject a legitimately reconfigured POS — the check is shape only', () => {
+    // The guard must not become a reason a real host change fails. It asks only
+    // "would fetch accept this?", never anything about host, path or vendor.
+    for (const good of [
+      'https://apiv2-dev.lazywait.com/v1',   // the live value, pinned
+      'https://apiv2.lazywait.com/v1',
+      'https://some-new-pos.example.com/api/v3',
+      'http://localhost:54321/v1',
+      'https://10.0.0.4:8443/v1',
+    ]) {
+      expect(resolveLazywaitBaseUrl(good).ok).toBe(true);
+    }
+  });
+
+  it('blank still reports NOT_CONFIGURED, not INVALID — the two stay distinguishable', () => {
+    for (const blank of [undefined, null, '', '   ', '\t\n ']) {
+      const r = resolveLazywaitBaseUrl(blank);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
     }
   });
 });
