@@ -72,6 +72,12 @@ export interface DbModifier {
   price: number; sort_order: number; is_active: boolean;
   lazywait_addon_id?: string | null;
 }
+/** A named price tier of a product — the local mirror of a Lazywait item price. */
+export interface DbProductVariant {
+  id: string; product_id: string; name_en: string; name_ar: string;
+  price: number; calories: number | null; sort_order: number; is_active: boolean;
+  lazywait_price_id: string | null;
+}
 export interface DbProductModifierGroup { product_id: string; group_id: string; sort_order: number; }
 export interface DbBranchAvailability { branch_id: string; product_id: string; is_available: boolean; }
 export interface DbAppSettings {
@@ -246,6 +252,12 @@ export interface DbIntegrationSetting {
 export interface DbOrderItem {
   id: string; order_id: string; product_id: string | null;
   name_en: string; name_ar: string; unit_price: number; quantity: number; line_total: number;
+  // Tier snapshot. admin_list_orders_with_items has projected these since
+  // 20260824130000; they were being fetched and then discarded by the mapper,
+  // so every tiered line rendered as the bare product name.
+  variant_id?: string | null;
+  variant_name_en?: string | null;
+  variant_name_ar?: string | null;
 }
 export interface DbOrderItemModifier {
   id: string; order_item_id: string; modifier_id: string | null;
@@ -573,6 +585,11 @@ export const catalog = {
   branches: async () => ok<DbBranch[]>(await supabase.from('branches').select('*').order('name_en')),
   categories: async () => ok<DbCategory[]>(await supabase.from('categories').select('*').order('sort_order')),
   products: async () => ok<DbProduct[]>(await supabase.from('products').select('*').order('sort_order')),
+  /** Price tiers. RLS returns active rows to everyone and all rows to staff. */
+  productVariants: async () => ok<DbProductVariant[]>(await supabase
+    .from('product_variants')
+    .select('id, product_id, name_en, name_ar, price, calories, sort_order, is_active, lazywait_price_id')
+    .order('sort_order')),
   modifierGroups: async () => ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select('*')),
   modifiers: async () => ok<DbModifier[]>(await supabase.from('modifiers').select('*').order('sort_order')),
   productModifierGroups: async () =>
@@ -590,13 +607,16 @@ export const catalog = {
       .eq('is_active', true)),
   /** Fetch the whole menu graph in parallel. */
   async all() {
-    const [branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones] =
+    const [branches, categories, products, productVariants, modifierGroups, modifiers, links,
+           availability, settings, deliveryZones] =
       await Promise.all([
-        this.branches(), this.categories(), this.products(), this.modifierGroups(),
+        this.branches(), this.categories(), this.products(), this.productVariants(),
+        this.modifierGroups(),
         this.modifiers(), this.productModifierGroups(), this.availability(), this.settings(),
         this.deliveryZones(),
       ]);
-    return { branches, categories, products, modifierGroups, modifiers, links, availability, settings, deliveryZones };
+    return { branches, categories, products, productVariants, modifierGroups, modifiers, links,
+             availability, settings, deliveryZones };
   },
 };
 

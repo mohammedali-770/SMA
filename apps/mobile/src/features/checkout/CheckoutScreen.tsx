@@ -49,6 +49,7 @@ import { pointInPolygon } from '../../lib/geo';
 import { useAddressBook, useAuth, useCart, useCatalog, useOrderContext } from '../../store';
 import { availabilityLookup, validateCartForBranch } from '../order/cartValidation';
 import type { CartItem, OrderType, SavedAddress } from '../../types/models';
+import { cartLineLabel } from '../../utils/format';
 import { recoverPendingSession } from './pendingSession';
 import { clearPendingSession, loadPendingSession, savePendingSession } from './pendingSessionStore';
 import { startCheckoutHandoff, type CheckoutHandoffResult } from './checkoutHandoff';
@@ -511,7 +512,7 @@ export function CheckoutScreen() {
     if (decision.kind === 'confirm-remove') {
       // Never drop a line silently — the app confirms removals everywhere else
       // (see the cart-conflict sheet in the order-type gate) and does so here.
-      setConfirmRemove({ cartItemId, name: pick(item.product.nameEn, item.product.nameAr) });
+      setConfirmRemove({ cartItemId, name: cartLineLabel(item, pick) });
       return;
     }
     // Mark the line as settling BEFORE mutating: the ref blocks the next
@@ -557,7 +558,7 @@ export function CheckoutScreen() {
           availabilityLookup(fresh.products), availabilityLookup(fresh.modifiers),
         ).invalid;
         if (soldOut.length > 0) {
-          const names = soldOut.map((it) => pick(it.product.nameEn, it.product.nameAr)).join('، ');
+          const names = soldOut.map((it) => cartLineLabel(it, pick)).join('، ');
           setError(`${t('soldOutNow')}: ${names}. ${t('soldOutBody')}`);
           return;
         }
@@ -895,7 +896,7 @@ export function CheckoutScreen() {
             <CheckoutLines
               items={cart.items}
               recalcLineId={recalcLine}
-              nameOf={(it) => pick(it.product.nameEn, it.product.nameAr)}
+              nameOf={(it) => cartLineLabel(it, pick)}
               modifierSummaryOf={(it) => modifierSummary(it, pick)}
               amountOf={lineTotal}
               onIncrement={(id) => changeQuantity(id, 1)}

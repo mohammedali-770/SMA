@@ -439,7 +439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const c = await catalog.all();
     setBranches(c.branches.map(mapBranch));
     setCategories(c.categories.map(mapCategory));
-    setProducts(c.products.map(p => mapProduct(p, c.links)));
+    setProducts(c.products.map(p => mapProduct(p, c.links, c.productVariants)));
     setModifierGroups(c.modifierGroups.map(g => mapModifierGroup(g, c.modifiers)));
     setAvailabilityMatrix(buildAvailabilityMatrix(c.products, c.branches, c.availability));
     setBrandSettings(mapBrandSettings(c.settings));

@@ -40,7 +40,7 @@ const branch = (id: string, nameEn: string, over: Partial<Branch> = {}): Branch 
 
 const product = (id: string, over: Partial<Product> = {}): Product => ({
   id, categoryId: 'c1', nameAr: id, nameEn: id, descriptionAr: '', descriptionEn: '',
-  price: 10, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [], ...over,
+  price: 10, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [], variants: [], ...over,
 });
 
 const modifier = (id: string, groupId = 'heat'): Modifier =>

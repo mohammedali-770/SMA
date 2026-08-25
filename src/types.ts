@@ -64,6 +64,25 @@ export interface Category {
   sortOrder: number;
 }
 
+/**
+ * A named price tier of a product — "Small"/"Large", "Spicy"/"Regular".
+ *
+ * The local mirror of a Lazywait item PRICE. Lazywait models a menu as
+ * category -> item -> price, and this is that third level: it is what carries
+ * `lazywait_price_id`, the id the POS ticket must name.
+ */
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  nameAr: string;
+  nameEn: string;
+  price: number; // VAT-inclusive, like Product.price
+  calories: number | null;
+  sortOrder: number;
+  isActive: boolean;
+  lazywaitPriceId?: string | null;
+}
+
 export interface Product {
   id: string;
   categoryId: string;
@@ -71,11 +90,17 @@ export interface Product {
   nameEn: string;
   descriptionAr: string;
   descriptionEn: string;
-  price: number; // VAT-inclusive in Saudi Arabia (15% VAT)
+  /**
+   * VAT-inclusive. With variants this is the CHEAPEST tier — the "from" price —
+   * and an order line is priced from the chosen variant instead.
+   */
+  price: number;
   imageUrl: string;
   calories: number;
   isActive: boolean;
   modifierGroupIds: string[]; // Association to modifier groups
+  /** Orderable price tiers. Empty means the product has a single price. */
+  variants: ProductVariant[];
 }
 
 export interface ProductBranchAvailability {
@@ -133,7 +158,30 @@ export interface OrderItem {
   quantity: number;
   /** The customer's instruction for THIS line ("no onion"), when they left one. */
   note?: string;
+  /**
+   * The price tier this line was ordered at, snapshotted onto the line at
+   * checkout. Absent for an untiered product and for any order placed before
+   * `20260824120000_product_variants`. Two lines both reading "Coral" may be
+   * different food at different prices, so the tier is what makes a ticket
+   * unambiguous — see `orderLineLabel`.
+   */
+  variantId?: string;
+  variantNameEn?: string;
+  variantNameAr?: string;
   selectedModifiers: OrderItemModifier[];
+}
+
+/**
+ * How a line is named to staff and on a receipt: "Coral — Large".
+ *
+ * Falls back to the bare product name when the line has no tier, or when the
+ * tier name merely repeats it, so an untiered product reads exactly as it did
+ * before variants existed.
+ */
+export function orderLineLabel(item: OrderItem, isRTL: boolean): string {
+  const base = isRTL ? item.nameAr : item.nameEn;
+  const tier = (isRTL ? item.variantNameAr : item.variantNameEn)?.trim();
+  return !tier || tier === base ? base : `${base} — ${tier}`;
 }
 
 export interface Order {

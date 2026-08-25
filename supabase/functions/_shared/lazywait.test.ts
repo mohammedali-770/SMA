@@ -452,11 +452,30 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
     ]);
   });
 
+  // A tiered line MUST ticket the tier the customer chose. `products` names
+  // only the cheapest tier, so reading it for a Large would tell the POS the
+  // customer bought a Small — the right money, the wrong food.
+  it('sends the CHOSEN tier price_id, not the product default', () => {
+    const tiered = {
+      ...row,
+      variant_id: 'v-large',
+      products: { ...row.products, lazywait_price_id: 'PR_SMALL' },
+      product_variants: { lazywait_price_id: 'PR_LARGE' },
+    };
+    expect(mapOrderItemRows([tiered])[0].priceId).toBe('PR_LARGE');
+  });
+
+  it('falls back to the product price_id when the line has no tier', () => {
+    const untiered = { ...row, variant_id: null, product_variants: null };
+    expect(mapOrderItemRows([untiered])[0].priceId).toBe('PR_SINGLE');
+  });
+
   it('ORDER_ITEM_SELECT actually asks for everything the mapper reads', () => {
     for (const fragment of [
       'name_ar', 'note', 'unit_price',
       'lazywait_item_id', 'lazywait_price_id',
       'categories(lazywait_category_id)',
+      'variant_id', 'product_variants(lazywait_price_id)',
       'order_item_modifiers(', 'modifiers(lazywait_addon_id)',
     ]) {
       expect(ORDER_ITEM_SELECT).toContain(fragment);

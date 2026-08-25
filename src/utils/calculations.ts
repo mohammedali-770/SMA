@@ -271,6 +271,8 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
 
     const prodId = generateId('prod-csv');
     const newProduct: Product = {
+      // CSV import carries a single price per row, so no tiers.
+      variants: [],
       id: prodId,
       categoryId: category.id,
       nameEn: prodNameEn,

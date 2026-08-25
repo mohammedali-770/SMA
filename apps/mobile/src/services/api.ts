@@ -23,7 +23,7 @@ import type {
   DbAddress, DbAppSettings, DbBranch, DbBranchAvailability, DbBranchDeliveryZone,
   DbBranchModifierAvailability, DbCategory,
   DbHomepageBanner, DbLegalDocument, DbModifier, DbModifierGroup, DbCustomerOrderWithItems, DbOrder,
-  DbProduct, DbProductModifierGroup, DbProfile, DbPushDevice, OrderType,
+  DbProduct, DbProductModifierGroup, DbProductVariant, DbProfile, DbPushDevice, OrderType,
 } from '../types/db';
 
 /** Return the data or throw the PostgREST error (never a silent null). */
@@ -117,6 +117,11 @@ export const catalog = {
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false })),
   products: async () => ok<DbProduct[]>(await supabase.from('products').select('*').order('sort_order')),
+  /** Price tiers. RLS returns only active rows to a customer. */
+  productVariants: async () => ok<DbProductVariant[]>(await supabase
+    .from('product_variants')
+    .select('id, product_id, name_en, name_ar, price, calories, sort_order, is_active')
+    .order('sort_order')),
   modifierGroups: async () => ok<DbModifierGroup[]>(await supabase.from('modifier_groups').select('*')),
   modifiers: async () => ok<DbModifier[]>(await supabase.from('modifiers').select('*').order('sort_order')),
   productModifierGroups: async () =>
@@ -140,15 +145,16 @@ export const catalog = {
       .eq('is_active', true)),
   /** Fetch the whole menu graph in parallel (one app-open round of requests). */
   async all() {
-    const [branches, categories, products, modifierGroups, modifiers, links, availability,
+    const [branches, categories, products, productVariants, modifierGroups, modifiers, links, availability,
            modifierAvailability, settings, deliveryZones] =
       await Promise.all([
-        this.branches(), this.categories(), this.products(), this.modifierGroups(),
+        this.branches(), this.categories(), this.products(), this.productVariants(),
+        this.modifierGroups(),
         this.modifiers(), this.productModifierGroups(), this.availability(),
         this.modifierAvailability(), this.settings(),
         this.deliveryZones(),
       ]);
-    return { branches, categories, products, modifierGroups, modifiers, links, availability,
+    return { branches, categories, products, productVariants, modifierGroups, modifiers, links, availability,
              modifierAvailability, settings, deliveryZones };
   },
 };
@@ -159,7 +165,11 @@ export const catalog = {
 export interface PlaceOrderInput {
   branchId: string;
   orderType: OrderType;
-  items: { product_id: string; quantity: number; modifier_ids?: string[] }[];
+  /**
+   * `variant_id` is the chosen price tier. place_order REFUSES a product that
+   * has tiers and was sent without one, rather than guessing a price.
+   */
+  items: { product_id: string; quantity: number; variant_id?: string; modifier_ids?: string[] }[];
   addressId?: string | null;
   couponCode?: string | null;
   notes?: string | null;

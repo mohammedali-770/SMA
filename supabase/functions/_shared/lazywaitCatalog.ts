@@ -16,8 +16,27 @@ export type CatalogEntityType = 'branch' | 'category' | 'item' | 'addon' | 'addo
 export interface NormalizedPrice {
   price_id: string | null;
   name: string | null;
+  name_ar: string | null;
+  /**
+   * VAT-INCLUSIVE price, and only when Lazywait actually sent one. Items
+   * authored in the Lazywait dashboard carry `price_with_vat`; items uploaded
+   * from a spreadsheet do NOT, and leave this null. Never derived here — the
+   * VAT rate belongs to `app_settings`, so the SQL importer grosses
+   * `price_excl_vat` up instead of this module guessing 15%.
+   */
   price_with_vat: number | null;
+  /**
+   * VAT-EXCLUSIVE price. Lazywait's plain `price` field IS this value —
+   * confirmed against Production: Chicken Wings / Small is `price:
+   * 6.086956521739131`, and 6.086956521739131 x 1.15 = 7.00, the menu price.
+   * Every price row the catalog returns carries it.
+   */
   price_excl_vat: number | null;
+  /** Per-tier online visibility. `false` = POS-only, never shown to customers. */
+  show_online: boolean | null;
+  /** Per-tier active flag; a retired tier stays in the payload as active:false. */
+  active: boolean | null;
+  calories: number | null;
 }
 
 export interface NormalizedCatalogRecord {
@@ -27,6 +46,10 @@ export interface NormalizedCatalogRecord {
   name_ar: string | null;
   name_other: string | null;      // e.g. Turkish test data with no en/ar
   parent_id: string | null;       // item->category, addon->group (reference)
+  description_en: string | null;  // item `details.en`
+  description_ar: string | null;  // item `details.ar`
+  show_online: boolean | null;    // record-level online visibility
+  active: boolean | null;         // record-level active flag
   prices: NormalizedPrice[] | null;
   branches_ids: string[] | null;
   min_selection: number | null;
@@ -102,19 +125,61 @@ function extractNames(raw: Record<string, unknown>): {
   return { name_en: en, name_ar: ar, name_other: other };
 }
 
+function pickBool(obj: Record<string, unknown> | null | undefined, keys: string[]): boolean | null {
+  if (!obj) return null;
+  for (const k of keys) {
+    const v = obj[k];
+    if (typeof v === 'boolean') return v;
+    if (typeof v === 'string') {
+      const t = v.trim().toLowerCase();
+      if (t === 'true' || t === 'yes' || t === '1') return true;
+      if (t === 'false' || t === 'no' || t === '0') return false;
+    }
+    if (typeof v === 'number' && (v === 0 || v === 1)) return v === 1;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Prices (items). Handles a `prices` array, a single `price` object, or a flat
 // numeric price. Null price / null price_id are preserved as null.
+//
+// THE PRICE FIELD IS `price`, AND IT EXCLUDES VAT. This is the bug that kept
+// the whole menu out of the app: every price row Lazywait returns carries its
+// money in a plain `price` key, and this function used to look only for
+// `price_with_vat` / `price_excluding_vat` / `net_price`. None of those exist
+// on a spreadsheet-sourced item, so all 126 Production price rows normalized to
+// `{price_with_vat: null, price_excl_vat: null}`; `import_lazywait_catalog()`
+// then read 0, and imported every product priced 0 and hidden.
+//
+// That `price` is the NET figure is not a guess. Dashboard-authored items send
+// BOTH keys, and across all 21 such rows `price_with_vat === price x 1.15`
+// exactly (45.21739130434783 -> 52, 66.08695652173914 -> 76). Spreadsheet rows
+// send only `price`, and the customer-facing menu price is likewise `price` x
+// 1.15 (6.086956521739131 -> 7.00 for Chicken Wings / Small).
+//
+// `price_with_vat` is therefore recorded ONLY when Lazywait actually sent it.
+// Grossing the net figure up is the SQL importer's job, because the VAT rate
+// lives in `app_settings.vat_percentage` and must not be hardcoded here.
 // ---------------------------------------------------------------------------
 function extractPrices(raw: Record<string, unknown>): NormalizedPrice[] | null {
-  const one = (p: Record<string, unknown>): NormalizedPrice => ({
-    price_id: pickStr(p, ['price_id', 'priceId', 'id']),
-    // Lazywait price variants label themselves under `names: {en, ar, tr}` too.
-    name: pickStr(p, ['name', 'price_name', 'title', 'label'])
-      ?? pickStr(isObj(p.names) ? p.names : null, ['en', 'ar', 'tr', 'value']),
-    price_with_vat: pickNum(p, ['price_with_vat', 'priceWithVat', 'price_with_tax', 'gross_price', 'gross']),
-    price_excl_vat: pickNum(p, ['price_excluding_vat', 'price_without_vat', 'price_excl_vat', 'net_price', 'net']),
-  });
+  const one = (p: Record<string, unknown>): NormalizedPrice => {
+    const names = isObj(p.names) ? p.names : null;
+    return {
+      price_id: pickStr(p, ['price_id', 'priceId', 'id']),
+      // Lazywait price variants label themselves under `names: {en, ar, tr}` too.
+      name: pickStr(p, ['name', 'price_name', 'title', 'label'])
+        ?? pickStr(names, ['en', 'ar', 'tr', 'value']),
+      name_ar: pickStr(p, ['name_ar', 'nameAr']) ?? pickStr(names, ['ar']),
+      price_with_vat: pickNum(p, ['price_with_vat', 'priceWithVat', 'price_with_tax', 'gross_price', 'gross']),
+      price_excl_vat: pickNum(p, [
+        'price', 'price_excluding_vat', 'price_without_vat', 'price_excl_vat', 'net_price', 'net',
+      ]),
+      show_online: pickBool(p, ['show_online', 'showOnline']),
+      active: pickBool(p, ['active', 'is_active']),
+      calories: pickNum(p, ['calories']),
+    };
+  };
 
   const arr = raw.prices ?? raw.price_list ?? raw.variants;
   if (Array.isArray(arr) && arr.length) {
@@ -123,17 +188,49 @@ function extractPrices(raw: Record<string, unknown>): NormalizedPrice[] | null {
   if (isObj(raw.price)) return [one(raw.price as Record<string, unknown>)];
 
   // Flat numeric price fallback (still capture the single price_id if present).
-  const flat = pickNum(raw, ['price', 'price_with_vat', 'amount']);
+  // `price` is net here too — an add-on is the only record that reaches this
+  // branch, and it uses the same field with the same meaning as a price row.
+  const flat = pickNum(raw, ['price', 'amount']);
+  const flatGross = pickNum(raw, ['price_with_vat', 'priceWithVat']);
   const flatId = pickStr(raw, ['price_id', 'priceId']);
-  if (flat != null || flatId != null) {
+  if (flat != null || flatGross != null || flatId != null) {
     return [{
       price_id: flatId,
       name: null,
-      price_with_vat: flat,
-      price_excl_vat: pickNum(raw, ['price_excluding_vat', 'price_without_vat', 'net']),
+      name_ar: null,
+      price_with_vat: flatGross,
+      price_excl_vat: flat ?? pickNum(raw, ['price_excluding_vat', 'price_without_vat', 'net']),
+      show_online: pickBool(raw, ['show_online', 'showOnline']),
+      active: pickBool(raw, ['active', 'is_active']),
+      calories: pickNum(raw, ['calories']),
     }];
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Item descriptions. Lazywait nests them under `details: {en, ar}` — the same
+// shape as `names`. Nothing read this before, so every imported product had an
+// empty description even though the POS had one.
+// ---------------------------------------------------------------------------
+function extractDescriptions(raw: Record<string, unknown>): {
+  description_en: string | null; description_ar: string | null;
+} {
+  const d = raw.details ?? raw.description ?? raw.descriptions ?? raw.item_details;
+  if (typeof d === 'string') {
+    const t = d.trim();
+    return { description_en: t || null, description_ar: null };
+  }
+  if (isObj(d)) {
+    return {
+      description_en: pickStr(d, ['en', 'english']),
+      description_ar: pickStr(d, ['ar', 'arabic']),
+    };
+  }
+  return {
+    description_en: pickStr(raw, ['description_en', 'details_en']),
+    description_ar: pickStr(raw, ['description_ar', 'details_ar']),
+  };
 }
 
 function extractBranchesIds(raw: Record<string, unknown>): string[] | null {
@@ -159,7 +256,14 @@ const ID_KEYS: Record<CatalogEntityType, string[]> = {
 };
 
 function extractParentId(entity: CatalogEntityType, raw: Record<string, unknown>): string | null {
-  if (entity === 'item') return pickStr(raw, ['category_id', 'categoryId', 'category']);
+  // `menu_category_id` FIRST: that is the key Lazywait actually sends on an
+  // item, and omitting it left `parent_id` null on every Production item. The
+  // SQL importer happened to survive because it falls back to
+  // `raw->>'menu_category_id'` itself, but the client-side mapping suggester
+  // reads `parent_id` and could not group a single item by its category.
+  if (entity === 'item') {
+    return pickStr(raw, ['menu_category_id', 'menuCategoryId', 'category_id', 'categoryId', 'category']);
+  }
   if (entity === 'addon') return pickStr(raw, ['addons_group_id', 'addon_group_id', 'group_id', 'groupId']);
   return null;
 }
@@ -176,6 +280,7 @@ export function extractCatalogRecord(
   if (!id) return null;
 
   const names = extractNames(raw);
+  const descriptions = extractDescriptions(raw);
   const isGroup = entity === 'addon_group';
   return {
     entity_type: entity,
@@ -184,6 +289,12 @@ export function extractCatalogRecord(
     name_ar: names.name_ar,
     name_other: names.name_other,
     parent_id: extractParentId(entity, raw),
+    description_en: entity === 'item' ? descriptions.description_en : null,
+    description_ar: entity === 'item' ? descriptions.description_ar : null,
+    // Absent means "not stated", not "hidden" — the importer treats null as
+    // visible/active so a payload without the flags behaves as it does today.
+    show_online: pickBool(raw, ['show_online', 'showOnline']),
+    active: pickBool(raw, ['active', 'is_active']),
     // Items carry a price list; addons may carry a single (possibly null) price.
     prices: (entity === 'item' || entity === 'addon') ? extractPrices(raw) : null,
     branches_ids: (entity === 'item' || entity === 'category') ? extractBranchesIds(raw) : null,

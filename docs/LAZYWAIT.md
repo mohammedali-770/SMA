@@ -138,15 +138,47 @@ select public.upsert_integration_settings(
 );
 ```
 
+## Menu structure — three levels, not two
+
+Lazywait models a menu as:
+
+```
+category  ->  item  ->  price      (a NAMED tier carrying its own price_id)
+```
+
+"Chicken Wings" is ONE item with two prices (Small 7.00, Large 13.00). "Coral"
+is one item with **eleven**, from 20.00 to 29.00. The local schema mirrors that
+exactly since `20260824120000_product_variants`:
+
+| Lazywait | Local |
+|---|---|
+| category | `categories` |
+| item | `products` |
+| **price** | **`product_variants`** |
+
+`products.price` is still a VAT-inclusive price and still means what it always
+did — but for a product WITH tiers it is the **cheapest orderable tier**, i.e.
+the "from" price a menu card shows. The line is priced from the chosen
+`product_variants` row. A product with no tiers behaves exactly as it did
+before variants existed.
+
+**Why this level is not optional.** `order_items[].price_id` is how the POS
+knows which tier was sold. Before variants it came from a single column on
+`products`, so every Coral ever synced would have claimed to be the same tier —
+the right money, the wrong food. `order_items.variant_id` now records the tier
+and `ORDER_ITEM_SELECT` reads its price id.
+
 ## Mapping (external ids)
 Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
-`20260708150000_lazywait_catalog_mapping`. All confirmed by an admin in the UI:
+`20260708150000_lazywait_catalog_mapping`; the price tier by
+`20260824120000_product_variants`. All confirmed by an admin in the UI:
 | Local column | Lazywait field | Catalog endpoint |
 |---|---|---|
 | `branches.lazywait_branch_id` | `branch_id` | `GET /platform/branches` |
 | `categories.lazywait_category_id` | `category_id` | `GET /menu/products/categories` |
 | `products.lazywait_item_id` | `menu_item_id` | `GET /menu/products/items` |
-| `products.lazywait_price_id` + `lazywait_price_ref` | `price_id` + price snapshot (**reference only, NOT sent in Create Order**) | `GET /menu/products/items` |
+| `products.lazywait_price_id` + `lazywait_price_ref` | the CHEAPEST tier's `price_id` + snapshot (a fallback for an untiered line; the ordered tier wins) | `GET /menu/products/items` |
+| **`product_variants.lazywait_price_id`** + `lazywait_price_ref` | **`price_id`** + price snapshot — **this is what Create Order sends** | `GET /menu/products/items` |
 | `modifier_groups.lazywait_group_id` | `addons_group_id` | `GET /menu/addons-groups` |
 | `modifiers.lazywait_addon_id` | `addon_id` | `GET /menu/addons` |
 | `profiles.lazywait_customer_id` | CRM `id` (matched by phone) | set automatically on CRM match |
@@ -201,9 +233,45 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    `high | medium | low | none`. Anything below `high` is flagged **review**.
 3. **Confirm (admin-only RPC):** `set_lazywait_mapping(entity, local_id,
    lazywait_id, price_ref?)` writes **only** the id column(s) — it never touches
-   local names or the local price. `clear_lazywait_mapping(entity, local_id)`
-   removes a mapping. Accountants can view the mapping tables + status but the
-   RPCs reject them (42501).
+   local names or the local price. `entity` accepts `variant` as well as
+   `branch` / `category` / `product` / `modifier_group` / `modifier`.
+   `clear_lazywait_mapping(entity, local_id)` removes a mapping. Accountants can
+   view the mapping tables + status but the RPCs reject them (42501).
+4. **Import (admin-only RPC):** `import_lazywait_catalog()` writes the local
+   menu from the cache — one product per item, one `product_variants` row per
+   price. "Replace" semantics: anything absent from the latest pull is
+   DEACTIVATED, never deleted, so order-history FKs survive.
+
+### What the pull actually returns, and the bug it hid
+
+These are contract facts confirmed against Production on 2026-08-24, not
+assumptions. They are written down because getting them wrong is what kept the
+menu out of the app entirely.
+
+- **The money is in a plain `price` key, and it EXCLUDES VAT.** A price row
+  looks like `{price_id, names:{en,ar}, price, active, show_online, calories}`.
+  Items authored in the Lazywait dashboard ALSO send `price_with_vat`; items
+  uploaded from a spreadsheet do not. Across all 21 dashboard-authored rows
+  `price_with_vat === price × 1.15` exactly, and the customer-facing menu price
+  of a spreadsheet row is likewise `price × 1.15` (`6.086956521739131` → 7.00).
+  The importer therefore grosses `price_excl_vat` up using
+  `app_settings.vat_percentage`, and uses `price_with_vat` verbatim when
+  Lazywait states one. **The VAT rate is never hardcoded in the parser.**
+- **An item names its category `menu_category_id`**, not `category_id`.
+- **The description is `details{en,ar}`**, the same shape as `names`.
+- **`show_online: false` means POS-only** and appears at all three levels. It is
+  inherited downwards: a hidden category hides its items. In Production this is
+  what keeps the "Offers" category, "Extra Bread", "Ranch Sauce" and the "Change
+  to Wedgez" upgrade off the customer menu.
+
+**The failure this explains.** `extractPrices()` used to look only for
+`price_with_vat` / `price_excluding_vat` / `net_price`. None of those exist on a
+spreadsheet-sourced item, so all 126 such Production price rows normalized to
+`{price_with_vat: null, price_excl_vat: null}`; `import_lazywait_catalog()` then
+read 0, and `v_active := ... and v_price > 0` made every product inactive at
+price 0. The pull had been succeeding for months — 61 items, 6 categories, no
+errors — and the app still had **zero products**. A green pull log is not
+evidence that the menu imported; check `products` count.
 
 `lazywait_mapping_status()` (staff) returns mapped/total per entity, the count of
 orders blocked on missing mapping, a **`secrets_configured` boolean** (computed
@@ -266,6 +334,12 @@ instead of the live config row.) Field-by-field state:
   stays inside `price` — the ticket implies exactly what the customer was
   charged either way. The Lazywait response total is still **ignored** (test
   returned 0).
+- `price_id` is the **ordered tier's** id — `product_variants.lazywait_price_id`
+  reached through `order_items.variant_id`, falling back to
+  `products.lazywait_price_id` for a line with no tier (an untiered product, or
+  any order placed before variants existed). Reading it from `products` alone,
+  as the worker used to, names the CHEAPEST tier on every line: a customer's
+  Large would reach the kitchen as a Small. Pinned by `lazywait.test.ts`.
 - `details` carries the line's kitchen note **and** any modifier we cannot map
   (see below): `"Volcano ×2, حار — No onions"` — choices joined by `, `, then the
   note after an em dash. Either half is emitted alone, and the key is **omitted

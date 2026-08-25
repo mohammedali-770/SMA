@@ -157,7 +157,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 820,
     isActive: true,
-    modifierGroupIds: ['mg-heat-level', 'mg-cheese', 'mg-burger-adds']
+    modifierGroupIds: ['mg-heat-level', 'mg-cheese', 'mg-burger-adds'],
+    variants: [],
   },
   {
     id: 'prod-volcano-chicken',
@@ -170,7 +171,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1627662236973-4f8259149f71?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 710,
     isActive: true,
-    modifierGroupIds: ['mg-heat-level', 'mg-cheese']
+    modifierGroupIds: ['mg-heat-level', 'mg-cheese'],
+    variants: [],
   },
   {
     id: 'prod-smoke-spicy',
@@ -183,7 +185,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1586190848861-99aa4a171e90?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 940,
     isActive: true,
-    modifierGroupIds: ['mg-heat-level', 'mg-cheese', 'mg-burger-adds']
+    modifierGroupIds: ['mg-heat-level', 'mg-cheese', 'mg-burger-adds'],
+    variants: [],
   },
   {
     id: 'prod-spicy-fries',
@@ -196,7 +199,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 380,
     isActive: true,
-    modifierGroupIds: ['mg-burger-adds']
+    modifierGroupIds: ['mg-burger-adds'],
+    variants: [],
   },
   {
     id: 'prod-volcano-bites',
@@ -209,7 +213,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1639024471283-2bc7b3c6a267?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 420,
     isActive: true,
-    modifierGroupIds: []
+    modifierGroupIds: [],
+    variants: [],
   },
   {
     id: 'prod-spicy-cola',
@@ -222,7 +227,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 140,
     isActive: true,
-    modifierGroupIds: []
+    modifierGroupIds: [],
+    variants: [],
   },
   {
     id: 'prod-strawberry-shake',
@@ -235,7 +241,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 450,
     isActive: true,
-    modifierGroupIds: []
+    modifierGroupIds: [],
+    variants: [],
   },
   {
     id: 'prod-apple-pie',
@@ -248,7 +255,8 @@ export const INITIAL_PRODUCTS: Product[] = [
     imageUrl: 'https://images.unsplash.com/photo-1519869325930-281384150729?auto=format&fit=crop&w=600&h=400&q=80',
     calories: 320,
     isActive: true,
-    modifierGroupIds: []
+    modifierGroupIds: [],
+    variants: [],
   }
 ];
 

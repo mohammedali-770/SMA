@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**146 TypeScript test files declaring 2209 test blocks, plus 53 SQL suites.**
+**149 TypeScript test files declaring 2248 test blocks, plus 55 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -54,6 +54,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/lazywait_requeue_test.sql`
 - `supabase/tests/lazywait_sync_health_summary_test.sql`
 - `supabase/tests/lazywait_sync_scheduler_test.sql`
+- `supabase/tests/lazywait_variant_import_test.sql`
 - `supabase/tests/loyalty_reason_history_safe_test.sql`
 - `supabase/tests/loyalty_reason_no_order_number_test.sql`
 - `supabase/tests/manual_only_pos_resend_test.sql`
@@ -76,6 +77,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/order_read_contracts_test.sql`
 - `supabase/tests/order_refund_claim_liveness_test.sql`
 - `supabase/tests/place_order_modifier_availability_test.sql`
+- `supabase/tests/place_order_variants_test.sql`
 - `supabase/tests/refund_trigger_execute_privilege_test.sql`
 - `supabase/tests/require_address_description_test.sql`
 - `supabase/tests/security_performance_hardening_test.sql`
@@ -98,7 +100,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-56 files, 803 declared test blocks.
+59 files, 831 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -131,6 +133,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/locationDescription.test.ts` | 26 | checkDescription |
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
+| `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
 | `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 16 | reference and channel safety |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 2 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
@@ -155,13 +158,15 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
+| `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |
+| `apps/mobile/src/utils/orderLineLabel.test.ts` | 6 | orderLineLabel |
 
 ### `src/`
 
-74 files, 983 declared test blocks.
+74 files, 987 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -221,7 +226,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 10 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/mappers.test.ts` | 23 | catalog mappers |
+| `src/lib/mappers.test.ts` | 27 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/moyasarAdminTest.test.ts` | 9 | canRunMoyasarAdminTestCheckout |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |
@@ -242,7 +247,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-15 files, 416 declared test blocks.
+15 files, 423 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -250,10 +255,10 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
-| `supabase/functions/_shared/lazywait.test.ts` | 69 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
+| `supabase/functions/_shared/lazywait.test.ts` | 71 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 48 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
-| `supabase/functions/_shared/lazywaitCatalog.test.ts` | 22 | extractCatalogList (response envelope) |
+| `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |

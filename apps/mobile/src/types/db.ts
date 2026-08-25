@@ -84,6 +84,11 @@ export interface DbModifier {
   id: string; group_id: string; name_en: string; name_ar: string;
   price: number; sort_order: number; is_active: boolean;
 }
+/** A named price tier of a product — the local mirror of a Lazywait item price. */
+export interface DbProductVariant {
+  id: string; product_id: string; name_en: string; name_ar: string;
+  price: number; calories: number | null; sort_order: number; is_active: boolean;
+}
 export interface DbProductModifierGroup { product_id: string; group_id: string; sort_order: number; }
 export interface DbBranchAvailability { branch_id: string; product_id: string; is_available: boolean; }
 export interface DbBranchModifierAvailability { branch_id: string; modifier_id: string; is_available: boolean; }

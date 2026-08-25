@@ -6,12 +6,12 @@
  * data now comes from Supabase instead of localStorage.
  */
 import {
-  Branch, Category, Product, ModifierGroup, Modifier, Order, OrderItem,
+  Branch, Category, Product, ProductVariant, ModifierGroup, Modifier, Order, OrderItem,
   OrderItemModifier, SavedAddress, UserProfile, BrandSettings, LoyaltySettings, SyncStatus,
   DeliveryZone,
 } from '../types';
 import {
-  DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier, DbProductModifierGroup,
+  DbBranch, DbCategory, DbProduct, DbProductVariant, DbModifierGroup, DbModifier, DbProductModifierGroup,
   DbBranchAvailability, DbAppSettings, DbProfile, DbAddress, DbOrderWithItems, DbOrderItem,
   DbOrderItemModifier, DbSyncStatus, DbBranchDeliveryZone,
 } from './api';
@@ -62,8 +62,32 @@ export function mapCategory(c: DbCategory): Category {
   return { id: c.id, nameEn: c.name_en, nameAr: c.name_ar, sortOrder: c.sort_order };
 }
 
-/** A product needs the ids of the modifier groups linked to it (M:N join). */
-export function mapProduct(p: DbProduct, links: DbProductModifierGroup[]): Product {
+export function mapProductVariant(v: DbProductVariant): ProductVariant {
+  return {
+    id: v.id,
+    productId: v.product_id,
+    nameEn: v.name_en,
+    nameAr: v.name_ar,
+    price: Number(v.price),
+    calories: v.calories,
+    sortOrder: v.sort_order,
+    isActive: v.is_active,
+    lazywaitPriceId: v.lazywait_price_id,
+  };
+}
+
+/**
+ * A product needs the ids of the modifier groups linked to it (M:N join), and
+ * its price tiers. Staff sessions can read INACTIVE tiers, so they are kept
+ * here rather than filtered — the admin menu has to be able to show a tier
+ * Lazywait has withdrawn. Customer-facing code reads `variants` after RLS has
+ * already removed them.
+ */
+export function mapProduct(
+  p: DbProduct,
+  links: DbProductModifierGroup[],
+  variants: DbProductVariant[] = [],
+): Product {
   return {
     id: p.id,
     categoryId: p.category_id,
@@ -76,6 +100,10 @@ export function mapProduct(p: DbProduct, links: DbProductModifierGroup[]): Produ
     calories: p.calories ?? 0,
     isActive: p.is_active,
     modifierGroupIds: links.filter(l => l.product_id === p.id).map(l => l.group_id),
+    variants: variants
+      .filter(v => v.product_id === p.id)
+      .sort((a, b) => a.sort_order - b.sort_order || Number(a.price) - Number(b.price))
+      .map(mapProductVariant),
   };
 }
 
@@ -199,6 +227,11 @@ function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModif
     price: Number(i.unit_price),
     quantity: i.quantity,
     note: (i as { note?: string | null }).note?.trim() || undefined,
+    // The tier this line was ordered at. Absent for an untiered product and for
+    // any order placed before variants existed, so it stays optional.
+    variantId: i.variant_id ?? undefined,
+    variantNameEn: i.variant_name_en ?? undefined,
+    variantNameAr: i.variant_name_ar ?? undefined,
     selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
   };
 }

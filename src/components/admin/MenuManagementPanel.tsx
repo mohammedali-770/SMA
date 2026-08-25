@@ -137,7 +137,10 @@ export const MenuManagementPanel: React.FC = () => {
       calories: parseInt(prodCalories) || 0,
       imageUrl: prodImg || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
       isActive: true,
-      modifierGroupIds: ['mg-heat-level']
+      modifierGroupIds: ['mg-heat-level'],
+      // A hand-authored product has no Lazywait price tiers. Tiers arrive
+      // only through the catalog import, which is where the menu is owned.
+      variants: [],
     };
 
     if (editingProduct) {
@@ -309,6 +312,11 @@ export const MenuManagementPanel: React.FC = () => {
                   <tbody>
                     {products.map(p => {
                       const catMatch = categories.find(c => c.id === p.categoryId);
+                      // Defensive: a product reaching this table from a cast or
+                      // a stale cache can arrive without `variants`, and an
+                      // admin menu that throws is worse than one that shows a
+                      // product with no tiers.
+                      const tiers = p.variants ?? [];
                       return (
                         <tr key={p.id} className="border-t border-con-line">
                           <td className={TD}>
@@ -326,7 +334,32 @@ export const MenuManagementPanel: React.FC = () => {
                               : <StatusPill label="No Category" tone="warning" />}
                           </td>
                           <td className={TD}>
-                            <Text variant="label" as="span"><Price amount={p.price} lang={adminLang} /></Text>
+                            {/* With price tiers the product's own price is the
+                                CHEAPEST one, so it is labelled "from" rather
+                                than presented as the price of anything. The
+                                tiers are listed under it because that is where
+                                the money actually lives — and because a tier
+                                Lazywait has withdrawn still has to be visible
+                                to staff to explain an old order. */}
+                            <Text variant="label" as="span">
+                              {tiers.length > 1 ? <>{isRTL ? 'من ' : 'from '}</> : null}
+                              <Price amount={p.price} lang={adminLang} />
+                            </Text>
+                            {tiers.length > 1 ? (
+                              <ul className="mt-1 space-y-0.5">
+                                {tiers.map(v => (
+                                  <li key={v.id} className="flex items-center gap-1.5">
+                                    <Text variant="caption" tone={v.isActive ? 'secondary' : 'tertiary'} as="span">
+                                      {isRTL ? v.nameAr : v.nameEn}
+                                    </Text>
+                                    <Text variant="caption" tone={v.isActive ? 'secondary' : 'tertiary'} as="span">
+                                      <Price amount={v.price} lang={adminLang} />
+                                    </Text>
+                                    {v.isActive ? null : <StatusPill label={isRTL ? 'غير معروض' : 'Hidden'} tone="neutral" />}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
                           </td>
                           <td className={TD}>
                             <Text variant="body" tone="secondary" numeric as="span">{p.calories} kcal</Text>

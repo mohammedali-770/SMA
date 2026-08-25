@@ -12,6 +12,7 @@ const product: Product = {
   price: 25,
   calories: 500,
   imageUrl: 'https://example.test/product.jpg',
+  variants: [],
   isActive: true, // reconstructed by the current edit form; must not reach DB
   modifierGroupIds: ['real-group-id'],
 };
