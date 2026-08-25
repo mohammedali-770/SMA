@@ -56,6 +56,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/lazywait.ts`
 - `_shared/lazywaitApi.test.ts`
 - `_shared/lazywaitApi.ts`
+- `_shared/lazywaitBaseUrlWiring.test.ts`
 - `_shared/lazywaitCatalog.test.ts`
 - `_shared/lazywaitCatalog.ts`
 - `_shared/moyasar.test.ts`

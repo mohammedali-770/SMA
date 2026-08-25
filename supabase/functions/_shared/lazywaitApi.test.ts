@@ -622,3 +622,54 @@ describe('endpoint coverage', () => {
     }
   });
 });
+
+// ===========================================================================
+// Client construction — FAIL CLOSED on a missing base URL
+//
+// `createLazywaitApiClient` used to read `cfg.baseUrl || DEFAULT_BASE_URL`,
+// silently binding an unconfigured client to the PRODUCTION Lazywait host. It
+// now throws at construction, before any spec can be executed.
+// ===========================================================================
+describe('client construction — base URL fails closed', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    ['undefined', undefined as unknown as string],
+    ['empty string', ''],
+    ['whitespace only', '   '],
+  ])('throws on %s instead of defaulting to the production host', (_label, baseUrl) => {
+    expect(() => createLazywaitApiClient({ ...CFG, baseUrl }))
+      .toThrowError(/lazywait_base_url_not_configured/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a configured base URL still builds a working client (unchanged behaviour)', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(branchesFixture));
+    const client = createLazywaitApiClient({ ...CFG, baseUrl: 'https://apiv2-dev.lazywait.com/v1' });
+    const r = await client.listBranches();
+    expect(r.ok).toBe(true);
+    expect(String(fetchMock.mock.calls[0][0]))
+      .toBe('https://apiv2-dev.lazywait.com/v1/platform/branches?client_id=CID_1');
+  });
+
+  it('createOrder never runs with a blank base URL — the throw precedes any send', async () => {
+    expect(() => createLazywaitApiClient({ ...CFG, baseUrl: '  ' })).toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('createOrder on a configured client is byte-identical to today', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createOrderSuccessFixture));
+    const client = createLazywaitApiClient({ ...CFG, baseUrl: 'https://apiv2-dev.lazywait.com/v1' });
+    const r = await client.createOrder(
+      { clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup', customerName: 'Ahmed', items: pickupItems },
+      { existingRef: null },
+    );
+    expect(r.sent).toBe(true);
+    expect(r.blockedReason).toBeNull();
+    expect(r.outcome?.kind).toBe('ok');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].method).toBe('POST');
+  });
+});

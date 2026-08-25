@@ -42,8 +42,9 @@
 import {
   buildCreateOrderPayload,
   classifyCreateOrderResult,
-  DEFAULT_BASE_URL,
+  LazywaitConfigError,
   lazywaitFetch,
+  resolveLazywaitBaseUrl,
   round2,
   serializeCreateOrderItem,
   SOURCE,
@@ -835,8 +836,17 @@ function finalize<T>(res: LazywaitResponse<unknown>, validation: ValidationResul
   };
 }
 
+/**
+ * Bind a config to the typed client. FAILS CLOSED on a missing/blank base URL:
+ * this used to read `cfg.baseUrl || DEFAULT_BASE_URL`, which silently pointed an
+ * unconfigured client at the PRODUCTION POS. It now throws at construction, so
+ * the fault surfaces before any request can be built — never as a `status: 0`
+ * the retry/confirmation classifiers would misread as a network fault.
+ */
 export function createLazywaitApiClient(cfg: LazywaitConfig, opts: LazywaitApiClientOptions = {}) {
-  const baseCfg: LazywaitConfig = { ...cfg, baseUrl: cfg.baseUrl || DEFAULT_BASE_URL };
+  const resolved = resolveLazywaitBaseUrl(cfg.baseUrl);
+  if (!resolved.ok) throw new LazywaitConfigError(resolved.reason);
+  const baseCfg: LazywaitConfig = { ...cfg, baseUrl: resolved.baseUrl };
   const defTimeout = opts.defaultTimeoutMs ?? 15_000;
 
   async function run<T>(spec: LazywaitRequestSpec, parse: (res: LazywaitResponse<unknown>) => ValidationResult<T>): Promise<LazywaitApiResult<T>> {
