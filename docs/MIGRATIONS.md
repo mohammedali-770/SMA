@@ -2847,10 +2847,16 @@ never looked. `lazywait_catalog_items.prices` was therefore **rebuilt from
 by dry run first: 147/147 rows gained a net price, 147/147 carried a `price_id`,
 and 147/147 gave a whole number at × 1.15. The import was then re-run.
 
-**That backfill is a bridge, not the fix, and it converges:** once
-`lazywait-catalog` is redeployed and the catalog re-pulled, the real parser
-rewrites that column with the same values. It is recorded here so a future
-reader does not mistake a hand-written SQL rebuild for parser output.
+**That backfill was a bridge, not the fix — and the bridge is now closed.**
+`lazywait-catalog` was redeployed the same day on owner approval (version 3,
+`verify_jwt` unchanged at `true`), so the deployed parser writes
+`price_excl_vat` itself and the next pull rewrites that column with the same
+values instead of nulling it. The deployed bundle was read back and verified
+**byte-identical to the default branch across all six files** — the entrypoint
+plus its five `_shared/` dependencies — by SHA-256, not by eye. The backfill is
+recorded here so a future reader does not mistake a hand-written SQL rebuild for
+parser output, and so the one pull that ran between the import and the redeploy
+is accounted for.
 
 Result, verified: **55 of 61 products active, 144 of 147 tiers active**, five
 categories, prices 1.00–74.00 SAR, zero active products priced 0, zero active
