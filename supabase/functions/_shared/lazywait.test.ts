@@ -1,13 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
   buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails,
-  computeBackoffMs, computePosNextAttempt, extractOrderRef, hmacSha256Hex, MAX_POS_ATTEMPTS, MAX_SYNC_ATTEMPTS,
-  normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN, round2,
-  mapOrderItemRows, ORDER_ITEM_SELECT, shouldResendCreateOrder, splitPhoneForPos,
-  STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature,
+  computeBackoffMs, computePosNextAttempt, DEFAULT_BASE_URL, extractOrderRef, hmacSha256Hex,
+  LAZYWAIT_BASE_URL_INVALID, LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
+  MAX_SYNC_ATTEMPTS, normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN,
+  resolveLazywaitBaseUrl, round2, mapOrderItemRows, ORDER_ITEM_SELECT, shouldResendCreateOrder,
+  splitPhoneForPos, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature, type LazywaitConfig,
 } from './lazywait';
 
 const items = [{ menuItemId: 'ITEM_1', name: 'Burger', quantity: 2, unitPrice: 25 }];
@@ -665,5 +666,209 @@ describe('computePosNextAttempt (5 attempts / 10-minute deadline)', () => {
   it('with no deadline, only the attempt ceiling bounds it', () => {
     expect(computePosNextAttempt(t0, 4, null)).toEqual({ final: false, nextAttemptAtMs: t0 + 9 * 60_000 });
     expect(computePosNextAttempt(t0, 5, null)).toEqual({ final: true });
+  });
+});
+
+// ===========================================================================
+// Base URL — FAIL CLOSED (no implicit production fallback)
+//
+// A blank `integration_settings.public_config.base_url` used to fall back to
+// DEFAULT_BASE_URL, the PRODUCTION Lazywait host. The live pilot posts to the
+// DEV host, so that fallback would have started sending live customer orders to
+// a POS nobody watches. These tests pin the replacement behaviour: a
+// configuration fault is TERMINAL and NAMED, it never becomes an HTTP request,
+// and it never enters the retry / customer-confirmation classifiers.
+// ===========================================================================
+describe('resolveLazywaitBaseUrl (fail closed)', () => {
+  it('names the terminal reason as a stable machine string', () => {
+    expect(LAZYWAIT_BASE_URL_NOT_CONFIGURED).toBe('lazywait_base_url_not_configured');
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty string', ''],
+    ['spaces', '   '],
+    ['tabs + newline', '\t\n '],
+  ])('rejects %s with the named terminal reason — never DEFAULT_BASE_URL', (_label, raw) => {
+    const r = resolveLazywaitBaseUrl(raw);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
+    expect(JSON.stringify(r)).not.toContain('apiv2.lazywait.com');
+  });
+
+  it('accepts a configured host and normalises trailing slashes', () => {
+    expect(resolveLazywaitBaseUrl('https://apiv2-dev.lazywait.com/v1'))
+      .toEqual({ ok: true, baseUrl: 'https://apiv2-dev.lazywait.com/v1' });
+    expect(resolveLazywaitBaseUrl('  https://apiv2-dev.lazywait.com/v1///  '))
+      .toEqual({ ok: true, baseUrl: 'https://apiv2-dev.lazywait.com/v1' });
+  });
+
+  it('DEFAULT_BASE_URL still names the production host, but is never returned as a default', () => {
+    expect(DEFAULT_BASE_URL).toBe('https://apiv2.lazywait.com/v1');
+    for (const blank of [undefined, null, '', '   ']) {
+      const r = resolveLazywaitBaseUrl(blank);
+      expect(r).not.toEqual({ ok: true, baseUrl: DEFAULT_BASE_URL });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Shape, not just emptiness. A non-blank but unusable value would otherwise
+  // reach `fetch`, throw, and come back as `status: 0` — which
+  // classifyCreateOrderResult reads as ambiguous -> confirmation_required on a
+  // REAL customer order. Same bad outcome as the blank case, reached by a typo.
+  // -------------------------------------------------------------------------
+  it('names the malformed reason as a stable machine string, distinct from blank', () => {
+    expect(LAZYWAIT_BASE_URL_INVALID).toBe('lazywait_base_url_invalid');
+    expect(LAZYWAIT_BASE_URL_INVALID).not.toBe(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
+  });
+
+  it.each([
+    ['no scheme (the likeliest typo)', 'apiv2-dev.lazywait.com/v1'],
+    ['misspelled scheme', 'htp://apiv2-dev.lazywait.com/v1'],
+    ['free text', 'not a url'],
+    ['scheme only', 'https://'],
+    ['a bare path', '/v1'],
+    ['a number', 12345],
+    ['non-http scheme', 'ftp://apiv2-dev.lazywait.com/v1'],
+    ['javascript scheme', 'javascript:alert(1)'],
+  ])('rejects %s as INVALID, so it never reaches fetch', (_label, raw) => {
+    const r = resolveLazywaitBaseUrl(raw);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe(LAZYWAIT_BASE_URL_INVALID);
+    expect(JSON.stringify(r)).not.toContain('apiv2.lazywait.com');
+  });
+
+  it('does NOT reject a legitimately reconfigured POS — the check is shape only', () => {
+    // The guard must not become a reason a real host change fails. It asks only
+    // "would fetch accept this?", never anything about host, path or vendor.
+    for (const good of [
+      'https://apiv2-dev.lazywait.com/v1',   // the live value, pinned
+      'https://apiv2.lazywait.com/v1',
+      'https://some-new-pos.example.com/api/v3',
+      'http://localhost:54321/v1',
+      'https://10.0.0.4:8443/v1',
+    ]) {
+      expect(resolveLazywaitBaseUrl(good).ok).toBe(true);
+    }
+  });
+
+  it('blank still reports NOT_CONFIGURED, not INVALID — the two stay distinguishable', () => {
+    for (const blank of [undefined, null, '', '   ', '\t\n ']) {
+      const r = resolveLazywaitBaseUrl(blank);
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.reason).toBe(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
+    }
+  });
+});
+
+describe('lazywaitFetch — refuses to send without a configured base URL', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  beforeEach(() => { fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it.each([
+    ['undefined', undefined as unknown as string],
+    ['empty string', ''],
+    ['whitespace only', '  \t '],
+  ])('throws LazywaitConfigError on %s and issues NO request', async (_label, baseUrl) => {
+    const cfg = { baseUrl, clientId: 'CID_1', apiToken: 'lw_live_T' } as LazywaitConfig;
+    await expect(
+      lazywaitFetch(cfg, { method: 'POST', path: '/pos/orders/create', body: { a: 1 } }),
+    ).rejects.toMatchObject({
+      name: 'LazywaitConfigError',
+      reason: LAZYWAIT_BASE_URL_NOT_CONFIGURED,
+    });
+    // The whole point: nothing left the process, so nothing reached production.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does NOT report the config fault as status 0 (which classifies as retryable/ambiguous)', async () => {
+    const cfg = { baseUrl: '', clientId: 'CID_1', apiToken: 'lw_live_T' } as LazywaitConfig;
+    const err = await lazywaitFetch(cfg, { method: 'POST', path: '/pos/orders/create' })
+      .then(() => null, (e) => e);
+    expect(err).toBeInstanceOf(LazywaitConfigError);
+    // A returned `{status: 0}` would have been routed to network_error /
+    // confirmation_required. Assert it is an exception, not a response.
+    expect(err).not.toHaveProperty('status');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a present base URL behaves exactly as before — one request, to that host', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ success: true, order: { order_ref: 'REF_9' } }), {
+        status: 200, headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const cfg: LazywaitConfig = {
+      baseUrl: 'https://apiv2-dev.lazywait.com/v1', clientId: 'CID_1', apiToken: 'lw_live_T',
+    };
+    const res = await lazywaitFetch(cfg, { method: 'POST', path: '/pos/orders/create', body: { a: 1 } });
+    expect(res.ok).toBe(true);
+    expect(res.status).toBe(200);
+    expect(extractOrderRef(res.data)).toBe('REF_9');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('https://apiv2-dev.lazywait.com/v1/pos/orders/create?client_id=CID_1');
+    expect(String(url)).not.toContain('apiv2.lazywait.com/v1/pos');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer lw_live_T');
+  });
+
+  it('a trailing-slash base URL still produces the same single-slash path', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const cfg: LazywaitConfig = {
+      baseUrl: 'https://apiv2-dev.lazywait.com/v1/', clientId: 'CID_1', apiToken: 'lw_live_T',
+    };
+    await lazywaitFetch(cfg, { method: 'GET', path: '/platform/branches' });
+    expect(String(fetchMock.mock.calls[0][0]))
+      .toBe('https://apiv2-dev.lazywait.com/v1/platform/branches?client_id=CID_1');
+  });
+});
+
+describe('the config fault does NOT disturb the existing classifiers', () => {
+  it('classifyLazywaitError is unchanged — status 0 is still retryable network_error', () => {
+    expect(classifyLazywaitError(0)).toEqual({ kind: 'retryable', reason: 'network_error' });
+    expect(classifyLazywaitError(429)).toEqual({ kind: 'retryable', reason: 'rate_limited' });
+    expect(classifyLazywaitError(503)).toEqual({ kind: 'retryable', reason: 'server_error_503' });
+    expect(classifyLazywaitError(401)).toEqual({ kind: 'terminal', reason: 'auth_invalid_key' });
+    expect(classifyLazywaitError(403, 'LICENSE_EXPIRED')).toEqual({ kind: 'terminal', reason: 'license_expired' });
+    expect(classifyLazywaitError(200)).toEqual({ kind: 'ok', reason: 'ok' });
+  });
+
+  it('classifyCreateOrderResult is unchanged — status 0 is still ambiguous -> confirmation', () => {
+    expect(classifyCreateOrderResult({ status: 0, error: 'timeout' })).toEqual({
+      kind: 'ambiguous', reason: 'timeout', orderRef: null, confirmationReason: 'timeout',
+    });
+    expect(classifyCreateOrderResult({ status: 0, error: 'boom' })).toEqual({
+      kind: 'ambiguous', reason: 'network_error', orderRef: null, confirmationReason: 'connection',
+    });
+    expect(classifyCreateOrderResult({ status: 429 }))
+      .toEqual({ kind: 'safe_retry', reason: 'rate_limited', orderRef: null });
+    expect(classifyCreateOrderResult({ status: 500 })).toEqual({
+      kind: 'ambiguous', reason: 'server_error_500', orderRef: null, confirmationReason: 'provider_5xx',
+    });
+    expect(classifyCreateOrderResult({ status: 200, data: { success: true, order: { order_ref: 'R' } } }))
+      .toEqual({ kind: 'ok', reason: 'created', orderRef: 'R' });
+    expect(classifyCreateOrderResult({ status: 401 }))
+      .toEqual({ kind: 'terminal', reason: 'auth_invalid_key', orderRef: null });
+  });
+
+  it('neither classifier knows the config reason — it can only arrive as a pre-flight failure', () => {
+    const reasons = [
+      classifyLazywaitError(0).reason, classifyLazywaitError(429).reason,
+      classifyLazywaitError(500).reason, classifyLazywaitError(401).reason,
+      classifyCreateOrderResult({ status: 0 }).reason,
+      classifyCreateOrderResult({ status: 429 }).reason,
+      classifyCreateOrderResult({ status: 500 }).reason,
+    ];
+    expect(reasons).not.toContain(LAZYWAIT_BASE_URL_NOT_CONFIGURED);
+  });
+
+  it('the retry budget/schedule is untouched', () => {
+    expect(MAX_POS_ATTEMPTS).toBe(5);
+    expect(POS_DEADLINE_MINUTES).toBe(10);
+    expect([...POS_RETRY_OFFSETS_MIN]).toEqual([0, 1, 3, 6, 9]);
   });
 });
