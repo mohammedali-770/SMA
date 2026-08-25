@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**147 TypeScript test files declaring 2201 test blocks, plus 55 SQL suites.**
+**147 TypeScript test files declaring 2207 test blocks, plus 55 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -246,7 +246,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-14 files, 386 declared test blocks.
+14 files, 392 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -256,7 +256,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
 | `supabase/functions/_shared/lazywait.test.ts` | 55 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 44 | request serialization — paths/methods/query |
-| `supabase/functions/_shared/lazywaitCatalog.test.ts` | 21 | extractCatalogList (response envelope) |
+| `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |
