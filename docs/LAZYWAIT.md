@@ -334,6 +334,13 @@ instead of the live config row.) Field-by-field state:
   stays inside `price` — the ticket implies exactly what the customer was
   charged either way. The Lazywait response total is still **ignored** (test
   returned 0).
+
+  The decomposition **assumes the POS sums** item price and add-on prices, which
+  is the reading the contract's own example shows. If the POS instead treats
+  `order_items[].price` as final, a decomposed line **undercharges** by the
+  add-on total. This is inert while zero modifiers are mapped — `addons[]` is
+  never emitted and nothing is subtracted — and activates the first time one is.
+  Open question **Q10**; settle it before mapping the first add-on.
 - `price_id` is the **ordered tier's** id — `product_variants.lazywait_price_id`
   reached through `order_items.variant_id`, falling back to
   `products.lazywait_price_id` for a line with no tier (an untiered product, or

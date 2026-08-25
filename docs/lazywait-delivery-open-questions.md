@@ -80,6 +80,43 @@ confirmation."
    - when `tax`/`tax_percentage` are omitted, does the POS apply its own
      configured tax to `order_items[].price`, or treat the prices as final?
    - is there a flag that declares the submitted prices tax-inclusive?
+10. **OPEN (new, 2026-08-24)** — Does the POS **add** `addons[].price` to
+   `order_items[].price`, or does it treat the item price as already inclusive
+   of its add-ons? This is a real-money question, and the current
+   implementation answers it by assumption rather than by confirmation.
+
+   Why it arises: `place_order` folds each selected modifier's price into
+   `order_items.unit_price` (`v_unit_price := product.price + Σ modifier.price`),
+   so a "Volcano (+2)" burger already reaches us at the +2 price.
+
+   **What we send today.** `serializeCreateOrderItem` decomposes the line: the
+   emitted `price` is `unit_price` **minus** the mapped add-on total, and each
+   `addons[]` entry carries its own price, so
+   `price + Σ(addon.price × quantity) === unit_price` exactly. That is correct
+   **if the POS sums**, which is what the contract's own worked example shows
+   (item `price` 25 + addon `price` 5 = `subtotal` 30).
+
+   **The exposure, stated rather than buried.** If the POS instead reads
+   `order_items[].price` as final and ignores `addons[].price`, the ticket
+   **undercharges by the add-on total**. The contract example is good evidence
+   for the summing reading, but it is evidence, not vendor confirmation — and
+   the failure direction is a ticket worth less than the customer paid.
+
+   **It is inert today, and that is the only reason this is not urgent.** Zero
+   of the three live modifiers carry a `lazywait_addon_id`, so `addons[]` is
+   never emitted, nothing is ever subtracted, and the full VAT-inclusive
+   `unit_price` goes out exactly as the pre-contract worker sent it. Unmapped
+   modifiers are folded into `details` as text and keep their money inside
+   `price`. **The assumption activates the first time a modifier is mapped.**
+
+   **The alternative that was rejected**, recorded because it is the safer
+   answer if Lazywait ever confirms the inclusive reading: closed PR #245 sent
+   `addons[].price = 0` always and kept the whole price on the item, which is
+   correct under *both* readings. It was not adopted because it contradicts the
+   contract's example and hides the add-on's price from the POS entirely.
+
+   **Before mapping the first modifier**, settle this — ask Lazywait, or map one
+   add-on, place a single test order and read the POS total against ours.
 
 ## What the contract already changed
 
