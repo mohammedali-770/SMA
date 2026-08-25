@@ -53,8 +53,9 @@ export function CartScreen() {
   const slateIds = suggestions.map((s) => s.product.id).join('|');
   // A new slate starts unseen, so re-test without waiting for a scroll event.
   useEffect(() => { evaluateStripVisible(); }, [slateIds, evaluateStripVisible]);
-  // A product with any modifier group opens its page — matching the menu, and
-  // so an optional PRICED group can never be added cheaper than the card shows.
+  // A product with any modifier group OR more than one price tier opens its
+  // page — matching the menu's `needsChoice`, so neither an optional PRICED
+  // group nor an unchosen tier can be added cheaper than the card shows.
   const onSuggestionPress = (id: string) => {
     const s = suggestions.find((x) => x.product.id === id); if (!s) return;
     if (s.addability === 'configure') router.push({ pathname: '/product/[id]', params: { id: s.product.id } });
