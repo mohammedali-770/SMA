@@ -1,4 +1,4 @@
-/** Design-system menu card. Modifier products open from the whole card. */
+/** Design-system menu card. Products needing a choice open from the whole card. */
 import { Image } from 'expo-image';
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -14,7 +14,15 @@ import { Text } from './Text';
 
 interface Props {
   product: Product;
-  hasModifiers: boolean;
+  /**
+   * The customer must choose something before this can be ordered — modifier
+   * groups, or more than one price tier. The whole card opens the detail screen
+   * instead of offering a one-tap Add, because adding silently would pick the
+   * cheapest tier on their behalf.
+   */
+  needsChoice: boolean;
+  /** Show the price as "from X". Only set when the tiers span a real range. */
+  showFromPrice?: boolean;
   /**
    * Orderable at the selected branch. A sold-out item stays on the menu but
    * becomes inert: dimmed, no Add button, and the whole card stops being
@@ -25,7 +33,7 @@ interface Props {
   onAdd: (product: Product, withModifiers: boolean) => void;
 }
 
-export const ProductCard = React.memo(function ProductCard({ product, hasModifiers, available = true, onAdd }: Props) {
+export const ProductCard = React.memo(function ProductCard({ product, needsChoice, showFromPrice = false, available = true, onAdd }: Props) {
   const colors = useThemeColors();
   const { t, pick, rtlRow } = useI18n();
   const styles = useStyles();
@@ -33,7 +41,7 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
   const name = pick(product.nameEn, product.nameAr);
   const description = pick(product.descriptionEn, product.descriptionAr);
   const kcalLabel = product.calories ? `${product.calories} ${t('kcal')}` : '';
-  const actionLabel = t('addToCart');
+  const actionLabel = needsChoice ? t('choose') : t('addToCart');
   const showImage = !!product.imageUrl && !imgFailed;
   const content = (
     <>
@@ -43,9 +51,9 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
         <Text variant="heading" numberOfLines={2}>{name}</Text>
         {description ? <Text variant="caption" tone="secondary" numberOfLines={2}>{description}</Text> : null}
         <View style={[styles.bottom, rtlRow]}>
-          <View><Price amount={product.price} size={typeScale.body.size} weight="700" />{kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}</View>
+          <View><Price amount={product.price} size={typeScale.body.size} weight="700" prefix={showFromPrice ? t('fromPrice') : undefined} />{kcalLabel ? <Text variant="caption" tone="tertiary">{kcalLabel}</Text> : null}</View>
           {available ? (
-            <Pressable onPress={(event) => { event.stopPropagation(); onAdd(product, hasModifiers); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}
+            <Pressable onPress={(event) => { event.stopPropagation(); onAdd(product, needsChoice); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={actionLabel}
               style={({ pressed }) => [styles.add, pressed && styles.addPressed]}>
               <Text variant="label" tone="onEmber" align="center">{actionLabel}</Text>
             </Pressable>
@@ -67,7 +75,7 @@ export const ProductCard = React.memo(function ProductCard({ product, hasModifie
       </View>
     );
   }
-  if (hasModifiers) {
+  if (needsChoice) {
     return <Pressable onPress={() => onAdd(product, true)} accessibilityRole="button" accessibilityLabel={name} accessibilityHint={pick('Opens item options', 'يفتح خيارات المنتج')}
       style={({ pressed }) => [styles.card, rtlRow, pressed && styles.cardPressed]}>{content}</Pressable>;
   }

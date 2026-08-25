@@ -35,19 +35,19 @@ import { useThemeColors } from '../theme/ThemeProvider';
 const P = (o: Partial<Product>): Product => o as unknown as Product;
 const C = (o: Partial<CartItem>): CartItem => o as unknown as CartItem;
 
-const MOCK_CARDS: { product: Product; hasModifiers: boolean }[] = [
-  { hasModifiers: true, product: P({
+const MOCK_CARDS: { product: Product; needsChoice: boolean }[] = [
+  { needsChoice: true, product: P({
     id: '1', nameEn: 'Spicy Crispy Chicken Meal', nameAr: 'وجبة دجاج مقرمش حار',
     descriptionEn: 'Two crispy fillets, fries, coleslaw and a drink.',
     descriptionAr: 'قطعتان مقرمشتان، بطاطس، سلطة كول سلو ومشروب.',
     price: 34.5, calories: 890, modifierGroupIds: ['g1'],
   }) },
-  { hasModifiers: false, product: P({
+  { needsChoice: false, product: P({
     id: '2', nameEn: 'Golden Fries', nameAr: 'بطاطس ذهبية',
     descriptionEn: 'Hand-cut and lightly salted.', descriptionAr: 'مقطعة يدويًا ومملحة قليلًا.',
     price: 9, calories: 320, modifierGroupIds: [],
   }) },
-  { hasModifiers: false, product: P({
+  { needsChoice: false, product: P({
     id: '3', nameEn: 'Fresh Lemon Mint', nameAr: 'ليمون بالنعناع الطازج',
     descriptionEn: '', descriptionAr: '', price: 12, modifierGroupIds: [],
   }) },
@@ -107,7 +107,7 @@ export default function DevPreview() {
                 />
               ))
             : MOCK_CARDS.map((m) => (
-                <ProductCard key={m.product.id} product={m.product} hasModifiers={m.hasModifiers} onAdd={() => {}} />
+                <ProductCard key={m.product.id} product={m.product} needsChoice={m.needsChoice} onAdd={() => {}} />
               ))}
       </ScrollView>
     </Screen>

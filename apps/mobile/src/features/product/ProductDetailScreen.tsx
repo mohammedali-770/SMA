@@ -15,6 +15,7 @@ import { Text } from '../../design-system/ui/Text';
 import { ITEM_NOTE_MAX_LENGTH } from '../order/orderNote';
 import { useI18n } from '../../i18n/I18nProvider';
 import { useCart, useCatalog } from '../../store';
+import { cheapestVariant } from '../../store/CartProvider';
 import { makeStyles } from '../../theme/makeStyles';
 import { useThemeColors } from '../../theme/ThemeProvider';
 import type { Modifier, ModifierGroup, ProductVariant } from '../../types/models';
@@ -52,10 +53,18 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   //
   // Pre-selected rather than left empty: place_order REFUSES a tiered product
   // sent without a tier, so an empty default would build a line that fails at
-  // checkout. The cheapest tier is first (the importer sorts them), which is
-  // also the price the menu card advertised.
+  // checkout. Preselect the CHEAPEST tier, which is the price the menu card
+  // advertised ("from X" comes from the same figure).
+  //
+  // Deliberately not `variants[0]`: tiers arrive in Lazywait `sort_order`, not
+  // price order, and on the live menu 14 of 27 multi-tier products have a
+  // first-by-sort tier that is NOT the cheapest — Fillet leads with "Spicy
+  // Fillet" at 15.00, Chicken Twister Meal with "Spicy" at 17.00. Seeding from
+  // `variants[0]` therefore opened the screen on a different price from the one
+  // the card had just shown. `cheapestVariant` is the same helper the cart uses,
+  // so card, picker and cart agree by construction.
   const [variant, setVariant] = useState<ProductVariant | null>(
-    () => editingLine?.variant ?? product?.variants[0] ?? null);
+    () => editingLine?.variant ?? cheapestVariant(product?.variants ?? []));
   const [qty, setQty] = useState(() => editingLine?.quantity ?? 1);
   // The line's own instruction. Seeded from the line being edited so reopening
   // an item shows what the customer already asked for rather than a blank box.
@@ -86,7 +95,7 @@ export function ProductDetailScreen({ productId, cartItemId }: { productId: stri
   // so only offer a choice when there is genuinely more than one.
   const tiers = product.variants;
   const showTierPicker = tiers.length > 1;
-  const activeTier = variant ?? tiers[0] ?? null;
+  const activeTier = variant ?? cheapestVariant(tiers);
   const total = Number((computeUnitPrice(product, selected, activeTier) * qty).toFixed(2));
   const isEditing = Boolean(cartItemId && editingLine);
   const save = () => {

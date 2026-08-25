@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildMenuSections, buildSearchIndex, menuItemKey } from './menuSections';
-import type { Category, Product } from '../../types/models';
+import { buildMenuSections, buildSearchIndex, hasPriceRange, hasTierChoice, menuItemKey } from './menuSections';
+import type { Category, Product, ProductVariant } from '../../types/models';
 
 function product(id: string, over: Partial<Product> = {}): Product {
   return {
     id, categoryId: 'c1', nameEn: `Name ${id}`, nameAr: `اسم ${id}`, descriptionEn: `desc ${id}`,
     descriptionAr: '', price: 10, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [],
+    variants: [],
     ...over,
   };
+}
+function tier(id: string, price: number): ProductVariant {
+  return { id, productId: 'p1', nameEn: id, nameAr: id, price, calories: null };
 }
 function category(id: string, sortOrder: number): Category {
   return { id, nameEn: id, nameAr: id, sortOrder };
@@ -33,7 +37,7 @@ function build(over: Partial<Parameters<typeof buildMenuSections>[0]> = {}) {
 
 describe('menuItemKey (branch-selection crash regression)', () => {
   it('returns the stable product id for real rows', () => {
-    expect(menuItemKey({ product: product('p9'), hasModifiers: false }, 4)).toBe('p9');
+    expect(menuItemKey({ product: product('p9'), needsChoice: false, showFromPrice: false, available: true }, 4)).toBe('p9');
   });
   it('NEVER throws on the synthetic header/footer rows RN feeds through keyExtractor', () => {
     // Reproduced crash: VirtualizedSectionList._convertViewable calls
@@ -126,9 +130,60 @@ describe('buildMenuSections', () => {
     expect(out.map((s) => s.category.id)).toEqual(['early', 'late']);
   });
 
-  it('carries the injected hasModifiers flag per item', () => {
+  it('carries the injected hasModifiers flag per item as needsChoice', () => {
     const products = [product('p1'), product('p2')];
     const out = build({ products, hasModifiers: (p) => p.id === 'p2' });
-    expect(out[0].data.map((i) => i.hasModifiers)).toEqual([false, true]);
+    expect(out[0].data.map((i) => i.needsChoice)).toEqual([false, true]);
+  });
+});
+
+describe('tier choice — a multi-tier product must never be added from the card', () => {
+  it('hasTierChoice is true only above one tier', () => {
+    expect(hasTierChoice(product('p', { variants: [] }))).toBe(false);
+    expect(hasTierChoice(product('p', { variants: [tier('a', 10)] }))).toBe(false);
+    expect(hasTierChoice(product('p', { variants: [tier('a', 10), tier('b', 14)] }))).toBe(true);
+  });
+
+  it('needsChoice is set by tiers ALONE, with no modifier groups', () => {
+    // The regression this exists for: a tiered product with no modifiers used
+    // to be added straight from the card, silently taking the cheapest tier.
+    const products = [product('p1', { variants: [tier('s', 20), tier('l', 26)] })];
+    const out = build({ products, hasModifiers: () => false });
+    expect(out[0].data[0].needsChoice).toBe(true);
+  });
+
+  it('a single-tier product is still one-tap addable', () => {
+    const products = [product('p1', { variants: [tier('only', 20)] })];
+    const out = build({ products, hasModifiers: () => false });
+    expect(out[0].data[0].needsChoice).toBe(false);
+  });
+});
+
+describe('from-price — only claim a range when one exists', () => {
+  it('is true when the tiers span different prices', () => {
+    expect(hasPriceRange(product('p', { variants: [tier('s', 20), tier('l', 26)] }))).toBe(true);
+  });
+
+  it('is FALSE when every tier costs the same', () => {
+    // Live data: Kinza is six flavours all at 2.00, Kids Meal eight at 15.00.
+    // "from 2.00" would advertise a cheaper option that does not exist.
+    const flavours = [tier('cola', 2), tier('pepsi', 2), tier('orange', 2)];
+    expect(hasPriceRange(product('p', { variants: flavours }))).toBe(false);
+  });
+
+  it('is false for one tier and for none', () => {
+    expect(hasPriceRange(product('p', { variants: [tier('a', 10)] }))).toBe(false);
+    expect(hasPriceRange(product('p', { variants: [] }))).toBe(false);
+  });
+
+  it('same-price flavours still need a choice, they just do not show "from"', () => {
+    const products = [product('p1', { variants: [tier('cola', 2), tier('pepsi', 2)] })];
+    const out = build({ products, hasModifiers: () => false });
+    expect(out[0].data[0].needsChoice).toBe(true);
+    expect(out[0].data[0].showFromPrice).toBe(false);
+  });
+
+  it('does not depend on tier order — cheapest last still reads as a range', () => {
+    expect(hasPriceRange(product('p', { variants: [tier('big', 30), tier('small', 12)] }))).toBe(true);
   });
 });

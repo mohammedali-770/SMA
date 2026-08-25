@@ -560,10 +560,18 @@ in Lazywait `sort_order`, so the first row is whichever the POS listed first. Fo
 Coral that is the 29.00 tier against a card reading 20.00. `cartSchema.test.ts`
 pins the cheapest-not-first rule directly.
 
-Whether a multi-tier product should instead **open a picker** before it can be
-added — and whether its card should read "from 20.00" rather than a bare
-"20.00" — is an open product decision, not settled here. What is settled is that
-the price charged may never exceed the price displayed.
+**Settled 2026-08-25:** a multi-tier product **opens the picker** instead of
+being added from the card, and a tiered card reads **"from X"** — but only where
+the tiers actually span a range, since more than half of them price every tier
+the same and a "from" would then advertise a cheaper option that does not exist.
+Those same-price products still open the picker; choosing between flavours
+matters to the kitchen even at one price.
+
+The cheapest-tier fallback described above therefore no longer decides what a
+customer is charged from the menu — it remains as the cart's defensive default
+and as the figure the "from" price and the picker's preselection are both read
+from. What is unchanged either way: the price charged may never exceed the price
+displayed.
 
 **A pre-tier cart is discarded, not migrated.** The persisted cart carries a
 schema version *inside the payload* (`CART_SCHEMA_VERSION`; the key itself may
