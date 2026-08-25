@@ -113,19 +113,25 @@ Production schema changes go only through the owner-approved migration workflow 
 
 Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files **as of that date**.
 
-**That count is now 100, and the last three are deliberately unapplied.** All three were added on 2026-08-24 and **none** has been applied to Production. Do not "reconcile" any of them: applying a migration is an owner action under §5, and the first is covered by the payment freeze besides.
+**Superseded 2026-08-25 — the two variant migrations are now APPLIED.** On the owner's explicit approval, `20260824120000_product_variants` and `20260824130000_place_order_variants` were applied to Production, in that dependency order, via MCP `apply_migration` — one call per file, each followed by read-only verification. Live history moved **103 → 105**. Full record: `docs/MIGRATIONS.md` §32, ledger rows 59–60.
 
-| File | Why it is unapplied |
+**One repository file remains deliberately unapplied.**
+
+| File | Status |
 | --- | --- |
-| `20260824100000_moyasar_payment_provider.sql` | Added for the Moyasar evaluation (§6). Applying it is a §5 action **and** frozen under §6. |
-| `20260824120000_product_variants.sql` | Adds `product_variants` — the Lazywait price tier — and `order_items.variant_id`. Applying it is a §5 action. |
-| `20260824130000_place_order_variants.sql` | Redefines the four order-pricing functions to price a line from the chosen tier. **Depends on `…120000`**; applying out of order fails. |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Added for the Moyasar evaluation (§6). Applying it is a §5 action **and** frozen under §6. Verified absent from Production after the 2026-08-25 applications: zero history rows, zero `%moyasar%` functions, `provider_name` still `tap` and still disabled. |
+| `20260824120000_product_variants.sql` | Applied 2026-08-25, live version `20260825061046`. |
+| `20260824130000_place_order_variants.sql` | Applied 2026-08-25, live version `20260825061502`. |
 
-The honest statement is therefore **100 repository files / 103 live rows / three unapplied files, all three unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **100 repository files / 105 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
-**Deploy order is load-bearing for the two variant migrations.** `lazywait-sync` reads `order_items.variant_id` and a `product_variants` embed through `ORDER_ITEM_SELECT`. Redeploying that function **before** `…120000` is applied makes PostgREST reject the select; the handler does not check that error, so every order is blocked from the kitchen under a misleading `no_items` reason. Apply the migrations first, then redeploy — each step its own §5 approval.
+**Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
-**A naive bulk apply would sweep the frozen Moyasar file in with them**, because `20260824100000` sorts ahead of both. Any application of the variant migrations must name them explicitly.
+**The deploy-order trap is closed, and the deploy is done.** `lazywait-sync` reads `order_items.variant_id` and a `product_variants` embed through `ORDER_ITEM_SELECT`. Redeploying it *before* `…120000` was applied would have made PostgREST reject the select, and the handler does not check that error, so every order would have been blocked from the kitchen under a misleading `no_items` reason. The migrations were applied first, and `lazywait-sync` was then redeployed on explicit owner approval (2026-08-25, version 3, `verify_jwt` unchanged at `false`).
+
+Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
+
+**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

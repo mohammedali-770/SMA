@@ -429,9 +429,18 @@ only way to get heat level onto the ticket as a **structured, separately priced*
 add-on rather than as text. That remains an owner decision
 (`docs/OWNER_ACTIONS.md` §17) — it is now an improvement, not a prerequisite.
 
-**Deployment status.** All of this is repository code. The live `lazywait-sync`
-Edge Function is still the July build, which sends no add-ons at all. Deploying
-is a separate owner action under CLAUDE.md §5.
+**Deployment status — LIVE as of 2026-08-25 (version 3).** This was repository
+code only until then: the deployed worker was still the July build, which sent no
+add-ons, no per-item note, no category or price id, and no customer phone. It is
+now deployed on explicit owner approval, verified byte-identical to the default
+branch by SHA-256 across all five bundled files.
+
+**The money on a ticket did not move.** Only a modifier carrying a real
+`modifiers.lazywait_addon_id` becomes an `addons[]` entry and is subtracted back
+out of `price`; all **three** live modifiers are unmapped, so nothing is
+subtracted and every line is charged exactly what it was under the July build.
+What changed is that the customer's heat-level choice now reaches the kitchen as
+`details` text instead of being silently dropped.
 
 ### Intentionally NOT sent (schemas unconfirmed — do not invent)
 Delivery address/fields, `latitude`/`longitude` (the contract has **no**
