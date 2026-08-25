@@ -836,11 +836,12 @@ If concurrent sessions on one branch become common, the cheap structural fix is
 one branch per session rather than a new CI control — but that is a working
 practice, not a repository setting, and it is not proposed as an action here.
 
-## 19. After the 2026-08-25 variant application — three open actions
+## 19. After the 2026-08-25 variant application — two open actions
 
-**Status:** OWNER DECISION ×3. None blocks ordering today. The one that had a
-timer on it — the `lazywait-catalog` redeploy — is **done**; see the closeout
-below the table.
+**Status:** OWNER DECISION ×2. Neither blocks ordering, and neither is urgent.
+**Both Edge Function redeploys are done** — `lazywait-catalog` (v3) and
+`lazywait-sync` (v3), each on explicit owner approval; see the closeouts below
+the table. What remains is bookkeeping and branch hygiene.
 
 On 2026-08-25 the two variant migrations were applied and the Lazywait catalog
 was imported, both on explicit owner approval. The menu is live for the first
@@ -849,9 +850,8 @@ Full record: [`MIGRATIONS.md`](MIGRATIONS.md) §32 and ledger rows 59–60.
 
 | # | Action | Why it is still open |
 | --- | --- | --- |
-| 1 | Redeploy `lazywait-sync` | Carries the ordered tier's `price_id` to the POS ticket. **Now safe** — it was a hazard only while `…120000` was unapplied, and that is done. Without it a tiered order still tickets the cheapest tier, so a Large is charged correctly in the app but printed as a Small in the kitchen. |
-| 2 | Version-align rows 59 and 60 | Live history carries the apply-time stamps `20260825061046` / `20260825061502`, not the repository filenames. §9-D makes realignment a separate live history write with its own approval. Leaving it is legitimate; "repairing" it unasked is not. |
-| 3 | Map or retire the 16 new branches | The importer created all 16 Lazywait branches because none matched a local `lazywait_branch_id`, taking the branch table 25 → 41. They are **inactive** and cannot take orders, but the duplication means branch mapping has never been done. |
+| 1 | Version-align rows 59 and 60 | Live history carries the apply-time stamps `20260825061046` / `20260825061502`, not the repository filenames. §9-D makes realignment a separate live history write with its own approval. Leaving it is legitimate; "repairing" it unasked is not. |
+| 2 | Map or retire the 16 new branches | The importer created all 16 Lazywait branches because none matched a local `lazywait_branch_id`, taking the branch table 25 → 41. They are **inactive** and cannot take orders, but the duplication means branch mapping has never been done. |
 
 **Closed 2026-08-25 — `lazywait-catalog` redeployed (version 3).** This was the
 item with a timer on it: `lazywait_catalog_items.prices` had been rebuilt from
@@ -869,9 +869,37 @@ SHA-256 against the default branch, and **all six files are byte-identical** —
 re-checked after the deploy and unmoved: 55 of 61 products active, 144 of 147
 tiers, five categories, all 147 cached price entries carrying a net price.
 
-**Action 1 is now the live one**, and it is a correctness gap rather than a trap:
-until `lazywait-sync` is redeployed a tiered order reaches the kitchen under the
-cheapest tier's `price_id`. Nothing degrades while it waits.
+**Closed 2026-08-25 — `lazywait-sync` redeployed (version 3).** A tiered order
+now reaches the kitchen under the chosen tier's `price_id` instead of the
+cheapest one's.
+
+**The deploy was materially larger than "carry the tier's price_id", and that is
+worth stating plainly.** The deployed worker was still the July build: its
+bundled `_shared/lazywait.ts` was a ~150-line stripped variant of the repository's
+870-line module. Redeploying therefore also shipped add-on/modifier support, the
+per-item kitchen note, `menu_category_id`, the order-level `order_details`, the
+CRM `customer_id`, the `customer_cell`/`country_code` phone split, and the
+fail-closed base-URL guard. All of it was already merged and reviewed; none of it
+was new code written for this deploy.
+
+**No ticket's money moved.** Only a modifier carrying a real
+`lazywait_addon_id` becomes an `addons[]` entry and is subtracted back out of
+`price`. All three live modifiers are unmapped, so nothing is subtracted, the new
+`addon_price_exceeds_item_price` block cannot trigger, and every line is charged
+exactly what the July build charged. The visible change is that a customer's
+heat-level choice now reaches the kitchen as `details` text instead of being
+dropped. The fail-closed base-URL guard is likewise inert: `base_url` is set to
+`https://apiv2-dev.lazywait.com/v1` and parses.
+
+Verified before and after. Before: every column, grant and embed FK in
+`ORDER_ITEM_SELECT` confirmed present, and each FK path **unambiguous** — two FKs
+between the same pair of tables would make PostgREST reject the whole select and
+block every order under a misleading `no_items`, exactly as a missing one would.
+Zero orders were in flight. After: the deployed bundle was read back and compared
+by SHA-256 — all five files byte-identical to the default branch — `verify_jwt`
+still `false`, and a live POST with no `x-sync-secret` returned
+`401 {"error":"unauthorized"}`, proving the bundle boots and the module graph
+resolves without claiming an order or changing any state.
 
 **The import ran under a synthesised admin context**, and that is recorded rather
 than buried. `import_lazywait_catalog()` requires `is_admin()` — role **and**
