@@ -851,7 +851,7 @@ Full record: [`MIGRATIONS.md`](MIGRATIONS.md) §32 and ledger rows 59–60.
 | # | Action | Why it is still open |
 | --- | --- | --- |
 | 1 | Version-align rows 59 and 60 | Live history carries the apply-time stamps `20260825061046` / `20260825061502`, not the repository filenames. §9-D makes realignment a separate live history write with its own approval. Leaving it is legitimate; "repairing" it unasked is not. |
-| 2 | Map or retire the 16 new branches | The importer created all 16 Lazywait branches because none matched a local `lazywait_branch_id`, taking the branch table 25 → 41. They are **inactive** and cannot take orders, but the duplication means branch mapping has never been done. |
+| 2 | Retire or reconcile the 15 remaining duplicate branches | The live branch is mapped (see the closeout below), so this no longer blocks ordering. Fifteen inactive importer-created rows remain, each holding a real `lazywait_branch_id`. They cannot take orders. Left in place deliberately: `branches` is FK-referenced by eleven tables, so deleting rows is destructive and needs its own decision. |
 
 **Closed 2026-08-25 — `lazywait-catalog` redeployed (version 3).** This was the
 item with a timer on it: `lazywait_catalog_items.prices` had been rebuilt from
@@ -868,6 +868,42 @@ SHA-256 against the default branch, and **all six files are byte-identical** —
 `verify_jwt` stays `true` and the admin `is_admin()` gate is unchanged. Live menu
 re-checked after the deploy and unmoved: 55 of 61 products active, 144 of 147
 tiers, five categories, all 147 cached price entries carrying a net price.
+
+**Closed 2026-08-25 — the live branch is mapped again, and this was breaking
+ordering.** Found while reviewing what to do next, not by a report.
+
+`branches.lazywait_branch_id` was **NULL on the only active branch** (Nasserah).
+`buildCreateOrderPayload` returns `missing_branch_mapping` when the branch id is
+absent, so the next pickup order placed would have been blocked and would never
+have reached the kitchen. Three orders were blocked on exactly that reason on
+23–24 July, right after that branch row was created; 31 orders synced later, so
+a mapping existed at some point and was not present on 2026-08-25.
+
+**The importer could never have fixed it.** `import_lazywait_catalog` matches
+branches on `lazywait_branch_id` and *inserts* when it finds no match — it never
+writes a mapping onto an existing row. That is why the 2026-08-25 import created
+a **second, inactive "Nasserah"** carrying the real Lazywait id rather than
+mapping the live one, and why the table went 25 → 41.
+
+Fixed on explicit owner confirmation that Nasserah is the operating branch: the
+active row now carries `0dDRHGE1hSBZjDvgg1bN` and the duplicate's mapping was
+cleared so exactly one row holds that id. Verified before and after — dry run in
+a rolled-back transaction first, then applied in one transaction: one active
+branch with a mapping, one holder of the id, **40 rows before and after, none
+created or deleted**.
+
+Two things worth carrying forward:
+
+- **There is no unique constraint on `branches.lazywait_branch_id`** — only a
+  partial btree index. Two rows *can* hold the same id, and the importer's
+  `update … where lazywait_branch_id = …` would then write to both. Clearing the
+  duplicate was therefore deliberate, not tidiness.
+- The write was made as a **scoped `update`, not through `set_lazywait_mapping`**.
+  That RPC requires `is_admin()` (role **and** AAL2) and for a branch it does
+  nothing beyond a non-empty check and the same single-column update. Using it
+  would have meant synthesising an admin session again, as the 2026-08-25 import
+  did; a direct, guarded update avoids asserting an authentication that did not
+  happen. Routine mapping edits should still go through the admin console.
 
 **Closed 2026-08-25 — `lazywait-sync` redeployed (version 3).** A tiered order
 now reaches the kitchen under the chosen tier's `price_id` instead of the
