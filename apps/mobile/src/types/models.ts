@@ -155,6 +155,15 @@ export interface OrderItem {
   nameAr: string;
   price: number; // unit price incl. selected modifiers
   quantity: number;
+  /**
+   * The price tier this line was ordered at, snapshotted onto the line at
+   * checkout. Absent for an untiered product and for any order placed before
+   * `20260824120000_product_variants`. Without it two receipt lines both
+   * reading "Coral" are indistinguishable, though they may be different food at
+   * different prices — see `orderLineLabel`.
+   */
+  variantNameEn?: string;
+  variantNameAr?: string;
   selectedModifiers: OrderItemModifier[];
 }
 

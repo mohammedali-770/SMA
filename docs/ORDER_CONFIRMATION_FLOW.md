@@ -574,12 +574,30 @@ customer would be unable to check out with nothing on screen explaining why, so
 a v1 payload is dropped on hydration. `CartProvider` holds no catalog and cannot
 repair those rows itself; an empty cart is recoverable, an unorderable one is not.
 
-**Still open — the tier does not yet reach the staff consoles or the receipt.**
-`order_items.variant_id` is recorded and the POS ticket carries the right
-`price_id`, but the rendered order model still drops `variant_id` and the variant
-name snapshots, and the mobile customer selector does not fetch them. BranchConsole,
-CallCentreConsole and the customer receipt therefore still show a bare "Coral".
-Closing that is tracked on the variants pull request and is not done here.
+**The tier reaches the staff receipt and the customer receipt too.** The line
+carries `variant_name_en` / `variant_name_ar` as a **snapshot**, written at
+checkout — not a join. A receipt therefore keeps naming the tier the customer
+actually bought even after the catalog is re-imported and that tier is renamed or
+withdrawn, which a live join could not do.
+
+Both sides render it through a label helper rather than the bare name:
+`orderLineLabel(item, isRTL)` in `src/types.ts` for staff, and
+`orderLineLabel(item, pick)` in `apps/mobile/src/utils/format.ts` for the
+customer. Both fall back to the bare product name when the line has no tier or
+the tier name merely repeats it, so an untiered product is unchanged.
+
+**The read grant is load-bearing, not a detail.** `20260824120000` grants
+`select (variant_id, variant_name_en, variant_name_ar)` on `order_items` to
+`authenticated`. PostgREST rejects the WHOLE select rather than omitting a column
+the caller may not read, so adding these to `CUSTOMER_ORDER_SELECT` without that
+grant would not hide the tier — it would break the entire receipt for every
+signed-in customer, exactly as §10c describes for the note. The grant and the
+selector must ship together, and `orderLineLabel.test.ts` pins that the selector
+carries the two name columns while still carrying no internal `order_number`, no
+`variant_id` and no catalog embed.
+
+`order_items.variant_id` is recorded and the POS ticket carries the ordered
+tier's `price_id`.
 
 ### Directions, for pickup only
 

@@ -25,6 +25,7 @@ import { useDsFontClass } from '../../../../design-system/ui/useDsLang';
 import { orderDisplayNumber } from '../../../../lib/mappers';
 import { mapsUrlFor } from '../../../../lib/maps';
 import { paymentDisplayState } from '../../../../lib/payment';
+import { orderLineLabel } from '../../../../types';
 import type { Branch, Order, OrderStatus } from '../../../../types';
 import { getVATBreakdown } from '../../../../utils/calculations';
 import { Price } from '../../../Price';
@@ -252,7 +253,7 @@ export function OrderReceiptModal({
                 <div className="min-w-0">
                   <Text variant="label" as="p">
                     <span className="num">{item.quantity}x</span>{' '}
-                    {isRTL ? item.nameAr : item.nameEn}
+                    {orderLineLabel(item, isRTL)}
                   </Text>
                   {item.selectedModifiers.length > 0 && (
                     <Text variant="caption" tone="tertiary" as="p" className="mt-0.5">

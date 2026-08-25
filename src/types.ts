@@ -158,7 +158,30 @@ export interface OrderItem {
   quantity: number;
   /** The customer's instruction for THIS line ("no onion"), when they left one. */
   note?: string;
+  /**
+   * The price tier this line was ordered at, snapshotted onto the line at
+   * checkout. Absent for an untiered product and for any order placed before
+   * `20260824120000_product_variants`. Two lines both reading "Coral" may be
+   * different food at different prices, so the tier is what makes a ticket
+   * unambiguous — see `orderLineLabel`.
+   */
+  variantId?: string;
+  variantNameEn?: string;
+  variantNameAr?: string;
   selectedModifiers: OrderItemModifier[];
+}
+
+/**
+ * How a line is named to staff and on a receipt: "Coral — Large".
+ *
+ * Falls back to the bare product name when the line has no tier, or when the
+ * tier name merely repeats it, so an untiered product reads exactly as it did
+ * before variants existed.
+ */
+export function orderLineLabel(item: OrderItem, isRTL: boolean): string {
+  const base = isRTL ? item.nameAr : item.nameEn;
+  const tier = (isRTL ? item.variantNameAr : item.variantNameEn)?.trim();
+  return !tier || tier === base ? base : `${base} — ${tier}`;
 }
 
 export interface Order {

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**148 TypeScript test files declaring 2238 test blocks, plus 55 SQL suites.**
+**149 TypeScript test files declaring 2248 test blocks, plus 55 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -100,7 +100,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-58 files, 825 declared test blocks.
+59 files, 831 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -162,10 +162,11 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |
+| `apps/mobile/src/utils/orderLineLabel.test.ts` | 6 | orderLineLabel |
 
 ### `src/`
 
-74 files, 983 declared test blocks.
+74 files, 987 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -225,7 +226,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 10 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/mappers.test.ts` | 23 | catalog mappers |
+| `src/lib/mappers.test.ts` | 27 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/moyasarAdminTest.test.ts` | 9 | canRunMoyasarAdminTestCheckout |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |

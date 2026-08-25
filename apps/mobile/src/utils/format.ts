@@ -102,6 +102,25 @@ export function cartLineLabel(
   return !tier || tier === base ? base : `${base} — ${tier}`;
 }
 
+/**
+ * How an ORDER line is named on a receipt: "Coral — Large".
+ *
+ * The cart equivalent is `cartLineLabel`, which reads the live catalog variant;
+ * this one reads the snapshot persisted onto the line at checkout, so a receipt
+ * keeps naming the tier the customer actually bought even after the catalog
+ * changes. Falls back to the bare name when there is no tier, or when the tier
+ * name merely repeats it.
+ */
+export function orderLineLabel(
+  item: { nameEn: string; nameAr: string; variantNameEn?: string; variantNameAr?: string },
+  pick: (en: string, ar: string) => string,
+): string {
+  const base = pick(item.nameEn, item.nameAr);
+  if (!item.variantNameEn && !item.variantNameAr) return base;
+  const tier = pick(item.variantNameEn ?? '', item.variantNameAr ?? '').trim();
+  return !tier || tier === base ? base : `${base} — ${tier}`;
+}
+
 /** Cart subtotal preview (sum of line totals). Server recomputes on checkout. */
 export function cartSubtotal(items: CartItem[]): number {
   return Number(items.reduce((sum, it) => sum + it.unitPrice * it.quantity, 0).toFixed(2));

@@ -67,7 +67,12 @@ export const CUSTOMER_ORDER_COLUMNS = [
 export const CUSTOMER_ORDER_ITEM_COLUMNS = [
   // `note` is the customer's own instruction for this line, on their own order
   // — the same reasoning as the order-level `notes` above.
+  // `variant_name_*` are the tier snapshot. 20260824120000 grants select on
+  // them to `authenticated`, which is required: PostgREST rejects the WHOLE
+  // select rather than omitting a column the caller may not read, so an
+  // ungranted column here would break the entire receipt, not hide the tier.
   'id', 'name_en', 'name_ar', 'unit_price', 'quantity', 'note',
+  'variant_name_en', 'variant_name_ar',
 ] as const;
 
 export const CUSTOMER_ORDER_MODIFIER_COLUMNS = [
@@ -122,7 +127,7 @@ export const INTERNAL_ONLY_ORDER_COLUMNS = [
 // literal type, and `'a' + 'b'` widens to `string`, which collapses the result
 // to GenericStringError. Do not reformat this across lines or via join().
 // eslint-disable-next-line max-len
-export const CUSTOMER_ORDER_SELECT = 'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, loyalty_points_earned, payment_status, payment_method, notes, lazywait_order_number, lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, pos_create_attempted_at, pos_customer_retry_count, refund_state, order_items(id, name_en, name_ar, unit_price, quantity, note, order_item_modifiers(id, name_en, name_ar, price))';
+export const CUSTOMER_ORDER_SELECT = 'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, loyalty_points_earned, payment_status, payment_method, notes, lazywait_order_number, lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, pos_create_attempted_at, pos_customer_retry_count, refund_state, order_items(id, name_en, name_ar, unit_price, quantity, note, variant_name_en, variant_name_ar, order_item_modifiers(id, name_en, name_ar, price))';
 
 /** The same expression rebuilt from the arrays — the drift guard for the literal. */
 export const CUSTOMER_ORDER_SELECT_FROM_COLUMNS =

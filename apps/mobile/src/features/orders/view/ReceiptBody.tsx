@@ -24,7 +24,7 @@ import { Text } from '../../../design-system/ui/Text';
 import { useI18n } from '../../../i18n/I18nProvider';
 import { orderDisplayNumber } from '../../../lib/mappers';
 import { paymentDisplayState, paymentMethodLabel } from '../../../lib/payment';
-import { formatRiyadhDateTime } from '../../../utils/format';
+import { formatRiyadhDateTime, orderLineLabel } from '../../../utils/format';
 import { ReceiptRow } from './ReceiptRow';
 import type { Order } from '../../../types/models';
 import { makeStyles } from '../../../theme/makeStyles';
@@ -81,7 +81,7 @@ export function ReceiptBody({ order }: { order: Order }) {
                   other figure in the app. */}
               <Text variant="label" tone="ember" style={styles.qty}>{it.quantity}×</Text>
               <View style={styles.itemBody}>
-                <Text variant="label" numberOfLines={2}>{pick(it.nameEn, it.nameAr)}</Text>
+                <Text variant="label" numberOfLines={2}>{orderLineLabel(it, pick)}</Text>
                 {it.selectedModifiers.length > 0 ? (
                   <Text variant="caption" tone="secondary">
                     {it.selectedModifiers.map((m) => pick(m.nameEn, m.nameAr)).join(' · ')}

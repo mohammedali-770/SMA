@@ -5,6 +5,7 @@ import {
   brandPatchToDb, loyaltyPatchToDb, productToDbInsert, branchPatchToDb,
   orderDisplayNumber,
 } from './mappers';
+import { orderLineLabel } from '../types';
 import type {
   DbBranch, DbCategory, DbProduct, DbModifierGroup, DbModifier, DbProductModifierGroup,
   DbBranchAvailability, DbAppSettings, DbProfile, DbAddress, DbOrderWithItems,
@@ -227,5 +228,66 @@ describe('reverse patch mappers (app -> DB)', () => {
       price: 10, imageUrl: 'u', calories: 5, isActive: true, modifierGroupIds: [], variants: [],
     }, 3);
     expect(ins).toMatchObject({ category_id: 'c1', name_en: 'X', price: 10, sort_order: 3, is_active: true });
+  });
+});
+
+// ===========================================================================
+// Tier snapshot on an order line.
+//
+// admin_list_orders_with_items has projected variant_id / variant_name_* since
+// 20260824130000, and the mapper discarded all three — so every tiered line
+// rendered as the bare product name, and two "Coral" lines at different prices
+// were indistinguishable on a ticket.
+// ===========================================================================
+describe('order line tier snapshot', () => {
+  function orderRowWithItem(item: Record<string, unknown>) {
+    return {
+      id: 'o1', order_number: 'SM-2026-000009', customer_id: 'u1',
+      customer_name: 'Ali', customer_phone: '+966', branch_id: 'b1',
+      branch_name_en: 'Olaya', branch_name_ar: 'العليا', status: 'received',
+      order_type: 'pickup', subtotal: 29, delivery_fee: 0, discount_amount: 0,
+      loyalty_discount_amount: 0, vat_amount: 3.8, total: 29,
+      payment_status: 'pending', payment_method: null, coupon_code: null,
+      notes: null, created_at: '2026-08-24T00:00:00Z', sync_status: 'pending',
+      address_snapshot: null,
+      order_items: [{
+        id: 'i1', order_id: 'o1', product_id: 'p1',
+        name_en: 'Coral', name_ar: 'كورال',
+        unit_price: 29, quantity: 1, line_total: 29,
+        order_item_modifiers: [],
+        ...item,
+      }],
+    } as unknown as DbOrderWithItems;
+  }
+
+  it('carries the tier through the mapper instead of discarding it', () => {
+    const [item] = mapOrder(orderRowWithItem({
+      variant_id: 'V_LARGE', variant_name_en: 'Large', variant_name_ar: 'كبير',
+    })).items;
+    expect(item.variantId).toBe('V_LARGE');
+    expect(item.variantNameEn).toBe('Large');
+    expect(item.variantNameAr).toBe('كبير');
+  });
+
+  it('leaves the tier undefined for an untiered line, never null', () => {
+    const [item] = mapOrder(orderRowWithItem({})).items;
+    expect(item.variantId).toBeUndefined();
+    expect(item.variantNameEn).toBeUndefined();
+    expect(item.variantNameAr).toBeUndefined();
+  });
+
+  it('labels a tiered line "Coral — Large", in both directions', () => {
+    const [item] = mapOrder(orderRowWithItem({
+      variant_id: 'V_LARGE', variant_name_en: 'Large', variant_name_ar: 'كبير',
+    })).items;
+    expect(orderLineLabel(item, false)).toBe('Coral — Large');
+    expect(orderLineLabel(item, true)).toBe('كورال — كبير');
+  });
+
+  it('falls back to the bare name with no tier, or when the tier repeats it', () => {
+    const [bare] = mapOrder(orderRowWithItem({})).items;
+    expect(orderLineLabel(bare, false)).toBe('Coral');
+    expect(orderLineLabel({ ...bare, variantNameEn: 'Coral' }, false)).toBe('Coral');
+    expect(orderLineLabel({ ...bare, variantNameEn: '   ' }, false)).toBe('Coral');
   });
 });

@@ -230,7 +230,7 @@ function mapAddressSnapshot(snap: Record<string, unknown>): SavedAddress {
 // not readable here either.
 type CustomerOrderItemModifier = Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>;
 type CustomerOrderItem = Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'>
-  & { note?: string | null };
+  & { note?: string | null; variant_name_en?: string | null; variant_name_ar?: string | null };
 
 function mapOrderItemModifier(m: CustomerOrderItemModifier): OrderItemModifier {
   return { id: m.id, nameEn: m.name_en, nameAr: m.name_ar, price: Number(m.price) };
@@ -245,6 +245,9 @@ function mapOrderItem(i: CustomerOrderItem & { order_item_modifiers?: CustomerOr
     price: Number(i.unit_price),
     quantity: i.quantity,
     note: i.note?.trim() || undefined,
+    // The tier, so the receipt can say "Coral — Large" rather than "Coral".
+    variantNameEn: i.variant_name_en ?? undefined,
+    variantNameAr: i.variant_name_ar ?? undefined,
     selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
   };
 }

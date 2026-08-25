@@ -227,6 +227,11 @@ function mapOrderItem(i: DbOrderItem & { order_item_modifiers?: DbOrderItemModif
     price: Number(i.unit_price),
     quantity: i.quantity,
     note: (i as { note?: string | null }).note?.trim() || undefined,
+    // The tier this line was ordered at. Absent for an untiered product and for
+    // any order placed before variants existed, so it stays optional.
+    variantId: i.variant_id ?? undefined,
+    variantNameEn: i.variant_name_en ?? undefined,
+    variantNameAr: i.variant_name_ar ?? undefined,
     selectedModifiers: (i.order_item_modifiers ?? []).map(mapOrderItemModifier),
   };
 }

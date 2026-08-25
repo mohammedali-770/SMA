@@ -252,6 +252,12 @@ export interface DbIntegrationSetting {
 export interface DbOrderItem {
   id: string; order_id: string; product_id: string | null;
   name_en: string; name_ar: string; unit_price: number; quantity: number; line_total: number;
+  // Tier snapshot. admin_list_orders_with_items has projected these since
+  // 20260824130000; they were being fetched and then discarded by the mapper,
+  // so every tiered line rendered as the bare product name.
+  variant_id?: string | null;
+  variant_name_en?: string | null;
+  variant_name_ar?: string | null;
 }
 export interface DbOrderItemModifier {
   id: string; order_item_id: string; modifier_id: string | null;
