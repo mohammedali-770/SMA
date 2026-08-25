@@ -536,6 +536,51 @@ order-level note is **`order_details`** — so `lazywait-sync` now forwards both
 and the POS ticket carries what the dashboard shows. The gap PR #231 left open
 is closed.
 
+### The chosen tier, on every line the customer sees
+
+A Lazywait item can carry several named prices — "Chicken Wings" is one item with
+Small 7.00 and Large 13.00 — and since `20260824120000_product_variants` those
+are `product_variants` rows rather than separate products. That makes the bare
+product name ambiguous on a ticket: two lines both reading "Coral" may be
+different food at different prices.
+
+Checkout therefore labels a line through `cartLineLabel(item, pick)` rather than
+`pick(product.nameEn, product.nameAr)`. It renders `Coral — Large`, and falls
+back to the bare name when the line has no tier or the tier name repeats the
+product name, so an untiered product reads exactly as it did before. The same
+label is used in the three places a line is named to the customer: the line row
+itself, the **remove** confirmation, and the **sold-out** message — a removal
+prompt naming "Coral" when the cart holds two Corals is not a confirmation.
+
+**The tier the customer is charged is the tier the card advertised.** A one-tap
+Add never asks which tier, so the cart assumes one, and it assumes the
+**cheapest** — `cheapestVariant`, matching `products.price`, which is the "from"
+price the menu card shows. It is deliberately not `variants[0]`: variants arrive
+in Lazywait `sort_order`, so the first row is whichever the POS listed first. For
+Coral that is the 29.00 tier against a card reading 20.00. `cartSchema.test.ts`
+pins the cheapest-not-first rule directly.
+
+Whether a multi-tier product should instead **open a picker** before it can be
+added — and whether its card should read "from 20.00" rather than a bare
+"20.00" — is an open product decision, not settled here. What is settled is that
+the price charged may never exceed the price displayed.
+
+**A pre-tier cart is discarded, not migrated.** The persisted cart carries a
+schema version *inside the payload* (`CART_SCHEMA_VERSION`; the key itself may
+never change — see `storageKeys.ts`). A v1 payload was written before tiers, so
+its rows hold no `variant`, `toOrderItems` would omit `variant_id`, and
+`place_order` refuses any product that has active tiers with no tier chosen. The
+customer would be unable to check out with nothing on screen explaining why, so
+a v1 payload is dropped on hydration. `CartProvider` holds no catalog and cannot
+repair those rows itself; an empty cart is recoverable, an unorderable one is not.
+
+**Still open — the tier does not yet reach the staff consoles or the receipt.**
+`order_items.variant_id` is recorded and the POS ticket carries the right
+`price_id`, but the rendered order model still drops `variant_id` and the variant
+name snapshots, and the mobile customer selector does not fetch them. BranchConsole,
+CallCentreConsole and the customer receipt therefore still show a bare "Coral".
+Closing that is tracked on the variants pull request and is not done here.
+
 ### Directions, for pickup only
 
 A **Directions to branch** control appears only when the order is `pickup`, the

@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**146 TypeScript test files declaring 2192 test blocks, plus 55 SQL suites.**
+**147 TypeScript test files declaring 2201 test blocks, plus 55 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -100,7 +100,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-57 files, 816 declared test blocks.
+58 files, 825 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -158,6 +158,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
 | `apps/mobile/src/services/addressPayload.test.ts` | 34 | ownership |
 | `apps/mobile/src/store/addressBook.test.ts` | 43 | loading and listing |
+| `apps/mobile/src/store/cartSchema.test.ts` | 9 | cheapestVariant — the assumed tier must match the advertised price |
 | `apps/mobile/src/store/profileCache.test.ts` | 10 | applyProfileEvent |
 | `apps/mobile/src/theme/paletteBinding.test.ts` | 2 | runtime palette binding |
 | `apps/mobile/src/utils/formatSAR.test.ts` | 7 | formatSAR after migration |

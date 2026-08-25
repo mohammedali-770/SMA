@@ -532,6 +532,27 @@ begin
          or lazywait_item_id not in (select lazywait_id from public.lazywait_catalog_items where entity_type = 'item'));
   get diagnostics v_prod_deactivated = row_count;
 
+  -- ---- 4b. RECOMPUTE a tiered product whose tiers have all gone inactive ----
+  -- The variant pass above deactivates every row with a NULL lazywait_price_id.
+  -- That includes id-less price rows THIS RUN created as visible and counted
+  -- towards making the parent product active (a price row without a `price_id`
+  -- is a shape the parser deliberately preserves). Without this pass such a
+  -- product stays active holding ZERO active tiers, and place_order then reads
+  -- it as UNTIERED: it accepts the line, prices it from products.price, and
+  -- sends products.lazywait_price_id — which for that product is null. The POS
+  -- receives an order it cannot attribute to any price.
+  --
+  -- The rule is simply: a product that HAS tiers but none orderable is not
+  -- itself orderable. Deactivating is reversible and never deletes, so the next
+  -- pull that returns a usable price_id brings it straight back.
+  update public.products p set is_active = false, updated_at = now()
+  where p.is_active = true
+    and exists (select 1 from public.product_variants v where v.product_id = p.id)
+    and not exists (select 1 from public.product_variants v
+                    where v.product_id = p.id and v.is_active = true);
+  get diagnostics v_hit = row_count;
+  v_prod_deactivated := v_prod_deactivated + v_hit;
+
   update public.categories set is_active = false, updated_at = now()
   where is_active = true
     and lazywait_category_id is distinct from '__lw_uncategorized__'

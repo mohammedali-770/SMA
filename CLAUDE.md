@@ -113,7 +113,19 @@ Production schema changes go only through the owner-approved migration workflow 
 
 Current read-only migration snapshot (2026-08-22): **97 repository migration files / 103 live migration-history rows**, latest live version **`20260822123940`** (`order_item_notes`), with **zero** unapplied repository files **as of that date**.
 
-**That count is now 98, and the 98th is deliberately unapplied.** `20260824100000_moyasar_payment_provider.sql` was added on 2026-08-24 for the Moyasar evaluation (§6) and has **not** been applied to Production. Do not "reconcile" it: applying it is an owner action under §5, and the payment freeze covers it besides. Until it is applied, the honest statement is 98 repository files / 103 live rows / **one** unapplied file, and that one is unapplied on purpose. Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+**That count is now 100, and the last three are deliberately unapplied.** All three were added on 2026-08-24 and **none** has been applied to Production. Do not "reconcile" any of them: applying a migration is an owner action under §5, and the first is covered by the payment freeze besides.
+
+| File | Why it is unapplied |
+| --- | --- |
+| `20260824100000_moyasar_payment_provider.sql` | Added for the Moyasar evaluation (§6). Applying it is a §5 action **and** frozen under §6. |
+| `20260824120000_product_variants.sql` | Adds `product_variants` — the Lazywait price tier — and `order_items.variant_id`. Applying it is a §5 action. |
+| `20260824130000_place_order_variants.sql` | Redefines the four order-pricing functions to price a line from the chosen tier. **Depends on `…120000`**; applying out of order fails. |
+
+The honest statement is therefore **100 repository files / 103 live rows / three unapplied files, all three unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATION_APPLICATION_20260822.md`; the previous snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+
+**Deploy order is load-bearing for the two variant migrations.** `lazywait-sync` reads `order_items.variant_id` and a `product_variants` embed through `ORDER_ITEM_SELECT`. Redeploying that function **before** `…120000` is applied makes PostgREST reject the select; the handler does not check that error, so every order is blocked from the kitchen under a misleading `no_items` reason. Apply the migrations first, then redeploy — each step its own §5 approval.
+
+**A naive bulk apply would sweep the frozen Moyasar file in with them**, because `20260824100000` sorts ahead of both. Any application of the variant migrations must name them explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
