@@ -160,6 +160,41 @@ Columns added by `20260708130000_lazywait_integration`; the pull/confirm flow by
    errors); records removed from Lazywait are pruned on the next successful pull.
    Parsing is **defensive**: handles en/ar/Turkish-only names, multi-price items,
    `branches_ids`, and null addon prices / null group min/max/multi safely.
+
+   **Add-on groups have never imported a single record.** Every
+   `lazywait_catalog_pulls` row in Production records `addon_groups: 0` with
+   `status: "success"` and no error — an empty parse is not an error, so the
+   count is the only signal there is.
+
+   The envelope unwrapper (`extractCatalogList`) tried a fixed key list that
+   carried a bare `groups` but **not** `addons_groups` or `addon_groups` — the
+   `addons_`-prefixed style the item payload itself uses for
+   `addons_groups_ids`. If `/menu/addons-groups` wraps its list under either of
+   those spellings, the unwrapper found nothing. It now takes the entity and
+   tries that entity's own envelope keys **first**; only `addon_group` needs it,
+   since the generic list already covers the other four. Trying them first
+   rather than appending them matters: a group envelope may itself carry an
+   `addons` key listing each group's add-ons, and `addons` precedes `groups` in
+   the generic order, so a group response could otherwise be read as an add-on
+   list. Pinned by `lazywaitCatalog.test.ts`, including a regression case
+   asserting the old path returned nothing for an `addons_groups` body.
+
+   **This is a hypothesis, not a confirmed root cause.** Confirmed: the old key
+   list had no `addons_groups` / `addon_groups`, and every pull returns zero.
+   Not confirmed: what `/menu/addons-groups` actually returns, which nobody has
+   captured. If it wraps under `data`, `results` or a bare `groups` — all of
+   which the old list already tried — then the parse was never the problem and
+   this changes nothing. Two further shapes would also survive the fix: a nested
+   wrapper, and a list of bare ids rather than objects.
+
+   What makes it worth fixing regardless is that the vendor side is **not**
+   empty: one item in the live catalog (`Extreme`) carries three ids in
+   `addons_groups_ids`, so at least three groups exist to be returned. Capture
+   one raw response before concluding either way.
+
+   A zero count from a healthy endpoint is indistinguishable from an empty
+   catalog in the pull log. If a future entity starts reporting 0 where records
+   are expected, suspect the envelope key before the vendor.
 2. **Suggest (client-side, pure):** `src/lib/lazywaitMatch.ts` normalizes names
    (Arabic alef/hamza/taa-marbuta/tashkeel, Latin diacritics, Turkish letters)
    and scores each local record against the pulled candidates →
