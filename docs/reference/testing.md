@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**146 TypeScript test files declaring 2192 test blocks, plus 53 SQL suites.**
+**146 TypeScript test files declaring 2203 test blocks, plus 53 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -161,7 +161,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-74 files, 976 declared test blocks.
+74 files, 983 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -199,7 +199,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/Price.contract.test.tsx` | 13 | digits render mono |
 | `src/components/Price.test.tsx` | 6 | Price (web) |
 | `src/components/PriceMigration.test.tsx` | 10 | Price migration — displayed values are byte-identical to toFixed(2) |
-| `src/components/StaffMfaGate.test.tsx` | 4 | StaffMfaGate |
+| `src/components/StaffMfaGate.test.tsx` | 11 | StaffMfaGate |
 | `src/context/AppContext.test.ts` | 14 | ORDER_STATUS_TRANSITIONS |
 | `src/design-system/buttonState.test.ts` | 10 | resolveButtonState |
 | `src/design-system/contrastContract.test.ts` | 9 | muted ink clears WCAG AA for normal text |
@@ -242,7 +242,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-15 files, 406 declared test blocks.
+15 files, 410 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -250,7 +250,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/adminAuth.test.ts` | 9 | decideAdminAuthorization |
 | `supabase/functions/_shared/adminAuthWiring.test.ts` | 18 | staff-accounts privileged actions |
 | `supabase/functions/_shared/authHook.test.ts` | 14 | normalizeHookSecret |
-| `supabase/functions/_shared/lazywait.test.ts` | 65 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
+| `supabase/functions/_shared/lazywait.test.ts` | 69 | buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08-24) |
 | `supabase/functions/_shared/lazywaitApi.test.ts` | 48 | request serialization — paths/methods/query |
 | `supabase/functions/_shared/lazywaitBaseUrlWiring.test.ts` | 11 | lazywait-sync guards before it claims any order |
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 16 | extractCatalogList (response envelope) |
