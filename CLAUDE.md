@@ -200,6 +200,20 @@ At that time, required CI status checks were **not** proven/enforced. Repository
 
 Before claiming GitHub blocks a red merge, verify **Settings → Rules** live.
 
+### Read live 2026-08-25 — one ruleset, and one intended gate that is NOT required
+
+Read from the REST API (`GET /repos/mohammedali-770/SMA/rulesets`), not inferred. **One** ruleset exists: **“Protect default branch”**, `enforcement: active`, `bypass_actors: null` — nobody can bypass it, owner included.
+
+Its condition is `ref_name.include = ["~DEFAULT_BRANCH"]` with an empty exclude, so it governs **only** `claude/project-build-ie4b56`. **No rule matches `claude/**` or any other ref.** Feature branches are unprotected and freely deletable; a 403 on deleting one is a token-permission problem, not a ruleset.
+
+Every enforcement the 2026-08-07 note claimed is confirmed still live: `pull_request` (with `required_review_thread_resolution: true`, which is what refuses a merge while a review thread is open), `required_linear_history`, `deletion`, `non_fast_forward`. `required_approving_review_count` is **0** — the pull-request workflow is required, an approving review is not.
+
+`required_status_checks` also carries **`strict_required_status_checks_policy: true`** — branches must be up to date with the base before merging. That is why a second pull request merged straight after a first is refused with *“5 of 5 required status checks are expected”* until its branch is updated; it is the rule working, not a failure.
+
+**The divergence, stated rather than smoothed over: five of the six intended contexts are required. `Documentation (generated + ownership)` is NOT.** A pull request whose `npm run docs:check` fails can therefore still be merged, so §14's documentation-consistency rule is enforced by CI *reporting* but not by the merge gate. Adding it is a dashboard change and therefore an owner action — see `docs/OWNER_ACTIONS.md`. Until it is added, do not describe the documentation gate as blocking.
+
+`Change-control guard` is likewise **not** required, which matches what §11 already says: the job is deliberately unfiltered so the context always reports and is *safe* to require, but the repository does not claim it is required.
+
 The intended always-reporting required check contexts are:
 
 - `design-system`

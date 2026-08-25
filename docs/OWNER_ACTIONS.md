@@ -973,6 +973,59 @@ Two refinements the data forced, neither of them a departure from that decision:
 The invariant that survived unchanged: **the price charged may never exceed the
 price displayed.**
 
+## 20. Add `Documentation (generated + ownership)` to the required checks
+
+**Status:** OWNER DECISION. Dashboard change, not a source change — nothing in
+this repository can make it true.
+
+Read live on 2026-08-25 from `GET /repos/mohammedali-770/SMA/rulesets`. One
+ruleset exists, **“Protect default branch”**, active, `bypass_actors: null`,
+scoped to `ref_name.include = ["~DEFAULT_BRANCH"]`. It requires five status
+check contexts:
+
+| context | required |
+| --- | --- |
+| `design-system` | ✅ |
+| `Production build (Vite + Expo web export)` | ✅ |
+| `Edge Function typecheck (Deno)` | ✅ |
+| `Dependency audit (high+)` | ✅ |
+| `SQL suites gate` | ✅ |
+| `Documentation (generated + ownership)` | ❌ **not required** |
+
+CLAUDE.md §12 lists six intended contexts. Five are enforced. **A pull request
+whose `npm run docs:check` fails can be merged**, so §14 — "documentation
+consistency is part of the change", the rule that makes `docs/ownership.json`
+and the generated-file drift check meaningful — is enforced by CI *reporting*
+and by review, not by the merge gate. That is the whole gap: the job runs, it
+reports, and nothing stops a red one landing.
+
+The job is already suitable for requiring. It is not path-filtered, so the
+context reports on every pull request and cannot go "expected" forever and wedge
+the queue — the same property §11 relies on for `Change-control guard`.
+
+**To add it:** Settings → Rules → *Protect default branch* → Require status
+checks to pass → add `Documentation (generated + ownership)` (the emitted
+context, not the workflow display name).
+
+Two related facts recorded at the same reading, neither of them an action:
+
+- **`Change-control guard` is also not required.** §11 already says the repository
+  does not claim it is. Adding it is a separate decision, on the same screen.
+- **`strict_required_status_checks_policy: true`** — branches must be up to date
+  before merging. A second pull request merged straight after a first is refused
+  with *“5 of 5 required status checks are expected”* until its branch is
+  updated. Working as intended; noted so it is not misread as a broken gate.
+
+Everything §12 claimed from the 2026-08-07 evidence is still live and was
+re-confirmed: pull-request workflow, linear history,
+`required_review_thread_resolution: true`, deletion and non-fast-forward
+protection. `required_approving_review_count` is **0** — the pull-request
+workflow is required, an approving review is not.
+
+**The ruleset does not protect feature branches.** Its condition matches the
+default branch only, so `claude/**` refs are unprotected and freely deletable; a
+403 on deleting one is a token-permission limit, not a server-side rule.
+
 ## Owner-action closeout rule
 
 When an item is completed:
