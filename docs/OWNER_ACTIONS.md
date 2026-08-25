@@ -851,7 +851,7 @@ Full record: [`MIGRATIONS.md`](MIGRATIONS.md) §32 and ledger rows 59–60.
 | # | Action | Why it is still open |
 | --- | --- | --- |
 | 1 | Version-align rows 59 and 60 | Live history carries the apply-time stamps `20260825061046` / `20260825061502`, not the repository filenames. §9-D makes realignment a separate live history write with its own approval. Leaving it is legitimate; "repairing" it unasked is not. |
-| 2 | Retire or reconcile the 15 remaining duplicate branches | The live branch is mapped (see the closeout below), so this no longer blocks ordering. Fifteen inactive importer-created rows remain, each holding a real `lazywait_branch_id`. They cannot take orders. Left in place deliberately: `branches` is FK-referenced by eleven tables, so deleting rows is destructive and needs its own decision. |
+| 2 | Retire or reconcile the **16** importer-created branch rows | The live branch is mapped (see the closeout below), so this no longer blocks ordering. Sixteen inactive rows were created by the 2026-08-25 import and all sixteen remain: **15 still hold a real `lazywait_branch_id`**, and **one is the Nasserah twin whose mapping was cleared** when the live branch was re-pointed — that row was not deleted, so it must be counted here or it is tracked nowhere. None can take orders. Left in place deliberately: `branches` is FK-referenced by eleven tables, so deleting rows is destructive and needs its own decision. The twin is the safest candidate if one is ever removed — zero orders, no mapping, and an exact duplicate of the live branch — but it is still a deletion. |
 
 **Closed 2026-08-25 — `lazywait-catalog` redeployed (version 3).** This was the
 item with a timer on it: `lazywait_catalog_items.prices` had been rebuilt from
@@ -891,6 +891,11 @@ cleared so exactly one row holds that id. Verified before and after — dry run 
 a rolled-back transaction first, then applied in one transaction: one active
 branch with a mapping, one holder of the id, **40 rows before and after, none
 created or deleted**.
+
+The duplicate row itself was **not** deleted, only unmapped — see item 2 above,
+which counts it. Clearing rather than deleting was deliberate (`branches` is
+FK-referenced by eleven tables), but it does mean the import's 16 rows are all
+still present: 15 mapped, 1 unmapped.
 
 Two things worth carrying forward:
 
