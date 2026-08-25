@@ -786,6 +786,56 @@ could become a wrong ticket. It was the wrong *response* to the gap, because no
 mapping exists to recover with. Deploying `lazywait-sync`, writing mapping rows
 and creating add-ons in the vendor catalog are each separate §5 actions.
 
+## 18. `a5d5cb7`'s commit message describes work it does not contain — one decision open
+
+**Status:** OWNER DECISION — recommendation below. The ledger contradiction this
+section originally led with is **resolved**; only the commit-message question
+remains.
+
+On 2026-08-24 two agent sessions held branch
+`claude/correct-migration-actor-attribution-20260824` at the same time. One
+narrowed it after the owner asked for a split; the other worked from a stale
+reading of the pre-split scope, which reached the squash message on `a5d5cb7` and
+then the comment that closed the follow-up pull request as a duplicate of work it
+did not contain. The mechanism and the rule that came out of it are in
+[`CLAUDE.md` §15](../CLAUDE.md) — this register carries only what still needs a
+decision.
+
+**Resolved 2026-08-24 — the ledger no longer contradicts itself.**
+[#243](https://github.com/mohammedali-770/SMA/pull/243) merged at 12:14:14 UTC as
+`8ba24f2`. Verified by reading the default branch afterwards: §5 ledger rows
+57–58, §27's `Applied` cell, §31's `By` column for migrations 2 and 3, §31's "Who
+applied them" paragraph and §31's mechanism paragraph now **all** name a Claude
+Code session (`session_01VXmTcJDSWXVD9qm7irPbpV`). The five-way disagreement this
+section previously tabulated is closed, and a reader following the
+cross-reference from row 57 now lands on a section that agrees with it. Evidence:
+`git show 8ba24f2 --stat` (one file, 49 insertions, 25 deletions) and
+`grep -n "repository owner" docs/MIGRATIONS.md` on the default branch, which no
+longer returns those five locations.
+
+**The open decision: what to do about `a5d5cb7`'s commit message.
+Recommendation: leave it.** The squash message on `a5d5cb7`
+describes §27/§31 changes that commit does not contain. Correcting it means
+rewriting history on a protected branch, which [`CLAUDE.md` §1](../CLAUDE.md)
+forbids outright and which is a far worse precedent than an inaccurate commit
+message. The message is wrong, it is recorded as wrong in `CLAUDE.md` §15, and
+#243's merge message states what actually landed. That is the cheapest honest
+resolution. Raised here rather than fixed quietly because a future reader
+diffing `a5d5cb7` against its own description will find the mismatch and should
+find the explanation with it.
+
+**No server-side control would have caught this, and none is proposed.** It was
+not a gap in the rulesets listed in §5 of this file: required checks all passed,
+the branch was not behind, review-thread and linear-history rules were satisfied.
+Both pull requests were individually correct. The failure was an agent verifying
+a claim against a stale description instead of against the merged diff, and the
+mitigation is the rule in `CLAUDE.md` §15, not another gate. Adding a check that
+cannot detect the failure it is named for would be worse than adding nothing.
+
+If concurrent sessions on one branch become common, the cheap structural fix is
+one branch per session rather than a new CI control — but that is a working
+practice, not a repository setting, and it is not proposed as an action here.
+
 ## Owner-action closeout rule
 
 When an item is completed:
