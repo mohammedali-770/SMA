@@ -302,7 +302,7 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
     expect(built.payload.promo_code).toBe('OK'); // non-identity extras pass through
   });
 
-  it('still blocks on unmapped branch / items / addons even with the gate ON', () => {
+  it('still blocks on unmapped branch / items even with the gate ON', () => {
     const base = { clientId: 'CID_1', orderType: 'delivery', customerName: 'A', allowAssumedFields: true } as const;
     expect(serializeCreateOrder({ ...base, branchId: null, items: pickupItems }))
       .toEqual({ ok: false, blockedReason: 'missing_branch_mapping' });
@@ -310,10 +310,20 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
       .toEqual({ ok: false, blockedReason: 'no_items' });
     expect(serializeCreateOrder({ ...base, branchId: 'BR_RUH', items: [{ menuItemId: null, name: 'X', quantity: 1, unitPrice: 5 }] }))
       .toEqual({ ok: false, blockedReason: 'missing_item_mapping' });
-    expect(serializeCreateOrder({
-      ...base, branchId: 'BR_RUH',
-      items: [{ menuItemId: 'IT_1', name: 'X', quantity: 1, unitPrice: 5, addons: [{ addonId: '', nameEn: 'bad' }] }],
-    })).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
+  });
+
+  it('folds an UNMAPPED add-on into `details` here too — the gated path shares the confirmed builder', () => {
+    const built = serializeCreateOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A',
+      allowAssumedFields: true,
+      items: [{ menuItemId: 'IT_1', name: 'X', quantity: 1, unitPrice: 5, addons: [{ addonId: '', nameEn: 'Volcano' }] }],
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const item = (built.payload.order_items as Record<string, unknown>[])[0];
+    expect('addons' in item).toBe(false);
+    expect(item.details).toBe('Volcano');
+    expect(item.price).toBe(5);
   });
 });
 

@@ -3,8 +3,8 @@ import { createHmac } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, computeBackoffMs,
-  computePosNextAttempt, extractOrderRef, hmacSha256Hex, MAX_POS_ATTEMPTS, MAX_SYNC_ATTEMPTS,
+  buildCreateOrderPayload, classifyCreateOrderResult, classifyLazywaitError, composeItemDetails,
+  computeBackoffMs, computePosNextAttempt, extractOrderRef, hmacSha256Hex, MAX_POS_ATTEMPTS, MAX_SYNC_ATTEMPTS,
   normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN, round2,
   mapOrderItemRows, ORDER_ITEM_SELECT, shouldResendCreateOrder, splitPhoneForPos,
   STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature,
@@ -105,6 +105,45 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect('details' in blank).toBe(false);
   });
 
+  it('still OMITS `details` when there is neither a note nor an unmapped modifier', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [
+        { menuItemId: 'I1', name: 'Cola', quantity: 1, unitPrice: 5 },
+        {
+          menuItemId: 'I2', name: 'Burger', quantity: 1, unitPrice: 30,
+          addons: [{ addonId: 'AD_CHEESE', nameEn: 'Extra Cheese', price: 5 }],
+        },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const [plain, allMapped] = r.payload.order_items as Record<string, unknown>[];
+    expect('details' in plain).toBe(false);
+    // A fully MAPPED add-on is untouched by the fold: addons[] carries it and
+    // `details` never appears.
+    expect('details' in allMapped).toBe(false);
+    expect(allMapped.price).toBe(25);
+  });
+
+  it('composeItemDetails composes the note and the unmapped choices, or returns null', () => {
+    expect(composeItemDetails(null, [])).toBeNull();
+    expect(composeItemDetails('  ', [])).toBeNull();
+    expect(composeItemDetails('  ', [{ addonId: null, nameEn: '  ', nameAr: '  ' }])).toBeNull();
+    expect(composeItemDetails('No onions', [])).toBe('No onions');
+    expect(composeItemDetails(null, [{ addonId: null, nameEn: 'Hot' }])).toBe('Hot');
+    // Arabic-only modifier falls back to names.ar rather than printing nothing.
+    expect(composeItemDetails(null, [{ addonId: null, nameEn: '', nameAr: 'حار' }])).toBe('حار');
+    // Quantity is appended only above 1, and a missing or <1 quantity means 1.
+    expect(composeItemDetails(null, [{ addonId: null, nameEn: 'Hot', quantity: 1 }])).toBe('Hot');
+    expect(composeItemDetails(null, [{ addonId: null, nameEn: 'Hot', quantity: 0 }])).toBe('Hot');
+    expect(composeItemDetails(null, [{ addonId: null, nameEn: 'Hot', quantity: 3 }])).toBe('Hot ×3');
+    expect(composeItemDetails('No onions', [
+      { addonId: null, nameEn: 'Volcano' },
+      { addonId: null, nameEn: 'Extra Hot', quantity: 2 },
+    ])).toBe('Volcano, Extra Hot ×2 — No onions');
+  });
+
   it('sends the order-level note as `order_details` and omits it when there is none', () => {
     const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
     const withNote = buildCreateOrderPayload({ ...base, orderDetails: 'Extra napkins' });
@@ -185,7 +224,7 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(r).toEqual({ ok: false, blockedReason: 'missing_item_mapping' });
   });
 
-  it('BLOCKS with missing_addon_mapping rather than silently dropping an unmapped modifier', () => {
+  it('FOLDS an unmapped modifier into `details` instead of blocking, leaving its money in `price`', () => {
     for (const addonId of [null, '', undefined as unknown as string]) {
       const r = buildCreateOrderPayload({
         clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
@@ -194,8 +233,102 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
           addons: [{ addonId, nameEn: 'Cheese', price: 5 }],
         }],
       });
-      expect(r).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const item = (r.payload.order_items as Record<string, unknown>[])[0];
+      // There is no mapped add-on, so the contract array is not emitted at all.
+      expect('addons' in item).toBe(false);
+      // The kitchen still sees the choice...
+      expect(item.details).toBe('Cheese');
+      // ...and the 5.00 stays inside the price the customer was charged, exactly
+      // as the pre-add-on worker sent it.
+      expect(item.price).toBe(30);
     }
+  });
+
+  it('MIXES mapped and unmapped modifiers on one line without moving any money', () => {
+    const unitPrice = 37;                     // burger 30 + cheese 5 + volcano 2
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I', name: 'Burger', quantity: 1, unitPrice,
+        addons: [
+          { addonId: 'AD_CHEESE', nameEn: 'Extra Cheese', nameAr: 'جبن', price: 5 },
+          { addonId: null, nameEn: 'Volcano', nameAr: 'بركان', price: 2 },
+        ],
+      }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const item = (r.payload.order_items as Record<string, unknown>[])[0];
+    // Only the MAPPED add-on becomes a contract line...
+    expect(item.addons).toEqual([{
+      addon_id: 'AD_CHEESE', name: 'Extra Cheese',
+      names: { en: 'Extra Cheese', ar: 'جبن' }, quantity: 1, price: 5,
+    }]);
+    // ...and only the mapped add-on is subtracted: 37 − 5 = 32 (the 2.00 stays).
+    expect(item.price).toBe(32);
+    expect(item.details).toBe('Volcano');
+    // THE INVARIANT: what the POS ticket implies is what the customer was charged.
+    const addons = item.addons as Array<{ price: number; quantity: number }>;
+    const implied = Number(item.price) + addons.reduce((s, a) => s + a.price * a.quantity, 0);
+    expect(implied).toBe(unitPrice);
+  });
+
+  it('keeps a PRICED unmapped modifier price on the line — Volcano (+2) is never given away', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I', name: 'Chicken Burger', quantity: 3, unitPrice: 22,
+        addons: [{ addonId: null, nameEn: 'Volcano (+2)', nameAr: 'بركان', price: 2 }],
+      }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const item = (r.payload.order_items as Record<string, unknown>[])[0];
+    expect(item.price).toBe(22);            // NOT 20 — nothing is subtracted
+    expect(item.details).toBe('Volcano (+2)');
+    expect('addons' in item).toBe(false);
+  });
+
+  it('combines the note and the unmapped modifiers in the documented order', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [{
+        menuItemId: 'I', name: 'Burger', quantity: 1, unitPrice: 30, note: '  No onions  ',
+        addons: [
+          { addonId: null, nameEn: 'Volcano', price: 2, quantity: 2 },
+          { addonId: '', nameEn: '', nameAr: 'حار', price: 0 },
+        ],
+      }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const item = (r.payload.order_items as Record<string, unknown>[])[0];
+    expect(item.details).toBe('Volcano ×2, حار — No onions');
+  });
+
+  it('skips an unmapped modifier with NO usable name rather than emitting an empty fragment', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: [
+        {
+          menuItemId: 'I1', name: 'Burger', quantity: 1, unitPrice: 30,
+          addons: [{ addonId: null, nameEn: '   ', nameAr: '  ', price: 0 }],
+        },
+        {
+          menuItemId: 'I2', name: 'Fries', quantity: 1, unitPrice: 10, note: 'Crispy',
+          addons: [{ addonId: null, nameEn: '', nameAr: null, price: 0 }],
+        },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const [nameless, withNote] = r.payload.order_items as Record<string, unknown>[];
+    // No fragment, no separator, no `details` key at all.
+    expect('details' in nameless).toBe(false);
+    // The note survives alone — it is not prefixed with a dangling em dash.
+    expect(withNote.details).toBe('Crispy');
   });
 
   it('BLOCKS when the add-on money exceeds the line price (the decomposition would be unsafe)', () => {
@@ -267,7 +400,7 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
     }]);
   });
 
-  it('a modifier with NO lazywait_addon_id blocks the order instead of vanishing', () => {
+  it('a modifier with NO lazywait_addon_id reaches the kitchen in `details` instead of vanishing', () => {
     const unmapped = {
       ...row,
       order_item_modifiers: [
@@ -275,17 +408,31 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
       ],
     };
     expect(mapOrderItemRows([unmapped])[0].addons?.[0].addonId).toBeNull();
-    expect(buildCreateOrderPayload({
+    const built = buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
       items: mapOrderItemRows([unmapped]),
-    })).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const item = (built.payload.order_items as Record<string, unknown>[])[0];
+    expect('addons' in item).toBe(false);
+    expect(item.details).toBe('Extra Cheese — No onions');
+    // 35 is the stored unit_price; nothing is subtracted, so the ticket implies
+    // exactly what place_order charged.
+    expect(item.price).toBe(35);
 
     // Same when the modifier row itself was orphaned (modifier_id set null).
     const orphan = { ...row, order_item_modifiers: [{ modifier_id: null, name_en: 'X', name_ar: 'X', price: 0, modifiers: null }] };
-    expect(buildCreateOrderPayload({
+    const builtOrphan = buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
       items: mapOrderItemRows([orphan]),
-    })).toEqual({ ok: false, blockedReason: 'missing_addon_mapping' });
+    });
+    expect(builtOrphan.ok).toBe(true);
+    if (!builtOrphan.ok) return;
+    const orphanItem = (builtOrphan.payload.order_items as Record<string, unknown>[])[0];
+    expect('addons' in orphanItem).toBe(false);
+    expect(orphanItem.details).toBe('X — No onions');
+    expect(orphanItem.price).toBe(35);
   });
 
   it('survives a row with no modifiers, no note and no catalog extras', () => {

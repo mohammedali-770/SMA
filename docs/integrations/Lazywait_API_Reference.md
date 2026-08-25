@@ -9,11 +9,14 @@
 > **Partial confirmation, 2026-08-24.** The owner supplied the vendor contract
 > for **one endpoint** — `POST /pos/orders/create` — and the Create Order
 > sections below now reflect it. That does not make this file the vendor's
-> reference: it covers 1 of the 27 endpoints, it describes a **pickup** order and
-> says nothing about delivery, and it was read from the **dev** host
-> `apiv2-dev.lazywait.com` while we POST to production `apiv2.lazywait.com`.
-> Field-level parity between the two hosts is **unverified**. The scaffold
-> warning stands; one dev-host document is not the vendor reference.
+> reference: it covers 1 of the 27 endpoints, and it describes a **pickup** order
+> and says nothing about delivery. It was read from `apiv2-dev.lazywait.com` —
+> **the host this integration actually posts to** (confirmed 2026-08-24; the dev
+> host is the live POS for this branch, see `docs/LAZYWAIT.md`), so it describes
+> the endpoint we use rather than a different environment's. An earlier revision
+> of this note said we POST to production and called host parity unverified; that
+> was wrong. The scaffold warning stands regardless: one document covering one
+> endpoint is not the vendor reference.
 
 Typed client: `supabase/functions/_shared/lazywaitApi.ts`
 (request interfaces + pure serializers + runtime validators for all 27 endpoints,
@@ -24,9 +27,9 @@ fixtures under `supabase/functions/_shared/__fixtures__/lazywait/`.
 - Base URL + `client_id` are non-secret (`integration_settings.public_config`).
 - The API token is a **server-only** `Bearer` secret, injected by `lazywaitFetch`
   and never present in any serialized body/query, log, or client bundle.
-- Environment note (issue #104): examples use `https://apiv2-dev.lazywait.com/v1`
-  with an `lw_live_` placeholder — the correct env URL + key prefix must be
-  confirmed with Lazywait before production use.
+- Environment note: examples use `https://apiv2-dev.lazywait.com/v1`, which is
+  the live POS host for this branch (confirmed 2026-08-24). The `lw_live_` key
+  prefix in examples is a placeholder; the real token lives server-side only.
 
 ## Endpoint coverage (27)
 
@@ -252,10 +255,11 @@ remaining open questions Q1, Q2, Q3, Q8 and Q9 in
 | (address/lat-long visibility) | n/a | delivery | Q8 — needs a look at a real delivery ticket |
 
 ### Other items to confirm
-- **Dev-vs-production parity for Create Order.** The contract was read from
-  `apiv2-dev.lazywait.com`; `DEFAULT_BASE_URL` is production `apiv2.lazywait.com`
-  and was deliberately **not** changed. Whether the two hosts accept identical
-  fields is unverified.
+- **Whether a production host is ever in scope.** The live POS is the dev host,
+  so Create Order is documented and exercised on the same environment. If the
+  integration is ever pointed at `apiv2.lazywait.com`, none of this is known to
+  transfer — the catalog ids (`client_id`, item/addon ids) would differ, and
+  field parity between the hosts would need confirming from scratch.
 - Dev vs prod base URL + compatible API-key prefix (`lw_live_` vs `lw_test_`).
 - `POST /menu/products/item` create/upsert **vs** `PUT` update-only semantics.
 - The `user` object schema for product updates.

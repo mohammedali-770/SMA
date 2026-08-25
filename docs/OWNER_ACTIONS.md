@@ -108,6 +108,27 @@ Also verify review-thread resolution / pull-request / linear-history rules remai
 
 If GitHub settings differ from this list, update `CLAUDE.md` and `docs/RELEASE_CHECKLIST.md` in the same change so source documentation does not claim a control that is absent.
 
+### Required status checks are enforced — evidence, 2026-08-24
+
+Server-side required status checks **are** configured and enforced on `claude/project-build-ie4b56`. On 2026-08-24 at ~12:09 UTC, merging PR #243 through the GitHub API was refused by the server:
+
+```
+PUT /repos/mohammedali-770/sma/pulls/243/merge -> 405
+Repository rule violations found
+
+5 of 5 required status checks are expected.
+```
+
+The branch was behind its base, so none of the required contexts had reported for the head being merged. Re-running CI via `update_pull_request_branch` cleared the refusal and the merge proceeded. Earlier the same day PRs #249, #250 and #241 merged normally with green checks.
+
+This supersedes the 2026-08-07 record — repeated in [`CLAUDE.md`](../CLAUDE.md) §12 — that required CI status checks were **not** proven or enforced. A required context that has not reported blocks the merge; that is precisely what refused #243.
+
+**Five required, six intended.** The rule expects **five** contexts. The list above names **six**. Which five are configured cannot be read from here: the GitHub tool surface available to an agent session has no branch-protection or ruleset read tool. They are therefore **not recorded here and not guessed at** — §12 exists precisely because dashboard state must not be asserted from source.
+
+**Inference, not established fact.** The likeliest missing context is `Documentation (generated + ownership)`. §14 of this file still records adding that context in **Settings → Rules** as an outstanding owner action, and six intended minus that one is five. **If that inference is correct**, the documentation gate that enforces `docs/ownership.json` — the mechanism behind [`CLAUDE.md`](../CLAUDE.md) §14 — currently runs and reports but does **not** block a merge. This is unconfirmed and cannot be confirmed from source.
+
+**Action needed:** the owner opens **Settings → Rules**, reads the configured required check contexts, and records which five they are. That one reading either confirms or refutes the inference above and closes the five-versus-six discrepancy.
+
 ## 6. Production deployment gating
 
 **Status:** LIVE VERIFY / SETTINGS.
@@ -413,6 +434,11 @@ The workflow reports the status check context:
 **Settings → Rules** alongside the other intended required contexts. Until it is added, the check
 runs and reports but a red result does not prevent merging.
 
+**Still outstanding as of 2026-08-24, on inference.** The merge refusal recorded in §5 names
+**five** required contexts where the intended list has six, which points at this action not having
+been done. That is read off a count, not off the dashboard — see §5 for the evidence and for the
+single check that would settle it.
+
 Use the emitted job name exactly as written above. The equivalent mistake has been made before with
 the design-system job, whose context is the job ID `design-system` rather than the workflow display
 name `Design system`. The authoritative list of emitted contexts is generated at
@@ -690,21 +716,30 @@ Source references: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3–§4,
 
 ## 17. Lazywait add-on mapping — heat level has no POS counterpart
 
-**Status:** OWNER DECISION. **The `lazywait-sync` deploy is held pending this.**
+**Status:** OWNER DECISION, narrowed. **The `lazywait-sync` deploy remains held —
+that is unchanged** — but the deploy is no longer *blocked* by this gap.
 
 PR #246 (`536a6cb`) brought the Create Order payload up to the vendor contract of
-2026-08-24. Part of that change: an order line whose modifier carries no
-`modifiers.lazywait_addon_id` now blocks the order with `missing_addon_mapping`
-rather than dropping the add-on silently — a silent drop would hide the add-on
-from the kitchen *and* undercharge the ticket, because the add-on money is
+2026-08-24. Part of that change: an order line whose modifier carried no
+`modifiers.lazywait_addon_id` blocked the whole order with
+`missing_addon_mapping`, on the reasoning that a silent drop would hide the
+add-on from the kitchen *and* undercharge the ticket, because the add-on money is
 subtracted out of the item price.
 
-A read-only Production check the same day found the precondition **entirely
+A read-only Production check the same day found that precondition **entirely
 unmet**: 0 of 3 modifiers mapped, all three active. Every active product, price
 and category *is* mapped — add-ons are the only gap. In the preceding 90 days,
 7 of 38 pickup orders (18.4%) carried a modifier and 5 synced fine under the
-older worker, so deploying as-is would block roughly one pickup order in five.
-Full numbers and method: `docs/LAZYWAIT.md`, "Operational precondition".
+older worker, so deploying as-is would have blocked roughly one pickup order in
+five, permanently, with no mapping available to fix it.
+
+**The block has since been replaced** (repository code; nothing deployed): an
+unmapped modifier is folded into `order_items[].details` and its money is left
+inside `price`, which is byte-for-byte what the still-live July worker sends.
+Both objections above are answered rather than waived — the choice is on the
+ticket in text, and the line is charged exactly what the customer paid, so
+**option 2 below no longer drops the 2 SAR** it was priced at. Full numbers,
+method and the two catalog searches: `docs/LAZYWAIT.md`, "Unmapped modifiers".
 
 **Why this is a decision and not a task.** The three modifiers are Mild, Hot and
 Volcano (+2), one "Heat Level" group on two active products. Lazywait's catalog
@@ -717,22 +752,35 @@ Options, with the money consequence stated:
    and correct in every case. Requires a vendor catalog write, which is an owner
    action.
 2. **Treat heat level as an instruction rather than a purchase**, carrying it in
-   `order_items[].details` — a field the same PR enabled. Free *today*: only Mild
-   and Hot have ever been ordered, both at 0.00. But **Volcano (+2.00) has never
-   been ordered**, and the first time it is, this option drops 2 SAR from the POS
-   ticket. It is only safe if Volcano is separately handled as a real add-on or
-   as a priced item variant.
+   `order_items[].details` — a field the same PR enabled. This is what the code
+   now does. The 2 SAR objection recorded here on 2026-08-24 assumed the add-on
+   money would still be subtracted out of `price`; it is not, so Volcano's 2.00
+   stays on the line and no money moves. What this option does *not* give is a
+   separately priced add-on line the POS can report on — heat level arrives as
+   text.
 3. **Hold the deploy** until 1 or 2 is settled. Costs nothing: the merged code is
    inert in Production until `lazywait-sync` is redeployed, and the running
    function continues to sync pickup orders exactly as before.
 
-Option 3 is the current state, chosen by the owner on 2026-08-24. Option 1 is the
-only one that keeps the money right unconditionally.
+Option 3 remains the current state, chosen by the owner on 2026-08-24 and not
+revisited here. Option 2 is now implemented in the repository, which removes the
+"deploying breaks one order in five" hazard; option 1 is still the only one that
+puts heat level on the ticket as a structured, separately priced add-on.
 
-Nothing here is a defect in the blocking behaviour — it surfaced a real catalog
-gap before it could become a wrong ticket. Deploying `lazywait-sync`, writing
-mapping rows and creating add-ons in the vendor catalog are each separate §5
-actions.
+**Two facts before acting on option 1.** Any add-ons would be created on the
+**dev host**, which the owner confirmed on 2026-08-24 is the live POS for this
+branch (`docs/LAZYWAIT.md`, "Which host is live"). And the catalog was re-pulled
+three times on 2026-08-24 — all clean, zero errors — showing it far smaller than
+the 2026-07-23 snapshot this section was written from (items 64 → 4, categories
+7 → 1, addons 27 → 10). **Option 1 should not be acted on until that is
+explained**: creating add-ons into a catalog that has just lost most of its menu
+would be building on sand, and 53 of 57 active products currently map to item
+ids the catalog no longer contains.
+
+The blocking behaviour was not wasted — it surfaced a real catalog gap before it
+could become a wrong ticket. It was the wrong *response* to the gap, because no
+mapping exists to recover with. Deploying `lazywait-sync`, writing mapping rows
+and creating add-ons in the vendor catalog are each separate §5 actions.
 
 ## Owner-action closeout rule
 

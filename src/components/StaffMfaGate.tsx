@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyRound, Loader2, LogOut, ShieldCheck } from 'lucide-react';
 
 import { useApp } from '../context/AppContext';
@@ -65,6 +65,78 @@ export const StaffMfaGate: React.FC<React.PropsWithChildren> = ({ children }) =>
     });
     return () => { active = false; };
   }, [inspect]);
+
+  // The mode, readable from the auth listener without making it a dependency —
+  // resubscribing on every mode change would tear the listener down mid-flow.
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  /**
+   * Re-check the assurance level after an auth change, and demote ONLY if AAL2
+   * was actually lost.
+   *
+   * WHY THIS EXISTS. `inspect()` runs once on mount. If AAL2 later drops — a
+   * refresh that returns an aal1 session, a factor unenrolled in another tab,
+   * an admin signed in elsewhere — the console stays rendered while every RLS
+   * policy and admin RPC starts refusing. The admin sees a panel that looks
+   * fine and fails on everything, until they happen to reload.
+   *
+   * WHY IT IS SILENT RATHER THAN A PLAIN `inspect()`. `inspect()` sets
+   * mode='checking', which unmounts `children`. Running it on every
+   * TOKEN_REFRESHED would flash the gate and remount the whole console —
+   * discarding open forms — on a session that is perfectly valid. Tokens
+   * refresh on a timer, so that would be routine, not rare. So the common case
+   * (still AAL2) must cause NO state change at all.
+   */
+  const revalidate = useCallback(async () => {
+    // A failed check is not proof of a lost session. Leave the console up and
+    // let the next event decide: tearing it down on a network blip would be the
+    // same disruption this function exists to avoid, and the real enforcement is
+    // server-side anyway — RLS and the admin RPCs refuse an AAL1 caller whatever
+    // this component renders. This gate is the explanation, not the boundary.
+    //
+    // That applies to a THROW as much as to a returned error. getAuthenticator-
+    // AssuranceLevel() rejects rather than returning when it cannot read the
+    // stored session or acquire the auth lock, and neither says anything about
+    // the caller's assurance level. Only a successful, genuinely-below-AAL2
+    // reading may close the console.
+    let assurance;
+    try {
+      assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    } catch {
+      return;
+    }
+    if (assurance.error) return;
+    if (assurance.data.currentLevel === 'aal2') return;
+
+    // AAL2 is genuinely gone. Fall back to the full inspection, which decides
+    // between challenging an existing factor and asking for enrollment.
+    await inspect();
+  }, [inspect]);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      // Only guard a console that is currently open. If the gate is already
+      // showing, the admin is mid-enrollment or mid-challenge and re-running
+      // the check would wipe a half-typed code for no benefit.
+      if (modeRef.current !== 'ready') return;
+
+      // MFA_CHALLENGE_VERIFIED is OUR OWN verify() completing. It already
+      // re-reads the assurance level and sets the mode itself; re-entering here
+      // would race that. SIGNED_OUT is handled by AppContext, which unmounts us.
+      if (event === 'MFA_CHALLENGE_VERIFIED' || event === 'SIGNED_OUT') return;
+
+      // Anything reaching here threw out of inspect(), which has already set
+      // mode='checking' — the console is gone either way, and leaving it there
+      // would hang on the spinner. Resolve to the same state the mount path
+      // uses for the same failure.
+      void revalidate().catch((e) => {
+        setError(e instanceof Error ? e.message : String(e));
+        setMode('needs_enrollment');
+      });
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [revalidate]);
 
   const beginEnrollment = async () => {
     setBusy(true); setError(null); setCode('');

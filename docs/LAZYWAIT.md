@@ -1,6 +1,8 @@
 # Spicy Meal — Lazywait POS Integration
 
-Server-side order sync to the **Lazywait POS** (`https://apiv2.lazywait.com/v1`).
+Server-side order sync to the **Lazywait POS**. The POS this integration talks
+to is the **dev host `https://apiv2-dev.lazywait.com/v1`** — see "Which host is
+live" below; it is the real POS for this branch, not a staging convenience.
 Supabase / `place_order` stays the **source of truth** for order creation,
 pricing, VAT, coupon, loyalty and order state. Lazywait is a sync **destination**
 only — a Lazywait failure NEVER blocks or alters a customer order.
@@ -18,13 +20,34 @@ only — a Lazywait failure NEVER blocks or alters a customer order.
   pasted into a chat/playground as compromised. Generate a fresh `lw_live_…` key
   in the Lazywait portal and store it via the admin card / SQL below.
 
+## Which host is live — read before changing `base_url`
+**The live POS is the DEV host** (`https://apiv2-dev.lazywait.com/v1`). Confirmed
+by the owner on **2026-08-24** and matching the live
+`integration_settings.public_config.base_url` in Production, last written
+2026-07-24. Every pickup order that has synced went there.
+
+Two things in source still name the **production** host and are now traps:
+
+- `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
+  `https://apiv2.lazywait.com/v1`. It is only a **fallback** — the worker prefers
+  `public_config.base_url` — but if that key were ever cleared, the worker would
+  silently start POSTing real customer orders to a POS nobody watches. It is
+  deliberately left unchanged here; changing it is a separate decision.
+- The admin Integrations card shows the production URL as its input
+  **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
+  wrong host could get typed back in.
+
+The `20260708130000` migration also seeds the production URL as a default. That
+file is applied history and must never be edited; the live row overrides it.
+
 ## Configuration (never committed)
 Set with the admin **Lazywait POS** card, or via SQL (service role / SQL editor):
 ```sql
 select public.upsert_integration_settings(
   'lazywait', 'lazywait', true,
   -- public_config (non-secret): base URL + client id
-  '{"base_url":"https://apiv2.lazywait.com/v1","client_id":"vAK1AmUr7Xhoa6KsYNhU"}'::jsonb,
+  -- base_url is the DEV host — that is the live POS (see "Which host is live")
+  '{"base_url":"https://apiv2-dev.lazywait.com/v1","client_id":"<CLIENT_ID>"}'::jsonb,
   -- secret_config (server-only): API token + webhook secret (+ optional cron gate)
   '{"api_token":"lw_live_…","webhook_secret":"whsec_…","sync_trigger_secret":"…"}'::jsonb
 );
@@ -156,10 +179,12 @@ no blocked orders).
    an `integration_sync_logs` row via `record_lazywait_sync`.
 
 ### Create Order payload (only CONFIRMED fields)
-The owner supplied the vendor Create Order contract on **2026-08-24**. It was
-read from the **dev** host `apiv2-dev.lazywait.com`; `DEFAULT_BASE_URL` is the
-**production** host and was deliberately not changed, so field-level parity
-between the two is **unverified**. Field-by-field state:
+The owner supplied the vendor Create Order contract on **2026-08-24**, read from
+`apiv2-dev.lazywait.com` — **the same host this integration actually posts to**,
+so it describes the endpoint we use rather than a different environment's. (An
+earlier revision of this section claimed we post to production and called
+dev-vs-prod parity unverified; that was wrong — it read `DEFAULT_BASE_URL`
+instead of the live config row.) Field-by-field state:
 `docs/integrations/Lazywait_API_Reference.md`.
 
 ```json
@@ -179,20 +204,26 @@ between the two is **unverified**. Field-by-field state:
   "customer_cell": "541234567", "country_code": "+966",
   "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
-- `price` is the **server-trusted, VAT-inclusive** item price with the add-on
-  money subtracted back out. `order_items.unit_price` already includes every
-  selected modifier (`place_order` adds them in) and the contract sums add-on
-  prices into the order, so sending both un-decomposed would charge add-ons
-  twice. The invariant `price + Σ(addon.price × addon.quantity) === unit_price`
-  is pinned by `lazywait.test.ts`. The Lazywait response total is still
-  **ignored** (test returned 0).
+- `price` is the **server-trusted, VAT-inclusive** item price with the **mapped**
+  add-on money subtracted back out. `order_items.unit_price` already includes
+  every selected modifier (`place_order` adds them in) and the contract sums
+  add-on prices into the order, so sending both un-decomposed would charge
+  add-ons twice. The invariant
+  `price + Σ(mapped addon.price × addon.quantity) === unit_price` is pinned by
+  `lazywait.test.ts`. An **unmapped** modifier is never subtracted, so its money
+  stays inside `price` — the ticket implies exactly what the customer was
+  charged either way. The Lazywait response total is still **ignored** (test
+  returned 0).
 - `price_id` is the **ordered tier's** id — `product_variants.lazywait_price_id`
   reached through `order_items.variant_id`, falling back to
   `products.lazywait_price_id` for a line with no tier (an untiered product, or
   any order placed before variants existed). Reading it from `products` alone,
   as the worker used to, names the CHEAPEST tier on every line: a customer's
   Large would reach the kitchen as a Small. Pinned by `lazywait.test.ts`.
-- `details` is **omitted entirely** when a line has no note — never sent as null.
+- `details` carries the line's kitchen note **and** any modifier we cannot map
+  (see below): `"Volcano ×2, حار — No onions"` — choices joined by `, `, then the
+  note after an em dash. Either half is emitted alone, and the key is **omitted
+  entirely** when there is neither — never sent as null.
 - `customer_cell` is the **local subscriber number**; the dialling prefix travels
   separately in `country_code`. E.164 is never sent in `customer_cell`. A number
   we cannot split confidently (non-Saudi, unparseable) sends **neither** field.
@@ -204,15 +235,27 @@ between the two is **unverified**. Field-by-field state:
   a cashier an order needs no cash is a financial signal and payment work is
   frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
 
-### Operational precondition — add-on mapping must be complete
-An order line whose modifier has no `modifiers.lazywait_addon_id` **blocks** the
-whole order with `missing_addon_mapping` instead of syncing. That is deliberate:
-the add-on money is subtracted out of the item price, so dropping an unmapped
-add-on would both hide it from the kitchen and undercharge the ticket.
+### Unmapped modifiers — folded into `details`, never dropped, never re-priced
+Only a modifier carrying a `modifiers.lazywait_addon_id` can become a contract
+`addons[]` entry. A modifier without one is written into the item's `details`
+text and its money is **left inside `price`**, which is exactly where
+`place_order` put it (`v_unit_price := product.price + Σ modifier.price`).
 
-**This precondition is NOT met, and the deploy is on hold (owner decision,
-2026-08-24).** The check was run read-only against Production the day the
-payload change merged (`536a6cb`), and the answer is not "a few rows to map":
+That reproduces what the pre-contract worker sent — it emitted `price =
+unit_price` and no add-ons at all — so neither the kitchen nor the till sees a
+change for an unmapped modifier: the choice is on the ticket in text, and the
+line is charged what the customer paid. Pinned by `lazywait.test.ts`, including
+the mixed case where one line carries a mapped **and** an unmapped modifier.
+
+**This replaces the `missing_addon_mapping` block introduced by PR #246**, which
+refused the whole order instead. The two objections that justified blocking —
+the choice would be hidden from the kitchen, and the line would be undercharged
+— are both answered by the fold, and neither applies to it. Blocking cost more
+than it bought: it is only recoverable if a mapping exists to add, and here none
+does.
+
+**There is nothing to map heat level to.** The check was run read-only against
+Production the day the payload change merged (`536a6cb`):
 
 | Entity | Total | Mapped | Active unmapped |
 |---|---|---|---|
@@ -223,23 +266,29 @@ payload change merged (`536a6cb`), and the answer is not "a few rows to map":
 
 Every active product, price and category is mapped. **No modifier is.** All three
 — Mild, Hot, Volcano (+2) — are active, sit in one "Heat Level" group and are
-offered by two active products. In the 90 days to 2026-08-24, **7 of 38 pickup
-orders (18.4%) carried a modifier**, and 5 of those synced successfully under the
-older worker that ignored modifiers. Deploying the current worker without
-resolving this would send roughly one pickup order in five to `blocked` instead
-of to the kitchen.
+offered by two active products. Lazywait's own catalog has no heat-level add-on
+in either language: two independent pulls (2026-07-23, 27 add-ons; 2026-08-24,
+10 add-ons) searched across every mirrored row returned zero matches for
+`mild|hot|spic|volcano|heat|level|chilli|flame` or
+`حار|حرا|نار|بركان|درجة`. Their add-ons are juices, drinks, cheese, salad items
+and wedges. Our three modifiers are local rows that never had a POS counterpart,
+which is why the catalog import left them null.
 
-**It cannot be fixed by mapping alone.** `lazywait_catalog_items` holds 27
-Lazywait add-ons — Cheese, Lettuce, Onion, tomato, Coleslaw, Wedges, juices,
-Kinza drinks — and **none is a heat level**, in either language. Our three
-modifiers are local rows that never had a POS counterpart, which is why the
-catalog import left them null. Resolving this needs a decision, not a mapping
-click; the options and their money implications are in `docs/OWNER_ACTIONS.md`
-§17.
+So the earlier instruction to "check `lazywait_mapping_status()` before
+deploying, and hold if any modifier is unmapped" is **obsolete** — that
+precondition can never be met by mapping alone, and the deploy no longer depends
+on it. `lazywait_mapping_status()` (staff role required) and the admin
+**Lazywait catalog mapping** card remain the right way to check *item*, *price*
+and *category* mappings, which do still block.
 
-Re-run the check before any future deploy — `lazywait_mapping_status()` (staff
-role required) or the admin **Lazywait catalog mapping** card. The numbers above
-are a dated snapshot, not a standing fact.
+Creating the three add-ons in the Lazywait catalog and mapping them is still the
+only way to get heat level onto the ticket as a **structured, separately priced**
+add-on rather than as text. That remains an owner decision
+(`docs/OWNER_ACTIONS.md` §17) — it is now an improvement, not a prerequisite.
+
+**Deployment status.** All of this is repository code. The live `lazywait-sync`
+Edge Function is still the July build, which sends no add-ons at all. Deploying
+is a separate owner action under CLAUDE.md §5.
 
 ### Intentionally NOT sent (schemas unconfirmed — do not invent)
 Delivery address/fields, `latitude`/`longitude` (the contract has **no**
@@ -391,8 +440,9 @@ is owner-supplied and replaces it once provided).
 payload mapping (the full confirmed body — names/details/price_id/
 menu_category_id/addons, the phone split, the add-on price decomposition, and
 `details` being absent rather than null when a line has no note), the
-`order_items` join via `mapOrderItemRows` (including an unmapped modifier
-producing `missing_addon_mapping` rather than a silent drop),
+`order_items` join via `mapOrderItemRows` (including an unmapped modifier being
+folded into `details` with its money left in `price`, rather than blocking the
+order or vanishing), `composeItemDetails` on its own,
 delivery/missing-branch/missing-item blocking, price rounding,
 error classification (401/403 terminal, 429/5xx retryable), webhook HMAC verify
 (valid/tampered/missing, cross-checked vs Node crypto), backoff, phone
