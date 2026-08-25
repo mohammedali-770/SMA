@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**149 TypeScript test files declaring 2248 test blocks, plus 55 SQL suites.**
+**149 TypeScript test files declaring 2258 test blocks, plus 55 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -100,7 +100,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-59 files, 831 declared test blocks.
+59 files, 841 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -113,7 +113,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/dev/fixtureSafety.test.ts` | 7 | fixture mechanism cannot reach production systems |
 | `apps/mobile/src/features/account/accountDeletion.test.ts` | 19 | isActiveDeletionStatus |
 | `apps/mobile/src/features/auth/loginAvailability.test.ts` | 18 | confirmed flag ON |
-| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 37 | classifyAddability |
+| `apps/mobile/src/features/cart/suggestionScoring.test.ts` | 39 | classifyAddability |
 | `apps/mobile/src/features/cart/suggestionState.test.ts` | 38 | parseSuggestionState |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | 19 | decideQuantityChange |
 | `apps/mobile/src/features/checkout/checkoutHandoff.test.ts` | 5 | checkoutHandoff |
@@ -123,7 +123,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 24 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 16 | decideNavigation — allow (Tap ecosystem) |
-| `apps/mobile/src/features/menu/menuSections.test.ts` | 15 | menuItemKey (branch-selection crash regression) |
+| `apps/mobile/src/features/menu/menuSections.test.ts` | 23 | menuItemKey (branch-selection crash regression) |
 | `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 20 | resolveNotificationRoute (allow-listed internal routes ONLY) |
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |

@@ -128,11 +128,25 @@ function saturate(weight: number, k: number): number {
  * This is reachable in production — `modifier_groups` has no active flag, but
  * RLS returns only active `modifiers`, so a group can arrive required-and-empty.
  */
-export function classifyAddability(groups: readonly ModifierGroup[]): Addability {
+export function classifyAddability(
+  groups: readonly ModifierGroup[],
+  /**
+   * `product.variants.length`. REQUIRED rather than defaulted: a caller that
+   * forgets it would silently restore the cheapest-tier bug this guards.
+   */
+  tierCount: number,
+): Addability {
   for (const g of groups) {
     const floor = Math.max(g.minSelection ?? 0, g.isRequired ? 1 : 0);
     if (floor > (g.modifiers?.length ?? 0)) return 'blocked';
   }
+  // More than one price tier means the customer has to choose, exactly as the
+  // menu card does (`needsChoice`). Without this a tiered product with no
+  // modifier groups classified 'one-tap', and the strip called
+  // `addItem(product, {}, 1)` — which falls back to `cheapestVariant` and hands
+  // over the cheapest tier unasked. That is the same defect the menu list was
+  // fixed for, and it kept the invariant in the next comment from holding.
+  if (tierCount > 1) return 'configure';
   // Deliberately stricter than the server-legal floor: a product that opens a
   // page from the menu must not silently one-tap from the cart, and an
   // optional PRICED group would otherwise be added cheaper than the card shows.
@@ -159,7 +173,12 @@ export function eligibleCandidates(input: {
     if (excludedProductIds.has(product.id)) return;
     // Always the RESOLVED groups: `groupsForProduct` filters out unresolved ids,
     // so `product.modifierGroupIds.length` can disagree with reality.
-    const addability = classifyAddability(groupsFor(product));
+    // `?? 0` is defensive, not decorative: `variants` is populated by the
+    // catalog mapper from the network, and a malformed payload must degrade to
+    // "no tier choice" rather than crash the cart's suggestion strip. The test
+    // fixture omitted it and TypeScript could not see that, because the
+    // `Partial<Product>` spread in the factory hides a missing required field.
+    const addability = classifyAddability(groupsFor(product), product.variants?.length ?? 0);
     if (addability === 'blocked') return;
     out.push({ product, addability, rank });
   });

@@ -11,8 +11,29 @@ import type { Category, Product } from '../../types/models';
 
 export interface MenuSectionItem {
   product: Product;
-  /** Precomputed once per rebuild — avoids groupsForProduct() per card per render. */
-  hasModifiers: boolean;
+  /**
+   * The card cannot add this straight to the cart — the customer has to choose
+   * something first. TRUE for a product with modifier groups, and ALSO for one
+   * with more than one price tier.
+   *
+   * The tier half is why this replaced a plain `hasModifiers`. Adding a tiered
+   * product from the card silently took the CHEAPEST tier (see
+   * `cheapestVariant`), so someone wanting a large Coral got the 20.00 one
+   * without ever being asked. That is half the live menu: 30 of 59 active
+   * products carry more than one tier, one carries eleven. Precomputed once per
+   * rebuild — avoids groupsForProduct() per card per render.
+   */
+  needsChoice: boolean;
+  /**
+   * Render the card price as "from X" rather than a bare X.
+   *
+   * Only when the tiers actually span a range. More than half the multi-tier
+   * products price every tier the same — Kinza is six flavours all at 2.00,
+   * Kids Meal eight at 15.00 — and "from 2.00" there advertises a cheaper
+   * option that does not exist. Those still open the picker (Cola vs Pepsi is a
+   * real choice for the kitchen); they just do not claim a range.
+   */
+  showFromPrice: boolean;
   /**
    * Orderable at the selected branch right now. Unavailable items STAY in the
    * list and render as out of stock rather than disappearing — a customer who
@@ -39,6 +60,30 @@ export interface MenuSection {
  */
 export function menuItemKey(item: MenuSectionItem | null | undefined, index: number): string {
   return item?.product ? item.product.id : `menu-row-${index}`;
+}
+
+/**
+ * More than one price tier, so the customer must pick one before ordering.
+ * A single-tier product is exactly as orderable as an untiered one.
+ */
+export function hasTierChoice(product: Product): boolean {
+  return product.variants.length > 1;
+}
+
+/**
+ * Do this product's tiers actually span a price range? Only then is a "from"
+ * price honest. Guards the same-price flavour case described on
+ * `MenuSectionItem.showFromPrice`.
+ */
+export function hasPriceRange(product: Product): boolean {
+  if (product.variants.length < 2) return false;
+  let lo = product.variants[0].price;
+  let hi = lo;
+  for (const v of product.variants) {
+    if (v.price < lo) lo = v.price;
+    if (v.price > hi) hi = v.price;
+  }
+  return lo !== hi;
 }
 
 /** Lowercased searchable text per product, computed once per catalog load. */
@@ -80,7 +125,8 @@ export function buildMenuSections(opts: {
         .filter((p) => p.categoryId === category.id)
         .map((product) => ({
           product,
-          hasModifiers: hasModifiers(product),
+          needsChoice: hasModifiers(product) || hasTierChoice(product),
+          showFromPrice: hasPriceRange(product),
           available: isOrderable(product.id, branchId),
         })),
     }))

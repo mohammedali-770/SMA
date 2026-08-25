@@ -45,8 +45,12 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
   const onScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => { listRef.current?.getScrollResponder()?.scrollTo({ y: info.averageItemLength * info.index, animated: false }); const pending = pendingScroll.current; if (pending && !pending.retried) { pending.retried = true; setTimeout(() => listRef.current?.scrollToLocation({ sectionIndex: pending.sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }), 120); } };
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
   useEffect(() => { const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null; if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true }); }, [activeCatIdResolved]);
-  const handleAdd = useCallback((product: Product, withModifiers: boolean) => { if (withModifiers) router.push(`/product/${product.id}`); else addItem(product, {}, 1); }, [addItem]);
-  const renderItem = useCallback(({ item }: { item: MenuSectionItem }) => <ProductCard product={item.product} hasModifiers={item.hasModifiers} available={item.available} onAdd={handleAdd} />, [handleAdd]);
+  // `needsChoice` covers modifier groups AND multi-tier products. A tiered
+  // product must never be added straight from the card: addItem falls back to
+  // cheapestVariant, so the customer would be given the cheapest tier without
+  // being asked. The detail screen already renders the tier picker.
+  const handleAdd = useCallback((product: Product, needsChoice: boolean) => { if (needsChoice) router.push(`/product/${product.id}`); else addItem(product, {}, 1); }, [addItem]);
+  const renderItem = useCallback(({ item }: { item: MenuSectionItem }) => <ProductCard product={item.product} needsChoice={item.needsChoice} showFromPrice={item.showFromPrice} available={item.available} onAdd={handleAdd} />, [handleAdd]);
 
   return <View style={styles.root}>
     <View style={[styles.topBar, { paddingTop: insets.top + space.s2 }]}>

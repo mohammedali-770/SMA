@@ -21,7 +21,7 @@ const T0 = 1_700_000_000_000;
 function product(over: Partial<Product> & { id: string }): Product {
   return {
     categoryId: 'cat-main', nameEn: 'Item', nameAr: 'صنف', descriptionEn: '', descriptionAr: '',
-    price: 12, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [],
+    price: 12, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [], variants: [],
     ...over,
   };
 }
@@ -53,18 +53,31 @@ function state(over: Partial<SuggestionState> = {}): SuggestionState {
 }
 
 describe('classifyAddability', () => {
-  it('no modifier groups is a one-tap add', () => {
-    expect(classifyAddability([])).toBe('one-tap');
+  it('no modifier groups and no tier choice is a one-tap add', () => {
+    expect(classifyAddability([], 0)).toBe('one-tap');
+    expect(classifyAddability([], 1)).toBe('one-tap');
   });
 
   it('any resolved group opens the product page, matching the menu', () => {
-    expect(classifyAddability([group({ isRequired: false, minSelection: 0 })])).toBe('configure');
-    expect(classifyAddability([group({ isRequired: true, minSelection: 1 })])).toBe('configure');
+    expect(classifyAddability([group({ isRequired: false, minSelection: 0 })], 0)).toBe('configure');
+    expect(classifyAddability([group({ isRequired: true, minSelection: 1 })], 0)).toBe('configure');
   });
 
   it('a required group whose modifiers were all deactivated is blocked, not a dead-end tap', () => {
-    expect(classifyAddability([group({ isRequired: true, modifiers: [] })])).toBe('blocked');
-    expect(classifyAddability([group({ minSelection: 2, modifiers: [group().modifiers[0]] })])).toBe('blocked');
+    expect(classifyAddability([group({ isRequired: true, modifiers: [] })], 0)).toBe('blocked');
+    expect(classifyAddability([group({ minSelection: 2, modifiers: [group().modifiers[0]] })], 0)).toBe('blocked');
+  });
+
+  it('MORE THAN ONE TIER opens the page even with no modifier groups', () => {
+    // The suggestion strip's version of the menu-card bug: this classified
+    // 'one-tap', so the strip called addItem(product, {}, 1), which falls back
+    // to cheapestVariant and handed over the cheapest tier unasked.
+    expect(classifyAddability([], 2)).toBe('configure');
+    expect(classifyAddability([], 11)).toBe('configure');
+  });
+
+  it('blocked still wins over a tier choice — a dead-end group is a dead end', () => {
+    expect(classifyAddability([group({ isRequired: true, modifiers: [] })], 5)).toBe('blocked');
   });
 });
 

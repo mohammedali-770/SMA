@@ -950,11 +950,28 @@ entitlement was genuine; the session assertion was not. It bypassed the AAL2
 requirement added 2026-08-23, on explicit owner instruction. Routine imports
 should go through the admin console under a real TOTP session.
 
-**Not changed, and still open from PR #256:** whether a multi-tier product should
-open a picker before it can be added to the cart, and whether its card should
-read "from 20.00" rather than a bare "20.00". The cart currently assumes the
-**cheapest** tier, so the price charged can never exceed the price displayed —
-but assuming a tier at all is a product decision, not an engineering one.
+**Decided and implemented 2026-08-25 (was open from PR #256).** The owner chose
+both: a multi-tier product **opens a picker** rather than being added from the
+card, and a tiered card reads **"from X"**. The cart no longer assumes a tier for
+anyone — `needsChoice` routes the product to the detail screen, whose tier picker
+already existed and was simply unreachable from the menu.
+
+Two refinements the data forced, neither of them a departure from that decision:
+
+- **"from" appears only when the tiers span a real range.** More than half of the
+  multi-tier products price every tier identically — Kinza is six flavours all at
+  2.00, Kids Meal eight at 15.00 — and "from 2.00" there advertises a cheaper
+  option that does not exist. Those still open the picker, because Cola versus
+  Pepsi is a real choice for the kitchen; they just do not claim a range.
+- **The picker now preselects the cheapest tier, not `variants[0]`.** It seeded
+  from the first tier by Lazywait `sort_order`, and on the live menu **14 of 27**
+  multi-tier products have a first-by-sort tier that is not the cheapest — Fillet
+  leads with "Spicy Fillet" at 15.00. The card would advertise one price and the
+  screen would open on another. Card, picker and cart now all read
+  `cheapestVariant`.
+
+The invariant that survived unchanged: **the price charged may never exceed the
+price displayed.**
 
 ## Owner-action closeout rule
 
