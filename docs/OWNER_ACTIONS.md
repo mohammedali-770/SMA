@@ -756,40 +756,35 @@ could become a wrong ticket. It was the wrong *response* to the gap, because no
 mapping exists to recover with. Deploying `lazywait-sync`, writing mapping rows
 and creating add-ons in the vendor catalog are each separate §5 actions.
 
-## 18. Ledger self-contradiction from a two-session merge — one action open
+## 18. `a5d5cb7`'s commit message describes work it does not contain — one decision open
 
-**Status:** OWNER DECISION ×2 — action 1 is **open and live**; action 2 is a
-judgement call with a recommendation.
+**Status:** OWNER DECISION — recommendation below. The ledger contradiction this
+section originally led with is **resolved**; only the commit-message question
+remains.
 
 On 2026-08-24 two agent sessions held branch
 `claude/correct-migration-actor-attribution-20260824` at the same time. One
-narrowed it after the owner asked for a split; the other merged it from the
-pre-split description and then closed the follow-up pull request as a duplicate
-of work it did not contain. The mechanism and the rule that came out of it are in
+narrowed it after the owner asked for a split; the other worked from a stale
+reading of the pre-split scope, which reached the squash message on `a5d5cb7` and
+then the comment that closed the follow-up pull request as a duplicate of work it
+did not contain. The mechanism and the rule that came out of it are in
 [`CLAUDE.md` §15](../CLAUDE.md) — this register carries only what still needs a
 decision.
 
-| # | Action | Status |
-| --- | --- | --- |
-| 1 | Merge [#243](https://github.com/mohammedali-770/SMA/pull/243) | **OPEN.** Reopened 2026-08-24 with the diff as evidence, rebased, all required checks green, `mergeable: clean`. Until it lands, `docs/MIGRATIONS.md` contradicts itself on the default branch. |
-| 2 | Decide what to do about `a5d5cb7`'s commit message | **OPEN — recommendation below.** |
+**Resolved 2026-08-24 — the ledger no longer contradicts itself.**
+[#243](https://github.com/mohammedali-770/SMA/pull/243) merged at 12:14:14 UTC as
+`8ba24f2`. Verified by reading the default branch afterwards: §5 ledger rows
+57–58, §27's `Applied` cell, §31's `By` column for migrations 2 and 3, §31's "Who
+applied them" paragraph and §31's mechanism paragraph now **all** name a Claude
+Code session (`session_01VXmTcJDSWXVD9qm7irPbpV`). The five-way disagreement this
+section previously tabulated is closed, and a reader following the
+cross-reference from row 57 now lands on a section that agrees with it. Evidence:
+`git show 8ba24f2 --stat` (one file, 49 insertions, 25 deletions) and
+`grep -n "repository owner" docs/MIGRATIONS.md` on the default branch, which no
+longer returns those five locations.
 
-**Action 1 is the live one.** `docs/MIGRATIONS.md` currently states two
-incompatible things about who applied the 2026-08-22 migrations:
-
-| Location | Says |
-| --- | --- |
-| §5 ledger rows 57–58 | a **Claude Code session** applied them — "Detail in §27 and §31" |
-| §27, the `Applied` cell | "**by the repository owner**, outside the agent session" |
-| §31, `By` column for migrations 2 and 3 | "**the repository owner**, directly" |
-| §31, "Who applied them" | the owner, "working directly against Production" |
-| §31, mechanism paragraph | "not known and is not recorded here" — rows 57/58 say it is |
-
-A reader who follows the cross-reference from row 57 lands on the claim the
-correction exists to retract. Merging #243 closes all five at once; it touches
-one file and nothing else.
-
-**Action 2, and the recommendation: leave it.** The squash message on `a5d5cb7`
+**The open decision: what to do about `a5d5cb7`'s commit message.
+Recommendation: leave it.** The squash message on `a5d5cb7`
 describes §27/§31 changes that commit does not contain. Correcting it means
 rewriting history on a protected branch, which [`CLAUDE.md` §1](../CLAUDE.md)
 forbids outright and which is a far worse precedent than an inaccurate commit
