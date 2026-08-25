@@ -240,7 +240,7 @@ describe at all. The client assembles it only when the caller passes
 **`allowAssumedFields: true`** (default **OFF**). The live `lazywait-sync` worker
 is **not** rewired for delivery: it stays pickup-only, and delivery orders are
 still held at `blocked` / `delivery_schema_unconfirmed`. These map to the
-remaining open questions Q1, Q2, Q3, Q8 and Q9 in
+remaining open questions Q1, Q2, Q3, Q8, Q9 and Q10 in
 `docs/lazywait-delivery-open-questions.md`.
 
 ### Assumed field names/shapes (please correct)
