@@ -728,7 +728,9 @@ subtracted out of the item price.
 
 A read-only Production check the same day found that precondition **entirely
 unmet**: 0 of 3 modifiers mapped, all three active. Every active product, price
-and category *is* mapped — add-ons are the only gap. In the preceding 90 days,
+and category *is* mapped — *non-null*, which is not the same as still resolving
+in the vendor catalog (`docs/LAZYWAIT.md`, "Those gates test presence"). Add-ons
+are the only gap in our own rows. In the preceding 90 days,
 7 of 38 pickup orders (18.4%) carried a modifier and 5 synced fine under the
 older worker, so deploying as-is would have blocked roughly one pickup order in
 five, permanently, with no mapping available to fix it.
@@ -743,8 +745,10 @@ method and the two catalog searches: `docs/LAZYWAIT.md`, "Unmapped modifiers".
 
 **Why this is a decision and not a task.** The three modifiers are Mild, Hot and
 Volcano (+2), one "Heat Level" group on two active products. Lazywait's catalog
-holds 27 add-ons — toppings and drinks — and **none of them is a heat level**.
-There is nothing to map them *to*.
+held 27 add-ons — toppings and drinks — at the 2026-07-23 snapshot this section
+was written from, and **none of them was a heat level**; the 2026-08-24 re-pull
+shows 10 add-ons, still with no heat level (see the two facts below). There is
+nothing to map them *to*.
 
 Options, with the money consequence stated:
 
