@@ -13,11 +13,20 @@ describe('extractCatalogList (response envelope)', () => {
   });
 
   it('reads an add-on GROUP envelope, whatever plural it uses', () => {
-    // The generic key list has no plural for this endpoint, so every one of
-    // these parsed to ZERO records before — silently, as a clean success.
+    // Note which of these are actually new: the generic list already carried a
+    // bare `groups`, so that one parsed before this change too. The four
+    // `addons_`/`addon_` spellings did not, and are what this fixes.
     for (const key of ['addons_groups', 'addon_groups', 'addonsGroups', 'addonGroups', 'groups']) {
       expect(extractCatalogList({ [key]: [{ id: 'G1' }, { id: 'G2' }] }, 'addon_group').length).toBe(2);
     }
+  });
+
+  it('pins WHICH spellings the old generic path missed', () => {
+    // Guards the claim the docs and the ENTITY_LIST_KEYS comment both make.
+    for (const key of ['addons_groups', 'addon_groups', 'addonsGroups', 'addonGroups']) {
+      expect(extractCatalogList({ [key]: [{ id: 'G1' }] }).length).toBe(0);   // no hint -> missed
+    }
+    expect(extractCatalogList({ groups: [{ id: 'G1' }] }).length).toBe(1);    // already worked
   });
 
   it('prefers the group envelope over an `addons` key on the same body', () => {

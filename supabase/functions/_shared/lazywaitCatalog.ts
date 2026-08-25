@@ -199,14 +199,20 @@ export function extractCatalogRecord(
  *
  * Only `addon_group` is listed, deliberately. The generic keys below cover the
  * plural of every other entity (`branches`, `categories`, `items`, `addons`),
- * and those four demonstrably parse — but nothing in the generic list matches
- * the add-on-GROUP endpoint's plural, so `/menu/addons-groups` produced zero
- * records on every catalog pull since the importer was written, reported as a
- * clean success with no error. Adding the group keys to the generic list would
- * also work, but a group envelope may itself carry an `addons` key (the add-ons
- * belonging to each group), and `addons` sits ahead of `groups` in the generic
- * order — so a group response would be at risk of being read as an add-on list.
- * Trying the entity's own keys first removes that ambiguity.
+ * and those four demonstrably parse. The generic list does carry a bare
+ * `groups`, but not `addons_groups` / `addon_groups` — the `addons_`-prefixed
+ * style the item payload uses for `addons_groups_ids` — so if
+ * `/menu/addons-groups` wraps under either of those, nothing matched. Every
+ * catalog pull since the importer was written has reported `addon_groups: 0` as
+ * a clean success with no error, which is consistent with that but does not
+ * prove it: the endpoint's actual envelope has never been captured, and a
+ * `data` / `results` / `groups` wrapper would have parsed fine all along.
+ *
+ * Adding the group keys to the generic list would also work, but a group
+ * envelope may itself carry an `addons` key (the add-ons belonging to each
+ * group), and `addons` sits ahead of `groups` in the generic order — so a group
+ * response would be at risk of being read as an add-on list. Trying the
+ * entity's own keys first removes that ambiguity.
  */
 const ENTITY_LIST_KEYS: Partial<Record<CatalogEntityType, string[]>> = {
   addon_group: ['addons_groups', 'addon_groups', 'addonsGroups', 'addonGroups', 'groups'],
