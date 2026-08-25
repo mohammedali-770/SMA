@@ -197,3 +197,97 @@ begin
 end $$;
 
 rollback;
+
+-- ============================================================================
+-- An id-less price row must not leave the product orderable.
+--
+-- Separate block so it gets its own catalog, rather than shifting every count
+-- asserted above.
+--
+-- The shape: Lazywait returns a price row with NO `price_id`. The parser
+-- deliberately preserves it, and the importer creates it visible and counts it
+-- towards making the parent product active. The replace pass then deactivates
+-- every variant whose lazywait_price_id is null -- including that one.
+--
+-- Before step 4b the product survived that with ZERO active tiers, and
+-- place_order read it as UNTIERED: it accepted the line, priced it from
+-- products.price and sent products.lazywait_price_id, which is null for such a
+-- product. The POS got an order it could not attribute to any price.
+-- ============================================================================
+begin;
+set local session_replication_role = replica;
+
+do $$
+declare
+  v_admin uuid := gen_random_uuid();
+  v_prod  uuid;
+  v_bool  boolean;
+  v_n     int;
+begin
+  insert into auth.users(id, email) values (v_admin, 'b@x');
+  insert into public.profiles(id, role) values (v_admin, 'admin');
+  perform set_config('request.jwt.claim.sub', v_admin::text, true);
+  perform set_config('test.is_admin', 'true', true);
+  insert into public.app_settings(id, vat_percentage) values (true, 15)
+    on conflict (id) do update set vat_percentage = 15;
+
+  insert into public.lazywait_catalog_items
+    (entity_type, lazywait_id, name_en, name_ar, show_online, active, raw)
+  values
+    ('category', 'CAT_X', 'Cat X', 'فئة', true, true, '{"active":true,"show_online":true}');
+
+  -- Its ONLY price row carries no price_id.
+  insert into public.lazywait_catalog_items
+    (entity_type, lazywait_id, name_en, name_ar, parent_id, show_online, active, prices, raw)
+  values
+    ('item', 'IT_NOID', 'No Id Item', 'صنف بدون معرف', 'CAT_X', true, true,
+     '[{"price_id":null,"name":"Regular","name_ar":"عادي","price_excl_vat":10,
+        "price_with_vat":null,"show_online":true,"active":true,"calories":null}]'::jsonb,
+     '{"active":true,"show_online":true}');
+
+  perform public.import_lazywait_catalog();
+
+  select id into v_prod from public.products where lazywait_item_id = 'IT_NOID';
+  if v_prod is null then
+    raise exception 'the id-less item should still create a product row';
+  end if;
+
+  -- The variant exists but is not active (the replace pass deactivates it).
+  select count(*) into v_n from public.product_variants
+   where product_id = v_prod and is_active = true;
+  if v_n <> 0 then
+    raise exception 'an id-less tier must not stay active, found %', v_n;
+  end if;
+
+  select count(*) into v_n from public.product_variants where product_id = v_prod;
+  if v_n <> 1 then
+    raise exception 'the tier must be kept (deactivated), not deleted; found %', v_n;
+  end if;
+
+  -- 4b: the parent must not be left orderable with no orderable tier.
+  select is_active into v_bool from public.products where id = v_prod;
+  if v_bool then
+    raise exception
+      'a product whose every tier is inactive must be deactivated, or place_order '
+      'reads it as untiered and sends a null lazywait_price_id to the POS';
+  end if;
+
+  -- An UNTIERED product is untouched by 4b -- it has no variants at all, so the
+  -- rule must not fire on it.
+  insert into public.lazywait_catalog_items
+    (entity_type, lazywait_id, name_en, name_ar, parent_id, show_online, active, prices, raw)
+  values
+    ('item', 'IT_FLAT', 'Flat Item', 'صنف', 'CAT_X', true, true,
+     '[{"price_id":"PR_FLAT","name":"One","name_ar":"واحد","price_excl_vat":10,
+        "price_with_vat":null,"show_online":true,"active":true,"calories":null}]'::jsonb,
+     '{"active":true,"show_online":true}');
+  perform public.import_lazywait_catalog();
+  select is_active into v_bool from public.products where lazywait_item_id = 'IT_FLAT';
+  if not v_bool then
+    raise exception 'a product with a usable tier must stay active';
+  end if;
+
+  raise notice 'lazywait_variant_import_test (id-less prices): all assertions passed';
+end $$;
+
+rollback;
