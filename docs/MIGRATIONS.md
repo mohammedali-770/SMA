@@ -421,7 +421,9 @@ production.
 | 55 | 20260729090000 | payment_refund_scheduler | — | 20260729112224 | payment_refund_scheduler | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Refund worker scheduler + stale-claim reaper** (PR #112, squash `e36fff1`). Applied 2026-07-29 (Wave C, §20). Adds `expire_stale_order_refund_claims()` and `invoke_payment_refund_processor()` and schedules cron `payment-refund-worker` (jobid 6, `*/5 * * * *`). **That cron was set `active = false` the same day** when the owner postponed payment work; the job row and all objects are retained (§21) |
 | 56 | 20260729091000 | caller_can_read_order_anon_revoke | — | 20260729112238 | caller_can_read_order_anon_revoke | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Security hardening (not payment-specific)** — revokes `anon` EXECUTE on `public.caller_can_read_order(uuid)` while `authenticated` retains it, with a DO-block assertion. Closes the Supabase Security Advisor `anon_security_definer_function_executable` finding for that function. Shipped alongside row 55 in PR #112; applied 2026-07-29 (Wave C, §20). Latest live version until the 2026-08-05 application |
 | 57 | 20260819120000 | order_note_length_limit | — | 20260822123620 | order_note_length_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Server-side 280-character bound on the customer order note** (PR #222, `aff65ce`; 182 lines). Applied **2026-08-22 12:36:20 UTC** with explicit owner approval; generated live version differs from the repository filename (class B, no §9-D alignment). Adds `order_note_normalized`, `order_note_is_acceptable`, `enforce_order_note` and the `orders` / `checkout_sessions` triggers; no existing row exceeded the bound, so nothing was rejected or rewritten. Executable SQL identical to the file (`skel` `0262280dd19823dcf85ab2b8b125d10b` both sides) but the stored text is condensed, 182 → 86 lines — a §9-C1 deviation, §31. Applied by a **Claude Code session** (`session_01VXmTcJDSWXVD9qm7irPbpV`), which applied this and row 58 one after the other via MCP `apply_migration` — one call per file, in dependency order, each followed by read-only verification — on the owner's explicit in-conversation approval. **Corrected 2026-08-24:** this row previously credited the **repository owner** directly, sourced to an owner statement of 2026-08-23; the owner authorised and drove both applications but did not issue the calls, and the mechanism is no longer unrecorded. Detail in §27 and §31 |
-| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the same **Claude Code session** as row 57, immediately after it, one after the other — see row 57, including the 2026-08-24 attribution correction. Detail in §31. **Current latest live version** |
+| 58 | 20260821170000 | order_item_notes | — | 20260822123940 | order_item_notes | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Per-item order notes** (PR #231, `0eeb66d`; 833 lines). Applied **2026-08-22 12:39:40 UTC**, immediately after row 57, which it **depends on**: it calls `public.order_note_normalized` in five places — `order_item_note_is_acceptable`, `enforce_order_item_note`, `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. The first of them, `order_item_note_is_acceptable`, is `language sql` — PostgreSQL validates such a body at `create function` time (`check_function_bodies` on by default) — so applying this one alone would have aborted there, loudly, in the apply output. An earlier revision of this row and of §1 claimed it would have succeeded silently and broken order placement; that was wrong and was corrected in PR #233 after review. Class B, no §9-D alignment. It re-emits four functions; all four matched their repository last-definers before the apply, so nothing live was silently reverted — PR #229's `branch_modifier_availability` guard in `place_order` confirmed present before *and* after. Executable SQL identical to the file (`skel` `89e6adeef95a6ff70b73a6298c672103` both sides), stored text condensed 833 → 721 lines — §9-C1 deviation, §31. Applied by the same **Claude Code session** as row 57, immediately after it, one after the other — see row 57, including the 2026-08-24 attribution correction. Detail in §31. |
+| 59 | 20260824120000 | product_variants | — | 20260825061046 | product_variants | ≠ | B | ✔ verified live | CONFIRMED | none | high if `db push` | **`product_variants` — the Lazywait price tier made first-class** (PR #256, `b36e7d8`; 572 lines). Applied **2026-08-25 06:10:46 UTC** on explicit owner approval, via MCP `apply_migration`. Adds `public.product_variants` (12 columns, RLS enabled, 2 policies, 3 indexes), `order_items.variant_id` + `variant_name_en` + `variant_name_ar` with a customer SELECT grant to `authenticated`, and four columns on `lazywait_catalog_items`. Redefines `set_lazywait_mapping`, `clear_lazywait_mapping` and `import_lazywait_catalog`. **Version NOT aligned** — live carries the apply-time stamp `20260825061046`, not the repository filename; realignment is a separate §9-D owner action and has not been performed. Fidelity proven rather than assumed: every function body applied was hashed against the merged file and matched byte-for-byte (`import_lazywait_catalog` md5 `58d2b732f11c17d442350b393db3928c`, 14 387 chars; `set_lazywait_mapping` `951093a076e2e95fb477808eea6e8a6f`; `clear_lazywait_mapping` `4dd0dc0c46a4db8b2c4cabc11199f05c`). Security advisors after the apply: **zero** naming `product_variants`. Detail in §32 |
+| 60 | 20260824130000 | place_order_variants | — | 20260825061502 | place_order_variants | ≠ | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Carry the chosen tier through every order-writing path** (PR #256, `b36e7d8`; 798 lines). Applied **2026-08-25 06:15:02 UTC**, immediately after row 59, which it **depends on**: every redefined body references `public.product_variants`, so applying this one first would have failed on an unknown relation. Redefines exactly four functions — `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `admin_list_orders_with_items`. `begin_checkout_session` is deliberately NOT redefined: it delegates item work to `compute_order_snapshot` and never touches a line. **Version NOT aligned** — live carries `20260825061502` (§9-D, separate approval). All four bodies hashed against the merged file and byte-identical: `place_order` md5 `dcd117de2c3a0f63c048bfa47a96587a` (15 287 chars), `compute_order_snapshot` `a37ee893140629b3636271089df3f576`, `insert_order_from_snapshot` `60b753bc57ef4d20ef529fc42b3ead79`, `admin_list_orders_with_items` `4d2b5d10d9d8124ca8891eb4a39f4d37`. No payment, coupon, loyalty or VAT arithmetic changed — the tier edits are the only difference from row 58's definitions. Detail in §32. **Current latest live version** |
 
 Reconciliation check: the rows above detail **58 repository / 59 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
@@ -2749,3 +2751,133 @@ reason to split the migration, not to edit its text on the way in. Verify with a
 full-text md5 of the live `schema_migrations` row against the file with its
 single trailing newline stripped — not a `skel` fingerprint, which cannot see
 this class of drift at all.
+
+## 32. The 2026-08-25 application (product variants + order-path tiers)
+
+Applied on explicit owner approval in conversation, following §9 end to end. Two
+files, in dependency order, one MCP `apply_migration` call each, each followed by
+read-only verification. **No `db push`, no batch replay, no unrelated SQL.**
+
+| | Repo file | Live version | Applied (UTC) |
+| --- | --- | --- | --- |
+| 1 | `20260824120000_product_variants.sql` | `20260825061046` | 2026-08-25 06:10:46 |
+| 2 | `20260824130000_place_order_variants.sql` | `20260825061502` | 2026-08-25 06:15:02 |
+
+Live migration history: **103 → 105**. Ledger rows 59–60.
+
+### Pre-live gate (§9-B), recorded before applying
+
+- Live state matched CLAUDE.md §8 exactly: 103 rows, latest `20260822123940`.
+- Neither target version nor target name present in `schema_migrations`;
+  `to_regclass('public.product_variants')` was NULL and `order_items` carried
+  none of the three variant columns — so neither file was applied, by history
+  **or** semantically (§9-B5).
+- Before-state fingerprints captured for all seven functions the two files
+  touch (§9-B6).
+- Rollback source (§9-B4): the prior definitions of all four order-writing
+  functions are in `20260821170000_order_item_notes.sql`; the first file is
+  purely additive DDL, reversible with `drop table public.product_variants
+  cascade` and three `alter table ... drop column`.
+
+### Fidelity was proven, not assumed
+
+MCP `apply_migration` takes the SQL as a parameter, so ~1 370 lines had to be
+transcribed. A transcription slip inside `place_order` would not show up in any
+object-level check, so **every applied function body was hashed against the
+merged file afterwards**, and all seven matched byte-for-byte:
+
+| Function | chars | md5 (live == file) |
+| --- | --- | --- |
+| `place_order` | 15 287 | `dcd117de2c3a0f63c048bfa47a96587a` |
+| `compute_order_snapshot` | 8 631 | `a37ee893140629b3636271089df3f576` |
+| `insert_order_from_snapshot` | 4 617 | `60b753bc57ef4d20ef529fc42b3ead79` |
+| `admin_list_orders_with_items` | 2 454 | `4d2b5d10d9d8124ca8891eb4a39f4d37` |
+| `import_lazywait_catalog` | 14 387 | `58d2b732f11c17d442350b393db3928c` |
+| `set_lazywait_mapping` | 1 718 | `951093a076e2e95fb477808eea6e8a6f` |
+| `clear_lazywait_mapping` | 1 036 | `4dd0dc0c46a4db8b2c4cabc11199f05c` |
+
+**A normalisation trap worth recording**, because it produced a false alarm on
+the first check: comparing `length(prosrc)` (Postgres counts **characters**)
+against `len(body.encode('utf-8'))` (bytes) disagrees for any body containing
+non-ASCII — `import_lazywait_catalog` embeds the Arabic literal `غير مصنّف`.
+The md5s were identical throughout. Compare characters to characters.
+
+### Verification (§9-E)
+
+- **Objects, exactly as promised and nothing more:** `product_variants` with 12
+  columns, RLS enabled, 2 policies, 3 indexes; `order_items` +3 columns with
+  `select (variant_id, variant_name_en, variant_name_ar)` granted to
+  `authenticated`; `lazywait_catalog_items` +4 columns.
+- **Advisors:** 82 total, all pre-existing classes (66
+  `authenticated_security_definer_function_executable`, 14
+  `rls_enabled_no_policy`, 1 `anon_security_definer_function_executable`, 1
+  `auth_leaked_password_protection`). **Zero** name `product_variants` — the new
+  table is not flagged for missing RLS or a missing policy.
+- **The frozen Moyasar migration was not swept in.** Checked explicitly, because
+  `20260824100000` sorts ahead of both applied files: zero history rows, zero
+  `%moyasar%` functions, zero `moyasar` provider rows, `provider_type='payment'`
+  still `tap` and still `enabled = false`.
+- **`orders` untouched** at 40 rows.
+
+### Version alignment is NOT done (§9-D)
+
+`apply_migration` stamps an apply-time version. Live history therefore carries
+`20260825061046` and `20260825061502`, not the repository filenames. Aligning
+them is a **separate live history write requiring its own explicit owner
+approval**, and it has not been requested or performed. The repo filename
+versions are absent from `schema_migrations` **by design** — that is not drift
+and must not be "repaired".
+
+### The catalog import that followed, and the bridge it needed
+
+With the migrations applied, `import_lazywait_catalog()` was run on owner
+approval. **The first run produced 61 products and 0 active ones** — the
+original empty-menu bug one layer up.
+
+The cause: this migration fixes the SQL **importer**, but the **parser** is
+TypeScript inside the `lazywait-catalog` Edge Function, which has not been
+redeployed. `lazywait_catalog_items.prices` therefore still held what the OLD
+parser wrote — `price_excl_vat` null on all 147 rows, `price_with_vat` on only
+the 21 dashboard-authored ones — so the importer read 0 and correctly marked 126
+tiers unorderable.
+
+The money was present in the cache all along, under `raw`, where the old parser
+never looked. `lazywait_catalog_items.prices` was therefore **rebuilt from
+`raw`** using the fixed parser's own rule (`price` → `price_excl_vat`), verified
+by dry run first: 147/147 rows gained a net price, 147/147 carried a `price_id`,
+and 147/147 gave a whole number at × 1.15. The import was then re-run.
+
+**That backfill is a bridge, not the fix, and it converges:** once
+`lazywait-catalog` is redeployed and the catalog re-pulled, the real parser
+rewrites that column with the same values. It is recorded here so a future
+reader does not mistake a hand-written SQL rebuild for parser output.
+
+Result, verified: **55 of 61 products active, 144 of 147 tiers active**, five
+categories, prices 1.00–74.00 SAR, zero active products priced 0, zero active
+products without a `lazywait_price_id`, every active tier a whole-riyal figure.
+Coral imported with all **11** tiers and a "from" price of 20.00. The POS-only
+records stayed out of the customer menu — `Extra Bread`, `Ranch Sauce`, the
+`Change to Wedgez` upgrade and the `Offers` category — and `Macaroni Béchamel`
+landed inactive as the orphan-category case the migration names by example.
+
+### How the admin gate was satisfied — stated plainly
+
+`import_lazywait_catalog()` is gated on `public.is_admin()`, which is
+`current_app_role() = 'admin'` **and** `jwt_has_aal2()`. The session held
+`postgres` credentials and no JWT, so the call was made after setting
+`request.jwt.claims` to a **real admin who holds a verified TOTP factor**
+(`b05de808-0666-4d2f-9184-6d3baa07174d`) with `aal: aal2`.
+
+The entitlement is genuine; the session assertion is synthesised. This bypassed
+the AAL2 requirement added on 2026-08-23, on the owner's explicit instruction,
+and is recorded as such rather than glossed. The designed path — an admin
+clicking Import in the console under their own TOTP session — remains the
+correct one for routine use.
+
+### Side effect: 16 branches created
+
+None of the 16 Lazywait branches in the cache matched a local
+`branches.lazywait_branch_id`, so the importer inserted all 16, taking the local
+branch table from 25 to 41. They are created **inactive** by design and cannot
+affect ordering until an admin sets their delivery configuration. It also means
+branch mapping has never been done. See `docs/OWNER_ACTIONS.md`.

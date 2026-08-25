@@ -836,6 +836,44 @@ If concurrent sessions on one branch become common, the cheap structural fix is
 one branch per session rather than a new CI control — but that is a working
 practice, not a repository setting, and it is not proposed as an action here.
 
+## 19. After the 2026-08-25 variant application — four open actions
+
+**Status:** OWNER DECISION ×4. None blocks ordering today; two of them are what
+stand between the current state and a menu that survives the next catalog pull.
+
+On 2026-08-25 the two variant migrations were applied and the Lazywait catalog
+was imported, both on explicit owner approval. The menu is live for the first
+time: **55 of 61 products active, 144 of 147 tiers**, prices 1.00–74.00 SAR.
+Full record: [`MIGRATIONS.md`](MIGRATIONS.md) §32 and ledger rows 59–60.
+
+| # | Action | Why it is still open |
+| --- | --- | --- |
+| 1 | Redeploy `lazywait-catalog` | **The parser fix is not live.** §32 explains: the applied migration fixed the SQL importer, but the field-name fix lives in the Edge Function's TypeScript. Until it is redeployed, `lazywait_catalog_items.prices` is populated by a hand-written SQL backfill, and the **next real catalog pull would overwrite it with nulls again and empty the menu**. |
+| 2 | Redeploy `lazywait-sync` | Carries the ordered tier's `price_id` to the POS ticket. **Now safe** — it was a hazard only while `…120000` was unapplied, and that is done. Without it a tiered order still tickets the cheapest tier. |
+| 3 | Version-align rows 59 and 60 | Live history carries the apply-time stamps `20260825061046` / `20260825061502`, not the repository filenames. §9-D makes realignment a separate live history write with its own approval. Leaving it is legitimate; "repairing" it unasked is not. |
+| 4 | Map or retire the 16 new branches | The importer created all 16 Lazywait branches because none matched a local `lazywait_branch_id`, taking the branch table 25 → 41. They are **inactive** and cannot take orders, but the duplication means branch mapping has never been done. |
+
+**Action 1 is the live one.** Everything else can wait; that one is a trap with a
+timer on it. The current `prices` column was rebuilt from `raw` by SQL, not
+written by the parser. A pull against the deployed (old) function rewrites those
+147 rows with `price_excl_vat: null`, the importer reads 0, and every product
+goes inactive at price 0 — the exact failure that kept the menu empty for
+months. **Redeploy before the next pull, not after.**
+
+**The import ran under a synthesised admin context**, and that is recorded rather
+than buried. `import_lazywait_catalog()` requires `is_admin()` — role **and**
+AAL2 — and the session held `postgres` credentials with no JWT, so
+`request.jwt.claims` was set to a real admin holding a verified TOTP factor. The
+entitlement was genuine; the session assertion was not. It bypassed the AAL2
+requirement added 2026-08-23, on explicit owner instruction. Routine imports
+should go through the admin console under a real TOTP session.
+
+**Not changed, and still open from PR #256:** whether a multi-tier product should
+open a picker before it can be added to the cart, and whether its card should
+read "from 20.00" rather than a bare "20.00". The cart currently assumes the
+**cheapest** tier, so the price charged can never exceed the price displayed —
+but assuming a tier at all is a product decision, not an engineering one.
+
 ## Owner-action closeout rule
 
 When an item is completed:
