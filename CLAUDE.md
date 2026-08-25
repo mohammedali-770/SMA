@@ -210,7 +210,7 @@ Every enforcement the 2026-08-07 note claimed is confirmed still live: `pull_req
 
 `required_status_checks` also carries **`strict_required_status_checks_policy: true`** — branches must be up to date with the base before merging. That is why a second pull request merged straight after a first is refused with *“5 of 5 required status checks are expected”* until its branch is updated; it is the rule working, not a failure.
 
-**The divergence, stated rather than smoothed over: five of the six intended contexts are required. `Documentation (generated + ownership)` is NOT.** A pull request whose `npm run docs:check` fails can therefore still be merged, so §14's documentation-consistency rule is enforced by CI *reporting* but not by the merge gate. Adding it is a dashboard change and therefore an owner action — see `docs/OWNER_ACTIONS.md`. Until it is added, do not describe the documentation gate as blocking.
+**The divergence, stated rather than smoothed over: five of the six intended contexts are required. `Documentation (generated + ownership)` is NOT.** A pull request whose `npm run docs:check` fails can therefore still be merged, so §14's documentation-consistency rule is enforced by CI *reporting* but not by the merge gate. Adding it is a dashboard change and therefore an owner action — `docs/OWNER_ACTIONS.md` §14, with the full reading recorded in §5 of that file. Until it is added, do not describe the documentation gate as blocking.
 
 `Change-control guard` is likewise **not** required, which matches what §11 already says: the job is deliberately unfiltered so the context always reports and is *safe* to require, but the repository does not claim it is required.
 

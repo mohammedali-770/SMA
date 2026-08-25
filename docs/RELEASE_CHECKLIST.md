@@ -62,7 +62,7 @@ Before relying on GitHub to block a bad merge, verify the current ruleset in Git
 `Protect default branch` ruleset, which is active with no bypass actors and
 applies only to the default branch. **`Documentation (generated + ownership)` is
 NOT among them**, so a pull request failing `npm run docs:check` can still be
-merged — treat that gate as advisory until it is added (`OWNER_ACTIONS.md` §20).
+merged — treat that gate as advisory until it is added (`OWNER_ACTIONS.md` §14, evidence in §5).
 The ruleset also sets `strict_required_status_checks_policy: true`, so a branch
 must be up to date with the base before merging; expect a second pull request
 merged straight after a first to need a branch update first.

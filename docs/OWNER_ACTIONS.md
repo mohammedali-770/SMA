@@ -123,11 +123,57 @@ The branch was behind its base, so none of the required contexts had reported fo
 
 This supersedes the 2026-08-07 record — repeated in [`CLAUDE.md`](../CLAUDE.md) §12 — that required CI status checks were **not** proven or enforced. A required context that has not reported blocks the merge; that is precisely what refused #243.
 
-**Five required, six intended.** The rule expects **five** contexts. The list above names **six**. Which five are configured cannot be read from here: the GitHub tool surface available to an agent session has no branch-protection or ruleset read tool. They are therefore **not recorded here and not guessed at** — §12 exists precisely because dashboard state must not be asserted from source.
+**READ LIVE 2026-08-25 — the inference below was correct, and the five are now recorded.**
+This section previously said the configured contexts "cannot be read from here"
+and asked the owner to go and read them. Both are superseded: they **were** read,
+by an agent session, from `GET /repos/mohammedali-770/SMA/rulesets`. That
+endpoint returns 200 for this integration; only `…/branches/{branch}/protection`
+is refused with *"Resource not accessible by integration"*. A future session
+should use the rulesets endpoint rather than repeat "this cannot be read".
 
-**Inference, not established fact.** The likeliest missing context is `Documentation (generated + ownership)`. §14 of this file still records adding that context in **Settings → Rules** as an outstanding owner action, and six intended minus that one is five. **If that inference is correct**, the documentation gate that enforces `docs/ownership.json` — the mechanism behind [`CLAUDE.md`](../CLAUDE.md) §14 — currently runs and reports but does **not** block a merge. This is unconfirmed and cannot be confirmed from source.
+**One ruleset: "Protect default branch"** — `enforcement: active`,
+`bypass_actors: null` (nobody bypasses, owner included), condition
+`ref_name.include = ["~DEFAULT_BRANCH"]` with an empty exclude, so it governs the
+default branch and nothing else.
 
-**Action needed:** the owner opens **Settings → Rules**, reads the configured required check contexts, and records which five they are. That one reading either confirms or refutes the inference above and closes the five-versus-six discrepancy.
+The five required contexts are:
+
+| context | required |
+| --- | --- |
+| `design-system` | ✅ |
+| `Production build (Vite + Expo web export)` | ✅ |
+| `Edge Function typecheck (Deno)` | ✅ |
+| `Dependency audit (high+)` | ✅ |
+| `SQL suites gate` | ✅ |
+| `Documentation (generated + ownership)` | ❌ **not required** |
+
+**The inference is confirmed, not merely likely.** The missing context is
+`Documentation (generated + ownership)`, exactly as suspected. The documentation
+gate that enforces `docs/ownership.json` — the mechanism behind
+[`CLAUDE.md`](../CLAUDE.md) §14 — runs and reports but does **not** block a
+merge. Adding it remains the outstanding owner action, and it lives in **§14 of
+this file**; it is deliberately not duplicated here.
+
+`Change-control guard` is also not required, consistent with
+[`CLAUDE.md`](../CLAUDE.md) §11, which already declines to claim it is.
+
+**`strict_required_status_checks_policy` is `true`** — a branch must be up to
+date with its base before merging. This is the second half of the #243 refusal
+explained above, and it recurs: on 2026-08-25 PR #261 was refused with *"5 of 5
+required status checks are expected"* immediately after #260 landed, with all
+seven of its checks green. The fix is a branch update, not a re-run. It is the
+rule working, not a broken gate.
+
+**The ruleset does not protect feature branches.** Its condition matches the
+default branch only, so `claude/**` refs carry no deletion or force-push
+protection. A 403 when an agent session deletes one is a token-permission limit
+on the integration, not a server-side rule.
+
+Everything the 2026-08-07 evidence claimed is confirmed still live:
+`pull_request`, `required_linear_history`, `deletion`, `non_fast_forward`, and
+`required_review_thread_resolution: true` — the last is what refuses a merge
+while a review thread is open. `required_approving_review_count` is **0**: the
+pull-request workflow is required, an approving review is not.
 
 ## 6. Production deployment gating
 
@@ -434,10 +480,15 @@ The workflow reports the status check context:
 **Settings → Rules** alongside the other intended required contexts. Until it is added, the check
 runs and reports but a red result does not prevent merging.
 
-**Still outstanding as of 2026-08-24, on inference.** The merge refusal recorded in §5 names
-**five** required contexts where the intended list has six, which points at this action not having
-been done. That is read off a count, not off the dashboard — see §5 for the evidence and for the
-single check that would settle it.
+**Still outstanding, and no longer an inference — confirmed 2026-08-25.** The ruleset was read
+directly (§5): `Documentation (generated + ownership)` is **not** among the five required contexts.
+The earlier version of this paragraph reasoned from a count of five-versus-six; that count was
+right, and the dashboard now confirms which context is missing. **A pull request whose
+`npm run docs:check` fails can still be merged today.**
+
+The job is already suitable for requiring: it is not path-filtered, so the context reports on every
+pull request and cannot sit "expected" forever and wedge the queue — the same property
+[`CLAUDE.md`](../CLAUDE.md) §11 relies on for `Change-control guard`.
 
 Use the emitted job name exactly as written above. The equivalent mistake has been made before with
 the design-system job, whose context is the job ID `design-system` rather than the workflow display
@@ -972,59 +1023,6 @@ Two refinements the data forced, neither of them a departure from that decision:
 
 The invariant that survived unchanged: **the price charged may never exceed the
 price displayed.**
-
-## 20. Add `Documentation (generated + ownership)` to the required checks
-
-**Status:** OWNER DECISION. Dashboard change, not a source change — nothing in
-this repository can make it true.
-
-Read live on 2026-08-25 from `GET /repos/mohammedali-770/SMA/rulesets`. One
-ruleset exists, **“Protect default branch”**, active, `bypass_actors: null`,
-scoped to `ref_name.include = ["~DEFAULT_BRANCH"]`. It requires five status
-check contexts:
-
-| context | required |
-| --- | --- |
-| `design-system` | ✅ |
-| `Production build (Vite + Expo web export)` | ✅ |
-| `Edge Function typecheck (Deno)` | ✅ |
-| `Dependency audit (high+)` | ✅ |
-| `SQL suites gate` | ✅ |
-| `Documentation (generated + ownership)` | ❌ **not required** |
-
-CLAUDE.md §12 lists six intended contexts. Five are enforced. **A pull request
-whose `npm run docs:check` fails can be merged**, so §14 — "documentation
-consistency is part of the change", the rule that makes `docs/ownership.json`
-and the generated-file drift check meaningful — is enforced by CI *reporting*
-and by review, not by the merge gate. That is the whole gap: the job runs, it
-reports, and nothing stops a red one landing.
-
-The job is already suitable for requiring. It is not path-filtered, so the
-context reports on every pull request and cannot go "expected" forever and wedge
-the queue — the same property §11 relies on for `Change-control guard`.
-
-**To add it:** Settings → Rules → *Protect default branch* → Require status
-checks to pass → add `Documentation (generated + ownership)` (the emitted
-context, not the workflow display name).
-
-Two related facts recorded at the same reading, neither of them an action:
-
-- **`Change-control guard` is also not required.** §11 already says the repository
-  does not claim it is. Adding it is a separate decision, on the same screen.
-- **`strict_required_status_checks_policy: true`** — branches must be up to date
-  before merging. A second pull request merged straight after a first is refused
-  with *“5 of 5 required status checks are expected”* until its branch is
-  updated. Working as intended; noted so it is not misread as a broken gate.
-
-Everything §12 claimed from the 2026-08-07 evidence is still live and was
-re-confirmed: pull-request workflow, linear history,
-`required_review_thread_resolution: true`, deletion and non-fast-forward
-protection. `required_approving_review_count` is **0** — the pull-request
-workflow is required, an approving review is not.
-
-**The ruleset does not protect feature branches.** Its condition matches the
-default branch only, so `claude/**` refs are unprotected and freely deletable; a
-403 on deleting one is a token-permission limit, not a server-side rule.
 
 ## Owner-action closeout rule
 
