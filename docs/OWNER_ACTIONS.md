@@ -922,9 +922,18 @@ files were byte-identical then — `lazywait-catalog/index.ts` plus
 `posLineName`, two columns to `ORDER_ITEM_SELECT` and the `mapOrderItemRows`
 composition on 2026-08-26, and that module was redeployed with `lazywait-sync`
 v4 the same day. `lazywait-catalog` was **not** redeployed, so its v3 bundle
-still carries the pre-#264 copy: 40 533 bytes against 42 221 in the repository,
-differing in exactly those three hunks and nothing else (read back and diffed
-2026-08-26).
+still carries the pre-#264 copy: 40 533 bytes against 42 221 in the repository
+at that moment, differing in exactly those three hunks and nothing else (read
+back and diffed 2026-08-26).
+
+**Updated 2026-08-26 (afternoon) — the gap widened by one more change, and the
+reasoning is unchanged.** `lazywait-sync` was redeployed to **v5** carrying the
+comped-ticket label (PR #269), so `_shared/lazywait.ts` in the repository and in
+`lazywait-sync` is now sha256 `ec5f8238…` / 43 797 bytes, while
+`lazywait-catalog` v3 still holds `8df5ea74…` / 42 221 bytes. The catalog
+function imports only `lazywaitFetch`, `resolveLazywaitBaseUrl` and
+`LazywaitConfig`; the comp label lives in `buildCreateOrderPayload`, which it
+never calls, so this second hunk is as inert as the first.
 
 The skew is inert and the owner chose on 2026-08-26 to leave it. `lazywait-catalog/index.ts`
 imports only `lazywaitFetch`, `resolveLazywaitBaseUrl` and `LazywaitConfig` —
@@ -1084,8 +1093,8 @@ price displayed.**
 
 ## 20. After the 2026-08-26 comped-customer application — two open actions
 
-**Status:** OWNER DECISION ×2. Neither blocks anything today, because nobody is
-comped yet.
+**Status:** OWNER DECISION ×1 — one of the two is now done. Neither blocked
+anything, because nobody is comped yet.
 
 On 2026-08-26 the three comped-customer migrations were applied on explicit
 owner approval, in filename order, one MCP `apply_migration` call per file with
@@ -1107,7 +1116,7 @@ reshaping to add.
 | # | Action | Why it is still open |
 | --- | --- | --- |
 | 1 | Ship the app build | The checkout "Complimentary" line, the receipt line and the submit-time membership re-check ship with it. **Safe to ship now** — the two new `orders` columns exist as of row 65. Shipping it *before* that would have broken order history entirely, because `CUSTOMER_ORDER_SELECT` names them and PostgREST rejects the whole select when one column is missing. |
-| 2 | Redeploy `lazywait-sync` | Until it happens, a comped ticket reaches the branch **unlabelled** — `buildCreateOrderPayload` sends no order-level money and lines carry undiscounted menu prices, so the cashier cannot tell a free order from a paid one. Order-independent with respect to the migration: the worker reads orders through `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a missing column yields `undefined` rather than a failed select. The repo's `_shared/lazywait.ts` is already ahead of the deployed v4 for this reason. |
+| 2 | ~~Redeploy `lazywait-sync`~~ | **DONE 2026-08-26 12:46 UTC — v4 → v5**, on explicit owner approval. `verify_jwt` unchanged at `false`. All five bundle files read back and hashed **byte-identical** to the merged repository, including the 43 797-byte `_shared/lazywait.ts`. Pre-flight was clean (0 pending, 0 syncing, 0 failed, no order in 30 minutes) so nothing was in flight. Boot proved live: an unsigned POST returned `401 {"error":"unauthorized"}` — the module loaded, read its config, found the trigger secret configured (a missing one answers 503) and refused at the constant-time compare without claiming an order. The cron then ran the new version at **12:47:00 and succeeded**. A comped ticket now carries the label. |
 
 Version alignment for rows 65–67 is deliberately **not** listed as an action.
 Live carries the apply-time stamps `20260826114717` / `20260826115025` /
