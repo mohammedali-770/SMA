@@ -226,11 +226,28 @@ begin
     get diagnostics v_hit = row_count;
     v_l_created := v_l_created + v_hit;
 
-    -- ...and detach it where Lazywait no longer lists it. Scoped to this group,
-    -- which carries a lazywait_group_id, so a hand-made group's links are never
-    -- reachable from here.
+  end loop;
+
+  -- Detach every Lazywait-owned group from products whose item no longer lists
+  -- it. This runs OUTSIDE the loop above, and that is the whole point: the loop
+  -- only visits groups some item still references, so a group dropped from the
+  -- LAST item referencing it would never be visited and would stay attached
+  -- forever - customers still asked to choose from a group Lazywait no longer
+  -- offers on that product, and, if it is required, still blocked from ordering
+  -- without one. Caught by the suite before this ever ran anywhere.
+  --
+  -- Scoped to groups carrying a lazywait_group_id, so a hand-made group's links
+  -- are unreachable from here.
+  --
+  -- Guarded on the cache holding at least one item, for the same reason the
+  -- catalog pull refuses to prune on an empty response: a failed or partial
+  -- pull must never be read as "Lazywait dropped everything" and strip every
+  -- option from the menu.
+  if exists (select 1 from public.lazywait_catalog_items where entity_type = 'item') then
     delete from public.product_modifier_groups pmg
-    where pmg.group_id = v_group_id
+    using public.modifier_groups mg
+    where mg.id = pmg.group_id
+      and mg.lazywait_group_id is not null
       and not exists (
         select 1
         from public.lazywait_catalog_items it
@@ -238,10 +255,10 @@ begin
         where it.entity_type = 'item'
           and p.id = pmg.product_id
           and jsonb_typeof(it.raw -> 'addons_groups_ids') = 'array'
-          and (it.raw -> 'addons_groups_ids') ? g.lazywait_id);
+          and (it.raw -> 'addons_groups_ids') ? mg.lazywait_group_id);
     get diagnostics v_hit = row_count;
     v_l_removed := v_l_removed + v_hit;
-  end loop;
+  end if;
 
   return jsonb_build_object(
     'groups',    jsonb_build_object('created', v_g_created, 'updated', v_g_updated,

@@ -246,4 +246,36 @@ begin
   raise notice 'lazywait_addon_group_import_test (detach): all assertions passed';
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 10. A cache with no items must NOT be read as "Lazywait dropped everything".
+--
+--     The detach pass runs over every Lazywait-owned group, not just the ones
+--     an item still references — that is what makes case 9 work. The cost of
+--     that reach is that an empty or partial cache would otherwise strip every
+--     option from the menu in one import, which is the same failure the catalog
+--     pull guards against by refusing to prune on an empty response.
+-- ---------------------------------------------------------------------------
+do $$
+declare v_res jsonb; v_links_before int; v_links_after int;
+begin
+  select count(*) into v_links_before from public.product_modifier_groups;
+  if v_links_before = 0 then
+    raise exception 'FAIL 10: the fixture left no links, so this case would pass vacuously';
+  end if;
+
+  delete from public.lazywait_catalog_items where entity_type = 'item';
+  v_res := public.import_lazywait_addon_groups();
+
+  select count(*) into v_links_after from public.product_modifier_groups;
+  if v_links_after <> v_links_before then
+    raise exception 'FAIL 10: an item-less cache stripped % link(s) — the guard did not hold',
+      v_links_before - v_links_after;
+  end if;
+  if (v_res->'links'->>'removed')::int <> 0 then
+    raise exception 'FAIL 10: the detach pass ran against an empty cache';
+  end if;
+
+  raise notice 'lazywait_addon_group_import_test (empty-cache guard): all assertions passed';
+end $$;
+
 rollback;
