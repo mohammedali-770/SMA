@@ -577,7 +577,7 @@ export function posLineName(
   const b = (base ?? '').trim();
   const t = (tier ?? '').trim();
   if (!t || t === b) return b;
-  return b ? `${b} \u2014 ${t}` : t;
+  return b ? `${b} — ${t}` : t;
 }
 
 /**
