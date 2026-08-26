@@ -324,6 +324,17 @@ instead of the live config row.) Field-by-field state:
   "customer_cell": "541234567", "country_code": "+966",
   "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
+- `name` and `names{en,ar}` carry the **chosen tier**, not the bare product name
+  — `Chicken Wings — Small` / `أجنحة الدجاج — صغير`, composed by
+  `posLineName`. **The POS renders the name we send; it does not resolve
+  `price_id` into a label.** Ticket #2 / invoice 19 (2026-08-26) printed
+  "Chicken Wings" for a line ordered as صغير even though the payload carried
+  the correct `price_id` (`20005a3e…`, straight from Lazywait's own catalog), so
+  the kitchen could not tell a 7.00 Small from a 13.00 Large. The separator and
+  the drop-a-tier-that-repeats-the-name rule mirror the app's `orderLineLabel`,
+  so receipt and ticket read identically. Tier names come from the
+  `order_items.variant_name_*` snapshots, so a ticket keeps naming what the
+  customer bought even after the catalog changes.
 - `price` is the **server-trusted, VAT-inclusive** item price with the **mapped**
   add-on money subtracted back out. `order_items.unit_price` already includes
   every selected modifier (`place_order` adds them in) and the contract sums

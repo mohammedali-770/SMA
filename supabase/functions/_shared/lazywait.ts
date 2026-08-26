@@ -550,6 +550,37 @@ export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<strin
 }
 
 /**
+ * The name a POS ticket should show for one line: the product, plus the chosen
+ * tier when there is one.
+ *
+ * Evidence this exists for: on 2026-08-26, ticket #2 / invoice 19 printed
+ * "Chicken Wings" for a line ordered as صغير, even though the payload carried
+ * the correct `price_id` (`20005a3e…` = Small, straight from Lazywait's own
+ * catalog). The POS renders the `name`/`names` we send rather than resolving
+ * `price_id` into a label, so the tier has to be IN the name or it never
+ * reaches the kitchen. A ticket that cannot distinguish a 7.00 Small from a
+ * 13.00 Large is a wrong order waiting to happen.
+ *
+ * Deliberately mirrors `orderLineLabel` in the app (`utils/format.ts`),
+ * separator and all, INCLUDING its rule that a tier merely repeating the
+ * product name is dropped — a "Cola" whose only tier is "Cola" must not print
+ * as "Cola — Cola". Receipt and ticket therefore read identically.
+ *
+ * Pure and null-safe: `variant_name_*` are the snapshots `place_order` writes
+ * onto the line, so the ticket keeps naming the tier the customer actually
+ * bought even after the catalog changes.
+ */
+export function posLineName(
+  base: string | null | undefined,
+  tier: string | null | undefined,
+): string {
+  const b = (base ?? '').trim();
+  const t = (tier ?? '').trim();
+  if (!t || t === b) return b;
+  return b ? `${b} \u2014 ${t}` : t;
+}
+
+/**
  * Column list the sync worker selects from `order_items` to build a Create
  * Order body. Kept here, next to the mapper that consumes it, so the query and
  * the mapping cannot drift apart — before the 2026-08-24 contract the worker
@@ -558,6 +589,7 @@ export function serializeCreateOrderItem(it: CreateOrderItemInput): Record<strin
  */
 export const ORDER_ITEM_SELECT =
   'id, name_en, name_ar, note, quantity, unit_price, product_id, variant_id,'
+  + ' variant_name_en, variant_name_ar,'
   + ' products(lazywait_item_id, lazywait_price_id, categories(lazywait_category_id)),'
   + ' product_variants(lazywait_price_id),'
   + ' order_item_modifiers(modifier_id, name_en, name_ar, price, modifiers(lazywait_addon_id))';
@@ -584,8 +616,11 @@ export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOr
     const modifiers = (it.order_item_modifiers ?? []) as Array<Record<string, unknown>>;
     return {
       menuItemId: product?.lazywait_item_id ?? null,
-      name: String(it.name_en ?? 'Item'),
-      nameAr: (it.name_ar as string | null) ?? null,
+      // Tier folded into the name — the POS shows what we send, not what
+      // `price_id` resolves to. See `posLineName`.
+      name: posLineName(String(it.name_en ?? 'Item'), it.variant_name_en as string | null)
+        || String(it.name_en ?? 'Item'),
+      nameAr: posLineName(it.name_ar as string | null, it.variant_name_ar as string | null) || null,
       quantity: Number(it.quantity ?? 1),
       // VAT-inclusive AND modifier-inclusive; the serializer subtracts the
       // add-on lines back out so the POS cannot charge them twice.
