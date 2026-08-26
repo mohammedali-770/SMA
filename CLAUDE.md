@@ -115,7 +115,7 @@ Current read-only migration snapshot (2026-08-22): **97 repository migration fil
 
 **Superseded 2026-08-25 — the two variant migrations are now APPLIED.** On the owner's explicit approval, `20260824120000_product_variants` and `20260824130000_place_order_variants` were applied to Production, in that dependency order, via MCP `apply_migration` — one call per file, each followed by read-only verification. Live history moved **103 → 105**. Full record: `docs/MIGRATIONS.md` §32, ledger rows 59–60.
 
-**Two repository files are unapplied: the frozen one, and one awaiting approval.**
+**One repository file remains unapplied, and it is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -124,10 +124,10 @@ Current read-only migration snapshot (2026-08-22): **97 repository migration fil
 | `20260824130000_place_order_variants.sql` | Applied 2026-08-25, live version `20260825061502`. |
 | `20260826050000_place_order_variant_fallback.sql` | Applied 2026-08-26, live version `20260826044204`. |
 | `20260826060000_compute_order_snapshot_variant_fallback.sql` | Applied 2026-08-26, live version `20260826065046`. |
-| `20260826080000_import_lazywait_addon_groups.sql` | **UNAPPLIED, awaiting approval — not frozen.** Adds `import_lazywait_addon_groups()` and has `import_lazywait_catalog()` call it, so a Lazywait add-on group finally becomes a choosable option. Before it, `product_modifier_groups` holds **zero** rows in Production and no product offers an option at all. Not a payment change; applying it is a §5 action. Detail: `docs/LAZYWAIT.md`. |
 | `20260826070000_place_order_single_tier_resolution.sql` | Applied 2026-08-26, live version `20260826065228`. |
+| `20260826080000_import_lazywait_addon_groups.sql` | Applied 2026-08-26, live version `20260826080319`. |
 
-The honest statement is therefore **104 repository files / 108 live rows / two unapplied files, one frozen on purpose and one waiting on approval.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **104 repository files / 109 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -135,7 +135,7 @@ The honest statement is therefore **104 repository files / 108 live rows / two u
 
 Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
 
-**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly. "Apply the outstanding migrations" would sweep it in alongside the add-on importer, which is exactly the instruction that would break the §6 freeze while looking like ordinary catch-up. Any `supabase migration` operation must still name its target explicitly.
+**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly. It is again the *only* thing a bulk apply could sweep in, which makes it more dangerous rather than less: with one file outstanding, "apply the outstanding migrations" reads like a no-op and is in fact the one instruction that would break the §6 freeze. Any `supabase migration` operation must still name its target explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
