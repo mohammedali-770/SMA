@@ -3109,9 +3109,57 @@ resolves each line **once** and carries the tier inside the snapshot, which
 `insert_order_from_snapshot` later writes verbatim. There is no second pass here
 to disagree with the first, and none was added.
 
-That also means this function is not exposed to the READ COMMITTED window that
-`place_order` still has between its two passes — a separate, narrower issue that
-is **not** addressed by this migration.
+That also means this function is not exposed to a defect `place_order` still
+has, which is **not** addressed by this migration and is recorded here so it is
+not lost.
+
+#### The open `place_order` window (not fixed)
+
+Both of `place_order`'s loops iterate `jsonb_array_elements(p_items)`
+independently, and under READ COMMITTED each `select` takes its own snapshot.
+Identical `order by price asc, sort_order asc, id asc` therefore does **not**
+make them agree. If a transaction commits a price change, an `is_active` flip,
+or a cheaper tier for a product in the cart between the two loops, pass 1 prices
+from one row and pass 2 stores another: `orders.subtotal` / `vat_amount` /
+`total` disagree with `order_items.unit_price`, and the POS ticket carries the
+second tier's `lazywait_price_id`. `import_lazywait_catalog` is exactly such a
+transaction.
+
+The window opens only for a line naming **no** `variant_id` — a line naming one
+is looked up by primary key in both passes, so those can only diverge on
+`is_active`, and pass 2 would then store `variant_id` null rather than a
+different tier. Today only pre-picker installs reach the fallback at all.
+
+Locking is the wrong tool: `for share` on the chosen row blocks an `update` but
+not the `insert` of a cheaper tier, so it closes half the window and buys a
+lock-ordering hazard with `import_lazywait_catalog`. The fix is to stop
+resolving twice — mirroring what `compute_order_snapshot` already does:
+
+```sql
+-- declare
+v_tiers jsonb := '[]'::jsonb;
+v_idx   int   := 0;
+
+-- pass 1, immediately after the tier is resolved
+v_tiers := v_tiers || jsonb_build_object(
+  'id', v_variant.id, 'name_en', v_variant.name_en,
+  'name_ar', v_variant.name_ar, 'price', v_variant.price);
+
+-- pass 2, replacing the whole re-resolution block
+v_tier  := v_tiers -> v_idx;
+v_idx   := v_idx + 1;
+```
+
+Pass 2 then reads the tier from `v_tier` and issues no query, which makes the
+passes atomic by construction rather than by coincidence. `jsonb` preserves
+`numeric` exactly, so no rounding is introduced, and both loops already walk
+`p_items` in array order, so positional indexing is safe.
+
+It is not in this migration because it replaces `place_order` a second time, and
+that function is applied and serving live orders. Putting a refactor of a live
+pricing path into an incident fix is how the next incident starts. Raised on
+PR #263 by review, answered there, and the thread is deliberately left open as
+the tracking record.
 
 ### Verification status
 
