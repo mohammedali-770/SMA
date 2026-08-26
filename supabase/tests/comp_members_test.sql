@@ -381,8 +381,8 @@ values (
   true);
 
 select set_config('test.auth_uid', :member, true);
-insert into public.addresses (id, customer_id, label, line1, city, latitude, longitude, description)
-values ('00000000-0000-0000-0000-0000000ad001', :member, 'Home', 'Olaya St', 'Riyadh',
+insert into public.addresses (id, customer_id, label, latitude, longitude, description)
+values ('00000000-0000-0000-0000-0000000ad001', :member, 'Home',
         24.7136, 46.6753, 'Second floor, blue door');
 
 do $$
