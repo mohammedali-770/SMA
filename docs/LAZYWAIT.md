@@ -477,6 +477,40 @@ subtracted and every line is charged exactly what it was under the July build.
 What changed is that the customer's heat-level choice now reaches the kitchen as
 `details` text instead of being silently dropped.
 
+### Add-ons went live 2026-08-26 — what actually landed
+
+Applied on explicit owner approval as live version `20260826080319`, then run
+from the admin console. Before it, `product_modifier_groups` held **zero** rows
+and no product offered an option of any kind. Verified read-only afterwards:
+
+| | before | after |
+| --- | --- | --- |
+| `modifier_groups` | 1 (hand-made) | 2 |
+| `modifiers` | 3 | 13 |
+| `product_modifier_groups` | **0** | 1 |
+
+The imported group is **مشروب الوجبة** — `min_select 1`, `max_select 1`,
+`is_required true` — carrying all **ten** drinks at 0.00, attached to **Coral**.
+The stray "Test" group was **not** imported, by the rule rather than by name: no
+item references it. The hand-made group and its rows are untouched, and there
+are zero duplicate groups and zero duplicate (group, add-on) pairs. The wider
+import left the menu where it was: 55 of 61 products active, 144 of 147 tiers.
+
+**`name_en` on that group is the Arabic string**, because Lazywait sent
+`name_en = null` and the column is `NOT NULL`. The fallback did what it was
+built to do — a blank heading would be worse — but an English-locale customer
+reads Arabic for the group title while the ten options themselves have proper
+English names. Fixing it is one field in Lazywait plus a re-pull and re-import;
+no code change.
+
+**Coral now requires a choice.** `min_select 1` on a required group means the
+Add button stays disabled until the customer picks a drink. That is Lazywait's
+setting, faithfully imported, not a decision made here.
+
+**Customers can read all of it**: `modifier_groups` and
+`product_modifier_groups` are publicly selectable, `modifiers` on `is_active`,
+and all ten are active.
+
 ### Add-ons: how a Lazywait group becomes an app option
 
 Until 2026-08-26 nothing connected the two. `import_lazywait_catalog` wrote
