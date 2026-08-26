@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **103**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826070000_place_order_single_tier_resolution.sql`.
+Migration files in the repository: **104**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826080000_import_lazywait_addon_groups.sql`.
 
 ## Tables
 
@@ -154,7 +154,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `handle_auth_user_phone_confirmed` | 1 | `20260710150000_whatsapp_login.sql` |
 | `handle_new_user` | 2 | `20260710150000_whatsapp_login.sql` |
 | `has_active_account_deletion` | 1 | `20260715130000_account_deletion_lock.sql` |
-| `import_lazywait_catalog` | 2 | `20260824120000_product_variants.sql` |
+| `import_lazywait_addon_groups` | 1 | `20260826080000_import_lazywait_addon_groups.sql` |
+| `import_lazywait_catalog` | 3 | `20260826080000_import_lazywait_addon_groups.sql` |
 | `insert_order_from_snapshot` | 4 | `20260824130000_place_order_variants.sql` |
 | `invoke_account_deletion_processor` | 1 | `20260716180000_account_deletion_scheduler_job.sql` |
 | `invoke_lazywait_sync_processor` | 1 | `20260720120000_lazywait_sync_scheduler.sql` |
