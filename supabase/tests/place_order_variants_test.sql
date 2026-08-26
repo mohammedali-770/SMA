@@ -300,4 +300,113 @@ begin
   raise notice 'place_order_variants_test (online path): all assertions passed';
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 9. place_order must resolve each line ONCE.
+--
+--    It used to walk the cart twice and re-query the product, the tier and
+--    every modifier in the write pass, on the assumption that the same rules
+--    would give the same answer. Under READ COMMITTED they need not: a catalog
+--    write committed between the passes can change the answer, leaving the
+--    order totals priced from one tier and order_items - and the POS ticket's
+--    price_id - written from another.
+--
+--    A race cannot be reproduced inside one transaction, so this pins the
+--    property that removes it: the write pass reads the snapshot the pricing
+--    pass built, and issues no catalog query of its own.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_src   text;
+  v_body  text;
+  v_state text;
+  v_n     int;
+  v_price numeric; v_line_total numeric; v_qty int; v_sub numeric; v_expected numeric;
+begin
+  select p.prosrc into v_src from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'place_order';
+  if v_src is null then raise exception 'FAIL 9: place_order is missing'; end if;
+
+  -- The pricing pass records its decision...
+  if v_src not like '%v_lines := v_lines ||%' then
+    raise exception 'FAIL 9: the pricing pass no longer records its line decisions';
+  end if;
+  -- ...and the write pass replays it rather than walking the raw cart again.
+  if v_src not like '%jsonb_array_elements(v_lines)%' then
+    raise exception 'FAIL 9: the write pass does not iterate the recorded lines';
+  end if;
+
+  -- The cheapest-tier fallback must appear exactly ONCE. Two occurrences means
+  -- the write pass is resolving independently again, which is the whole bug.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'order by price asc, sort_order asc, id asc', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one cheapest-tier resolution in place_order, found %', v_n;
+  end if;
+
+  -- The write pass must not look the product up again either.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'into v_product from public.products', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one product lookup in place_order, found %', v_n;
+  end if;
+
+  -- Nor the modifiers.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'into v_modifier', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one modifier lookup in place_order, found %', v_n;
+  end if;
+
+  -- compute_order_snapshot has always resolved once; pin that it still does.
+  select p.prosrc into v_body from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'compute_order_snapshot';
+  select count(*) into v_n
+    from regexp_matches(v_body, 'order by price asc, sort_order asc, id asc', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: compute_order_snapshot must resolve the fallback exactly once, found %', v_n;
+  end if;
+
+  -- Behavioural half: collapsing the old insert-then-update must leave
+  -- unit_price, line_total and the order subtotal exactly as they were. Beef
+  -- falls back to Small (32.00); the modifier adds its own price on top.
+  select m.price into v_expected from public.modifiers m
+   where m.id = '80000000-0000-0000-0000-000000000001';
+  v_expected := 32.00 + coalesce(v_expected, 0);
+
+  v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
+                                '80000000-0000-0000-0000-000000000001');
+  if v_state is not null then raise exception 'FAIL 9: the fallback order failed: %', v_state; end if;
+
+  select i.unit_price, i.line_total, i.quantity into v_price, v_line_total, v_qty
+    from public.order_items i
+   where i.order_id = (select id from pg_temp.last_order);
+  if v_price is distinct from v_expected then
+    raise exception 'FAIL 9: unit_price % expected % (cheapest tier plus the modifier)',
+      v_price, v_expected;
+  end if;
+  if v_line_total is distinct from v_price * v_qty then
+    raise exception 'FAIL 9: line_total % does not equal unit_price % x qty %',
+      v_line_total, v_price, v_qty;
+  end if;
+
+  -- And the modifier row itself must still be written, from the snapshot.
+  select count(*) into v_n from public.order_item_modifiers om
+    join public.order_items i on i.id = om.order_item_id
+   where i.order_id = (select id from pg_temp.last_order)
+     and om.modifier_id = '80000000-0000-0000-0000-000000000001';
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected the modifier row to be written once, found %', v_n;
+  end if;
+
+  select o.subtotal into v_sub from public.orders o
+   where o.id = (select id from pg_temp.last_order);
+  if v_sub is distinct from v_line_total then
+    raise exception 'FAIL 9: order subtotal % disagrees with the line total %', v_sub, v_line_total;
+  end if;
+
+  raise notice 'place_order_variants_test (single resolution): all assertions passed';
+end $$;
+
 rollback;

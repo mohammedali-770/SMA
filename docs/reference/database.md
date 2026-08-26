@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **102**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826060000_compute_order_snapshot_variant_fallback.sql`.
+Migration files in the repository: **103**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826070000_place_order_single_tier_resolution.sql`.
 
 ## Tables
 
@@ -220,7 +220,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_get_active_challenge` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_increment_attempt` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
-| `place_order` | 11 | `20260826050000_place_order_variant_fallback.sql` |
+| `place_order` | 12 | `20260826070000_place_order_single_tier_resolution.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
 | `pos_confirmation_channel_active` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
