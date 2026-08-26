@@ -123,7 +123,7 @@ Current read-only migration snapshot (2026-08-22): **97 repository migration fil
 | `20260824120000_product_variants.sql` | Applied 2026-08-25, live version `20260825061046`. |
 | `20260824130000_place_order_variants.sql` | Applied 2026-08-25, live version `20260825061502`. |
 
-The honest statement is therefore **100 repository files / 105 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **101 repository files / 106 live rows / one unapplied file, and that one is unapplied on purpose.** The 101st file and the 106th row are `place_order_variant_fallback`, applied 2026-08-26 to end an ordering outage — see `docs/MIGRATIONS.md` §33. Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
