@@ -891,8 +891,8 @@ practice, not a repository setting, and it is not proposed as an action here.
 
 **Status:** OWNER DECISION ×2. Neither blocks ordering, and neither is urgent.
 **Both Edge Function redeploys are done** — `lazywait-catalog` (v3) and
-`lazywait-sync` (v3), each on explicit owner approval; see the closeouts below
-the table. What remains is bookkeeping and branch hygiene.
+`lazywait-sync` (**v4** as of 2026-08-26), each on explicit owner approval; see
+the closeouts below the table. What remains is bookkeeping and branch hygiene.
 
 On 2026-08-25 the two variant migrations were applied and the Lazywait catalog
 was imported, both on explicit owner approval. The menu is live for the first
@@ -1000,6 +1000,44 @@ AAL2 — and the session held `postgres` credentials with no JWT, so
 entitlement was genuine; the session assertion was not. It bypassed the AAL2
 requirement added 2026-08-23, on explicit owner instruction. Routine imports
 should go through the admin console under a real TOTP session.
+
+**Closed 2026-08-26 — `lazywait-sync` redeployed (version 4): the chosen tier
+now prints on the ticket.** The v3 deploy above put the correct `price_id` on the
+line; it did not put the tier in the line's *name*, and the POS renders the name
+we send rather than resolving `price_id` into a label. Ticket **#2 / invoice 19**
+therefore printed "Chicken Wings" for an order placed as صغير — a ticket that
+cannot tell a 7.00 Small from a 13.00 Large. `mapOrderItemRows` now composes the
+name from the `order_items.variant_name_*` snapshots, so a ticket keeps naming
+the tier the customer actually bought even after the catalog changes. Repository
+record: PR #264.
+
+**No money field moved and no provider behaviour changed** — the change is to two
+name strings and to `ORDER_ITEM_SELECT`, which gains `variant_name_en` and
+`variant_name_ar`. Both columns were confirmed present with an explicit
+`service_role` SELECT grant **before** the deploy, because an ungranted column
+makes PostgREST reject the whole select and would block every order under a
+misleading `no_items`. Zero orders were in flight; `verify_jwt` stays `false`;
+`Edge Function typecheck (Deno)` was green on the deployed commit first.
+
+**Read back, and it did not match — which is the point of reading it back.**
+Four of the five bundled files were byte-identical to the branch. `_shared/lazywait.ts`
+was 42 221 bytes deployed against 42 224 in the repository. The gap was one line:
+Supabase's deploy pipeline normalises Unicode escapes in stored source, so the
+six-character escape the repository used for the em dash separator came back as
+the single character it denotes. Runtime behaviour is identical — such an escape
+inside a template literal is resolved when the module is parsed — and all three
+functional changes arrived intact. The repository was then changed to write the
+character directly, so the file is byte-identical to what is running
+(sha256 `8df5ea74…`). A file that can never match turns the post-deploy hash
+check into an argument each time, which is how a real mismatch eventually gets
+waved through.
+
+**Still unanswered, and larger than the name.** The same ticket shows Subtotal,
+VAT and Total all **0.00** on a cash order for 7.00, with the line flagged
+`** Non-Taxable`. We deliberately send no money fields (open question Q9), and
+the flag suggests the POS is treating our lines as free text rather than catalog
+references. That needs an answer from Lazywait with ticket #2 / invoice 19 in
+front of them, not a guess from us — see [`LAZYWAIT.md`](LAZYWAIT.md).
 
 **Decided and implemented 2026-08-25 (was open from PR #256).** The owner chose
 both: a multi-tier product **opens a picker** rather than being added from the
