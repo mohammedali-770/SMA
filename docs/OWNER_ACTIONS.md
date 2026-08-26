@@ -913,9 +913,29 @@ price 0 — the exact failure that kept the menu empty for months. The deployed
 parser now writes that field itself, so a pull converges instead of collapsing.
 
 Verified rather than assumed: the deployed bundle was read back and compared by
-SHA-256 against the default branch, and **all six files are byte-identical** —
-`lazywait-catalog/index.ts` plus `_shared/cors.ts`, `_shared/supabaseClient.ts`,
-`_shared/secrets.ts`, `_shared/lazywait.ts` and `_shared/lazywaitCatalog.ts`.
+SHA-256 against the default branch **as it stood on 2026-08-25**, and all six
+files were byte-identical then — `lazywait-catalog/index.ts` plus
+`_shared/cors.ts`, `_shared/supabaseClient.ts`, `_shared/secrets.ts`,
+`_shared/lazywait.ts` and `_shared/lazywaitCatalog.ts`.
+
+**That is no longer true of `_shared/lazywait.ts`, deliberately.** PR #264 added
+`posLineName`, two columns to `ORDER_ITEM_SELECT` and the `mapOrderItemRows`
+composition on 2026-08-26, and that module was redeployed with `lazywait-sync`
+v4 the same day. `lazywait-catalog` was **not** redeployed, so its v3 bundle
+still carries the pre-#264 copy: 40 533 bytes against 42 221 in the repository,
+differing in exactly those three hunks and nothing else (read back and diffed
+2026-08-26).
+
+The skew is inert and the owner chose on 2026-08-26 to leave it. `lazywait-catalog/index.ts`
+imports only `lazywaitFetch`, `resolveLazywaitBaseUrl` and `LazywaitConfig` —
+none of which #264 touched — so no code path this function executes differs. The
+alternative was a six-file, ~68 KB redeploy carrying a 42 KB regex-dense module
+through a tool parameter, for zero behavioural gain; folding it into the next
+`lazywait-catalog` deploy that has a real reason costs nothing and gets tested
+against that reason.
+
+**So: do not read the byte-identity claim above as current, and do not "fix" the
+skew on its own.** The next redeploy of this function clears it automatically.
 `verify_jwt` stays `true` and the admin `is_admin()` gate is unchanged. Live menu
 re-checked after the deploy and unmoved: 55 of 61 products active, 144 of 147
 tiers, five categories, all 147 cached price entries carrying a net price.
