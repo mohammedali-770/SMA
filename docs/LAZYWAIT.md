@@ -324,6 +324,17 @@ instead of the live config row.) Field-by-field state:
   "customer_cell": "541234567", "country_code": "+966",
   "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
+- `name` and `names{en,ar}` carry the **chosen tier**, not the bare product name
+  — `Chicken Wings — Small` / `أجنحة الدجاج — صغير`, composed by
+  `posLineName`. **The POS renders the name we send; it does not resolve
+  `price_id` into a label.** Ticket #2 / invoice 19 (2026-08-26) printed
+  "Chicken Wings" for a line ordered as صغير even though the payload carried
+  the correct `price_id` (`20005a3e…`, straight from Lazywait's own catalog), so
+  the kitchen could not tell a 7.00 Small from a 13.00 Large. The separator and
+  the drop-a-tier-that-repeats-the-name rule mirror the app's `orderLineLabel`,
+  so receipt and ticket read identically. Tier names come from the
+  `order_items.variant_name_*` snapshots, so a ticket keeps naming what the
+  customer bought even after the catalog changes.
 - `price` is the **server-trusted, VAT-inclusive** item price with the **mapped**
   add-on money subtracted back out. `order_items.unit_price` already includes
   every selected modifier (`place_order` adds them in) and the contract sums
@@ -436,11 +447,28 @@ only way to get heat level onto the ticket as a **structured, separately priced*
 add-on rather than as text. That remains an owner decision
 (`docs/OWNER_ACTIONS.md` §17) — it is now an improvement, not a prerequisite.
 
-**Deployment status — LIVE as of 2026-08-25 (version 3).** This was repository
-code only until then: the deployed worker was still the July build, which sent no
-add-ons, no per-item note, no category or price id, and no customer phone. It is
-now deployed on explicit owner approval, verified byte-identical to the default
-branch by SHA-256 across all five bundled files.
+**Deployment status — LIVE, version 4 as of 2026-08-26.** This was repository
+code only until 2026-08-25: the deployed worker was still the July build, which
+sent no add-ons, no per-item note, no category or price id, and no customer
+phone. Version 3 shipped all of that on explicit owner approval, verified
+byte-identical to the default branch by SHA-256 across all five bundled files.
+
+**Version 4 (2026-08-26) puts the chosen tier in the line name.** Version 3 sent
+the correct `price_id`, but the POS renders the `name`/`names` we send and does
+not resolve `price_id` into a label, so ticket #2 / invoice 19 printed "Chicken
+Wings" for an order placed as صغير. `mapOrderItemRows` now composes the name from
+the `order_items.variant_name_*` snapshots via `posLineName`, which mirrors the
+app's `orderLineLabel` — same separator, and the same rule that a tier merely
+repeating the product name is dropped, so receipt and ticket read identically.
+Reading the snapshots rather than the live catalog means the ticket keeps naming
+the tier the customer actually bought after the catalog changes.
+`ORDER_ITEM_SELECT` gains `variant_name_en` and `variant_name_ar`; both were
+confirmed granted to `service_role` before the deploy, because an ungranted
+column makes PostgREST reject the whole select. Deployed with zero orders in
+flight and read back: four files byte-identical, and `_shared/lazywait.ts`
+differing only where the deploy pipeline normalised a Unicode escape on the
+separator line — since corrected in the repository so the file matches
+byte-for-byte. No money field and no provider behaviour changed.
 
 **The money on a ticket did not move.** Only a modifier carrying a real
 `modifiers.lazywait_addon_id` becomes an `addons[]` entry and is subtracted back

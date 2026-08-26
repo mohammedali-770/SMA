@@ -7,7 +7,7 @@ import {
   computeBackoffMs, computePosNextAttempt, DEFAULT_BASE_URL, extractOrderRef, hmacSha256Hex,
   LAZYWAIT_BASE_URL_INVALID, LAZYWAIT_BASE_URL_NOT_CONFIGURED, LazywaitConfigError, lazywaitFetch, MAX_POS_ATTEMPTS,
   MAX_SYNC_ATTEMPTS, normalizePhone, parseRetryAfterMs, POS_DEADLINE_MINUTES, POS_RETRY_OFFSETS_MIN,
-  resolveLazywaitBaseUrl, round2, mapOrderItemRows, ORDER_ITEM_SELECT, shouldResendCreateOrder,
+  resolveLazywaitBaseUrl, round2, mapOrderItemRows, ORDER_ITEM_SELECT, posLineName, shouldResendCreateOrder,
   splitPhoneForPos, STALE_SYNC_TIMEOUT_MINUTES, verifyWebhookSignature, type LazywaitConfig,
 } from './lazywait';
 
@@ -476,10 +476,67 @@ describe('mapOrderItemRows — order_items join -> Create Order items', () => {
       'lazywait_item_id', 'lazywait_price_id',
       'categories(lazywait_category_id)',
       'variant_id', 'product_variants(lazywait_price_id)',
+      'variant_name_en', 'variant_name_ar',
       'order_item_modifiers(', 'modifiers(lazywait_addon_id)',
     ]) {
       expect(ORDER_ITEM_SELECT).toContain(fragment);
     }
+  });
+
+  it('folds the chosen tier into the name the POS prints', () => {
+    // Ticket #2 / invoice 19 on 2026-08-26 printed "Chicken Wings" for a line
+    // ordered as صغير, despite carrying the correct price_id. The POS renders
+    // the name we send, so the tier has to be in it.
+    const tiered = {
+      ...row,
+      name_en: 'Chicken Wings', name_ar: 'أجنحة الدجاج',
+      variant_name_en: 'Small', variant_name_ar: 'صغير',
+      order_item_modifiers: [],
+    };
+    const mapped = mapOrderItemRows([tiered])[0];
+    expect(mapped.name).toBe('Chicken Wings \u2014 Small');
+    expect(mapped.nameAr).toBe('أجنحة الدجاج \u2014 صغير');
+
+    const built = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A',
+      items: mapOrderItemRows([tiered]),
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    const line = (built.payload.order_items as Record<string, unknown>[])[0];
+    // BOTH the bare `name` and the localized `names` must carry it — the ticket
+    // may render either.
+    expect(line.name).toBe('Chicken Wings \u2014 Small');
+    expect(line.names).toEqual({ en: 'Chicken Wings \u2014 Small', ar: 'أجنحة الدجاج \u2014 صغير' });
+  });
+
+  it('leaves an untiered line exactly as it was', () => {
+    const mapped = mapOrderItemRows([{ ...row, variant_name_en: null, variant_name_ar: null }])[0];
+    expect(mapped.name).toBe('Beef Burger');
+    expect(mapped.nameAr).toBe('برجر لحم');
+  });
+});
+
+describe('posLineName', () => {
+  it('joins product and tier with the same separator the app receipt uses', () => {
+    expect(posLineName('Chicken Wings', 'Small')).toBe('Chicken Wings \u2014 Small');
+  });
+
+  it('drops a tier that merely repeats the product name', () => {
+    // A "Cola" whose only tier is "Cola" must not print as "Cola \u2014 Cola".
+    expect(posLineName('Cola', 'Cola')).toBe('Cola');
+  });
+
+  it('returns the bare name when there is no tier', () => {
+    expect(posLineName('Fries', null)).toBe('Fries');
+    expect(posLineName('Fries', undefined)).toBe('Fries');
+    expect(posLineName('Fries', '   ')).toBe('Fries');
+  });
+
+  it('is null-safe on the base and trims both sides', () => {
+    expect(posLineName(null, 'Small')).toBe('Small');
+    expect(posLineName('  Wings  ', '  Small  ')).toBe('Wings \u2014 Small');
+    expect(posLineName(null, null)).toBe('');
   });
 });
 
