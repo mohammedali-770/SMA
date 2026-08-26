@@ -102,13 +102,57 @@ begin
   if v_price <> 47.00 then raise exception 'Large(45) + Volcano(2) should be 47.00, got %', v_price; end if;
 
   -- ------------------------------------------------------------------ 3.
-  -- A product that HAS tiers, ordered without one, is REFUSED. Guessing would
-  -- charge a price the customer never saw.
+  -- A product that HAS tiers, ordered WITHOUT one, falls back to the CHEAPEST
+  -- active tier instead of being refused.
+  --
+  -- This assertion is inverted from its original form, and the reason is an
+  -- incident rather than a change of taste. Refusing took the whole app down:
+  -- every active product carries a tier, and the client that sends `variant_id`
+  -- shipped in the same commit as the requirement, so no build in a customer's
+  -- hands could satisfy it. See 20260826050000_place_order_variant_fallback.
   v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
                                 '80000000-0000-0000-0000-000000000001');
-  if v_state is null then
-    raise exception 'ordering a tiered product with no tier must be refused, it succeeded';
+  if v_state is not null then
+    raise exception 'a tiered product ordered with no tier must fall back, got %', v_state;
   end if;
+
+  select i.unit_price, i.variant_id, i.variant_name_en
+    into v_price, v_uuid, v_txt
+    from public.order_items i where i.order_id = (select id from pg_temp.last_order);
+
+  -- Cheapest, not first-by-sort and not products.price by coincidence: Small is
+  -- 32.00, Large 45.00, and the retired 99.00 tier must be ignored entirely.
+  if v_price <> 32.00 then
+    raise exception 'fallback should price from the cheapest tier (32.00), got %', v_price;
+  end if;
+
+  -- The line must RECORD the tier it was priced from. Both passes of
+  -- place_order resolve the tier independently, and an earlier revision applied
+  -- the fallback only in the pricing pass — which charged 32.00 correctly but
+  -- stored variant_id null, so the POS ticket carried no price_id and the
+  -- receipt named no tier. This is the assertion that catches that.
+  if v_uuid is distinct from 'c0000000-0000-0000-0000-000000000001' then
+    raise exception 'fallback line must record the cheapest tier id, got %', v_uuid;
+  end if;
+  if v_txt <> 'Small' then
+    raise exception 'fallback line must snapshot the tier name, got %', v_txt;
+  end if;
+
+  -- ------------------------------------------------------------------ 3b.
+  -- Ties break by sort_order, then id — mirroring the client's cheapestVariant
+  -- so server and app never disagree about which tier "cheapest" means.
+  insert into public.product_variants (id, product_id, name_en, name_ar, price, is_active, sort_order)
+  values ('c0000000-0000-0000-0000-00000000000a',
+          'a0000000-0000-0000-0000-000000000001', 'AlsoSmall', 'صغير ٢', 32.00, true, 0);
+  v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
+                                '80000000-0000-0000-0000-000000000001');
+  if v_state is not null then raise exception 'tie-break order failed: %', v_state; end if;
+  select i.variant_id into v_uuid from public.order_items i
+    where i.order_id = (select id from pg_temp.last_order);
+  if v_uuid is distinct from 'c0000000-0000-0000-0000-00000000000a' then
+    raise exception 'at equal price the lower sort_order must win, got %', v_uuid;
+  end if;
+  delete from public.product_variants where id = 'c0000000-0000-0000-0000-00000000000a';
 
   -- ------------------------------------------------------------------ 4.
   -- An inactive tier is not orderable, even by id.
@@ -190,22 +234,179 @@ begin
   if v_price <> 45.00 then raise exception 'paid order line priced at %, expected 45.00', v_price; end if;
   if v_txt <> 'Large' then raise exception 'paid order line lost the tier name, got %', v_txt; end if;
 
-  -- A tiered product sent with no tier must be refused on this path too.
+  -- A tiered product sent with NO tier must fall back to the cheapest active
+  -- one here too, not be refused. This assertion was inverted on 2026-08-26:
+  -- it previously required the refusal, which is the behaviour that took
+  -- ordering down on the cash path. The online path has to make the same
+  -- choice, or a stale install would be able to pay cash and not pay online.
+  --
+  -- Retired (99.00) is inactive and must be ignored; Small (32.00) wins over
+  -- Large (45.00) on price alone.
+  v_snap := public.compute_order_snapshot(
+    '01000000-0000-0000-0000-000000000001'::uuid,
+    'b0000000-0000-0000-0000-000000000001'::uuid,
+    'pickup'::public.order_type,
+    jsonb_build_array(jsonb_build_object(
+      'product_id','a0000000-0000-0000-0000-000000000001', 'quantity',1,
+      'modifier_ids', jsonb_build_array('80000000-0000-0000-0000-000000000001'))),
+    null, null, 0);
+
+  if (v_snap->'items'->0->>'unit_price')::numeric <> 32.00 then
+    raise exception 'snapshot fallback priced the line at %, expected the cheapest 32.00 tier',
+      v_snap->'items'->0->>'unit_price';
+  end if;
+  if v_snap->'items'->0->>'variant_id' <> 'c0000000-0000-0000-0000-000000000001' then
+    raise exception 'snapshot fallback recorded tier %, expected Small',
+      coalesce(v_snap->'items'->0->>'variant_id', '(null)');
+  end if;
+  if v_snap->'items'->0->>'variant_name_en' <> 'Small' then
+    raise exception 'snapshot fallback lost the tier name, got %',
+      coalesce(v_snap->'items'->0->>'variant_name_en', '(null)');
+  end if;
+
+  -- The tier the fallback chose must survive into the paid order row, or the
+  -- POS ticket gets no price_id and the receipt no tier name.
+  v_order := public.insert_order_from_snapshot(
+    '01000000-0000-0000-0000-000000000001'::uuid, v_snap, 'online', 'paid', null);
+  select unit_price, variant_name_en into v_price, v_txt
+    from public.order_items where order_id = v_order.id;
+  if v_price <> 32.00 then
+    raise exception 'paid order line from the fallback priced at %, expected 32.00', v_price;
+  end if;
+  if v_txt <> 'Small' then
+    raise exception 'paid order line from the fallback lost the tier name, got %',
+      coalesce(v_txt, '(null)');
+  end if;
+
+  -- A tier belonging to a DIFFERENT product is still refused: the fallback
+  -- replaces the "no tier named" branch only, never the validation one.
   begin
     perform public.compute_order_snapshot(
       '01000000-0000-0000-0000-000000000001'::uuid,
       'b0000000-0000-0000-0000-000000000001'::uuid,
       'pickup'::public.order_type,
       jsonb_build_array(jsonb_build_object(
-        'product_id','a0000000-0000-0000-0000-000000000001', 'quantity',1,
-        'modifier_ids', jsonb_build_array('80000000-0000-0000-0000-000000000001'))),
+        'product_id','a0000000-0000-0000-0000-000000000004',
+        'variant_id','c0000000-0000-0000-0000-000000000001', 'quantity',1)),
       null, null, 0);
-    raise exception 'the snapshot path accepted a tiered product with no tier';
+    raise exception 'the snapshot path accepted a tier from another product';
   exception when others then
-    if sqlstate = 'P0001' and sqlerrm like '%accepted a tiered product%' then raise; end if;
+    if sqlerrm like '%accepted a tier from another product%' then raise; end if;
+    if sqlerrm not like '%selected option is no longer available%' then
+      raise exception 'expected the foreign-tier refusal, got: %', sqlerrm;
+    end if;
   end;
 
   raise notice 'place_order_variants_test (online path): all assertions passed';
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- 9. place_order must resolve each line ONCE.
+--
+--    It used to walk the cart twice and re-query the product, the tier and
+--    every modifier in the write pass, on the assumption that the same rules
+--    would give the same answer. Under READ COMMITTED they need not: a catalog
+--    write committed between the passes can change the answer, leaving the
+--    order totals priced from one tier and order_items - and the POS ticket's
+--    price_id - written from another.
+--
+--    A race cannot be reproduced inside one transaction, so this pins the
+--    property that removes it: the write pass reads the snapshot the pricing
+--    pass built, and issues no catalog query of its own.
+-- ---------------------------------------------------------------------------
+do $$
+declare
+  v_src   text;
+  v_body  text;
+  v_state text;
+  v_n     int;
+  v_price numeric; v_line_total numeric; v_qty int; v_sub numeric; v_expected numeric;
+begin
+  select p.prosrc into v_src from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'place_order';
+  if v_src is null then raise exception 'FAIL 9: place_order is missing'; end if;
+
+  -- The pricing pass records its decision...
+  if v_src not like '%v_lines := v_lines ||%' then
+    raise exception 'FAIL 9: the pricing pass no longer records its line decisions';
+  end if;
+  -- ...and the write pass replays it rather than walking the raw cart again.
+  if v_src not like '%jsonb_array_elements(v_lines)%' then
+    raise exception 'FAIL 9: the write pass does not iterate the recorded lines';
+  end if;
+
+  -- The cheapest-tier fallback must appear exactly ONCE. Two occurrences means
+  -- the write pass is resolving independently again, which is the whole bug.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'order by price asc, sort_order asc, id asc', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one cheapest-tier resolution in place_order, found %', v_n;
+  end if;
+
+  -- The write pass must not look the product up again either.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'into v_product from public.products', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one product lookup in place_order, found %', v_n;
+  end if;
+
+  -- Nor the modifiers.
+  select count(*) into v_n
+    from regexp_matches(v_src, 'into v_modifier', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected exactly one modifier lookup in place_order, found %', v_n;
+  end if;
+
+  -- compute_order_snapshot has always resolved once; pin that it still does.
+  select p.prosrc into v_body from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'compute_order_snapshot';
+  select count(*) into v_n
+    from regexp_matches(v_body, 'order by price asc, sort_order asc, id asc', 'g');
+  if v_n <> 1 then
+    raise exception 'FAIL 9: compute_order_snapshot must resolve the fallback exactly once, found %', v_n;
+  end if;
+
+  -- Behavioural half: collapsing the old insert-then-update must leave
+  -- unit_price, line_total and the order subtotal exactly as they were. Beef
+  -- falls back to Small (32.00); the modifier adds its own price on top.
+  select m.price into v_expected from public.modifiers m
+   where m.id = '80000000-0000-0000-0000-000000000001';
+  v_expected := 32.00 + coalesce(v_expected, 0);
+
+  v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
+                                '80000000-0000-0000-0000-000000000001');
+  if v_state is not null then raise exception 'FAIL 9: the fallback order failed: %', v_state; end if;
+
+  select i.unit_price, i.line_total, i.quantity into v_price, v_line_total, v_qty
+    from public.order_items i
+   where i.order_id = (select id from pg_temp.last_order);
+  if v_price is distinct from v_expected then
+    raise exception 'FAIL 9: unit_price % expected % (cheapest tier plus the modifier)',
+      v_price, v_expected;
+  end if;
+  if v_line_total is distinct from v_price * v_qty then
+    raise exception 'FAIL 9: line_total % does not equal unit_price % x qty %',
+      v_line_total, v_price, v_qty;
+  end if;
+
+  -- And the modifier row itself must still be written, from the snapshot.
+  select count(*) into v_n from public.order_item_modifiers om
+    join public.order_items i on i.id = om.order_item_id
+   where i.order_id = (select id from pg_temp.last_order)
+     and om.modifier_id = '80000000-0000-0000-0000-000000000001';
+  if v_n <> 1 then
+    raise exception 'FAIL 9: expected the modifier row to be written once, found %', v_n;
+  end if;
+
+  select o.subtotal into v_sub from public.orders o
+   where o.id = (select id from pg_temp.last_order);
+  if v_sub is distinct from v_line_total then
+    raise exception 'FAIL 9: order subtotal % disagrees with the line total %', v_sub, v_line_total;
+  end if;
+
+  raise notice 'place_order_variants_test (single resolution): all assertions passed';
 end $$;
 
 rollback;

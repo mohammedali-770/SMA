@@ -115,15 +115,18 @@ Current read-only migration snapshot (2026-08-22): **97 repository migration fil
 
 **Superseded 2026-08-25 — the two variant migrations are now APPLIED.** On the owner's explicit approval, `20260824120000_product_variants` and `20260824130000_place_order_variants` were applied to Production, in that dependency order, via MCP `apply_migration` — one call per file, each followed by read-only verification. Live history moved **103 → 105**. Full record: `docs/MIGRATIONS.md` §32, ledger rows 59–60.
 
-**One repository file remains deliberately unapplied.**
+**Three repository files are unapplied, for different reasons.**
 
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Added for the Moyasar evaluation (§6). Applying it is a §5 action **and** frozen under §6. Verified absent from Production after the 2026-08-25 applications: zero history rows, zero `%moyasar%` functions, `provider_name` still `tap` and still disabled. |
+| `20260826060000_compute_order_snapshot_variant_fallback.sql` | **UNAPPLIED, awaiting approval — not frozen.** Carries the cheapest-tier fallback that `20260826050000` gave `place_order` across to `compute_order_snapshot`, the online path's half of the same rule. It is not a payment change (no charge construction, verification, webhook, return, provider setting or money field), so §6 does not cover it; it is unapplied only because applying it is a §5 action nobody has approved yet. Until it is applied the two order paths disagree about a cart naming no tier: cash falls back, online still raises. That is latent rather than live — `begin_checkout_session` refuses on `app_settings.online_payment_enabled = false` before reaching the snapshot — and it becomes live the day that flag is switched on. |
+| `20260826070000_place_order_single_tier_resolution.sql` | **UNAPPLIED, awaiting approval — not frozen.** `place_order` walked the cart twice and re-queried the product, tier and modifiers in the write pass; under READ COMMITTED a catalog write committed between the passes could price a line from one row and store another, so order totals and `order_items` (and the POS ticket's `price_id`) could disagree. The pricing pass now records each line and the write pass writes from that record, querying nothing. Raised by review on PR #263. Not a payment change; applying it is a §5 action. |
 | `20260824120000_product_variants.sql` | Applied 2026-08-25, live version `20260825061046`. |
 | `20260824130000_place_order_variants.sql` | Applied 2026-08-25, live version `20260825061502`. |
+| `20260826050000_place_order_variant_fallback.sql` | Applied 2026-08-26, live version `20260826044204`. |
 
-The honest statement is therefore **100 repository files / 105 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **103 repository files / 106 live rows / three unapplied files, one frozen on purpose and two waiting on approval.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -131,7 +134,7 @@ The honest statement is therefore **100 repository files / 105 live rows / one u
 
 Before that deploy, every column, grant and embed FK the new select needs was verified present and **unambiguous** — a second FK path between the same two tables would make PostgREST reject the select just as surely as a missing one. Zero orders were in flight at the time. Detail: `docs/LAZYWAIT.md` and `docs/OWNER_ACTIONS.md` §19.
 
-**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
+**A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly. The point now has teeth it did not have before: with three unapplied files sitting side by side, one of which is deliberately frozen and two of which must go in dependency order (`…060000` before `…070000` is not required — they touch different functions — but both are generated from definitions that must still be live when they are applied), "apply the outstanding migrations" is no longer a safe instruction to follow literally.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
