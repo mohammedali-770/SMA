@@ -14,12 +14,11 @@
 to Production.**
 
 > **Superseded — read this before quoting the paragraph above.** That sentence
-> was true on 2026-08-22 and is not true now. Three repository files are
-> unapplied as of 2026-08-26: `20260824100000_moyasar_payment_provider.sql`,
-> held deliberately under the §6 payment freeze, and
-> `20260826060000_compute_order_snapshot_variant_fallback.sql` and
-> `20260826070000_place_order_single_tier_resolution.sql`, both built and
-> waiting on a §5 approval. The counts in this section are a dated snapshot and
+> was true on 2026-08-22 and is not true now, though it is close again. As of
+> 2026-08-26 exactly one repository file is unapplied:
+> `20260824100000_moyasar_payment_provider.sql`, held deliberately under the §6
+> payment freeze. Everything else is applied, including the three tier
+> migrations of 2026-08-26. The counts in this section are a dated snapshot and
 > are kept as one; the current position is in CLAUDE.md §8, and the row-level
 > detail in §5 rows 59–63 with §32, §33 and §34.
 
@@ -191,7 +190,7 @@ The **five account-deletion migrations** (live `20260715120000`,
 repository files of the same names) are applied and live but **not yet
 itemized/classified in §4/§5** — a known documentation gap, deliberately left
 for a separate documentation PR so this reconciliation stays reviewable. They
-are counted in the 63 / 62 totals above.
+are counted in the 63 / 64 totals above.
 
 ### Schema alignment
 
@@ -338,7 +337,7 @@ notes.
 > the table above covers every file and every row, and §5's row-by-row mapping
 > is now a *subset* of it rather than its definition. §5 has not been re-derived
 > — its class algebra stands as written; only its row list and the arithmetic
-> over it have moved, to **63/62** with the addition of rows 62 and 63 — so
+> over it have moved, to **63/64** with the addition of rows 62 and 63 — so
 > treat §4 as authoritative for counts and §5 as the detailed mapping of the
 > rows it covers.
 >
@@ -437,19 +436,20 @@ production.
 | 59 | 20260824120000 | product_variants | — | 20260825061046 | product_variants | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **`product_variants` — the Lazywait price tier made first-class** (PR #256, `b36e7d8`; 572 lines). Applied **2026-08-25 06:10:46 UTC** on explicit owner approval, via MCP `apply_migration`. Adds `public.product_variants` (12 columns, RLS enabled, 2 policies, 3 indexes), `order_items.variant_id` + `variant_name_en` + `variant_name_ar` with a customer SELECT grant to `authenticated`, and four columns on `lazywait_catalog_items`. Redefines `set_lazywait_mapping`, `clear_lazywait_mapping` and `import_lazywait_catalog`. **Version NOT aligned** — live carries the apply-time stamp `20260825061046`, not the repository filename; realignment is a separate §9-D owner action and has not been performed. Fidelity proven rather than assumed: every function body applied was hashed against the merged file and matched byte-for-byte (`import_lazywait_catalog` md5 `58d2b732f11c17d442350b393db3928c`, 14 387 chars; `set_lazywait_mapping` `951093a076e2e95fb477808eea6e8a6f`; `clear_lazywait_mapping` `4dd0dc0c46a4db8b2c4cabc11199f05c`). File-level fidelity confirmed too: repo and live `skel` are **identical** (`5de875f4a2306f0de46adc23d6180520`, 13 927 normalised chars both sides), so the `live skel` column is `=` and the class-B version difference is the only deviation. Security advisors after the apply: **zero** naming `product_variants`. Detail in §32 |
 | 60 | 20260824130000 | place_order_variants | — | 20260825061502 | place_order_variants | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Carry the chosen tier through every order-writing path** (PR #256, `b36e7d8`; 798 lines). Applied **2026-08-25 06:15:02 UTC**, immediately after row 59, which it **depends on**: every redefined body references `public.product_variants`, so applying this one first would have failed on an unknown relation. Redefines exactly four functions — `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot`, `admin_list_orders_with_items`. `begin_checkout_session` is deliberately NOT redefined: it delegates item work to `compute_order_snapshot` and never touches a line. **Version NOT aligned** — live carries `20260825061502` (§9-D, separate approval). All four bodies hashed against the merged file and byte-identical: `place_order` md5 `dcd117de2c3a0f63c048bfa47a96587a` (15 287 chars), `compute_order_snapshot` `a37ee893140629b3636271089df3f576`, `insert_order_from_snapshot` `60b753bc57ef4d20ef529fc42b3ead79`, `admin_list_orders_with_items` `4d2b5d10d9d8124ca8891eb4a39f4d37`. Repo and live `skel` are **identical** (`bbe1a916bc9a227f3211eed57364d497`, 22 947 normalised chars both sides), so `live skel` is `=`. No payment, coupon, loyalty or VAT arithmetic changed — the tier edits are the only difference from row 58's definitions. Detail in §32 |
 | 61 | 20260826050000 | place_order_variant_fallback | — | 20260826044204 | place_order_variant_fallback | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **INCIDENT FIX — ordering was impossible for ~22 hours** (PR #263). Applied **2026-08-26 04:42:04 UTC** on explicit owner approval, via MCP `apply_migration`, after CI including `Migration chain + SQL suites` went green. Row 60 made `place_order` refuse any cart line naming no `variant_id` for a product with active tiers; **all 55 active products have one**, and the client that sends `variant_id` shipped in the *same commit*, so no build in a customer's hands could satisfy it. From 2026-08-25 06:15:02 UTC to 2026-08-26 04:42:04 UTC **no order could be placed, for any product** — three attempts logged as 400s from `place_customer_order` with no order row written. This file replaces the refusal with a fallback to the cheapest active tier, applied in **both** passes of the function; fixing only the pricing pass would have stored `variant_id` null and left the POS ticket without a `price_id`. It cannot mis-charge: all **55 of 55** active products have cheapest-tier price equal to `products.price`, which is what a pre-tier client displays. Re-emits `place_order` verbatim from row 60 apart from those two blocks — generated from that file rather than retyped, diffed at generation: 3 hunks, 9 lines removed. Fidelity proven after applying: live body **byte-identical** to the file (`080be48e558798e0c393936d486fc738`, 16 915 chars), one overload, zero executable raises of the refusal, two executable fallback selects. **Version NOT aligned** — live carries `20260826044204` (§9-D, separate approval). Verified by the first order after the fix, `SM-2026-000051`: three lines, each recording its tier and a real `lazywait_price_id`, each charged exactly the card price, synced to the POS on the first attempt. Detail in §33. **Current latest live version**
-| 62 | 20260826060000 | compute_order_snapshot_variant_fallback | — | — | — | n/a | — | ✖ NOT APPLIED | n/a | none | high if `db push` | **Built, not applied — the online half of row 61.** Row 60 put the same tier refusal into `place_order` *and* `compute_order_snapshot`. Row 61 replaced it in `place_order` only, so since 2026-08-26 the two order paths disagree about a cart that names no tier: the cash path falls back to the cheapest active tier, the online path still raises `Please choose an option for a product in your cart`. This file carries the identical fallback across. **It has not caused an outage and cannot cause one today**: `begin_checkout_session` is the function's only caller, and it raises `Online payment is not available` on `app_settings.online_payment_enabled` — verified `false` — three lines *before* it calls the snapshot; `compute_order_snapshot` is itself revoked from `anon` and `authenticated`, so there is no direct route either. Latent, not live; it becomes live the day that flag is switched on, which is the day a provider is chosen and attention is elsewhere. **Not a payment change** — no charge construction, verification, webhook, return, provider setting or money field — so §6 does not freeze it; applying it is an ordinary §5 action awaiting approval. Generated from row 60's file rather than retyped, whose `compute_order_snapshot` body was confirmed byte-identical to live first (`a37ee893140629b3636271089df3f576`, 8 631 chars); diffed at generation: **2 hunks, 5 executable lines removed** (the `elsif exists` test and its `raise`), the surrounding `if`/`end if` untouched. `create or replace` keeps the signature, so the ACL survives — `execute` to `service_role` only. Detail in §34 |
-| 63 | 20260826070000 | place_order_single_tier_resolution | — | — | — | n/a | — | ✖ NOT APPLIED | n/a | none | high if `db push` | **Built, not applied — removes a two-pass window in `place_order`.** Raised by review on PR #263 and confirmed real. The function walks the cart twice: pass 1 validates and prices, pass 2 writes `order_items` once the `orders` row exists. Pass 2 re-queried the product, the tier (including row 61's cheapest-tier fallback) and each modifier, on the assumption that the same rules give the same answer. Under READ COMMITTED they need not — every statement takes its own snapshot — so a catalog write committed between the passes (`import_lazywait_catalog` is exactly one) could leave `orders.subtotal` / `vat_amount` / `total` priced from pass 1 while `order_items`, the receipt and the POS ticket's `price_id` came from pass 2. Narrow (it needs a commit inside one order transaction, and the tier half only opens for a line naming no `variant_id`) but a money bug that fails silently. Pass 1 now records product id and names, quantity, the final unit price **including** modifiers, the normalised note, the tier id and names, and the modifier list with prices; pass 2 writes from that and **issues no query**. Mirrors what `compute_order_snapshot` has always done. Locking was rejected: `for share` blocks an update of the chosen tier but not the insert of a cheaper one, and buys a lock-ordering hazard with the importer. Two intentional side effects: `order_items` is inserted once with its final `unit_price` and `line_total` instead of inserted at base price with `line_total` 0 and updated later — safe because the only BEFORE trigger validates `note` and both modifier-contract triggers are AFTER INSERT `DEFERRABLE INITIALLY DEFERRED`; and pass 2's unguarded modifier lookup is gone, which could previously abort the whole order on a `name_en` not-null violation if a modifier went inactive mid-transaction. **No refusal or validation rule changed** — `raise exception` count 23 → 23 — and no money arithmetic changed. Generated from row 61's file, whose body was confirmed byte-identical to live first (`080be48e558798e0c393936d486fc738`, 16 915 chars). Detail in §34 |
+| 62 | 20260826060000 | compute_order_snapshot_variant_fallback | — | 20260826065046 | compute_order_snapshot_variant_fallback | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 06:50:46 UTC — the online half of row 61.** Row 60 put the same tier refusal into `place_order` *and* `compute_order_snapshot`. Row 61 replaced it in `place_order` only, so since 2026-08-26 the two order paths disagree about a cart that names no tier: the cash path falls back to the cheapest active tier, the online path still raises `Please choose an option for a product in your cart`. This file carries the identical fallback across. **It has not caused an outage and cannot cause one today**: `begin_checkout_session` is the function's only caller, and it raises `Online payment is not available` on `app_settings.online_payment_enabled` — verified `false` — three lines *before* it calls the snapshot; `compute_order_snapshot` is itself revoked from `anon` and `authenticated`, so there is no direct route either. Latent, not live; it becomes live the day that flag is switched on, which is the day a provider is chosen and attention is elsewhere. **Not a payment change** — no charge construction, verification, webhook, return, provider setting or money field — so §6 does not freeze it; applying it is an ordinary §5 action awaiting approval. Generated from row 60's file rather than retyped, whose `compute_order_snapshot` body was confirmed byte-identical to live first (`a37ee893140629b3636271089df3f576`, 8 631 chars); diffed at generation: **2 hunks, 5 executable lines removed** (the `elsif exists` test and its `raise`), the surrounding `if`/`end if` untouched. `create or replace` keeps the signature, so the ACL survives — verified after the apply as `postgres=X | service_role=X`, still revoked from `anon` and `authenticated`. Applied on explicit owner approval via MCP `apply_migration`, after PR #263 merged. **Fidelity proven after applying:** live body byte-identical to the repository file (`f99ed9f7c3bb427f304353f318195c52`, 10 229 chars), one overload, **zero** executable raises of the refusal and **exactly one** cheapest-tier select. `security definer` and `search_path=public` unchanged; `place_order` confirmed untouched by this call. **Version NOT aligned** — live carries the apply-time stamp `20260826065046`, not the repository filename (§9-D, separate approval). Detail in §34 |
+| 63 | 20260826070000 | place_order_single_tier_resolution | — | 20260826065228 | place_order_single_tier_resolution | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 06:52:28 UTC — removes a two-pass window in `place_order`.** Raised by review on PR #263 and confirmed real. The function walks the cart twice: pass 1 validates and prices, pass 2 writes `order_items` once the `orders` row exists. Pass 2 re-queried the product, the tier (including row 61's cheapest-tier fallback) and each modifier, on the assumption that the same rules give the same answer. Under READ COMMITTED they need not — every statement takes its own snapshot — so a catalog write committed between the passes (`import_lazywait_catalog` is exactly one) could leave `orders.subtotal` / `vat_amount` / `total` priced from pass 1 while `order_items`, the receipt and the POS ticket's `price_id` came from pass 2. Narrow (it needs a commit inside one order transaction, and the tier half only opens for a line naming no `variant_id`) but a money bug that fails silently. Pass 1 now records product id and names, quantity, the final unit price **including** modifiers, the normalised note, the tier id and names, and the modifier list with prices; pass 2 writes from that and **issues no query**. Mirrors what `compute_order_snapshot` has always done. Locking was rejected: `for share` blocks an update of the chosen tier but not the insert of a cheaper one, and buys a lock-ordering hazard with the importer. Two intentional side effects: `order_items` is inserted once with its final `unit_price` and `line_total` instead of inserted at base price with `line_total` 0 and updated later — safe because the only BEFORE trigger validates `note` and both modifier-contract triggers are AFTER INSERT `DEFERRABLE INITIALLY DEFERRED`; and pass 2's unguarded modifier lookup is gone, which could previously abort the whole order on a `name_en` not-null violation if a modifier went inactive mid-transaction. **No refusal or validation rule changed** — `raise exception` count 23 → 23 — and no money arithmetic changed. Generated from row 61's file, whose body was confirmed byte-identical to live first (`080be48e558798e0c393936d486fc738`, 16 915 chars). Applied on explicit owner approval via MCP `apply_migration`, immediately after row 62, with zero orders placed in the preceding 15 minutes and nothing in the POS sync queue. **Fidelity proven after applying:** live body byte-identical to the repository file (`8bcc3354ac572a56dfe4c0c612bff890`, 17 937 chars), one overload; the cheapest-tier select, the product lookup and the modifier lookup each appear **exactly once**; the write pass reads `jsonb_array_elements(v_lines)`; **zero** `update public.order_items` statements remain. **Executable** `raise exception` count is **23 before and 23 after** — the raw text count is 24 on both sides because one occurrence sits inside a comment, which is the kind of thing that has produced a false alarm in this repository before. ACL, `security definer` and `search_path` unchanged. Security advisors after both applies: **82 lints, zero naming `place_order` or `compute_order_snapshot`** — both are revoked from `authenticated`, so the SECURITY DEFINER advisor does not reach them; every lint is pre-existing and unrelated. **Version NOT aligned** — live carries `20260826065228` (§9-D, separate approval). Detail in §34 |
 
-Reconciliation check: the rows above detail **63 repository / 62 live** rows.
+Reconciliation check: the rows above detail **63 repository / 64 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
 (§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–63
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they are the most recent applications (2026-08-25 and 2026-08-26, §32
-and §33), and 62–63 because they are repository files with **no** live row —
-the first such entries in this table, which is why the repository total now
-exceeds the live total here.
+and §33), and 62–63 because they are the applications of 2026-08-26 06:50 and
+06:52 UTC. Both were listed here as NOT APPLIED for a few hours between the
+merge of PR #263 and the owner approving their application; that state is gone
+and the rows now carry their live versions.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
@@ -3116,7 +3116,7 @@ That also means this function was never exposed to a defect `place_order` did
 have. That defect is now fixed too, by row 63 — the section below is kept in
 full because the reasoning is the useful part.
 
-### Row 63 — `place_order` resolves each line once (built, not applied)
+### Row 63 — `place_order` resolves each line once (applied 2026-08-26)
 
 Both of `place_order`'s loops iterate `jsonb_array_elements(p_items)`
 independently, and under READ COMMITTED each `select` takes its own snapshot.
@@ -3200,6 +3200,64 @@ once, and checks behaviourally that collapsing the insert-and-update left
 `unit_price`, `line_total`, the modifier row and the order subtotal unchanged.
 
 Raised on PR #263 by review, answered there, and fixed there.
+
+### Both were applied on 2026-08-26, and what was checked
+
+On explicit owner approval, after PR #263 merged, via MCP `apply_migration` —
+one call per file, `…060000` then `…070000`, each followed by read-only
+verification. Live history moved **106 → 108**.
+
+Pre-flight, before either call:
+
+| check | result |
+| --- | --- |
+| live `compute_order_snapshot` body | `a37ee893…`, 8 631 chars — exactly what `…060000` was generated from |
+| live `place_order` body | `080be48e…`, 16 915 chars — exactly what `…070000` was generated from |
+| orders placed in the previous 15 minutes | 0 |
+| orders in the POS sync queue | 0 |
+| `%moyasar%` rows in live history | 0 |
+
+The first two matter most: they prove nothing had drifted underneath the
+generated files between authoring and applying, so neither call silently
+reverted someone else's change.
+
+After each call, the live body was hashed against the repository file and
+matched byte-for-byte — `f99ed9f7c3bb427f304353f318195c52` (10 229 chars) and
+`8bcc3354ac572a56dfe4c0c612bff890` (17 937 chars). Both functions kept one
+overload, `security definer`, `search_path=public`, and their ACL: `execute` to
+`service_role` only, still revoked from `anon` and `authenticated`.
+
+The structural properties the migrations exist to create were then re-checked
+against the live text rather than the file: **zero** executable refusal lines in
+`compute_order_snapshot` and **exactly one** cheapest-tier select; in
+`place_order`, the cheapest-tier select, the product lookup and the modifier
+lookup each appearing **exactly once**, the write pass reading
+`jsonb_array_elements(v_lines)`, and **zero** remaining `update
+public.order_items` statements.
+
+One number needed care. The raw count of `raise exception` in `place_order` is
+**24**, not the 23 quoted while the file was being written. Both are right: 23
+are executable and one sits inside a comment quoting the refusal this work
+removed. The line-level count confirms **23 executable before and 23 after**, so
+no validation rule moved. This repository has produced a false alarm on exactly
+this pattern before — a `grep -c` matching commentary — which is why the check
+is recorded here in the form that distinguishes them.
+
+Security advisors after both applies: 82 lints, **zero** naming either function.
+That is not luck — the `SECURITY DEFINER` advisor only flags functions the
+`authenticated` role can execute, and both of these are revoked from it. Every
+lint is pre-existing and unrelated; there are no ERROR-level entries.
+
+**Neither is version-aligned**, and that is not a defect: `apply_migration`
+stamps an apply-time version, so live history carries `20260826065046` and
+`20260826065228` rather than the repository filenames. Realigning them is a
+separate live-history write with its own approval (§9-D). Do not "repair" it.
+
+The Moyasar file was **not** touched: `apply_migration` runs only the SQL it is
+given, each call named its target, and live history still holds zero `%moyasar%`
+rows. It is now the **only** unapplied repository file, which makes "apply the
+outstanding migrations" more dangerous than it was, not less — it now reads like
+a no-op and is in fact the one instruction that would break the §6 freeze.
 
 ### Verification status
 
