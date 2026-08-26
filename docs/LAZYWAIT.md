@@ -477,6 +477,61 @@ subtracted and every line is charged exactly what it was under the July build.
 What changed is that the customer's heat-level choice now reaches the kitchen as
 `details` text instead of being silently dropped.
 
+### Add-ons: how a Lazywait group becomes an app option
+
+Until 2026-08-26 nothing connected the two. `import_lazywait_catalog` wrote
+categories, products, variants and branches and mentioned modifiers nowhere, so
+`product_modifier_groups` held **zero** rows in Production and no product
+offered an option of any kind. `import_lazywait_addon_groups()` is the missing
+consumer, called last by the importer once its products exist.
+
+**Two facts from the 2026-08-26 07:18 pull drive the design.** Both are the kind
+that produce a silent empty result rather than an error if you assume otherwise:
+
+- **Membership is readable only from the group.** Every add-on carries an
+  `addons_group_id` key and every one of them is null — 0 of 10 non-empty. The
+  group's `addons_ids` array is the only link. Reading it add-on-first, which is
+  the obvious direction, finds nothing.
+- **One add-on may sit in several groups.** Mango juice belongs to both
+  "مشروب الوجبة" and the stray "Test" group. `modifiers.group_id` is `NOT NULL`,
+  so one row cannot serve both: there is **one modifier row per (group, add-on)
+  pair**, `lazywait_addon_id` is deliberately not unique across the table, and
+  the unique index is on `(group_id, lazywait_addon_id)`.
+
+| Lazywait | App |
+| --- | --- |
+| add-on group referenced by ≥1 item | `modifier_groups` row, `lazywait_group_id` set |
+| group's `min_selection` | `min_select`; `>= 1` also sets `is_required` |
+| group's `max_selection`, else `multi_max` | `max_select` (0/absent → null, meaning no cap) |
+| each id in the group's `addons_ids` | a `modifiers` row in that group |
+| item's `addons_groups_ids` | `product_modifier_groups` link, for mapped products |
+
+**Groups no item references are not imported.** That is a rule, not a special
+case, and it is what keeps a stray group — the real catalog has one called
+"Test" — out of every customer's menu.
+
+**An item's own `addons_ids` is ignored on purpose.** Coral lists Mango juice
+directly *and* through the group. This model has no add-on outside a group, and
+importing the direct one as well would show it twice on the product screen.
+
+**Names fall back across languages.** Lazywait sent `name_en = null` for both
+groups; `modifier_groups.name_en` is `NOT NULL` and the app renders
+`pick(nameEn, nameAr)` by locale, so without a fallback an English-locale
+customer would read a blank heading.
+
+**Prices use the same rule as products and variants** — a stated gross wins,
+otherwise the net is grossed up by the configured VAT, never negative. On the
+2026-08-26 pull every add-on is priced 0, so this path is exercised but proves
+nothing about the arithmetic until one carries a real price.
+
+**Removal is deactivation, never deletion**, for both options and links, because
+an `order_item_modifiers` row references a modifier for the life of the order.
+
+**Consequence for the POS.** Once a modifier carries a real `lazywait_addon_id`,
+`lazywait-sync` starts emitting it as an `addons[]` entry and subtracting its
+price back out of `price`. Before this import every live modifier was unmapped,
+which is why no ticket has ever carried one. At a 0 price the subtraction is 0.
+
 ### Intentionally NOT sent (schemas unconfirmed — do not invent)
 Delivery address/fields, `latitude`/`longitude` (the contract has **no**
 coordinate field), the `order_deliveries[]` element shape, and every money field
