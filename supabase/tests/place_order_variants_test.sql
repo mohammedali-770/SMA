@@ -234,19 +234,67 @@ begin
   if v_price <> 45.00 then raise exception 'paid order line priced at %, expected 45.00', v_price; end if;
   if v_txt <> 'Large' then raise exception 'paid order line lost the tier name, got %', v_txt; end if;
 
-  -- A tiered product sent with no tier must be refused on this path too.
+  -- A tiered product sent with NO tier must fall back to the cheapest active
+  -- one here too, not be refused. This assertion was inverted on 2026-08-26:
+  -- it previously required the refusal, which is the behaviour that took
+  -- ordering down on the cash path. The online path has to make the same
+  -- choice, or a stale install would be able to pay cash and not pay online.
+  --
+  -- Retired (99.00) is inactive and must be ignored; Small (32.00) wins over
+  -- Large (45.00) on price alone.
+  v_snap := public.compute_order_snapshot(
+    '01000000-0000-0000-0000-000000000001'::uuid,
+    'b0000000-0000-0000-0000-000000000001'::uuid,
+    'pickup'::public.order_type,
+    jsonb_build_array(jsonb_build_object(
+      'product_id','a0000000-0000-0000-0000-000000000001', 'quantity',1,
+      'modifier_ids', jsonb_build_array('80000000-0000-0000-0000-000000000001'))),
+    null, null, 0);
+
+  if (v_snap->'items'->0->>'unit_price')::numeric <> 32.00 then
+    raise exception 'snapshot fallback priced the line at %, expected the cheapest 32.00 tier',
+      v_snap->'items'->0->>'unit_price';
+  end if;
+  if v_snap->'items'->0->>'variant_id' <> 'c0000000-0000-0000-0000-000000000001' then
+    raise exception 'snapshot fallback recorded tier %, expected Small',
+      coalesce(v_snap->'items'->0->>'variant_id', '(null)');
+  end if;
+  if v_snap->'items'->0->>'variant_name_en' <> 'Small' then
+    raise exception 'snapshot fallback lost the tier name, got %',
+      coalesce(v_snap->'items'->0->>'variant_name_en', '(null)');
+  end if;
+
+  -- The tier the fallback chose must survive into the paid order row, or the
+  -- POS ticket gets no price_id and the receipt no tier name.
+  v_order := public.insert_order_from_snapshot(
+    '01000000-0000-0000-0000-000000000001'::uuid, v_snap, 'online', 'paid', null);
+  select unit_price, variant_name_en into v_price, v_txt
+    from public.order_items where order_id = v_order.id;
+  if v_price <> 32.00 then
+    raise exception 'paid order line from the fallback priced at %, expected 32.00', v_price;
+  end if;
+  if v_txt <> 'Small' then
+    raise exception 'paid order line from the fallback lost the tier name, got %',
+      coalesce(v_txt, '(null)');
+  end if;
+
+  -- A tier belonging to a DIFFERENT product is still refused: the fallback
+  -- replaces the "no tier named" branch only, never the validation one.
   begin
     perform public.compute_order_snapshot(
       '01000000-0000-0000-0000-000000000001'::uuid,
       'b0000000-0000-0000-0000-000000000001'::uuid,
       'pickup'::public.order_type,
       jsonb_build_array(jsonb_build_object(
-        'product_id','a0000000-0000-0000-0000-000000000001', 'quantity',1,
-        'modifier_ids', jsonb_build_array('80000000-0000-0000-0000-000000000001'))),
+        'product_id','a0000000-0000-0000-0000-000000000004',
+        'variant_id','c0000000-0000-0000-0000-000000000001', 'quantity',1)),
       null, null, 0);
-    raise exception 'the snapshot path accepted a tiered product with no tier';
+    raise exception 'the snapshot path accepted a tier from another product';
   exception when others then
-    if sqlstate = 'P0001' and sqlerrm like '%accepted a tiered product%' then raise; end if;
+    if sqlerrm like '%accepted a tier from another product%' then raise; end if;
+    if sqlerrm not like '%selected option is no longer available%' then
+      raise exception 'expected the foreign-tier refusal, got: %', sqlerrm;
+    end if;
   end;
 
   raise notice 'place_order_variants_test (online path): all assertions passed';

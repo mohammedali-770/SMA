@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **101**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826050000_place_order_variant_fallback.sql`.
+Migration files in the repository: **102**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826060000_compute_order_snapshot_variant_fallback.sql`.
 
 ## Tables
 
@@ -120,7 +120,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_modifier_snooze` | 1 | `20260820140000_branch_modifier_availability.sql` |
 | `clear_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
 | `compute_campaign_discount` | 1 | `20260728120000_discounts_campaigns.sql` |
-| `compute_order_snapshot` | 3 | `20260824130000_place_order_variants.sql` |
+| `compute_order_snapshot` | 4 | `20260826060000_compute_order_snapshot_variant_fallback.sql` |
 | `confirm_order_payment` | 2 | `20260709140000_payment_methods.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
