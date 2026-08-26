@@ -18,10 +18,11 @@ to Production.**
 > 2026-08-26 exactly one repository file is unapplied:
 > `20260824100000_moyasar_payment_provider.sql`, held deliberately under the §6
 > payment freeze. Everything else is applied, including the three tier
-> migrations of 2026-08-26 and the add-on importer applied the same day. The
-> counts in this section are a dated snapshot and are kept as one; the current
-> position is in CLAUDE.md §8, and the row-level detail in §5 rows 59–64 with
-> §32, §33 and §34.
+> migrations of 2026-08-26, the add-on importer applied the same day, and the
+> three comped-customer migrations applied that afternoon. The counts in this
+> section are a dated snapshot and are kept as one; the current position is in
+> CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
+> detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
 Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. Full evidence — pre-live gate,
@@ -444,17 +445,20 @@ production.
 | 66 | 20260826100000 | comp_order_totals | — | 20260826115025 | comp_order_totals | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:50:25 UTC, immediately after row 65, which it depends on** — every redefined body reads `public.comp_members`, so applying this first would have failed on an unknown relation. Redefines exactly three functions: `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. **All three, deliberately** — the cart is priced in three places and this repository has twice shipped a rule applied to one path and not its twin (rows 61/62 are that same defect, two hours apart). A comp skips the coupon block (otherwise a limited code's `usage_count` burns on an order that was free anyway), skips loyalty redemption, and zeroes the total **before** VAT is derived from it, so VAT falls out at 0.00 with no second rule to keep in step. **`payment_status` becomes `'paid'` with `paid_at` set, and that is load-bearing rather than tidy:** `set_lazywait_initial_sync` parks a non-paid ONLINE order at `awaiting_payment` and `begin_payment_attempt` refuses a total of 0, so a comped order left `'pending'` would never reach the kitchen and could never be paid — stranded permanently. `paid_at` is stamped because watchdog rule R1 `PAID_ORDER_NOT_SYNCED` requires it non-null, so a null would put comped orders in a blind spot. **What did NOT change:** the branch delivery minimum (judged on `subtotal`, which a comp does not touch), `subtotal` as the real goods value, and `discount_amount` still meaning *coupon* so the admin coupon report is not corrupted. Generated from rows 61/62/60's files rather than retyped, after confirming each matched live byte-for-byte at generation time (`8bcc3354…` 17 937, `f99ed9f7…` 10 229, `60b753bc…` 4 617). **Fidelity proven after applying:** all three live bodies byte-identical to the merged file — `place_order` `b3d00f382d44c522a12fe5bf58d6c20b` (20 186 chars), `compute_order_snapshot` `e98d309a9b3a82701c485c79cc6d7cb5` (11 372), `insert_order_from_snapshot` `da8c457bade050e0a0280a88061d0304` (4 911). **Version NOT aligned** — live carries `20260826115025` (§9-D). Detail in §35 |
 | 67 | 20260826110000 | checkout_zero_total_idempotency | — | 20260826115122 | checkout_zero_total_idempotency | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:51:22 UTC — closes a PRE-EXISTING defect before comped customers made it reachable.** `begin_checkout_session` settles a zero-total cart inside a single call: it inserts the session, creates the order and flips the session to `'consumed'`. Its retry lookup required `status = 'pending_payment'` and it passed `p_idempotency_key = null` to `insert_order_from_snapshot`, so a retried call with the same cart key matched nothing at either level and produced **a second session and a second free order**. A flaky mobile network is enough — precisely the scenario order idempotency was added for in 20260707121400. **It had not bitten** because online payment is disabled and that check sits above the snapshot, and because a zero total was otherwise only reachable by fully covering a cart with points and a coupon; comped customers make the branch ordinary. Fixed in two independent layers: the reuse lookup now also matches a session that already produced an order (the sequential retry), and the key is carried onto the order so `orders_idempotency_idx` refuses a duplicate (the concurrent retry), with the loser returning the winner's session and dropping its own so one key still means one session. **Two limits recorded rather than glossed:** a client sending no idempotency key still has no protection (the mobile cart always sends one), and the concurrent branch is **not covered by the SQL suite** — reaching it needs the loser's first lookup before the winner commits and its recovery lookup after, an ordering one psql connection cannot produce. A case for it was written, observed to pass *without* exercising the delete, and removed; the gap is stated in the migration itself. The sequential retry IS covered, and was confirmed to **fail** against the pre-fix definition. **Fidelity proven after applying:** live body byte-identical to the merged file (`1cc3338fa22994e7483a90d8b3f64e49`, 6 408 chars). **Version NOT aligned** — live carries `20260826115122` (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **64 repository / 65 live** rows.
+Reconciliation check: the rows above detail **67 repository / 68 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–63
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–67
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
-because they are the most recent applications (2026-08-25 and 2026-08-26, §32
-and §33), and 62–63 because they are the applications of 2026-08-26 06:50 and
-06:52 UTC. Both were listed here as NOT APPLIED for a few hours between the
-merge of PR #263 and the owner approving their application; that state is gone
-and the rows now carry their live versions.
+because they were the most recent applications at the time (2026-08-25 and
+2026-08-26, §32 and §33), 62–63 because they are the applications of
+2026-08-26 06:50 and 06:52 UTC — both were listed here as NOT APPLIED for a few
+hours between the merge of PR #263 and the owner approving their application,
+and that state is gone — 64 because it is the add-on importer of the same
+morning, and 65–67 because they are the comped-customer application of
+2026-08-26 11:47–11:51 UTC (§35). Rows 65–67 were likewise listed as NOT
+APPLIED between the merge of PR #269 and the owner approving them.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
@@ -467,7 +471,9 @@ and the rows now carry their live versions.
 **§4 is authoritative for the class algebra**, and reconciled the full set
 exactly **as of 2026-08-07**: `A 8 + B 54 + C 3 + H 3 = 68` repository files,
 `A 8 + B 54 + C 3 + F 5 = 70` live rows. It has not been recomputed from live
-data since; §1 carries the current totals (97 files / 103 rows). The rows
+data since; §1's own paragraph carries a 2026-08-22 snapshot (97 files / 103 rows),
+superseded by the note directly beneath it — the current totals are **107 files
+/ 112 rows**. The rows
 between 2026-07-29 and 2026-08-22 have deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §1 and §4.
