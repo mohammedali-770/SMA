@@ -211,10 +211,20 @@ than exotic, so it is closed here, before it is stood on.
 The fix has two independent layers: the reuse lookup now also matches a session
 that already produced an order (the sequential retry), and the idempotency key
 is carried onto the order so `orders_idempotency_idx` refuses a duplicate (the
-concurrent retry). **Residual limit, stated rather than hidden:** a client that
-sends no idempotency key at all still has no protection. The mobile cart always
-sends one (`CartProvider` generates a uuid per cart), so this is a contract note
-rather than a live gap.
+concurrent retry). On that second path the loser also hands back the *winner's*
+session and drops the one it just inserted — the session-level index is partial
+on `status = 'pending_payment'`, so it stops guarding the moment the winner
+consumes itself, and without the delete one key would end up with two settled
+sessions.
+
+**Two residual limits, stated rather than hidden.** A client that sends no
+idempotency key at all still has no protection; the mobile cart always sends one
+(`CartProvider` generates a uuid per cart), so this is a contract note rather
+than a live gap. And the concurrent branch is **not covered by the SQL suite**:
+reaching it needs the loser's first lookup to run before the winner commits and
+its recovery lookup after, an ordering a single psql connection cannot produce —
+any state that hides the winner from one lookup hides it from the other. The
+suite covers the sequential retry and stops there rather than pretending.
 
 ## What the branch sees
 
@@ -274,7 +284,27 @@ charged nothing, which is a confusing way to give someone a gift.
 
 This is display only. `computePreviewTotals` is a preview; the server reads the
 table itself and never trusts a client flag, so a forged one changes nothing
-about what is charged.
+about what is charged. The preview **skips the coupon and loyalty rows entirely
+for a comped customer**, because the server skips both — showing them would
+display two reductions that never happen and report a comp smaller than the
+`comp_discount_amount` the order actually records.
+
+**The membership is re-read immediately before the order is submitted.** An
+administrator can revoke a comp while checkout sits open; the mount-time read
+never re-runs, so the screen would keep showing 0.00 while `place_order`
+re-reads the now-inactive membership and charges in full — the customer charged
+**more** than they were shown. `decideCompChange` (`checkoutGuards.ts`) makes
+that decision, and it is deliberately asymmetric: losing the comp corrects the
+screen and refuses the submission; gaining one only corrects the screen, since
+charging less than displayed breaks nothing; and an answer that could not be
+read blocks nothing at all, because a flaky network must not refuse a valid
+order and the server remains the authority.
+
+**A customer can read only two columns of their own row** — `profile_id` and
+`is_active` — through a column-level grant. RLS filters rows, not columns, so
+the own-row policy alone would have handed over `note`, which holds the
+*administrator's* private reason, written about the customer rather than for
+them, and `added_by`, which is an admin's user id.
 
 The receipt carries the same line — without it a comped receipt reads
 *"Subtotal 64.00, Delivery 15.00, Total 0.00"* and does not add up on the page.

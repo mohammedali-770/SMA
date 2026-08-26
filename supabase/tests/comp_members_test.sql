@@ -516,7 +516,26 @@ begin
     raise exception 'FAIL 10: a customer can read the comp audit trail';
   end if;
 
-  raise notice 'case 10 ok — own row visible, other rows and the audit hidden';
+  -- COLUMN scope, not just row scope. `note` holds the ADMINISTRATOR's private
+  -- reason — written about the customer, never for them — and `added_by` is an
+  -- admin's user id. RLS filters rows and would have handed both over with the
+  -- customer's own row, so the grant is what closes this.
+  begin
+    perform cm.note from public.comp_members cm
+     where cm.profile_id = '00000000-0000-0000-0000-0000000ca002';
+    raise exception 'FAIL 10: a customer can read the admin note on their own row';
+  exception when insufficient_privilege then
+    null;  -- 42501, as intended
+  end;
+  begin
+    perform cm.added_by from public.comp_members cm
+     where cm.profile_id = '00000000-0000-0000-0000-0000000ca002';
+    raise exception 'FAIL 10: a customer can read which admin comped them';
+  exception when insufficient_privilege then
+    null;
+  end;
+
+  raise notice 'case 10 ok — own row visible, columns scoped, audit hidden';
 end $$;
 reset role;
 
@@ -584,6 +603,7 @@ begin
   end if;
   raise notice 'case 11b ok — the order-level guard holds on its own';
 end $$;
+
 
 -- A paying customer's session is unchanged by any of it.
 select set_config('test.auth_uid', :payer, true);

@@ -33,7 +33,7 @@ import {
   orderNoteMessage,
   orderNoteRemainingMessage,
 } from '../order/orderNote';
-import { appliedCouponSurvives, decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import { appliedCouponSurvives, decideCompChange, decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
@@ -572,6 +572,30 @@ export function CheckoutScreen() {
         if (soldOut.length > 0) {
           const names = soldOut.map((it) => cartLineLabel(it, pick)).join('، ');
           setError(`${t('soldOutNow')}: ${names}. ${t('soldOutBody')}`);
+          return;
+        }
+      }
+
+      // Comped membership can be revoked by an administrator while this screen
+      // sits open. The mount-time read never re-runs (the customer has not
+      // changed), so the screen would keep showing 0.00 while `place_order`
+      // re-reads the now-inactive membership and charges in full — the customer
+      // charged MORE than they were shown, which is the one direction that is
+      // never acceptable.
+      //
+      // Only the losing direction blocks. Gaining a comp mid-checkout charges
+      // less than was displayed, so it just corrects the screen and continues.
+      // An UNKNOWN answer (null) blocks nothing: same rule as the availability
+      // refresh above — the server stays the authority rather than a flaky
+      // network stopping a valid order.
+      const compChange = decideCompChange({
+        displayed: comped,
+        fresh: await compMembership.readComped(),
+      });
+      if (compChange.action !== 'none') {
+        setComped(compChange.comped);
+        if (compChange.action === 'block') {
+          setError(t('compEndedBody'));
           return;
         }
       }

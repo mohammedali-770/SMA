@@ -51,13 +51,24 @@ create trigger set_comp_members_updated_at
 
 alter table public.comp_members enable row level security;
 revoke all on public.comp_members from public, anon, authenticated;
-grant select on public.comp_members to authenticated;
 
--- A customer may read THEIR OWN row and nothing else. The checkout screen needs
--- it to show the discount before the order is placed; without that the customer
--- sees full price and is then charged nothing, which is a confusing way to give
--- someone a gift. It is a read of a boolean about themselves — it reveals
--- nothing about anyone else, and the money is still decided server-side.
+-- TWO columns, not the row. The checkout screen needs to know whether the
+-- customer is comped, so it can show 0.00 instead of a price nobody will be
+-- asked for. It does NOT need `note`, which holds the ADMINISTRATOR's private
+-- reason ("left the company", and whatever else an admin types), nor
+-- `added_by`, which is an admin's user id.
+--
+-- RLS filters ROWS, not columns, so the own-row policy below would have handed
+-- the customer the whole row — including a note written about them, never for
+-- them. Column-level grants are what actually closes that, and PostgREST
+-- honours them: selecting `note` returns a permission error rather than the
+-- text. This is the same class of gap `docs/ORDER_CONFIRMATION_FLOW.md` §11
+-- records for the table-wide grant on `orders`.
+grant select (profile_id, is_active) on public.comp_members to authenticated;
+
+-- A customer may read THEIR OWN row and nothing else. Admins read through the
+-- SECURITY DEFINER RPCs below, which is why they need no wider grant here; the
+-- is_admin() arm only lets an admin read the same two columns directly.
 drop policy if exists comp_members_read_own on public.comp_members;
 create policy comp_members_read_own
   on public.comp_members

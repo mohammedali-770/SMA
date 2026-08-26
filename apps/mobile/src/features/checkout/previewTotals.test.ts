@@ -196,16 +196,30 @@ describe('computePreviewTotals — comped customers', () => {
     expect(t.total).toBe(0);
   });
 
-  it('reports the comp net of a coupon and loyalty, never more than was owed', () => {
-    // The server SKIPS both for a comped customer, so the comp is worth the
-    // full amount there. The preview is shown before that resolution, so it
-    // must not report a comp larger than the number on screen.
+  it('ignores a coupon and loyalty entirely, exactly as the server does', () => {
+    // `place_order` and `compute_order_snapshot` skip the coupon block and the
+    // loyalty redemption for a comped customer, so neither is consumed and the
+    // order records the FULL amount as comp_discount_amount. Subtracting them
+    // here would show two reductions that never happen and under-report the
+    // comp by their combined value.
     const t = computePreviewTotals({
       ...base, items: [line(20, 2)], couponDiscount: 10,
       loyaltyPoints: 100, discountPerPoint: 0.1, comped: true,
     });
-    expect(t.compDiscount).toBe(30);   // 40 + 10 - 10 coupon - 10 loyalty
+    expect(t.couponDiscount).toBe(0);
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.compDiscount).toBe(50);   // 40 goods + 10 delivery, nothing removed
     expect(t.total).toBe(0);
+  });
+
+  it('still applies both for a customer who is not comped', () => {
+    const t = computePreviewTotals({
+      ...base, items: [line(20, 2)], couponDiscount: 10,
+      loyaltyPoints: 100, discountPerPoint: 0.1,
+    });
+    expect(t.couponDiscount).toBe(10);
+    expect(t.loyaltyDiscount).toBe(10);
+    expect(t.total).toBe(30);
   });
 
   it('never reports a negative comp on an empty cart', () => {

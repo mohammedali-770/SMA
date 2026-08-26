@@ -31,7 +31,11 @@
 --   2. the idempotency key is carried onto the order, so the existing unique
 --      index refuses a duplicate - the concurrent retry. The unique_violation
 --      is recovered by returning the order that won, the same shape place_order
---      has used since 20260707121400.
+--      has used since 20260707121400, and by handing back the winner's session
+--      rather than leaving a second settled session behind. That second part
+--      matters because the session-level index is partial on
+--      status = 'pending_payment' and so stops guarding the moment the winner
+--      consumes itself.
 --
 -- Nothing else in the function changes: the expiry sweep, the online-payment
 -- gate, the pricing call and the session row are reproduced verbatim.
@@ -134,6 +138,40 @@ begin
       select * into v_order from public.orders
         where customer_id = v_customer and idempotency_key = p_idempotency_key;
       if not found then raise; end if;
+
+      -- Another call won the race, and its session is already settled against
+      -- this order. Hand back THAT session and drop the one this call just
+      -- inserted, so one key still means one session.
+      --
+      -- The session-level index cannot do this on its own: it is partial on
+      -- status = 'pending_payment', so the winner leaves it the moment it
+      -- consumes itself, and this call's insert then succeeds. Without the
+      -- delete the money would still be right - one order, recovered above -
+      -- but two settled sessions would exist for one key, which is precisely
+      -- what the lookup at the top of this function promises does not happen.
+      --
+      -- Deleting is safe here and only here: the row was inserted by THIS
+      -- transaction moments ago, it is still 'pending_payment', and a
+      -- zero-total session never reaches a payment attempt, so no
+      -- payment_records row references it.
+      --
+      -- NOT COVERED BY THE SUITE, and said plainly rather than left to be
+      -- assumed. This branch is reachable only when two transactions overlap:
+      -- the loser's reuse lookup has to run BEFORE the winner commits, and its
+      -- recovery lookup AFTER. A single psql connection cannot produce that
+      -- ordering - any state that hides the winner from the first lookup hides
+      -- it from the second as well - so `comp_members_test.sql` exercises the
+      -- sequential retry (which the lookup above handles) and stops there.
+      -- Writing a case that merely appeared to cover this would be worse than
+      -- the gap.
+      select * into v_existing from public.checkout_sessions
+        where customer_id = v_customer and idempotency_key = p_idempotency_key
+          and order_id = v_order.id and id <> v_session.id
+        order by created_at limit 1;
+      if found then
+        delete from public.checkout_sessions where id = v_session.id;
+        return v_existing;
+      end if;
     end;
     update public.checkout_sessions
       set status = 'consumed', order_id = v_order.id, consumed_at = now()

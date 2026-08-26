@@ -91,20 +91,27 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
 
   // Discounts never exceed the goods value: a coupon plus loyalty must not make
   // the delivery fee free or drive the total negative.
-  const couponDiscount = money(Math.min(input.couponDiscount, subtotal));
+  //
+  // A comped customer gets NEITHER, and that is not a display choice — it is
+  // what the server does. `place_order` and `compute_order_snapshot` both skip
+  // the coupon block and the loyalty redemption entirely for a comped customer,
+  // so the code is not consumed and the points are not burned. Subtracting them
+  // here would show two reductions that will not happen, and would report a
+  // comp SMALLER than the `comp_discount_amount` the order actually records.
+  const comped = Boolean(input.comped);
+  const couponDiscount = comped ? 0 : money(Math.min(input.couponDiscount, subtotal));
   const loyaltyCap = Math.max(0, subtotal - couponDiscount);
-  const loyaltyDiscount = money(
-    Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap),
-  );
+  const loyaltyDiscount = comped
+    ? 0
+    : money(Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap));
 
-  // A comped customer owes nothing at all. Computed AFTER the ordinary total so
-  // the comp is worth exactly what was about to be charged — delivery fee
-  // included, which is what the owner asked for. Mirrors place_order and
-  // compute_order_snapshot, which zero v_total in the same position, before VAT
-  // is derived from it.
+  // A comped customer owes nothing at all. The comp is worth exactly what was
+  // about to be charged — delivery fee included, which is what the owner asked
+  // for. Mirrors place_order and compute_order_snapshot, which zero v_total in
+  // the same position, before VAT is derived from it.
   const payable = money(subtotal + deliveryFee - couponDiscount - loyaltyDiscount);
-  const compDiscount = input.comped ? payable : 0;
-  const total = input.comped ? 0 : payable;
+  const compDiscount = comped ? payable : 0;
+  const total = comped ? 0 : payable;
 
   // The minimum is judged on goods only — adding a delivery fee to clear the
   // branch minimum would let a customer buy their way past it with the fee.
