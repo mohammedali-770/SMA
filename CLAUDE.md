@@ -115,18 +115,20 @@ Current read-only migration snapshot (2026-08-22): **97 repository migration fil
 
 **Superseded 2026-08-25 — the two variant migrations are now APPLIED.** On the owner's explicit approval, `20260824120000_product_variants` and `20260824130000_place_order_variants` were applied to Production, in that dependency order, via MCP `apply_migration` — one call per file, each followed by read-only verification. Live history moved **103 → 105**. Full record: `docs/MIGRATIONS.md` §32, ledger rows 59–60.
 
-**Superseded 2026-08-26 — three comped-customer migrations added, none applied.**
-`20260826090000_comp_members`, `20260826100000_comp_order_totals` and
-`20260826110000_checkout_zero_total_idempotency` implement the owner's
-100%-discount group (`docs/DISCOUNTS_CAMPAIGNS.md` Part 2). They are written and
-tested but **NOT applied**: applying them is a §5 action, and until it happens
-`comp_members` does not exist in Production and nothing reads it. They must be
-applied **in filename order** — the totals migration redefines `place_order`,
-`compute_order_snapshot` and `insert_order_from_snapshot` to read the table the
-first one creates.
+**Superseded 2026-08-26 — the three comped-customer migrations are now APPLIED.**
+On the owner's explicit approval, `20260826090000_comp_members`,
+`20260826100000_comp_order_totals` and
+`20260826110000_checkout_zero_total_idempotency` were applied to Production in
+that dependency order, via MCP `apply_migration` — one call per file, each
+followed by read-only verification. Live history moved **109 → 112**. All four
+redefined function bodies were hashed against the merged files afterwards and
+are **byte-identical**. Full record: `docs/MIGRATIONS.md` §35, ledger rows 65-67.
 
-**Four repository files are unapplied. One is frozen; three are awaiting owner
-approval.**
+The feature is applied and **dormant**: `comp_members` is empty, so nobody is
+comped until an administrator adds somebody. All 44 pre-existing orders were
+verified unchanged.
+
+**One repository file remains unapplied, and it is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -137,11 +139,11 @@ approval.**
 | `20260826060000_compute_order_snapshot_variant_fallback.sql` | Applied 2026-08-26, live version `20260826065046`. |
 | `20260826070000_place_order_single_tier_resolution.sql` | Applied 2026-08-26, live version `20260826065228`. |
 | `20260826080000_import_lazywait_addon_groups.sql` | Applied 2026-08-26, live version `20260826080319`. |
-| `20260826090000_comp_members.sql` | **UNAPPLIED — awaiting owner approval (§5).** Creates `comp_members`, `comp_member_audit`, three admin RPCs and two `orders` columns. Safe in isolation: no existing order is touched and the table starts empty. |
-| `20260826100000_comp_order_totals.sql` | **UNAPPLIED — awaiting owner approval (§5).** Redefines the three pricing functions. Applying it BEFORE `…090000` fails: it reads `public.comp_members`. |
-| `20260826110000_checkout_zero_total_idempotency.sql` | **UNAPPLIED — awaiting owner approval (§5).** Redefines `begin_checkout_session` to stop a retried zero-total checkout creating a second free order. Independent of the other two; fixes a pre-existing defect. |
+| `20260826090000_comp_members.sql` | Applied 2026-08-26, live version `20260826114717`. |
+| `20260826100000_comp_order_totals.sql` | Applied 2026-08-26, live version `20260826115025`. |
+| `20260826110000_checkout_zero_total_idempotency.sql` | Applied 2026-08-26, live version `20260826115122`. |
 
-The honest statement is therefore **107 repository files / 109 live rows / four unapplied files — one frozen on purpose, three awaiting an owner decision.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **107 repository files / 112 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -151,11 +153,14 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-That trap is now WORSE, not better. Three legitimate files are outstanding
-alongside the frozen one, so "apply the outstanding migrations" has become a
-plausible-sounding instruction that would apply Moyasar first — it sorts ahead
-of all three. Approving the comp migrations is **not** approval to apply
-everything pending. Name every target explicitly, one call per file.
+It is again the *only* thing a bulk apply could sweep in, which makes it more
+dangerous rather than less: with one file outstanding, "apply the outstanding
+migrations" reads like a no-op and is in fact the one instruction that would
+break the §6 freeze. The 2026-08-26 comp application is the worked example of
+doing this correctly — each target named explicitly, one call per file, with
+Moyasar's continued absence verified afterwards (zero functions, zero history
+rows, `provider_name` still `tap`). Any `supabase migration` operation must
+still name its target explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

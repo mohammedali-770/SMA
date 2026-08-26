@@ -5,7 +5,7 @@ This document owns two separate mechanisms, at very different stages:
 | Mechanism | Status |
 | --- | --- |
 | **Campaigns** (#100) | Schema applied to Production, **inert** — no discount can affect a total. |
-| **Comped customers** (2026-08-26) | Built, tested, **awaiting the owner applying three migrations**. Once applied it is LIVE and automatic. |
+| **Comped customers** (2026-08-26) | **APPLIED to Production 2026-08-26.** Live and automatic the moment an administrator adds a member; `comp_members` is currently empty. |
 
 Coupons (`public.coupons` + `validate_coupon`) are the third and oldest
 mechanism; they are live and are described where they are used rather than here.
@@ -119,10 +119,24 @@ bake wrong pricing into a server-authoritative RPC. Items **1**, **3**, **4**,
 
 # Part 2 — Comped customers (100% off, automatic)
 
-Status: **built and tested; three migrations are NOT yet applied.** Nothing in
-Production reads `comp_members` today because the table does not exist there
-yet. Applying the migrations is an owner action under CLAUDE.md §5, and the day
-it happens the feature is live for anybody in the table.
+Status: **APPLIED to Production on 2026-08-26** (live versions `20260826114717`,
+`20260826115025`, `20260826115122` — ledger rows 65-67, `docs/MIGRATIONS.md`
+§35). Every function body was verified byte-identical to the merged repository
+file afterwards.
+
+**Applied is not the same as in use.** `comp_members` is empty, so no customer
+is comped and every order still prices exactly as it did before. The feature
+becomes live for a given person the moment an administrator adds them in
+**Finance → Comped Customers**. All 44 orders that existed at the time of the
+application were verified unchanged.
+
+Two owner actions remain before it is fully visible:
+
+1. **the app build** — the checkout and receipt lines ship with it. The two new
+   `orders` columns exist as of the application, so the build is safe to ship
+   now;
+2. **the `lazywait-sync` redeploy** — until it happens a comped ticket reaches
+   the branch **unlabelled**, indistinguishable from a paid one.
 
 ## What the owner asked for
 
@@ -323,9 +337,11 @@ The receipt carries the same line — without it a comped receipt reads
 
 ## Deploy order — this one matters
 
-1. **Apply the three migrations, in filename order.** Nothing works before this
-   and nothing breaks by it: no existing order is touched and `comp_members`
-   starts empty.
+1. ~~**Apply the three migrations, in filename order.**~~ **DONE 2026-08-26.**
+   Nothing existing was touched: `comp_members` started empty and all 44 live
+   orders were verified unchanged. Each target was named explicitly, one call
+   per file — the frozen Moyasar migration sorts ahead of all three and a bulk
+   apply would have swept it in.
 2. **Then** ship the app build. `CUSTOMER_ORDER_SELECT` now names `is_comped`
    and `comp_discount_amount`, and PostgREST rejects the **whole** select when
    one column is missing — so a build that reaches customers first would make
