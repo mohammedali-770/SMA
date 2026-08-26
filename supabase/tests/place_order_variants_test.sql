@@ -102,13 +102,57 @@ begin
   if v_price <> 47.00 then raise exception 'Large(45) + Volcano(2) should be 47.00, got %', v_price; end if;
 
   -- ------------------------------------------------------------------ 3.
-  -- A product that HAS tiers, ordered without one, is REFUSED. Guessing would
-  -- charge a price the customer never saw.
+  -- A product that HAS tiers, ordered WITHOUT one, falls back to the CHEAPEST
+  -- active tier instead of being refused.
+  --
+  -- This assertion is inverted from its original form, and the reason is an
+  -- incident rather than a change of taste. Refusing took the whole app down:
+  -- every active product carries a tier, and the client that sends `variant_id`
+  -- shipped in the same commit as the requirement, so no build in a customer's
+  -- hands could satisfy it. See 20260826050000_place_order_variant_fallback.
   v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
                                 '80000000-0000-0000-0000-000000000001');
-  if v_state is null then
-    raise exception 'ordering a tiered product with no tier must be refused, it succeeded';
+  if v_state is not null then
+    raise exception 'a tiered product ordered with no tier must fall back, got %', v_state;
   end if;
+
+  select i.unit_price, i.variant_id, i.variant_name_en
+    into v_price, v_uuid, v_txt
+    from public.order_items i where i.order_id = (select id from pg_temp.last_order);
+
+  -- Cheapest, not first-by-sort and not products.price by coincidence: Small is
+  -- 32.00, Large 45.00, and the retired 99.00 tier must be ignored entirely.
+  if v_price <> 32.00 then
+    raise exception 'fallback should price from the cheapest tier (32.00), got %', v_price;
+  end if;
+
+  -- The line must RECORD the tier it was priced from. Both passes of
+  -- place_order resolve the tier independently, and an earlier revision applied
+  -- the fallback only in the pricing pass — which charged 32.00 correctly but
+  -- stored variant_id null, so the POS ticket carried no price_id and the
+  -- receipt named no tier. This is the assertion that catches that.
+  if v_uuid is distinct from 'c0000000-0000-0000-0000-000000000001' then
+    raise exception 'fallback line must record the cheapest tier id, got %', v_uuid;
+  end if;
+  if v_txt <> 'Small' then
+    raise exception 'fallback line must snapshot the tier name, got %', v_txt;
+  end if;
+
+  -- ------------------------------------------------------------------ 3b.
+  -- Ties break by sort_order, then id — mirroring the client's cheapestVariant
+  -- so server and app never disagree about which tier "cheapest" means.
+  insert into public.product_variants (id, product_id, name_en, name_ar, price, is_active, sort_order)
+  values ('c0000000-0000-0000-0000-00000000000a',
+          'a0000000-0000-0000-0000-000000000001', 'AlsoSmall', 'صغير ٢', 32.00, true, 0);
+  v_state := pg_temp.order_tier('a0000000-0000-0000-0000-000000000001', null,
+                                '80000000-0000-0000-0000-000000000001');
+  if v_state is not null then raise exception 'tie-break order failed: %', v_state; end if;
+  select i.variant_id into v_uuid from public.order_items i
+    where i.order_id = (select id from pg_temp.last_order);
+  if v_uuid is distinct from 'c0000000-0000-0000-0000-00000000000a' then
+    raise exception 'at equal price the lower sort_order must win, got %', v_uuid;
+  end if;
+  delete from public.product_variants where id = 'c0000000-0000-0000-0000-00000000000a';
 
   -- ------------------------------------------------------------------ 4.
   -- An inactive tier is not orderable, even by id.

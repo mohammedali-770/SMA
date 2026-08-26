@@ -560,6 +560,36 @@ in Lazywait `sort_order`, so the first row is whichever the POS listed first. Fo
 Coral that is the 29.00 tier against a card reading 20.00. `cartSchema.test.ts`
 pins the cheapest-not-first rule directly.
 
+**INCIDENT, 2026-08-26 — the server required a tier the shipped app could not
+send.** `20260824130000` made `place_order` raise *"Please choose an option for a
+product in your cart"* whenever a cart line named no `variant_id` for a product
+carrying active tiers. Every one of the 55 active products carries at least one,
+and the client code that sends `variant_id` shipped in the **same commit** as the
+requirement (`b36e7d8`, PR #256) — so no build in a customer's hands could
+satisfy it. From the moment the migration was applied (2026-08-25 06:15:02 UTC)
+**no order could be placed from the app, for any product**. It surfaced only as a
+generic error; three attempts were logged as 400s from `place_customer_order`
+with no order row written.
+
+`20260826050000_place_order_variant_fallback` replaces the refusal with a
+fallback to the **cheapest active tier**, applied identically in both passes of
+`place_order` — the pricing pass and the insert pass. Applying it to only the
+first would charge correctly but store `variant_id` null, leaving the POS ticket
+without a `price_id` and the receipt without a tier name.
+
+**The fallback cannot mis-charge anyone.** `products.price` is maintained by the
+importer as the cheapest tier and is exactly what a pre-tier client displays;
+verified against Production on 2026-08-26, all **55 of 55** active products have
+`cheapest active tier price == products.price`, none differing. The invariant
+below is preserved rather than weakened.
+
+**It is not a substitute for the picker, and it is not temporary.** An updated
+client always names a tier and never reaches the fallback. It exists so a stale
+install — of which there will be many for weeks after any release — degrades to
+the old single-price behaviour instead of being unable to order at all. The
+picker prevents the bad experience for updated clients; the fallback prevents
+total failure for the rest.
+
 **Settled 2026-08-25:** a multi-tier product **opens the picker** instead of
 being added from the card, and a tiered card reads **"from X"** — but only where
 the tiers actually span a range, since more than half of them price every tier
