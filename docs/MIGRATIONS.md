@@ -18,10 +18,11 @@ to Production.**
 > 2026-08-26 exactly one repository file is unapplied:
 > `20260824100000_moyasar_payment_provider.sql`, held deliberately under the §6
 > payment freeze. Everything else is applied, including the three tier
-> migrations of 2026-08-26 and the add-on importer applied the same day. The
-> counts in this section are a dated snapshot and are kept as one; the current
-> position is in CLAUDE.md §8, and the row-level detail in §5 rows 59–64 with
-> §32, §33 and §34.
+> migrations of 2026-08-26, the add-on importer applied the same day, and the
+> three comped-customer migrations applied that afternoon. The counts in this
+> section are a dated snapshot and are kept as one; the current position is in
+> CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
+> detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
 Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. Full evidence — pre-live gate,
@@ -439,19 +440,25 @@ production.
 | 61 | 20260826050000 | place_order_variant_fallback | — | 20260826044204 | place_order_variant_fallback | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **INCIDENT FIX — ordering was impossible for ~22 hours** (PR #263). Applied **2026-08-26 04:42:04 UTC** on explicit owner approval, via MCP `apply_migration`, after CI including `Migration chain + SQL suites` went green. Row 60 made `place_order` refuse any cart line naming no `variant_id` for a product with active tiers; **all 55 active products have one**, and the client that sends `variant_id` shipped in the *same commit*, so no build in a customer's hands could satisfy it. From 2026-08-25 06:15:02 UTC to 2026-08-26 04:42:04 UTC **no order could be placed, for any product** — three attempts logged as 400s from `place_customer_order` with no order row written. This file replaces the refusal with a fallback to the cheapest active tier, applied in **both** passes of the function; fixing only the pricing pass would have stored `variant_id` null and left the POS ticket without a `price_id`. It cannot mis-charge: all **55 of 55** active products have cheapest-tier price equal to `products.price`, which is what a pre-tier client displays. Re-emits `place_order` verbatim from row 60 apart from those two blocks — generated from that file rather than retyped, diffed at generation: 3 hunks, 9 lines removed. Fidelity proven after applying: live body **byte-identical** to the file (`080be48e558798e0c393936d486fc738`, 16 915 chars), one overload, zero executable raises of the refusal, two executable fallback selects. **Version NOT aligned** — live carries `20260826044204` (§9-D, separate approval). Verified by the first order after the fix, `SM-2026-000051`: three lines, each recording its tier and a real `lazywait_price_id`, each charged exactly the card price, synced to the POS on the first attempt. Detail in §33 |
 | 62 | 20260826060000 | compute_order_snapshot_variant_fallback | — | 20260826065046 | compute_order_snapshot_variant_fallback | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 06:50:46 UTC — the online half of row 61.** Row 60 put the same tier refusal into `place_order` *and* `compute_order_snapshot`. Row 61 replaced it in `place_order` only, so for roughly two hours on 2026-08-26 the two order paths disagreed about a cart that named no tier: the cash path fell back to the cheapest active tier, the online path still raised `Please choose an option for a product in your cart`. This file carried the identical fallback across, and **the paths have agreed since it was applied**. **It never caused an outage and could not have**: `begin_checkout_session` is the function's only caller, and it raises `Online payment is not available` on `app_settings.online_payment_enabled` — verified `false` — three lines *before* it calls the snapshot; `compute_order_snapshot` is itself revoked from `anon` and `authenticated`, so there was no direct route either. It was latent, and would have become live the day that flag is switched on — the day a provider is chosen and attention is elsewhere, which is why it was fixed first. **Not a payment change** — no charge construction, verification, webhook, return, provider setting or money field — so §6 never froze it, and it was applied as an ordinary §5 action on explicit owner approval. Generated from row 60's file rather than retyped, whose `compute_order_snapshot` body was confirmed byte-identical to live first (`a37ee893140629b3636271089df3f576`, 8 631 chars); diffed at generation: **2 hunks, 5 executable lines removed** (the `elsif exists` test and its `raise`), the surrounding `if`/`end if` untouched. `create or replace` keeps the signature, so the ACL survives — verified after the apply as `postgres=X | service_role=X`, still revoked from `anon` and `authenticated`. Applied on explicit owner approval via MCP `apply_migration`, after PR #263 merged. **Fidelity proven after applying:** live body byte-identical to the repository file (`f99ed9f7c3bb427f304353f318195c52`, 10 229 chars), one overload, **zero** executable raises of the refusal and **exactly one** cheapest-tier select. `security definer` and `search_path=public` unchanged; `place_order` confirmed untouched by this call. **Version NOT aligned** — live carries the apply-time stamp `20260826065046`, not the repository filename (§9-D, separate approval). Detail in §34 |
 | 63 | 20260826070000 | place_order_single_tier_resolution | — | 20260826065228 | place_order_single_tier_resolution | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 06:52:28 UTC — removes a two-pass window in `place_order`.** Raised by review on PR #263 and confirmed real. The function walks the cart twice: pass 1 validates and prices, pass 2 writes `order_items` once the `orders` row exists. Pass 2 re-queried the product, the tier (including row 61's cheapest-tier fallback) and each modifier, on the assumption that the same rules give the same answer. Under READ COMMITTED they need not — every statement takes its own snapshot — so a catalog write committed between the passes (`import_lazywait_catalog` is exactly one) could leave `orders.subtotal` / `vat_amount` / `total` priced from pass 1 while `order_items`, the receipt and the POS ticket's `price_id` came from pass 2. Narrow (it needs a commit inside one order transaction, and the tier half only opens for a line naming no `variant_id`) but a money bug that fails silently. Pass 1 now records product id and names, quantity, the final unit price **including** modifiers, the normalised note, the tier id and names, and the modifier list with prices; pass 2 writes from that and **issues no query**. Mirrors what `compute_order_snapshot` has always done. Locking was rejected: `for share` blocks an update of the chosen tier but not the insert of a cheaper one, and buys a lock-ordering hazard with the importer. Two intentional side effects: `order_items` is inserted once with its final `unit_price` and `line_total` instead of inserted at base price with `line_total` 0 and updated later — safe because the only BEFORE trigger validates `note` and both modifier-contract triggers are AFTER INSERT `DEFERRABLE INITIALLY DEFERRED`; and pass 2's unguarded modifier lookup is gone, which could previously abort the whole order on a `name_en` not-null violation if a modifier went inactive mid-transaction. **No refusal or validation rule changed** — `raise exception` count 23 → 23 — and no money arithmetic changed. Generated from row 61's file, whose body was confirmed byte-identical to live first (`080be48e558798e0c393936d486fc738`, 16 915 chars). Applied on explicit owner approval via MCP `apply_migration`, immediately after row 62, with zero orders placed in the preceding 15 minutes and nothing in the POS sync queue. **Fidelity proven after applying:** live body byte-identical to the repository file (`8bcc3354ac572a56dfe4c0c612bff890`, 17 937 chars), one overload; the cheapest-tier select, the product lookup and the modifier lookup each appear **exactly once**; the write pass reads `jsonb_array_elements(v_lines)`; **zero** `update public.order_items` statements remain. **Executable** `raise exception` count is **23 before and 23 after** — the raw text count is 24 on both sides because one occurrence sits inside a comment, which is the kind of thing that has produced a false alarm in this repository before. ACL, `security definer` and `search_path` unchanged. Security advisors after both applies: **82 lints, zero naming `place_order` or `compute_order_snapshot`** — both are revoked from `authenticated`, so the SECURITY DEFINER advisor does not reach them; every lint is pre-existing and unrelated. **Version NOT aligned** — live carries `20260826065228` (§9-D, separate approval). Detail in §34 |
-| 64 | 20260826080000 | import_lazywait_addon_groups | — | 20260826080319 | import_lazywait_addon_groups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 08:03:19 UTC — Lazywait add-on groups become app options** (PR #266). Before it, `import_lazywait_catalog` wrote categories, products, variants and branches and mentioned modifiers **nowhere**, so `product_modifier_groups` held **zero** rows in Production and no product offered an option of any kind. Adds two partial unique indexes, `import_lazywait_addon_groups()`, and a redefinition of `import_lazywait_catalog` that calls it **last** — the helper links groups to products through `products.lazywait_item_id`, so it must run after that pull's products exist. **Two facts from the 2026-08-26 pull drive the design and both fail silently if assumed the other way:** membership is readable only from the group (every add-on's `addons_group_id` is null, 0 of 10 non-empty), and one add-on may sit in several groups while `modifiers.group_id` is `NOT NULL` — hence one modifier row per (group, add-on) pair and `lazywait_addon_id` deliberately **not** unique. **CI caught a real defect in the first revision:** the detach step sat inside a loop that only visits groups an item still references, so a group dropped by its last item would have stayed attached to the product forever — customers still asked to choose from a group Lazywait no longer offered and, since these groups can be required, still blocked from ordering. Fixed before merge; the detach now runs once after the loop over every Lazywait-owned group, guarded to skip entirely when the cache holds no items so a partial pull can never strip the menu. **Fidelity proven after applying:** both bodies byte-identical to the repository file (`ed5e10237e45a9824d830b850eb07595`, 8 109 chars; `8ccdc8cf823061ac5e635f8c92477344`, 14 816 chars), both indexes present, helper ACL `execute` to `service_role` only. **Verified by running the import:** `modifier_groups` 1 → 2, `modifiers` 3 → 13, links **0 → 1**; مشروب الوجبة imported at min 1 / max 1 / required with ten options, the unreferenced "Test" group skipped, the hand-made group untouched, zero duplicates, and the menu unmoved at 55/61 products and 144/147 tiers. **Version NOT aligned** — live carries `20260826080319` (§9-D, separate approval). Detail: `docs/LAZYWAIT.md`. **Current latest live version** |
+| 64 | 20260826080000 | import_lazywait_addon_groups | — | 20260826080319 | import_lazywait_addon_groups | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 08:03:19 UTC — Lazywait add-on groups become app options** (PR #266). Before it, `import_lazywait_catalog` wrote categories, products, variants and branches and mentioned modifiers **nowhere**, so `product_modifier_groups` held **zero** rows in Production and no product offered an option of any kind. Adds two partial unique indexes, `import_lazywait_addon_groups()`, and a redefinition of `import_lazywait_catalog` that calls it **last** — the helper links groups to products through `products.lazywait_item_id`, so it must run after that pull's products exist. **Two facts from the 2026-08-26 pull drive the design and both fail silently if assumed the other way:** membership is readable only from the group (every add-on's `addons_group_id` is null, 0 of 10 non-empty), and one add-on may sit in several groups while `modifiers.group_id` is `NOT NULL` — hence one modifier row per (group, add-on) pair and `lazywait_addon_id` deliberately **not** unique. **CI caught a real defect in the first revision:** the detach step sat inside a loop that only visits groups an item still references, so a group dropped by its last item would have stayed attached to the product forever — customers still asked to choose from a group Lazywait no longer offered and, since these groups can be required, still blocked from ordering. Fixed before merge; the detach now runs once after the loop over every Lazywait-owned group, guarded to skip entirely when the cache holds no items so a partial pull can never strip the menu. **Fidelity proven after applying:** both bodies byte-identical to the repository file (`ed5e10237e45a9824d830b850eb07595`, 8 109 chars; `8ccdc8cf823061ac5e635f8c92477344`, 14 816 chars), both indexes present, helper ACL `execute` to `service_role` only. **Verified by running the import:** `modifier_groups` 1 → 2, `modifiers` 3 → 13, links **0 → 1**; مشروب الوجبة imported at min 1 / max 1 / required with ten options, the unreferenced "Test" group skipped, the hand-made group untouched, zero duplicates, and the menu unmoved at 55/61 products and 144/147 tiers. **Version NOT aligned** — live carries `20260826080319` (§9-D, separate approval). Detail: `docs/LAZYWAIT.md` |
+| 65 | 20260826090000 | comp_members | — | 20260826114717 | comp_members | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:47:17 UTC — the comped-customer membership** (PR #269, squash `fa0faf8`). The owner asked for a 100% discount for a named group; nothing in the project could express it — `coupons` has no per-customer targeting, `campaigns` is applied but dormant and has no eligibility column, and `profiles` carries no group or tier. Adds `public.comp_members` (6 columns, RLS enabled, one own-row SELECT policy, one partial index) and `public.comp_member_audit` (mirroring `role_change_audit` down to the `on delete set null` FKs, so account deletion still works without erasing the money trail), three admin RPCs gated on `public.is_admin()` — role **and** AAL2 — and two `orders` columns, `is_comped` and `comp_discount_amount`. **Safe in isolation and verified so:** the table starts empty, and all **44** existing orders were confirmed unchanged after the apply (0 comped, 0 carrying a comp amount). **The customer read is COLUMN-scoped, not row-scoped** — `grant select (profile_id, is_active)` — because RLS filters rows and the own-row policy alone would have handed the customer `note`, which holds the administrator's private reason written *about* them, and `added_by`. That was a Codex review finding on the PR, confirmed real and fixed before merge; `comp_members_test.sql` case 10 asserts both columns raise `42501`. Zero client INSERT/UPDATE/DELETE grants: `admin_set_comp_member` is the only door. **Version NOT aligned** — live carries the apply-time stamp `20260826114717` (§9-D, separate approval). Detail in §35 |
+| 66 | 20260826100000 | comp_order_totals | — | 20260826115025 | comp_order_totals | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:50:25 UTC, immediately after row 65, which it depends on** — every redefined body reads `public.comp_members`, so applying this first would have failed on an unknown relation. Redefines exactly three functions: `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot`. **All three, deliberately** — the cart is priced in three places and this repository has twice shipped a rule applied to one path and not its twin (rows 61/62 are that same defect, two hours apart). A comp skips the coupon block (otherwise a limited code's `usage_count` burns on an order that was free anyway), skips loyalty redemption, and zeroes the total **before** VAT is derived from it, so VAT falls out at 0.00 with no second rule to keep in step. **`payment_status` becomes `'paid'` with `paid_at` set, and that is load-bearing rather than tidy:** `set_lazywait_initial_sync` parks a non-paid ONLINE order at `awaiting_payment` and `begin_payment_attempt` refuses a total of 0, so a comped order left `'pending'` would never reach the kitchen and could never be paid — stranded permanently. `paid_at` is stamped because watchdog rule R1 `PAID_ORDER_NOT_SYNCED` requires it non-null, so a null would put comped orders in a blind spot. **What did NOT change:** the branch delivery minimum (judged on `subtotal`, which a comp does not touch), `subtotal` as the real goods value, and `discount_amount` still meaning *coupon* so the admin coupon report is not corrupted. Generated from rows 61/62/60's files rather than retyped, after confirming each matched live byte-for-byte at generation time (`8bcc3354…` 17 937, `f99ed9f7…` 10 229, `60b753bc…` 4 617). **Fidelity proven after applying:** all three live bodies byte-identical to the merged file — `place_order` `b3d00f382d44c522a12fe5bf58d6c20b` (20 186 chars), `compute_order_snapshot` `e98d309a9b3a82701c485c79cc6d7cb5` (11 372), `insert_order_from_snapshot` `da8c457bade050e0a0280a88061d0304` (4 911). **Version NOT aligned** — live carries `20260826115025` (§9-D). Detail in §35 |
+| 67 | 20260826110000 | checkout_zero_total_idempotency | — | 20260826115122 | checkout_zero_total_idempotency | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:51:22 UTC — closes a PRE-EXISTING defect before comped customers made it reachable.** `begin_checkout_session` settles a zero-total cart inside a single call: it inserts the session, creates the order and flips the session to `'consumed'`. Its retry lookup required `status = 'pending_payment'` and it passed `p_idempotency_key = null` to `insert_order_from_snapshot`, so a retried call with the same cart key matched nothing at either level and produced **a second session and a second free order**. A flaky mobile network is enough — precisely the scenario order idempotency was added for in 20260707121400. **It had not bitten** because online payment is disabled and that check sits above the snapshot, and because a zero total was otherwise only reachable by fully covering a cart with points and a coupon; comped customers make the branch ordinary. Fixed in two independent layers: the reuse lookup now also matches a session that already produced an order (the sequential retry), and the key is carried onto the order so `orders_idempotency_idx` refuses a duplicate (the concurrent retry), with the loser returning the winner's session and dropping its own so one key still means one session. **Two limits recorded rather than glossed:** a client sending no idempotency key still has no protection (the mobile cart always sends one), and the concurrent branch is **not covered by the SQL suite** — reaching it needs the loser's first lookup before the winner commits and its recovery lookup after, an ordering one psql connection cannot produce. A case for it was written, observed to pass *without* exercising the delete, and removed; the gap is stated in the migration itself. The sequential retry IS covered, and was confirmed to **fail** against the pre-fix definition. **Fidelity proven after applying:** live body byte-identical to the merged file (`1cc3338fa22994e7483a90d8b3f64e49`, 6 408 chars). **Version NOT aligned** — live carries `20260826115122` (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **64 repository / 65 live** rows.
+Reconciliation check: the rows above detail **67 repository / 68 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–63
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–67
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
-because they are the most recent applications (2026-08-25 and 2026-08-26, §32
-and §33), and 62–63 because they are the applications of 2026-08-26 06:50 and
-06:52 UTC. Both were listed here as NOT APPLIED for a few hours between the
-merge of PR #263 and the owner approving their application; that state is gone
-and the rows now carry their live versions.
+because they were the most recent applications at the time (2026-08-25 and
+2026-08-26, §32 and §33), 62–63 because they are the applications of
+2026-08-26 06:50 and 06:52 UTC — both were listed here as NOT APPLIED for a few
+hours between the merge of PR #263 and the owner approving their application,
+and that state is gone — 64 because it is the add-on importer of the same
+morning, and 65–67 because they are the comped-customer application of
+2026-08-26 11:47–11:51 UTC (§35). Rows 65–67 were likewise listed as NOT
+APPLIED between the merge of PR #269 and the owner approving them.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
@@ -464,7 +471,9 @@ and the rows now carry their live versions.
 **§4 is authoritative for the class algebra**, and reconciled the full set
 exactly **as of 2026-08-07**: `A 8 + B 54 + C 3 + H 3 = 68` repository files,
 `A 8 + B 54 + C 3 + F 5 = 70` live rows. It has not been recomputed from live
-data since; §1 carries the current totals (97 files / 103 rows). The rows
+data since; §1's own paragraph carries a 2026-08-22 snapshot (97 files / 103 rows),
+superseded by the note directly beneath it — the current totals are **107 files
+/ 112 rows**. The rows
 between 2026-07-29 and 2026-08-22 have deliberately **not** been re-derived —
 doing so is a mechanical expansion with no new information, and the counts it
 would produce are already stated in §1 and §4.
@@ -3282,3 +3291,108 @@ PostgreSQL server reachable, no PostGIS, and no Docker daemon to start the
 `postgis/postgis:16-3.4` image CI uses. Nothing was applied to Production to
 validate it either — a rolled-back DDL transaction against Production is still a
 write, and no approval covers one here.
+
+---
+
+## 35. The comped-customer application (rows 65-67, applied 2026-08-26)
+
+Three files, applied in filename order on the owner's explicit in-conversation
+approval, one MCP `apply_migration` call per file, each followed by read-only
+verification before the next was sent.
+
+| | Repository file | Live version | Applied (UTC) |
+| --- | --- | --- | --- |
+| 65 | `20260826090000_comp_members.sql` | `20260826114717` | 11:47:17 |
+| 66 | `20260826100000_comp_order_totals.sql` | `20260826115025` | 11:50:25 |
+| 67 | `20260826110000_checkout_zero_total_idempotency.sql` | `20260826115122` | 11:51:22 |
+
+Live history moved **109 → 112**.
+
+### Order was mandatory, not stylistic
+
+Row 66 redefines three functions that all read `public.comp_members`. Applying
+it before row 65 fails on an unknown relation — loudly, so it would not have
+corrupted anything, but it would have left the money path half-changed. Row 67
+is independent of both and was applied last only because filename order says so.
+
+### The trap that was NOT stepped on
+
+`20260824100000_moyasar_payment_provider.sql` remains **unapplied and frozen**
+under §6, and it sorts **ahead of all three** of these files. "Apply the
+outstanding migrations" would therefore have applied Moyasar first. Each target
+was named explicitly instead, one call per file. Verified after all three:
+**zero** `%moyasar%` functions, **zero** `%moyasar%` history rows,
+`integration_settings.provider_name` still `tap` and still disabled.
+
+### Fidelity: proven, not assumed
+
+Every function body was hashed against the merged repository file after
+applying. All four are **byte-identical** — the same standard rows 61-64 were
+held to.
+
+| Function | md5 | chars |
+| --- | --- | --- |
+| `place_order` | `b3d00f382d44c522a12fe5bf58d6c20b` | 20 186 |
+| `compute_order_snapshot` | `e98d309a9b3a82701c485c79cc6d7cb5` | 11 372 |
+| `insert_order_from_snapshot` | `da8c457bade050e0a0280a88061d0304` | 4 911 |
+| `begin_checkout_session` | `1cc3338fa22994e7483a90d8b3f64e49` | 6 408 |
+
+This matters more here than usual: the three pricing bodies were **generated**
+from their predecessors rather than retyped, and the generation was itself
+verified against live hashes beforehand (`8bcc3354…`, `f99ed9f7…`,
+`60b753bc…`). Both ends of that chain are now recorded.
+
+### Nothing was charged differently
+
+Before and after, read-only:
+
+- `orders`: **44** rows, **0** comped, **0** carrying a comp amount;
+- `comp_members`: **0** rows. Nobody is comped until an administrator adds
+  somebody through **Finance → Comped Customers**;
+- `comp_member_audit`: **0** rows.
+
+The feature is applied and **dormant**. That is the honest state: applying these
+migrations did not give anybody free food, it made it possible to.
+
+### Advisors after the apply
+
+**Zero ERROR-level findings.** The three new RPCs each draw the generic
+`authenticated_security_definer_function_executable` WARN, which is the house
+pattern — they sit alongside fifteen pre-existing `admin_*` functions with the
+identical lint, all `SECURITY DEFINER`, all granted to `authenticated`, all
+gating internally on `is_admin()`. Nothing names `is_comped` or
+`comp_discount_amount`.
+
+### What the SQL suite does and does not cover
+
+`supabase/tests/comp_members_test.sql` is the **first suite in this repository
+that places a zero-total order** — 18 cases, run by CI and reproduced locally
+against the real `.github/sql-ci/run.sh` harness (107 migrations applied
+cleanly, 55/57 suites passing, 2 pre-existing quarantines, 0 new failures).
+
+Two things are worth stating plainly rather than leaving to be inferred:
+
+- the zero-total retry case was confirmed to **FAIL** against the pre-fix
+  `begin_checkout_session`, so it tests something real;
+- the **concurrent** recovery branch of row 67 is **not covered**, and cannot be
+  from one connection. A case for it was written, seen to pass without
+  exercising the code, and deleted. The gap is recorded in the migration body.
+
+A defect was caught by that harness before it could reach Production: `case …
+end` yields `text`, and the bare literal it replaced was an untyped literal
+Postgres coerced to the enum, so the `orders` insert needed an explicit
+`::public.payment_status` cast. It would have failed at apply time.
+
+### Still outstanding after this application
+
+Two owner actions remain before the feature is fully visible:
+
+1. **the app build** — `CUSTOMER_ORDER_SELECT` now names `is_comped` and
+   `comp_discount_amount`. Those columns exist as of row 65, so the build is
+   safe to ship *now*; shipping it *before* row 65 would have made order history
+   fail entirely, because PostgREST rejects the whole select when one column is
+   missing;
+2. **the `lazywait-sync` redeploy** — comped tickets are unlabelled at the
+   branch until it happens. Order-independent: the worker reads orders through
+   `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
+   missing column yields `undefined` rather than a failed select.

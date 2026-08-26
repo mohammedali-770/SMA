@@ -1082,6 +1082,39 @@ Two refinements the data forced, neither of them a departure from that decision:
 The invariant that survived unchanged: **the price charged may never exceed the
 price displayed.**
 
+## 20. After the 2026-08-26 comped-customer application — two open actions
+
+**Status:** OWNER DECISION ×2. Neither blocks anything today, because nobody is
+comped yet.
+
+On 2026-08-26 the three comped-customer migrations were applied on explicit
+owner approval, in filename order, one MCP `apply_migration` call per file with
+read-only verification between each. Live history moved **109 → 112**; all four
+redefined function bodies were hashed afterwards and are byte-identical to the
+merged files. Full record: [`MIGRATIONS.md`](MIGRATIONS.md) §35 and ledger rows
+65–67; behaviour in [`DISCOUNTS_CAMPAIGNS.md`](DISCOUNTS_CAMPAIGNS.md) Part 2.
+
+**Applied, and dormant.** `comp_members` is empty, so no customer is comped and
+every order still prices exactly as before. All 44 pre-existing orders were
+verified unchanged. The feature goes live for a person the moment an
+administrator adds them in **Finance → Comped Customers** — and from then on
+every order that person places is free in full, delivery fee included, with
+**no cap**. That was the owner's decision on 2026-08-26 and is recorded rather
+than softened: one wrongly-added member is unlimited free food, bounded by
+nothing downstream. A per-period cap would live on `comp_members` and needs no
+reshaping to add.
+
+| # | Action | Why it is still open |
+| --- | --- | --- |
+| 1 | Ship the app build | The checkout "Complimentary" line, the receipt line and the submit-time membership re-check ship with it. **Safe to ship now** — the two new `orders` columns exist as of row 65. Shipping it *before* that would have broken order history entirely, because `CUSTOMER_ORDER_SELECT` names them and PostgREST rejects the whole select when one column is missing. |
+| 2 | Redeploy `lazywait-sync` | Until it happens, a comped ticket reaches the branch **unlabelled** — `buildCreateOrderPayload` sends no order-level money and lines carry undiscounted menu prices, so the cashier cannot tell a free order from a paid one. Order-independent with respect to the migration: the worker reads orders through `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a missing column yields `undefined` rather than a failed select. The repo's `_shared/lazywait.ts` is already ahead of the deployed v4 for this reason. |
+
+Version alignment for rows 65–67 is deliberately **not** listed as an action.
+Live carries the apply-time stamps `20260826114717` / `20260826115025` /
+`20260826115122` rather than the repository filenames, which is class B and
+expected; §9-D makes realignment a separate live-history write with its own
+approval, and leaving it alone is the correct default.
+
 ## Owner-action closeout rule
 
 When an item is completed:
