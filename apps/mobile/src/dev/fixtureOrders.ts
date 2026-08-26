@@ -54,6 +54,8 @@ const BASE = {
   deliveryFee: 15,
   discountAmount: 0,
   loyaltyDiscountAmount: 0,
+  isComped: false,
+  compDiscountAmount: 0,
   vatAmount: 12.13,
   total: 93,
   loyaltyPointsEarned: 93,
@@ -157,6 +159,19 @@ export const ORDER_CANCELLED = order('ord-cancelled', 'cancelled', {
   syncBlockedReason: 'no_channel',
 });
 
+/**
+ * A comped member's receipt: subtotal and delivery fee shown at their real
+ * value, VAT 0.00, total 0.00, and the comp row explaining the gap. Marked paid
+ * on arrival, which is what place_order writes and what keeps the order out of
+ * `awaiting_payment`.
+ */
+export const ORDER_COMPED = order('ord-comped', 'received', {
+  paymentMethod: 'online', paymentStatus: 'paid',
+  isComped: true, compDiscountAmount: 93, vatAmount: 0, total: 0,
+  loyaltyPointsEarned: 0,
+  syncBlockedReason: 'no_channel',
+});
+
 /** The My Orders list: one card per interesting state. */
 export const FIXTURE_ORDER_LIST: Order[] = [
   ORDER_CONFIRMED,
@@ -182,6 +197,7 @@ export const FIXTURE_RECEIPTS = {
   'refund-pending': ORDER_REFUND_PENDING,
   refunded: ORDER_REFUNDED,
   'refund-failed': ORDER_REFUND_FAILED,
+  comped: ORDER_COMPED,
   ready: ORDER_READY,
   completed: ORDER_COMPLETED,
   cancelled: ORDER_CANCELLED,

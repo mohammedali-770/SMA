@@ -25,6 +25,7 @@ import { OperationsAlertsCapability, operationsAlertsTabVisible } from '../lib/o
 import { canTriageRole } from '../lib/orderIntegrityTriage';
 import { ADMIN_LOCALES } from './admin/adminLocales';
 import { ReportsPanel } from './admin/ReportsPanel';
+import { CompMembersPanel } from './admin/CompMembersPanel';
 import { SettingsPanel } from './admin/SettingsPanel';
 import { IntegrationsPanel } from './admin/IntegrationsPanel';
 import { BannerManagementPanel } from './admin/BannerManagementPanel';
@@ -284,6 +285,11 @@ export const AdminDashboard: React.FC = () => {
 
           {/* TAB 5: FINANCIAL REPORTS & ANALYTICS (PHASE 9) */}
           {activeTab === 'reports' && <ReportsPanel />}
+
+          {/* TAB: COMPED CUSTOMERS — who orders at no charge, and why.
+              Ungated: the RPCs it calls refuse a non-admin themselves, and a
+              capability probe would only hide the reason for the refusal. */}
+          {activeTab === 'comps' && <CompMembersPanel lang={adminLang} />}
 
           {/* TAB 6: INTEGRATIONS (secure provider slots, grouped) */}
           {activeTab === 'integrations' && <IntegrationsPanel />}

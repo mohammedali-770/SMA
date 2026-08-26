@@ -156,6 +156,79 @@ describe('computePreviewTotals — discounts', () => {
   });
 });
 
+describe('computePreviewTotals — comped customers', () => {
+  // The owner's decision, 2026-08-26: automatic, zeroes EVERYTHING including
+  // the delivery fee, no cap. These mirror the SQL suite's cases 4 and 8.
+  it('zeroes the total and reports what the comp was worth', () => {
+    const t = computePreviewTotals({ ...base, items: [line(20, 2)], comped: true });
+    expect(t.total).toBe(0);
+    expect(t.compDiscount).toBe(50);   // 40 goods + 10 delivery
+    expect(t.subtotal).toBe(40);       // the real value of the goods is kept
+    expect(t.deliveryFee).toBe(10);    // still shown, still comped
+  });
+
+  it('leaves a non-comped cart exactly as before', () => {
+    const t = computePreviewTotals({ ...base, items: [line(20, 2)] });
+    expect(t.total).toBe(50);
+    expect(t.compDiscount).toBe(0);
+  });
+
+  it('treats an absent flag as not comped', () => {
+    const t = computePreviewTotals({ ...base, items: [line(20, 2)], comped: undefined });
+    expect(t.total).toBe(50);
+    expect(t.compDiscount).toBe(0);
+  });
+
+  it('does not comp a pickup delivery fee that was never charged', () => {
+    const t = computePreviewTotals({
+      ...base, items: [line(20, 2)], orderType: 'pickup', comped: true,
+    });
+    expect(t.total).toBe(0);
+    expect(t.compDiscount).toBe(40);   // no fee to comp on pickup
+  });
+
+  it('still reports belowMinimum — a comp does not buy past the branch minimum', () => {
+    // The server refuses this too: place_order judges the minimum on subtotal,
+    // which a comp does not change.
+    const t = computePreviewTotals({ ...base, items: [line(20, 1)], comped: true });
+    expect(t.belowMinimum).toBe(true);
+    expect(t.missingForMinimum).toBe(5);
+    expect(t.total).toBe(0);
+  });
+
+  it('ignores a coupon and loyalty entirely, exactly as the server does', () => {
+    // `place_order` and `compute_order_snapshot` skip the coupon block and the
+    // loyalty redemption for a comped customer, so neither is consumed and the
+    // order records the FULL amount as comp_discount_amount. Subtracting them
+    // here would show two reductions that never happen and under-report the
+    // comp by their combined value.
+    const t = computePreviewTotals({
+      ...base, items: [line(20, 2)], couponDiscount: 10,
+      loyaltyPoints: 100, discountPerPoint: 0.1, comped: true,
+    });
+    expect(t.couponDiscount).toBe(0);
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.compDiscount).toBe(50);   // 40 goods + 10 delivery, nothing removed
+    expect(t.total).toBe(0);
+  });
+
+  it('still applies both for a customer who is not comped', () => {
+    const t = computePreviewTotals({
+      ...base, items: [line(20, 2)], couponDiscount: 10,
+      loyaltyPoints: 100, discountPerPoint: 0.1,
+    });
+    expect(t.couponDiscount).toBe(10);
+    expect(t.loyaltyDiscount).toBe(10);
+    expect(t.total).toBe(30);
+  });
+
+  it('never reports a negative comp on an empty cart', () => {
+    const t = computePreviewTotals({ ...base, items: [], comped: true });
+    expect(t.total).toBe(0);
+    expect(t.compDiscount).toBe(0);
+  });
+});
+
 describe('canSubmitOrder', () => {
   const totals = computePreviewTotals({ ...base, items: [line(20, 2)] }); // 40, above minimum
 

@@ -269,6 +269,11 @@ export function mapOrder(o: DbCustomerOrderWithItems): Order {
     deliveryFee: Number(o.delivery_fee),
     discountAmount: Number(o.discount_amount),
     loyaltyDiscountAmount: Number(o.loyalty_discount_amount),
+    // Default rather than assert: an app build can outlive the migration that
+    // adds these, and a receipt that renders without the comp line is a much
+    // better failure than one that throws.
+    isComped: Boolean(o.is_comped),
+    compDiscountAmount: Number(o.comp_discount_amount ?? 0),
     vatAmount: Number(o.vat_amount),
     total: Number(o.total),
     loyaltyPointsEarned: o.loyalty_points_earned ?? 0,

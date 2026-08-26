@@ -324,6 +324,32 @@ instead of the live config row.) Field-by-field state:
   "customer_cell": "541234567", "country_code": "+966",
   "order_details": "<orders.notes>", "source": "LWAPI" }
 ```
+- `order_details` carries the customer's own kitchen note, and — for a **comped**
+  order — a label in front of it:
+
+  ```
+  *** COMPLIMENTARY / ضيافة *** — No onions
+  ```
+
+  Without it the branch is told **nothing**: no order-level money is sent at all
+  (Q9) and each line carries its undiscounted menu price, so a free ticket is
+  byte-for-byte indistinguishable from a paid one and the cashier has no way to
+  know why nobody is paying. It is prefixed rather than appended so it survives
+  a POS display that truncates a long note.
+
+  It is deliberately **not** the contract's `is_paid` flag. `is_paid` changes the
+  POS's own payment state, which is the financial signal CLAUDE.md §6 reserves
+  for a separate owner decision; this only annotates the field that already
+  carries the customer's instructions, and states what the order **is** rather
+  than instructing the cashier what to collect. `lazywait.test.ts` pins both the
+  label and the continued absence of `isPaid`. Comped orders themselves are
+  documented in `docs/DISCOUNTS_CAMPAIGNS.md`.
+
+  **Not live until `lazywait-sync` is redeployed** (a §5 action). Until then a
+  comped order syncs correctly but arrives unlabelled. The redeploy is
+  order-independent with respect to the migration: the worker reads orders
+  through `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
+  missing `is_comped` column yields `undefined` rather than a failed select.
 - `name` and `names{en,ar}` carry the **chosen tier**, not the bare product name
   — `Chicken Wings — Small` / `أجنحة الدجاج — صغير`, composed by
   `posLineName`. **The POS renders the name we send; it does not resolve

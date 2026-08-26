@@ -185,6 +185,10 @@ export interface Order {
   deliveryFee: number;
   discountAmount: number;
   loyaltyDiscountAmount: number;
+  /** The order was placed by a comped member (`public.comp_members`). */
+  isComped: boolean;
+  /** What the comp was worth: everything the customer would have owed. */
+  compDiscountAmount: number;
   vatAmount: number;
   total: number;
   loyaltyPointsEarned: number;

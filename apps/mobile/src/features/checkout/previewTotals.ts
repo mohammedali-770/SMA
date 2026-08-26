@@ -9,9 +9,13 @@
  * a second, drifting calculation to appear next to the first.
  *
  * This is still a PREVIEW. `place_order` recomputes every amount server-side
- * from product and modifier ids and is the only authority — see
- * `subtotal` derivation via `cartSubtotal`, which reads the same `unitPrice` the
- * cart store already stores. Nothing here may be sent as an amount.
+ * from product and modifier ids and is the only authority — see `subtotal`
+ * derivation via `cartSubtotal`, which reads the same `unitPrice` the cart store
+ * already stores. Nothing here may be sent as an amount.
+ *
+ * That applies to the comp as well: `comped` only decides what this screen
+ * SHOWS. The server reads `public.comp_members` itself and never trusts a
+ * client flag, so a customer who forged one would still be charged in full.
  */
 import { cartSubtotal } from '../../utils/format';
 import type { CartItem } from '../../types/models';
@@ -29,6 +33,12 @@ export interface PreviewInput {
   loyaltyPoints: number;
   /** Currency value of one loyalty point. */
   discountPerPoint: number;
+  /**
+   * The customer is a comped member (`public.comp_members`, active). The server
+   * decides this; the flag is here only so the screen shows 0.00 instead of a
+   * full price the customer will not be charged.
+   */
+  comped?: boolean;
 }
 
 export interface PreviewTotals {
@@ -36,6 +46,12 @@ export interface PreviewTotals {
   deliveryFee: number;
   couponDiscount: number;
   loyaltyDiscount: number;
+  /**
+   * What the comp is worth: everything that would otherwise have been owed,
+   * delivery fee included. 0 when the customer is not comped. Kept apart from
+   * `couponDiscount` because a comp is not a coupon.
+   */
+  compDiscount: number;
   total: number;
   /** True when delivery is selected and the subtotal is under the minimum. */
   belowMinimum: boolean;
@@ -75,13 +91,27 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
 
   // Discounts never exceed the goods value: a coupon plus loyalty must not make
   // the delivery fee free or drive the total negative.
-  const couponDiscount = money(Math.min(input.couponDiscount, subtotal));
+  //
+  // A comped customer gets NEITHER, and that is not a display choice — it is
+  // what the server does. `place_order` and `compute_order_snapshot` both skip
+  // the coupon block and the loyalty redemption entirely for a comped customer,
+  // so the code is not consumed and the points are not burned. Subtracting them
+  // here would show two reductions that will not happen, and would report a
+  // comp SMALLER than the `comp_discount_amount` the order actually records.
+  const comped = Boolean(input.comped);
+  const couponDiscount = comped ? 0 : money(Math.min(input.couponDiscount, subtotal));
   const loyaltyCap = Math.max(0, subtotal - couponDiscount);
-  const loyaltyDiscount = money(
-    Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap),
-  );
+  const loyaltyDiscount = comped
+    ? 0
+    : money(Math.min(input.loyaltyPoints * input.discountPerPoint, loyaltyCap));
 
-  const total = money(subtotal + deliveryFee - couponDiscount - loyaltyDiscount);
+  // A comped customer owes nothing at all. The comp is worth exactly what was
+  // about to be charged — delivery fee included, which is what the owner asked
+  // for. Mirrors place_order and compute_order_snapshot, which zero v_total in
+  // the same position, before VAT is derived from it.
+  const payable = money(subtotal + deliveryFee - couponDiscount - loyaltyDiscount);
+  const compDiscount = comped ? payable : 0;
+  const total = comped ? 0 : payable;
 
   // The minimum is judged on goods only — adding a delivery fee to clear the
   // branch minimum would let a customer buy their way past it with the fee.
@@ -95,6 +125,7 @@ export function computePreviewTotals(input: PreviewInput): PreviewTotals {
     deliveryFee,
     couponDiscount,
     loyaltyDiscount,
+    compDiscount,
     total,
     belowMinimum,
     missingForMinimum,

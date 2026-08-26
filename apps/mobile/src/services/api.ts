@@ -369,6 +369,56 @@ export const coupons = {
 };
 
 // ---------------------------------------------------------------------------
+// Comped membership (public.comp_members)
+//
+// DISPLAY ONLY. `place_order` and `compute_order_snapshot` read the same table
+// themselves and never trust anything the client sends, so this cannot change
+// what a customer is charged - it only stops the checkout screen quoting a
+// price the customer will not be asked for.
+//
+// RLS lets a customer read exactly one row: their own. A missing row and an
+// inactive row are the same answer, which is why this returns a plain boolean.
+// ---------------------------------------------------------------------------
+export const compMembership = {
+  /**
+   * Whether the signed-in customer currently orders at no charge, or `null`
+   * when it could not be determined (signed out, network failure, RLS refusal).
+   *
+   * The three-state answer exists because the two callers want opposite things
+   * from a failure. Painting the screen wants a definite answer and a safe
+   * default; re-checking at submission wants to know that it does NOT have one,
+   * so it can leave the server as the authority instead of blocking a valid
+   * order on a flaky network — exactly what `refreshAvailability` already does
+   * a few lines earlier in the same function.
+   *
+   * Only these two columns are readable: `note` holds the administrator's
+   * private reason and is not granted to the customer.
+   */
+  async readComped(): Promise<boolean | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) return null;
+    const { data, error } = await supabase
+      .from('comp_members')
+      .select('profile_id, is_active')
+      .eq('profile_id', user.id)
+      .maybeSingle();
+    if (error) return null;
+    return Boolean(data?.is_active);
+  },
+
+  /**
+   * The same question with a safe default for painting the screen.
+   *
+   * Showing full price to a comped customer is a cosmetic disappointment;
+   * showing 0.00 to someone who will be charged is a broken promise. That
+   * asymmetry is why an unknown answer resolves to `false`.
+   */
+  async isComped(): Promise<boolean> {
+    return (await compMembership.readComped()) ?? false;
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Addresses (customer-owned, RLS-isolated)
 //
 // The payload/ownership/error rules live in services/addressPayload.ts, which is

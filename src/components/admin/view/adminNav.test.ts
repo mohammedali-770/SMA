@@ -68,7 +68,7 @@ describe('the agreed structure', () => {
     expect(tabsOf('operations')).toEqual(['orders', 'health', 'alerts', 'integrity']);
     expect(tabsOf('catalog')).toEqual(['menu', 'banners']);
     expect(tabsOf('branches')).toEqual(['branches']);
-    expect(tabsOf('finance')).toEqual(['reports']);
+    expect(tabsOf('finance')).toEqual(['reports', 'comps']);
     expect(tabsOf('system')).toEqual(['integrations', 'settings', 'legal']);
   });
 

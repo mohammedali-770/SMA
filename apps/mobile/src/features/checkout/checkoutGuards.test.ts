@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { appliedCouponSurvives, decideQuantityChange, resolveBlockReason } from './checkoutGuards';
+import { appliedCouponSurvives, decideCompChange, decideQuantityChange, resolveBlockReason } from './checkoutGuards';
 
 /**
  * Replays a sequence of stepper taps the way CheckoutScreen does: a synchronous
@@ -169,5 +169,35 @@ describe('appliedCouponSurvives', () => {
 
   it('drops the coupon when the cart empties', () => {
     expect(appliedCouponSurvives(applied(104), 0)).toBe(false);
+  });
+});
+
+describe('decideCompChange', () => {
+  // An administrator revoked the comp while checkout sat open. Letting this
+  // through would charge the customer full price against a screen reading 0.00.
+  it('blocks when the comp was lost, and corrects the screen', () => {
+    expect(decideCompChange({ displayed: true, fresh: false }))
+      .toEqual({ action: 'block', comped: false });
+  });
+
+  it('lets a newly-comped order through, charging less than was displayed', () => {
+    expect(decideCompChange({ displayed: false, fresh: true }))
+      .toEqual({ action: 'update', comped: true });
+  });
+
+  it('does nothing when the answer has not changed', () => {
+    expect(decideCompChange({ displayed: true, fresh: true }))
+      .toEqual({ action: 'none', comped: true });
+    expect(decideCompChange({ displayed: false, fresh: false }))
+      .toEqual({ action: 'none', comped: false });
+  });
+
+  it('never blocks on an unknown answer — the server stays the authority', () => {
+    // A flaky network must not refuse a valid order. Critically this holds for
+    // a COMPED customer too: null must not be read as "no longer comped".
+    expect(decideCompChange({ displayed: true, fresh: null }))
+      .toEqual({ action: 'none', comped: true });
+    expect(decideCompChange({ displayed: false, fresh: null }))
+      .toEqual({ action: 'none', comped: false });
   });
 });

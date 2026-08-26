@@ -132,7 +132,8 @@ export interface DbOrder {
   branch_id: string; branch_name_en: string | null; branch_name_ar: string | null;
   status: OrderStatus; order_type: OrderType;
   subtotal: number; delivery_fee: number; discount_amount: number;
-  loyalty_discount_amount: number; vat_amount: number; total: number;
+  loyalty_discount_amount: number; is_comped?: boolean; comp_discount_amount?: number;
+  vat_amount: number; total: number;
   payment_status: 'pending' | 'paid'; payment_method: string | null;
   payment_provider?: string | null; paid_at?: string | null;
   coupon_code: string | null; notes: string | null; created_at: string;
@@ -183,6 +184,8 @@ export interface DbCustomerOrder {
   delivery_fee: number;
   discount_amount: number;
   loyalty_discount_amount: number;
+  is_comped?: boolean;
+  comp_discount_amount?: number;
   vat_amount: number;
   total: number;
   loyalty_points_earned: number;
