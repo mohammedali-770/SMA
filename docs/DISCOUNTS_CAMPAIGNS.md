@@ -1,4 +1,16 @@
-# Discounts & Promotional Campaigns (#100)
+# Discounts, Campaigns & Comped Customers
+
+This document owns two separate mechanisms, at very different stages:
+
+| Mechanism | Status |
+| --- | --- |
+| **Campaigns** (#100) | Schema applied to Production, **inert** — no discount can affect a total. |
+| **Comped customers** (2026-08-26) | Built, tested, **awaiting the owner applying three migrations**. Once applied it is LIVE and automatic. |
+
+Coupons (`public.coupons` + `validate_coupon`) are the third and oldest
+mechanism; they are live and are described where they are used rather than here.
+
+## Part 1 — Campaigns (#100)
 
 Status: **schema APPLIED to Production; NOT yet wired into pricing.**
 
@@ -102,3 +114,205 @@ bake wrong pricing into a server-authoritative RPC. Items **1**, **3**, **4**,
 - No applied migration is ever edited. Any change to this schema is a **new**
   migration applied through the owner-approved `apply_migration` workflow in
   `docs/MIGRATIONS.md`.
+
+---
+
+# Part 2 — Comped customers (100% off, automatic)
+
+Status: **built and tested; three migrations are NOT yet applied.** Nothing in
+Production reads `comp_members` today because the table does not exist there
+yet. Applying the migrations is an owner action under CLAUDE.md §5, and the day
+it happens the feature is live for anybody in the table.
+
+## What the owner asked for
+
+A named group — staff, family, investors — who order without paying. Confirmed
+on 2026-08-26:
+
+- **automatic on every order** (no code to type and none to leak);
+- **everything goes to 0.00**, including the delivery fee;
+- **no limit** — no per-order, daily or monthly cap.
+
+Nothing in the project could express this before. `coupons` has no per-customer
+targeting of any kind; `campaigns` (Part 1) has none either — `per_user_limit`
+counts redemptions by *any* user and there is no eligibility column — and
+`profiles` carries no group, segment or tier (`profiles.role` is staff-console
+routing and is read by **zero** pricing code).
+
+## The risk, stated plainly
+
+**Uncapped automatic free ordering is the highest-abuse surface in the app.**
+One wrongly-added member is unlimited free food, and nothing downstream stops
+it. Everything below makes a comp **traceable** — a mandatory reason, a
+permanent audit row, an AAL2-gated writer, `is_comped` stamped on every order —
+but nothing makes it **bounded**. That is the owner's decision, recorded rather
+than smoothed over.
+
+A per-period cap would live on `comp_members` and needs no reshaping of any of
+this to add later.
+
+## What a comp does to a total
+
+Applied identically in **both** pricing functions, because a rule applied to one
+and not its twin is a bug:
+
+1. the **coupon block is skipped** — otherwise a limited code's `usage_count` is
+   burned on an order that was free anyway, and a mistyped code raises at a
+   customer who owes nothing;
+2. **loyalty redemption is skipped** — no burning points against free food.
+   `loyalty_points_earned` needs no special case: `floor(0 × rate)` is 0;
+3. the total is **zeroed before VAT is derived from it**, so VAT falls out at
+   0.00 with no second rule to keep in step;
+4. `orders.is_comped` and `orders.comp_discount_amount` are stamped, and
+   `payment_status` is written **`paid`** with `paid_at` set.
+
+**What does NOT change:** the branch delivery minimum still applies (it protects
+the kitchen from an uneconomic run and is judged on `subtotal`, which a comp
+does not touch); `subtotal` still records the real value of the goods; and
+`discount_amount` still means *coupon*, so the admin coupon-usage report is not
+silently corrupted.
+
+## Why `payment_status = 'paid'` is load-bearing, not tidiness
+
+This is the part that decides whether the food gets cooked.
+
+`set_lazywait_initial_sync` parks a **non-paid ONLINE** order at
+`lazywait_sync_state = 'awaiting_payment'`, and `begin_payment_attempt` refuses
+a total of 0 with *"Order total must be greater than zero"*. `place_order`
+resolves the payment method **before** the total exists, so a comped order is
+still assigned `'online'` whenever that is the configured default. Left
+`'pending'`, such an order would therefore **never reach the kitchen and could
+never be paid** — stranded permanently.
+
+Writing `'paid'` sends it down the trigger's `else` branch and straight to the
+POS queue. The precedent is already in the repository: `begin_checkout_session`
+has always written `'paid'` for a zero total.
+
+`paid_at` is stamped for the same reason it matters elsewhere: watchdog rule
+**R1 `PAID_ORDER_NOT_SYNCED`** requires `paid_at is not null`, so a comped
+pickup order left with a null timestamp would be invisible to the alert that
+exists to catch a paid order the kitchen never received.
+
+## A pre-existing defect this work also fixes
+
+`begin_checkout_session` settles a zero-total cart inside a **single** call: it
+inserts the session, creates the order and flips the session to `'consumed'`.
+Its retry-safety lookup required `status = 'pending_payment'`, and it passed
+`p_idempotency_key = null` to `insert_order_from_snapshot` — so a retried call
+with the same cart key matched nothing at either level and produced **a second
+session and a second free order**.
+
+It has not bitten because online payment is disabled and the availability check
+sits above the snapshot, so every call raises before reaching that branch. A
+zero total is also currently only reachable by fully covering a cart with
+loyalty points and a coupon. Comped customers make that branch ordinary rather
+than exotic, so it is closed here, before it is stood on.
+
+The fix has two independent layers: the reuse lookup now also matches a session
+that already produced an order (the sequential retry), and the idempotency key
+is carried onto the order so `orders_idempotency_idx` refuses a duplicate (the
+concurrent retry). **Residual limit, stated rather than hidden:** a client that
+sends no idempotency key at all still has no protection. The mobile cart always
+sends one (`CartProvider` generates a uuid per cart), so this is a contract note
+rather than a live gap.
+
+## What the branch sees
+
+`buildCreateOrderPayload` sends **no order-level money at all** (see Q9 in
+`docs/integrations/Lazywait_API_Reference.md`) and each line carries its
+undiscounted menu price. A comped ticket would therefore be
+**indistinguishable** from a full-price one — the cashier would have no way to
+know why nobody is paying.
+
+So the order-level free-text note carries a label:
+
+```
+*** COMPLIMENTARY / ضيافة *** — <the customer's own kitchen note>
+```
+
+It is prefixed, so it survives a POS display that truncates a long note.
+
+It is deliberately **not** the contract's `is_paid` flag. That distinction is
+the point: `is_paid` changes the POS's own payment state, which is the financial
+signal CLAUDE.md §6 reserves for a separate owner decision; the label only
+annotates the field that already carries the customer's instructions. For the
+same reason the text states what the order **is** rather than instructing the
+cashier what to collect.
+
+**The label only reaches the branch after `lazywait-sync` is redeployed**, which
+is its own §5 action. Until then a comped order syncs correctly but arrives
+unlabelled.
+
+## Administration
+
+**Finance → Comped Customers** in the console (`CompMembersPanel`).
+
+- Search any customer by name, email or phone (reuses
+  `admin_search_role_candidates`, already admin-gated).
+- Adding or removing requires a **reason of 3–500 characters**. It is enforced
+  in the RPC, not only in the form.
+- The confirmation names the person and spells out the consequence — *"Every
+  order they place will be free in full — delivery fee included — with no cap"*
+  — rather than asking "Are you sure?".
+- Membership is **deactivated, never deleted**, so an order stamped `is_comped`
+  months ago stays explicable.
+- `comp_member_audit` is permanent. It deliberately does **not** use
+  `ops_change_events`, which self-prunes after one day: fine for operational
+  noise, useless as a money trail.
+
+Every write goes through `admin_set_comp_member`, which is SECURITY DEFINER and
+gated on `public.is_admin()` — role **and** AAL2. There is **no client write
+grant** on either table, so the console cannot bypass that path even by
+accident.
+
+## What the customer sees
+
+The checkout screen reads its own `comp_members` row (RLS permits exactly one
+row: your own) and shows a **Complimentary** line plus *"This order is on us —
+nothing to pay."* Without it the customer would see full price and then be
+charged nothing, which is a confusing way to give someone a gift.
+
+This is display only. `computePreviewTotals` is a preview; the server reads the
+table itself and never trusts a client flag, so a forged one changes nothing
+about what is charged.
+
+The receipt carries the same line — without it a comped receipt reads
+*"Subtotal 64.00, Delivery 15.00, Total 0.00"* and does not add up on the page.
+
+## Files
+
+| File | What it does |
+| --- | --- |
+| `supabase/migrations/20260826090000_comp_members.sql` | `comp_members`, `comp_member_audit`, three admin RPCs, `orders.is_comped` / `orders.comp_discount_amount` |
+| `supabase/migrations/20260826100000_comp_order_totals.sql` | `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot` |
+| `supabase/migrations/20260826110000_checkout_zero_total_idempotency.sql` | `begin_checkout_session` retry fix |
+| `supabase/tests/comp_members_test.sql` | 17 cases — the first suite anywhere that places a zero-total order |
+| `src/lib/compMembersApi.ts`, `src/components/admin/CompMembersPanel.tsx` | the console panel |
+| `apps/mobile/src/features/checkout/previewTotals.ts` | the preview line |
+| `supabase/functions/_shared/lazywait.ts` | the POS label |
+
+## Deploy order — this one matters
+
+1. **Apply the three migrations, in filename order.** Nothing works before this
+   and nothing breaks by it: no existing order is touched and `comp_members`
+   starts empty.
+2. **Then** ship the app build. `CUSTOMER_ORDER_SELECT` now names `is_comped`
+   and `comp_discount_amount`, and PostgREST rejects the **whole** select when
+   one column is missing — so a build that reaches customers first would make
+   order history fail to load entirely rather than degrade. Same trap as
+   `ORDER_ITEM_SELECT` and `lazywait-sync` (CLAUDE.md §8).
+3. **Then, separately,** redeploy `lazywait-sync` for the POS label. This one is
+   order-independent: the worker reads orders through
+   `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
+   missing column yields `undefined` rather than a failed select.
+
+Each of the three is its own owner action under CLAUDE.md §5.
+
+## Known follow-up, not fixed here
+
+`customer_order_state` reports `'final_failure_refund_pending'` for a paid order
+whose POS sends exhaust the retry budget. For a comped order that is refund
+language for money nobody paid, and `order_refund_due` (which requires
+`total > 0`) will never enrol it. The defect pre-dates this work; comped orders
+make it reachable. Flagged rather than fixed, because changing refund language
+is payment-adjacent and §6 is active.

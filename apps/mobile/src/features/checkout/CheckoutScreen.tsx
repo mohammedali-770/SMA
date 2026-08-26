@@ -38,7 +38,7 @@ import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
-import { checkout, coupons, orders, payments } from '../../services/api';
+import { checkout, compMembership, coupons, orders, payments } from '../../services/api';
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
@@ -364,6 +364,17 @@ export function CheckoutScreen() {
   // One tested function (previewTotals) owns every dependent number, so editing
   // a quantity below moves the line total, subtotal, discounts, minimum-order
   // eligibility and the final total together. place_order remains authoritative.
+  // Comped membership. Read once when the screen mounts, because it changes
+  // only when an administrator changes it - not while somebody is checking out.
+  // It never gates submission: a stale `false` simply shows the ordinary price
+  // and the server still charges nothing, which is the safe direction to fail.
+  const [comped, setComped] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    compMembership.isComped().then((v) => { if (alive) setComped(v); });
+    return () => { alive = false; };
+  }, [profile?.id]);
+
   const availablePoints = profile?.loyaltyPoints ?? 0;
   const loyaltyEnabled = Boolean(loyalty?.isEnabled) && availablePoints >= (loyalty?.minPointsToRedeem ?? Infinity);
   const couponDiscount = couponResult?.ok ? couponResult.discount : 0;
@@ -376,7 +387,8 @@ export function CheckoutScreen() {
     couponDiscount,
     loyaltyPoints: redeemPoints ? availablePoints : 0,
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
-  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty]);
+    comped,
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty, comped]);
 
   // The confirmed location, and the landmark that travels WITH it.
   //
@@ -916,6 +928,8 @@ export function CheckoutScreen() {
               deliveryFee: t('deliveryFee'),
               discount: t('discount'),
               loyaltyDiscount: t('loyaltyDiscount'),
+              compDiscount: t('compDiscount'),
+              compNote: t('compNote'),
               // Single substitution at the point of use. The i18n layer has no
               // interpolation and this PR does not add one for a single string.
               vat: t('vat').replace('{rate}', String(brand?.vatPercentage ?? 15)),

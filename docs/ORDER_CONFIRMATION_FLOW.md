@@ -790,6 +790,41 @@ was to go back to the cart — losing the location, coupon and payment method
 that Checkout's editable lines exist to preserve. Both screens now use the one
 editor and the one `cart.updateItem`.
 
+## 10f. A comped order is `paid` on arrival, and that is deliberate
+
+A comped customer (`public.comp_members`) is charged nothing, and the order is
+written **`payment_status = 'paid'`** with `paid_at` set at the moment
+`place_order` inserts it. No money moved; the state records that nothing is
+owed.
+
+That is not tidiness — it is what decides whether the food is cooked.
+`set_lazywait_initial_sync` parks a **non-paid ONLINE** order at
+`lazywait_sync_state = 'awaiting_payment'`, and `begin_payment_attempt` refuses
+a total of 0. `place_order` resolves the payment method **before** the total
+exists, so a comped order is still assigned `'online'` whenever that is the
+configured default. Left `'pending'` it would never reach the kitchen and could
+never be paid — stranded permanently. `'paid'` sends it down the trigger's
+`else` branch and straight to the POS queue, exactly as a cash pickup order
+goes.
+
+Consequences worth holding in mind:
+
+- a comped order appears in any report keyed on `payment_status = 'paid'`. Its
+  `total` is 0.00, so a **sum** is unaffected; a **count** or an average order
+  value includes it, which is arguably correct — it is a real order;
+- `paid_at` is stamped so watchdog rule **R1 `PAID_ORDER_NOT_SYNCED`** (which
+  requires `paid_at is not null`) still catches a comped pickup order the
+  kitchen never received. Leaving it null would have put comped orders in a
+  blind spot;
+- **`customer_order_state` reports `'final_failure_refund_pending'`** for a paid
+  order whose POS sends exhaust the retry budget. For a comped order that is
+  refund language for money nobody paid, and `order_refund_due` (which requires
+  `total > 0`) will never enrol it. The defect pre-dates comps; comped orders
+  make it reachable. Not fixed here — refund language is payment-adjacent and
+  CLAUDE.md §6 is active. Listed again under Known gaps.
+
+Full behaviour, administration and deploy order: `docs/DISCOUNTS_CAMPAIGNS.md`.
+
 ## 11. Known gaps
 
 - **The raw `public.orders` table surface still carries `order_number` (and
@@ -815,6 +850,14 @@ editor and the one `cart.updateItem`.
   a distinct Postgres role), then column-scoping the customer grant and dropping
   `orders` from the realtime publication in favour of a staff-only channel. That
   is an architectural change and needs its own reviewed PR.
+- **A comped order can be told it is awaiting a refund.** `customer_order_state`
+  reaches `'final_failure_refund_pending'` on a paid order whose POS sends are
+  exhausted; a comped order is `paid` with `total` 0.00, so the customer would
+  be promised a refund of nothing while `order_refund_due` (requiring
+  `total > 0`) never enrols it. Reachable only when a comped order's POS sync
+  fails outright. Fixing it means changing refund-facing language, which is
+  payment-adjacent under CLAUDE.md §6, so it is recorded rather than patched.
+  See §10f.
 - **No Lazywait reconciliation API.** Issue #94 asks that a timeout/unknown
   response be reconciled with Lazywait before another create request. Lazywait
   exposes no order-lookup endpoint we have confirmed, so "reconcile" currently

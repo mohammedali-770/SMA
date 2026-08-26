@@ -153,6 +153,37 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(without.ok && 'order_details' in without.payload).toBe(false);
   });
 
+  it('labels a comped ticket, keeping the customer note after it', () => {
+    const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
+    const comped = buildCreateOrderPayload({
+      ...base, orderDetails: 'Extra napkins', isComped: true,
+    });
+    if (!comped.ok) throw new Error('expected a payload');
+    // Prefixed, so it survives a POS display that truncates a long note.
+    expect(String(comped.payload.order_details)).toBe(
+      '*** COMPLIMENTARY / \u0636\u064a\u0627\u0641\u0629 *** \u2014 Extra napkins',
+    );
+    // A label, never the financial flag.
+    expect(comped.payload.is_paid).toBeUndefined();
+  });
+
+  it('labels a comped ticket that carries no customer note', () => {
+    const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
+    const comped = buildCreateOrderPayload({ ...base, orderDetails: null, isComped: true });
+    if (!comped.ok) throw new Error('expected a payload');
+    expect(String(comped.payload.order_details)).toBe(
+      '*** COMPLIMENTARY / \u0636\u064a\u0627\u0641\u0629 ***',
+    );
+  });
+
+  it('adds nothing at all when the order is not comped', () => {
+    const base = { clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items } as const;
+    const plain = buildCreateOrderPayload({ ...base, orderDetails: 'Extra napkins' });
+    if (!plain.ok) throw new Error('expected a payload');
+    expect(String(plain.payload.order_details)).toBe('Extra napkins');
+    expect(String(plain.payload.order_details)).not.toContain('COMPLIMENTARY');
+  });
+
   it('splits the phone: customer_cell is the LOCAL number and country_code is separate — never E.164', () => {
     for (const stored of ['0541234567', '+966541234567', '966541234567', '054 123 4567']) {
       const r = buildCreateOrderPayload({
@@ -556,6 +587,12 @@ describe('lazywait-sync worker wiring (source contract)', () => {
     expect(workerSrc).toContain('customerPhone: (order.customer_phone as string | null)');
     // `is_paid` is a confirmed field but a financial signal to the cashier;
     // wiring it is a separate owner decision under the payment freeze.
+    expect(workerSrc).not.toMatch(/\bisPaid\s*:/);
+  });
+
+  it('forwards the comp flag, which is the ONLY comp signal the branch gets', () => {
+    expect(workerSrc).toContain('isComped: Boolean(order.is_comped)');
+    // And it still does not reach for the financial flag to do it.
     expect(workerSrc).not.toMatch(/\bisPaid\s*:/);
   });
 

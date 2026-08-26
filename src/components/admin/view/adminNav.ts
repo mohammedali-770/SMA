@@ -21,13 +21,13 @@
  */
 import {
   Activity, BarChart3, BellRing, Building2, ClipboardList, FileSpreadsheet,
-  HeartPulse, Images, Layers, Plug, Scale, Settings, ShieldAlert,
+  Gift, HeartPulse, Images, Layers, Plug, Scale, Settings, ShieldAlert,
   SlidersHorizontal, Store, Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
 export type AdminTab =
-  | 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports'
+  | 'stats' | 'orders' | 'menu' | 'banners' | 'branches' | 'reports' | 'comps'
   | 'integrations' | 'health' | 'alerts' | 'integrity' | 'settings' | 'legal';
 
 export interface AdminNavItem {
@@ -50,6 +50,9 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { tab: 'banners', icon: Images, en: 'Banners', ar: 'بانرات الرئيسية' },
   { tab: 'branches', icon: Store, en: 'Branch Management', ar: 'إدارة الفروع' },
   { tab: 'reports', icon: FileSpreadsheet, en: 'Financial Reports', ar: 'التقارير والتحليلات المالية' },
+  // Finance rather than Settings: a comp is a money decision, and it belongs
+  // next to the reports that show what it cost.
+  { tab: 'comps', icon: Gift, en: 'Comped Customers', ar: 'عملاء الضيافة' },
   { tab: 'integrations', icon: Plug, en: 'Integrations', ar: 'الربط والتكاملات' },
   { tab: 'health', icon: HeartPulse, en: 'Operations Health', ar: 'صحة العمليات', gated: 'health' },
   { tab: 'alerts', icon: BellRing, en: 'Operations Alerts', ar: 'التنبيهات والملخص', gated: 'alerts' },
@@ -116,7 +119,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
   },
   {
     id: 'finance', icon: Wallet, en: 'Finance', ar: 'المالية',
-    tabs: ['reports'], collapsible: true,
+    tabs: ['reports', 'comps'], collapsible: true,
   },
   {
     id: 'system', icon: SlidersHorizontal, en: 'System', ar: 'النظام',

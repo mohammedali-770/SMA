@@ -369,6 +369,39 @@ export const coupons = {
 };
 
 // ---------------------------------------------------------------------------
+// Comped membership (public.comp_members)
+//
+// DISPLAY ONLY. `place_order` and `compute_order_snapshot` read the same table
+// themselves and never trust anything the client sends, so this cannot change
+// what a customer is charged - it only stops the checkout screen quoting a
+// price the customer will not be asked for.
+//
+// RLS lets a customer read exactly one row: their own. A missing row and an
+// inactive row are the same answer, which is why this returns a plain boolean.
+// ---------------------------------------------------------------------------
+export const compMembership = {
+  /**
+   * Whether the signed-in customer currently orders at no charge.
+   *
+   * Fails SOFT: on any error this returns false, so the customer sees the
+   * ordinary price rather than a broken screen. Showing full price to a comped
+   * customer is a cosmetic disappointment; showing 0.00 to someone who will be
+   * charged is a broken promise, and the asymmetry decides the default.
+   */
+  async isComped(): Promise<boolean> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.id) return false;
+    const { data, error } = await supabase
+      .from('comp_members')
+      .select('is_active')
+      .eq('profile_id', user.id)
+      .maybeSingle();
+    if (error) return false;
+    return Boolean(data?.is_active);
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Addresses (customer-owned, RLS-isolated)
 //
 // The payload/ownership/error rules live in services/addressPayload.ts, which is

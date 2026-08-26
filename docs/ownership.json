@@ -95,6 +95,19 @@
       "docs": ["docs/account-deletion-scheduler.md", "docs/OWNER_ACTIONS.md"]
     },
     {
+      "id": "comped-customers",
+      "why": "A comped customer's every order is free, automatically, with no cap - the highest-abuse surface in the app, and the one where a silent behaviour change is hardest to notice because the customer sees exactly what they expect. The pricing functions live in migrations that are not listed (migrations are append-only and each is its own file), so the rule covers the code that decides WHO is comped and what a comped order looks like to the admin, the customer and the branch.",
+      "sources": [
+        "src/lib/compMembersApi.ts",
+        "src/components/admin/CompMembersPanel.tsx",
+        "apps/mobile/src/features/checkout/previewTotals.ts",
+        "apps/mobile/src/services/api.ts"
+      ],
+      "docs": [
+        "docs/DISCOUNTS_CAMPAIGNS.md"
+      ]
+    },
+    {
       "id": "order-lifecycle",
       "why": "The confirmation flow spans the app, the POS and the receipt a cashier reads. Its documentation is what makes a customer complaint traceable.",
       "sources": [

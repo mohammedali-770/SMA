@@ -385,10 +385,35 @@ export interface CreateOrderInput {
    * owner decision.
    */
   isPaid?: boolean;
+  /**
+   * `orders.is_comped` — the customer is a comped member and the order total is
+   * 0.00.
+   *
+   * Without this the branch is told NOTHING: no order-level money is sent at
+   * all (see the money note in buildCreateOrderPayload) and each line carries
+   * its undiscounted menu price, so a comped ticket is byte-for-byte
+   * indistinguishable from a full-price one. The cashier would have no way to
+   * know why nobody is paying.
+   *
+   * It is a LABEL in the free-text note, deliberately NOT the `is_paid`
+   * contract flag. The distinction is the point: `is_paid` changes the POS's
+   * own payment state, which is the financial signal §6 reserves for a separate
+   * owner decision; this only annotates the note field that already carries the
+   * customer's kitchen instructions. For the same reason the text states what
+   * the order IS rather than instructing the cashier what to collect.
+   */
+  isComped?: boolean;
 }
 export type BuildResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; blockedReason: string };
+
+/**
+ * What a comped ticket says. Descriptive, not an instruction: it names the kind
+ * of order rather than telling the cashier what to collect, which is the line
+ * between a label and the `is_paid` financial signal §6 keeps for the owner.
+ */
+export const COMP_TICKET_LABEL = '*** COMPLIMENTARY / ضيافة ***';
 
 function trimToNull(v: string | null | undefined): string | null {
   if (v == null) return null;
@@ -686,8 +711,14 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
     source: SOURCE,
   };
 
-  // Order-level kitchen note (orders.notes).
-  const orderDetails = trimToNull(input.orderDetails);
+  // Order-level kitchen note (orders.notes), with the comp label in front of it.
+  //
+  // Prefixed rather than appended so it survives a POS display that truncates a
+  // long note, and bilingual because the ticket is read in both languages.
+  const orderNote = trimToNull(input.orderDetails);
+  const orderDetails = input.isComped
+    ? [COMP_TICKET_LABEL, orderNote].filter(Boolean).join(' — ')
+    : orderNote;
   if (orderDetails) payload.order_details = orderDetails;
 
   // CRM link.

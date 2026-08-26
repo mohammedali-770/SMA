@@ -122,6 +122,11 @@ export function ReceiptBody({ order }: { order: Order }) {
           {order.deliveryFee > 0 ? <ReceiptRow label={t('deliveryFee')} amount={order.deliveryFee} /> : null}
           {order.discountAmount > 0 ? <ReceiptRow label={t('discount')} amount={order.discountAmount} negative /> : null}
           {order.loyaltyDiscountAmount > 0 ? <ReceiptRow label={t('loyaltyDiscount')} amount={order.loyaltyDiscountAmount} negative /> : null}
+          {/* Without this row a comped receipt reads "Subtotal 64.00, Delivery
+              15.00, Total 0.00" and does not add up on the page. Rendered on
+              the AMOUNT rather than on `isComped`, so an older order written
+              before the columns existed simply shows nothing. */}
+          {order.compDiscountAmount > 0 ? <ReceiptRow label={t('compDiscount')} amount={order.compDiscountAmount} negative /> : null}
           {/* The RECEIPT states the VAT actually charged, so unlike the checkout
               preview this row carries a real amount.
 

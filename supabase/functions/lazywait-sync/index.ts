@@ -193,6 +193,11 @@ Deno.serve(async (req: Request) => {
         customerName: String(order.customer_name ?? 'Guest'),
         items: mappedItems,
         orderDetails: (order.notes as string | null) ?? null,
+        // The ONLY thing that tells the branch this ticket is free. No
+        // order-level money is sent and the lines carry menu prices, so
+        // without the label a comped ticket looks exactly like a paid one.
+        // It is a note, not the `is_paid` contract flag - see CreateOrderInput.
+        isComped: Boolean(order.is_comped),
         customerId: crmCustomerId,
         customerPhone: (order.customer_phone as string | null) ?? null,
       });

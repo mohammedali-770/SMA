@@ -69,6 +69,7 @@ The admin console is panel-based rather than routed: one component per operation
 | --- | --- |
 | BannerManagementPanel | Admin-only Banner Management. Admins add/enable/order/delete homepage banners shown in the mobile app (above the search bar). Accountants are… |
 | BranchPoliciesPanel | Lazy so mapbox-gl loads only when an admin opens the zone editor |
+| CompMembersPanel | Comped customers — the people who order at no charge |
 | EmailServerPanel | Admin Email/SMTP status + test-send panel. Reads config-presence booleans from the `email-test-config` Edge Function (never the SMTP password) and… |
 | IntegrationsPanel | Admin-only system console for external integrations + staff access |
 | LazywaitPanel | Admin-only Lazywait POS visibility + controls (secure: talks to Supabase via RLS-guarded api calls; no Lazywait secret ever reaches the browser): |
