@@ -185,8 +185,12 @@ Deno.serve(async (req: Request) => {
       // `isPaid` is deliberately NOT passed: `is_paid` is a confirmed contract
       // field, but telling a cashier an order needs no cash is a financial
       // signal and payment work is frozen (CLAUDE.md §6). Wiring it is a
-      // separate owner decision. Totals are omitted too — see the money note in
-      // `buildCreateOrderPayload` and Q9 in the open-questions document.
+      // separate owner decision.
+      //
+      // Order TOTALS are passed as of 2026-08-27 (Q9). That is a different
+      // thing from `is_paid`: it tells the branch what the order is worth, not
+      // that it has been settled. Every value is a stored snapshot column,
+      // copied verbatim — see the money note in `buildCreateOrderPayload`.
       const built = buildCreateOrderPayload({
         clientId: lw.clientId,
         branchId: (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id ?? null,
@@ -211,6 +215,20 @@ Deno.serve(async (req: Request) => {
           description?: string | null;
           national_short_address?: string | null;
         } | null) ?? null,
+        // Straight from the claimed row — `claim_lazywait_sync_batch` returns
+        // `SETOF orders`, so these are the authoritative snapshot values and no
+        // extra read is needed. Discounts are summed because the contract has
+        // ONE `discount` field while we track coupon, loyalty and comp
+        // separately; the sum is what came off this order's price.
+        money: {
+          subtotal: Number(order.subtotal ?? 0),
+          discount: Number(order.discount_amount ?? 0)
+            + Number(order.loyalty_discount_amount ?? 0)
+            + Number(order.comp_discount_amount ?? 0),
+          tax: Number(order.vat_amount ?? 0),
+          total: Number(order.total ?? 0),
+          deliveryFee: Number(order.delivery_fee ?? 0),
+        },
       });
 
       if (!built.ok) {

@@ -667,29 +667,46 @@ vendor fixes the renderer, and it would be wrong everywhere else the field is
 read — their dashboard, any export, any other template. Report it with the
 header as evidence.
 
-**2. Order totals print as 0.00.** Ticket #3 shows the two line items at 23.00
-and 5.00, then `Subtotal 0.00`, `VAT 0.00`, `Total 0.00`. SM-2026-000059 is a
-**cash** order with a real total of **28.00**, not comped — so a driver reading
-that ticket has no idea what to collect.
+**2. Order totals printed as 0.00 — FIXED 2026-08-27 (Q9 answered).** Ticket #3
+showed the two line items at 23.00 and 5.00, then `Subtotal 0.00`, `VAT 0.00`,
+`Total 0.00`. SM-2026-000059 is a **cash** order with a real total of **28.00**,
+not comped — so a driver reading that ticket had no idea what to collect. It was
+never a delivery bug: no money was sent for pickup either, so every ticket had
+it. Delivery only made it dangerous, because the food leaves with a driver.
 
-This is Q9 arriving in practice. We deliberately send no order-level money
-(see the money note in `buildCreateOrderPayload`) because the contract's example
-computes `total = subtotal × 1.15`, i.e. VAT **added on top**, while our stored
-prices are VAT-**inclusive**; filling those fields blind would print a wrong
-number on a customer's receipt. The printed evidence now shows the cost of
-sending nothing: zeros.
+**The ticket itself answered the question that had blocked this.** The open
+worry was that the contract's example computes `total = subtotal × 1.15` — VAT
+added on top — while our prices are VAT-inclusive, so we could not tell whether
+the POS **computes** or **displays**. Ticket #3 settles it: we sent no money and
+it printed `0.00` for all three. **A POS that computed a subtotal from the lines
+would have printed 28.00**, because the lines were right there at 23.00 and 5.00.
+It displays what it is given.
 
-It is **not a delivery bug** — no money is sent for pickup either, so every
-ticket has had this. Delivery only makes it dangerous, because the food leaves
-the building with a driver.
+So the money is now sent, and every value is copied **verbatim** from the order
+snapshot — `orders.subtotal`, `orders.vat_amount`, `orders.total`,
+`orders.delivery_fee`, and the three discount columns summed into the contract's
+single `discount`. Nothing is recomputed, which is the whole point: these are the
+same numbers on the customer's own receipt, so the ticket cannot disagree with
+what was charged and no new rounding enters the path.
 
-The promising resolution, still to be confirmed with the vendor and tested on one
-order before being trusted: send the VAT-**exclusive** decomposition
-(`subtotal` 24.35, `tax` 3.65, `total` 28.00, with line prices likewise
-exclusive). That is self-consistent under *both* readings — a POS that displays
-the fields verbatim shows 28.00, and a POS that recomputes `subtotal × 1.15`
-also reaches 28.00. Rounding across many lines needs checking before it ships.
-Changing what money prints on a customer receipt is an owner decision.
+`tax` is the VAT **contained within** `total`, not added to it — the template
+already prints "Total includes VAT". Line prices are **unchanged** and stay
+VAT-inclusive: they match what the customer saw in the app and have printed
+correctly for weeks, and re-basing them exclusive would put prices on the ticket
+the customer never agreed to.
+
+Two fields stay deliberately unsent:
+
+- **`tax_percentage`** — optional, and the explicit `tax` amount carries the same
+  information. A percentage is exactly the field that might invite the POS to
+  recompute `subtotal × 1.15` and print 32.20 on a 28.00 order. Not worth the
+  tidiness on a customer-facing money figure.
+- **`is_paid`** — still the CLAUDE.md §6 financial signal reserved for a separate
+  owner decision. Telling a branch what an order is *worth* is not the same as
+  telling the POS it has been *settled*.
+
+A comped order now prints `Subtotal 9.00 / Discount 9.00 / Total 0.00` beside the
+COMPLIMENTARY label, which explains itself.
 
 ### Still intentionally NOT sent (do not invent)
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the

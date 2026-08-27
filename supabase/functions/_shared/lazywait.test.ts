@@ -358,6 +358,107 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(String(r.payload.order_details)).toBe('Ring the bell');
   });
 
+  it('sends order money VERBATIM — the numbers on the ticket are the ones charged', () => {
+    // Modelled on SM-2026-000059, the order whose ticket printed Total 0.00.
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      money: { subtotal: 28, discount: 0, tax: 3.65, total: 28, deliveryFee: 0 },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.subtotal).toBe(28);
+    expect(r.payload.total).toBe(28);
+    expect(r.payload.tax).toBe(3.65);
+    // Zero-valued optionals are omitted, not sent as 0.
+    expect(r.payload.discount).toBeUndefined();
+    expect(r.payload.order_delivery_fee).toBeUndefined();
+    // NEVER sent: a percentage could invite the POS to recompute subtotal x 1.15,
+    // and is_paid remains the CLAUDE.md §6 signal reserved for the owner.
+    expect(r.payload.tax_percentage).toBeUndefined();
+    expect(r.payload.is_paid).toBeUndefined();
+  });
+
+  it('tax is the VAT CONTAINED WITHIN total, never added to it', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      money: { subtotal: 28, tax: 3.65, total: 28 },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // The trap this pins: total must NOT be subtotal + tax (31.65), and must NOT
+    // be subtotal x 1.15 (32.20). It is what the customer pays.
+    expect(r.payload.total).toBe(28);
+    expect(Number(r.payload.total) + Number(r.payload.tax)).not.toBe(28);
+  });
+
+  it('a comped order sends Total 0.00 and the discount that got it there', () => {
+    // SM-2026-000056: subtotal 9.00, comp discount 9.00, VAT 0.00, total 0.00.
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      isComped: true,
+      money: { subtotal: 9, discount: 9, tax: 0, total: 0 },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.subtotal).toBe(9);
+    expect(r.payload.discount).toBe(9);
+    expect(r.payload.total).toBe(0);
+    // A 0.00 VAT line is noise on a free ticket.
+    expect(r.payload.tax).toBeUndefined();
+    // The label still carries the reason.
+    expect(String(r.payload.order_details)).toContain('COMPLIMENTARY');
+  });
+
+  it('order_delivery_fee rides only on a delivery order, and only when charged', () => {
+    const base = {
+      clientId: 'C', branchId: 'B', customerName: 'A', items,
+      deliveryAddress: { label: 'Home' },
+      money: { subtotal: 28, tax: 3.65, total: 33, deliveryFee: 5 },
+    };
+    const del = buildCreateOrderPayload({ ...base, orderType: 'delivery' });
+    expect(del.ok).toBe(true);
+    if (!del.ok) return;
+    expect(del.payload.order_delivery_fee).toBe(5);
+
+    // Same money on a pickup: the fee is meaningless and must not appear.
+    const pick = buildCreateOrderPayload({ ...base, orderType: 'pickup' });
+    expect(pick.ok).toBe(true);
+    if (!pick.ok) return;
+    expect(pick.payload.order_delivery_fee).toBeUndefined();
+
+    // A zero fee on a delivery order is omitted too (Nasserah today).
+    const free = buildCreateOrderPayload({
+      ...base, orderType: 'delivery',
+      money: { subtotal: 28, tax: 3.65, total: 28, deliveryFee: 0 },
+    });
+    expect(free.ok).toBe(true);
+    if (!free.ok) return;
+    expect(free.payload.order_delivery_fee).toBeUndefined();
+  });
+
+  it('omitting money sends NO money field at all — the pre-2026-08-27 shape', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    for (const k of ['subtotal', 'total', 'tax', 'discount', 'tax_percentage', 'order_delivery_fee']) {
+      expect(r.payload[k]).toBeUndefined();
+    }
+  });
+
+  it('rounds to 2dp rather than emitting a float artefact', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      money: { subtotal: 28.005, tax: 3.6522, total: 28.004 },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.subtotal).toBe(28.01);
+    expect(r.payload.tax).toBe(3.65);
+    expect(r.payload.total).toBe(28);
+  });
+
   it('BLOCKS an order type it has never seen rather than guessing', () => {
     expect(buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'dine_in', customerName: 'A', items,

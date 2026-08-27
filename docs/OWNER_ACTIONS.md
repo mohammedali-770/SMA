@@ -1238,15 +1238,23 @@ bidirectional algorithm. The header is a clean repro that does not involve our
 integration. **Do not work around it by pre-reversing our text** — it would
 break when they fix it and be wrong in every other surface that reads the field.
 
-**C. Decide what money to send to the POS (Q9).** Ticket #3 printed
-`Subtotal 0.00 / VAT 0.00 / Total 0.00` for a **cash** order whose real total is
-**28.00**, with the line items showing 23.00 and 5.00. A driver reading it has
-no idea what to collect. This affects pickup identically — no money has ever
-been sent — but delivery makes it dangerous because the food leaves with a
-driver. Proposed resolution, needing vendor confirmation and one test order:
-send the VAT-exclusive decomposition, which is self-consistent whether the POS
-displays the fields or recomputes `subtotal × 1.15`. This changes what money
-prints on a customer receipt, so it is an owner decision either way.
+**C.** ~~Decide what money to send to the POS (Q9).~~ **DECIDED AND BUILT
+2026-08-27**, on the owner's approval. Ticket #3 printed
+`Subtotal 0.00 / VAT 0.00 / Total 0.00` for a **cash** order really worth
+**28.00**, with the lines showing 23.00 and 5.00 — a driver had no idea what to
+collect.
+
+**The ticket answered its own question.** The blocker was not knowing whether the
+POS computes or displays; sending nothing and getting `0.00` while the lines were
+visible proves it **displays**. So subtotal / discount / tax / total /
+order_delivery_fee are now copied **verbatim** from the order snapshot — no
+recomputation, no new rounding, the same numbers as the customer's receipt.
+`tax_percentage` and `is_paid` stay unsent, for reasons recorded in
+`docs/LAZYWAIT.md`.
+
+**Still needs a deploy** (§5) and one live order to confirm the printed ticket.
+No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
+so the worker already had every money column.
 
 ### One consequence worth stating
 
