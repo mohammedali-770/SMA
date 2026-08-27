@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**151 TypeScript test files declaring 2319 test blocks, plus 59 SQL suites.**
+**153 TypeScript test files declaring 2351 test blocks, plus 60 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -62,6 +62,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/loyalty_reason_history_safe_test.sql`
 - `supabase/tests/loyalty_reason_no_order_number_test.sql`
 - `supabase/tests/manual_only_pos_resend_test.sql`
+- `supabase/tests/menu_display_order_test.sql`
 - `supabase/tests/moyasar_begin_attempt_test.sql`
 - `supabase/tests/operations_alerts_activation_test.sql`
 - `supabase/tests/operations_alerts_digest_test.sql`
@@ -104,7 +105,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-59 files, 853 declared test blocks.
+59 files, 857 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -127,7 +128,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 32 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 16 | decideNavigation — allow (Tap ecosystem) |
-| `apps/mobile/src/features/menu/menuSections.test.ts` | 23 | menuItemKey (branch-selection crash regression) |
+| `apps/mobile/src/features/menu/menuSections.test.ts` | 27 | menuItemKey (branch-selection crash regression) |
 | `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 20 | resolveNotificationRoute (allow-listed internal routes ONLY) |
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
@@ -170,7 +171,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-75 files, 1001 declared test blocks.
+77 files, 1029 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -233,6 +234,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/legal.test.ts` | 6 | legal document registry |
 | `src/lib/mappers.test.ts` | 27 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
+| `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/moyasarAdminTest.test.ts` | 9 | canRunMoyasarAdminTestCheckout |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |
 | `src/lib/observability/devTest.test.ts` | 3 | admin dev Sentry test facility |
@@ -244,6 +246,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 13 | checkout payment availability |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
+| `src/lib/productImages.test.ts` | 15 | product image type gate |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |

@@ -1,7 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Download, Edit, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Edit, FileSpreadsheet, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
+import { menuOrder as menuOrderApi, productImages as productImageApi } from '../../lib/api';
+import { moveWithin, productsInCategory, sortRows } from '../../lib/menuOrdering';
+import { isAllowedProductImageSize, isAllowedProductImageType } from '../../lib/productImages';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Field } from '../../design-system/ui/Field';
@@ -55,7 +58,7 @@ export const MenuManagementPanel: React.FC = () => {
     categories, products,
     addCategory, updateCategory, deleteCategory,
     addProduct, updateProduct, deleteProduct,
-    bulkUploadMenu, currentUser, adminLang,
+    bulkUploadMenu, currentUser, adminLang, reload,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -80,6 +83,21 @@ export const MenuManagementPanel: React.FC = () => {
   const [prodCalories, setProdCalories] = useState('500');
   const [prodCatId, setProdCatId] = useState('');
   const [prodImg, setProdImg] = useState('');
+  // One in-flight reorder at a time. The RPC rewrites a whole list, so two
+  // overlapping moves would race and the slower response would win.
+  const [reordering, setReordering] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+  // Upload state for the product photo. `prodImg` stays the single source of
+  // truth for what gets saved — an upload just fills it in, so a hand-pasted
+  // URL and an uploaded one are indistinguishable downstream.
+  // The image_url the product row ACTUALLY holds right now, captured when the
+  // modal opens. Deleting a stored object is only safe once the row has stopped
+  // pointing at it, so nothing is deleted until a save succeeds — see
+  // handleSaveProduct and closeProductModal.
+  const [persistedImg, setPersistedImg] = useState('');
+  const [imgUploading, setImgUploading] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const imgFileRef = useRef<HTMLInputElement>(null);
 
   // CSV Parsing simulation state
   const [rawCsvText, setRawCsvText] = useState('');
@@ -135,7 +153,12 @@ export const MenuManagementPanel: React.FC = () => {
       descriptionAr: prodDescAr,
       price: parsedPrice,
       calories: parseInt(prodCalories) || 0,
-      imageUrl: prodImg || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
+      // NO stock-photo default. This used to persist an Unsplash BURGER into
+      // image_url for any product saved without one, so a chicken-wings row
+      // carried a photo of a burger forever. The mobile ProductCard already
+      // renders a neutral dish icon when image_url is null, which is honest;
+      // a confidently wrong photo is not.
+      imageUrl: prodImg.trim(),
       isActive: true,
       modifierGroupIds: ['mg-heat-level'],
       // A hand-authored product has no Lazywait price tiers. Tiers arrive
@@ -152,7 +175,17 @@ export const MenuManagementPanel: React.FC = () => {
       addProduct(pData);
     }
 
+    // Only NOW is it safe to retire the old object: the row has been told to
+    // point somewhere else. Ordered this way round because the failure that
+    // matters is a live product referencing a deleted file — an orphaned file
+    // costs a few kilobytes and nothing else. removeByUrl is a no-op for a URL
+    // this bucket did not produce, so a hand-pasted external link is untouched.
+    if (persistedImg && persistedImg !== pData.imageUrl) {
+      void productImageApi.removeByUrl(persistedImg);
+    }
+
     setEditingProduct(null);
+    setPersistedImg('');
     setProdNameEn('');
     setProdNameAr('');
     setProdDescEn('');
@@ -160,7 +193,20 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice('30.00');
     setProdCalories('500');
     setProdCatId('');
-    setProdImg('');
+    setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
+    setIsProductModalOpen(false);
+  };
+
+  /**
+   * Abandoning the modal: the row was never told about the new object, so the
+   * NEWLY UPLOADED one is the orphan and the persisted one must survive
+   * untouched. This is the mirror of handleSaveProduct's cleanup, and the two
+   * together mean exactly one of the pair is ever deleted.
+   */
+  const closeProductModal = () => {
+    if (prodImg && prodImg !== persistedImg) void productImageApi.removeByUrl(prodImg);
+    setPersistedImg('');
+    setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(false);
   };
 
@@ -173,11 +219,75 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice(p.price.toString());
     setProdCalories(p.calories.toString());
     setProdCatId(p.categoryId);
-    setProdImg(p.imageUrl);
+    setProdImg(p.imageUrl); setPersistedImg(p.imageUrl);
+    setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(true);
   };
 
   // CSV Drag and drop / selection parser handler
+  // Both tables render in the SAME order the customer sees, so what the
+  // administrator rearranges is what the menu actually is.
+  const orderedCategories = sortRows(categories);
+
+  // Send the WHOLE list: the RPC assigns ranks 1..N from array position, so a
+  // partial list would renumber the menu against a stale picture. Reload after,
+  // because sort_order is what every subsequent move is computed from.
+  const runReorder = async (fn: () => Promise<void>) => {
+    setReordering(true); setOrderError(null);
+    try {
+      await fn();
+      await reload();
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const moveCategory = (index: number, direction: 'up' | 'down') => {
+    const ids = moveWithin(orderedCategories, index, direction);
+    if (!ids) return;  // already at an end — no pointless write
+    void runReorder(() => menuOrderApi.categories(ids));
+  };
+
+  const moveProduct = (categoryId: string, index: number, direction: 'up' | 'down') => {
+    const siblings = productsInCategory(products, categoryId);
+    const ids = moveWithin(siblings, index, direction);
+    if (!ids) return;
+    void runReorder(() => menuOrderApi.products(categoryId, ids));
+  };
+
+  // Validate BEFORE uploading so a rejected file costs no round trip, using the
+  // same rules the bucket enforces server-side (jpg/png/webp, <= 5 MB).
+  const onPickProductImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgError(null);
+    if (!isAllowedProductImageType({ type: file.type, name: file.name })) {
+      setImgError(isRTL ? 'صيغة غير مدعومة. استخدم JPG أو PNG أو WebP.' : 'Unsupported format. Use JPG, PNG, or WebP.');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
+    if (!isAllowedProductImageSize(file.size)) {
+      setImgError(isRTL ? 'حجم الصورة كبير جداً (الحد ٥ ميجابايت).' : 'Image too large (5 MB max).');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
+    setImgUploading(true);
+    try {
+      const { publicUrl } = await productImageApi.upload(file);
+      // Fill the field and STOP. Nothing is deleted here: the product row still
+      // points at the old object until the administrator saves, so deleting it
+      // now would leave the live menu referencing a file that no longer exists
+      // if they then press Escape, close the modal, or the save fails.
+      setProdImg(publicUrl);
+    } catch (err) {
+      setImgError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImgUploading(false);
+    }
+  };
+
   const handleParseCSV = () => {
     if (!rawCsvText.trim()) {
       alert(adminLang === 'en' ? 'Please paste CSV lines first' : 'الرجاء لصق خطوط CSV أولاً');
@@ -285,13 +395,19 @@ export const MenuManagementPanel: React.FC = () => {
           {subTab('csv', t.csv_tab, <FileSpreadsheet className="size-3.5" aria-hidden="true" />)}
         </div>
 
+        {/* A refused reorder must be visible: reorder_products rejects the whole
+            call when an id is not in the category (a stale tab), and silently
+            swallowing that would leave the administrator dragging rows that
+            never move. */}
+        {orderError && <Notice title={orderError} tone="blocking" />}
+
         {menuSubTab === 'products' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <Text variant="heading" as="h3">{t.products_tab}</Text>
               <Button
                 label={t.add_prod_btn}
-                onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
+                onClick={() => { setEditingProduct(null); setPersistedImg(''); setIsProductModalOpen(true); }}
                 disabled={isAccountant}
                 leading={<Plus className="size-4" aria-hidden="true" />}
               />
@@ -302,7 +418,7 @@ export const MenuManagementPanel: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-con-line">
-                      {['Photo', t.product_name_en, t.product_name_ar, t.category, t.price, t.calories, t.actions].map((h, i) => (
+                      {[isRTL ? 'الترتيب' : 'Order', 'Photo', t.product_name_en, t.product_name_ar, t.category, t.price, t.calories, t.actions].map((h, i) => (
                         <th key={h || `sp-${i}`} className={TH}>
                           <Text variant="caption" tone="tertiary" as="span">{h}</Text>
                         </th>
@@ -310,8 +426,16 @@ export const MenuManagementPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map(p => {
+                    {/* Grouped by category, then by rank within it — the order
+                        the customer actually sees. Flat-by-arrival made "move
+                        up" meaningless, because a product's neighbour in the
+                        table was rarely its neighbour in the app. */}
+                    {orderedCategories.flatMap((cat) => productsInCategory(products, cat.id)).map((p, flatIndex, flat) => {
                       const catMatch = categories.find(c => c.id === p.categoryId);
+                      // Position WITHIN the category is what the arrows move,
+                      // because reorder_products is category-scoped.
+                      const siblings = flat.filter((x) => x.categoryId === p.categoryId);
+                      const indexInCategory = siblings.findIndex((x) => x.id === p.id);
                       // Defensive: a product reaching this table from a cast or
                       // a stale cache can arrive without `variants`, and an
                       // admin menu that throws is worse than one that shows a
@@ -320,8 +444,30 @@ export const MenuManagementPanel: React.FC = () => {
                       return (
                         <tr key={p.id} className="border-t border-con-line">
                           <td className={TD}>
-                            <img src={p.imageUrl} alt={p.nameEn}
-                              className="size-10 rounded-[var(--radius-ds-sm)] border border-con-line bg-con-surface-2 object-cover" />
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => moveProduct(p.categoryId, indexInCategory, 'up')}
+                                disabled={isAccountant || reordering || indexInCategory === 0}
+                                aria-label={isRTL ? 'تحريك للأعلى' : 'Move up'} className={ICON_BTN}>
+                                <ArrowUp className="size-3.5 text-con-text-2" aria-hidden="true" />
+                              </button>
+                              <button type="button" onClick={() => moveProduct(p.categoryId, indexInCategory, 'down')}
+                                disabled={isAccountant || reordering || indexInCategory === siblings.length - 1}
+                                aria-label={isRTL ? 'تحريك للأسفل' : 'Move down'} className={ICON_BTN}>
+                                <ArrowDown className="size-3.5 text-con-text-2" aria-hidden="true" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className={TD}>
+                            {/* No stock-photo stand-in: an administrator must be
+                                able to see WHICH products still have no image. */}
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt={p.nameEn}
+                                className="size-10 rounded-[var(--radius-ds-sm)] border border-con-line bg-con-surface-2 object-cover" />
+                            ) : (
+                              <span className="flex size-10 items-center justify-center rounded-[var(--radius-ds-sm)] border border-dashed border-con-line bg-con-surface-2">
+                                <Text variant="caption" tone="tertiary" as="span">—</Text>
+                              </span>
+                            )}
                           </td>
                           <td className={TD}><Text variant="label" as="span">{p.nameEn}</Text></td>
                           <td className={TD}><Text variant="label" as="span" dir="rtl">{p.nameAr}</Text></td>
@@ -408,7 +554,7 @@ export const MenuManagementPanel: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-con-line">
-                      {['Category Name (EN)', 'Category Name (AR)', t.actions].map((h, i) => (
+                      {[isRTL ? 'الترتيب' : 'Order', 'Category Name (EN)', 'Category Name (AR)', t.actions].map((h, i) => (
                         <th key={h || `sp-${i}`} className={TH}>
                           <Text variant="caption" tone="tertiary" as="span">{h}</Text>
                         </th>
@@ -416,8 +562,22 @@ export const MenuManagementPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {categories.map(c => (
+                    {orderedCategories.map((c, i) => (
                       <tr key={c.id} className="border-t border-con-line">
+                        <td className={`${TD} py-3`}>
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => moveCategory(i, 'up')}
+                              disabled={isAccountant || reordering || i === 0}
+                              aria-label={isRTL ? 'تحريك للأعلى' : 'Move up'} className={ICON_BTN}>
+                              <ArrowUp className="size-3.5 text-con-text-2" aria-hidden="true" />
+                            </button>
+                            <button type="button" onClick={() => moveCategory(i, 'down')}
+                              disabled={isAccountant || reordering || i === orderedCategories.length - 1}
+                              aria-label={isRTL ? 'تحريك للأسفل' : 'Move down'} className={ICON_BTN}>
+                              <ArrowDown className="size-3.5 text-con-text-2" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
                         <td className={`${TD} py-3`}><Text variant="label" as="span">{c.nameEn}</Text></td>
                         <td className={`${TD} py-3`}><Text variant="label" as="span" dir="rtl">{c.nameAr}</Text></td>
                         <td className={`${TD} py-3`}>
@@ -594,7 +754,7 @@ export const MenuManagementPanel: React.FC = () => {
         <AdminModal
           title={editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}
           isRTL={isRTL}
-          onClose={() => setIsProductModalOpen(false)}
+          onClose={closeProductModal}
         >
           <form onSubmit={handleSaveProduct} className="space-y-3">
             <div className="grid grid-cols-2 gap-2.5">
@@ -625,7 +785,60 @@ export const MenuManagementPanel: React.FC = () => {
               </label>
             </div>
 
-            <Field label="Image URL" value={prodImg} onValueChange={setProdImg} placeholder="https://unsplash..." />
+            {/* Product photo. Lazywait cannot supply one — its catalog `photo`
+                field is null on every item — so the dashboard is the only way
+                a menu item gets a real picture. Upload writes to the
+                product-images bucket (admin-only via RLS) and fills the URL
+                field below; pasting a URL by hand still works unchanged. */}
+            <div className="flex flex-col gap-2">
+              <span className="text-start text-[13px] font-semibold text-con-text-2">
+                {isRTL ? 'صورة المنتج' : 'Product image'}
+              </span>
+              <div className="flex items-center gap-3">
+                {prodImg ? (
+                  <img
+                    src={prodImg}
+                    alt={isRTL ? 'معاينة صورة المنتج' : 'Product image preview'}
+                    className="size-16 shrink-0 rounded-[var(--radius-ds-md)] object-cover"
+                  />
+                ) : (
+                  <span className="flex size-16 shrink-0 items-center justify-center rounded-[var(--radius-ds-md)] bg-con-surface-2">
+                    <Text variant="caption" tone="tertiary" as="span">{isRTL ? 'لا صورة' : 'None'}</Text>
+                  </span>
+                )}
+                <input
+                  ref={imgFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => void onPickProductImage(e)}
+                  disabled={imgUploading}
+                  aria-label={isRTL ? 'اختر صورة المنتج' : 'Choose product image'}
+                  className={`block w-full text-[13px] text-con-text-2 file:me-2 file:cursor-pointer file:rounded-[var(--radius-ds-md)] file:border-0 file:bg-ember file:px-3 file:py-1.5 file:text-[13px] file:font-bold file:text-on-ember ${family}`}
+                />
+              </div>
+              {imgUploading && (
+                <Text variant="caption" tone="secondary" as="span" className="flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" aria-hidden="true" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}
+                </Text>
+              )}
+              {imgError && <Notice title={imgError} tone="blocking" />}
+              {prodImg && (
+                <button
+                  type="button"
+                  onClick={() => { setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = ''; }}
+                  className="self-start text-[13px] font-semibold text-con-text-2 underline"
+                >
+                  {isRTL ? 'إزالة الصورة' : 'Remove image'}
+                </button>
+              )}
+              <Text variant="caption" tone="tertiary" as="p">
+                {isRTL
+                  ? 'JPG أو PNG أو WebP، بحد أقصى ٥ ميجابايت. بدون صورة يظهر رمز محايد في التطبيق — وهو أفضل من صورة لا تخص الصنف.'
+                  : 'JPG, PNG, or WebP, 5 MB max. With no image the app shows a neutral icon — better than a photo of the wrong dish.'}
+              </Text>
+            </div>
+
+            <Field label="Image URL" value={prodImg} onValueChange={setProdImg} placeholder="https://…" />
 
             <button
               type="submit"

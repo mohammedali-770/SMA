@@ -123,6 +123,19 @@ export function buildMenuSections(opts: {
       category,
       data: visible
         .filter((p) => p.categoryId === category.id)
+        // Order WITHIN the category is the administrator's, set through
+        // `reorder_products`. This used to rely on the fetch arriving already
+        // sorted, which was true only by accident: every product sat at
+        // sort_order 0, so Postgres returned a tied sort in whatever order it
+        // liked and the menu could differ between two loads. Sorting here makes
+        // it explicit and testable, and survives any change to how the catalog
+        // is fetched or cached.
+        //
+        // Name is the tie-break so equal ranks are still STABLE rather than
+        // arbitrary — which is exactly today's data, where nothing has been
+        // ordered yet.
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn))
         .map((product) => ({
           product,
           needsChoice: hasModifiers(product) || hasTierChoice(product),
