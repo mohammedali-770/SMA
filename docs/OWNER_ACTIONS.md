@@ -1252,7 +1252,11 @@ recomputation, no new rounding, the same numbers as the customer's receipt.
 `tax_percentage` and `is_paid` stay unsent, for reasons recorded in
 `docs/LAZYWAIT.md`.
 
-**Still needs a deploy** (§5) and one live order to confirm the printed ticket.
+**Deployed** 2026-08-27 in `lazywait-sync` **v8** — read back and hash-verified
+byte-identical to the merged branch. See the deploy table at the end of this
+section. What remains is one live order to confirm the printed ticket carries the
+right total; no command can establish that.
+
 No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
 so the worker already had every money column.
 
@@ -1294,10 +1298,17 @@ the customer hears in a second or two.
 something has gone wrong. Both now say "no need to place it again" alongside what
 we are doing about it. **This adds `push-dispatch` to the deploy list.**
 
-**Needs a deploy** (§5) of `lazywait-sync`, `order-intake` AND `push-dispatch` — they are two
-halves of one change, and deploying only one is worse than neither: `order-intake`
-alone removes the push and nothing replaces it; `lazywait-sync` alone sends
-`pos_confirmed` alongside the old `received` and the customer gets two.
+**Deployed** 2026-08-27 — `lazywait-sync` v8, `order-intake` v5, `push-dispatch`
+v5, in that order. Versions and verification are in the deploy table at the end
+of this section; they are not restated here, because restating a status in three
+places is what let this document contradict itself in the first place.
+
+The order was not incidental. `lazywait-sync` and `order-intake` are two halves
+of one change and deploying either alone was wrong in a different way:
+`order-intake` first would have removed the push with nothing yet replacing it,
+leaving silence; `lazywait-sync` first sends `pos_confirmed` while the old
+`received` still fires, giving two pushes. Noise is the recoverable failure, so
+the worker went first and the gap was under a minute.
 
 ### The three deploys, 2026-08-27
 
