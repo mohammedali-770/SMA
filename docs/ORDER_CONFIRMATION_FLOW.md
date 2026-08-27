@@ -173,13 +173,26 @@ truth:
 | Outcome | Event | What the customer is told |
 | --- | --- | --- |
 | reached the branch | `pos_confirmed` | "confirmed by the restaurant" |
-| retryable failure | `pos_retrying` | "we are retrying, please do not order again" |
+| retryable failure | `pos_retrying` | "confirming it with the restaurant, no need to place it again" |
 | ambiguous | `pos_confirmation_required` | "we are verifying" |
 | terminal failure | `pos_failed` | "we could not send it" |
 
 `pos_confirmed` now fires on **every** success. It used to be gated behind a
 prior failure, which is why **not one `pos_sync` row had ever been written** — and
 why the next problem went unnoticed for so long.
+
+### The wording matters as much as the timing
+
+`pos_retrying` and `pos_confirmation_required` used to end **"Please do not place
+another order." / "فضلاً لا تنشئ طلبًا جديدًا."** The intent was *do not
+duplicate this order while we sort it out.* What it actually reads as — and the
+owner read it exactly this way, in Arabic — is **"do not order from us again"**.
+
+Saying that at the precise moment something has gone wrong is the worst available
+time to sound like a rejection. Both messages now say *"no need to place it
+again"* and pair it with what is being done about it, so the same instruction
+lands as reassurance rather than a ban. Keep that shape: this copy is read by
+someone who is already worried.
 
 ### The gap this uncovered: nothing was sending them
 
@@ -192,7 +205,7 @@ caller anywhere. Those rows would have sat `pending` for ever.
 It had never shown because no sync had ever failed *and* `pos_confirmed` was
 gated behind a failure, so the queue had never held a single row. The first real
 POS failure would have been met with silence — precisely when a customer most
-needs to hear "we are retrying, please do not order again".
+needs to hear that we are on it and they need not re-order.
 
 `lazywait-sync` now drains that queue (`dispatchPendingPosSync`, bounded at
 `POS_NOTIFY_DRAIN_LIMIT`) at the end of every run. It is the right home: it

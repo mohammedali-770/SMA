@@ -1287,7 +1287,14 @@ would have been met with silence. `lazywait-sync` now drains that queue every
 run, and on the happy path within the same invocation `order-intake` triggers, so
 the customer hears in a second or two.
 
-**Needs a deploy** (§5) of BOTH `lazywait-sync` and `order-intake` — they are two
+**Customer copy corrected in the same change.** `pos_retrying` and
+`pos_confirmation_required` used to end "Please do not place another order." /
+"فضلاً لا تنشئ طلبًا جديدًا." Intended as *do not duplicate this one*; read as
+*do not order from us again*, which is the worst thing to say at the moment
+something has gone wrong. Both now say "no need to place it again" alongside what
+we are doing about it. **This adds `push-dispatch` to the deploy list.**
+
+**Needs a deploy** (§5) of `lazywait-sync`, `order-intake` AND `push-dispatch` — they are two
 halves of one change, and deploying only one is worse than neither: `order-intake`
 alone removes the push and nothing replaces it; `lazywait-sync` alone sends
 `pos_confirmed` alongside the old `received` and the customer gets two.
