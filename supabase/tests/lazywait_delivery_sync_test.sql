@@ -125,6 +125,84 @@ begin
   raise notice 'case 5 ok — delivery_schema_unconfirmed is no longer produced';
 end $$;
 
+-- ============================================================================
+-- 6. THE REAL PAYMENT FLOW — pending -> paid via confirm_order_payment
+-- ============================================================================
+-- Case 4 inserts an already-paid row, which never touches confirm_order_payment
+-- and so proved nothing about the online path. Raised in review of PR #274, and
+-- it was right: `confirm_order_payment` carried the SAME `order_type = 'pickup'`
+-- filter, so a paid online DELIVERY order parked at awaiting_payment forever.
+do $$
+declare o public.orders; v_after public.orders;
+begin
+  insert into public.orders (customer_id, branch_id, order_type, status,
+                             payment_method, payment_status, subtotal, total)
+  values ('00000000-0000-0000-0000-0000000dd001',
+          'b0000000-0000-0000-0000-000000000001', 'delivery', 'received',
+          'online', 'pending', 49.00, 49.00)
+  returning * into o;
+
+  if o.lazywait_sync_state <> 'awaiting_payment' then
+    raise exception 'FAIL 6: setup — expected awaiting_payment, got %', o.lazywait_sync_state;
+  end if;
+
+  v_after := public.confirm_order_payment(o.id, 'test-provider', 'REF_D_1', 49.00, null);
+
+  if v_after.payment_status <> 'paid' then
+    raise exception 'FAIL 6: payment did not confirm (%)', v_after.payment_status;
+  end if;
+  if v_after.lazywait_sync_state <> 'pending' then
+    raise exception 'FAIL 6: a PAID online delivery order is still % — it will never reach the kitchen',
+      v_after.lazywait_sync_state;
+  end if;
+  if v_after.sync_next_attempt_at is null then
+    raise exception 'FAIL 6: paid delivery order was never scheduled to send';
+  end if;
+
+  raise notice 'case 6 ok — paying for an online delivery order releases it to the POS queue';
+end $$;
+
+-- ============================================================================
+-- 7. Pickup's payment release is unchanged
+-- ============================================================================
+do $$
+declare o public.orders; v_after public.orders;
+begin
+  insert into public.orders (customer_id, branch_id, order_type, status,
+                             payment_method, payment_status, subtotal, total)
+  values ('00000000-0000-0000-0000-0000000dd001',
+          'b0000000-0000-0000-0000-000000000001', 'pickup', 'received',
+          'online', 'pending', 32.00, 32.00)
+  returning * into o;
+
+  v_after := public.confirm_order_payment(o.id, 'test-provider', 'REF_P_1', 32.00, null);
+  if v_after.lazywait_sync_state <> 'pending' then
+    raise exception 'FAIL 7: pickup payment release regressed to %', v_after.lazywait_sync_state;
+  end if;
+  raise notice 'case 7 ok — pickup payment release unchanged';
+end $$;
+
+-- ============================================================================
+-- 8. Retry: delivery is retryable, but the retired-reason rows are NOT
+-- ============================================================================
+-- Also raised in review: dropping the delivery refusal made the three
+-- historical `delivery_schema_unconfirmed` rows fall through to 'requeued'.
+-- They are up to a month old with no deadline, so nothing else stopped them.
+do $$
+begin
+  if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 1, null, 'delivery', null) <> 'requeued' then
+    raise exception 'FAIL 8: a failed delivery order should be retryable';
+  end if;
+  if public.lazywait_requeue_eligibility('blocked', null, null, 0, null, 'delivery', 'delivery_schema_unconfirmed') <> 'not_retryable' then
+    raise exception 'FAIL 8: a row blocked under the RETIRED reason must never auto-retry';
+  end if;
+  -- The rails still bite for delivery.
+  if public.lazywait_requeue_eligibility('synced', 'REF_1', null, 1, null, 'delivery', null) <> 'already_synced' then
+    raise exception 'FAIL 8: delivery with a usable ref must not resend';
+  end if;
+  raise notice 'case 8 ok — delivery retries, retired-reason rows do not';
+end $$;
+
 do $$ begin raise notice 'lazywait_delivery_sync_test: all assertions passed'; end $$;
 
 rollback;

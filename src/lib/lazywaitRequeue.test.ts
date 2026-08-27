@@ -86,6 +86,14 @@ describe('lazywaitRequeueEligibility (mirror of SQL rule)', () => {
       .toBe('requeued');
   });
 
+  it('refuses the historical rows blocked under the retired reason', () => {
+    // Never attempted, up to a month old, and no deadline to stop them.
+    expect(lazywaitRequeueEligibility({
+      lazywait_sync_state: 'blocked', order_type: 'delivery',
+      sync_blocked_reason: 'delivery_schema_unconfirmed',
+    }, NOW)).toBe('not_retryable');
+  });
+
   it('rejects non-retryable states', () => {
     expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'syncing', order_type: 'delivery', pos_sync_deadline_at: future }, NOW))
       .toBe('not_retryable');

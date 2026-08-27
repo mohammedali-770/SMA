@@ -127,7 +127,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `clear_product_snooze` | 1 | `20260820110500_branch_availability_rpcs.sql` |
 | `compute_campaign_discount` | 1 | `20260728120000_discounts_campaigns.sql` |
 | `compute_order_snapshot` | 5 | `20260826100000_comp_order_totals.sql` |
-| `confirm_order_payment` | 2 | `20260709140000_payment_methods.sql` |
+| `confirm_order_payment` | 3 | `20260827120000_lazywait_delivery_sync.sql` |
 | `create_account_deletion_request` | 1 | `20260715120000_account_deletion.sql` |
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
 | `current_staff_branch_id` | 1 | `20260820100500_ops_branch_scoping.sql` |
@@ -239,7 +239,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `register_push_device` | 1 | `20260714090000_push_notifications.sql` |
 | `release_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `request_customer_pos_resend` | 2 | `20260813143000_manual_only_pos_resend.sql` |
-| `requeue_lazywait_order` | 3 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
+| `requeue_lazywait_order` | 4 | `20260827120000_lazywait_delivery_sync.sql` |
 | `resolve_account_deletion_request` | 1 | `20260810120000_account_deletion_manual_review_resolution.sql` |
 | `set_branch_delivery_pause` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `set_branch_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |

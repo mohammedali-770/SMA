@@ -92,13 +92,26 @@ comment on function public.set_lazywait_initial_sync() is
 --
 -- `src/lib/lazywaitRequeue.ts` mirrors this function and is changed in the same
 -- commit; a test asserts the two agree.
+-- A SEVENTH parameter is added: the block reason. Removing the delivery refusal
+-- would otherwise make the THREE historical rows blocked under the retired
+-- `delivery_schema_unconfirmed` reason retryable — and they are 1 month, 5 days
+-- and 40 minutes old, with `pos_sync_deadline_at` NULL because they were never
+-- queued, so not one of the existing rails stops them. An admin clicking Retry
+-- would print a month-old ticket in a live kitchen.
+--
+-- Those rows were never sent and were never meant to be. Reviving one is a
+-- deliberate decision about a specific old order, not a routine retry, so the
+-- predicate refuses them by name.
+drop function if exists public.lazywait_requeue_eligibility(text, text, timestamptz, integer, timestamptz, text);
+
 create or replace function public.lazywait_requeue_eligibility(
   p_state text,
   p_ref text,
   p_deadline_at timestamptz,
   p_attempt_count integer,
   p_marker_at timestamptz,
-  p_order_type text
+  p_order_type text,
+  p_blocked_reason text default null
 )
 returns text
 language sql
@@ -106,6 +119,8 @@ stable
 set search_path = public
 as $$
   select case
+    -- Retired gate: these rows predate delivery sync and were never attempted.
+    when p_blocked_reason = 'delivery_schema_unconfirmed' then 'not_retryable'
     when public.lazywait_pos_ref_is_usable(p_ref) then 'already_synced'
     when p_ref is not null then 'ref_present_unverified'
     when p_state = 'synced' then 'ref_present_unverified'
@@ -117,3 +132,128 @@ as $$
     else 'requeued'
   end;
 $$;
+
+revoke all on function public.lazywait_requeue_eligibility(text, text, timestamptz, integer, timestamptz, text, text)
+  from public, anon;
+grant execute on function public.lazywait_requeue_eligibility(text, text, timestamptz, integer, timestamptz, text, text)
+  to authenticated;
+
+-- Pass the reason through from the caller that holds the whole row.
+create or replace function public.requeue_lazywait_order(p_order_id uuid)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+  v_elig  text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins may requeue Lazywait sync' using errcode = '42501';
+  end if;
+
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'not_found: Order not found' using errcode = 'P0002';
+  end if;
+
+  v_elig := public.lazywait_requeue_eligibility(
+    v_order.lazywait_sync_state, v_order.lazywait_ref, v_order.pos_sync_deadline_at,
+    v_order.sync_attempt_count, v_order.pos_create_attempted_at, v_order.order_type::text,
+    v_order.sync_blocked_reason);
+
+  if v_elig <> 'requeued' then
+    raise exception '%', v_elig || ': ' || case v_elig
+      when 'deadline_expired'      then 'Automatic POS retry window has expired. Verify the order manually.'
+      when 'confirmation_required' then 'Order needs manual verification; automatic retry is disabled.'
+      when 'already_synced'        then 'Order already has a usable POS reference / is synced; never resend.'
+      when 'ref_present_unverified' then 'An existing POS reference marker requires manual verification; automatic resend is disabled.'
+      when 'may_have_sent'         then 'A Create Order request may already have been sent; verify manually before any resend.'
+      when 'attempt_limit_reached' then 'Maximum POS retry attempts reached. Verify the order manually.'
+      else                              'Order is not in a safe, retryable state.'
+    end
+    using errcode = 'P0001';
+  end if;
+
+  update public.orders set
+    lazywait_sync_state  = 'pending',
+    sync_next_attempt_at = now(),
+    sync_last_error      = null,
+    sync_blocked_reason  = null,
+    sync_status          = 'not_synced'::public.sync_status,
+    updated_at           = now()
+  where id = p_order_id
+  returning * into v_order;
+
+  return v_order;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- A PAID online delivery order must actually enter the queue
+-- ---------------------------------------------------------------------------
+-- The same `order_type = 'pickup'` filter appears a THIRD time, in
+-- `confirm_order_payment`: it released `awaiting_payment` -> `pending` only for
+-- pickup. Opening the insert trigger without this would have moved the failure
+-- rather than fixed it — an online delivery order would take the payment, park
+-- at `awaiting_payment`, and sit there forever.
+--
+-- It does not bite today only because online payment is disabled; it would fire
+-- the moment that is switched on. Found in review of PR #274.
+--
+-- Body carried over verbatim; the two `order_type = 'pickup' and` clauses are
+-- the only change. The rest of the payment logic — the duplicate-ref short
+-- circuit, the amount check, the payment_records upsert — is untouched.
+create or replace function public.confirm_order_payment(
+  p_order_id uuid,
+  p_provider text,
+  p_provider_ref text,
+  p_amount numeric,
+  p_raw jsonb default null
+)
+returns public.orders
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_order public.orders;
+begin
+  select * into v_order from public.orders where id = p_order_id for update;
+  if not found then
+    raise exception 'Order % not found', p_order_id;
+  end if;
+
+  if p_provider_ref is not null and exists (
+    select 1 from public.payment_records
+    where provider = p_provider and provider_ref = p_provider_ref and status = 'paid'
+  ) then
+    return v_order;
+  end if;
+
+  if p_amount is distinct from v_order.total then
+    insert into public.payment_records (order_id, provider, provider_ref, status, amount, raw)
+      values (p_order_id, p_provider, p_provider_ref, 'failed', coalesce(p_amount, 0), p_raw);
+    raise exception 'Payment amount % does not match order total %', p_amount, v_order.total;
+  end if;
+
+  insert into public.payment_records (order_id, provider, provider_ref, status, amount, raw)
+    values (p_order_id, p_provider, p_provider_ref, 'paid', p_amount, p_raw)
+  on conflict (provider, provider_ref) where provider_ref is not null
+    do update set status = 'paid', amount = excluded.amount, raw = excluded.raw, updated_at = now();
+
+  update public.orders
+    set payment_status   = 'paid',
+        payment_provider = p_provider,
+        paid_at          = now(),
+        -- Delivery is released here too, as of 20260827120000.
+        lazywait_sync_state  = case when lazywait_sync_state = 'awaiting_payment'
+                                    then 'pending' else lazywait_sync_state end,
+        sync_next_attempt_at = case when lazywait_sync_state = 'awaiting_payment'
+                                    then now() else sync_next_attempt_at end,
+        updated_at = now()
+    where id = p_order_id
+    returning * into v_order;
+
+  return v_order;
+end $$;
