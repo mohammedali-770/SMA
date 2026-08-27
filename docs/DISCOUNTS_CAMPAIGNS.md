@@ -317,11 +317,31 @@ which is the evidence.
 phone is only safe if the phone cannot be self-asserted. Verified against live
 Production before the design was fixed: `authenticated` holds column `UPDATE` on
 `profiles` for `email` and `full_name` **only**. `phone_number` is written
-solely by `handle_new_user()` and `handle_auth_user_phone_confirmed()`, both
-SECURITY DEFINER and both fed from `auth.users.phone`. The claim hangs off those
-same two functions, so a membership can only ever attach to a number Auth has
-confirmed — a customer cannot type a comped number into their profile and eat
-free.
+solely by SECURITY DEFINER functions fed from a proven number. A customer cannot
+type a comped number into their profile and eat free.
+
+**There are THREE paths that prove phone ownership, not two** — raised in review
+on PR #272 and fixed there:
+
+| Path | Fires | Claims |
+| --- | --- | --- |
+| `handle_new_user()` | signup, when the phone arrives already confirmed | yes |
+| `handle_auth_user_phone_confirmed()` | `auth.users.phone_confirmed_at` transitions | yes |
+| `mark_phone_verified()` | `whatsapp-verify-otp`, which never touches Supabase Auth | yes |
+
+The third one is the one that is easy to miss: `whatsapp-verify-otp` verifies
+the code itself and records the result by writing `profiles` only, so
+`on_auth_user_phone_confirmed` never fires. Without a claim there, a customer
+who verified that way would sit unclaimed and be **charged in full forever**.
+Claiming there is safe because ownership is already proven when it runs — the
+function is EXECUTE-able by `service_role` alone, and its only caller checks the
+requested number against `auth.users.phone` before consuming a matching OTP.
+
+**An unconfirmed number binds nothing.** `auth.users.phone` is populated when an
+OTP is *requested* and confirmed only when it is *answered*, so a row can hold an
+unproven number. `admin_set_comp_member` therefore resolves an account only from
+a **confirmed** Auth phone or a **verified** profile phone; anything else stays
+pending and binds later, at the proven moment. Late, not wrong.
 
 **A withdrawn invitation stays withdrawn.** Deactivating a pending number and
 then having it sign up binds the row but leaves it inactive. The claim
@@ -424,7 +444,7 @@ The receipt carries the same line — without it a comped receipt reads
 | `supabase/migrations/20260827090000_admin_search_phone_normalization.sql` | **unapplied** — `admin_search_role_candidates` normalizes phone on both sides |
 | `supabase/migrations/20260827100000_comp_members_by_phone.sql` | **unapplied** — `phone_e164`, the OTP claim, the four admin RPCs |
 | `supabase/migrations/20260827110000_comp_erasure.sql` | **unapplied** — `anonymize_account_data` reaches the comp tables |
-| `supabase/tests/comp_members_test.sql` | 25 cases — the first suite anywhere that places a zero-total order |
+| `supabase/tests/comp_members_test.sql` | 27 cases — the first suite anywhere that places a zero-total order |
 | `supabase/tests/admin_search_phone_normalization_test.sql` | 6 cases — every typed shape of a number finds its customer |
 | `src/lib/compMembersApi.ts`, `src/components/admin/CompMembersPanel.tsx` | the console panel |
 | `apps/mobile/src/features/checkout/previewTotals.ts` | the preview line |

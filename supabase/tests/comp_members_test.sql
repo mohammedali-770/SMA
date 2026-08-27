@@ -1011,6 +1011,104 @@ begin
   raise notice 'case 20 ok — erasure removes the comp and scrubs the number, keeping the trail';
 end $$;
 
+-- ============================================================================
+-- 21-22 cover the review findings on PR #272: there are THREE paths that prove
+-- phone ownership in this project, not two, and one of them does not go through
+-- Supabase Auth at all.
+-- ============================================================================
+\set otponly '''00000000-0000-0000-0000-0000000ca008'''
+
+-- ============================================================================
+-- 21. An UNCONFIRMED Auth phone must not bind a comp
+-- ============================================================================
+-- `auth.users.phone` is set when an OTP is REQUESTED and confirmed only when it
+-- is answered, so a row can legitimately hold an unproven number. Binding on it
+-- would hand the comp to whoever holds the half-finished account.
+insert into auth.users (id, phone) values (:otponly, '966500000008');
+
+select set_config('test.auth_uid', :admin, true);
+select set_config('test.is_admin', 'true', true);
+do $$
+declare v jsonb; v_row public.comp_members;
+begin
+  v := public.admin_set_comp_member(null::uuid, true, 'guest, mid-signup', '0500000008');
+
+  if not (v ->> 'pending')::boolean then
+    raise exception 'FAIL 21: an UNCONFIRMED phone bound the comp to an account';
+  end if;
+
+  select * into v_row from public.comp_members where phone_e164 = '+966500000008';
+  if v_row.profile_id is not null then
+    raise exception 'FAIL 21: profile_id was set from an unproven number';
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :otponly, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+  if o.is_comped or o.total = 0 then
+    raise exception 'FAIL 21: an unverified account ate free (total %, comped %)',
+      o.total, o.is_comped;
+  end if;
+  raise notice 'case 21 ok — an unconfirmed Auth phone leaves the comp pending';
+end $$;
+
+-- ============================================================================
+-- 22. The WhatsApp OTP path claims it — `mark_phone_verified`
+-- ============================================================================
+-- `whatsapp-verify-otp` never touches Supabase Auth: it verifies the code itself
+-- and records the result through mark_phone_verified, which writes `profiles`
+-- only. Without a claim there, on_auth_user_phone_confirmed never fires and the
+-- customer is charged in full forever.
+--
+-- Safe to claim here because ownership is proven by the time it runs: the
+-- function is EXECUTE-able by service_role alone, and its only caller checks the
+-- requested number against auth.users.phone before consuming a matching OTP.
+do $$
+declare v_granted boolean;
+begin
+  -- If a client role could ever call this, the claim below would be a way to
+  -- hand yourself somebody else's comp.
+  select has_function_privilege('authenticated', 'public.mark_phone_verified(uuid, text)', 'execute')
+      or has_function_privilege('anon', 'public.mark_phone_verified(uuid, text)', 'execute')
+    into v_granted;
+  if v_granted then
+    raise exception 'FAIL 22: a client role can execute mark_phone_verified';
+  end if;
+end $$;
+
+select public.mark_phone_verified(:otponly, '+966500000008');
+
+do $$
+declare v_row public.comp_members;
+begin
+  select * into v_row from public.comp_members where phone_e164 = '+966500000008';
+  if v_row.profile_id <> '00000000-0000-0000-0000-0000000ca008' then
+    raise exception 'FAIL 22: the WhatsApp OTP path did not claim the comp (profile_id %)',
+      v_row.profile_id;
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :otponly, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+  if o.total <> 0 or not o.is_comped then
+    raise exception 'FAIL 22: still charged after verification (total %, comped %)',
+      o.total, o.is_comped;
+  end if;
+  raise notice 'case 22 ok — a verified WhatsApp OTP claims the comp, and the food is free';
+end $$;
+
 do $$ begin raise notice 'comp_members_test: all assertions passed'; end $$;
 
 rollback;

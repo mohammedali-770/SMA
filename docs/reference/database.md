@@ -180,7 +180,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `list_integration_settings` | 1 | `20260707121000_integration_settings.sql` |
 | `list_pos_confirmation_required` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `loyalty_safe_reason` | 1 | `20260724130000_loyalty_reason_no_order_number.sql` |
-| `mark_phone_verified` | 1 | `20260710140000_whatsapp_otp.sql` |
+| `mark_phone_verified` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `normalize_branch_availability` | 1 | `20260820110000_branch_availability_snooze.sql` |
 | `normalize_branch_delivery_pause` | 1 | `20260820120000_branch_delivery_control.sql` |
 | `normalize_delivery_area` | 1 | `20260820120000_branch_delivery_control.sql` |

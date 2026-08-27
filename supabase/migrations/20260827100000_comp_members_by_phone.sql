@@ -235,6 +235,40 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- The THIRD path that proves phone ownership
+-- ---------------------------------------------------------------------------
+-- `whatsapp-verify-otp` does not go through Supabase Auth at all. It verifies a
+-- WhatsApp OTP itself and records the result with `mark_phone_verified`, which
+-- writes `profiles` only — so `on_auth_user_phone_confirmed` never fires and a
+-- pending comp would sit unclaimed while the customer was charged in full.
+--
+-- Claiming here is safe because ownership is already proven when this runs:
+-- the function is EXECUTE-able by `service_role` alone (`authenticated` and
+-- `anon` both have no grant, verified against live Production), and its only
+-- caller checks `requested.e164 === auth.users.phone` before reading the
+-- challenge, then consumes a matching OTP. A customer cannot reach it to claim
+-- somebody else's number.
+--
+-- Body carried over verbatim from the live definition; the claim is the only
+-- addition.
+create or replace function public.mark_phone_verified(p_user_id uuid, p_phone text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.profiles
+    set phone_verified = true,
+        phone_verified_at = now(),
+        phone_number = coalesce(nullif(btrim(p_phone), ''), phone_number),
+        updated_at = now()
+    where id = p_user_id;
+
+  perform public.claim_comp_membership(p_user_id, p_phone);
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- admin_set_comp_member — now takes a phone, an account, or both
 -- ---------------------------------------------------------------------------
 -- Signature change, so the old one is dropped rather than replaced. Every caller
@@ -291,16 +325,31 @@ begin
       raise exception 'No such customer' using errcode = 'P0002';
     end if;
   else
-    -- Does this number already belong to somebody? auth.users.phone first: it is
-    -- OTP-verified and not customer-writable. profiles.phone_number is the
-    -- fallback for accounts that predate phone sign-in (there are such rows) and
-    -- is likewise not customer-writable. Same precedence anonymize_account_data
-    -- uses, for the same reason.
+    -- Does this number already belong to somebody? Only a PROVEN number binds
+    -- straight to an account: `auth.users.phone` must be confirmed, and the
+    -- `profiles` fallback (for accounts that predate Auth phone sign-in) must be
+    -- flagged verified. Same precedence anonymize_account_data uses, for the
+    -- same reason.
+    --
+    -- WHY THE CONFIRMATION CHECK IS NOT OPTIONAL. `auth.users.phone` is set when
+    -- an OTP is REQUESTED and confirmed only when it is answered, so a row can
+    -- legitimately hold an unproven number. Binding on that would make the comp
+    -- live for whoever holds the half-finished account — which contradicts the
+    -- rest of this migration, where ownership is trusted only at the moment Auth
+    -- (or a verified WhatsApp OTP) says the number is proven.
+    --
+    -- Nothing is lost by being strict: an unresolved number simply stays
+    -- PENDING, and the claim binds it at that proven moment instead. Late, not
+    -- wrong.
     select u.id into v_profile from auth.users u
-     where public.normalize_ksa_e164(u.phone) = v_phone limit 1;
+     where public.normalize_ksa_e164(u.phone) = v_phone
+       and u.phone_confirmed_at is not null
+     limit 1;
     if v_profile is null then
       select p.id into v_profile from public.profiles p
-       where public.normalize_ksa_e164(p.phone_number) = v_phone limit 1;
+       where public.normalize_ksa_e164(p.phone_number) = v_phone
+         and p.phone_verified is true
+       limit 1;
     end if;
   end if;
 

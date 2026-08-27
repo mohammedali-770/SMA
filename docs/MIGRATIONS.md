@@ -3408,7 +3408,7 @@ as 0."* None has been applied. Applying each is a §5 action.
 | Order | File | What it changes |
 | --- | --- | --- |
 | 1 | `20260827090000_admin_search_phone_normalization.sql` | `admin_search_role_candidates` — normalizes phone on both sides through `normalize_ksa_e164` |
-| 2 | `20260827100000_comp_members_by_phone.sql` | `comp_members.phone_e164`, nullable `profile_id`, surrogate PK, `claim_comp_membership`, the two Auth hooks, four admin RPCs, `comp_member_audit.target_phone` |
+| 2 | `20260827100000_comp_members_by_phone.sql` | `comp_members.phone_e164`, nullable `profile_id`, surrogate PK, `claim_comp_membership`, **three** ownership-proving hooks (`handle_new_user`, `handle_auth_user_phone_confirmed`, `mark_phone_verified`), four admin RPCs, `comp_member_audit.target_phone` |
 | 3 | `20260827110000_comp_erasure.sql` | `anonymize_account_data` — deletes the membership and scrubs the number from the audit |
 
 **The order is load-bearing between 2 and 3 only.** `…110000` references
@@ -3431,10 +3431,17 @@ target explicitly, one call per file, and verify Moyasar's continued absence
 afterwards (zero `%moyasar%` functions, zero history rows, `provider_name` still
 `tap`).
 
+**Two P1 review findings were fixed in the same pull request**, both about the
+WhatsApp OTP path that does not go through Supabase Auth: `mark_phone_verified`
+now claims a pending comp (without it a customer verifying that way is charged
+in full forever), and `admin_set_comp_member` binds an account only from a
+**confirmed** Auth phone or a **verified** profile phone, since
+`auth.users.phone` is set at OTP *request* time. Cases 21-22 pin both.
+
 **Validation performed before the pull request** (local, not Production):
 the full chain replays clean onto an empty PostGIS database at **110 migrations**
 via `.github/sql-ci/run.sh`; **57 suites run, 54 pass, 2 quarantined, 0 new
-failures**; `comp_members_test.sql` extended 18 → 25 cases and
+failures**; `comp_members_test.sql` extended 18 → 27 cases and
 `admin_search_phone_normalization_test.sql` added with 6. The search suite was
 re-run against the *pre-fix* function definition and fails at case 2, which is
 what makes it a test rather than a description.
