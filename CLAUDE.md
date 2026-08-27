@@ -200,8 +200,10 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827110000_comp_erasure.sql` | Applied 2026-08-27, live version `20260827064044`. |
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
 | `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
+| `20260827140000_product_images_bucket.sql` | Applied 2026-08-27, live version `20260827195223`. Storage only, no table change: the public `product-images` bucket plus three `storage.objects` policies gated on `public.is_admin()`. Added because Lazywait cannot supply product photos — its `photo` key is null on every cached item — so all 55 active products sat at `image_url` NULL. Verified after apply: bucket config as intended, 3 new policies, the 3 `banner_images_*` policies intact, bucket empty. |
+| `20260827150000_menu_display_order.sql` | Applied 2026-08-27, live version `20260827195309`. No table change: adds `reorder_categories` and `reorder_products`, the missing WRITE side of two `sort_order` columns already honoured on the read side (55 of 55 active products shared one value, so item order within a category was an unstable tied sort). Both `SECURITY DEFINER`, both gated on `is_admin()`; `anon` cannot execute. Verified after apply: `place_order` and `compute_order_snapshot` hashes **unchanged**, no menu data moved. |
 
-The honest statement is therefore **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **114 repository files / 119 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -211,14 +213,16 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**As of 2026-08-27 10:40 UTC this is once again literally true: Moyasar is the
-ONLY unapplied file in the repository.** That makes it more dangerous rather than
+**As of 2026-08-27 19:53 UTC this is STILL literally true, and has now survived
+two more applications: Moyasar is the ONLY unapplied file in the repository.** That makes it more dangerous rather than
 less — with one file left, "apply the outstanding migrations" reads like a no-op
 and is in fact the one instruction that would break the §6 freeze. There is no
 longer any other file such an instruction could plausibly mean.
 
 The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
-correctly — each target named explicitly, one call per file, with Moyasar's
+correctly — most recently `product_images_bucket` and `menu_display_order`, each
+applied only AFTER PR #281 was verified merged (`1837ca6`) and each file hashed
+against its merged copy — each target named explicitly, one call per file, with Moyasar's
 continued absence verified afterwards (most recently 2026-08-27 after the
 watchdog application: zero `%moyasar%` functions, zero history rows,
 `provider_name` still `tap`, still disabled). Any `supabase migration` operation

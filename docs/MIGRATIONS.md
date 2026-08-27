@@ -448,7 +448,9 @@ production.
 | 69 | 20260827100000 | comp_members_by_phone | — | 20260827063746 | comp_members_by_phone | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:37:46 UTC — a comp can be attached to a PHONE NUMBER before that person has an account.** Owner's requirement: *"when the number of someone in comped customers enters the app, they should see the prices as 0."* Row 65 keyed membership on `profile_id`, which is backwards for how the decision is made — the owner knows the NUMBER, usually before that person has opened the app. Adds `comp_members.phone_e164` (canonical `+9665XXXXXXXX` by check constraint), makes `profile_id` **nullable**, moves the PK to a surrogate `id` because neither natural key is present on every row (5 of 10 live profiles carry no phone at all), adds two partial unique indexes and `comp_member_audit.target_phone`. **THE MONEY PATH IS NOT REDEFINED** — `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot` are untouched, and both hashes were confirmed **unchanged across the apply** (`8bd7183832108abb25bcca6942dccd70`, `f955b748b698a1704533f4aaffb835cb`). That is the design, not an omission: a pending row has `profile_id` NULL and never matches the pricing lookup, which is correct because an unclaimed number has no account and cannot place an order. All **18** pre-existing cases in `comp_members_test.sql` pass unchanged, which is the evidence for the claim rather than an assertion about it. **The binding happens at the moment ownership is proven, and there are THREE such paths, not two** — the third was missed in the first commit and found in review: `handle_new_user`, `handle_auth_user_phone_confirmed`, and `mark_phone_verified`, which backs `whatsapp-verify-otp` and never touches Supabase Auth at all. Without a claim there a customer comped by number who verified that way would have been **charged in full forever**. Safe to claim there because `mark_phone_verified` is EXECUTE-able by `service_role` **alone** (verified live: `authenticated` false, `anon` false) and its only caller checks the requested number against `auth.users.phone` before consuming a matching OTP; case 22 asserts that grant so a future loosening fails the test rather than opening a hole quietly. **A second review finding, also real:** `admin_set_comp_member` resolved an account from an **unconfirmed** `auth.users.phone`, which is set at OTP *request* time — now requires `phone_confirmed_at`, or `profiles.phone_verified` on the fallback; an unresolved number stays PENDING and binds later. **Applying comped nobody:** `comp_members` still 1 row / **0 active** / 0 pending afterwards, the single existing row backfilled to canonical `+9665…`, audit still 2 rows, both comped orders unchanged at `total` 0.00. **A transcription slip during the apply was caught and corrected** — see §36. Bodies: `admin_set_comp_member` `55009930c7bfdac7d4e79864b83dcdff` (5 579), `claim_comp_membership` `2df644c097dc7fb2c4fbd3136573605b` (1 144), `handle_new_user` `3737461bfd0fcfb6e92766c04aba0175` (796), `handle_auth_user_phone_confirmed` `526ad4d149754e2eb5a9691ffd6ce458` (663), `mark_phone_verified` `fc71ade769b833fcad02a5fe5c907d4f` (478), `admin_list_comp_members` `0ae53f5ad305936a016fc287a3545ede` (866), `admin_list_comp_member_audit` `5184b90dc10e0a90f6d9d4718f3f166a` (878). **Version NOT aligned** (§9-D). Detail in §36 |
 | 70 | 20260827110000 | comp_erasure | — | 20260827064044 | comp_erasure | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:40:44 UTC, after row 69 which it depends on** — it reads `comp_member_audit.target_phone`, a column row 69 adds, so applying it first fails on an undefined column. Row 69 created a new place a customer's phone number is written, and **two of those places carry no FK back to the user**, so nothing in the existing deletion path would have removed them: an UNCLAIMED `comp_members` row holds `phone_e164` with `profile_id` NULL, so the `on delete cascade` that removes a claimed row never fires for it; and `comp_member_audit.target_phone` sits on the permanent trail whose `target_user_id` is deliberately `on delete set null` so "who was made free, and why" outlives the account — a raw phone number surviving there defeats exactly that intent, being the one field that re-identifies a customer who asked to be forgotten. `anonymize_account_data` now deletes the claimed membership by FK (which also matters for the anonymize-without-delete path, where a comp outliving its account would silently re-apply if the number were re-registered), deletes an unclaimed row by normalized value, and **nulls the number out of the audit while keeping the row**. Two new counts in the summary, `comp_memberships_deleted` and `comp_audit_phones_cleared`. Everything else is the live body carried over verbatim — the orders/addresses/devices/sessions/loyalty/OTP/WhatsApp work, the `auth.users`-then-profile phone precedence, and the `phone_purge_attempted` wording. Body `37e0162ca97f4bf5ff8ca3ab31ffd5c8` (4 282 chars). Covered by `comp_members_test.sql` case 20. **Version NOT aligned** (§9-D). |
 | 71 | 20260827120000 | lazywait_delivery_sync | — | 20260827082634 | lazywait_delivery_sync | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 08:26:34 UTC** on explicit owner approval, via MCP `apply_migration`. Opens the POS gate for delivery orders. Redefines four functions: `set_lazywait_initial_sync` (drops the branch that parked EVERY delivery order at `blocked`/`delivery_schema_unconfirmed` on INSERT — the reason SM-2026-000057 died with `sync_attempt_count = 0` while the customer was pushed "we sent it to the kitchen"); `lazywait_requeue_eligibility` (6-arg dropped, 7-arg created with `p_blocked_reason text default null`, refusing the now-retired `delivery_schema_unconfirmed` so three stale legacy rows — one 1 month 2 days old, all with `pos_sync_deadline_at` NULL — could not be swept into Retry); `requeue_lazywait_order` (passes the reason through); and `confirm_order_payment` (drops `order_type = 'pickup'` from both release clauses, which was a THIRD instance of the same filter and would have kept paid online deliveries out of the queue even with the trigger open). **The money path was verified, not assumed**: `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash identically before and after. Moyasar re-verified absent (0 functions, 0 rows, `provider_name` still `tap`, disabled). Paired with the `lazywait-sync` **v6** deploy the same day — the two are halves of one change: the migration alone admits a delivery order to a queue whose worker still refuses it, which is exactly what stranded SM-2026-000058 in the 40-second gap. Proven live by **SM-2026-000059**: POS ticket #3 at 10:15 UTC, 42 s end-to-end, first attempt, `success: true`. Covered by `lazywait_delivery_sync_test.sql` (8 cases; case 1 and case 6 verified failing against the pre-fix bodies). **Version NOT aligned** (§9-D). |
-| 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). **Current latest live version** |
+| 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). |
+| 73 | 20260827140000 | product_images_bucket | — | 20260827195223 | product_images_bucket | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:52:23 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #281 merged as `1837ca6` and the file was hashed against its merged copy (`606d06ed9466f091` — identical). **Storage only; NO table change.** Creates the public `product-images` bucket (5 MB, jpg/png/webp) and three `storage.objects` policies — insert/update/delete — each gated on `public.is_admin()`, i.e. role **and** AAL2. A near-copy of `20260712130000_homepage_banners.sql`'s storage half, deliberately: two buckets that behave identically beat one clever shared one. **A separate bucket rather than a folder in `banner-images`** because a cleanup that empties banners must not be able to delete the menu's photography. **Why it was needed:** Lazywait cannot supply product photos — `GET /menu/products/items` carries a `photo` key on **77 of 95** cached items and **every value is null** — so all 55 active products sat at `image_url` NULL with no way to fill it but pasting a URL by hand. **Verified after apply:** bucket present with the intended public/limit/MIME config, 3 new policies, the 3 `banner_images_*` policies **intact**, Moyasar absent (0 functions). No `storage.objects` row exists yet. **Version NOT aligned** (§9-D). |
+| 74 | 20260827150000 | menu_display_order | — | 20260827195309 | menu_display_order | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:53:09 UTC** on explicit owner approval, via MCP `apply_migration`, hashed against its merged copy first (`d89df6be3b2f2409` — identical). **NO table change**: adds `reorder_categories(uuid[])` and `reorder_products(uuid, uuid[])`, the missing WRITE side of two columns that were already honoured on the READ side. Measured before apply: 5 active categories with 3 distinct `sort_order` values, and **55 active products sharing ONE value (all 0)** — so item order within a category was whatever Postgres returned for a tied sort, unstable between queries. Each RPC writes the whole ordering in ONE statement from an array whose **position is the rank** (`with ordinality`), so a gap or duplicate rank is not a producible failure mode. `reorder_products` takes `FOR UPDATE` on the category before counting and requires the array to be the **complete** membership — a valid-but-partial list would let a product moved in by another administrator keep a colliding inherited rank. `reorder_categories` deliberately allows a partial list (a new category defaults to 0 and sorts to the front, visible and correctable); the migration records that asymmetry. **Verified after apply:** both functions present, both `SECURITY DEFINER`, both gating on `is_admin()`, `anon` **cannot** execute and `authenticated` can, the `incomplete_order` guard present; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 rows). **No menu data moved** — still 55 products at 1 distinct rank, 5 categories in their prior order, 55 orders. Covered by `menu_display_order_test.sql` (11 cases; the admin-gate case was proven to fail against an ungated copy of the function). **Version NOT aligned** (§9-D). **Current latest live version** |
 
 Reconciliation check: the rows above detail **72 repository / 73 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
@@ -3636,5 +3638,94 @@ The comment probe is not ceremony. Comments between `$…$` are stored in
 function bodies that did exactly that. Extracting mechanically and then probing
 the result is the pair of habits that prevents it.
 
-**Moyasar is now the only unapplied file in the repository** — see CLAUDE.md §8
+**Moyasar is still the only unapplied file in the repository**, re-verified after the two 2026-08-27 evening applications — see CLAUDE.md §8
 for why that makes it more dangerous, not less.
+
+
+## 39. Menu presentation — product images and display order — APPLIED 2026-08-27 (rows 73-74)
+
+Two migrations applied on explicit owner approval at 19:52 and 19:53 UTC, in
+that order, one `apply_migration` call each with read-only verification after
+every one. Live history moved **117 → 119**.
+
+**The merge was verified BEFORE anything was applied.** The instruction "apply
+the two migrations" arrived while PR #281 was still open — GitHub reported
+`merged: false`, `mergeable_state: blocked`, and both files were absent from the
+default branch. Nothing was applied until the pull request actually merged
+(`1837ca6`) and each file was hashed against its merged copy
+(`606d06ed9466f091`, `d89df6be3b2f2409` — both identical to the tested local
+files). §15 exists for precisely this, and this is the second time in one day it
+has caught the same sequence.
+
+The block was not a defect: two review findings had arrived after CI started, and
+both were real. Both were fixed, answered on the thread and resolved before the
+merge — see the pull request.
+
+### What was applied
+
+| Row | File | Live version | What it does |
+| --- | --- | --- | --- |
+| 73 | `20260827140000_product_images_bucket.sql` | `20260827195223` | The public `product-images` bucket (5 MB, jpg/png/webp) and three `storage.objects` policies gated on `public.is_admin()`. Storage only. |
+| 74 | `20260827150000_menu_display_order.sql` | `20260827195309` | `reorder_categories(uuid[])` and `reorder_products(uuid, uuid[])`. Functions only. |
+
+**Neither touches a table.** No column was added, altered or dropped; row 73 is
+entirely `storage.buckets` / `storage.objects`, and row 74 creates two functions.
+
+### Why they were needed, measured rather than assumed
+
+Both close a gap where one half of a feature had existed for months without the
+other:
+
+- **`products.image_url` existed with no way to fill it.** 55 of 55 active
+  products carried NULL. Lazywait cannot help: `GET /menu/products/items` carries
+  a `photo` key on **77 of 95** cached items and **every value is null**.
+- **`sort_order` existed on both tables and was already honoured on the READ
+  side** — both catalog fetches `.order('sort_order')` and `buildMenuSections`
+  sorts categories by it — but nothing could write it. All 55 active products
+  shared **one** value, so item order within a category was whatever Postgres
+  returned for a tied sort: not stable between queries.
+
+### The property that makes row 74 safe
+
+Reordering is a whole-list operation, so each function writes the entire ordering
+in ONE statement from an array whose **position** is the rank (`with
+ordinality`). A gap or duplicate rank is therefore not a producible failure mode,
+and no client-computed integer is ever trusted.
+
+`reorder_products` additionally takes `FOR UPDATE` on the category's rows before
+counting and requires the array to be the **complete** membership. Checking only
+that every id belongs to the category is not enough: a product moved in by
+another administrator after the dashboard loaded would keep an inherited rank
+that collides with the renumbered rows. `reorder_categories` deliberately still
+accepts a partial list — a new category takes the column default 0 and sorts to
+the front, where it is visible and one click from correct — and the migration
+records that asymmetry so it does not read as an oversight.
+
+### Verified after apply
+
+| Check | Result |
+| --- | --- |
+| Bucket config | public, 5 242 880 bytes, `image/jpeg,image/png,image/webp` |
+| New storage policies | 3 |
+| `banner_images_*` policies | **3, intact** |
+| Reorder functions | 2, both `SECURITY DEFINER`, both gating on `is_admin()` |
+| Execute grants | `anon` **false**, `authenticated` true |
+| `incomplete_order` guard | present |
+| `place_order` hash | `8bd71838…` — **unchanged** |
+| `compute_order_snapshot` hash | `f955b748…` — **unchanged** |
+| Moyasar | 0 functions, 0 history rows |
+| Menu data | **nothing moved** — 55 products still at 1 distinct rank, 0 images, 5 categories in their prior order, 55 orders |
+
+The money path was verified rather than assumed even though neither migration
+goes near it, because that is the standing rule and it costs one query.
+
+### Applied but DORMANT
+
+Both are inert until somebody uses them. The bucket holds **zero objects**, no
+product has an image, and no reorder has been performed — every product is still
+at rank 0. Nothing a customer sees has changed yet; what changed is that an
+administrator can now change it.
+
+**Neither version is aligned** (§9-D): `apply_migration` stamps an apply-time
+version, so live history carries `20260827195223` / `20260827195309` rather than
+the repository filenames. Do not "repair" that.
