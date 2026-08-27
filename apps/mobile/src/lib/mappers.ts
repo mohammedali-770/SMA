@@ -17,10 +17,6 @@ import type {
 import type { PaymentMethodSettings } from './payment';
 import type { SupportSettings } from './supportContact';
 
-/** A neutral food image used when a product has no image_url. */
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
-
 /** Homepage banner row -> display model. Normalizes the optional action fields. */
 export function mapBanner(b: DbHomepageBanner): HomeBanner {
   const action = b.action_type === 'category' || b.action_type === 'product' ? b.action_type : 'none';
@@ -114,7 +110,17 @@ export function mapProduct(
     descriptionEn: p.description_en ?? '',
     descriptionAr: p.description_ar ?? '',
     price: Number(p.price),
-    imageUrl: p.image_url ?? FALLBACK_IMAGE,
+    // NO stock-photo fallback. This used to substitute a single Unsplash
+    // BURGER for every product with a null image_url — which was all 55 of
+    // them — so the menu showed the same burger beside "Chicken Wings" and
+    // "Fries with cheese". It was commented "a neutral food image"; a photo of
+    // one specific dish is not neutral.
+    //
+    // ProductCard already renders a neutral DishIcon when imageUrl is empty
+    // (ProductCard.tsx: `showImage = !!product.imageUrl && !imgFailed`), so
+    // removing the substitution activates an empty state that was already
+    // built, already styled and previously unreachable.
+    imageUrl: p.image_url ?? '',
     calories: p.calories ?? 0,
     isActive: p.is_active,
     modifierGroupIds: links.filter((l) => l.product_id === p.id).map((l) => l.group_id),

@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Download, Edit, FileSpreadsheet, Plus, Trash2 } from 'lucide-react';
+import { Download, Edit, FileSpreadsheet, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
+import { productImages as productImageApi } from '../../lib/api';
+import { isAllowedProductImageSize, isAllowedProductImageType } from '../../lib/productImages';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Field } from '../../design-system/ui/Field';
@@ -80,6 +82,12 @@ export const MenuManagementPanel: React.FC = () => {
   const [prodCalories, setProdCalories] = useState('500');
   const [prodCatId, setProdCatId] = useState('');
   const [prodImg, setProdImg] = useState('');
+  // Upload state for the product photo. `prodImg` stays the single source of
+  // truth for what gets saved — an upload just fills it in, so a hand-pasted
+  // URL and an uploaded one are indistinguishable downstream.
+  const [imgUploading, setImgUploading] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const imgFileRef = useRef<HTMLInputElement>(null);
 
   // CSV Parsing simulation state
   const [rawCsvText, setRawCsvText] = useState('');
@@ -135,7 +143,12 @@ export const MenuManagementPanel: React.FC = () => {
       descriptionAr: prodDescAr,
       price: parsedPrice,
       calories: parseInt(prodCalories) || 0,
-      imageUrl: prodImg || 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80',
+      // NO stock-photo default. This used to persist an Unsplash BURGER into
+      // image_url for any product saved without one, so a chicken-wings row
+      // carried a photo of a burger forever. The mobile ProductCard already
+      // renders a neutral dish icon when image_url is null, which is honest;
+      // a confidently wrong photo is not.
+      imageUrl: prodImg.trim(),
       isActive: true,
       modifierGroupIds: ['mg-heat-level'],
       // A hand-authored product has no Lazywait price tiers. Tiers arrive
@@ -160,7 +173,7 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice('30.00');
     setProdCalories('500');
     setProdCatId('');
-    setProdImg('');
+    setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(false);
   };
 
@@ -173,11 +186,44 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice(p.price.toString());
     setProdCalories(p.calories.toString());
     setProdCatId(p.categoryId);
-    setProdImg(p.imageUrl);
+    setProdImg(p.imageUrl); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(true);
   };
 
   // CSV Drag and drop / selection parser handler
+  // Validate BEFORE uploading so a rejected file costs no round trip, using the
+  // same rules the bucket enforces server-side (jpg/png/webp, <= 5 MB).
+  const onPickProductImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgError(null);
+    if (!isAllowedProductImageType({ type: file.type, name: file.name })) {
+      setImgError(isRTL ? 'صيغة غير مدعومة. استخدم JPG أو PNG أو WebP.' : 'Unsupported format. Use JPG, PNG, or WebP.');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
+    if (!isAllowedProductImageSize(file.size)) {
+      setImgError(isRTL ? 'حجم الصورة كبير جداً (الحد ٥ ميجابايت).' : 'Image too large (5 MB max).');
+      if (imgFileRef.current) imgFileRef.current.value = '';
+      return;
+    }
+    setImgUploading(true);
+    const previous = prodImg;
+    try {
+      const { publicUrl } = await productImageApi.upload(file);
+      setProdImg(publicUrl);
+      // Clean up the object this product used to point at, but ONLY if we
+      // produced it. An external URL is left alone — it is not ours to delete.
+      // Deliberately after the new URL is in hand, so a failed upload never
+      // destroys the image still on the row.
+      void productImageApi.removeByUrl(previous);
+    } catch (err) {
+      setImgError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImgUploading(false);
+    }
+  };
+
   const handleParseCSV = () => {
     if (!rawCsvText.trim()) {
       alert(adminLang === 'en' ? 'Please paste CSV lines first' : 'الرجاء لصق خطوط CSV أولاً');
@@ -625,7 +671,60 @@ export const MenuManagementPanel: React.FC = () => {
               </label>
             </div>
 
-            <Field label="Image URL" value={prodImg} onValueChange={setProdImg} placeholder="https://unsplash..." />
+            {/* Product photo. Lazywait cannot supply one — its catalog `photo`
+                field is null on every item — so the dashboard is the only way
+                a menu item gets a real picture. Upload writes to the
+                product-images bucket (admin-only via RLS) and fills the URL
+                field below; pasting a URL by hand still works unchanged. */}
+            <div className="flex flex-col gap-2">
+              <span className="text-start text-[13px] font-semibold text-con-text-2">
+                {isRTL ? 'صورة المنتج' : 'Product image'}
+              </span>
+              <div className="flex items-center gap-3">
+                {prodImg ? (
+                  <img
+                    src={prodImg}
+                    alt={isRTL ? 'معاينة صورة المنتج' : 'Product image preview'}
+                    className="size-16 shrink-0 rounded-[var(--radius-ds-md)] object-cover"
+                  />
+                ) : (
+                  <span className="flex size-16 shrink-0 items-center justify-center rounded-[var(--radius-ds-md)] bg-con-surface-2">
+                    <Text variant="caption" tone="tertiary" as="span">{isRTL ? 'لا صورة' : 'None'}</Text>
+                  </span>
+                )}
+                <input
+                  ref={imgFileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => void onPickProductImage(e)}
+                  disabled={imgUploading}
+                  aria-label={isRTL ? 'اختر صورة المنتج' : 'Choose product image'}
+                  className={`block w-full text-[13px] text-con-text-2 file:me-2 file:cursor-pointer file:rounded-[var(--radius-ds-md)] file:border-0 file:bg-ember file:px-3 file:py-1.5 file:text-[13px] file:font-bold file:text-on-ember ${family}`}
+                />
+              </div>
+              {imgUploading && (
+                <Text variant="caption" tone="secondary" as="span" className="flex items-center gap-1">
+                  <Loader2 className="size-3 animate-spin" aria-hidden="true" /> {isRTL ? 'جاري الرفع…' : 'Uploading…'}
+                </Text>
+              )}
+              {imgError && <Notice title={imgError} tone="blocking" />}
+              {prodImg && (
+                <button
+                  type="button"
+                  onClick={() => { const was = prodImg; setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = ''; void productImageApi.removeByUrl(was); }}
+                  className="self-start text-[13px] font-semibold text-con-text-2 underline"
+                >
+                  {isRTL ? 'إزالة الصورة' : 'Remove image'}
+                </button>
+              )}
+              <Text variant="caption" tone="tertiary" as="p">
+                {isRTL
+                  ? 'JPG أو PNG أو WebP، بحد أقصى ٥ ميجابايت. بدون صورة يظهر رمز محايد في التطبيق — وهو أفضل من صورة لا تخص الصنف.'
+                  : 'JPG, PNG, or WebP, 5 MB max. With no image the app shows a neutral icon — better than a photo of the wrong dish.'}
+              </Text>
+            </div>
+
+            <Field label="Image URL" value={prodImg} onValueChange={setProdImg} placeholder="https://…" />
 
             <button
               type="submit"

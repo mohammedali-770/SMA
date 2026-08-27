@@ -10,6 +10,7 @@
  */
 import { supabase } from './supabase';
 import { BANNER_BUCKET, bannerStoragePath } from './banners';
+import { PRODUCT_IMAGE_BUCKET, productImagePathFromUrl, productImageStoragePath } from './productImages';
 import { classifyWatchdogProbe, WatchdogCapability } from './orderIntegrityCapability';
 import {
   BranchDependencyCounts, BranchHasDependenciesError,
@@ -1008,6 +1009,51 @@ export const banners = {
   async removeImage(path: string) {
     const { error } = await supabase.storage.from(BANNER_BUCKET).remove([path]);
     if (error) throw new Error(error.message);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Product images (admin-uploaded photography for menu items).
+//
+// `products.image_url` is unchanged and still holds ANY public URL — a
+// hand-pasted external one still works. These helpers just give an
+// administrator a way to produce one without leaving the dashboard, which is
+// what was missing: 55 of 55 active products had a NULL image_url, and Lazywait
+// cannot supply photos (its `photo` field is null on every cached item).
+//
+// RLS on storage.objects enforces admin (role AND AAL2 via public.is_admin()).
+// ---------------------------------------------------------------------------
+export const productImages = {
+  /**
+   * Upload an image to the public product-images bucket and return its stored
+   * path + public URL. Uses a unique path so an upload NEVER overwrites an
+   * existing object; `upsert:false` makes a collision an error rather than a
+   * silent replacement.
+   */
+  async upload(file: File): Promise<{ path: string; publicUrl: string }> {
+    const unique = `${Date.now()}-${crypto.randomUUID()}`;
+    const path = productImageStoragePath(file.name, unique);
+    const { error } = await supabase.storage
+      .from(PRODUCT_IMAGE_BUCKET)
+      .upload(path, file, { cacheControl: '3600', upsert: false, contentType: file.type || undefined });
+    if (error) throw new Error(error.message);
+    const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(path);
+    return { path, publicUrl: data.publicUrl };
+  },
+
+  /**
+   * Best-effort cleanup of an image THIS bucket produced, given the public URL
+   * currently stored on the product.
+   *
+   * Deliberately a no-op for any URL we did not produce, so replacing a
+   * hand-pasted Unsplash link never attempts a delete, and a banner-bucket URL
+   * can never be reached from here. Never throws: losing an orphaned object is
+   * strictly better than failing the administrator's save.
+   */
+  async removeByUrl(url: string | null | undefined): Promise<void> {
+    const path = productImagePathFromUrl(url);
+    if (!path) return;
+    try { await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([path]); } catch { /* orphan, not a failure */ }
   },
 };
 

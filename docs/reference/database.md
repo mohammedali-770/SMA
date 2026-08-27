@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **112**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827130000_watchdog_delivery_coverage.sql`.
+Migration files in the repository: **113**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827140000_product_images_bucket.sql`.
 
 ## Tables
 
