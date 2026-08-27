@@ -148,7 +148,7 @@ the default branch. Nothing was applied until the merge actually landed
 precisely this.
 
 **Superseded 2026-08-27 — delivery orders now reach the POS, and that migration
-is UNAPPLIED.** `20260827120000_lazywait_delivery_sync` opens the real gate:
+is APPLIED.** `20260827120000_lazywait_delivery_sync` opened the real gate:
 `set_lazywait_initial_sync`, a BEFORE INSERT trigger, parked **every** delivery
 order at `blocked`/`delivery_schema_unconfirmed` before the sync worker could
 claim it — which is why the customer order SM-2026-000057 died with
@@ -156,7 +156,30 @@ claim it — which is why the customer order SM-2026-000057 died with
 same migration makes a failed delivery order retryable
 (`lazywait_requeue_eligibility` refused delivery outright). The payment gate is
 untouched: an unpaid ONLINE order still parks at `awaiting_payment`, delivery or
-not. Applying it is a §5 action and is unrelated to §6.
+not.
+
+On the owner's explicit approval it was applied via MCP `apply_migration` (live
+version `20260827082634`, history **115 → 116**), and `lazywait-sync` was then
+deployed as **version 6** — the matching half, since the migration alone lets a
+delivery order into a queue whose worker still refuses it. All five bundle files
+were hashed back from Supabase and are byte-identical to the merged branch. The
+money path was verified unchanged, and Moyasar re-verified absent (zero
+`%moyasar%` functions, zero history rows).
+
+**It works, and that is measured rather than assumed: SM-2026-000059 reached the
+POS as ticket #3 at 10:15 UTC, 42 seconds after being placed, first attempt, no
+retries.** Q1 is answered — Lazywait accepts `order_type: "delivery"`. Q8 (does
+the POS *render* `delivery_address`, or only the duplicated `order_details`
+line?) can only be answered by looking at a printed ticket.
+
+**Four delivery orders stay parked, by design.** SM-2026-000032, -000049,
+-000057 and -000058 all carry `delivery_schema_unconfirmed` and are
+`not_retryable`. SM-2026-000058 is the instructive one: it was placed in the
+40-second window between the migration landing and the deploy, so the *old*
+worker claimed it and blocked it. That reason is now retired — neither the
+trigger nor worker v6 can produce it — so the guard parks exactly these four and
+nothing reachable. Re-driving any of them would create a real kitchen ticket for
+food nobody is waiting for, and is a §5 live write regardless.
 
 **Two repository files are unapplied. One of them is the frozen one.**
 
@@ -175,9 +198,10 @@ not. Applying it is a §5 action and is unrelated to §6.
 | `20260827090000_admin_search_phone_normalization.sql` | Applied 2026-08-27, live version `20260827063613`. |
 | `20260827100000_comp_members_by_phone.sql` | Applied 2026-08-27, live version `20260827063746`. |
 | `20260827110000_comp_erasure.sql` | Applied 2026-08-27, live version `20260827064044`. |
-| `20260827120000_lazywait_delivery_sync.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Pairs with a `lazywait-sync` deploy; either order is safe, both are needed. |
+| `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
+| `20260827130000_watchdog_delivery_coverage.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Removes the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which went blind to failed **paid delivery** orders the moment delivery went live. |
 
-The honest statement is therefore **111 repository files / 115 live rows / two unapplied files: one awaiting ordinary owner approval, and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **112 repository files / 116 live rows / two unapplied files: one awaiting ordinary owner approval (`20260827130000_watchdog_delivery_coverage`), and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 

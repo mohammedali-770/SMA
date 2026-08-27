@@ -16,8 +16,9 @@ import {
  *
  * Source of truth stays Supabase/place_order. A Lazywait failure NEVER affects
  * the local order — it is retried with backoff, blocked (config/mapping), or
- * dead-lettered. Only PICKUP orders are synced (delivery Create Order schema is
- * unconfirmed and is blocked at insert).
+ * dead-lettered. PICKUP AND DELIVERY are both synced. Delivery was enabled on
+ * 2026-08-27 by migration 20260827120000 (which removed the insert-time block)
+ * plus worker v6; SM-2026-000059 was the first delivery order the POS accepted.
  *
  * verify_jwt = false (config.toml): server/scheduled caller. Optionally gated by
  * a shared secret in secret_config.sync_trigger_secret (header x-sync-secret).

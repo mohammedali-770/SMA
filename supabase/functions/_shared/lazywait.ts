@@ -296,7 +296,7 @@ export function computePosNextAttempt(
 }
 
 // ---------------------------------------------------------------------------
-// Create Order payload mapping (PICKUP ONLY)
+// Create Order payload mapping (pickup + delivery)
 //
 // Grounded in the owner-supplied Lazywait Create Order contract of 2026-08-24,
 // read from the DEV host `apiv2-dev.lazywait.com`.
@@ -315,7 +315,10 @@ export function computePosNextAttempt(
 // That document states only `client_id`, `branch_id` and a non-empty
 // `order_items` are required and everything else is optional, and that the
 // identity fields (order_ref/order_id/order_number/order_date) are generated
-// server-side. Delivery is still NOT confirmed by it and stays blocked.
+// server-side. DELIVERY was enabled on 2026-08-27 using only fields that
+// document confirms — see buildCreateOrderPayload for what is and is not
+// sent. SM-2026-000059 was the first delivery order the POS accepted
+// (ticket #3, first attempt, no retries).
 // ---------------------------------------------------------------------------
 
 /**
@@ -464,9 +467,24 @@ export function formatDeliveryAddress(
   }
   // Label first (what the customer calls the place), then the national short
   // address (the precise, driver-usable code), then free-text directions.
-  const parts = [addr.label, addr.national_short_address, addr.description]
-    .map((v) => (v == null ? '' : String(v).trim()))
-    .filter((v) => v.length > 0);
+  //
+  // DEDUPED, because nothing stops a customer saving the same text as both the
+  // label and the directions — and SM-2026-000059, the first delivery order to
+  // reach the POS, did exactly that. Its line composed as
+  // "الناصرة جنب بقالة الرحمة · الناصرة جنب بقالة الرحمة", and because the same string is
+  // repeated into `order_details` (see DELIVERY_TICKET_PREFIX) the ticket
+  // carried that address FOUR times. Compare case-insensitively on the trimmed
+  // value; keep the first occurrence, and keep its original casing.
+  const parts: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of [addr.label, addr.national_short_address, addr.description]) {
+    const v = raw == null ? '' : String(raw).trim();
+    if (!v) continue;
+    const key = v.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    parts.push(v);
+  }
   if (!parts.length) return null;
   return parts.join(' · ');
 }

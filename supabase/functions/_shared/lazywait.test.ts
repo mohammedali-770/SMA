@@ -308,6 +308,41 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(r.payload.delivery_address).toBe('RIYD2929');
   });
 
+  it('DEDUPES a repeated address part — SM-2026-000059 carried its address four times', () => {
+    // The live defect: the app let the same text be saved as BOTH the label and
+    // the directions, so the composed line repeated it, and order_details then
+    // repeated the whole line again.
+    const same = 'الناصرة جنب بقالة الرحمة';
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: { label: same, description: same, national_short_address: null },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.delivery_address).toBe(same);
+    expect(String(r.payload.order_details)).toBe(`التوصيل إلى / DELIVER TO: ${same}`);
+  });
+
+  it('dedupes case-insensitively and on surrounding whitespace, keeping the first casing', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: { label: 'Home Gate', national_short_address: 'RIYD2929', description: '  home gate  ' },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.delivery_address).toBe('Home Gate · RIYD2929');
+  });
+
+  it('leaves genuinely different parts alone — dedupe must not swallow detail', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: { label: 'Home', national_short_address: 'RIYD2929', description: 'Second gate' },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.delivery_address).toBe('Home · RIYD2929 · Second gate');
+  });
+
   it('pickup is unchanged — no delivery fields leak onto it', () => {
     const r = buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,

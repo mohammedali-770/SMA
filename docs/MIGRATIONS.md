@@ -446,7 +446,8 @@ production.
 | 67 | 20260826110000 | checkout_zero_total_idempotency | — | 20260826115122 | checkout_zero_total_idempotency | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-26 11:51:22 UTC — closes a PRE-EXISTING defect before comped customers made it reachable.** `begin_checkout_session` settles a zero-total cart inside a single call: it inserts the session, creates the order and flips the session to `'consumed'`. Its retry lookup required `status = 'pending_payment'` and it passed `p_idempotency_key = null` to `insert_order_from_snapshot`, so a retried call with the same cart key matched nothing at either level and produced **a second session and a second free order**. A flaky mobile network is enough — precisely the scenario order idempotency was added for in 20260707121400. **It had not bitten** because online payment is disabled and that check sits above the snapshot, and because a zero total was otherwise only reachable by fully covering a cart with points and a coupon; comped customers make the branch ordinary. Fixed in two independent layers: the reuse lookup now also matches a session that already produced an order (the sequential retry), and the key is carried onto the order so `orders_idempotency_idx` refuses a duplicate (the concurrent retry), with the loser returning the winner's session and dropping its own so one key still means one session. **Two limits recorded rather than glossed:** a client sending no idempotency key still has no protection (the mobile cart always sends one), and the concurrent branch is **not covered by the SQL suite** — reaching it needs the loser's first lookup before the winner commits and its recovery lookup after, an ordering one psql connection cannot produce. A case for it was written, observed to pass *without* exercising the delete, and removed; the gap is stated in the migration itself. The sequential retry IS covered, and was confirmed to **fail** against the pre-fix definition. **Fidelity proven after applying:** live body byte-identical to the merged file (`1cc3338fa22994e7483a90d8b3f64e49`, 6 408 chars). **Version NOT aligned** — live carries `20260826115122` (§9-D). |
 | 68 | 20260827090000 | admin_search_phone_normalization | — | 20260827063613 | admin_search_phone_normalization | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:36:13 UTC — the admin customer search stops depending on how a phone number happens to be stored** (PR #272, squash `47f18f2`). Found from the Comped Customers panel on its first live use: an admin searched `+966555820667` and got "No matching customers". `admin_search_role_candidates` matched `phone_number ilike '%'||query||'%'` — a raw substring over a column that is **not stored in one shape**. Live data held **four `9665…` and one `+9665…`**, because `profiles.phone_number` is written raw from `auth.users.phone`. So typing `+966555…` matched 1 of 5 customers, `0555…` matched **0 of 5**, and bare digits matched 5 of 5. **The failure mode is what made it worth a migration:** a customer who exists and one who does not both render as "No matching customers", so the operator cannot tell them apart — and on this particular panel the wrong conclusion is "that person has no account". Now normalizes **both sides** through `normalize_ksa_e164`, the same function and the same both-sides treatment 20260806120000 already applies to erasure for this exact drift; a complete number matches **exactly** (no false positives — `…667` must not also return `…668`), a partial matches forgivingly with each prefix strip length-guarded so a short query cannot reduce to `''` and match everyone. Storage is deliberately **not** rewritten: normalizing existing values would be a bulk write to live customer PII to fix a read path, and would leave every future writer free to reintroduce the drift. The same function backs the staff-role candidate picker, so that trap closed too. **Verified live after applying** by replaying the predicate against a real stored `9665…` row: all five typed shapes (`+9665…`, `9665…`, `009665…`, `05…`, `5…`) resolve to the same customer. Body `9d476656ccdf422ba23ff80ef4173008` (3 028 chars). Covered by `admin_search_phone_normalization_test.sql`, 6 cases, **observed failing at case 2 against the pre-fix definition**. **Version NOT aligned** (§9-D). Detail in §36 |
 | 69 | 20260827100000 | comp_members_by_phone | — | 20260827063746 | comp_members_by_phone | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:37:46 UTC — a comp can be attached to a PHONE NUMBER before that person has an account.** Owner's requirement: *"when the number of someone in comped customers enters the app, they should see the prices as 0."* Row 65 keyed membership on `profile_id`, which is backwards for how the decision is made — the owner knows the NUMBER, usually before that person has opened the app. Adds `comp_members.phone_e164` (canonical `+9665XXXXXXXX` by check constraint), makes `profile_id` **nullable**, moves the PK to a surrogate `id` because neither natural key is present on every row (5 of 10 live profiles carry no phone at all), adds two partial unique indexes and `comp_member_audit.target_phone`. **THE MONEY PATH IS NOT REDEFINED** — `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot` are untouched, and both hashes were confirmed **unchanged across the apply** (`8bd7183832108abb25bcca6942dccd70`, `f955b748b698a1704533f4aaffb835cb`). That is the design, not an omission: a pending row has `profile_id` NULL and never matches the pricing lookup, which is correct because an unclaimed number has no account and cannot place an order. All **18** pre-existing cases in `comp_members_test.sql` pass unchanged, which is the evidence for the claim rather than an assertion about it. **The binding happens at the moment ownership is proven, and there are THREE such paths, not two** — the third was missed in the first commit and found in review: `handle_new_user`, `handle_auth_user_phone_confirmed`, and `mark_phone_verified`, which backs `whatsapp-verify-otp` and never touches Supabase Auth at all. Without a claim there a customer comped by number who verified that way would have been **charged in full forever**. Safe to claim there because `mark_phone_verified` is EXECUTE-able by `service_role` **alone** (verified live: `authenticated` false, `anon` false) and its only caller checks the requested number against `auth.users.phone` before consuming a matching OTP; case 22 asserts that grant so a future loosening fails the test rather than opening a hole quietly. **A second review finding, also real:** `admin_set_comp_member` resolved an account from an **unconfirmed** `auth.users.phone`, which is set at OTP *request* time — now requires `phone_confirmed_at`, or `profiles.phone_verified` on the fallback; an unresolved number stays PENDING and binds later. **Applying comped nobody:** `comp_members` still 1 row / **0 active** / 0 pending afterwards, the single existing row backfilled to canonical `+9665…`, audit still 2 rows, both comped orders unchanged at `total` 0.00. **A transcription slip during the apply was caught and corrected** — see §36. Bodies: `admin_set_comp_member` `55009930c7bfdac7d4e79864b83dcdff` (5 579), `claim_comp_membership` `2df644c097dc7fb2c4fbd3136573605b` (1 144), `handle_new_user` `3737461bfd0fcfb6e92766c04aba0175` (796), `handle_auth_user_phone_confirmed` `526ad4d149754e2eb5a9691ffd6ce458` (663), `mark_phone_verified` `fc71ade769b833fcad02a5fe5c907d4f` (478), `admin_list_comp_members` `0ae53f5ad305936a016fc287a3545ede` (866), `admin_list_comp_member_audit` `5184b90dc10e0a90f6d9d4718f3f166a` (878). **Version NOT aligned** (§9-D). Detail in §36 |
-| 70 | 20260827110000 | comp_erasure | — | 20260827064044 | comp_erasure | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:40:44 UTC, after row 69 which it depends on** — it reads `comp_member_audit.target_phone`, a column row 69 adds, so applying it first fails on an undefined column. Row 69 created a new place a customer's phone number is written, and **two of those places carry no FK back to the user**, so nothing in the existing deletion path would have removed them: an UNCLAIMED `comp_members` row holds `phone_e164` with `profile_id` NULL, so the `on delete cascade` that removes a claimed row never fires for it; and `comp_member_audit.target_phone` sits on the permanent trail whose `target_user_id` is deliberately `on delete set null` so "who was made free, and why" outlives the account — a raw phone number surviving there defeats exactly that intent, being the one field that re-identifies a customer who asked to be forgotten. `anonymize_account_data` now deletes the claimed membership by FK (which also matters for the anonymize-without-delete path, where a comp outliving its account would silently re-apply if the number were re-registered), deletes an unclaimed row by normalized value, and **nulls the number out of the audit while keeping the row**. Two new counts in the summary, `comp_memberships_deleted` and `comp_audit_phones_cleared`. Everything else is the live body carried over verbatim — the orders/addresses/devices/sessions/loyalty/OTP/WhatsApp work, the `auth.users`-then-profile phone precedence, and the `phone_purge_attempted` wording. Body `37e0162ca97f4bf5ff8ca3ab31ffd5c8` (4 282 chars). Covered by `comp_members_test.sql` case 20. **Version NOT aligned** (§9-D). **Current latest live version** |
+| 70 | 20260827110000 | comp_erasure | — | 20260827064044 | comp_erasure | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:40:44 UTC, after row 69 which it depends on** — it reads `comp_member_audit.target_phone`, a column row 69 adds, so applying it first fails on an undefined column. Row 69 created a new place a customer's phone number is written, and **two of those places carry no FK back to the user**, so nothing in the existing deletion path would have removed them: an UNCLAIMED `comp_members` row holds `phone_e164` with `profile_id` NULL, so the `on delete cascade` that removes a claimed row never fires for it; and `comp_member_audit.target_phone` sits on the permanent trail whose `target_user_id` is deliberately `on delete set null` so "who was made free, and why" outlives the account — a raw phone number surviving there defeats exactly that intent, being the one field that re-identifies a customer who asked to be forgotten. `anonymize_account_data` now deletes the claimed membership by FK (which also matters for the anonymize-without-delete path, where a comp outliving its account would silently re-apply if the number were re-registered), deletes an unclaimed row by normalized value, and **nulls the number out of the audit while keeping the row**. Two new counts in the summary, `comp_memberships_deleted` and `comp_audit_phones_cleared`. Everything else is the live body carried over verbatim — the orders/addresses/devices/sessions/loyalty/OTP/WhatsApp work, the `auth.users`-then-profile phone precedence, and the `phone_purge_attempted` wording. Body `37e0162ca97f4bf5ff8ca3ab31ffd5c8` (4 282 chars). Covered by `comp_members_test.sql` case 20. **Version NOT aligned** (§9-D). |
+| 71 | 20260827120000 | lazywait_delivery_sync | — | 20260827082634 | lazywait_delivery_sync | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 08:26:34 UTC** on explicit owner approval, via MCP `apply_migration`. Opens the POS gate for delivery orders. Redefines four functions: `set_lazywait_initial_sync` (drops the branch that parked EVERY delivery order at `blocked`/`delivery_schema_unconfirmed` on INSERT — the reason SM-2026-000057 died with `sync_attempt_count = 0` while the customer was pushed "we sent it to the kitchen"); `lazywait_requeue_eligibility` (6-arg dropped, 7-arg created with `p_blocked_reason text default null`, refusing the now-retired `delivery_schema_unconfirmed` so three stale legacy rows — one 1 month 2 days old, all with `pos_sync_deadline_at` NULL — could not be swept into Retry); `requeue_lazywait_order` (passes the reason through); and `confirm_order_payment` (drops `order_type = 'pickup'` from both release clauses, which was a THIRD instance of the same filter and would have kept paid online deliveries out of the queue even with the trigger open). **The money path was verified, not assumed**: `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash identically before and after. Moyasar re-verified absent (0 functions, 0 rows, `provider_name` still `tap`, disabled). Paired with the `lazywait-sync` **v6** deploy the same day — the two are halves of one change: the migration alone admits a delivery order to a queue whose worker still refuses it, which is exactly what stranded SM-2026-000058 in the 40-second gap. Proven live by **SM-2026-000059**: POS ticket #3 at 10:15 UTC, 42 s end-to-end, first attempt, `success: true`. Covered by `lazywait_delivery_sync_test.sql` (8 cases; case 1 and case 6 verified failing against the pre-fix bodies). **Version NOT aligned** (§9-D). **Current latest live version** |
 
 Reconciliation check: the rows above detail **70 repository / 71 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
@@ -3503,3 +3504,100 @@ failures** — 58 files in `supabase/tests/`, 2 of them in `known-failing.txt`;
 `admin_search_phone_normalization_test.sql` added with 6. The search suite was
 re-run against the *pre-fix* function definition and fails at case 2, which is
 what makes it a test rather than a description.
+
+---
+
+## 37. Delivery orders reach the POS — APPLIED 2026-08-27 (row 71)
+
+One file, `20260827120000_lazywait_delivery_sync.sql`, applied on the owner's
+explicit in-conversation approval via MCP `apply_migration` with the target named
+explicitly. Live history moved **115 → 116**, live version `20260827082634`.
+
+The owner's framing was direct: *"I want you to focus on solving why my delivery
+orders not reaching pos"*, after placing SM-2026-000057 and watching the app push
+"we sent it to the kitchen" for an order the kitchen never received.
+
+### Four gates, not one
+
+The first attempt at this fix started in the Edge Function and would have fixed
+nothing. `docs/LAZYWAIT.md` revealed the real block was a BEFORE INSERT trigger.
+In total:
+
+| # | Gate | Where | Fixed by |
+| --- | --- | --- | --- |
+| 1 | Parks every delivery order at `blocked` on INSERT | `set_lazywait_initial_sync` | this migration |
+| 2 | Refuses `orderType !== 'pickup'` before building | `buildCreateOrderPayload` | worker v6 |
+| 3 | Refuses to release a **paid** delivery order into the queue | `confirm_order_payment` | this migration |
+| 4 | Refuses delivery outright in Retry | `lazywait_requeue_eligibility` | this migration |
+
+Gate 3 was found in review, not by design: the same `order_type = 'pickup'`
+filter appeared a third time, and the test written for it inserted an
+already-paid row, so it proved nothing. After that a grep of **every** function
+established the true extent — four functions contain the filter;
+`compute_order_snapshot` and `place_order` use it correctly for delivery-fee
+pricing, and `order_integrity_watchdog` is the remaining gap (§38).
+
+### The migration and the deploy are halves of one change
+
+Applying the migration alone admits a delivery order to a queue whose worker
+still refuses it, and the newly-applied Retry guard then refuses that reason
+**permanently**. That window was 40 seconds wide and it caught a real order:
+**SM-2026-000058**, placed at 08:27:14 against a migration applied at 08:26:34,
+blocked by worker v5 and left `not_retryable` with its deadline expired at
+08:37:14. Nothing about it is otherwise wrong — address usable, branch mapped,
+two items, all mapped. It simply missed the worker.
+
+`lazywait-sync` was deployed as **version 6** at 08:40 UTC, `verify_jwt: false`
+unchanged, all five bundle files hashed back from Supabase and byte-identical to
+the merged default branch.
+
+### Verified rather than assumed
+
+- **Money path unchanged**: `place_order` (`8bd71838…`) and
+  `compute_order_snapshot` (`f955b748…`) hash identically before and after.
+- **Moyasar still absent** (CLAUDE.md §6): zero `%moyasar%` functions, zero
+  history rows, `provider_name` still `tap`, still disabled.
+- **The three legacy blocked rows were untouched** by the apply.
+- **It works**: SM-2026-000059 reached the POS as ticket **#3** at 10:15:07 UTC,
+  **42 seconds** after being placed — first attempt, no retries, `success: true`,
+  `order_ref e5d6bf08…`, `order_status_id new-order`. That answers Q1: Lazywait
+  accepts `order_type: "delivery"`.
+
+**Q8 remains open** and no API response can close it: whether the POS *renders*
+`delivery_address`, or whether only the duplicated `order_details` line reaches
+the ticket. It needs a human to look at printed paper.
+
+### Four parked delivery orders
+
+SM-2026-000032 (Jul 24), -000049 (Aug 21), -000057 and -000058 all carry
+`delivery_schema_unconfirmed` and are `not_retryable`. The reason is now
+**retired** — neither the trigger nor worker v6 can emit it — so the guard parks
+exactly these four and nothing reachable. Re-driving any of them is a §5 live
+write and would create a real kitchen ticket for food nobody is waiting for.
+
+## 38. Watchdog delivery coverage — UNAPPLIED (`20260827130000`)
+
+Enabling delivery opened a monitoring blind spot in the same motion. Two
+**critical** watchdog rules still filtered `o.order_type = 'pickup'`:
+
+| Rule | What it misses |
+| --- | --- |
+| R1 `PAID_ORDER_NOT_SYNCED` | a paid delivery order stuck unsynced for >5 minutes raised **no** critical incident |
+| R7 `PAID_ORDER_DEAD_LETTER` | a paid delivery order that exhausted its retry budget raised **no** critical incident |
+
+Correct while delivery was gated; a blind spot the moment
+`confirm_order_payment` began releasing paid deliveries into the queue.
+
+`20260827130000_watchdog_delivery_coverage.sql` removes those two filters and
+changes nothing else. The function body was **extracted mechanically** from
+`20260721170000` rather than retyped — `diff` shows exactly two changed lines
+across 438 — because a hand-retyped body is how comment drift got into four
+`pg_proc` entries during the comp application (§35).
+
+**Deliberately NOT changed.** R1 still carries
+`sync_blocked_reason <> 'delivery_schema_unconfirmed'`, and the stranded-orders
+health card (`20260810113000`) still excludes the same reason. That reason is
+retired, so the exclusion hides no reachable failure — it hides exactly the four
+parked legacy rows, which would otherwise be a permanent false alarm.
+
+Applying it is a §5 action. It is **not** frozen under §6.

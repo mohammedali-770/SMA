@@ -600,9 +600,21 @@ price back out of `price`. Before this import every live modifier was unmapped,
 which is why no ticket has ever carried one. At a 0 price the subtraction is 0.
 
 ### Delivery (enabled 2026-08-27)
-Delivery orders **are synced**. `order_type: "delivery"` and the confirmed
-top-level `delivery_address` are sent; the destination is composed from
-`orders.address_snapshot` (`label · national_short_address · description`).
+Delivery orders **are synced**, and this is no longer a claim about code:
+**SM-2026-000059 reached the POS as ticket #3 on 2026-08-27 at 10:15 UTC**, 42
+seconds after it was placed, accepted on the first attempt with no retries
+(`success: true`, `order_ref e5d6bf08…`, `order_status_id new-order`). That
+answers Q1 — Lazywait **accepts `order_type: "delivery"`**.
+
+`order_type: "delivery"` and the confirmed top-level `delivery_address` are
+sent; the destination is composed from `orders.address_snapshot`
+(`label · national_short_address · description`).
+
+**Repeated parts are deduped**, case-insensitively on the trimmed value, keeping
+the first occurrence. Nothing stops a customer saving the same text as both the
+label and the directions, and SM-2026-000059 did exactly that: its line composed
+as `الناصرة جنب بقالة الرحمة · الناصرة جنب بقالة الرحمة`, which — repeated again
+into `order_details` — put the same address on the ticket four times.
 
 **The address is sent twice, deliberately.** Whether the POS *renders*
 `delivery_address` is Q8 and is not answerable from the API, so the same string
@@ -759,9 +771,11 @@ is owner-supplied and replaces it once provided).
   **delivery** assumptions, which are assembled ONLY when the caller passes
   `allowAssumedFields: true` (default OFF). Because the confirmed body has one
   source, the typed client cannot drift from the worker's payload — a test
-  asserts the two are equal. The live `lazywait-sync` worker is pickup-only and
-  delivery stays blocked. Remaining assumed field names are in the reference
-  doc's "STILL ASSUMED" section.
+  asserts the two are equal. The live `lazywait-sync` worker syncs **pickup and
+  delivery** as of worker v6 (2026-08-27); what it sends for delivery is the
+  confirmed-fields-only set described above, not the typed client's assumed
+  block. Remaining assumed field names are in the reference doc's
+  "STILL ASSUMED" section.
 - **Payment endpoints** (`update-cash-payment`, `update-online-payment`) are
   typed/serialized/validated only; live wiring stays **frozen** (CLAUDE.md §6).
 - The client never re-POSTs Create Order once an `order_ref` exists and never
@@ -817,8 +831,15 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
 ```
 
 ## Known limitations (confirm with Lazywait)
-- Delivery Create Order schema, addons/modifiers, `price_id`, and
-  `customer_cell`/`customer_id` in Create Order are **not confirmed** → not sent.
+- ~~Delivery Create Order schema, addons/modifiers, `price_id`, and
+  `customer_cell`/`customer_id` in Create Order are **not confirmed** → not
+  sent.~~ **Superseded.** The owner-supplied contract of 2026-08-24 confirmed
+  add-ons, `price_id`, `customer_cell`/`country_code` and `customer_id`; add-ons
+  went live 2026-08-26 and delivery on 2026-08-27, proven by SM-2026-000059.
+  What remains genuinely unconfirmed is narrower and listed under "Still
+  intentionally NOT sent": coordinates, the `order_deliveries[]` element shape,
+  `order_status_id` and every money field. **Q8 is still open** — whether the POS
+  renders `delivery_address`, which only a printed ticket can answer.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
 - **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line
@@ -840,9 +861,17 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
 - Webhook URL registration method + exact event catalog are not fully confirmed.
 
 ## Recommended next task
-Catalog id mapping (pull + suggest + confirm) is now implemented. Next: run a
-**single-branch pickup pilot** against a Lazywait sandbox — map that branch + its
-active products, place a real pickup order, confirm it creates in the POS with
-the right `order_ref`, then widen to all branches. (Addons/modifiers, `price_id`,
-and delivery are mapped for reference but still intentionally **not** sent in
-Create Order until Lazywait confirms those schemas.)
+The single-branch pilot is **done**: catalog mapping, pickup, add-ons, variant
+`price_id` and now delivery have all created real POS tickets on the live host.
+
+Next, in order:
+
+1. **Close Q8 by looking at a printed delivery ticket.** If `delivery_address`
+   renders, drop the duplicate line from `order_details` — on evidence. No API
+   response can answer this.
+2. **Decide what to do with the four parked delivery orders**
+   (SM-2026-000032, -000049, -000057, -000058). All carry the retired
+   `delivery_schema_unconfirmed` reason, are `not_retryable` by design, and
+   would create real kitchen tickets for food nobody is waiting for if
+   re-driven. Leaving them parked is the current decision.
+3. **Widen to all branches** once Q8 is closed.
