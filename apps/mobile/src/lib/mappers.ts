@@ -120,6 +120,7 @@ export function mapProduct(
     // (ProductCard.tsx: `showImage = !!product.imageUrl && !imgFailed`), so
     // removing the substitution activates an empty state that was already
     // built, already styled and previously unreachable.
+    sortOrder: p.sort_order ?? 0,
     imageUrl: p.image_url ?? '',
     calories: p.calories ?? 0,
     isActive: p.is_active,

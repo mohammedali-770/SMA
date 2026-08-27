@@ -98,6 +98,15 @@ export interface Product {
   imageUrl: string;
   calories: number;
   isActive: boolean;
+  /**
+   * Display rank WITHIN its category, set by an administrator through
+   * `reorder_products`. Compared only against products in the SAME category.
+   *
+   * Optional because this type doubles as the view model for products that do
+   * not exist yet — a parsed CSV row, a half-filled form — where a rank is
+   * genuinely absent rather than zero. Readers treat absent as 0.
+   */
+  sortOrder?: number;
   modifierGroupIds: string[]; // Association to modifier groups
   /** Orderable price tiers. Empty means the product has a single price. */
   variants: ProductVariant[];

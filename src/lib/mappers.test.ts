@@ -54,7 +54,14 @@ describe('catalog mappers', () => {
     const mapped = mapProduct(p, links);
     expect(mapped.modifierGroupIds).toEqual(['g1', 'g2']);
     expect(mapped.price).toBe(32);
-    expect(mapped.imageUrl).toContain('http'); // falls back when null
+    // A NULL image_url maps to empty, NOT to a stock photo. This assertion used
+    // to be `toContain('http')`, pinning a substitution that put one Unsplash
+    // burger on every product without an image — which, live, was all 55 of
+    // them. The dashboard must be able to show which products genuinely have
+    // none, and the app renders a neutral dish icon for an empty value.
+    expect(mapped.imageUrl).toBe('');
+    // Rank comes through so the dashboard can order the way the app does.
+    expect(mapped.sortOrder).toBe(1);
   });
 
   it('nests a group\'s active modifiers and defaults an unbounded max_select', () => {

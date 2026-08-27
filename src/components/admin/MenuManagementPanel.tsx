@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Download, Edit, FileSpreadsheet, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Edit, FileSpreadsheet, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { useApp } from '../../context/AppContext';
-import { productImages as productImageApi } from '../../lib/api';
+import { menuOrder as menuOrderApi, productImages as productImageApi } from '../../lib/api';
+import { moveWithin, productsInCategory, sortRows } from '../../lib/menuOrdering';
 import { isAllowedProductImageSize, isAllowedProductImageType } from '../../lib/productImages';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
@@ -57,7 +58,7 @@ export const MenuManagementPanel: React.FC = () => {
     categories, products,
     addCategory, updateCategory, deleteCategory,
     addProduct, updateProduct, deleteProduct,
-    bulkUploadMenu, currentUser, adminLang,
+    bulkUploadMenu, currentUser, adminLang, reload,
   } = useApp();
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
@@ -82,6 +83,10 @@ export const MenuManagementPanel: React.FC = () => {
   const [prodCalories, setProdCalories] = useState('500');
   const [prodCatId, setProdCatId] = useState('');
   const [prodImg, setProdImg] = useState('');
+  // One in-flight reorder at a time. The RPC rewrites a whole list, so two
+  // overlapping moves would race and the slower response would win.
+  const [reordering, setReordering] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   // Upload state for the product photo. `prodImg` stays the single source of
   // truth for what gets saved — an upload just fills it in, so a hand-pasted
   // URL and an uploaded one are indistinguishable downstream.
@@ -191,6 +196,38 @@ export const MenuManagementPanel: React.FC = () => {
   };
 
   // CSV Drag and drop / selection parser handler
+  // Both tables render in the SAME order the customer sees, so what the
+  // administrator rearranges is what the menu actually is.
+  const orderedCategories = sortRows(categories);
+
+  // Send the WHOLE list: the RPC assigns ranks 1..N from array position, so a
+  // partial list would renumber the menu against a stale picture. Reload after,
+  // because sort_order is what every subsequent move is computed from.
+  const runReorder = async (fn: () => Promise<void>) => {
+    setReordering(true); setOrderError(null);
+    try {
+      await fn();
+      await reload();
+    } catch (err) {
+      setOrderError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setReordering(false);
+    }
+  };
+
+  const moveCategory = (index: number, direction: 'up' | 'down') => {
+    const ids = moveWithin(orderedCategories, index, direction);
+    if (!ids) return;  // already at an end — no pointless write
+    void runReorder(() => menuOrderApi.categories(ids));
+  };
+
+  const moveProduct = (categoryId: string, index: number, direction: 'up' | 'down') => {
+    const siblings = productsInCategory(products, categoryId);
+    const ids = moveWithin(siblings, index, direction);
+    if (!ids) return;
+    void runReorder(() => menuOrderApi.products(categoryId, ids));
+  };
+
   // Validate BEFORE uploading so a rejected file costs no round trip, using the
   // same rules the bucket enforces server-side (jpg/png/webp, <= 5 MB).
   const onPickProductImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,6 +368,12 @@ export const MenuManagementPanel: React.FC = () => {
           {subTab('csv', t.csv_tab, <FileSpreadsheet className="size-3.5" aria-hidden="true" />)}
         </div>
 
+        {/* A refused reorder must be visible: reorder_products rejects the whole
+            call when an id is not in the category (a stale tab), and silently
+            swallowing that would leave the administrator dragging rows that
+            never move. */}
+        {orderError && <Notice title={orderError} tone="blocking" />}
+
         {menuSubTab === 'products' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
@@ -348,7 +391,7 @@ export const MenuManagementPanel: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-con-line">
-                      {['Photo', t.product_name_en, t.product_name_ar, t.category, t.price, t.calories, t.actions].map((h, i) => (
+                      {[isRTL ? 'الترتيب' : 'Order', 'Photo', t.product_name_en, t.product_name_ar, t.category, t.price, t.calories, t.actions].map((h, i) => (
                         <th key={h || `sp-${i}`} className={TH}>
                           <Text variant="caption" tone="tertiary" as="span">{h}</Text>
                         </th>
@@ -356,8 +399,16 @@ export const MenuManagementPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {products.map(p => {
+                    {/* Grouped by category, then by rank within it — the order
+                        the customer actually sees. Flat-by-arrival made "move
+                        up" meaningless, because a product's neighbour in the
+                        table was rarely its neighbour in the app. */}
+                    {orderedCategories.flatMap((cat) => productsInCategory(products, cat.id)).map((p, flatIndex, flat) => {
                       const catMatch = categories.find(c => c.id === p.categoryId);
+                      // Position WITHIN the category is what the arrows move,
+                      // because reorder_products is category-scoped.
+                      const siblings = flat.filter((x) => x.categoryId === p.categoryId);
+                      const indexInCategory = siblings.findIndex((x) => x.id === p.id);
                       // Defensive: a product reaching this table from a cast or
                       // a stale cache can arrive without `variants`, and an
                       // admin menu that throws is worse than one that shows a
@@ -366,8 +417,30 @@ export const MenuManagementPanel: React.FC = () => {
                       return (
                         <tr key={p.id} className="border-t border-con-line">
                           <td className={TD}>
-                            <img src={p.imageUrl} alt={p.nameEn}
-                              className="size-10 rounded-[var(--radius-ds-sm)] border border-con-line bg-con-surface-2 object-cover" />
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => moveProduct(p.categoryId, indexInCategory, 'up')}
+                                disabled={isAccountant || reordering || indexInCategory === 0}
+                                aria-label={isRTL ? 'تحريك للأعلى' : 'Move up'} className={ICON_BTN}>
+                                <ArrowUp className="size-3.5 text-con-text-2" aria-hidden="true" />
+                              </button>
+                              <button type="button" onClick={() => moveProduct(p.categoryId, indexInCategory, 'down')}
+                                disabled={isAccountant || reordering || indexInCategory === siblings.length - 1}
+                                aria-label={isRTL ? 'تحريك للأسفل' : 'Move down'} className={ICON_BTN}>
+                                <ArrowDown className="size-3.5 text-con-text-2" aria-hidden="true" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className={TD}>
+                            {/* No stock-photo stand-in: an administrator must be
+                                able to see WHICH products still have no image. */}
+                            {p.imageUrl ? (
+                              <img src={p.imageUrl} alt={p.nameEn}
+                                className="size-10 rounded-[var(--radius-ds-sm)] border border-con-line bg-con-surface-2 object-cover" />
+                            ) : (
+                              <span className="flex size-10 items-center justify-center rounded-[var(--radius-ds-sm)] border border-dashed border-con-line bg-con-surface-2">
+                                <Text variant="caption" tone="tertiary" as="span">—</Text>
+                              </span>
+                            )}
                           </td>
                           <td className={TD}><Text variant="label" as="span">{p.nameEn}</Text></td>
                           <td className={TD}><Text variant="label" as="span" dir="rtl">{p.nameAr}</Text></td>
@@ -454,7 +527,7 @@ export const MenuManagementPanel: React.FC = () => {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-con-line">
-                      {['Category Name (EN)', 'Category Name (AR)', t.actions].map((h, i) => (
+                      {[isRTL ? 'الترتيب' : 'Order', 'Category Name (EN)', 'Category Name (AR)', t.actions].map((h, i) => (
                         <th key={h || `sp-${i}`} className={TH}>
                           <Text variant="caption" tone="tertiary" as="span">{h}</Text>
                         </th>
@@ -462,8 +535,22 @@ export const MenuManagementPanel: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {categories.map(c => (
+                    {orderedCategories.map((c, i) => (
                       <tr key={c.id} className="border-t border-con-line">
+                        <td className={`${TD} py-3`}>
+                          <div className="flex items-center gap-1">
+                            <button type="button" onClick={() => moveCategory(i, 'up')}
+                              disabled={isAccountant || reordering || i === 0}
+                              aria-label={isRTL ? 'تحريك للأعلى' : 'Move up'} className={ICON_BTN}>
+                              <ArrowUp className="size-3.5 text-con-text-2" aria-hidden="true" />
+                            </button>
+                            <button type="button" onClick={() => moveCategory(i, 'down')}
+                              disabled={isAccountant || reordering || i === orderedCategories.length - 1}
+                              aria-label={isRTL ? 'تحريك للأسفل' : 'Move down'} className={ICON_BTN}>
+                              <ArrowDown className="size-3.5 text-con-text-2" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </td>
                         <td className={`${TD} py-3`}><Text variant="label" as="span">{c.nameEn}</Text></td>
                         <td className={`${TD} py-3`}><Text variant="label" as="span" dir="rtl">{c.nameAr}</Text></td>
                         <td className={`${TD} py-3`}>

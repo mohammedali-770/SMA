@@ -1023,6 +1023,29 @@ export const banners = {
 //
 // RLS on storage.objects enforces admin (role AND AAL2 via public.is_admin()).
 // ---------------------------------------------------------------------------
+/**
+ * Menu display order. Both RPCs write the WHOLE ordering in one statement from
+ * an array whose POSITION is the rank, so the list is never observable
+ * half-renumbered and a client-computed integer is never trusted. See
+ * 20260827150000_menu_display_order.sql for why this is not N row updates.
+ */
+export const menuOrder = {
+  /** Persist the full ordered list of category ids. */
+  async categories(ids: string[]): Promise<void> {
+    const { error } = await supabase.rpc('reorder_categories', { p_ids: ids });
+    if (error) throw new Error(error.message);
+  },
+  /**
+   * Persist the order of products WITHIN one category. Every id must belong to
+   * that category — the RPC refuses the whole call otherwise rather than
+   * writing a partial order from a stale view of the menu.
+   */
+  async products(categoryId: string, ids: string[]): Promise<void> {
+    const { error } = await supabase.rpc('reorder_products', { p_category_id: categoryId, p_ids: ids });
+    if (error) throw new Error(error.message);
+  },
+};
+
 export const productImages = {
   /**
    * Upload an image to the public product-images bucket and return its stored
