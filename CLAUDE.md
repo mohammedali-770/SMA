@@ -128,16 +128,26 @@ The feature is applied and **dormant**: `comp_members` is empty, so nobody is
 comped until an administrator adds somebody. All 44 pre-existing orders were
 verified unchanged.
 
-**Superseded 2026-08-27 — three more files are unapplied, and they are NOT the
-frozen one.** `20260827090000_admin_search_phone_normalization`,
-`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure` extend
-comped customers so a membership can be attached to a **phone number** before
-that person has an account. They do **not** touch the money path: `place_order`
-and `compute_order_snapshot` are unchanged, and all 18 pre-existing cases in
-`comp_members_test.sql` pass against the new schema. Applying them is a §5
-action; they are unrelated to §6 and must each be named explicitly.
+**Superseded 2026-08-27 — the three comp-by-phone migrations are now APPLIED.**
+On the owner's explicit approval, `20260827090000_admin_search_phone_normalization`,
+`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure` were
+applied to Production in that order, via MCP `apply_migration` — one call per
+file, each followed by read-only verification. Live history moved **112 → 115**.
 
-**Four repository files are unapplied. One of them is the frozen one.**
+They do **not** touch the money path, and that was verified rather than assumed:
+`place_order` and `compute_order_snapshot` hash **identically before and after**
+the apply (`8bd71838…`, `f955b748…`). Applying comped nobody — `comp_members`
+still holds 1 row, **0 active**, and both existing comped orders are unchanged.
+Full record: `docs/MIGRATIONS.md` §36, ledger rows 68-70.
+
+**The merge was verified before anything was applied, and it had not happened.**
+The instruction "merged it, apply the three migrations" arrived while PR #272 was
+still open — GitHub reported `merged: false` and the three files were absent from
+the default branch. Nothing was applied until the merge actually landed
+(`47f18f2`) and each file was hashed against its merged copy. §15 exists for
+precisely this.
+
+**One repository file remains unapplied, and it is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -151,11 +161,11 @@ action; they are unrelated to §6 and must each be named explicitly.
 | `20260826090000_comp_members.sql` | Applied 2026-08-26, live version `20260826114717`. |
 | `20260826100000_comp_order_totals.sql` | Applied 2026-08-26, live version `20260826115025`. |
 | `20260826110000_checkout_zero_total_idempotency.sql` | Applied 2026-08-26, live version `20260826115122`. |
-| `20260827090000_admin_search_phone_normalization.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. |
-| `20260827100000_comp_members_by_phone.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Depends on `…090000` only for review order, not schema. |
-| `20260827110000_comp_erasure.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Must follow `…100000` — it references `comp_member_audit.target_phone`. |
+| `20260827090000_admin_search_phone_normalization.sql` | Applied 2026-08-27, live version `20260827063613`. |
+| `20260827100000_comp_members_by_phone.sql` | Applied 2026-08-27, live version `20260827063746`. |
+| `20260827110000_comp_erasure.sql` | Applied 2026-08-27, live version `20260827064044`. |
 
-The honest statement is therefore **110 repository files / 112 live rows / four unapplied files: three awaiting ordinary owner approval, and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **110 repository files / 115 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -165,15 +175,14 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-It is no longer the only outstanding file, and that makes the trap *worse*, not
-better. `20260824100000` sorts ahead of all three 2026-08-27 files, so "apply the
-outstanding comp migrations" — a reasonable-sounding instruction that is now
-mostly correct — would sweep Moyasar in first and break the §6 freeze. The
-2026-08-26 comp application is the worked example of doing this correctly: each
-target named explicitly, one call per file, with Moyasar's continued absence
-verified afterwards (zero functions, zero history rows, `provider_name` still
-`tap`). Any `supabase migration` operation must still name its target
-explicitly.
+It is once again the *only* outstanding file, which makes it more dangerous
+rather than less: with one file left, "apply the outstanding migrations" reads
+like a no-op and is in fact the one instruction that would break the §6 freeze.
+The 2026-08-26 and 2026-08-27 comp applications are the worked examples of doing
+this correctly — each target named explicitly, one call per file, with Moyasar's
+continued absence verified afterwards (2026-08-27: zero `%moyasar%` functions,
+zero history rows, `provider_name` still `tap`, still disabled). Any
+`supabase migration` operation must still name its target explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

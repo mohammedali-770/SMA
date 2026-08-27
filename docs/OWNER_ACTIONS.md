@@ -1124,7 +1124,7 @@ Live carries the apply-time stamps `20260826114717` / `20260826115025` /
 expected; §9-D makes realignment a separate live-history write with its own
 approval, and leaving it alone is the correct default.
 
-## 21. Comped customers by phone — three migrations awaiting approval (2026-08-27)
+## 21. Comped customers by phone — APPLIED 2026-08-27 (closed)
 
 **Why this exists.** The owner asked for a comp that starts from a phone number:
 *"when the number of someone in comped customers enters the app, they should see
@@ -1132,13 +1132,20 @@ the prices as 0."* The panel's first live use had already shown why — a search
 for `+966555820667` returned "No matching customers", correctly, because nobody
 with that number had signed up, and there was no way to comp them anyway.
 
-**Open action — apply three migrations, in this order, each named explicitly:**
+**Done.** All three applied on 2026-08-27 on the owner's explicit approval, one
+`apply_migration` call per file, each named explicitly and verified before the
+next was sent. Live history **112 → 115**:
 
-1. `20260827090000_admin_search_phone_normalization.sql`
-2. `20260827100000_comp_members_by_phone.sql`
-3. `20260827110000_comp_erasure.sql`
+1. `20260827090000_admin_search_phone_normalization.sql` → `20260827063613`
+2. `20260827100000_comp_members_by_phone.sql` → `20260827063746`
+3. `20260827110000_comp_erasure.sql` → `20260827064044`
 
-Only 2 → 3 is a hard dependency (`…110000` reads a column `…100000` adds).
+Only 2 → 3 was a hard dependency (`…110000` reads a column `…100000` adds).
+
+**The merge was checked first, and had not happened.** The approval to apply
+arrived while PR #272 was still open; nothing was applied until it actually
+landed (`47f18f2`) and each file was hashed against its merged copy. Record:
+`docs/MIGRATIONS.md` §36, ledger rows 68-70.
 
 **What the owner is approving.** A membership can be attached to a phone number
 before that person has an account; it binds itself when Auth confirms the OTP.
@@ -1150,15 +1157,15 @@ The pricing functions are **not** redefined — `place_order` and
 change (§6 untouched). No Vercel or EAS action. No change to who is currently
 comped — `comp_members` holds one deactivated row.
 
-**The bulk-apply trap, restated because it got worse.** These are the first
-non-frozen unapplied files since 2026-08-24, so "apply the outstanding
-migrations" now sounds reasonable and would sweep in
-`20260824100000_moyasar_payment_provider`, which sorts ahead of all three and is
-frozen under §6. Name each target; verify Moyasar's absence afterwards.
+**Moyasar verified still absent afterwards:** zero `%moyasar%` functions, zero
+matching history rows, `provider_name` still `tap` and still disabled. The §6
+freeze is intact.
 
 **Still open from §20:** the **app build**, which carries the checkout
 "Complimentary" line, the receipt line and the submit-time membership re-check.
-Independent of these migrations and safe to ship either way.
+It is now the only remaining action for this feature — everything server-side is
+live. Until it ships, a comped customer sees full price at checkout and is
+charged 0.00: correct money, confusing screen.
 
 ## Owner-action closeout rule
 

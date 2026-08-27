@@ -133,12 +133,13 @@ rather than `awaiting_payment` — the landmine-1 regression, confirmed fixed in
 Production. The loyalty balance did not move and no coupon was consumed. The
 test membership was deactivated afterwards.
 
-**Superseded in part, 2026-08-27 — membership is now keyed on a PHONE NUMBER
-too.** Three further migrations are written and **NOT yet applied**:
-`20260827090000_admin_search_phone_normalization`,
-`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure`. See
+**Extended 2026-08-27 — membership is now keyed on a PHONE NUMBER too, and it
+is APPLIED.** `20260827090000_admin_search_phone_normalization`,
+`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure` are
+live (versions `20260827063613` / `063746` / `064044`; history 112 → 115). See
 *Comping a number before they sign up*, below. The money path is **unchanged**
-by all three.
+by all three, verified by hashing `place_order` and `compute_order_snapshot`
+identically before and after the apply.
 
 **One owner action remains** before it is fully visible: **the app build**. The
 checkout and receipt lines ship with it, and the two new `orders` columns exist
@@ -441,9 +442,9 @@ The receipt carries the same line — without it a comped receipt reads
 | `supabase/migrations/20260826090000_comp_members.sql` | `comp_members`, `comp_member_audit`, three admin RPCs, `orders.is_comped` / `orders.comp_discount_amount` |
 | `supabase/migrations/20260826100000_comp_order_totals.sql` | `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot` |
 | `supabase/migrations/20260826110000_checkout_zero_total_idempotency.sql` | `begin_checkout_session` retry fix |
-| `supabase/migrations/20260827090000_admin_search_phone_normalization.sql` | **unapplied** — `admin_search_role_candidates` normalizes phone on both sides |
-| `supabase/migrations/20260827100000_comp_members_by_phone.sql` | **unapplied** — `phone_e164`, the OTP claim, the four admin RPCs |
-| `supabase/migrations/20260827110000_comp_erasure.sql` | **unapplied** — `anonymize_account_data` reaches the comp tables |
+| `supabase/migrations/20260827090000_admin_search_phone_normalization.sql` | applied 2026-08-27 — `admin_search_role_candidates` normalizes phone on both sides |
+| `supabase/migrations/20260827100000_comp_members_by_phone.sql` | applied 2026-08-27 — `phone_e164`, the claim, three ownership hooks, four admin RPCs |
+| `supabase/migrations/20260827110000_comp_erasure.sql` | applied 2026-08-27 — `anonymize_account_data` reaches the comp tables |
 | `supabase/tests/comp_members_test.sql` | 27 cases — the first suite anywhere that places a zero-total order |
 | `supabase/tests/admin_search_phone_normalization_test.sql` | 6 cases — every typed shape of a number finds its customer |
 | `src/lib/compMembersApi.ts`, `src/components/admin/CompMembersPanel.tsx` | the console panel |
