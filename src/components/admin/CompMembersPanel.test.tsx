@@ -21,9 +21,17 @@ vi.mock('../../lib/compMembersApi', () => ({ compMembers: api }));
 import { CompMembersPanel } from './CompMembersPanel';
 
 const member = {
-  profile_id: 'cust-1', full_name: 'Free Eater', phone_number: '+966500000002',
-  is_active: true, note: 'founding staff member',
+  id: 1, profile_id: 'cust-1', phone_e164: '+966500000002',
+  full_name: 'Free Eater', phone_number: '+966500000002',
+  is_active: true, pending: false, note: 'founding staff member',
   added_at: '2026-08-26T00:00:00Z', updated_at: '2026-08-26T00:00:00Z',
+};
+/** Comped by number, nobody holds it yet. */
+const pendingMember = {
+  id: 2, profile_id: null, phone_e164: '+966555820667',
+  full_name: null, phone_number: null,
+  is_active: true, pending: true, note: 'guest of the owner',
+  added_at: '2026-08-27T00:00:00Z', updated_at: '2026-08-27T00:00:00Z',
 };
 const candidate = {
   id: 'cust-2', full_name: 'New Person', email: 'new@example.test',
@@ -35,7 +43,10 @@ beforeEach(() => {
   api.list.mockResolvedValue([member]);
   api.listAudit.mockResolvedValue([]);
   api.search.mockResolvedValue([candidate]);
-  api.set.mockResolvedValue({ profile_id: candidate.id, is_active: true, was_active: false });
+  api.set.mockResolvedValue({
+    id: 3, profile_id: candidate.id, phone_e164: null,
+    is_active: true, was_active: false, pending: false,
+  });
 });
 afterEach(() => {
   cleanup();
@@ -80,7 +91,9 @@ describe('CompMembersPanel', () => {
     });
     fireEvent.click(screen.getByText('Comp'));
 
-    await waitFor(() => expect(api.set).toHaveBeenCalledWith('cust-2', true, 'owner family'));
+    await waitFor(() => expect(api.set).toHaveBeenCalledWith(
+      { userId: 'cust-2' }, true, 'owner family',
+    ));
     const message = String(confirmSpy.mock.calls[0]?.[0] ?? '');
     expect(message).toContain('New Person');
     expect(message).toContain('no cap');
@@ -111,25 +124,87 @@ describe('CompMembersPanel', () => {
 
   it('removes a member with its own reason', async () => {
     vi.stubGlobal('confirm', vi.fn(() => true));
-    api.set.mockResolvedValue({ profile_id: member.profile_id, is_active: false, was_active: true });
+    api.set.mockResolvedValue({
+      id: member.id, profile_id: member.profile_id, phone_e164: member.phone_e164,
+      is_active: false, was_active: true, pending: false,
+    });
     render(<CompMembersPanel lang="en" />);
-    fireEvent.change(await screen.findByLabelText('cust-1 reason'), {
+    fireEvent.change(await screen.findByLabelText('1 reason'), {
       target: { value: 'left the company' },
     });
     fireEvent.click(screen.getByText('Remove'));
-    await waitFor(() => expect(api.set).toHaveBeenCalledWith('cust-1', false, 'left the company'));
+    await waitFor(() => expect(api.set).toHaveBeenCalledWith(
+      { userId: 'cust-1' }, false, 'left the company',
+    ));
   });
 
   it('surfaces a server refusal rather than reporting success', async () => {
     vi.stubGlobal('confirm', vi.fn(() => true));
     api.set.mockRejectedValue(new Error('Only admins may change comped membership'));
     render(<CompMembersPanel lang="en" />);
-    fireEvent.change(await screen.findByLabelText('cust-1 reason'), {
+    fireEvent.change(await screen.findByLabelText('1 reason'), {
       target: { value: 'left the company' },
     });
     fireEvent.click(screen.getByText('Remove'));
     expect(await screen.findByText('Only admins may change comped membership')).toBeTruthy();
     expect(screen.queryByText('Saved')).toBeNull();
+  });
+
+  it('comps a phone number that belongs to no account yet', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    api.set.mockResolvedValue({
+      id: 9, profile_id: null, phone_e164: '+966555820667',
+      is_active: true, was_active: false, pending: true,
+    });
+    render(<CompMembersPanel lang="en" />);
+
+    fireEvent.change(await screen.findByLabelText('Phone number'), {
+      target: { value: '0555820667' },
+    });
+    fireEvent.change(screen.getByLabelText('new-phone reason'), {
+      target: { value: 'guest of the owner' },
+    });
+    fireEvent.click(screen.getByText('Comp this number'));
+
+    // The number goes to the server exactly as typed; normalization is the
+    // server's job, so the panel cannot disagree with it.
+    await waitFor(() => expect(api.set).toHaveBeenCalledWith(
+      { phone: '0555820667' }, true, 'guest of the owner',
+    ));
+    // A pending result must NOT be reported as a live discount.
+    expect(await screen.findByText(/the comp goes live the moment they sign up/)).toBeTruthy();
+  });
+
+  it('will not send an obviously too-short number', async () => {
+    render(<CompMembersPanel lang="en" />);
+    fireEvent.change(await screen.findByLabelText('Phone number'), { target: { value: '0555' } });
+    expect(
+      (screen.getByText('Comp this number').closest('button') as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
+  it('marks a member nobody has claimed yet, and still allows removing it', async () => {
+    vi.stubGlobal('confirm', vi.fn(() => true));
+    api.list.mockResolvedValue([pendingMember]);
+    render(<CompMembersPanel lang="en" />);
+
+    expect(await screen.findByText('NOT SIGNED UP YET')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('2 reason'), { target: { value: 'invitation withdrawn' } });
+    fireEvent.click(screen.getByText('Remove'));
+    // No account to name, so the number is the identity the server is given.
+    await waitFor(() => expect(api.set).toHaveBeenCalledWith(
+      { phone: '+966555820667' }, false, 'invitation withdrawn',
+    ));
+  });
+
+  it('points a fruitless search at the phone form instead of a dead end', async () => {
+    api.search.mockResolvedValue([]);
+    render(<CompMembersPanel lang="en" />);
+    fireEvent.change(await screen.findByLabelText('Search customers'), {
+      target: { value: '+966555820667' },
+    });
+    fireEvent.click(screen.getByText('Search'));
+    expect(await screen.findByText(/may not have an account yet/)).toBeTruthy();
   });
 
   it('requires two search characters before calling the server', async () => {

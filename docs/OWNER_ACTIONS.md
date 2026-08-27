@@ -1124,6 +1124,42 @@ Live carries the apply-time stamps `20260826114717` / `20260826115025` /
 expected; §9-D makes realignment a separate live-history write with its own
 approval, and leaving it alone is the correct default.
 
+## 21. Comped customers by phone — three migrations awaiting approval (2026-08-27)
+
+**Why this exists.** The owner asked for a comp that starts from a phone number:
+*"when the number of someone in comped customers enters the app, they should see
+the prices as 0."* The panel's first live use had already shown why — a search
+for `+966555820667` returned "No matching customers", correctly, because nobody
+with that number had signed up, and there was no way to comp them anyway.
+
+**Open action — apply three migrations, in this order, each named explicitly:**
+
+1. `20260827090000_admin_search_phone_normalization.sql`
+2. `20260827100000_comp_members_by_phone.sql`
+3. `20260827110000_comp_erasure.sql`
+
+Only 2 → 3 is a hard dependency (`…110000` reads a column `…100000` adds).
+
+**What the owner is approving.** A membership can be attached to a phone number
+before that person has an account; it binds itself when Auth confirms the OTP.
+The pricing functions are **not** redefined — `place_order` and
+`compute_order_snapshot` are untouched, and the 18 cases that verified them on
+2026-08-26 still pass. Account deletion now reaches the comp tables.
+
+**What it does NOT include.** No Edge Function deploy. No payment or provider
+change (§6 untouched). No Vercel or EAS action. No change to who is currently
+comped — `comp_members` holds one deactivated row.
+
+**The bulk-apply trap, restated because it got worse.** These are the first
+non-frozen unapplied files since 2026-08-24, so "apply the outstanding
+migrations" now sounds reasonable and would sweep in
+`20260824100000_moyasar_payment_provider`, which sorts ahead of all three and is
+frozen under §6. Name each target; verify Moyasar's absence afterwards.
+
+**Still open from §20:** the **app build**, which carries the checkout
+"Complimentary" line, the receipt line and the submit-time membership re-check.
+Independent of these migrations and safe to ship either way.
+
 ## Owner-action closeout rule
 
 When an item is completed:

@@ -14,10 +14,18 @@
  * write. That is also why removal is one click with no reason-free path — the
  * fast action is the safe one.
  *
+ * COMPING A NUMBER. Membership can be attached to a phone number that has no
+ * account yet (20260827100000). The owner normally knows the number of the
+ * person they want to host before that person has opened the app, and the
+ * profile-only design made that impossible to express — the panel's first live
+ * search, for a number nobody had registered, returned "No matching customers"
+ * and there was no way to say "comp them anyway, from the moment they join".
+ * Such a row shows as PENDING until Auth confirms the number.
+ *
  * Mirrors StaffAccessPanel, which does the same job for roles.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Gift, RefreshCw, Search, UserMinus } from 'lucide-react';
+import { Gift, Phone, RefreshCw, Search, UserMinus } from 'lucide-react';
 
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
@@ -38,14 +46,22 @@ function candidateName(c: CompCandidate): string {
 }
 
 function memberName(m: CompMember): string {
-  return m.full_name?.trim() || m.phone_number?.trim() || m.profile_id;
+  return m.full_name?.trim()
+      || m.phone_number?.trim()
+      || m.phone_e164?.trim()
+      || m.profile_id
+      || String(m.id);
 }
+
+/** The reason input for the "comp a number" form has no row to key on. */
+const NEW_PHONE_KEY = 'new-phone';
 
 export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
   const isRTL = lang === 'ar';
   const [members, setMembers] = useState<CompMember[]>([]);
   const [audit, setAudit] = useState<CompAuditEntry[]>([]);
   const [query, setQuery] = useState('');
+  const [phone, setPhone] = useState('');
   const [results, setResults] = useState<CompCandidate[]>([]);
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -89,12 +105,21 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
   /** The ids already comped, so the search list can say so instead of offering
    *  an Add that the server would refuse as a no-op. */
   const activeIds = useMemo(
-    () => new Set(members.filter((m) => m.is_active).map((m) => m.profile_id)),
+    () => new Set(
+      members
+        .filter((m) => m.is_active && m.profile_id !== null)
+        .map((m) => m.profile_id as string),
+    ),
     [members],
   );
 
-  const apply = async (userId: string, name: string, active: boolean) => {
-    const reason = (reasons[userId] ?? '').trim();
+  const apply = async (
+    key: string,
+    target: { userId: string } | { phone: string },
+    name: string,
+    active: boolean,
+  ) => {
+    const reason = (reasons[key] ?? '').trim();
     setSaved(null); setError(null);
     if (reason.length < 3) {
       setError(isRTL
@@ -106,20 +131,27 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
     // the operator that they are authorising unlimited free orders.
     const ok = window.confirm(active
       ? (isRTL
-        ? `جعل ${name} عميل ضيافة؟ ستكون جميع طلباته مجانية بالكامل (شاملة رسوم التوصيل) وبدون حد أقصى، حتى يتم إيقافه.`
-        : `Make ${name} a comped customer? Every order they place will be free in full — delivery fee included — with no cap, until you switch it off.`)
+        ? `جعل ${name} عميل ضيافة؟ ستكون جميع طلباته مجانية بالكامل (شاملة رسوم التوصيل) وبدون حد أقصى، حتى يتم إيقافه.${'phone' in target ? ' إذا لم يكن الرقم مسجلاً بعد، تبدأ الضيافة فور تسجيله.' : ''}`
+        : `Make ${name} a comped customer? Every order they place will be free in full — delivery fee included — with no cap, until you switch it off.${'phone' in target ? ' If nobody holds that number yet, the comp starts the moment they sign up.' : ''}`)
       : (isRTL
         ? `إيقاف الضيافة عن ${name}؟ سيدفع ثمن طلبه القادم بالكامل.`
         : `Stop comping ${name}? Their next order will be charged in full.`));
     if (!ok) return;
 
-    setBusyId(userId);
+    setBusyId(key);
     try {
-      await compMembers.set(userId, active, reason);
-      setReasons((prev) => ({ ...prev, [userId]: '' }));
-      setSaved(active
-        ? (isRTL ? 'تمت الإضافة وتسجيلها في سجل التدقيق.' : 'Added, and written to the audit trail.')
-        : (isRTL ? 'تم الإيقاف وتسجيله في سجل التدقيق.' : 'Removed, and written to the audit trail.'));
+      const res = await compMembers.set(target, active, reason);
+      setReasons((prev) => ({ ...prev, [key]: '' }));
+      if ('phone' in target) setPhone('');
+      // A pending row is a normal outcome, but it must not be reported as if the
+      // discount were already live for somebody.
+      setSaved(!active
+        ? (isRTL ? 'تم الإيقاف وتسجيله في سجل التدقيق.' : 'Removed, and written to the audit trail.')
+        : res.pending
+          ? (isRTL
+            ? 'تمت الإضافة. الرقم غير مسجّل بعد — ستصبح الضيافة فعّالة فور تسجيل صاحبه ودخوله بالتطبيق.'
+            : 'Added. Nobody holds that number yet — the comp goes live the moment they sign up and verify it.')
+          : (isRTL ? 'تمت الإضافة وتسجيلها في سجل التدقيق.' : 'Added, and written to the audit trail.'));
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -183,7 +215,7 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
         <div className="space-y-2">
           {members.map((m) => (
             <div
-              key={m.profile_id}
+              key={m.id}
               className="grid gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3 md:grid-cols-[minmax(180px,1.5fr)_minmax(180px,1fr)_auto] md:items-center"
             >
               <div className="min-w-0">
@@ -193,19 +225,32 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
                     label={m.is_active ? (isRTL ? 'مفعّل' : 'ACTIVE') : (isRTL ? 'موقوف' : 'INACTIVE')}
                     tone={m.is_active ? 'success' : 'neutral'}
                   />
+                  {/* Comped, but nobody holds the number yet. Saying so stops the
+                      row reading as a live discount for a person who does not
+                      exist. */}
+                  {m.pending ? (
+                    <StatusPill label={isRTL ? 'بانتظار التسجيل' : 'NOT SIGNED UP YET'} tone="warning" />
+                  ) : null}
                 </div>
                 <Text variant="caption" tone="tertiary" as="p" className="mt-1 break-all">
-                  {m.note || m.phone_number || m.profile_id}
+                  {m.note || m.phone_number || m.phone_e164 || m.profile_id}
                 </Text>
               </div>
-              {reasonField(m.profile_id, m.is_active
+              {reasonField(String(m.id), m.is_active
                 ? (isRTL ? 'سبب الإيقاف' : 'Reason for removing')
                 : (isRTL ? 'سبب إعادة التفعيل' : 'Reason for re-adding'))}
               <Button
-                label={busyId === m.profile_id
+                label={busyId === String(m.id)
                   ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…')
                   : m.is_active ? (isRTL ? 'إيقاف' : 'Remove') : (isRTL ? 'إعادة تفعيل' : 'Re-add')}
-                onClick={() => void apply(m.profile_id, memberName(m), !m.is_active)}
+                onClick={() => void apply(
+                  String(m.id),
+                  // Prefer the account when the row has one: it is the identity
+                  // the pricing functions actually match on.
+                  m.profile_id ? { userId: m.profile_id } : { phone: m.phone_e164 as string },
+                  memberName(m),
+                  !m.is_active,
+                )}
                 disabled={busyId !== null}
                 variant="secondary"
                 leading={m.is_active ? <UserMinus className="size-4" /> : <Gift className="size-4" />}
@@ -217,6 +262,44 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
 
       <Card className="space-y-3">
         <Text variant="heading" as="h4">{isRTL ? 'إضافة عميل' : 'Add a Customer'}</Text>
+
+        <div className="space-y-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface p-3">
+          <Text variant="label" as="p">
+            {isRTL ? 'بالرقم — حتى لو لم يسجّل بعد' : 'By phone number — even if they have not signed up'}
+          </Text>
+          <Text variant="caption" tone="tertiary" as="p">
+            {isRTL
+              ? 'اكتب الرقم بأي صيغة (05… أو ‎+9665…‎). إذا لم يكن له حساب، تُحفظ الضيافة وتبدأ تلقائياً عند تسجيله بنفس الرقم.'
+              : 'Any format works (05… or +9665…). If nobody holds the number yet, the comp is saved and starts by itself when they sign up with it.'}
+          </Text>
+          <div className="grid gap-2 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1.5fr)_auto] md:items-center">
+            <input
+              aria-label={isRTL ? 'رقم الجوال' : 'Phone number'}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder={isRTL ? '05XXXXXXXX' : '05XXXXXXXX or +9665XXXXXXXX'}
+              className={INPUT}
+              inputMode="tel"
+              disabled={busyId !== null}
+            />
+            {reasonField(NEW_PHONE_KEY, isRTL ? 'سبب منح الضيافة' : 'Reason for comping')}
+            <Button
+              label={busyId === NEW_PHONE_KEY
+                ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…')
+                : (isRTL ? 'منح الضيافة للرقم' : 'Comp this number')}
+              onClick={() => void apply(
+                NEW_PHONE_KEY, { phone: phone.trim() }, phone.trim(), true,
+              )}
+              disabled={phone.trim().length < 9 || busyId !== null}
+              variant="secondary"
+              leading={<Phone className="size-4" />}
+            />
+          </div>
+        </div>
+
+        <Text variant="caption" tone="tertiary" as="p">
+          {isRTL ? 'أو ابحث عن عميل مسجّل:' : 'Or find an existing customer:'}
+        </Text>
         <div className="flex flex-col gap-2 md:flex-row">
           <input
             aria-label={isRTL ? 'البحث عن عميل' : 'Search customers'}
@@ -257,7 +340,7 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
                   label={busyId === c.id
                     ? (isRTL ? 'جارٍ الحفظ…' : 'Saving…')
                     : (isRTL ? 'منح الضيافة' : 'Comp')}
-                  onClick={() => void apply(c.id, candidateName(c), true)}
+                  onClick={() => void apply(c.id, { userId: c.id }, candidateName(c), true)}
                   disabled={already || busyId !== null}
                   variant="secondary"
                   leading={<Gift className="size-4" />}
@@ -266,7 +349,11 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
             );
           })}
           {!searching && query.trim().length >= 2 && results.length === 0 ? (
-            <Text variant="body" tone="tertiary" as="p">{isRTL ? 'لا توجد نتائج.' : 'No matching customers.'}</Text>
+            <Text variant="body" tone="tertiary" as="p">
+              {isRTL
+                ? 'لا توجد نتائج — قد لا يكون له حساب بعد. استخدم "بالرقم" أعلاه لمنحه الضيافة الآن.'
+                : 'No matching customers — they may not have an account yet. Use "By phone number" above to comp them now.'}
+            </Text>
           ) : null}
         </div>
       </Card>
@@ -297,7 +384,9 @@ export const CompMembersPanel: React.FC<{ lang: 'en' | 'ar' }> = ({ lang }) => {
                 <tr key={a.id} className="border-t border-con-line">
                   <td className="px-3 py-2">
                     <Text variant="caption" as="span">
-                      {a.target_name || (isRTL ? 'حساب محذوف' : 'Deleted account')}
+                      {a.target_name
+                        || a.target_phone
+                        || (isRTL ? 'حساب محذوف' : 'Deleted account')}
                     </Text>
                   </td>
                   <td className="px-3 py-2">

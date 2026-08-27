@@ -128,7 +128,16 @@ The feature is applied and **dormant**: `comp_members` is empty, so nobody is
 comped until an administrator adds somebody. All 44 pre-existing orders were
 verified unchanged.
 
-**One repository file remains unapplied, and it is the frozen one.**
+**Superseded 2026-08-27 — three more files are unapplied, and they are NOT the
+frozen one.** `20260827090000_admin_search_phone_normalization`,
+`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure` extend
+comped customers so a membership can be attached to a **phone number** before
+that person has an account. They do **not** touch the money path: `place_order`
+and `compute_order_snapshot` are unchanged, and all 18 pre-existing cases in
+`comp_members_test.sql` pass against the new schema. Applying them is a §5
+action; they are unrelated to §6 and must each be named explicitly.
+
+**Four repository files are unapplied. One of them is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -142,8 +151,11 @@ verified unchanged.
 | `20260826090000_comp_members.sql` | Applied 2026-08-26, live version `20260826114717`. |
 | `20260826100000_comp_order_totals.sql` | Applied 2026-08-26, live version `20260826115025`. |
 | `20260826110000_checkout_zero_total_idempotency.sql` | Applied 2026-08-26, live version `20260826115122`. |
+| `20260827090000_admin_search_phone_normalization.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. |
+| `20260827100000_comp_members_by_phone.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Depends on `…090000` only for review order, not schema. |
+| `20260827110000_comp_erasure.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Must follow `…100000` — it references `comp_member_audit.target_phone`. |
 
-The honest statement is therefore **107 repository files / 112 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **110 repository files / 112 live rows / four unapplied files: three awaiting ordinary owner approval, and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -153,14 +165,15 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-It is again the *only* thing a bulk apply could sweep in, which makes it more
-dangerous rather than less: with one file outstanding, "apply the outstanding
-migrations" reads like a no-op and is in fact the one instruction that would
-break the §6 freeze. The 2026-08-26 comp application is the worked example of
-doing this correctly — each target named explicitly, one call per file, with
-Moyasar's continued absence verified afterwards (zero functions, zero history
-rows, `provider_name` still `tap`). Any `supabase migration` operation must
-still name its target explicitly.
+It is no longer the only outstanding file, and that makes the trap *worse*, not
+better. `20260824100000` sorts ahead of all three 2026-08-27 files, so "apply the
+outstanding comp migrations" — a reasonable-sounding instruction that is now
+mostly correct — would sweep Moyasar in first and break the §6 freeze. The
+2026-08-26 comp application is the worked example of doing this correctly: each
+target named explicitly, one call per file, with Moyasar's continued absence
+verified afterwards (zero functions, zero history rows, `provider_name` still
+`tap`). Any `supabase migration` operation must still name its target
+explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

@@ -3396,3 +3396,45 @@ Two owner actions remain before the feature is fully visible:
    branch until it happens. Order-independent: the worker reads orders through
    `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
    missing column yields `undefined` rather than a failed select.
+
+---
+
+## 36. Comped customers by phone number — WRITTEN, NOT APPLIED (2026-08-27)
+
+Three files, added after the owner's requirement of 2026-08-27: *"when the
+number of someone in comped customers enters the app, they should see the prices
+as 0."* None has been applied. Applying each is a §5 action.
+
+| Order | File | What it changes |
+| --- | --- | --- |
+| 1 | `20260827090000_admin_search_phone_normalization.sql` | `admin_search_role_candidates` — normalizes phone on both sides through `normalize_ksa_e164` |
+| 2 | `20260827100000_comp_members_by_phone.sql` | `comp_members.phone_e164`, nullable `profile_id`, surrogate PK, `claim_comp_membership`, the two Auth hooks, four admin RPCs, `comp_member_audit.target_phone` |
+| 3 | `20260827110000_comp_erasure.sql` | `anonymize_account_data` — deletes the membership and scrubs the number from the audit |
+
+**The order is load-bearing between 2 and 3 only.** `…110000` references
+`comp_member_audit.target_phone`, which `…100000` adds; applying it first fails
+on an undefined column. `…090000` is independent — it touches a different
+function entirely — and is listed first only because it is the smaller review.
+
+**These do NOT touch the money path.** `place_order`, `compute_order_snapshot`
+and `insert_order_from_snapshot` are not redefined by any of the three. The comp
+is still resolved by `comp_members.profile_id`, exactly as §35 left it; a
+phone-only row simply has `profile_id` NULL and never matches until Auth
+confirms the number. All 18 pre-existing cases in `comp_members_test.sql` pass
+unchanged against the new schema, which is the evidence for that claim.
+
+**A bulk apply is more dangerous than before, not less.** These three are the
+first non-frozen unapplied files since 2026-08-24, so an instruction like "apply
+the outstanding migrations" now reads as mostly-legitimate — and
+`20260824100000_moyasar_payment_provider` sorts ahead of all three. Name every
+target explicitly, one call per file, and verify Moyasar's continued absence
+afterwards (zero `%moyasar%` functions, zero history rows, `provider_name` still
+`tap`).
+
+**Validation performed before the pull request** (local, not Production):
+the full chain replays clean onto an empty PostGIS database at **110 migrations**
+via `.github/sql-ci/run.sh`; **57 suites run, 54 pass, 2 quarantined, 0 new
+failures**; `comp_members_test.sql` extended 18 → 25 cases and
+`admin_search_phone_normalization_test.sql` added with 6. The search suite was
+re-run against the *pre-fix* function definition and fails at case 2, which is
+what makes it a test rather than a description.

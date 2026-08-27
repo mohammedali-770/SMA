@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **107**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260826110000_checkout_zero_total_idempotency.sql`.
+Migration files in the repository: **110**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827110000_comp_erasure.sql`.
 
 ## Tables
 
@@ -37,8 +37,8 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `campaigns` | `20260728120000_discounts_campaigns.sql` | 0 | 5 |
 | `categories` | `20260707120200_catalog.sql` | 1 | 3 |
 | `checkout_sessions` | `20260712160000_checkout_sessions.sql` | 1 | 1 |
-| `comp_member_audit` | `20260826090000_comp_members.sql` | 0 | 1 |
-| `comp_members` | `20260826090000_comp_members.sql` | 0 | 1 |
+| `comp_member_audit` | `20260826090000_comp_members.sql` | 1 | 1 |
+| `comp_members` | `20260826090000_comp_members.sql` | 1 | 1 |
 | `coupons` | `20260707120400_coupons.sql` | 0 | 1 |
 | `homepage_banners` | `20260712130000_homepage_banners.sql` | 0 | 5 |
 | `integration_settings` | `20260707121000_integration_settings.sql` | 2 | **none declared** |
@@ -90,22 +90,22 @@ A function defined by more than one migration has been redefined; the last defin
 | `admin_add_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_clear_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `admin_delete_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
-| `admin_list_comp_member_audit` | 1 | `20260826090000_comp_members.sql` |
-| `admin_list_comp_members` | 1 | `20260826090000_comp_members.sql` |
+| `admin_list_comp_member_audit` | 2 | `20260827100000_comp_members_by_phone.sql` |
+| `admin_list_comp_members` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `admin_list_orders` | 1 | `20260724200000_order_read_contracts.sql` |
 | `admin_list_orders_for_range` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
 | `admin_list_orders_with_items` | 4 | `20260824130000_place_order_variants.sql` |
 | `admin_list_role_change_audit` | 1 | `20260810141000_staff_access_directory.sql` |
 | `admin_list_staff` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_order_stats` | 1 | `20260806130000_admin_ranged_orders_and_stats.sql` |
-| `admin_search_role_candidates` | 1 | `20260810141000_staff_access_directory.sql` |
-| `admin_set_comp_member` | 1 | `20260826090000_comp_members.sql` |
+| `admin_search_role_candidates` | 2 | `20260827090000_admin_search_phone_normalization.sql` |
+| `admin_set_comp_member` | 2 | `20260827100000_comp_members_by_phone.sql` |
 | `admin_set_order_status` | 2 | `20260810100000_order_status_cancellation_integrity.sql` |
 | `admin_set_staff_branch` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `admin_set_user_role` | 1 | `20260810140000_staff_role_administration.sql` |
 | `admin_update_delivery_area` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
 | `admin_upsert_branch_working_hours` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
-| `anonymize_account_data` | 2 | `20260806120000_erasure_phone_normalization.sql` |
+| `anonymize_account_data` | 3 | `20260827110000_comp_erasure.sql` |
 | `assert_order_item_modifier_contract` | 1 | `20260810132000_order_modifier_contract.sql` |
 | `begin_checkout_session` | 3 | `20260826110000_checkout_zero_total_idempotency.sql` |
 | `begin_lazywait_create_attempt` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
@@ -113,6 +113,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `begin_session_attempt` | 1 | `20260824100000_moyasar_payment_provider.sql` |
 | `branch_availability_sweep` | 4 | `20260822090000_branch_availability_retention.sql` |
 | `caller_can_read_order` | 1 | `20260724200000_order_read_contracts.sql` |
+| `claim_comp_membership` | 1 | `20260827100000_comp_members_by_phone.sql` |
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |
 | `claim_lazywait_sync_one` | 3 | `20260813143000_manual_only_pos_resend.sql` |
@@ -156,8 +157,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `finalize_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `guard_address_delete_live_checkout` | 1 | `20260801120100_checkout_session_address_fk_set_null.sql` |
 | `guard_used_coupon_identity` | 1 | `20260810100500_coupon_code_identity_guard.sql` |
-| `handle_auth_user_phone_confirmed` | 1 | `20260710150000_whatsapp_login.sql` |
-| `handle_new_user` | 2 | `20260710150000_whatsapp_login.sql` |
+| `handle_auth_user_phone_confirmed` | 2 | `20260827100000_comp_members_by_phone.sql` |
+| `handle_new_user` | 3 | `20260827100000_comp_members_by_phone.sql` |
 | `has_active_account_deletion` | 1 | `20260715130000_account_deletion_lock.sql` |
 | `import_lazywait_addon_groups` | 1 | `20260826080000_import_lazywait_addon_groups.sql` |
 | `import_lazywait_catalog` | 3 | `20260826080000_import_lazywait_addon_groups.sql` |
