@@ -448,20 +448,22 @@ production.
 | 69 | 20260827100000 | comp_members_by_phone | — | 20260827063746 | comp_members_by_phone | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:37:46 UTC — a comp can be attached to a PHONE NUMBER before that person has an account.** Owner's requirement: *"when the number of someone in comped customers enters the app, they should see the prices as 0."* Row 65 keyed membership on `profile_id`, which is backwards for how the decision is made — the owner knows the NUMBER, usually before that person has opened the app. Adds `comp_members.phone_e164` (canonical `+9665XXXXXXXX` by check constraint), makes `profile_id` **nullable**, moves the PK to a surrogate `id` because neither natural key is present on every row (5 of 10 live profiles carry no phone at all), adds two partial unique indexes and `comp_member_audit.target_phone`. **THE MONEY PATH IS NOT REDEFINED** — `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot` are untouched, and both hashes were confirmed **unchanged across the apply** (`8bd7183832108abb25bcca6942dccd70`, `f955b748b698a1704533f4aaffb835cb`). That is the design, not an omission: a pending row has `profile_id` NULL and never matches the pricing lookup, which is correct because an unclaimed number has no account and cannot place an order. All **18** pre-existing cases in `comp_members_test.sql` pass unchanged, which is the evidence for the claim rather than an assertion about it. **The binding happens at the moment ownership is proven, and there are THREE such paths, not two** — the third was missed in the first commit and found in review: `handle_new_user`, `handle_auth_user_phone_confirmed`, and `mark_phone_verified`, which backs `whatsapp-verify-otp` and never touches Supabase Auth at all. Without a claim there a customer comped by number who verified that way would have been **charged in full forever**. Safe to claim there because `mark_phone_verified` is EXECUTE-able by `service_role` **alone** (verified live: `authenticated` false, `anon` false) and its only caller checks the requested number against `auth.users.phone` before consuming a matching OTP; case 22 asserts that grant so a future loosening fails the test rather than opening a hole quietly. **A second review finding, also real:** `admin_set_comp_member` resolved an account from an **unconfirmed** `auth.users.phone`, which is set at OTP *request* time — now requires `phone_confirmed_at`, or `profiles.phone_verified` on the fallback; an unresolved number stays PENDING and binds later. **Applying comped nobody:** `comp_members` still 1 row / **0 active** / 0 pending afterwards, the single existing row backfilled to canonical `+9665…`, audit still 2 rows, both comped orders unchanged at `total` 0.00. **A transcription slip during the apply was caught and corrected** — see §36. Bodies: `admin_set_comp_member` `55009930c7bfdac7d4e79864b83dcdff` (5 579), `claim_comp_membership` `2df644c097dc7fb2c4fbd3136573605b` (1 144), `handle_new_user` `3737461bfd0fcfb6e92766c04aba0175` (796), `handle_auth_user_phone_confirmed` `526ad4d149754e2eb5a9691ffd6ce458` (663), `mark_phone_verified` `fc71ade769b833fcad02a5fe5c907d4f` (478), `admin_list_comp_members` `0ae53f5ad305936a016fc287a3545ede` (866), `admin_list_comp_member_audit` `5184b90dc10e0a90f6d9d4718f3f166a` (878). **Version NOT aligned** (§9-D). Detail in §36 |
 | 70 | 20260827110000 | comp_erasure | — | 20260827064044 | comp_erasure | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:40:44 UTC, after row 69 which it depends on** — it reads `comp_member_audit.target_phone`, a column row 69 adds, so applying it first fails on an undefined column. Row 69 created a new place a customer's phone number is written, and **two of those places carry no FK back to the user**, so nothing in the existing deletion path would have removed them: an UNCLAIMED `comp_members` row holds `phone_e164` with `profile_id` NULL, so the `on delete cascade` that removes a claimed row never fires for it; and `comp_member_audit.target_phone` sits on the permanent trail whose `target_user_id` is deliberately `on delete set null` so "who was made free, and why" outlives the account — a raw phone number surviving there defeats exactly that intent, being the one field that re-identifies a customer who asked to be forgotten. `anonymize_account_data` now deletes the claimed membership by FK (which also matters for the anonymize-without-delete path, where a comp outliving its account would silently re-apply if the number were re-registered), deletes an unclaimed row by normalized value, and **nulls the number out of the audit while keeping the row**. Two new counts in the summary, `comp_memberships_deleted` and `comp_audit_phones_cleared`. Everything else is the live body carried over verbatim — the orders/addresses/devices/sessions/loyalty/OTP/WhatsApp work, the `auth.users`-then-profile phone precedence, and the `phone_purge_attempted` wording. Body `37e0162ca97f4bf5ff8ca3ab31ffd5c8` (4 282 chars). Covered by `comp_members_test.sql` case 20. **Version NOT aligned** (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **67 repository / 68 live** rows.
+Reconciliation check: the rows above detail **70 repository / 71 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–67
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–70
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they were the most recent applications at the time (2026-08-25 and
 2026-08-26, §32 and §33), 62–63 because they are the applications of
 2026-08-26 06:50 and 06:52 UTC — both were listed here as NOT APPLIED for a few
 hours between the merge of PR #263 and the owner approving their application,
 and that state is gone — 64 because it is the add-on importer of the same
-morning, and 65–67 because they are the comped-customer application of
-2026-08-26 11:47–11:51 UTC (§35). Rows 65–67 were likewise listed as NOT
-APPLIED between the merge of PR #269 and the owner approving them.
+morning, 65–67 because they are the comped-customer application of
+2026-08-26 11:47–11:51 UTC (§35), and 68–70 because they are the comp-by-phone
+application of 2026-08-27 06:36–06:40 UTC (§36). Rows 65–67 were likewise listed
+as NOT APPLIED between the merge of PR #269 and the owner approving them, and
+rows 68–70 between the merge of PR #272 and the owner approving those.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
@@ -3495,8 +3497,9 @@ deploy.
 
 **Validation performed before the pull request** (local, not Production):
 the full chain replays clean onto an empty PostGIS database at **110 migrations**
-via `.github/sql-ci/run.sh`; **57 suites run, 54 pass, 2 quarantined, 0 new
-failures**; `comp_members_test.sql` extended 18 → 27 cases and
+via `.github/sql-ci/run.sh`; **58 suites run, 56 pass, 2 quarantined, 0 new
+failures** — 58 files in `supabase/tests/`, 2 of them in `known-failing.txt`;
+`comp_members_test.sql` extended 18 → 27 cases and
 `admin_search_phone_normalization_test.sql` added with 6. The search suite was
 re-run against the *pre-fix* function definition and fails at case 2, which is
 what makes it a test rather than a description.
