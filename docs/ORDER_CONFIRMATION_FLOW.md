@@ -148,6 +148,67 @@ leftover, and delivery fell through to the cron:
 the wait for the next tick, and the 18-45 s spread is only where in the minute
 each order happened to land.
 
+### The kick is TARGETED, and it was 253 ms from failing
+
+Closing the delivery gate fixed *which* orders got a kick. It did not fix what
+the kick then did, and measuring one healthy order exposed that:
+
+| SM-2026-000065, 8.06 s to the POS | |
+| --- | --- |
+| order-intake overhead + gateway | 1.04 s |
+| worker boot + a duplicate `integration_settings` read | 0.24 s |
+| `reap_stale_lazywait_syncs` | 0.89 s |
+| claim | 0.16 s |
+| three SERIAL reads (branches, order_items, profiles) | 0.69 s |
+| **CRM customer search** | **3.47 s** |
+| **`POST /pos/orders/create`** | **1.57 s** |
+
+**The POS was never the problem.** The one irreducible external call is 1.6 s;
+the other ~6.5 s was ours. Then `dispatchPendingPosSync` added another 3.4 s
+*after* the branch number was already known — inside the invocation the
+customer's checkout was still awaiting. That request took **10.747 s against an
+11 s abort**: 253 ms of headroom. On SM-2026-000064 the abort appears to have
+actually fired, and the order number arrived by luck.
+
+Four changes, and the reasoning matters more than the numbers:
+
+- **The kick names ONE order.** It used to send `{limit: 5}`, and
+  `claim_lazywait_sync_batch` orders by `created_at` **ascending** while the
+  worker processes serially — so the customer's brand-new order was handled
+  **last** of whatever the batch claimed. Their checkout blocked while other
+  people's orders were sent to the POS. `claim_lazywait_sync_one` already
+  existed, unused, with a byte-identical predicate apart from the id filter.
+  Draining the queue was never this function's job; the cron owns that.
+- **The push drain is deferred**, not removed. It cannot change the number the
+  customer is waiting on, yet it was a third of the awaited time. Delivery stays
+  at-most-once because `claim_pos_sync_notification` fences the claim, and a row
+  left `pending` by a teardown is taken by the next tick — delayed, never
+  dropped.
+- **The reaper is deferred, NOT skipped**, and that distinction is deliberate.
+  Skipping saves the same 0.9 s, but `reap_stale_lazywait_syncs` has exactly one
+  production caller, so the cron and this kick are also its only two reaping
+  drivers — and they do not share a failure mode (the cron returns early without
+  invoking anything if the vault secret `lazywait_sync_project_url` is missing;
+  the kick builds its URL from `SUPABASE_URL`). Deleting the redundant driver
+  would let one missing secret stop all reaping, and a **cash** order stranded in
+  `syncing` with no ref is invisible to the watchdog too, since R1 and R7 both
+  require `payment_status = 'paid'`.
+- **The CRM lookup is capped at 1.5 s on the kick path** and keeps its 8 s on the
+  cron path. It returned nothing on both measured orders, and it cannot do
+  otherwise yet: `profiles.lazywait_customer_id` has never been populated for
+  anybody. It also sits *before* `begin_lazywait_create_attempt`, so every
+  millisecond it burns is deadline budget spent before that gate re-checks
+  `pos_sync_deadline_at` — capping it is safety-positive, not merely faster.
+
+The three per-order reads now issue concurrently. `SYNC_TIMEOUT_MS` stays at
+11 s deliberately: it is a **ceiling**, not a target, and with the awaited work
+now bounded at roughly 4-5 s the point is that it should never be reached.
+
+**An unclaimed win worth stating:** an ONLINE order sits at `awaiting_payment`
+and cannot be sent at all, yet its checkout previously blocked for up to the full
+11 s while the worker reaped and drained up to five *other* customers' orders.
+Targeting ends that too.
+
 ### The push must follow the send, not precede it
 
 The "order received" push fires **after** the sync block, and that ordering is
