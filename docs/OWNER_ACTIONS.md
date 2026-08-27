@@ -1252,7 +1252,11 @@ recomputation, no new rounding, the same numbers as the customer's receipt.
 `tax_percentage` and `is_paid` stay unsent, for reasons recorded in
 `docs/LAZYWAIT.md`.
 
-**Still needs a deploy** (§5) and one live order to confirm the printed ticket.
+**Deployed** 2026-08-27 in `lazywait-sync` **v8** — read back and hash-verified
+byte-identical to the merged branch. See the deploy table at the end of this
+section. What remains is one live order to confirm the printed ticket carries the
+right total; no command can establish that.
+
 No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
 so the worker already had every money column.
 
@@ -1263,11 +1267,11 @@ is now the only unapplied migration in the repository.** An instruction like
 "apply the outstanding migrations" therefore has exactly one possible target, and
 that target is the frozen one (§6). Name the file explicitly, always.
 
-**D. Deploy `order-intake`** (§5) — the immediate POS sync kick was gated to
-pickup, so delivery orders waited for the once-a-minute cron (measured 17.8-44.6 s,
-all first-attempt successes). Removing the gate should put the branch number on
-the confirmation screen in ~1-2 s. Fix is merged and tested; it needs a deploy of
-`order-intake`, which has not been redeployed for this.
+**D.** ~~Deploy `order-intake`.~~ **DONE 2026-08-27 — version 5**,
+`verify_jwt: true` unchanged (matching `config.toml`). The immediate POS sync
+kick was gated to pickup, so delivery orders waited for the once-a-minute cron
+(measured 17.8-44.6 s, all first-attempt successes). The branch number should now
+reach the confirmation screen in a second or two.
 
 **E.** ~~Decide the `received` push copy — still not honest.~~ **DECIDED AND
 BUILT 2026-08-27.** The owner chose accuracy over immediacy: *"I prefer the
@@ -1294,10 +1298,54 @@ the customer hears in a second or two.
 something has gone wrong. Both now say "no need to place it again" alongside what
 we are doing about it. **This adds `push-dispatch` to the deploy list.**
 
-**Needs a deploy** (§5) of `lazywait-sync`, `order-intake` AND `push-dispatch` — they are two
-halves of one change, and deploying only one is worse than neither: `order-intake`
-alone removes the push and nothing replaces it; `lazywait-sync` alone sends
-`pos_confirmed` alongside the old `received` and the customer gets two.
+**Deployed** 2026-08-27 — `lazywait-sync` v8, `order-intake` v5, `push-dispatch`
+v5, in that order. Versions and verification are in the deploy table at the end
+of this section; they are not restated here, because restating a status in three
+places is what let this document contradict itself in the first place.
+
+The order was not incidental. `lazywait-sync` and `order-intake` are two halves
+of one change and deploying either alone was wrong in a different way:
+`order-intake` first would have removed the push with nothing yet replacing it,
+leaving silence; `lazywait-sync` first sends `pos_confirmed` while the old
+`received` still fires, giving two pushes. Noise is the recoverable failure, so
+the worker went first and the gap was under a minute.
+
+### The three deploys, 2026-08-27
+
+All on explicit owner approval, in the order below — which was chosen, not
+incidental.
+
+| # | Function | Version | verify_jwt | Carries |
+| --- | --- | --- | --- | --- |
+| 1 | `lazywait-sync` | **8** | false | order totals + the `pos_sync` drain |
+| 2 | `order-intake` | **5** | true | the latency fix, and no premature push |
+| 3 | `push-dispatch` | **5** | false | the reworded failure messages |
+
+**Why that order.** `lazywait-sync` and `order-intake` are two halves of one
+behaviour and deploying either alone is wrong in a different way: `order-intake`
+first removes the push with nothing yet replacing it — a window of **silence**;
+`lazywait-sync` first sends `pos_confirmed` while the old `received` still fires
+— a window of **two pushes**. Noise is the recoverable failure, so the worker
+went first. The gap was under a minute.
+
+`push-dispatch` is independent: it only carries wording, and the message that
+fires on the happy path (`pos_confirmed`) was not among the strings changed.
+
+**Verification.** `lazywait-sync` was read back from Supabase and hashed against
+the merged branch — all five bundle files **byte-identical**
+(`index.ts` `a9d277a2f8d0ed6e`, `_shared/lazywait.ts` `d1068f393a1a48e9`, the
+three other shared files unchanged). `order-intake` and `push-dispatch` were read
+back in full and reviewed, and their platform bundle hashes match between deploy
+and read-back; they were not hashed against the repository the way
+`lazywait-sync` was, because their read-backs returned inline rather than to a
+file. Worth knowing which of the three carries the stronger proof.
+
+`lazywait-sync` v8 has returned 200 on every cron tick since (11:50 onward), so
+the new drain boots and runs clean.
+
+**Still unproven, and only one order can prove it:** that a real ticket now shows
+the correct total, that the branch number appears in a second or two, and that
+exactly one push arrives saying the restaurant has the order.
 
 ### A decision recorded rather than taken
 
