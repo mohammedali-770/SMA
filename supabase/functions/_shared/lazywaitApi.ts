@@ -27,12 +27,16 @@
  * `customer_cell` + `country_code`, `order_details`, `delivery_address` (name
  * only) and `is_paid` are CONFIRMED and no longer gated.
  *
- * What is still ASSUMED — and therefore assembled ONLY when the caller passes
- * `allowAssumedFields: true` (default OFF) — is delivery: `order_type:
- * "delivery"`, its `order_status_id`, the element shape of `order_deliveries[]`,
- * and top-level `latitude`/`longitude`, which the contract does not contain at
- * all. The live `lazywait-sync` worker remains pickup-only and delivery stays
- * blocked with `delivery_schema_unconfirmed`.
+ * DELIVERY IS NO LONGER GATED (2026-08-27). `order_type` and `delivery_address`
+ * are confirmed contract fields and the shared builder sends both; the live
+ * `lazywait-sync` worker now syncs delivery orders. What remains ASSUMED — and
+ * therefore assembled ONLY when the caller passes `allowAssumedFields: true`
+ * (default OFF) — is top-level `latitude`/`longitude`, which the contract does
+ * not contain anywhere, and `order_delivery_fee`, which is confirmed by name but
+ * blocked behind the unresolved VAT question (Q9). `order_deliveries[]` is never
+ * assembled: the vendor's own pickup sample sends it EMPTY, alongside
+ * `order_payments[]` and `order_taxes[]`, so it is a POS-side collection rather
+ * than caller input.
  *
  * PAYMENTS (Tap freeze — CLAUDE.md §6): the cash/online payment endpoints are
  * TYPED + serialized + validated here, but this client does not wire them into
@@ -424,31 +428,34 @@ export interface CreateOrderRequest {
 export function serializeCreateOrder(req: CreateOrderRequest): BuildResult {
   const assumed = req.allowAssumedFields === true;
 
+  // Delivery is no longer gated: `order_type` and `delivery_address` are both
+  // confirmed contract fields, and the shared builder now sends them (and
+  // blocks a delivery order carrying no destination). The gate below has
+  // narrowed to what the contract genuinely does NOT contain.
   const confirmed = buildCreateOrderPayload({
     clientId: req.clientId,
     branchId: req.branchId,
-    // Gate OFF: pass the real order type so delivery blocks. Gate ON: build the
-    // confirmed body as pickup, then override order_type below.
-    orderType: assumed ? 'pickup' : req.orderType,
+    orderType: req.orderType,
     customerName: req.customerName,
     items: req.items,
     orderDetails: req.orderDetails,
     customerId: req.customerId,
     customerPhone: req.customerPhone,
     isPaid: req.isPaid,
+    deliveryAddress: req.delivery?.address ?? null,
   });
   if (!confirmed.ok || !assumed) return confirmed;
 
-  // ---- Assumed delivery half (owner-authorized capability; still gated) -----
+  // ---- What is STILL assumed, and therefore still gated --------------------
+  // Coordinates appear nowhere in the contract, and the money fields are
+  // unresolved (Q9: the vendor example adds tax on top, our prices include it).
   const payload = confirmed.payload;
-  payload.order_type = req.orderType;                    // [ASSUMPTION for delivery]
 
   const d = req.delivery;
   if (d) {
-    if (d.address != null && String(d.address) !== '') payload.delivery_address = d.address;
     if (d.latitude != null) payload.latitude = d.latitude;      // [ASSUMPTION — not in the contract]
     if (d.longitude != null) payload.longitude = d.longitude;   // [ASSUMPTION — not in the contract]
-    if (d.fee != null) payload.order_delivery_fee = round2(d.fee);
+    if (d.fee != null) payload.order_delivery_fee = round2(d.fee);  // [Q9]
   }
 
   // Escape hatch — identity fields can never be injected.

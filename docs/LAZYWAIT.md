@@ -281,8 +281,9 @@ no blocked orders).
 
 ## Order sync flow
 1. `place_order` creates the local order (`payment_status='pending'`). A BEFORE
-   INSERT trigger sets `lazywait_sync_state='pending'` for **pickup**, or
-   `'blocked'` (`delivery_schema_unconfirmed`) for **delivery**.
+   INSERT trigger sets `lazywait_sync_state='pending'` — for **pickup and
+   delivery alike** as of `20260827120000`. The only gate left is payment: an
+   **online** order that is not yet paid parks at `'awaiting_payment'`.
 2. `lazywait-sync` (cron/scheduled) calls `claim_lazywait_sync_batch(N)` —
    `FOR UPDATE SKIP LOCKED` so concurrent workers never double-send — flipping
    claimed rows to `'syncing'`.
@@ -598,11 +599,35 @@ an `order_item_modifiers` row references a modifier for the life of the order.
 price back out of `price`. Before this import every live modifier was unmapped,
 which is why no ticket has ever carried one. At a 0 price the subtraction is 0.
 
-### Intentionally NOT sent (schemas unconfirmed — do not invent)
-Delivery address/fields, `latitude`/`longitude` (the contract has **no**
-coordinate field), the `order_deliveries[]` element shape, and every money field
-(Q9). Delivery orders are **blocked** (not synced) until Lazywait confirms the
-schema — unchanged by the 2026-08-24 contract, which documents a pickup order.
+### Delivery (enabled 2026-08-27)
+Delivery orders **are synced**. `order_type: "delivery"` and the confirmed
+top-level `delivery_address` are sent; the destination is composed from
+`orders.address_snapshot` (`label · national_short_address · description`).
+
+**The address is sent twice, deliberately.** Whether the POS *renders*
+`delivery_address` is Q8 and is not answerable from the API, so the same string
+is repeated inside `order_details` behind `التوصيل إلى / DELIVER TO:` — the note
+field the branch already reads. A ticket that reaches the kitchen without a
+destination is the worst outcome available, and this costs one line to remove.
+Once a real ticket shows the dedicated field rendered, the duplication can go —
+on evidence, not in advance.
+
+A delivery order whose snapshot yields **no** usable address is blocked with
+`missing_delivery_address` rather than sent: better no ticket than a ticket the
+driver cannot use.
+
+**What opened the gate.** It was never only the Edge Function — the real block
+was `set_lazywait_initial_sync`, a BEFORE INSERT trigger that parked every
+delivery order at `blocked` before the worker could claim it. That is why
+SM-2026-000057 died with `sync_attempt_count = 0`.
+
+### Still intentionally NOT sent (do not invent)
+`latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
+`order_deliveries[]` element shape — the vendor's own **pickup** sample sends it
+EMPTY next to `order_payments[]`/`order_taxes[]`, so it is a POS-side collection
+rather than caller input — `order_status_id`, and every money field including
+`order_delivery_fee` (Q9: the vendor example adds tax on top, our prices include
+it).
 
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,

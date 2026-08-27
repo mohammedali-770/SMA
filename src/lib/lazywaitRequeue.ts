@@ -40,16 +40,24 @@ export interface RequeueRow {
   sync_attempt_count?: number | null;
   pos_create_attempted_at?: string | null;
   order_type?: string | null;
+  sync_blocked_reason?: string | null;
 }
 
 /**
  * Mirrors `public.lazywait_requeue_eligibility(state, ref, deadline_at,
- * attempt_count, marker_at, order_type)` exactly. Returns 'requeued' only for a
+ * attempt_count, marker_at, order_type, blocked_reason)` exactly. Returns 'requeued' only for a
  * proven-safe failure still inside its original budget.
  */
 export function lazywaitRequeueEligibility(row: RequeueRow, now: number = Date.now()): RequeueEligibility {
   const state = row.lazywait_sync_state ?? '';
-  if (row.order_type === 'delivery') return 'not_retryable';
+  // Delivery used to be refused here outright, because it was never sent and so
+  // never had anything to retry. It syncs as of 20260827120000, so it retries on
+  // the same terms as pickup — every resend rail below applies to it unchanged.
+  //
+  // The rows blocked under the RETIRED reason are the exception: they were never
+  // attempted and are up to a month old, with no deadline to stop them, so a
+  // Retry click would print a stale ticket in a live kitchen.
+  if (row.sync_blocked_reason === 'delivery_schema_unconfirmed') return 'not_retryable';
   // RESEND SAFETY: ANY stored ref marker (even blank/malformed) blocks an
   // automatic resend — do NOT trim here. A USABLE ref proves creation
   // (already_synced); a merely-present marker (or 'synced' without a usable ref)

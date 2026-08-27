@@ -81,8 +81,17 @@ begin
     raise exception 'PREDICATE FAILED: attempt ceiling'; end if;
   if public.lazywait_requeue_eligibility('blocked', null, now()+interval '5m', 1, now(), 'pickup') <> 'may_have_sent' then
     raise exception 'PREDICATE FAILED: may-have-sent marker'; end if;
-  if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 1, null, 'delivery') <> 'not_retryable' then
-    raise exception 'PREDICATE FAILED: delivery'; end if;
+  -- Delivery syncs as of 20260827120000, so a failed delivery order retries on
+  -- exactly the same terms as pickup. It used to return 'not_retryable' here.
+  if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 1, null, 'delivery') <> 'requeued' then
+    raise exception 'PREDICATE FAILED: a failed delivery order should requeue'; end if;
+  -- ...and every resend rail still applies to it.
+  if public.lazywait_requeue_eligibility('synced', 'REF_1', now()+interval '5m', 1, null, 'delivery') <> 'already_synced' then
+    raise exception 'PREDICATE FAILED: delivery with a usable ref must not resend'; end if;
+  if public.lazywait_requeue_eligibility('blocked', null, now()+interval '5m', 1, now(), 'delivery') <> 'may_have_sent' then
+    raise exception 'PREDICATE FAILED: delivery send-marker must need a human'; end if;
+  if public.lazywait_requeue_eligibility('failed', null, now()+interval '5m', 5, null, 'delivery') <> 'attempt_limit_reached' then
+    raise exception 'PREDICATE FAILED: delivery attempt ceiling'; end if;
   if public.lazywait_requeue_eligibility('pending', null, now()+interval '5m', 0, null, 'pickup') <> 'not_retryable' then
     raise exception 'PREDICATE FAILED: pending not retryable'; end if;
   raise notice 'PREDICATE OK';

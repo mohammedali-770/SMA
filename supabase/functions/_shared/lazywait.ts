@@ -403,7 +403,24 @@ export interface CreateOrderInput {
    * the order IS rather than instructing the cashier what to collect.
    */
   isComped?: boolean;
+  /**
+   * `orders.address_snapshot` — the delivery destination. Required for a
+   * delivery order and ignored for pickup.
+   *
+   * `latitude`/`longitude` are deliberately NOT part of this type even though
+   * the snapshot carries them: the contract has no coordinate field anywhere
+   * (Q3), so there is nowhere to put them that Lazywait has confirmed.
+   */
+  deliveryAddress?: DeliveryAddressInput | string | null;
 }
+
+/** The subset of `orders.address_snapshot` that can be written to a ticket. */
+export interface DeliveryAddressInput {
+  label?: string | null;
+  description?: string | null;
+  national_short_address?: string | null;
+}
+
 export type BuildResult =
   | { ok: true; payload: Record<string, unknown> }
   | { ok: false; blockedReason: string };
@@ -414,6 +431,45 @@ export type BuildResult =
  * between a label and the `is_paid` financial signal §6 keeps for the owner.
  */
 export const COMP_TICKET_LABEL = '*** COMPLIMENTARY / ضيافة ***';
+
+/**
+ * Prefix for the destination inside `order_details`.
+ *
+ * WHY THE ADDRESS IS WRITTEN TWICE. `delivery_address` is a confirmed contract
+ * field, but nothing confirms the POS *renders* it — that is Q8, and no API
+ * response can answer it. A ticket that reaches the kitchen without a
+ * destination is the worst outcome available here: the food gets made and
+ * nobody knows where it goes. `order_details` is the note field the branch
+ * already reads, so putting the address there too costs one line and removes
+ * that failure mode. If a real ticket shows `delivery_address` rendered, this
+ * duplication can be dropped then — on evidence, not in advance.
+ */
+export const DELIVERY_TICKET_PREFIX = 'التوصيل إلى / DELIVER TO';
+
+/**
+ * One human-readable destination line from the address snapshot.
+ *
+ * Returns null when nothing usable is present, which is what makes
+ * `missing_delivery_address` a block rather than a destination-less ticket.
+ */
+export function formatDeliveryAddress(
+  addr: DeliveryAddressInput | string | null | undefined,
+): string | null {
+  if (!addr) return null;
+  // A caller that already holds one composed line (the typed client) passes a
+  // string; the worker passes the raw snapshot.
+  if (typeof addr === 'string') {
+    const one = addr.trim();
+    return one.length > 0 ? one : null;
+  }
+  // Label first (what the customer calls the place), then the national short
+  // address (the precise, driver-usable code), then free-text directions.
+  const parts = [addr.label, addr.national_short_address, addr.description]
+    .map((v) => (v == null ? '' : String(v).trim()))
+    .filter((v) => v.length > 0);
+  if (!parts.length) return null;
+  return parts.join(' · ');
+}
 
 function trimToNull(v: string | null | undefined): string | null {
   if (v == null) return null;
@@ -666,18 +722,51 @@ export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOr
 }
 
 /**
- * Build the confirmed Create Order body.
+ * Build the Create Order body.
  *
- * Delivery stays BLOCKED: the contract documents a pickup order and says
- * nothing about `order_type: "delivery"`, its `order_status_id`, or the shape of
- * `order_deliveries[]` — so nothing here enables delivery sync.
+ * DELIVERY, enabled 2026-08-27 — using only fields the contract confirms.
+ *
+ * It had been blocked since the integration was written, on the reasoning that
+ * the contract documents a pickup order and says nothing about delivery. That
+ * was too cautious, and a real customer order (SM-2026-000057) died silently
+ * because of it. Re-reading the contract and the vendor's own request sample:
+ *
+ *   * only `client_id`, `branch_id` and a non-empty `order_items` are REQUIRED;
+ *     every other field is optional;
+ *   * `delivery_address` is a confirmed top-level string;
+ *   * `order_deliveries[]` is sent EMPTY on the vendor's own PICKUP sample,
+ *     next to `order_payments[]`, `order_discounts[]` and `order_taxes[]` —
+ *     POS-side collections the caller does not populate. It is not a required
+ *     part of a delivery order, so nothing here invents an element for it.
+ *
+ * What is still unconfirmed is narrow: whether `order_type` accepts the literal
+ * `"delivery"`. It is one string, the endpoint has proven lenient about shape
+ * (our body is flat while the vendor's sample is wrapped in `{ order: … }`, and
+ * pickup has synced in Production for weeks), and a rejection is recorded as a
+ * normal sync failure with the API's own message — which is a better answer
+ * than a hypothetical.
+ *
+ * Money stays absent for delivery exactly as for pickup, including
+ * `order_delivery_fee`: see the money note below (Q9).
  *
  * Returns a blockedReason instead of throwing so the worker can record it.
  */
 export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
-  if (input.orderType !== 'pickup') {
-    // Delivery Create Order schema is not confirmed by Lazywait; do not invent it.
-    return { ok: false, blockedReason: 'delivery_schema_unconfirmed' };
+  const isDelivery = input.orderType === 'delivery';
+  // `public.order_type` is exactly ('pickup','delivery'). Anything else is a
+  // value this builder has never seen, so it blocks rather than guessing.
+  if (input.orderType !== 'pickup' && !isDelivery) {
+    return { ok: false, blockedReason: 'unsupported_order_type' };
+  }
+
+  // A delivery ticket with no destination is worse than no ticket: the food is
+  // made and nobody knows where it goes. Block instead.
+  let deliveryAddress: string | null = null;
+  if (isDelivery) {
+    deliveryAddress = formatDeliveryAddress(input.deliveryAddress);
+    if (!deliveryAddress) {
+      return { ok: false, blockedReason: 'missing_delivery_address' };
+    }
   }
   if (!input.branchId) return { ok: false, blockedReason: 'missing_branch_mapping' };
   if (!input.items.length) return { ok: false, blockedReason: 'no_items' };
@@ -705,7 +794,7 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   const payload: Record<string, unknown> = {
     client_id: input.clientId,
     branch_id: input.branchId,
-    order_type: 'pickup',
+    order_type: isDelivery ? 'delivery' : 'pickup',
     order_items: input.items.map(serializeCreateOrderItem),
     customer_name: input.customerName || 'Guest',
     source: SOURCE,
@@ -716,10 +805,16 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
   // Prefixed rather than appended so it survives a POS display that truncates a
   // long note, and bilingual because the ticket is read in both languages.
   const orderNote = trimToNull(input.orderDetails);
-  const orderDetails = input.isComped
-    ? [COMP_TICKET_LABEL, orderNote].filter(Boolean).join(' — ')
-    : orderNote;
+  const orderDetails = [
+    input.isComped ? COMP_TICKET_LABEL : null,
+    // Duplicated from `delivery_address` on purpose — see DELIVERY_TICKET_PREFIX.
+    deliveryAddress ? `${DELIVERY_TICKET_PREFIX}: ${deliveryAddress}` : null,
+    orderNote,
+  ].filter(Boolean).join(' — ');
   if (orderDetails) payload.order_details = orderDetails;
+
+  // The confirmed contract field. Sent in ADDITION to the note line above.
+  if (deliveryAddress) payload.delivery_address = deliveryAddress;
 
   // CRM link.
   if (input.customerId != null && String(input.customerId) !== '') {

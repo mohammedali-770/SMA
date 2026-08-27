@@ -81,8 +81,21 @@ describe('lazywaitRequeueEligibility (mirror of SQL rule)', () => {
     )).toBe('may_have_sent');
   });
 
-  it('rejects delivery and non-retryable states', () => {
+  it('RETRIES a failed delivery order — it syncs now, so it retries like pickup', () => {
     expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'failed', order_type: 'delivery', pos_sync_deadline_at: future }, NOW))
+      .toBe('requeued');
+  });
+
+  it('refuses the historical rows blocked under the retired reason', () => {
+    // Never attempted, up to a month old, and no deadline to stop them.
+    expect(lazywaitRequeueEligibility({
+      lazywait_sync_state: 'blocked', order_type: 'delivery',
+      sync_blocked_reason: 'delivery_schema_unconfirmed',
+    }, NOW)).toBe('not_retryable');
+  });
+
+  it('rejects non-retryable states', () => {
+    expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'syncing', order_type: 'delivery', pos_sync_deadline_at: future }, NOW))
       .toBe('not_retryable');
     expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'pending', order_type: 'pickup', pos_sync_deadline_at: future }, NOW))
       .toBe('not_retryable');
