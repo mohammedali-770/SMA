@@ -185,10 +185,35 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c).toContain('await p;');
   });
 
-  it('caps the CRM lookup on the kick path but leaves the cron path alone', () => {
+  it('DEFERS the CRM lookup on the kick path, and does not drop it', () => {
     const c = code('lazywait-sync');
-    expect(c).toContain('CRM_SEARCH_TIMEOUT_MS_TARGETED');
-    expect(c).toMatch(/timeoutMs:\s*targeted\s*\?\s*CRM_SEARCH_TIMEOUT_MS_TARGETED\s*:\s*8000/);
+    // Capping it at 1.5 s was not enough: on SM-2026-000067 it spent the whole
+    // cap and still returned nothing. It is now off the awaited path entirely.
+    expect(c).not.toContain('CRM_SEARCH_TIMEOUT_MS_TARGETED');
+    expect(c).toContain('crmBackfills');
+    expect(c).toMatch(/if \(targeted\) \{\s*crmBackfills\.push\(refreshCrmLink\);/);
+  });
+
+  it('still RUNS the CRM refresh, because the cron would never run it', () => {
+    const c = code('lazywait-sync');
+    // The cron claims nothing now that the kick syncs every order on placement
+    // (every observed tick reports claimed: 0), so a search moved to the cron
+    // path would never execute and profiles.lazywait_customer_id would stay
+    // null for ever. The deferred call is what keeps the feature alive.
+    expect(c).toContain('/crm/customers/search');
+    const drain = c.indexOf('dispatchPendingPosSync(admin)');
+    const loop = c.indexOf('for (const backfill of crmBackfills)');
+    expect(loop).toBeGreaterThan(-1);
+    // Runs after the push, inside the same deferred block.
+    expect(loop).toBeGreaterThan(drain);
+  });
+
+  it('keeps the full 8 s inline search on the untargeted (cron) path', () => {
+    const c = code('lazywait-sync');
+    // Where nothing is waiting, a fresh match should still supersede the stored
+    // link on the ticket being built.
+    expect(c).toMatch(/crmCustomerId = String\(match\.id\);/);
+    expect(c).not.toContain('timeoutMs: targeted');
   });
 
   it('issues the three per-order reads concurrently', () => {

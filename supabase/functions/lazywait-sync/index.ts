@@ -133,6 +133,10 @@ Deno.serve(async (req: Request) => {
   // Ordering is safe because everything the reaper decides is time-thresholded
   // (STALE_SYNC_TIMEOUT_MINUTES = 10), not event-driven: nothing it would act on
   // can have become stale during this invocation.
+  // CRM link refreshes to run AFTER the response, on the targeted path. See the
+  // note at the search itself for why this is deferred rather than dropped.
+  const crmBackfills: Array<() => Promise<void>> = [];
+
   let reaped: Record<string, unknown> = {
     recovered_synced: 0, requeued: 0, dead_lettered: 0, confirmation_required: 0, deadline_failed: 0,
   };
@@ -242,32 +246,64 @@ Deno.serve(async (req: Request) => {
       let crmCustomerId: string | null =
         (profileRow?.data as { lazywait_customer_id?: string | null } | null)?.lazywait_customer_id ?? null;
       const phone = normalizePhone(order.customer_phone as string | null);
-      if (phone && order.customer_id) {
-        try {
-          // TIGHT budget on the kick path. This lookup measured 3.47 s on
-          // SM-2026-000065 and 3.68 s on -000064 — larger than the POS call
-          // itself — and returned nothing both times, because
-          // profiles.lazywait_customer_id has never been populated for anybody
-          // (0 of 10 rows). Its 8 s ceiling alone exceeded most of
-          // order-intake's whole budget, so one slow CRM response could spend
-          // the entire window and the customer would get no POS number for an
-          // order that synced perfectly.
-          //
-          // It also sits BEFORE begin_lazywait_create_attempt, so every
-          // millisecond it burns is deadline budget spent before the gate
-          // re-checks pos_sync_deadline_at — capping it is safety-positive, not
-          // just faster. The stored link is still read and used; only the
-          // refresh is time-boxed, and the cron path keeps the full 8 s.
-          const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
-            method: 'GET', path: '/crm/customers/search', query: { query: phone },
-            timeoutMs: targeted ? CRM_SEARCH_TIMEOUT_MS_TARGETED : 8000,
-          });
-          const match = Array.isArray(crm.data) ? crm.data[0] : null;
-          if (crm.ok && match?.id) {
-            crmCustomerId = String(match.id);
-            await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', order.customer_id);
-          }
-        } catch { /* CRM match is optional; ignore */ }
+      const customerId = order.customer_id as string | null;
+      if (phone && customerId) {
+        // ---- The CRM search is DEFERRED on the kick path, not dropped ------
+        //
+        // It is the single most expensive thing the customer was waiting for:
+        // 3.47 s on SM-2026-000065, 3.68 s on -000064, and after being capped
+        // at 1.5 s it spent the ENTIRE cap and still returned nothing on -067.
+        // It has never once succeeded — `profiles.lazywait_customer_id` is null
+        // for all 10 profiles — so on today's data it is 1.5 s of guaranteed
+        // waiting for a value that is guaranteed not to arrive.
+        //
+        // WHY NOT SIMPLY MOVE IT TO THE CRON PATH. Because the cron never
+        // claims anything: the kick now syncs every order the moment it is
+        // placed, and every observed tick reports `claimed: 0`. A search that
+        // only runs on the cron path would therefore never run at all, and the
+        // link would stay null for ever — turning a latency fix into a silent
+        // feature removal.
+        //
+        // Deferring keeps both properties. THIS ticket uses whatever link is
+        // already stored (none, today), and the refresh runs after the response
+        // so the NEXT order for the same customer can carry `customer_id`. The
+        // link is a nice-to-have on the ticket; the customer's order number is
+        // not.
+        //
+        // It also sits before `begin_lazywait_create_attempt`, so every
+        // millisecond it burned was deadline budget spent before that gate
+        // re-checks `pos_sync_deadline_at`. Taking it off the path is
+        // safety-positive as well as faster.
+        const refreshCrmLink = async () => {
+          try {
+            const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
+              method: 'GET', path: '/crm/customers/search', query: { query: phone },
+              timeoutMs: 8000,
+            });
+            const match = Array.isArray(crm.data) ? crm.data[0] : null;
+            if (crm.ok && match?.id) {
+              await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', customerId);
+            }
+          } catch { /* CRM match is optional; ignore */ }
+        };
+
+        if (targeted) {
+          crmBackfills.push(refreshCrmLink);
+        } else {
+          // Cron path: nothing is waiting, so keep the original inline search
+          // AND let a fresh match supersede the stored link on this ticket.
+          try {
+            const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
+              method: 'GET', path: '/crm/customers/search', query: { query: phone },
+              timeoutMs: 8000,
+            });
+            const match = Array.isArray(crm.data) ? crm.data[0] : null;
+            if (crm.ok && match?.id) {
+              crmCustomerId = String(match.id);
+              await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', customerId);
+            }
+          } catch { /* CRM match is optional; ignore */ }
+        }
       }
 
       // ---- Build the confirmed Create Order payload ------------------------
@@ -632,7 +668,12 @@ Deno.serve(async (req: Request) => {
   // isolate is torn down before the claim commits, the row is still 'pending'
   // and the next cron tick takes it — delayed, never dropped.
   let notified: unknown = { found: 0, dispatched: 0 };
-  await runOffPath(async () => { notified = await dispatchPendingPosSync(admin); });
+  await runOffPath(async () => {
+    notified = await dispatchPendingPosSync(admin);
+    // After the push, because a customer waiting to hear their order reached
+    // the kitchen matters more than a CRM link nobody sees.
+    for (const backfill of crmBackfills) await backfill();
+  });
 
   return json({ status: 'ok', ...summary, reaped, notified, targeted }, 200);
 });
@@ -643,16 +684,6 @@ Deno.serve(async (req: Request) => {
  * takes the rest.
  */
 const POS_NOTIFY_DRAIN_LIMIT = 20;
-
-/**
- * CRM customer-search budget on the TARGETED (checkout kick) path only.
- *
- * The cron path keeps the original 8 s: nothing is waiting on it there, and a
- * slow CRM should still get its chance to establish the link. On the kick path
- * a customer is watching a spinner, and the lookup is best-effort enrichment —
- * the ticket is complete without it.
- */
-const CRM_SEARCH_TIMEOUT_MS_TARGETED = 1500;
 
 /**
  * Send the queued customer messages about what happened at the POS.

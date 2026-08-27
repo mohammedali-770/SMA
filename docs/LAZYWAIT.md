@@ -828,7 +828,23 @@ blocks the order (no match → continue). No Create-Customer endpoint is confirm
 — we don't create Lazywait customers, and `customer_id`/`customer_cell` are NOT
 sent to Create Order.
 
-**Time-boxed to 1.5 s on the checkout kick, 8 s on the cron (2026-08-27).** This
+**DEFERRED off the checkout kick entirely (2026-08-27, second revision).**
+Capping it at 1.5 s was not enough: on SM-2026-000067 the search spent the
+**whole cap** and still returned nothing, so the customer waited 1.5 s for a
+value that could not arrive. It now runs AFTER the response on the kick path,
+alongside the push drain, and keeps its full inline 8 s on the cron path.
+
+**It was deferred rather than deleted, and that distinction is the whole
+design.** Moving it "to the cron path" would have looked equivalent and been a
+silent feature removal: the kick now syncs every order the moment it is placed,
+so every observed cron tick reports `claimed: 0` — a search that only ran there
+would never run at all, and `profiles.lazywait_customer_id` would stay null for
+ever. Deferring keeps the backfill alive, so the NEXT order for that customer
+can carry `customer_id`, while THIS ticket simply uses whatever link is already
+stored. The link is a nice-to-have on the ticket; the order number is not.
+
+The superseded first attempt, kept because the measurements are the argument:
+**time-boxed to 1.5 s on the checkout kick, 8 s on the cron.** This
 lookup measured **3.47 s** on SM-2026-000065 and 3.68 s on -000064 — larger than
 the `POST /pos/orders/create` call itself — and returned nothing both times. It
 cannot yet do otherwise: `profiles.lazywait_customer_id` has never been populated
@@ -857,7 +873,7 @@ does before returning.
 | Claim | `claim_lazywait_sync_one` | `claim_lazywait_sync_batch` |
 | `reap_stale_lazywait_syncs` | runs, **deferred** past the response | runs, awaited |
 | Notification drain | runs, **deferred** past the response | runs, awaited |
-| CRM search budget | 1.5 s | 8 s |
+| CRM search | **deferred past the response** (8 s there) | 8 s, inline |
 
 Untargeted is byte-for-byte the old behaviour. Targeted exists because the kick
 used to send `{limit: 5}`, and `claim_lazywait_sync_batch` orders by `created_at`
