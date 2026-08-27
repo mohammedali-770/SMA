@@ -35,6 +35,14 @@
 -- Ids not present in p_ids are left untouched rather than pushed to the end:
 -- a partial list is treated as "reorder these", not "delete the rest from the
 -- ordering". Callers send the whole list.
+--
+-- ASYMMETRY WITH reorder_products, deliberate rather than an oversight.
+-- reorder_products REFUSES a partial list, because a product moved into a
+-- category carries an arbitrary inherited rank and lands silently mid-list. A
+-- category created concurrently instead takes the column default 0, so it sorts
+-- to the FRONT, where it is immediately visible and one click from correct.
+-- Categories are also a handful of rows changed rarely, by one person. If that
+-- stops being true, make this symmetric with reorder_products.
 create or replace function public.reorder_categories(p_ids uuid[])
 returns void
 language plpgsql
@@ -89,20 +97,32 @@ as $$
 declare
   v_matched int;
   v_sent    int;
+  v_total   int;
 begin
   if not public.is_admin() then
     raise exception 'admin_required' using errcode = '42501';
   end if;
 
-  if p_category_id is null or p_ids is null or array_length(p_ids, 1) is null then
+  if p_category_id is null or p_ids is null then
     return;
   end if;
 
-  v_sent := (select count(*) from unnest(p_ids) x);
+  v_sent := coalesce(array_length(p_ids, 1), 0);
 
   if v_sent <> (select count(distinct x) from unnest(p_ids) x) then
     raise exception 'duplicate_ids' using errcode = '22023';
   end if;
+
+  -- Lock the category's rows for the rest of this transaction BEFORE counting.
+  -- Without it, a concurrent insert or a product moved into this category
+  -- between the count and the update would slip past both checks below.
+  perform 1 from public.products
+   where category_id = p_category_id
+   for update;
+
+  select count(*) into v_total
+    from public.products
+   where category_id = p_category_id;
 
   -- Fail LOUDLY when an id does not belong to this category, rather than
   -- silently reordering the subset that does. A mismatch means the dashboard's
@@ -116,6 +136,22 @@ begin
 
   if v_matched <> v_sent then
     raise exception 'ids_not_in_category' using errcode = '22023';
+  end if;
+
+  -- The array must be the COMPLETE membership, not merely a valid subset.
+  -- Checking only that every id belongs here is not enough: if another
+  -- administrator moves a product INTO this category after this dashboard
+  -- loaded, a stale reorder renumbers the rows it knows about while the moved
+  -- product keeps the rank it inherited from its old category — so two products
+  -- collide on one rank and the displayed sequence is decided by the name
+  -- tie-break rather than by anybody's intent. Refusing sends the administrator
+  -- back for a reload, which is the only way to order a list they can see.
+  if v_sent <> v_total then
+    raise exception 'incomplete_order' using errcode = '22023';
+  end if;
+
+  if v_sent = 0 then
+    return;  -- an empty category, correctly described by an empty array
   end if;
 
   update public.products p

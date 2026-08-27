@@ -90,6 +90,11 @@ export const MenuManagementPanel: React.FC = () => {
   // Upload state for the product photo. `prodImg` stays the single source of
   // truth for what gets saved — an upload just fills it in, so a hand-pasted
   // URL and an uploaded one are indistinguishable downstream.
+  // The image_url the product row ACTUALLY holds right now, captured when the
+  // modal opens. Deleting a stored object is only safe once the row has stopped
+  // pointing at it, so nothing is deleted until a save succeeds — see
+  // handleSaveProduct and closeProductModal.
+  const [persistedImg, setPersistedImg] = useState('');
   const [imgUploading, setImgUploading] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
   const imgFileRef = useRef<HTMLInputElement>(null);
@@ -170,7 +175,17 @@ export const MenuManagementPanel: React.FC = () => {
       addProduct(pData);
     }
 
+    // Only NOW is it safe to retire the old object: the row has been told to
+    // point somewhere else. Ordered this way round because the failure that
+    // matters is a live product referencing a deleted file — an orphaned file
+    // costs a few kilobytes and nothing else. removeByUrl is a no-op for a URL
+    // this bucket did not produce, so a hand-pasted external link is untouched.
+    if (persistedImg && persistedImg !== pData.imageUrl) {
+      void productImageApi.removeByUrl(persistedImg);
+    }
+
     setEditingProduct(null);
+    setPersistedImg('');
     setProdNameEn('');
     setProdNameAr('');
     setProdDescEn('');
@@ -178,6 +193,19 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice('30.00');
     setProdCalories('500');
     setProdCatId('');
+    setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
+    setIsProductModalOpen(false);
+  };
+
+  /**
+   * Abandoning the modal: the row was never told about the new object, so the
+   * NEWLY UPLOADED one is the orphan and the persisted one must survive
+   * untouched. This is the mirror of handleSaveProduct's cleanup, and the two
+   * together mean exactly one of the pair is ever deleted.
+   */
+  const closeProductModal = () => {
+    if (prodImg && prodImg !== persistedImg) void productImageApi.removeByUrl(prodImg);
+    setPersistedImg('');
     setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(false);
   };
@@ -191,7 +219,8 @@ export const MenuManagementPanel: React.FC = () => {
     setProdPrice(p.price.toString());
     setProdCalories(p.calories.toString());
     setProdCatId(p.categoryId);
-    setProdImg(p.imageUrl); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
+    setProdImg(p.imageUrl); setPersistedImg(p.imageUrl);
+    setImgError(null); if (imgFileRef.current) imgFileRef.current.value = '';
     setIsProductModalOpen(true);
   };
 
@@ -245,15 +274,13 @@ export const MenuManagementPanel: React.FC = () => {
       return;
     }
     setImgUploading(true);
-    const previous = prodImg;
     try {
       const { publicUrl } = await productImageApi.upload(file);
+      // Fill the field and STOP. Nothing is deleted here: the product row still
+      // points at the old object until the administrator saves, so deleting it
+      // now would leave the live menu referencing a file that no longer exists
+      // if they then press Escape, close the modal, or the save fails.
       setProdImg(publicUrl);
-      // Clean up the object this product used to point at, but ONLY if we
-      // produced it. An external URL is left alone — it is not ours to delete.
-      // Deliberately after the new URL is in hand, so a failed upload never
-      // destroys the image still on the row.
-      void productImageApi.removeByUrl(previous);
     } catch (err) {
       setImgError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -380,7 +407,7 @@ export const MenuManagementPanel: React.FC = () => {
               <Text variant="heading" as="h3">{t.products_tab}</Text>
               <Button
                 label={t.add_prod_btn}
-                onClick={() => { setEditingProduct(null); setIsProductModalOpen(true); }}
+                onClick={() => { setEditingProduct(null); setPersistedImg(''); setIsProductModalOpen(true); }}
                 disabled={isAccountant}
                 leading={<Plus className="size-4" aria-hidden="true" />}
               />
@@ -727,7 +754,7 @@ export const MenuManagementPanel: React.FC = () => {
         <AdminModal
           title={editingProduct ? 'Edit Menu Product' : 'Create Menu Product'}
           isRTL={isRTL}
-          onClose={() => setIsProductModalOpen(false)}
+          onClose={closeProductModal}
         >
           <form onSubmit={handleSaveProduct} className="space-y-3">
             <div className="grid grid-cols-2 gap-2.5">
@@ -798,7 +825,7 @@ export const MenuManagementPanel: React.FC = () => {
               {prodImg && (
                 <button
                   type="button"
-                  onClick={() => { const was = prodImg; setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = ''; void productImageApi.removeByUrl(was); }}
+                  onClick={() => { setProdImg(''); setImgError(null); if (imgFileRef.current) imgFileRef.current.value = ''; }}
                   className="self-start text-[13px] font-semibold text-con-text-2 underline"
                 >
                   {isRTL ? 'إزالة الصورة' : 'Remove image'}

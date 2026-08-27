@@ -231,8 +231,20 @@ end $$;
 select public.reorder_categories(null);
 select public.reorder_categories(array[]::uuid[]);
 select public.reorder_products('c0000000-0000-0000-0000-0000000000a1'::uuid, null);
-select public.reorder_products('c0000000-0000-0000-0000-0000000000a1'::uuid, array[]::uuid[]);
 select public.reorder_products(null, array['d0000000-0000-0000-0000-0000000000a1']::uuid[]);
+
+-- An EMPTY array for a category that HAS products is not a no-op: it is the
+-- most extreme incomplete list, and it is refused like any other.
+do $$
+begin
+  perform public.reorder_products('c0000000-0000-0000-0000-0000000000a1'::uuid, array[]::uuid[]);
+  raise exception 'FAIL 7: an empty array was accepted for a NON-empty category';
+exception
+  when others then
+    if sqlstate <> '22023' then
+      raise exception 'FAIL 7: wrong error for an empty array: % (%)', sqlerrm, sqlstate;
+    end if;
+end $$;
 
 do $$
 declare v_got text;
@@ -273,6 +285,69 @@ begin
   end if;
   if not has_function_privilege('authenticated', 'public.reorder_categories(uuid[])', 'execute') then
     raise exception 'FAIL 9: authenticated cannot execute reorder_categories';
+  end if;
+end $$;
+
+-- ---- 10. A VALID BUT INCOMPLETE list is refused ----------------------------
+-- Every id below genuinely belongs to the category, so the ids_not_in_category
+-- check passes. That is exactly the hole this case closes: if another
+-- administrator moves a product INTO the category after this dashboard loaded,
+-- renumbering only the known rows leaves the moved product holding an inherited
+-- rank that COLLIDES with them, and the displayed order is then decided by the
+-- name tie-break rather than by anybody's intent.
+do $$
+begin
+  perform public.reorder_products(
+    'c0000000-0000-0000-0000-0000000000a1'::uuid,
+    array['d0000000-0000-0000-0000-0000000000a1',
+          'd0000000-0000-0000-0000-0000000000a2']::uuid[]);  -- 2 of the category's 3
+  raise exception 'FAIL 10: an incomplete list was accepted';
+exception
+  when others then
+    if sqlstate <> '22023' then
+      raise exception 'FAIL 10: wrong error for an incomplete list: % (%)', sqlerrm, sqlstate;
+    end if;
+end $$;
+
+-- Nothing was written by the refused call.
+do $$
+declare v_got text;
+begin
+  select string_agg(name_en || '=' || sort_order, ',' order by sort_order)
+    into v_got from public.products
+   where category_id = 'c0000000-0000-0000-0000-0000000000a1'::uuid;
+  if v_got <> 'Cheese fries=1,Fries=2,Wings=3' then
+    raise exception 'FAIL 10: the refused call still wrote (%)', v_got;
+  end if;
+end $$;
+
+-- ---- 11. The COMPLETE list still works after a product joins the category ---
+-- The counterpart to case 10: once the administrator reloads and sends all
+-- four, the reorder is accepted and every rank is distinct.
+update public.products
+   set category_id = 'c0000000-0000-0000-0000-0000000000a1'::uuid
+ where id = 'd0000000-0000-0000-0000-0000000000b1'::uuid;
+
+select public.reorder_products(
+  'c0000000-0000-0000-0000-0000000000a1'::uuid,
+  array['d0000000-0000-0000-0000-0000000000b1',
+        'd0000000-0000-0000-0000-0000000000a3',
+        'd0000000-0000-0000-0000-0000000000a1',
+        'd0000000-0000-0000-0000-0000000000a2']::uuid[]);
+
+do $$
+declare v_got text; v_distinct int; v_n int;
+begin
+  select string_agg(name_en || '=' || sort_order, ',' order by sort_order),
+         count(distinct sort_order), count(*)
+    into v_got, v_distinct, v_n
+    from public.products
+   where category_id = 'c0000000-0000-0000-0000-0000000000a1'::uuid;
+  if v_got <> 'Burger=1,Cheese fries=2,Fries=3,Wings=4' then
+    raise exception 'FAIL 11: expected Burger=1,Cheese fries=2,Fries=3,Wings=4 got %', v_got;
+  end if;
+  if v_distinct <> v_n then
+    raise exception 'FAIL 11: % rows share only % distinct ranks', v_n, v_distinct;
   end if;
 end $$;
 
