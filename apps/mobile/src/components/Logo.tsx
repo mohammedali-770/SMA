@@ -18,6 +18,16 @@ interface Props {
   /** Mark only, 30px — for dense headers. */
   compact?: boolean;
   /**
+   * Mark only, 64px — for a centred hero that is not the whole screen.
+   *
+   * The order-confirmation screen used `compact` and looked like a mistake: a
+   * 30px mark, alone and centred above a 72px order number, reads as a stray
+   * icon rather than a brand. This is that screen's real size. It stays well
+   * under `stacked`'s 104px because the number, not the mark, is what the
+   * customer holds across a counter.
+   */
+  hero?: boolean;
+  /**
    * Centred hero lockup: large mark over the wordmark and "Since 1997".
    *
    * Deliberately the SAME three elements, in the same order, as the launch
@@ -28,7 +38,7 @@ interface Props {
   stacked?: boolean;
 }
 
-export function Logo({ compact = false, stacked = false }: Props) {
+export function Logo({ compact = false, stacked = false, hero = false }: Props) {
   const styles = useStyles();
   const { pick } = useI18n();
 
@@ -46,8 +56,8 @@ export function Logo({ compact = false, stacked = false }: Props) {
 
   return (
     <View style={styles.row}>
-      <Image source={MARK} style={compact ? styles.markSm : styles.mark} contentFit="contain" />
-      {!compact && (
+      <Image source={MARK} style={hero ? styles.markLg : compact ? styles.markSm : styles.mark} contentFit="contain" />
+      {!compact && !hero && (
         <View>
           <Text variant="title">Spicy Meal</Text>
           <Text variant="caption" tone="ember">سبايسي ميل</Text>
@@ -62,6 +72,7 @@ const useStyles = makeStyles(() => ({
   // No corner radius: the mark is transparent now, so there is no tile to round.
   mark: { width: 40, height: 40 },
   markSm: { width: 30, height: 30 },
+  markLg: { width: 64, height: 64 },
   // The hero mark carries the login screen on its own — there is no headline
   // beside it to share the weight with, which is what buys it this size.
   markXl: { width: 104, height: 104 },

@@ -542,9 +542,23 @@ undo it.
 
 | Element | Why |
 | --- | --- |
-| Brand lockup at the top | The cashier is handed a stranger's phone; they need to see whose order this is before reading anything else. |
+| Brand mark at the top, **64 px** (`<Logo hero />`) | The cashier is handed a stranger's phone; they need to see whose order this is before reading anything else. |
 | Branch order number, very large, in its own card | The one thing the screen is for. Forced **LTR** so a two-digit number can never render reversed in an Arabic layout. |
 | Order state as a compact pill | Reassurance, not the headline. Once the number is visible the customer already has what they came for. |
+
+### The mark's size is load-bearing, not decoration
+
+Until 2026-08-27 this used `<Logo compact />` — the **30 px** variant documented
+as "mark only, for dense headers". This screen is not a dense header: the mark
+sits alone and centred above a 72 px order number, and at 30 px it read as a
+stray icon rather than as the brand identifying the order. That defeats the
+first row of the table above, which is the only reason the mark is on the screen
+at all.
+
+It now uses a `hero` variant at **64 px**: unmistakably the brand, and
+deliberately well under the login screen's 104 px `stacked` mark, which is sized
+to carry a screen on its own. Here the **number** must stay the largest thing in
+view — so if these two ever need to move, they move in opposite directions.
 
 ### The number is shown VERBATIM
 

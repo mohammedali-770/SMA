@@ -29,8 +29,11 @@ export function ConfirmationHero({order,onResend,resending,resendError}:{order:O
   // Whatever the POS returns is what appears here, unaltered.
   const branchNumber=orderDisplayNumber(order);
   return <View style={styles.wrap} accessible accessibilityLiveRegion="polite" accessibilityLabel={[p.showBranchNumber?`${t('oc_branch_order_number')} ${branchNumber??t('oc_number_pending')}`:null,t(p.titleKey),body].filter(Boolean).join('. ')}>
-    {/* The cashier is handed a phone: they need to see WHOSE order this is. */}
-    <Logo compact />
+    {/* The cashier is handed a phone: they need to see WHOSE order this is —
+        which is why this is `hero` (64px) and not `compact` (30px, sized for a
+        dense header). At 30px, alone above a 72px number, it read as a stray
+        icon rather than the brand identifying the order. */}
+    <Logo hero />
 
     {/* THE thing this screen exists to show across a counter. Always LTR so a
         two-digit number can never render reversed in an Arabic layout.

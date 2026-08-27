@@ -1,7 +1,13 @@
 /**
- * Homepage promotional banners — shown BELOW the branch selector and ABOVE the
- * search bar. Self-contained: it fetches its own data (RLS returns only active,
- * in-window rows) so a slow/failed banner fetch never blocks menu rendering.
+ * Homepage promotional banners. Self-contained: it fetches its own data (RLS
+ * returns only active, in-window rows) so a slow/failed banner fetch never
+ * blocks menu rendering.
+ *
+ * POSITION CHANGED 2026-08-27. It used to sit BELOW the branch selector and
+ * ABOVE the search bar, as fixed chrome. Between that and the pinned search +
+ * category chips, roughly three menu items fit on a phone — the menu was a
+ * letterbox. It is now the SCROLLING list's header, so it is on screen at rest
+ * and gets out of the way the moment the customer scrolls.
  *
  *  - 0 active banners  -> renders nothing (the area collapses; search moves up).
  *  - 1 active banner   -> a single static banner.
@@ -24,7 +30,11 @@ import { makeStyles } from '../../theme/makeStyles';
 const ROTATE_MS = 4000;
 const RATIO = 6 / 16; // height = width * 6/16 (~2.67:1) — short banner.
 
-export function BannerCarousel() {
+export function BannerCarousel({ inset = true }: { /**
+   * Apply the component's own horizontal margin. Pass `false` when the parent
+   * already pads (e.g. a list `contentContainerStyle`), or the inset doubles.
+   */
+  inset?: boolean } = {}) {
   const styles = useStyles();
   const [banners, setBanners] = useState<HomeBanner[]>([]);
   const [failed, setFailed] = useState<Record<string, true>>({});
@@ -89,7 +99,7 @@ export function BannerCarousel() {
   };
 
   return (
-    <View style={styles.wrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View style={inset ? styles.wrap : styles.wrapFlush} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {width > 0 && (
         <View style={[styles.frame, { height }]}>
           {count === 1 ? (
@@ -144,6 +154,8 @@ function BannerImage({
 
 const useStyles = makeStyles((colors) => ({
   wrap: { marginHorizontal: space.s4, marginTop: space.s3 },
+  // Parent already pads horizontally; keep only the vertical rhythm.
+  wrapFlush: { marginBottom: space.s4 },
   frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.appSurface2, width: '100%' },
   dots: { position: 'absolute', bottom: space.s2, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
