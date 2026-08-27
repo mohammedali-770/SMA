@@ -86,7 +86,20 @@ Deno.serve(async (req: Request) => {
         await fetch(`${url}/functions/v1/lazywait-sync`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: anon, 'x-sync-secret': secret },
-          body: JSON.stringify({ limit: 5 }),
+          // TARGETED: sync THIS order, not "up to five, oldest first".
+          //
+          // claim_lazywait_sync_batch orders by created_at ASC, and the worker
+          // processes serially, so the customer's brand-new order was the LAST
+          // of whatever the batch claimed — their checkout blocked while other
+          // people's orders were sent to the POS. On SM-2026-000065 the awaited
+          // call took 10.747 s against the 11 s abort below; on -000064 the
+          // abort appears to have fired and the order number arrived by luck.
+          //
+          // The id is server-derived: it comes from place_customer_order's
+          // return, not from the request body, so a client cannot name somebody
+          // else's order. Draining the rest of the queue was never this
+          // function's job — the once-a-minute cron owns that.
+          body: JSON.stringify({ orderId }),
           signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
         });
       }

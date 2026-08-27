@@ -104,3 +104,102 @@ describe('lazywait-sync — dispatches the POS lifecycle messages', () => {
     expect(CODE).toContain("p_notify_status: 'pos_confirmed'");
   });
 });
+
+/**
+ * THE KICK IS TARGETED, AND THE WORK THE CUSTOMER IS NOT WAITING FOR IS
+ * DEFERRED RATHER THAN DROPPED (added 2026-08-27).
+ *
+ * The defect: order-intake kicked the worker with `{limit: 5}`, and
+ * `claim_lazywait_sync_batch` orders by created_at ASC while the worker
+ * processes serially — so the customer's brand-new order was handled LAST of
+ * whatever the batch claimed. Measured on SM-2026-000065 the awaited call took
+ * 10.747 s against an 11 s abort (253 ms of headroom); on -000064 the abort
+ * appears to have fired and the branch number arrived by luck.
+ *
+ * The case worth reading twice is "the reaper is still CALLED". Skipping it on
+ * the kick path saves the same ~0.9 s as deferring it and is the obvious
+ * shortcut, but `reap_stale_lazywait_syncs` has exactly one production caller —
+ * this worker — so the cron and this kick are also its only two reaping
+ * drivers, and they do not share a failure mode. Deleting the redundant one
+ * would let a single missing vault secret stop all reaping, and a cash order
+ * stranded in 'syncing' with no ref is invisible to the watchdog as well (R1 and
+ * R7 both require payment_status = 'paid'). Deferring costs nothing and keeps
+ * both alive.
+ */
+describe('targeted kick and deferred off-path work', () => {
+  it('order-intake asks for ONE named order, not a batch', () => {
+    const c = code('order-intake');
+    expect(c).toContain('JSON.stringify({ orderId })');
+    expect(c).not.toContain('limit: 5');
+  });
+
+  it('the id it sends is server-derived, never taken from the request body', () => {
+    const c = code('order-intake');
+    // `orderId` is derived from place_customer_order's return and validated
+    // before the kick; a client-supplied id would let one customer name
+    // another's order.
+    expect(c).toMatch(/const orderId = order\?\.id \? String\(order\.id\) : null;/);
+    expect(c).toContain("if (!orderId) return json(");
+    expect(c).not.toMatch(/orderId\s*[:=]\s*body\./);
+  });
+
+  it('the worker claims ONE order when targeted and keeps the batch path', () => {
+    const c = code('lazywait-sync');
+    expect(c).toContain("claim_lazywait_sync_one");
+    expect(c).toContain("claim_lazywait_sync_batch");
+    // The narrow 'pending'-only predicate was set deliberately by
+    // 20260813143000_manual_only_pos_resend; the worker must not reintroduce a
+    // 'failed' claim by calling some other RPC.
+    expect(c).not.toContain("claim_lazywait_sync_failed");
+  });
+
+  it('STILL CALLS the reaper — deferred, never skipped', () => {
+    const c = code('lazywait-sync');
+    expect(c).toContain('reap_stale_lazywait_syncs');
+    // And it must sit INSIDE the off-path wrapper. Positional rather than a
+    // negative regex: the tempting shortcut is `if (!targeted) { ...reap... }`,
+    // which still contains the RPC name, so presence alone proves nothing.
+    const reap = c.indexOf('reap_stale_lazywait_syncs');
+    const wrap = c.indexOf('runOffPath(async () => {');
+    expect(wrap).toBeGreaterThan(-1);
+    expect(wrap).toBeLessThan(reap);
+    // Nothing between the wrapper and the RPC may reintroduce a skip.
+    expect(c.slice(wrap, reap)).not.toContain('targeted');
+  });
+
+  it('defers the reaper and the push drain through one guarded helper', () => {
+    const c = code('lazywait-sync');
+    expect(c).toContain('runOffPath');
+    expect(c).toContain('EdgeRuntime');
+    expect(c).toContain('waitUntil');
+    // Both off-path jobs go through it. The regex matches INVOCATIONS only —
+    // the declaration is `const runOffPath = async (`, which it does not match —
+    // so this is exactly the two call sites: the reaper and the push drain.
+    const calls = c.match(/(?<!const )runOffPath\(/g) ?? [];
+    expect(calls).toHaveLength(2);
+  });
+
+  it('the deferral degrades to awaiting, never to skipping', () => {
+    const c = code('lazywait-sync');
+    // On a runtime without EdgeRuntime.waitUntil the work must still run.
+    expect(c).toContain('await p;');
+  });
+
+  it('caps the CRM lookup on the kick path but leaves the cron path alone', () => {
+    const c = code('lazywait-sync');
+    expect(c).toContain('CRM_SEARCH_TIMEOUT_MS_TARGETED');
+    expect(c).toMatch(/timeoutMs:\s*targeted\s*\?\s*CRM_SEARCH_TIMEOUT_MS_TARGETED\s*:\s*8000/);
+  });
+
+  it('issues the three per-order reads concurrently', () => {
+    const c = code('lazywait-sync');
+    expect(c).toMatch(/await Promise\.all\(\[\s*admin\.from\('branches'\)/);
+  });
+
+  it('order-intake still bounds the kick and still sends the secret', () => {
+    // Unchanged guarantees — the targeting must not have loosened either.
+    const c = code('order-intake');
+    expect(c).toContain('AbortSignal.timeout(SYNC_TIMEOUT_MS)');
+    expect(c).toContain("'x-sync-secret'");
+  });
+});
