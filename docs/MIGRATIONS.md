@@ -450,11 +450,11 @@ production.
 | 71 | 20260827120000 | lazywait_delivery_sync | — | 20260827082634 | lazywait_delivery_sync | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 08:26:34 UTC** on explicit owner approval, via MCP `apply_migration`. Opens the POS gate for delivery orders. Redefines four functions: `set_lazywait_initial_sync` (drops the branch that parked EVERY delivery order at `blocked`/`delivery_schema_unconfirmed` on INSERT — the reason SM-2026-000057 died with `sync_attempt_count = 0` while the customer was pushed "we sent it to the kitchen"); `lazywait_requeue_eligibility` (6-arg dropped, 7-arg created with `p_blocked_reason text default null`, refusing the now-retired `delivery_schema_unconfirmed` so three stale legacy rows — one 1 month 2 days old, all with `pos_sync_deadline_at` NULL — could not be swept into Retry); `requeue_lazywait_order` (passes the reason through); and `confirm_order_payment` (drops `order_type = 'pickup'` from both release clauses, which was a THIRD instance of the same filter and would have kept paid online deliveries out of the queue even with the trigger open). **The money path was verified, not assumed**: `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash identically before and after. Moyasar re-verified absent (0 functions, 0 rows, `provider_name` still `tap`, disabled). Paired with the `lazywait-sync` **v6** deploy the same day — the two are halves of one change: the migration alone admits a delivery order to a queue whose worker still refuses it, which is exactly what stranded SM-2026-000058 in the 40-second gap. Proven live by **SM-2026-000059**: POS ticket #3 at 10:15 UTC, 42 s end-to-end, first attempt, `success: true`. Covered by `lazywait_delivery_sync_test.sql` (8 cases; case 1 and case 6 verified failing against the pre-fix bodies). **Version NOT aligned** (§9-D). |
 | 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **70 repository / 71 live** rows.
+Reconciliation check: the rows above detail **72 repository / 73 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–70
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–72
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they were the most recent applications at the time (2026-08-25 and
 2026-08-26, §32 and §33), 62–63 because they are the applications of
@@ -466,6 +466,13 @@ morning, 65–67 because they are the comped-customer application of
 application of 2026-08-27 06:36–06:40 UTC (§36). Rows 65–67 were likewise listed
 as NOT APPLIED between the merge of PR #269 and the owner approving them, and
 rows 68–70 between the merge of PR #272 and the owner approving those.
+
+Rows **71–72** continue the same pattern and are the deliveries-to-POS work of
+2026-08-27: 71 is `lazywait_delivery_sync`, applied 08:26:34 UTC (§37), which
+opened the POS gate for delivery orders; 72 is `watchdog_delivery_coverage`,
+applied 10:40:53 UTC (§38), which closed the monitoring blind spot the first one
+created. Each was listed here as NOT APPLIED between the merge of its pull
+request (#274 and #275 respectively) and the owner approving the application.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
