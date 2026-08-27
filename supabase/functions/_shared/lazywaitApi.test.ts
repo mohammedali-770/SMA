@@ -237,10 +237,25 @@ describe('serializeCreateOrder — confirmed body (default, delivery gate OFF)',
     expect(s).toContain('price_id');
   });
 
-  it('BLOCKS delivery by default (schema unconfirmed) — the safe result', () => {
+  it('sends delivery WITHOUT the gate — order_type and delivery_address are confirmed fields', () => {
+    const built = serializeCreateOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems,
+      delivery: { address: 'King Fahd Rd, Riyadh' },
+    });
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.payload.order_type).toBe('delivery');
+    expect(built.payload.delivery_address).toBe('King Fahd Rd, Riyadh');
+    // The gate has narrowed to what the contract genuinely lacks.
+    expect(built.payload.latitude).toBeUndefined();
+    expect(built.payload.order_delivery_fee).toBeUndefined();
+    expect(built.payload.order_deliveries).toBeUndefined();
+  });
+
+  it('BLOCKS a delivery order with no destination — never a ticket the driver cannot use', () => {
     expect(serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems,
-    })).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
+    })).toEqual({ ok: false, blockedReason: 'missing_delivery_address' });
   });
 
   it('never sends a totals field — the contract cannot settle VAT-inclusive vs exclusive (Q9)', () => {
@@ -279,7 +294,10 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
     expect('delivery_fee' in p).toBe(false);
     // CORRECTED: there is no `delivery_notes` field; the order note is `order_details`.
     expect('delivery_notes' in p).toBe(false);
-    expect(p.order_details).toBe('Gate 3');
+    // The destination is repeated into the note on purpose — the POS may not
+    // render `delivery_address` (Q8), and a ticket without it is unusable.
+    expect(String(p.order_details)).toContain('DELIVER TO: King Fahd Rd, Riyadh');
+    expect(String(p.order_details)).toContain('Gate 3');
     // Still an invention — the contract has no coordinate field at all.
     expect(p.latitude).toBe(24.7136);
     expect(p.longitude).toBe(46.6753);
@@ -290,6 +308,7 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
     const built = serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'Sara',
       allowAssumedFields: true, items: pickupItems,
+      delivery: { address: 'King Fahd Rd, Riyadh' },
       extraAssumedFields: { order_ref: 'HACK', order_id: 'X', order_number: 'Y', order_date: 'Z', promo_code: 'OK' },
     });
     expect(built.ok).toBe(true);
@@ -303,7 +322,10 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
   });
 
   it('still blocks on unmapped branch / items even with the gate ON', () => {
-    const base = { clientId: 'CID_1', orderType: 'delivery', customerName: 'A', allowAssumedFields: true } as const;
+    const base = {
+      clientId: 'CID_1', orderType: 'delivery', customerName: 'A', allowAssumedFields: true,
+      delivery: { address: 'King Fahd Rd, Riyadh' },
+    } as const;
     expect(serializeCreateOrder({ ...base, branchId: null, items: pickupItems }))
       .toEqual({ ok: false, blockedReason: 'missing_branch_mapping' });
     expect(serializeCreateOrder({ ...base, branchId: 'BR_RUH', items: [] }))
@@ -315,7 +337,7 @@ describe('serializeCreateOrder — GATED delivery assumptions (allowAssumedField
   it('folds an UNMAPPED add-on into `details` here too — the gated path shares the confirmed builder', () => {
     const built = serializeCreateOrder({
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A',
-      allowAssumedFields: true,
+      allowAssumedFields: true, delivery: { address: 'King Fahd Rd, Riyadh' },
       items: [{ menuItemId: 'IT_1', name: 'X', quantity: 1, unitPrice: 5, addons: [{ addonId: '', nameEn: 'Volcano' }] }],
     });
     expect(built.ok).toBe(true);
@@ -337,7 +359,7 @@ describe('buildCreateOrderRequest', () => {
   });
   it('propagates a block reason instead of a spec', () => {
     const r = buildCreateOrderRequest({ clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems });
-    expect(r).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
+    expect(r).toEqual({ ok: false, blockedReason: 'missing_delivery_address' });
   });
 });
 
@@ -530,12 +552,24 @@ describe('client.createOrder — duplicate prevention + no false success', () =>
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('does not send a delivery order without the gate (safe block, no POST)', async () => {
+  it('does not send a delivery order with no destination (safe block, no POST)', async () => {
     const client = createLazywaitApiClient(CFG);
     const r = await client.createOrder({ clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems });
     expect(r.sent).toBe(false);
-    expect(r.blockedReason).toBe('delivery_schema_unconfirmed');
+    expect(r.blockedReason).toBe('missing_delivery_address');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('DOES send a delivery order that carries one', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(createOrderSuccessFixture));
+    const client = createLazywaitApiClient(CFG);
+    const r = await client.createOrder({
+      clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'delivery', customerName: 'A', items: pickupItems,
+      delivery: { address: 'King Fahd Rd, Riyadh' },
+    });
+    expect(r.sent).toBe(true);
+    expect(r.blockedReason).toBeNull();
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it('classifies 2xx+success+ref as OK (confirmed)', async () => {

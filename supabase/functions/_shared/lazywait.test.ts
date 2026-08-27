@@ -235,14 +235,95 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
     expect(implied).toBe(unitPrice);
   });
 
-  it('BLOCKS delivery orders (schema unconfirmed) — the gate is untouched by the contract', () => {
-    const r = buildCreateOrderPayload({ clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items });
-    expect(r).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
-    // Even with every confirmed field supplied, delivery still blocks.
-    expect(buildCreateOrderPayload({
+  // --- Delivery, enabled 2026-08-27 --------------------------------------
+  // Previously this asserted delivery was BLOCKED. It no longer is: the gate
+  // cost a real customer order (SM-2026-000057) and the contract confirms every
+  // field needed to send one.
+
+  const addr = {
+    label: 'Home',
+    national_short_address: 'RIYD2929',
+    description: 'Second gate, third floor',
+  };
+
+  it('sends a delivery order using only confirmed contract fields', () => {
+    const r = buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
-      orderDetails: 'Gate 3', customerId: 'CRM_1', customerPhone: '0541234567', isPaid: true,
-    })).toEqual({ ok: false, blockedReason: 'delivery_schema_unconfirmed' });
+      deliveryAddress: addr,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.order_type).toBe('delivery');
+    expect(r.payload.delivery_address).toBe('Home · RIYD2929 · Second gate, third floor');
+    // Nothing invented: no order_deliveries element, no coordinates, and no
+    // money field (Q9 is unanswered and the fee is 0.00 today).
+    expect(r.payload.order_deliveries).toBeUndefined();
+    expect(r.payload.latitude).toBeUndefined();
+    expect(r.payload.longitude).toBeUndefined();
+    expect(r.payload.order_delivery_fee).toBeUndefined();
+    expect(r.payload.order_status_id).toBeUndefined();
+  });
+
+  it('repeats the destination in order_details, because delivery_address may not render', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: addr, orderDetails: 'Ring the bell',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const details = String(r.payload.order_details);
+    expect(details).toContain('DELIVER TO: Home · RIYD2929');
+    // The customer's own note must survive alongside it.
+    expect(details).toContain('Ring the bell');
+  });
+
+  it('keeps the comp label first, then the destination, then the note', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: addr, orderDetails: 'Ring the bell', isComped: true,
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const details = String(r.payload.order_details);
+    expect(details.indexOf('COMPLIMENTARY')).toBeLessThan(details.indexOf('DELIVER TO'));
+    expect(details.indexOf('DELIVER TO')).toBeLessThan(details.indexOf('Ring the bell'));
+  });
+
+  it('BLOCKS a delivery order with no usable address — a ticket with no destination is worse than none', () => {
+    for (const bad of [undefined, null, {}, { label: '  ', description: null, national_short_address: '' }]) {
+      expect(buildCreateOrderPayload({
+        clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+        deliveryAddress: bad as never,
+      })).toEqual({ ok: false, blockedReason: 'missing_delivery_address' });
+    }
+  });
+
+  it('builds a partial address rather than blocking when only one part is present', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
+      deliveryAddress: { national_short_address: 'RIYD2929' },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.delivery_address).toBe('RIYD2929');
+  });
+
+  it('pickup is unchanged — no delivery fields leak onto it', () => {
+    const r = buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'pickup', customerName: 'A', items,
+      deliveryAddress: addr, orderDetails: 'Ring the bell',
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.payload.order_type).toBe('pickup');
+    expect(r.payload.delivery_address).toBeUndefined();
+    expect(String(r.payload.order_details)).toBe('Ring the bell');
+  });
+
+  it('BLOCKS an order type it has never seen rather than guessing', () => {
+    expect(buildCreateOrderPayload({
+      clientId: 'C', branchId: 'B', orderType: 'dine_in', customerName: 'A', items,
+    })).toEqual({ ok: false, blockedReason: 'unsupported_order_type' });
   });
 
   it('BLOCKS when branch mapping is missing', () => {

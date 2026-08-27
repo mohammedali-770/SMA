@@ -186,7 +186,7 @@ export const LazywaitPanel: React.FC<{ disabled: boolean }> = ({ disabled }) => 
       </div>
 
       <Text variant="caption" tone="tertiary" as="p">
-        Delivery orders are intentionally not synced (Lazywait delivery Create Order schema unconfirmed).
+        Delivery orders sync like pickup. The destination is sent as `delivery_address` and repeated in the ticket note; an order with no usable address is held as `missing_delivery_address`.
         Blocked = missing mapping or config; dead-letter = exhausted retries. Configure credentials in the Lazywait card above.
       </Text>
     </Card>

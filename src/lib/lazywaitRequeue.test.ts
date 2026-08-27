@@ -81,8 +81,13 @@ describe('lazywaitRequeueEligibility (mirror of SQL rule)', () => {
     )).toBe('may_have_sent');
   });
 
-  it('rejects delivery and non-retryable states', () => {
+  it('RETRIES a failed delivery order — it syncs now, so it retries like pickup', () => {
     expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'failed', order_type: 'delivery', pos_sync_deadline_at: future }, NOW))
+      .toBe('requeued');
+  });
+
+  it('rejects non-retryable states', () => {
+    expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'syncing', order_type: 'delivery', pos_sync_deadline_at: future }, NOW))
       .toBe('not_retryable');
     expect(lazywaitRequeueEligibility({ lazywait_sync_state: 'pending', order_type: 'pickup', pos_sync_deadline_at: future }, NOW))
       .toBe('not_retryable');

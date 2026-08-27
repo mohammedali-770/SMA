@@ -49,7 +49,9 @@ export interface RequeueRow {
  */
 export function lazywaitRequeueEligibility(row: RequeueRow, now: number = Date.now()): RequeueEligibility {
   const state = row.lazywait_sync_state ?? '';
-  if (row.order_type === 'delivery') return 'not_retryable';
+  // Delivery used to be refused here outright, because it was never sent and so
+  // never had anything to retry. It syncs as of 20260827120000, so it retries on
+  // the same terms as pickup — every resend rail below applies to it unchanged.
   // RESEND SAFETY: ANY stored ref marker (even blank/malformed) blocks an
   // automatic resend — do NOT trim here. A USABLE ref proves creation
   // (already_synced); a merely-present marker (or 'synced' without a usable ref)

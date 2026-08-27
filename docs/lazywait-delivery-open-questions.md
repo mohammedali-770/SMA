@@ -24,17 +24,33 @@ confirmation."
 
 ## Questions for Lazywait
 
-1. **OPEN** — Does `POST /pos/orders/create` support `order_type = "delivery"`,
+1. **ANSWERED IN PRACTICE, 2026-08-27** — delivery is now SENT. `order_type`
+   is a free string and the endpoint has proven lenient about body shape (our
+   body is flat while the vendor's own sample wraps it in `{ order: … }`, and
+   pickup has synced for weeks), so `"delivery"` is sent and a rejection would
+   surface as an ordinary sync failure carrying the API's own message.
+   `order_status_id` is not sent at all — it is optional and pickup is correct
+   without it. Original question kept below.
+
+   ~~Does `POST /pos/orders/create` support `order_type = "delivery"`,
    and what `order_status_id` does a new delivery order take? The contract's
    example is `"order_type": "pickup"` with `"order_status_id": "new-order"`;
    neither value is documented as an enumeration, so the delivery equivalents
-   are still guesses.
-2. **OPEN** — What fields are required for the delivery address? The contract has
+   are still guesses.~~
+2. **CLOSED, 2026-08-27** — `order_deliveries[]` is NOT caller input. The
+   owner's vendor request sample sends it **empty on a PICKUP order**, next to
+   `order_payments: []`, `order_discounts: []`, `order_taxes: []` and
+   `metadata: {}` — POS-side collections. Nothing is invented for it. The
+   destination goes in the confirmed top-level `delivery_address`, and is
+   repeated into `order_details` because whether the POS *renders*
+   `delivery_address` is Q8 and still unverified. Original question below.
+
+   ~~What fields are required for the delivery address? The contract has
    a top-level `delivery_address` string (empty on the pickup example), which
    confirms the *name* but not what a delivery order needs in it. It also has an
    **`order_deliveries[]`** array, empty in the example and undocumented — that
    is almost certainly where delivery actually lives, and its element shape is
-   the missing piece.
+   the missing piece.~~
 3. **OPEN** — Can we send customer latitude/longitude? The contract contains **no
    coordinate field anywhere**. Our assumed top-level `latitude`/`longitude` are
    therefore *not* confirmed by it and stay gated behind `allowAssumedFields`.
@@ -61,10 +77,17 @@ confirmation."
    the live worker deliberately does **not** set it. Telling a cashier that an
    order needs no cash is a financial signal, and payment work is frozen
    (CLAUDE.md §6) — wiring it is a separate owner decision.
-8. **OPEN** — Can the driver/cashier see the customer delivery location or
+8. **OPEN — and now the ONE that matters most.** Delivery orders reach the POS
+   as of 2026-08-27, so this stops being theoretical: it is answered by looking
+   at the first real delivery ticket. The address is sent twice (confirmed
+   `delivery_address`, plus a `التوصيل إلى / DELIVER TO:` line inside
+   `order_details`) precisely because this is unverified. If the ticket shows
+   the dedicated field, the note duplication can be dropped — on evidence.
+
+   ~~Can the driver/cashier see the customer delivery location or
    address clearly? Unanswerable from the contract, which documents field names
    rather than what the POS renders. It depends on Q2's `order_deliveries[]`
-   shape and needs a look at a real delivery ticket.
+   shape and needs a look at a real delivery ticket.~~
 9. **OPEN (new, 2026-08-24)** — Are the money fields VAT-**inclusive** or
    VAT-**exclusive**? The contract carries `subtotal`, `discount`, `tax`,
    `tax_percentage`, `total` and `order_delivery_fee`, and its example computes

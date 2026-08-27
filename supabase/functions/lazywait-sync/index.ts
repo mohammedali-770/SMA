@@ -200,6 +200,16 @@ Deno.serve(async (req: Request) => {
         isComped: Boolean(order.is_comped),
         customerId: crmCustomerId,
         customerPhone: (order.customer_phone as string | null) ?? null,
+        // The destination, for a delivery order. Read from the SNAPSHOT rather
+        // than joining `addresses`, because the customer may edit or delete the
+        // address after ordering and the ticket must reflect where they asked
+        // for it to go. The builder blocks a delivery order whose snapshot
+        // yields nothing usable.
+        deliveryAddress: (order.address_snapshot as {
+          label?: string | null;
+          description?: string | null;
+          national_short_address?: string | null;
+        } | null) ?? null,
       });
 
       if (!built.ok) {

@@ -1,11 +1,13 @@
 /**
  * Map deep links for delivery addresses.
  *
- * Delivery orders never reach the POS (`delivery_schema_unconfirmed`) and there
- * is no driver or dispatch feature, so every delivery is coordinated by a human
- * reading the address off this console and phoning or driving it. Until that
- * changes, a tappable map link is the difference between reading coordinates
- * aloud and opening the destination.
+ * Delivery orders DO reach the POS as of 2026-08-27, and the ticket carries the
+ * address twice (`delivery_address` plus a DELIVER TO line in the note). There
+ * is still no driver or dispatch feature, so the last leg is coordinated by a
+ * human reading the address off this console and phoning or driving it — and
+ * coordinates are still not sent to the POS at all, because the contract has no
+ * field for them. A tappable map link therefore remains the difference between
+ * reading coordinates aloud and opening the destination.
  *
  * Pure and framework-free so it is unit-tested under Node.
  */

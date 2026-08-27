@@ -147,7 +147,18 @@ the default branch. Nothing was applied until the merge actually landed
 (`47f18f2`) and each file was hashed against its merged copy. §15 exists for
 precisely this.
 
-**One repository file remains unapplied, and it is the frozen one.**
+**Superseded 2026-08-27 — delivery orders now reach the POS, and that migration
+is UNAPPLIED.** `20260827120000_lazywait_delivery_sync` opens the real gate:
+`set_lazywait_initial_sync`, a BEFORE INSERT trigger, parked **every** delivery
+order at `blocked`/`delivery_schema_unconfirmed` before the sync worker could
+claim it — which is why the customer order SM-2026-000057 died with
+`sync_attempt_count = 0` while the app pushed "we sent it to the kitchen". The
+same migration makes a failed delivery order retryable
+(`lazywait_requeue_eligibility` refused delivery outright). The payment gate is
+untouched: an unpaid ONLINE order still parks at `awaiting_payment`, delivery or
+not. Applying it is a §5 action and is unrelated to §6.
+
+**Two repository files are unapplied. One of them is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -164,8 +175,9 @@ precisely this.
 | `20260827090000_admin_search_phone_normalization.sql` | Applied 2026-08-27, live version `20260827063613`. |
 | `20260827100000_comp_members_by_phone.sql` | Applied 2026-08-27, live version `20260827063746`. |
 | `20260827110000_comp_erasure.sql` | Applied 2026-08-27, live version `20260827064044`. |
+| `20260827120000_lazywait_delivery_sync.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Pairs with a `lazywait-sync` deploy; either order is safe, both are needed. |
 
-The honest statement is therefore **110 repository files / 115 live rows / one unapplied file, and that one is unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **111 repository files / 115 live rows / two unapplied files: one awaiting ordinary owner approval, and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
