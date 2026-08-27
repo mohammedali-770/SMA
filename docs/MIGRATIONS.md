@@ -1114,8 +1114,13 @@ the refund lifecycle lives in a separate `refund_state` column, avoiding an
 
 ### Delivery-channel note (forward compatibility)
 
-Delivery orders are held at `blocked` / `delivery_schema_unconfirmed` because the
-Lazywait delivery Create Order schema is unconfirmed. Gating them on Lazywait
+**Superseded 2026-08-27 — delivery is live.** Delivery orders *were* held at
+`blocked` / `delivery_schema_unconfirmed` while the Lazywait delivery Create
+Order schema was unconfirmed; `20260827120000` removed that insert-time block and
+delivery orders now enqueue exactly like pickup. The design note below is kept
+because the reasoning still explains why participation is expressed in terms of
+sync state rather than order type — which is precisely what let delivery switch
+on without touching the confirmation channel. Gating them on Lazywait
 acceptance would mark every delivery order permanently unconfirmed and refund all
 of them. Participation is therefore decided by `pos_confirmation_channel_active()`,
 expressed in terms of the SYNC STATE rather than the order type: when Lazywait
@@ -3571,9 +3576,16 @@ the merged default branch.
   `order_ref e5d6bf08…`, `order_status_id new-order`. That answers Q1: Lazywait
   accepts `order_type: "delivery"`.
 
-**Q8 remains open** and no API response can close it: whether the POS *renders*
-`delivery_address`, or whether only the duplicated `order_details` line reaches
-the ticket. It needs a human to look at printed paper.
+**Q8 was closed the same day, by looking at printed paper — and the answer was
+the unwelcome one.** The POS does **not** render `delivery_address`. Ticket #3
+shows `Order Type: Delivery` but carries no address row at all; the destination
+reached the kitchen only through the duplicated `order_details` note. Had the
+builder trusted the confirmed contract field alone, that ticket would have
+reached the kitchen with no destination on it. The duplication is therefore
+permanent, not provisional.
+
+**Q9 followed on ticket #9** (SM-2026-000065, 2026-08-27): order totals are sent
+and they print — `Subtotal 84.00 / VAT 10.96 / Total 84.00`.
 
 ### Four parked delivery orders
 

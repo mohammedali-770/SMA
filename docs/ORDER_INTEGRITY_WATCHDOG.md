@@ -67,13 +67,13 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 
 | # | Rule code | Sev | Fires when |
 |---|-----------|-----|------------|
-| 1 | `PAID_ORDER_NOT_SYNCED` | critical | paid pickup, not cancelled, `paid_at` > 5 min ago, `lazywait_sync_state ∈ {pending,failed,syncing,blocked}`, and NOT intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
+| 1 | `PAID_ORDER_NOT_SYNCED` | critical | paid order of **either** type, not cancelled, `paid_at` > 5 min ago, `lazywait_sync_state ∈ {pending,failed,syncing,blocked}`, and NOT intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
 | 2 | `PAID_ORDER_AWAITING_PAYMENT` | critical | order is paid but still `lazywait_sync_state='awaiting_payment'` (the paid→pending flip was missed). |
 | 3 | `CAPTURED_PAYMENT_WITHOUT_ORDER` | critical | `payment_records.status='paid'` for > 3 min but no corresponding **paid** order (DB-invariant variant — see §4). |
 | 4 | `PAYMENT_AMOUNT_MISMATCH` | critical | a paid payment record's `round(amount,2)` differs from its order's `round(total,2)`. |
 | 5 | `DUPLICATE_PROVIDER_REFERENCE` | critical | one paid provider reference (`reference_transaction`/`provider_ref`) maps to **> 1 distinct order**. |
 | 6 | `MULTIPLE_SUCCESSFUL_CAPTURES` | critical | **> 1** paid `payment_records` row for a single order. |
-| 7 | `PAID_ORDER_DEAD_LETTER` | critical | paid pickup, not cancelled, `lazywait_sync_state='dead_letter'`. |
+| 7 | `PAID_ORDER_DEAD_LETTER` | critical | paid order of **either** type, not cancelled, `lazywait_sync_state='dead_letter'`. |
 | 8 | `SYNCED_WITHOUT_USABLE_REFERENCE` | critical | `lazywait_sync_state='synced'` but the stored `lazywait_ref` is not usable (missing / whitespace-only). |
 | 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
 | 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |

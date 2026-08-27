@@ -237,24 +237,46 @@ the import deliberately does not guess which price is current.**
 
 ## STILL ASSUMED
 
-What remains an assumption is the **delivery half**, which the contract does not
-describe at all. The client assembles it only when the caller passes
-**`allowAssumedFields: true`** (default **OFF**). The live `lazywait-sync` worker
-is **not** rewired for delivery: it stays pickup-only, and delivery orders are
-still held at `blocked` / `delivery_schema_unconfirmed`. These map to the
-remaining open questions Q1, Q2, Q3, Q8, Q9 and Q10 in
+**Superseded 2026-08-27 — delivery is live, and three of these questions are
+answered by real printed tickets.** This paragraph used to say the worker "stays
+pickup-only, and delivery orders are still held at `blocked` /
+`delivery_schema_unconfirmed`". That stopped being true when migration
+`20260827120000` removed the insert-time block and `lazywait-sync` v6 shipped.
+
+**Q1 — ANSWERED, accepted.** `order_type: "delivery"` is accepted. Seven
+delivery orders have created real POS tickets — SM-2026-000059 → #3 through
+SM-2026-000065 → #9, consecutively — every one on the first attempt
+(`sync_attempt_count` 0, no retries).
+
+**Q8 — ANSWERED, negatively.** The POS does **not** render `delivery_address`.
+The printed ticket shows `Order Type: Delivery` but no address row; the
+destination arrives only through the duplicated `order_details` note. That is why
+the duplication is permanent rather than provisional.
+
+**Q9 — ANSWERED.** Money is sent and it prints. Confirmed on ticket **#9** for
+SM-2026-000065: `Subtotal 84.00 / VAT 10.96 / Total 84.00`, against a stored
+total of 84.00 and `vat_amount` 10.96.
+
+Exactly two questions remain genuinely open: **Q3** (coordinates — the
+contract has no coordinate field anywhere) and **Q10** (whether the POS sums
+`addons[].price` into the line price). Q2 is **closed**, not open:
+`order_deliveries[]` is POS-side output, sent empty even on the vendor's own
+pickup sample, so nothing is guessed for it. See
 `docs/lazywait-delivery-open-questions.md`.
+
+The typed client's `allowAssumedFields: true` gate (default **OFF**) still exists
+for the genuinely-assumed remainder.
 
 ### Assumed field names/shapes (please correct)
 | Assumed field | Assumed shape | Used for | Status |
 |---|---|---|---|
-| `order_type: "delivery"` | string | delivery create | Q1 — the contract documents `"pickup"` only |
+| ~~`order_type: "delivery"`~~ | string | delivery create | **Q1 ANSWERED 2026-08-27 — accepted.** Five orders created real tickets (#3 … #9), all first-attempt. No longer an assumption. |
 | `order_status_id` for a new delivery order | string | delivery create | Q1 — `"new-order"` is the documented *pickup* value |
 | `order_deliveries[]` element shape | unknown | delivery | Q2 — empty array in the example; almost certainly where delivery lives. **Not implemented** — we do not guess an element |
 | `delivery_address` contents | string | delivery | Q2 — field name confirmed, required contents are not |
 | `latitude`, `longitude` | number, top-level | delivery | Q3 — **the contract has no coordinate field anywhere**; ours is an invention and stays gated |
-| `order_delivery_fee` on a delivery order | number | delivery | Q6 — name corrected and confirmed, but only meaningful once Q1 is answered; see Q9 before sending any money field |
-| (address/lat-long visibility) | n/a | delivery | Q8 — needs a look at a real delivery ticket |
+| `order_delivery_fee` on a delivery order | number | delivery | Q6 — name confirmed. **Q9 is answered and money IS now sent**; this field is emitted only on a delivery order and only when the fee is > 0 (it is 0.00 at Nasserah today, so no live ticket has exercised it yet). |
+| (address/lat-long visibility) | n/a | delivery | **Q8 ANSWERED 2026-08-27, negatively.** A real ticket shows NO address row — `delivery_address` is not rendered. The destination reaches the kitchen only via the `order_details` note, which is why that duplication is permanent. |
 
 ### Other items to confirm
 - **Whether a production host is ever in scope.** The live POS is the dev host,
