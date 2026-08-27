@@ -1217,11 +1217,17 @@ difference on the v4 deploy of this same function.
 
 ### Opened by the first printed ticket (2026-08-27)
 
-**A. Redeploy `lazywait-sync` to pick up the address dedupe** (§5). The fix
-merged in `c4b46c1` at 10:40 UTC; the running worker is **v6, deployed 08:40**,
-so it does not have it. SM-2026-000059's saved address has identical `label` and
-`description`, so its ticket printed the address twice inside one note line. The
-code is correct and tested; it just is not live.
+**A.** ~~Redeploy `lazywait-sync` to pick up the address dedupe.~~ **DONE
+2026-08-27 — `lazywait-sync` v7**, `verify_jwt: false` unchanged, all five
+bundle files read back from Supabase and byte-identical to `c4b46c1`
+(`index.ts` `f2519f446a63ecd8`, `_shared/lazywait.ts` `4cc51dfe59c8b538`, the
+three other shared files unchanged from v6).
+
+Why it was needed: the dedupe merged in `c4b46c1` at 10:40 UTC, but the running
+worker was **v6, deployed 08:40** — before the fix existed. SM-2026-000059's
+saved address has identical `label` and `description`, which is why its ticket
+printed the address twice inside one note line. The next delivery order will
+print it once.
 
 **B. Report the Arabic reversal to Lazywait — vendor bug, not ours.** The
 printed ticket reverses Arabic word order, including in **the shop's own header
