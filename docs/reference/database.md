@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **111**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827120000_lazywait_delivery_sync.sql`.
+Migration files in the repository: **112**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827130000_watchdog_delivery_coverage.sql`.
 
 ## Tables
 
@@ -217,7 +217,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_integrity_incident_timeline` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_list_incidents` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_suppress_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
-| `order_integrity_watchdog` | 1 | `20260721170000_order_integrity_watchdog.sql` |
+| `order_integrity_watchdog` | 2 | `20260827130000_watchdog_delivery_coverage.sql` |
 | `order_item_note_is_acceptable` | 1 | `20260821170000_order_item_notes.sql` |
 | `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_note_normalized` | 1 | `20260819120000_order_note_length_limit.sql` |

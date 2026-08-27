@@ -783,5 +783,77 @@ begin
   raise notice 'HEALTH MATRIX OK';
 end $$;
 
+-- ---- DELIVERY COVERAGE (20260827130000) -------------------------------------
+-- Until 2026-08-27 delivery never entered the POS sync queue, so R1 and R7 both
+-- filtered `order_type = 'pickup'`. With delivery live, a paid delivery order
+-- fails exactly as a pickup one does and must raise the same critical incident.
+-- Cases 1 and 2 FAIL against the pre-20260827130000 watchdog.
+do $$
+declare v_run bigint;
+begin
+  perform pg_temp.oiw_reset();
+  -- R1: paid, unsynced, older than the 5-minute grace.
+  perform pg_temp.oiw_order('W-DEL-R1','failed','paid','delivery','received',null, now()-interval '6m');
+  v_run := public.order_integrity_watchdog();
+  if (select status from public.order_integrity_runs where id=v_run) <> 'success' then
+    raise exception 'DELIVERY R1 FAILED: run not success'; end if;
+  if (select count(*) from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_NOT_SYNCED') <> 1 then
+    raise exception 'DELIVERY R1 FAILED: a paid DELIVERY order stuck unsynced raised no incident';
+  end if;
+  if (select safe_details->>'order_type' from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_NOT_SYNCED') <> 'delivery' then
+    raise exception 'DELIVERY R1 FAILED: incident did not record order_type=delivery'; end if;
+  raise notice 'DELIVERY R1 ok - a failed paid delivery order is now a critical incident';
+end $$;
+
+do $$
+declare v_run bigint;
+begin
+  perform pg_temp.oiw_reset();
+  -- R7: paid delivery order that exhausted its retry budget.
+  perform pg_temp.oiw_order('W-DEL-R7','dead_letter','paid','delivery','received',null, now()-interval '6m');
+  v_run := public.order_integrity_watchdog();
+  if (select count(*) from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_DEAD_LETTER') <> 1 then
+    raise exception 'DELIVERY R7 FAILED: a dead-lettered paid DELIVERY order raised no incident';
+  end if;
+  raise notice 'DELIVERY R7 ok - a dead-lettered paid delivery order is now a critical incident';
+end $$;
+
+do $$
+declare v_run bigint;
+begin
+  perform pg_temp.oiw_reset();
+  -- Regression guard: pickup coverage is unchanged by the filter removal.
+  perform pg_temp.oiw_order('W-PU-R1','failed','paid','pickup','received',null, now()-interval '6m');
+  perform pg_temp.oiw_order('W-PU-R7','dead_letter','paid','pickup','received',null, now()-interval '6m');
+  v_run := public.order_integrity_watchdog();
+  if (select count(*) from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_NOT_SYNCED') <> 1
+     or (select count(*) from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_DEAD_LETTER') <> 1 then
+    raise exception 'DELIVERY COVERAGE FAILED: pickup detection regressed'; end if;
+  raise notice 'PICKUP REGRESSION ok - pickup still detected by R1 and R7';
+end $$;
+
+do $$
+declare v_run bigint;
+begin
+  perform pg_temp.oiw_reset();
+  -- DELIBERATELY still excluded: `delivery_schema_unconfirmed` is a RETIRED
+  -- reason that neither the insert trigger nor worker v6 can produce. It marks
+  -- exactly four legacy rows that are parked and un-retryable by design, so it
+  -- must NOT become a permanent failing incident. Pinning the decision.
+  perform pg_temp.oiw_order('W-DEL-RETIRED','blocked','paid','delivery','received',null,
+                            now()-interval '6m', null, null, 10, 'delivery_schema_unconfirmed');
+  v_run := public.order_integrity_watchdog();
+  if (select count(*) from public.order_integrity_incidents
+        where rule_code='PAID_ORDER_NOT_SYNCED') <> 0 then
+    raise exception 'RETIRED-REASON FAILED: a parked legacy row raised a critical incident';
+  end if;
+  raise notice 'RETIRED REASON ok - parked delivery_schema_unconfirmed rows stay quiet';
+end $$;
+
 do $$ begin raise notice 'ALL ORDER INTEGRITY WATCHDOG CASES PASSED'; end $$;
 rollback;

@@ -1167,6 +1167,57 @@ It is now the only remaining action for this feature — everything server-side 
 live. Until it ships, a comped customer sees full price at checkout and is
 charged 0.00: correct money, confusing screen.
 
+## 22. Delivery orders reach the POS — APPLIED + DEPLOYED 2026-08-27 (one action open)
+
+Both halves are **done**, on explicit owner approval, and both are verified:
+
+| Action | Result |
+| --- | --- |
+| Apply `20260827120000_lazywait_delivery_sync` | Live version `20260827082634`, history **115 → 116** |
+| Deploy `lazywait-sync` | **Version 6**, `verify_jwt: false` unchanged, ACTIVE |
+
+The deploy went through MCP because the CI path is unusable: `deploy-functions.yml`
+exists but `SUPABASE_ACCESS_TOKEN` has never existed — all four runs died at
+"Access token not provided" — and §15 of this file recommends against creating it.
+
+All five bundle files were read back from Supabase after deploying and hashed
+against the merged default branch:
+
+| File | Bytes | sha256 (16) |
+| --- | --- | --- |
+| `lazywait-sync/index.ts` | 26 674 | `28db3b1871ba2d55` |
+| `_shared/lazywait.ts` | 48 228 | `65ba235077d51298` |
+| `_shared/supabaseClient.ts` | 1 380 | `9c8d52e18d8ebf24` |
+| `_shared/secrets.ts` | 1 373 | `c6a15f7f566b8afe` |
+| `_shared/cors.ts` | 466 | `5262b16eb01ece21` |
+
+All five byte-identical. This read-back is not ceremony: it caught a 3-byte
+difference on the v4 deploy of this same function.
+
+**Proven live.** SM-2026-000059 reached the POS as ticket **#3** at 10:15 UTC,
+42 seconds after being placed, first attempt, no retries.
+
+### What is still open
+
+1. **Q8 — look at a printed delivery ticket.** The address is deliberately sent
+   twice: in the confirmed `delivery_address` field and again inside
+   `order_details` behind `التوصيل إلى / DELIVER TO:`. Nothing in the API says
+   whether the POS renders the dedicated field. If a real ticket shows it, the
+   duplicate line can be dropped — on evidence, not in advance. **Only a human
+   looking at paper can close this.**
+2. **Apply `20260827130000_watchdog_delivery_coverage`** (§5, not frozen). Until
+   it is applied, watchdog rules R1 and R7 remain blind to failed **paid
+   delivery** orders — see `docs/MIGRATIONS.md` §38.
+
+### A decision recorded rather than taken
+
+Four delivery orders (SM-2026-000032, -000049, -000057, -000058) are parked with
+the now-retired `delivery_schema_unconfirmed` reason and are `not_retryable`.
+SM-2026-000058 was placed in the 40-second window between the migration landing
+and the deploy, so the old worker blocked it. **None was re-driven**: that is a
+§5 live write and would create a real kitchen ticket for food nobody is waiting
+for. Leaving them parked is the current decision, reversible at any time.
+
 ## Owner-action closeout rule
 
 When an item is completed:
