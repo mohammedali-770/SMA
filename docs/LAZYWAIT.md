@@ -645,6 +645,46 @@ was `set_lazywait_initial_sync`, a BEFORE INSERT trigger that parked every
 delivery order at `blocked` before the worker could claim it. That is why
 SM-2026-000057 died with `sync_attempt_count = 0`.
 
+### How fast an order reaches the branch, and why it used to be slow
+
+`order-intake` kicks `lazywait-sync` **synchronously** right after `place_order`,
+bounded by an ~11 s timeout, so the confirmation screen can show the branch
+number immediately. The once-a-minute cron is the *backstop*, not the primary
+path.
+
+**Delivery did not get that kick until 2026-08-27.** The block read
+`if (order_type === 'pickup')`, which was correct only while the insert trigger
+parked every delivery order at `blocked` — kicking the worker for an order it
+would refuse was pointless. Once migration `20260827120000` opened that gate the
+condition became a leftover, and delivery orders fell through to the cron:
+
+| Order | Placed → branch number | Attempts |
+| --- | --- | --- |
+| SM-2026-000059 | 42.3 s | first try |
+| SM-2026-000060 | 32.2 s | first try |
+| SM-2026-000061 | 17.8 s | first try |
+| SM-2026-000062 | 44.6 s | first try |
+
+Every one succeeded on the **first attempt**, so none of that time was Lazywait.
+It was the wait for the next cron tick, and the 18-45 s spread is just where in
+the minute the order happened to land.
+
+**It also produced the false push.** The "order received" push fires *after* the
+sync block, so for pickup it followed a real attempt; for delivery the block was
+skipped entirely and the customer was told the kitchen had an order that had not
+been sent anywhere. Closing the gate makes the ordering honest for both, and
+`orderIntakeSyncWiring.test.ts` now pins that the sync call precedes the push
+call in the source.
+
+That gate was the **fifth** place the pickup-only assumption was written down,
+after the insert trigger, `buildCreateOrderPayload`, `confirm_order_payment` and
+the watchdog's R1/R7.
+
+**Still true, and not fixed by this:** the `received` copy asserts "sent it to
+the kitchen" unconditionally, so a *failed* sync still produces that claim. The
+ordering fix means it now follows a real attempt, but the copy does not yet
+reflect the outcome. See `docs/OWNER_ACTIONS.md` §22.
+
 ### Two POS-side defects the first ticket exposed
 
 Both were found on ticket #3 and neither is fixable from our payload.

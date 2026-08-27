@@ -64,6 +64,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/moyasarRefund.test.ts`
 - `_shared/moyasarRefund.ts`
 - `_shared/moyasarVerify.ts`
+- `_shared/orderIntakeSyncWiring.test.ts`
 - `_shared/paymentSync.ts`
 - `_shared/secrets.ts`
 - `_shared/supabaseClient.ts`

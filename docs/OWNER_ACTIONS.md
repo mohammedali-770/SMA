@@ -1263,6 +1263,29 @@ is now the only unapplied migration in the repository.** An instruction like
 "apply the outstanding migrations" therefore has exactly one possible target, and
 that target is the frozen one (§6). Name the file explicitly, always.
 
+**D. Deploy `order-intake`** (§5) — the immediate POS sync kick was gated to
+pickup, so delivery orders waited for the once-a-minute cron (measured 17.8-44.6 s,
+all first-attempt successes). Removing the gate should put the branch number on
+the confirmation screen in ~1-2 s. Fix is merged and tested; it needs a deploy of
+`order-intake`, which has not been redeployed for this.
+
+**E. Decide the `received` push copy — still not honest.** The push says "We
+received your order and sent it to the kitchen" / "استلمنا طلبك وتم إرساله إلى
+المطبخ" unconditionally. Fixing D means it now fires *after* a real sync attempt
+rather than before one, but the wording still claims success even when the sync
+failed. Options, none yet chosen because this is a LIVE customer channel (§7):
+
+1. only send `received` when the order actually reached the POS, and let the
+   existing `pos_retrying` / `pos_confirmation_required` / `pos_failed` copy own
+   the failure story — needs the worker's `pos_confirmed` widened so a *late*
+   success still notifies, otherwise a slow-but-successful sync goes silent;
+2. soften the copy to "we've received your order and are sending it to the
+   restaurant", which is always true and needs no timing logic, at the cost of a
+   second push when the branch number arrives.
+
+Option 1 is more accurate, option 2 is simpler and cannot go silent. Owner
+decision.
+
 ### A decision recorded rather than taken
 
 Four delivery orders (SM-2026-000032, -000049, -000057, -000058) are parked with

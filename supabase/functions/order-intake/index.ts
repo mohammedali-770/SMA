@@ -53,9 +53,29 @@ Deno.serve(async (req: Request) => {
   const orderId = order?.id ? String(order.id) : null;
   if (!orderId) return json({ error: 'Order was not created.' }, 400);
 
-  // Best-effort synchronous POS sync for pickup orders (delivery is 'blocked' at
-  // insert). Fully guarded — a POS/network problem never fails the order.
-  if (String(order?.order_type) === 'pickup') {
+  // Best-effort synchronous POS sync, for PICKUP AND DELIVERY alike. Fully
+  // guarded — a POS/network problem never fails the order.
+  //
+  // This used to read `if (order_type === 'pickup')`, which was correct only
+  // while `set_lazywait_initial_sync` parked every delivery order at `blocked`
+  // on INSERT: kicking the worker for an order it would refuse was pointless.
+  // Migration 20260827120000 removed that trigger branch and worker v6 sends
+  // delivery, so the gate became a leftover — and an expensive one. A delivery
+  // order fell through to the once-a-minute cron instead, which is exactly the
+  // 18-45 s the owner measured between placing an order and the branch number
+  // appearing (SM-2026-000059 42.3 s, -60 32.2 s, -61 17.8 s, -62 44.6 s — all
+  // first-attempt successes, so the wait was the tick, never the POS).
+  //
+  // It also explains the false push. The "order received" push below fires
+  // AFTER this block, so for pickup it followed a real sync attempt; for
+  // delivery the block was skipped entirely and the customer was told the
+  // kitchen had their order before anything had been sent. Closing the gate
+  // makes the ordering honest for both.
+  //
+  // This was the FIFTH place the pickup-only assumption was written down —
+  // after the insert trigger, `buildCreateOrderPayload`, `confirm_order_payment`
+  // and the watchdog's R1/R7.
+  {
     try {
       const admin = adminClient();
       const cfg = await getProviderConfig(admin, 'lazywait');
