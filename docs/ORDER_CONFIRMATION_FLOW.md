@@ -241,8 +241,28 @@ order got its branch number anyway. The customer sees the "number pending" state
 and the number arrives by push about a second after the POS confirms, from a
 push that only ever says "confirmed" when the POS really has the order.
 
-So the trade is: on a slow POS the number arrives a second or two later by push
-instead of on first paint, and in exchange nobody waits 11 s for it.
+So the trade is: on a slow POS the number arrives shortly after first paint
+instead of on it, and in exchange nobody waits 11 s for it.
+
+**That sentence originally said "a second or two later by push", and it was
+wrong** — caught in review before the cut shipped. The `pos_confirmed` push is
+**data-free** and `NotificationTapBridge` only navigates when the notification is
+**tapped**, so a customer sitting on the receipt was not being refreshed by it at
+all. They would have waited for the next `RECEIPT_POLL_MS` tick — **25 seconds**
+— to see a number the server had held for twenty of them. Cutting the timeout
+without noticing that would have made the 5-11 s band *worse* than before, which
+is the exact band the cut exists to serve.
+
+So the receipt now **polls every 2 s while the branch number is still missing**
+(`nextReceiptPollMs`), falling back to the 25 s interval once it arrives, and
+bounded to a 90 s window so a number that is never coming is not polled for
+indefinitely. It is a self-scheduling timeout rather than `setInterval`, because
+an interval cannot change its delay.
+
+Deliberately **independent of push delivery**: a poll still works when the
+customer denied notifications, when Expo is slow, and when the push is simply
+never displayed. Tying the number's arrival to a notification would make it
+depend on a channel that is allowed to fail.
 
 The variance itself is a question for the vendor rather than something to
 engineer around indefinitely — the evidence pack is

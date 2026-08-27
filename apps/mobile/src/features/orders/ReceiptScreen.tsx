@@ -39,7 +39,7 @@ import { openDirections } from '../../lib/openDirections';
 import { isCompletedForReview, shouldRequestReview } from '../onboarding/firstRun';
 import { markReviewAsked, readFirstRun } from '../onboarding/firstRunStore';
 import { requestStoreReview } from '../onboarding/storeReview';
-import { isTerminalOrderStatus, RECEIPT_POLL_MS } from './ordersRefresh';
+import { isTerminalOrderStatus, nextReceiptPollMs } from './ordersRefresh';
 import { mapOrder } from '../../lib/mappers';
 import { ConfirmationHero } from './view/ConfirmationHero';
 import { ReceiptBody } from './view/ReceiptBody';
@@ -88,13 +88,39 @@ export function ReceiptScreen({ orderId }: { orderId: string }) {
   // the status (received → preparing → …) doesn't sit stale. Ticks no-op once
   // the order is terminal (delivered/cancelled), and the interval is torn down
   // on blur/unmount — Supabase is never polled from the background.
+  //
+  // The delay is chosen per tick rather than fixed, so a receipt still WAITING
+  // for its branch number refreshes every 2 s instead of every 25 s. That gap
+  // is real: order-intake now stops waiting for the POS at 5 s, and a slow
+  // Create Order call (8.02 s measured on SM-2026-000068) lands the customer on
+  // a receipt whose number arrives moments later — but the pos_confirmed push
+  // is data-free and only navigates when TAPPED, so without this they would sit
+  // looking at "not issued yet" for up to a full 25 s poll.
+  //
+  // A self-scheduling timeout, not setInterval, because setInterval cannot
+  // change its delay. See nextReceiptPollMs for the escalation rule and why the
+  // fast phase is bounded.
   useFocusEffect(useCallback(() => {
     if (orderRef.current) void refreshSilently();
-    const id = setInterval(() => {
+    const focusedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
+
+    const schedule = () => {
       const current = orderRef.current;
-      if (current && !isTerminalOrderStatus(current.status)) void refreshSilently();
-    }, RECEIPT_POLL_MS);
-    return () => clearInterval(id);
+      if (!current) return;
+      const delay = nextReceiptPollMs(current, Date.now() - focusedAt);
+      if (delay == null) return;  // terminal — stop entirely
+      timer = setTimeout(() => {
+        if (cancelled) return;
+        const now = orderRef.current;
+        if (now && !isTerminalOrderStatus(now.status)) void refreshSilently();
+        schedule();
+      }, delay);
+    };
+    schedule();
+
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
   }, [refreshSilently]));
 
   /**
