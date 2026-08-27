@@ -1390,6 +1390,17 @@ construction, and would still hold if Lazywait took five minutes. The sent
 figure varies with dispatcher latency and guarantees nothing. Every one of the
 seven rows was `targeted 1 / sent 1 / failed 0` on `attempt_count` 1.
 
+**`sent` means Expo accepted the ticket, not that a phone displayed it.**
+`push-dispatch` counts `sent` on an Expo ticket returned `ok`, and it performs
+no receipt polling — its own comment records that as a follow-up. So the
+database cannot distinguish "Expo accepted it" from "the customer saw it", and
+nothing here should be read as proof a notification was displayed. What *is*
+proved is the ordering and the copy.
+
+**One more limit worth stating: all eleven of today's orders belong to the same
+customer account, on one device.** The pipeline is proved end to end; fan-out
+across a varied device base is not exercised by any of this.
+
 ### A decision recorded rather than taken
 
 Four delivery orders (SM-2026-000032, -000049, -000057, -000058) are parked with
