@@ -124,11 +124,21 @@ Status: **APPLIED to Production on 2026-08-26** (live versions `20260826114717`,
 §35). Every function body was verified byte-identical to the merged repository
 file afterwards.
 
-**Applied is not the same as in use.** `comp_members` is empty, so no customer
-is comped and every order still prices exactly as it did before. The feature
-becomes live for a given person the moment an administrator adds them in
-**Finance → Comped Customers**. All 44 orders that existed at the time of the
-application were verified unchanged.
+**Verified end to end on 2026-08-27.** One member was added and two real pickup
+orders were placed on that account: `SM-2026-000055` (subtotal 15.00) and
+`SM-2026-000056` (subtotal 9.00). Both came out `total` 0.00, `vat_amount` 0.00,
+`is_comped` true, `comp_discount_amount` equal to the real goods value,
+`payment_status` `paid` with `paid_at` set, and `lazywait_sync_state` `synced`
+rather than `awaiting_payment` — the landmine-1 regression, confirmed fixed in
+Production. The loyalty balance did not move and no coupon was consumed. The
+test membership was deactivated afterwards.
+
+**Superseded in part, 2026-08-27 — membership is now keyed on a PHONE NUMBER
+too.** Three further migrations are written and **NOT yet applied**:
+`20260827090000_admin_search_phone_normalization`,
+`20260827100000_comp_members_by_phone` and `20260827110000_comp_erasure`. See
+*Comping a number before they sign up*, below. The money path is **unchanged**
+by all three.
 
 **One owner action remains** before it is fully visible: **the app build**. The
 checkout and receipt lines ship with it, and the two new `orders` columns exist
@@ -269,12 +279,111 @@ repository, an unsigned POST returned `401 unauthorized` proving the module
 boots and its gate holds, and the cron ran the new version at 12:47:00 and
 succeeded. Record: `docs/OWNER_ACTIONS.md` §20.
 
+## Comping a number before they sign up
+
+*Added 2026-08-27, on the owner's requirement: "when the number of someone in
+comped customers enters the app, they should see the prices as 0."*
+
+The original design keyed membership on `profile_id`, so a person had to already
+have an account before they could be comped. That is backwards for how the
+decision is made — the owner knows the **number** of the person they want to
+host, usually before that person has opened the app. The panel proved it on its
+first live use: a search for a number nobody had registered returned *"No
+matching customers"*, correctly, and there was no way to say *comp them anyway,
+from the moment they join*.
+
+**How it works now.** `comp_members` carries `phone_e164` (canonical
+`+9665XXXXXXXX`, enforced by check constraint) and `profile_id` became nullable.
+A row with no `profile_id` is **pending**: comped, but nobody holds the number
+yet. When Auth confirms that number — the OTP moment — the row binds itself to
+the new account, and from then on it is an ordinary membership.
+
+**The money path is untouched.** `place_order` and `compute_order_snapshot`
+still resolve the comp exactly as they did on 2026-08-26:
+
+```sql
+select cm.is_active into v_is_comp
+  from public.comp_members cm where cm.profile_id = v_customer;
+```
+
+That is the design, not an omission. Those functions were verified against two
+live orders; re-deriving the comp from a phone number inside them would put a
+proven path back under review to buy nothing, because a pending row has no
+account and an account with no orders cannot be charged wrongly. All 18
+pre-existing cases in `supabase/tests/comp_members_test.sql` pass unchanged,
+which is the evidence.
+
+**Why the OTP moment, and not `profiles.phone_number` generally.** Comping by
+phone is only safe if the phone cannot be self-asserted. Verified against live
+Production before the design was fixed: `authenticated` holds column `UPDATE` on
+`profiles` for `email` and `full_name` **only**. `phone_number` is written
+solely by SECURITY DEFINER functions fed from a proven number. A customer cannot
+type a comped number into their profile and eat free.
+
+**There are THREE paths that prove phone ownership, not two** — raised in review
+on PR #272 and fixed there:
+
+| Path | Fires | Claims |
+| --- | --- | --- |
+| `handle_new_user()` | signup, when the phone arrives already confirmed | yes |
+| `handle_auth_user_phone_confirmed()` | `auth.users.phone_confirmed_at` transitions | yes |
+| `mark_phone_verified()` | `whatsapp-verify-otp`, which never touches Supabase Auth | yes |
+
+The third one is the one that is easy to miss: `whatsapp-verify-otp` verifies
+the code itself and records the result by writing `profiles` only, so
+`on_auth_user_phone_confirmed` never fires. Without a claim there, a customer
+who verified that way would sit unclaimed and be **charged in full forever**.
+Claiming there is safe because ownership is already proven when it runs — the
+function is EXECUTE-able by `service_role` alone, and its only caller checks the
+requested number against `auth.users.phone` before consuming a matching OTP.
+
+**An unconfirmed number binds nothing.** `auth.users.phone` is populated when an
+OTP is *requested* and confirmed only when it is *answered*, so a row can hold an
+unproven number. `admin_set_comp_member` therefore resolves an account only from
+a **confirmed** Auth phone or a **verified** profile phone; anything else stays
+pending and binds later, at the proven moment. Late, not wrong.
+
+**A withdrawn invitation stays withdrawn.** Deactivating a pending number and
+then having it sign up binds the row but leaves it inactive. The claim
+deliberately does not filter on `is_active`, because a row that refused to bind
+could be re-added as a fresh pending row and the deactivation would be quietly
+undone.
+
+**Deletion reaches it.** A pending row has no FK to cascade from, and
+`comp_member_audit` deliberately outlives the account — so `target_phone` is the
+one field that could re-identify a customer who asked to be forgotten.
+`anonymize_account_data` now deletes the membership (claimed or pending) and
+nulls the number out of the audit, keeping the row itself.
+
+### The search bug that surfaced it
+
+`profiles.phone_number` is stored raw from `auth.users.phone`, so live data held
+**four `9665…` and one `+9665…`**. The admin search matched a raw substring, so:
+
+| typed | matched |
+| --- | --- |
+| `+966555…` | 1 of 5 customers |
+| `0555…` | 0 of 5 |
+| `555…` | 5 of 5 |
+
+A customer who existed and one who did not both rendered as *"No matching
+customers"*, and the admin could not tell them apart.
+`admin_search_role_candidates` now normalizes **both sides** through
+`normalize_ksa_e164`: a complete number matches exactly, a partial matches
+forgivingly. The same function backs the staff-role candidate picker, so that
+trap is closed too.
+
 ## Administration
 
 **Finance → Comped Customers** in the console (`CompMembersPanel`).
 
-- Search any customer by name, email or phone (reuses
-  `admin_search_role_candidates`, already admin-gated).
+- **Comp a phone number directly**, in any format (`05…`, `+9665…`, `9665…`,
+  `00966…`). If nobody holds it, the row shows **NOT SIGNED UP YET** and the
+  save message says the comp goes live when they sign up — it is never reported
+  as a live discount for a person who does not exist.
+- Or search an existing customer by name, email or phone (reuses
+  `admin_search_role_candidates`, already admin-gated). A fruitless search now
+  points at the phone form rather than dead-ending.
 - Adding or removing requires a **reason of 3–500 characters**. It is enforced
   in the RPC, not only in the form.
 - The confirmation names the person and spells out the consequence — *"Every
@@ -332,7 +441,11 @@ The receipt carries the same line — without it a comped receipt reads
 | `supabase/migrations/20260826090000_comp_members.sql` | `comp_members`, `comp_member_audit`, three admin RPCs, `orders.is_comped` / `orders.comp_discount_amount` |
 | `supabase/migrations/20260826100000_comp_order_totals.sql` | `place_order`, `compute_order_snapshot`, `insert_order_from_snapshot` |
 | `supabase/migrations/20260826110000_checkout_zero_total_idempotency.sql` | `begin_checkout_session` retry fix |
-| `supabase/tests/comp_members_test.sql` | 17 cases — the first suite anywhere that places a zero-total order |
+| `supabase/migrations/20260827090000_admin_search_phone_normalization.sql` | **unapplied** — `admin_search_role_candidates` normalizes phone on both sides |
+| `supabase/migrations/20260827100000_comp_members_by_phone.sql` | **unapplied** — `phone_e164`, the OTP claim, the four admin RPCs |
+| `supabase/migrations/20260827110000_comp_erasure.sql` | **unapplied** — `anonymize_account_data` reaches the comp tables |
+| `supabase/tests/comp_members_test.sql` | 27 cases — the first suite anywhere that places a zero-total order |
+| `supabase/tests/admin_search_phone_normalization_test.sql` | 6 cases — every typed shape of a number finds its customer |
 | `src/lib/compMembersApi.ts`, `src/components/admin/CompMembersPanel.tsx` | the console panel |
 | `apps/mobile/src/features/checkout/previewTotals.ts` | the preview line |
 | `supabase/functions/_shared/lazywait.ts` | the POS label |

@@ -124,11 +124,11 @@ begin
   end loop;
 
   -- anon may not execute the writer.
-  if has_function_privilege('anon', 'public.admin_set_comp_member(uuid, boolean, text)', 'execute') then
+  if has_function_privilege('anon', 'public.admin_set_comp_member(uuid, boolean, text, text)', 'execute') then
     raise exception 'FAIL 2: anon can execute admin_set_comp_member';
   end if;
   if not has_function_privilege('authenticated',
-        'public.admin_set_comp_member(uuid, boolean, text)', 'execute') then
+        'public.admin_set_comp_member(uuid, boolean, text, text)', 'execute') then
     raise exception 'FAIL 2: authenticated cannot execute admin_set_comp_member';
   end if;
 
@@ -705,6 +705,408 @@ begin
   end if;
 
   raise notice 'case 13 ok — % audit row(s) survived a deleted account', v_orphaned;
+end $$;
+
+-- ============================================================================
+-- 14-20 cover 20260827100000: a comp can now be attached to a PHONE NUMBER
+-- before that person has an account, and binds itself when Auth confirms it.
+--
+-- Cases 1-13 above are UNCHANGED and still pass, which is the load-bearing
+-- evidence for this design: the money path (place_order,
+-- compute_order_snapshot, insert_order_from_snapshot) was not touched at all.
+-- A pending comp is invisible to pricing because it has no profile_id, and an
+-- account with no orders cannot be charged wrongly.
+-- ============================================================================
+\set newbie    '''00000000-0000-0000-0000-0000000ca005'''
+\set signup    '''00000000-0000-0000-0000-0000000ca006'''
+\set withdrawn '''00000000-0000-0000-0000-0000000ca007'''
+
+-- ============================================================================
+-- 14. Comp a number that belongs to nobody yet
+-- ============================================================================
+select set_config('test.auth_uid', :admin, true);
+select set_config('test.is_admin', 'true', true);
+do $$
+declare v jsonb; v_row public.comp_members; v_audit public.comp_member_audit;
+begin
+  v := public.admin_set_comp_member(null::uuid, true,
+        'guest of the owner, has not signed up yet', '0500000009');
+
+  if not (v ->> 'pending')::boolean then
+    raise exception 'FAIL 14: a number with no account did not come back pending';
+  end if;
+  if (v ->> 'phone_e164') <> '+966500000009' then
+    raise exception 'FAIL 14: stored phone is %, expected canonical +966500000009',
+      v ->> 'phone_e164';
+  end if;
+
+  select * into v_row from public.comp_members where phone_e164 = '+966500000009';
+  if v_row.id is null then
+    raise exception 'FAIL 14: no membership row was created';
+  end if;
+  if v_row.profile_id is not null then
+    raise exception 'FAIL 14: a pending row was linked to an account that does not exist';
+  end if;
+  if not v_row.is_active then
+    raise exception 'FAIL 14: the pending row is not active';
+  end if;
+
+  -- The audit must still answer "who was made free, and why" when there is no
+  -- account to name.
+  select * into v_audit from public.comp_member_audit
+   where target_phone = '+966500000009';
+  if v_audit.id is null then
+    raise exception 'FAIL 14: the audit did not record the number';
+  end if;
+  if v_audit.target_user_id is not null then
+    raise exception 'FAIL 14: the audit named an account that does not exist';
+  end if;
+
+  raise notice 'case 14 ok — an unregistered number can be comped, and reads as pending';
+end $$;
+
+-- ============================================================================
+-- 15. One number, five shapes, one row — and a non-mobile is refused
+-- ============================================================================
+-- This is the defect that started the whole change: the admin panel searched
+-- `+966555820667` against raw stored strings and found nothing, because live
+-- data holds four `9665…` and one `+9665…`. Canonicalising on the way IN is
+-- what makes the shape stop mattering.
+do $$
+declare v_shape text; v_refused boolean; v_n integer;
+begin
+  foreach v_shape in array array[
+    '+966500000009', '966500000009', '00966500000009', '0500000009', '500000009'
+  ] loop
+    v_refused := false;
+    begin
+      perform public.admin_set_comp_member(null::uuid, true, 'the same number again', v_shape);
+    exception when sqlstate 'P0001' then
+      v_refused := true;   -- "already comped" — it resolved to the SAME row
+    end;
+    if not v_refused then
+      raise exception 'FAIL 15: shape % was treated as a different number', v_shape;
+    end if;
+  end loop;
+
+  select count(*) into v_n from public.comp_members where phone_e164 = '+966500000009';
+  if v_n <> 1 then
+    raise exception 'FAIL 15: % rows exist for one number', v_n;
+  end if;
+
+  -- A landline is not a sign-in identity, so comping one could never take
+  -- effect. Refused at the door rather than stored as a string nothing matches.
+  v_refused := false;
+  begin
+    perform public.admin_set_comp_member(null::uuid, true, 'a landline', '0112345678');
+  exception when sqlstate '22023' then
+    v_refused := true;
+  end;
+  if not v_refused then
+    raise exception 'FAIL 15: a landline was accepted as a comped number';
+  end if;
+
+  raise notice 'case 15 ok — every shape of one number is one row; a non-mobile is refused';
+end $$;
+
+-- ============================================================================
+-- 16. THE REQUIREMENT: they sign up, and the food is free
+-- ============================================================================
+-- "when the number of someone in comped customers enters the app, they should
+-- see the prices as 0" — owner, 2026-08-27.
+insert into auth.users (id, phone) values (:newbie, '966500000009');
+
+do $$
+declare v_row public.comp_members;
+begin
+  -- Signed up, but the OTP has not been confirmed yet. Nothing may bind on an
+  -- unproven number.
+  select * into v_row from public.comp_members where phone_e164 = '+966500000009';
+  if v_row.profile_id is not null then
+    raise exception 'FAIL 16: the comp bound to an UNCONFIRMED number';
+  end if;
+end $$;
+
+-- The OTP lands. This is the only moment the number is trustworthy.
+update auth.users set phone_confirmed_at = now() where id = :newbie;
+
+do $$
+declare v_row public.comp_members;
+begin
+  select * into v_row from public.comp_members where phone_e164 = '+966500000009';
+  if v_row.profile_id is null then
+    raise exception 'FAIL 16: the comp did not bind when the OTP was confirmed';
+  end if;
+  if v_row.profile_id <> '00000000-0000-0000-0000-0000000ca005' then
+    raise exception 'FAIL 16: the comp bound to % instead', v_row.profile_id;
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :newbie, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+
+  if o.total <> 0 then
+    raise exception 'FAIL 16: the newly-claimed member was charged %', o.total;
+  end if;
+  if not o.is_comped then
+    raise exception 'FAIL 16: the order is not marked comped';
+  end if;
+  if o.subtotal <> 32 then
+    raise exception 'FAIL 16: subtotal is %, expected the real goods value 32', o.subtotal;
+  end if;
+  if o.comp_discount_amount <> 32 then
+    raise exception 'FAIL 16: comp_discount_amount is %, expected 32', o.comp_discount_amount;
+  end if;
+  if o.payment_status <> 'paid' then
+    raise exception 'FAIL 16: payment_status is %, expected paid', o.payment_status;
+  end if;
+
+  raise notice 'case 16 ok — comped BEFORE signing up, free on the first order after it';
+end $$;
+
+-- ============================================================================
+-- 17. The other Auth path: a signup that arrives already confirmed
+-- ============================================================================
+select set_config('test.auth_uid', :admin, true);
+select set_config('test.is_admin', 'true', true);
+select public.admin_set_comp_member(null::uuid, true, 'second guest', '0500000006');
+
+insert into auth.users (id, phone, phone_confirmed_at)
+values (:signup, '+966500000006', now());
+
+do $$
+declare v_row public.comp_members;
+begin
+  select * into v_row from public.comp_members where phone_e164 = '+966500000006';
+  if v_row.profile_id <> '00000000-0000-0000-0000-0000000ca006' then
+    raise exception 'FAIL 17: handle_new_user did not claim a pre-confirmed number (profile_id %)',
+      v_row.profile_id;
+  end if;
+  raise notice 'case 17 ok — a signup that arrives pre-confirmed claims on insert';
+end $$;
+
+-- ============================================================================
+-- 18. A withdrawn invitation stays withdrawn
+-- ============================================================================
+-- The number is comped, then switched off BEFORE anybody signs up. When it
+-- finally does sign up the row must bind (so the decision is not silently
+-- reversible by re-adding) but must NOT be active.
+select public.admin_set_comp_member(null::uuid, true,  'invited to eat free', '0500000007');
+select public.admin_set_comp_member(null::uuid, false, 'invitation withdrawn before they joined', '0500000007');
+
+insert into auth.users (id, phone, phone_confirmed_at)
+values (:withdrawn, '966500000007', now());
+
+do $$
+declare v_row public.comp_members;
+begin
+  select * into v_row from public.comp_members where phone_e164 = '+966500000007';
+  if v_row.profile_id is null then
+    raise exception 'FAIL 18: a deactivated number did not bind to its account';
+  end if;
+  if v_row.is_active then
+    raise exception 'FAIL 18: signing up REACTIVATED a withdrawn comp';
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :withdrawn, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+  if o.is_comped or o.total = 0 then
+    raise exception 'FAIL 18: a withdrawn invitation still ate free (total %, comped %)',
+      o.total, o.is_comped;
+  end if;
+  raise notice 'case 18 ok — a comp withdrawn before signup does not revive on signup';
+end $$;
+
+-- ============================================================================
+-- 19. Pending rows are nobody's business but the admin's
+-- ============================================================================
+-- A pending row holds somebody else's phone number. The own-row RLS policy
+-- filters on `profile_id = auth.uid()`, which NULL never satisfies — but that
+-- is worth pinning, because a policy written as `profile_id is not distinct
+-- from auth.uid()` would leak every pending number to every customer.
+select set_config('test.auth_uid', :admin, true);
+select set_config('test.is_admin', 'true', true);
+select public.admin_set_comp_member(null::uuid, true, 'still pending, for case 19', '0500000005');
+
+select set_config('test.auth_uid', :member, true);
+select set_config('test.is_admin', 'false', true);
+set local role authenticated;
+do $$
+declare v_n integer; v_leaked boolean := false;
+begin
+  select count(*) into v_n from public.comp_members where profile_id is null;
+  if v_n <> 0 then
+    raise exception 'FAIL 19: a customer can see % pending comp row(s)', v_n;
+  end if;
+
+  -- The number itself is not in the customer-facing column grant either.
+  begin
+    perform cm.phone_e164 from public.comp_members cm limit 1;
+    v_leaked := true;
+  exception when insufficient_privilege then
+    null;   -- 42501, as intended
+  end;
+  if v_leaked then
+    raise exception 'FAIL 19: a customer can read phone_e164 off comp_members';
+  end if;
+
+  raise notice 'case 19 ok — pending comps and their numbers are invisible to customers';
+end $$;
+reset role;
+
+-- ============================================================================
+-- 20. Deleting an account takes the number with it
+-- ============================================================================
+-- 20260827110000. The membership has no FK when it is pending, and the audit
+-- deliberately outlives the account — so the number is the one field that could
+-- re-identify a customer who asked to be forgotten.
+do $$
+declare v_res jsonb; v_members integer; v_phones integer; v_audit integer;
+begin
+  v_res := public.anonymize_account_data('00000000-0000-0000-0000-0000000ca005');
+
+  select count(*) into v_members from public.comp_members
+   where profile_id = '00000000-0000-0000-0000-0000000ca005';
+  if v_members <> 0 then
+    raise exception 'FAIL 20: % membership row(s) survived erasure', v_members;
+  end if;
+
+  select count(*) into v_phones from public.comp_members
+   where phone_e164 = '+966500000009';
+  if v_phones <> 0 then
+    raise exception 'FAIL 20: the erased number is still comped';
+  end if;
+
+  select count(*) into v_audit from public.comp_member_audit
+   where target_phone = '+966500000009';
+  if v_audit <> 0 then
+    raise exception 'FAIL 20: % audit row(s) still carry the erased number', v_audit;
+  end if;
+
+  -- The trail itself must remain: erasure removes the identifier, not the
+  -- record that somebody was comped and why.
+  select count(*) into v_audit from public.comp_member_audit
+   where reason = 'guest of the owner, has not signed up yet';
+  if v_audit <> 1 then
+    raise exception 'FAIL 20: erasure destroyed the audit row instead of the number';
+  end if;
+
+  if (v_res ->> 'comp_memberships_deleted')::integer < 1 then
+    raise exception 'FAIL 20: the summary did not report the membership deletion';
+  end if;
+
+  raise notice 'case 20 ok — erasure removes the comp and scrubs the number, keeping the trail';
+end $$;
+
+-- ============================================================================
+-- 21-22 cover the review findings on PR #272: there are THREE paths that prove
+-- phone ownership in this project, not two, and one of them does not go through
+-- Supabase Auth at all.
+-- ============================================================================
+\set otponly '''00000000-0000-0000-0000-0000000ca008'''
+
+-- ============================================================================
+-- 21. An UNCONFIRMED Auth phone must not bind a comp
+-- ============================================================================
+-- `auth.users.phone` is set when an OTP is REQUESTED and confirmed only when it
+-- is answered, so a row can legitimately hold an unproven number. Binding on it
+-- would hand the comp to whoever holds the half-finished account.
+insert into auth.users (id, phone) values (:otponly, '966500000008');
+
+select set_config('test.auth_uid', :admin, true);
+select set_config('test.is_admin', 'true', true);
+do $$
+declare v jsonb; v_row public.comp_members;
+begin
+  v := public.admin_set_comp_member(null::uuid, true, 'guest, mid-signup', '0500000008');
+
+  if not (v ->> 'pending')::boolean then
+    raise exception 'FAIL 21: an UNCONFIRMED phone bound the comp to an account';
+  end if;
+
+  select * into v_row from public.comp_members where phone_e164 = '+966500000008';
+  if v_row.profile_id is not null then
+    raise exception 'FAIL 21: profile_id was set from an unproven number';
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :otponly, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+  if o.is_comped or o.total = 0 then
+    raise exception 'FAIL 21: an unverified account ate free (total %, comped %)',
+      o.total, o.is_comped;
+  end if;
+  raise notice 'case 21 ok — an unconfirmed Auth phone leaves the comp pending';
+end $$;
+
+-- ============================================================================
+-- 22. The WhatsApp OTP path claims it — `mark_phone_verified`
+-- ============================================================================
+-- `whatsapp-verify-otp` never touches Supabase Auth: it verifies the code itself
+-- and records the result through mark_phone_verified, which writes `profiles`
+-- only. Without a claim there, on_auth_user_phone_confirmed never fires and the
+-- customer is charged in full forever.
+--
+-- Safe to claim here because ownership is proven by the time it runs: the
+-- function is EXECUTE-able by service_role alone, and its only caller checks the
+-- requested number against auth.users.phone before consuming a matching OTP.
+do $$
+declare v_granted boolean;
+begin
+  -- If a client role could ever call this, the claim below would be a way to
+  -- hand yourself somebody else's comp.
+  select has_function_privilege('authenticated', 'public.mark_phone_verified(uuid, text)', 'execute')
+      or has_function_privilege('anon', 'public.mark_phone_verified(uuid, text)', 'execute')
+    into v_granted;
+  if v_granted then
+    raise exception 'FAIL 22: a client role can execute mark_phone_verified';
+  end if;
+end $$;
+
+select public.mark_phone_verified(:otponly, '+966500000008');
+
+do $$
+declare v_row public.comp_members;
+begin
+  select * into v_row from public.comp_members where phone_e164 = '+966500000008';
+  if v_row.profile_id <> '00000000-0000-0000-0000-0000000ca008' then
+    raise exception 'FAIL 22: the WhatsApp OTP path did not claim the comp (profile_id %)',
+      v_row.profile_id;
+  end if;
+end $$;
+
+select set_config('test.auth_uid', :otponly, true);
+select set_config('test.is_admin', 'false', true);
+do $$
+declare o public.orders;
+begin
+  o := public.place_order(
+        'b0000000-0000-0000-0000-000000000001'::uuid, 'pickup',
+        '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":1}]'::jsonb);
+  if o.total <> 0 or not o.is_comped then
+    raise exception 'FAIL 22: still charged after verification (total %, comped %)',
+      o.total, o.is_comped;
+  end if;
+  raise notice 'case 22 ok — a verified WhatsApp OTP claims the comp, and the food is free';
 end $$;
 
 do $$ begin raise notice 'comp_members_test: all assertions passed'; end $$;
