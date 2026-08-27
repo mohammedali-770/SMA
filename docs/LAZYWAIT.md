@@ -345,11 +345,17 @@ instead of the live config row.) Field-by-field state:
   label and the continued absence of `isPaid`. Comped orders themselves are
   documented in `docs/DISCOUNTS_CAMPAIGNS.md`.
 
-  **Not live until `lazywait-sync` is redeployed** (a §5 action). Until then a
-  comped order syncs correctly but arrives unlabelled. The redeploy is
-  order-independent with respect to the migration: the worker reads orders
-  through `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
-  missing `is_comped` column yields `undefined` rather than a failed select.
+  **LIVE since 2026-08-26 12:46 UTC**, when `lazywait-sync` was redeployed to
+  **v5** on explicit owner approval (`verify_jwt` unchanged at `false`). All five
+  bundle files were read back and hashed byte-identical to the repository; the
+  cron ran the new version at 12:47:00 and succeeded. Detail:
+  `docs/OWNER_ACTIONS.md` §20.
+
+  The redeploy was order-independent with respect to the migration — the worker
+  reads orders through `claim_lazywait_sync_batch`, which returns
+  `setof public.orders`, so a missing `is_comped` column would have yielded
+  `undefined` rather than a failed select — but in the event the migration went
+  first anyway.
 - `name` and `names{en,ar}` carry the **chosen tier**, not the bare product name
   — `Chicken Wings — Small` / `أجنحة الدجاج — صغير`, composed by
   `posLineName`. **The POS renders the name we send; it does not resolve

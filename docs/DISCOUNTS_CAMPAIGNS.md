@@ -130,13 +130,12 @@ becomes live for a given person the moment an administrator adds them in
 **Finance → Comped Customers**. All 44 orders that existed at the time of the
 application were verified unchanged.
 
-Two owner actions remain before it is fully visible:
+**One owner action remains** before it is fully visible: **the app build**. The
+checkout and receipt lines ship with it, and the two new `orders` columns exist
+as of the application, so it is safe to ship now.
 
-1. **the app build** — the checkout and receipt lines ship with it. The two new
-   `orders` columns exist as of the application, so the build is safe to ship
-   now;
-2. **the `lazywait-sync` redeploy** — until it happens a comped ticket reaches
-   the branch **unlabelled**, indistinguishable from a paid one.
+The `lazywait-sync` redeploy is **done** — v5, 2026-08-26 12:46 UTC — so a
+comped ticket already reaches the branch labelled.
 
 ## What the owner asked for
 
@@ -263,9 +262,12 @@ annotates the field that already carries the customer's instructions. For the
 same reason the text states what the order **is** rather than instructing the
 cashier what to collect.
 
-**The label only reaches the branch after `lazywait-sync` is redeployed**, which
-is its own §5 action. Until then a comped order syncs correctly but arrives
-unlabelled.
+**The label is LIVE.** `lazywait-sync` was redeployed to **v5** on 2026-08-26 at
+12:46 UTC on explicit owner approval, with `verify_jwt` unchanged at `false`.
+All five bundle files were read back and hashed byte-identical to the merged
+repository, an unsigned POST returned `401 unauthorized` proving the module
+boots and its gate holds, and the cron ran the new version at 12:47:00 and
+succeeded. Record: `docs/OWNER_ACTIONS.md` §20.
 
 ## Administration
 
@@ -347,12 +349,13 @@ The receipt carries the same line — without it a comped receipt reads
    one column is missing — so a build that reaches customers first would make
    order history fail to load entirely rather than degrade. Same trap as
    `ORDER_ITEM_SELECT` and `lazywait-sync` (CLAUDE.md §8).
-3. **Then, separately,** redeploy `lazywait-sync` for the POS label. This one is
-   order-independent: the worker reads orders through
-   `claim_lazywait_sync_batch`, which returns `setof public.orders`, so a
-   missing column yields `undefined` rather than a failed select.
+3. ~~**Then, separately,** redeploy `lazywait-sync` for the POS label.~~
+   **DONE 2026-08-26 (v5).** It was order-independent: the worker reads orders
+   through `claim_lazywait_sync_batch`, which returns `setof public.orders`, so
+   a missing column would have yielded `undefined` rather than a failed select.
 
-Each of the three is its own owner action under CLAUDE.md §5.
+Each of the three is its own owner action under CLAUDE.md §5; two are done and
+only the app build is outstanding.
 
 ## Known follow-up, not fixed here
 
