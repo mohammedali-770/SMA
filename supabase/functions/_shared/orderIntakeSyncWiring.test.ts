@@ -221,6 +221,23 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c).toMatch(/await Promise\.all\(\[\s*admin\.from\('branches'\)/);
   });
 
+  it('bounds the customer wait at 5 s, not 11 s', () => {
+    const c = code('order-intake');
+    expect(c).toContain('const SYNC_TIMEOUT_MS = 5_000;');
+    expect(c).not.toContain('11_000');
+  });
+
+  it('does NOT shorten the Create Order timeout, which means something else', () => {
+    // lazywaitFetch's 15 s on /pos/orders/create is the boundary between
+    // proven-not-sent and may-have-been-sent: a timeout there is classified
+    // `ambiguous` and routes to confirmation_required rather than a resend,
+    // because Create Order has no idempotency key. Cutting it would convert
+    // slow-but-successful tickets into orders a human must verify by hand.
+    // It is the obvious next thing to "optimise" and it must not be.
+    const c = code('lazywait-sync');
+    expect(c).toMatch(/path: '\/pos\/orders\/create', body: built\.payload, timeoutMs: 15000/);
+  });
+
   it('order-intake still bounds the kick and still sends the secret', () => {
     // Unchanged guarantees — the targeting must not have loosened either.
     const c = code('order-intake');
