@@ -185,6 +185,10 @@ describe('serializeCreateOrder — confirmed body (default, delivery gate OFF)',
     const full = {
       clientId: 'CID_1', branchId: 'BR_RUH', orderType: 'pickup' as const, customerName: 'Ahmed',
       orderDetails: 'Ring the bell', customerId: 'CRM_9', customerPhone: '0541234567', isPaid: false,
+      // `money` is a CONFIRMED field as of 2026-08-27. Supplying it here is the
+      // point of this test: without it the drift went unnoticed, because the
+      // typed client dropped every total while the worker sent them.
+      money: { subtotal: 57.5, discount: 0, tax: 7.5, total: 57.5, deliveryFee: 0 },
       items: [{
         menuItemId: 'IT_BURGER', name: 'Beef Burger', nameAr: 'برجر', quantity: 1, unitPrice: 30,
         menuCategoryId: 'CAT_MAIN', priceId: 'PR_SINGLE', note: 'No onions',

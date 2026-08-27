@@ -392,11 +392,12 @@ export interface CreateOrderInput {
    * `orders.is_comped` — the customer is a comped member and the order total is
    * 0.00.
    *
-   * Without this the branch is told NOTHING: no order-level money is sent at
-   * all (see the money note in buildCreateOrderPayload) and each line carries
-   * its undiscounted menu price, so a comped ticket is byte-for-byte
-   * indistinguishable from a full-price one. The cashier would have no way to
-   * know why nobody is paying.
+   * Each line carries its UNDISCOUNTED menu price, so without this the cashier
+   * has no words for why nobody is paying. Since 2026-08-27 the ticket also
+   * prints `Subtotal 9.00 / Discount 9.00 / Total 0.00`, so the numbers
+   * corroborate the label — but before that no order-level money was sent at
+   * all and a comped ticket was byte-for-byte indistinguishable from a
+   * full-price one, which is the hole this was written to close.
    *
    * It is a LABEL in the free-text note, deliberately NOT the `is_paid`
    * contract flag. The distinction is the point: `is_paid` changes the POS's

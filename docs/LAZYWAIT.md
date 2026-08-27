@@ -332,11 +332,15 @@ instead of the live config row.) Field-by-field state:
   *** COMPLIMENTARY / ضيافة *** — No onions
   ```
 
-  Without it the branch is told **nothing**: no order-level money is sent at all
-  (Q9) and each line carries its undiscounted menu price, so a free ticket is
-  byte-for-byte indistinguishable from a paid one and the cashier has no way to
-  know why nobody is paying. It is prefixed rather than appended so it survives
-  a POS display that truncates a long note.
+  It is prefixed rather than appended so it survives a POS display that
+  truncates a long note.
+
+  It mattered even more before totals were sent: with no order-level money at
+  all, a free ticket was byte-for-byte indistinguishable from a paid one. Since
+  2026-08-27 a comped ticket also prints `Subtotal 9.00 / Discount 9.00 /
+  Total 0.00`, so the numbers now corroborate the label — but the label stays,
+  because each LINE still carries its undiscounted menu price and "why is nobody
+  paying" is a question the label answers in words.
 
   It is deliberately **not** the contract's `is_paid` flag. `is_paid` changes the
   POS's own payment state, which is the financial signal CLAUDE.md §6 reserves
@@ -398,10 +402,16 @@ instead of the live config row.) Field-by-field state:
 - `customer_cell` is the **local subscriber number**; the dialling prefix travels
   separately in `country_code`. E.164 is never sent in `customer_cell`. A number
   we cannot split confidently (non-Saudi, unparseable) sends **neither** field.
-- **No totals are sent** — not `subtotal`, `tax`, `total` or
-  `order_delivery_fee`. The contract's example adds tax on top of the item
-  prices; ours are VAT-inclusive, and the document does not say what the POS does
-  when the tax fields are absent. Open question **Q9**.
+- **Totals ARE sent, since 2026-08-27** — `subtotal`, `discount`, `tax`, `total`
+  and, on a delivery order, `order_delivery_fee`. Each is copied **verbatim**
+  from the order snapshot (`orders.subtotal`, `vat_amount`, `total`,
+  `delivery_fee`, and the three discount columns summed), so the ticket carries
+  the same numbers as the customer's receipt and nothing is recomputed. `tax` is
+  the VAT **contained within** `total`, never added to it. Q9 was answered by a
+  printed ticket — see "Order totals printed as 0.00" below. **`tax_percentage`
+  is still not sent**: it is optional, `tax` says the same thing, and a
+  percentage is the one field that might invite the POS to recompute
+  `subtotal × 1.15`.
 - **`is_paid` is supported but not wired.** It is a confirmed field, but telling
   a cashier an order needs no cash is a financial signal and payment work is
   frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
@@ -752,9 +762,13 @@ COMPLIMENTARY label, which explains itself.
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
 `order_deliveries[]` element shape — the vendor's own **pickup** sample sends it
 EMPTY next to `order_payments[]`/`order_taxes[]`, so it is a POS-side collection
-rather than caller input — `order_status_id`, and every money field including
-`order_delivery_fee` (Q9: the vendor example adds tax on top, our prices include
-it).
+rather than caller input — `order_status_id`, `tax_percentage` (see the payload
+section: `tax` carries the same information without inviting a recompute), and
+`is_paid` (CLAUDE.md §6).
+
+**The money fields are no longer on this list.** `subtotal`, `discount`, `tax`,
+`total` and `order_delivery_fee` have been sent since 2026-08-27; Q9 was answered
+by a printed ticket rather than by the vendor.
 
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
@@ -953,8 +967,10 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   went live 2026-08-26 and delivery on 2026-08-27, proven by SM-2026-000059.
   What remains genuinely unconfirmed is narrower and listed under "Still
   intentionally NOT sent": coordinates, the `order_deliveries[]` element shape,
-  `order_status_id` and every money field. **Q8 is still open** — whether the POS
-  renders `delivery_address`, which only a printed ticket can answer.
+  and `order_status_id`. The money fields left that list on 2026-08-27 when Q9
+  was answered by a printed ticket. **Q8 is answered too, and negatively** — the
+  POS does NOT render `delivery_address`, which is why the duplicate line in
+  `order_details` is permanent.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
 - **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line
