@@ -123,6 +123,103 @@ reconciliation, and `reference.order` is a bound field that `payment-verify`
 validates, so changing it would weaken payment verification. The description is
 visible on Tap's hosted page; see §10.
 
+### When the number appears — and why it once took 45 seconds
+
+`order-intake` kicks `lazywait-sync` **synchronously** immediately after
+`place_order`, bounded by an ~11 s timeout, so the confirmation screen can show
+the branch number on first paint. The once-a-minute cron is the **backstop**, not
+the primary path — an order that misses the synchronous window is finished by the
+worker and the screen fills in later.
+
+**Delivery did not get that kick until 2026-08-27.** The block read
+`if (order_type === 'pickup')`, which was correct only while the insert trigger
+parked every delivery order at `blocked` — kicking the worker for an order it
+would refuse was pointless. Once §7's prediction came true the condition was a
+leftover, and delivery fell through to the cron:
+
+| Order | Placed → branch number | Attempts |
+| --- | --- | --- |
+| SM-2026-000059 | 42.3 s | first try |
+| SM-2026-000060 | 32.2 s | first try |
+| SM-2026-000061 | 17.8 s | first try |
+| SM-2026-000062 | 44.6 s | first try |
+
+**Every one succeeded on the first attempt**, so none of that was the POS. It was
+the wait for the next tick, and the 18-45 s spread is only where in the minute
+each order happened to land.
+
+### The push must follow the send, not precede it
+
+The "order received" push fires **after** the sync block, and that ordering is
+load-bearing rather than incidental. For pickup it therefore followed a real
+attempt. For delivery the block was skipped entirely, so the customer was told
+*"we sent it to the kitchen"* before anything had been sent anywhere — a claim
+about the branch made before the branch had heard of the order.
+
+`orderIntakeSyncWiring.test.ts` now pins the ordering positionally in the source,
+because no runtime test can: the handler imports Deno-only modules, so Vitest
+cannot execute it and `deno check` only typechecks.
+
+### The POS outcome owns the customer's first message
+
+**`order-intake` no longer sends any push.** It used to fire
+`order_status/received` unconditionally — *"we received your order and sent it to
+the kitchen"* — which is a claim about the **branch**, made whether or not the
+branch had heard of the order.
+
+The POS outcome now owns that message, because only the POS outcome knows the
+truth:
+
+| Outcome | Event | What the customer is told |
+| --- | --- | --- |
+| reached the branch | `pos_confirmed` | "confirmed by the restaurant" |
+| retryable failure | `pos_retrying` | "confirming it with the restaurant, no need to place it again" |
+| ambiguous | `pos_confirmation_required` | "we are verifying" |
+| terminal failure | `pos_failed` | "we could not send it" |
+
+`pos_confirmed` now fires on **every** success. It used to be gated behind a
+prior failure, which is why **not one `pos_sync` row had ever been written** — and
+why the next problem went unnoticed for so long.
+
+### The wording matters as much as the timing
+
+`pos_retrying` and `pos_confirmation_required` used to end **"Please do not place
+another order." / "فضلاً لا تنشئ طلبًا جديدًا."** The intent was *do not
+duplicate this order while we sort it out.* What it actually reads as — and the
+owner read it exactly this way, in Arabic — is **"do not order from us again"**.
+
+Saying that at the precise moment something has gone wrong is the worst available
+time to sound like a rejection. Both messages now say *"no need to place it
+again"* and pair it with what is being done about it, so the same instruction
+lands as reassurance rather than a ban. Keep that shape: this copy is read by
+someone who is already worried.
+
+### The gap this uncovered: nothing was sending them
+
+`record_lazywait_sync` and `reap_stale_lazywait_syncs` enqueued deduplicated
+`kind='pos_sync'` rows, and `push-dispatch` has a complete `pos_sync` action to
+render and send one. **Nothing connected the two** — no cron, no trigger on
+`notification_log` (only a status normaliser and an `updated_at` setter), and no
+caller anywhere. Those rows would have sat `pending` for ever.
+
+It had never shown because no sync had ever failed *and* `pos_confirmed` was
+gated behind a failure, so the queue had never held a single row. The first real
+POS failure would have been met with silence — precisely when a customer most
+needs to hear that we are on it and they need not re-order.
+
+`lazywait-sync` now drains that queue (`dispatchPendingPosSync`, bounded at
+`POS_NOTIFY_DRAIN_LIMIT`) at the end of every run. It is the right home: it
+already runs every minute, it produces most of these events, and `order-intake`
+already invokes it synchronously at checkout — so on the happy path the
+confirmation push rides the very invocation that created it, a second or two
+after the customer pressed the button, rather than waiting for a tick.
+
+The drain is a pure **consumer** and never invents an event. `push-dispatch`
+re-validates each one against the order's current state
+(`pos_sync_status_matches`, marking a stale event `superseded` rather than
+sending it) and its fenced claim keeps delivery at-most-once, so a slow or
+duplicated drain can neither double-send nor send something no longer true.
+
 ## 5. Customer resend — proven-not-sent only
 
 **Lazywait's Create Order endpoint has no idempotency key.** The existing
@@ -195,17 +292,25 @@ reduced to an md5 fingerprint and no provider payload stored anywhere.
 
 ## 7. Channels without a branch step
 
-Delivery orders are held at `blocked` / `delivery_schema_unconfirmed` because the
-Lazywait delivery Create Order schema is unconfirmed and is never invented. Under
-a literal "confirmed only after Lazywait accepts" rule, every paid delivery order
-would be permanently unconfirmed, exhaust zero retries, and be auto-refunded.
+**Superseded 2026-08-27 — delivery is now a full branch channel, and this
+section's own prediction is what made it painless.**
+
+Delivery orders *used* to be held at `blocked` / `delivery_schema_unconfirmed`,
+because the Lazywait delivery Create Order schema was unconfirmed and is never
+invented. Under a literal "confirmed only after Lazywait accepts" rule, every
+paid delivery order would have been permanently unconfirmed, exhausted zero
+retries, and been auto-refunded.
 
 `pos_confirmation_channel_active()` decides participation, and is expressed in
-terms of the **sync state**, not the order type. Delivery is excluded today only
-because it is blocked with that specific reason. When Lazywait publishes the
-delivery API and `set_lazywait_initial_sync` starts enqueuing delivery to
-`pending` like pickup, delivery becomes gate-active automatically — no change to
-the state machine, the RPCs, the refund predicate, or the app.
+terms of the **sync state**, not the order type. That is what this section
+predicted would matter: *"when `set_lazywait_initial_sync` starts enqueuing
+delivery to `pending` like pickup, delivery becomes gate-active automatically —
+no change to the state machine, the RPCs, the refund predicate, or the app."*
+
+Migration `20260827120000` did exactly that, and the prediction held: **nothing
+in the state machine, the RPCs, the refund predicate or the app was touched.**
+Delivery became gate-active on its own. SM-2026-000059 was the first delivery
+order the POS accepted (ticket #3, first attempt).
 
 A `blocked` order whose reason is a *real* POS rejection (bad licence, bad
 mapping) stays inside the gate and is treated as a genuine branch failure.

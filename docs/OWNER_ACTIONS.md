@@ -1238,15 +1238,23 @@ bidirectional algorithm. The header is a clean repro that does not involve our
 integration. **Do not work around it by pre-reversing our text** — it would
 break when they fix it and be wrong in every other surface that reads the field.
 
-**C. Decide what money to send to the POS (Q9).** Ticket #3 printed
-`Subtotal 0.00 / VAT 0.00 / Total 0.00` for a **cash** order whose real total is
-**28.00**, with the line items showing 23.00 and 5.00. A driver reading it has
-no idea what to collect. This affects pickup identically — no money has ever
-been sent — but delivery makes it dangerous because the food leaves with a
-driver. Proposed resolution, needing vendor confirmation and one test order:
-send the VAT-exclusive decomposition, which is self-consistent whether the POS
-displays the fields or recomputes `subtotal × 1.15`. This changes what money
-prints on a customer receipt, so it is an owner decision either way.
+**C.** ~~Decide what money to send to the POS (Q9).~~ **DECIDED AND BUILT
+2026-08-27**, on the owner's approval. Ticket #3 printed
+`Subtotal 0.00 / VAT 0.00 / Total 0.00` for a **cash** order really worth
+**28.00**, with the lines showing 23.00 and 5.00 — a driver had no idea what to
+collect.
+
+**The ticket answered its own question.** The blocker was not knowing whether the
+POS computes or displays; sending nothing and getting `0.00` while the lines were
+visible proves it **displays**. So subtotal / discount / tax / total /
+order_delivery_fee are now copied **verbatim** from the order snapshot — no
+recomputation, no new rounding, the same numbers as the customer's receipt.
+`tax_percentage` and `is_paid` stay unsent, for reasons recorded in
+`docs/LAZYWAIT.md`.
+
+**Still needs a deploy** (§5) and one live order to confirm the printed ticket.
+No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
+so the worker already had every money column.
 
 ### One consequence worth stating
 
@@ -1254,6 +1262,42 @@ With the watchdog migration applied, **`20260824100000_moyasar_payment_provider`
 is now the only unapplied migration in the repository.** An instruction like
 "apply the outstanding migrations" therefore has exactly one possible target, and
 that target is the frozen one (§6). Name the file explicitly, always.
+
+**D. Deploy `order-intake`** (§5) — the immediate POS sync kick was gated to
+pickup, so delivery orders waited for the once-a-minute cron (measured 17.8-44.6 s,
+all first-attempt successes). Removing the gate should put the branch number on
+the confirmation screen in ~1-2 s. Fix is merged and tested; it needs a deploy of
+`order-intake`, which has not been redeployed for this.
+
+**E.** ~~Decide the `received` push copy — still not honest.~~ **DECIDED AND
+BUILT 2026-08-27.** The owner chose accuracy over immediacy: *"I prefer the
+accurate and little slow option."*
+
+`order-intake` no longer pushes at all. The POS outcome owns the customer's first
+message — `pos_confirmed` on success, `pos_retrying` / `pos_confirmation_required`
+/ `pos_failed` otherwise — and `pos_confirmed` now fires on **every** success
+rather than only after a prior failure.
+
+**Building it uncovered a live gap worth its own line.** Those four messages were
+enqueued into `notification_log` as `kind='pos_sync'`, `push-dispatch` had a
+complete action to send them, and **nothing connected the two** — no cron, no
+trigger, no caller. Zero such rows had ever existed, because no sync had ever
+failed and `pos_confirmed` was gated behind a failure. The first real POS failure
+would have been met with silence. `lazywait-sync` now drains that queue every
+run, and on the happy path within the same invocation `order-intake` triggers, so
+the customer hears in a second or two.
+
+**Customer copy corrected in the same change.** `pos_retrying` and
+`pos_confirmation_required` used to end "Please do not place another order." /
+"فضلاً لا تنشئ طلبًا جديدًا." Intended as *do not duplicate this one*; read as
+*do not order from us again*, which is the worst thing to say at the moment
+something has gone wrong. Both now say "no need to place it again" alongside what
+we are doing about it. **This adds `push-dispatch` to the deploy list.**
+
+**Needs a deploy** (§5) of `lazywait-sync`, `order-intake` AND `push-dispatch` — they are two
+halves of one change, and deploying only one is worse than neither: `order-intake`
+alone removes the push and nothing replaces it; `lazywait-sync` alone sends
+`pos_confirmed` alongside the old `received` and the customer gets two.
 
 ### A decision recorded rather than taken
 

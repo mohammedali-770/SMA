@@ -332,11 +332,15 @@ instead of the live config row.) Field-by-field state:
   *** COMPLIMENTARY / ضيافة *** — No onions
   ```
 
-  Without it the branch is told **nothing**: no order-level money is sent at all
-  (Q9) and each line carries its undiscounted menu price, so a free ticket is
-  byte-for-byte indistinguishable from a paid one and the cashier has no way to
-  know why nobody is paying. It is prefixed rather than appended so it survives
-  a POS display that truncates a long note.
+  It is prefixed rather than appended so it survives a POS display that
+  truncates a long note.
+
+  It mattered even more before totals were sent: with no order-level money at
+  all, a free ticket was byte-for-byte indistinguishable from a paid one. Since
+  2026-08-27 a comped ticket also prints `Subtotal 9.00 / Discount 9.00 /
+  Total 0.00`, so the numbers now corroborate the label — but the label stays,
+  because each LINE still carries its undiscounted menu price and "why is nobody
+  paying" is a question the label answers in words.
 
   It is deliberately **not** the contract's `is_paid` flag. `is_paid` changes the
   POS's own payment state, which is the financial signal CLAUDE.md §6 reserves
@@ -398,10 +402,16 @@ instead of the live config row.) Field-by-field state:
 - `customer_cell` is the **local subscriber number**; the dialling prefix travels
   separately in `country_code`. E.164 is never sent in `customer_cell`. A number
   we cannot split confidently (non-Saudi, unparseable) sends **neither** field.
-- **No totals are sent** — not `subtotal`, `tax`, `total` or
-  `order_delivery_fee`. The contract's example adds tax on top of the item
-  prices; ours are VAT-inclusive, and the document does not say what the POS does
-  when the tax fields are absent. Open question **Q9**.
+- **Totals ARE sent, since 2026-08-27** — `subtotal`, `discount`, `tax`, `total`
+  and, on a delivery order, `order_delivery_fee`. Each is copied **verbatim**
+  from the order snapshot (`orders.subtotal`, `vat_amount`, `total`,
+  `delivery_fee`, and the three discount columns summed), so the ticket carries
+  the same numbers as the customer's receipt and nothing is recomputed. `tax` is
+  the VAT **contained within** `total`, never added to it. Q9 was answered by a
+  printed ticket — see "Order totals printed as 0.00" below. **`tax_percentage`
+  is still not sent**: it is optional, `tax` says the same thing, and a
+  percentage is the one field that might invite the POS to recompute
+  `subtotal × 1.15`.
 - **`is_paid` is supported but not wired.** It is a confirmed field, but telling
   a cashier an order needs no cash is a financial signal and payment work is
   frozen (CLAUDE.md §6). Wiring it is a separate owner decision.
@@ -645,6 +655,46 @@ was `set_lazywait_initial_sync`, a BEFORE INSERT trigger that parked every
 delivery order at `blocked` before the worker could claim it. That is why
 SM-2026-000057 died with `sync_attempt_count = 0`.
 
+### How fast an order reaches the branch, and why it used to be slow
+
+`order-intake` kicks `lazywait-sync` **synchronously** right after `place_order`,
+bounded by an ~11 s timeout, so the confirmation screen can show the branch
+number immediately. The once-a-minute cron is the *backstop*, not the primary
+path.
+
+**Delivery did not get that kick until 2026-08-27.** The block read
+`if (order_type === 'pickup')`, which was correct only while the insert trigger
+parked every delivery order at `blocked` — kicking the worker for an order it
+would refuse was pointless. Once migration `20260827120000` opened that gate the
+condition became a leftover, and delivery orders fell through to the cron:
+
+| Order | Placed → branch number | Attempts |
+| --- | --- | --- |
+| SM-2026-000059 | 42.3 s | first try |
+| SM-2026-000060 | 32.2 s | first try |
+| SM-2026-000061 | 17.8 s | first try |
+| SM-2026-000062 | 44.6 s | first try |
+
+Every one succeeded on the **first attempt**, so none of that time was Lazywait.
+It was the wait for the next cron tick, and the 18-45 s spread is just where in
+the minute the order happened to land.
+
+**It also produced the false push.** The "order received" push fires *after* the
+sync block, so for pickup it followed a real attempt; for delivery the block was
+skipped entirely and the customer was told the kitchen had an order that had not
+been sent anywhere. Closing the gate makes the ordering honest for both, and
+`orderIntakeSyncWiring.test.ts` now pins that the sync call precedes the push
+call in the source.
+
+That gate was the **fifth** place the pickup-only assumption was written down,
+after the insert trigger, `buildCreateOrderPayload`, `confirm_order_payment` and
+the watchdog's R1/R7.
+
+**Also fixed, 2026-08-27:** `order-intake` no longer sends any push at all. The
+POS outcome owns the customer's first message, and `lazywait-sync` now drains the
+`pos_sync` notification queue that — until this change — **nothing was
+draining**. Detail in `docs/ORDER_CONFIRMATION_FLOW.md`.
+
 ### Two POS-side defects the first ticket exposed
 
 Both were found on ticket #3 and neither is fixable from our payload.
@@ -667,37 +717,58 @@ vendor fixes the renderer, and it would be wrong everywhere else the field is
 read — their dashboard, any export, any other template. Report it with the
 header as evidence.
 
-**2. Order totals print as 0.00.** Ticket #3 shows the two line items at 23.00
-and 5.00, then `Subtotal 0.00`, `VAT 0.00`, `Total 0.00`. SM-2026-000059 is a
-**cash** order with a real total of **28.00**, not comped — so a driver reading
-that ticket has no idea what to collect.
+**2. Order totals printed as 0.00 — FIXED 2026-08-27 (Q9 answered).** Ticket #3
+showed the two line items at 23.00 and 5.00, then `Subtotal 0.00`, `VAT 0.00`,
+`Total 0.00`. SM-2026-000059 is a **cash** order with a real total of **28.00**,
+not comped — so a driver reading that ticket had no idea what to collect. It was
+never a delivery bug: no money was sent for pickup either, so every ticket had
+it. Delivery only made it dangerous, because the food leaves with a driver.
 
-This is Q9 arriving in practice. We deliberately send no order-level money
-(see the money note in `buildCreateOrderPayload`) because the contract's example
-computes `total = subtotal × 1.15`, i.e. VAT **added on top**, while our stored
-prices are VAT-**inclusive**; filling those fields blind would print a wrong
-number on a customer's receipt. The printed evidence now shows the cost of
-sending nothing: zeros.
+**The ticket itself answered the question that had blocked this.** The open
+worry was that the contract's example computes `total = subtotal × 1.15` — VAT
+added on top — while our prices are VAT-inclusive, so we could not tell whether
+the POS **computes** or **displays**. Ticket #3 settles it: we sent no money and
+it printed `0.00` for all three. **A POS that computed a subtotal from the lines
+would have printed 28.00**, because the lines were right there at 23.00 and 5.00.
+It displays what it is given.
 
-It is **not a delivery bug** — no money is sent for pickup either, so every
-ticket has had this. Delivery only makes it dangerous, because the food leaves
-the building with a driver.
+So the money is now sent, and every value is copied **verbatim** from the order
+snapshot — `orders.subtotal`, `orders.vat_amount`, `orders.total`,
+`orders.delivery_fee`, and the three discount columns summed into the contract's
+single `discount`. Nothing is recomputed, which is the whole point: these are the
+same numbers on the customer's own receipt, so the ticket cannot disagree with
+what was charged and no new rounding enters the path.
 
-The promising resolution, still to be confirmed with the vendor and tested on one
-order before being trusted: send the VAT-**exclusive** decomposition
-(`subtotal` 24.35, `tax` 3.65, `total` 28.00, with line prices likewise
-exclusive). That is self-consistent under *both* readings — a POS that displays
-the fields verbatim shows 28.00, and a POS that recomputes `subtotal × 1.15`
-also reaches 28.00. Rounding across many lines needs checking before it ships.
-Changing what money prints on a customer receipt is an owner decision.
+`tax` is the VAT **contained within** `total`, not added to it — the template
+already prints "Total includes VAT". Line prices are **unchanged** and stay
+VAT-inclusive: they match what the customer saw in the app and have printed
+correctly for weeks, and re-basing them exclusive would put prices on the ticket
+the customer never agreed to.
+
+Two fields stay deliberately unsent:
+
+- **`tax_percentage`** — optional, and the explicit `tax` amount carries the same
+  information. A percentage is exactly the field that might invite the POS to
+  recompute `subtotal × 1.15` and print 32.20 on a 28.00 order. Not worth the
+  tidiness on a customer-facing money figure.
+- **`is_paid`** — still the CLAUDE.md §6 financial signal reserved for a separate
+  owner decision. Telling a branch what an order is *worth* is not the same as
+  telling the POS it has been *settled*.
+
+A comped order now prints `Subtotal 9.00 / Discount 9.00 / Total 0.00` beside the
+COMPLIMENTARY label, which explains itself.
 
 ### Still intentionally NOT sent (do not invent)
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
 `order_deliveries[]` element shape — the vendor's own **pickup** sample sends it
 EMPTY next to `order_payments[]`/`order_taxes[]`, so it is a POS-side collection
-rather than caller input — `order_status_id`, and every money field including
-`order_delivery_fee` (Q9: the vendor example adds tax on top, our prices include
-it).
+rather than caller input — `order_status_id`, `tax_percentage` (see the payload
+section: `tax` carries the same information without inviting a recompute), and
+`is_paid` (CLAUDE.md §6).
+
+**The money fields are no longer on this list.** `subtotal`, `discount`, `tax`,
+`total` and `order_delivery_fee` have been sent since 2026-08-27; Q9 was answered
+by a printed ticket rather than by the vendor.
 
 ## Retry / backoff / dead-letter
 - Retryable (429, 5xx, network/timeout): `sync_attempt_count++`,
@@ -896,8 +967,10 @@ psql -h 127.0.0.1 -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
   went live 2026-08-26 and delivery on 2026-08-27, proven by SM-2026-000059.
   What remains genuinely unconfirmed is narrower and listed under "Still
   intentionally NOT sent": coordinates, the `order_deliveries[]` element shape,
-  `order_status_id` and every money field. **Q8 is still open** — whether the POS
-  renders `delivery_address`, which only a printed ticket can answer.
+  and `order_status_id`. The money fields left that list on 2026-08-27 when Q9
+  was answered by a printed ticket. **Q8 is answered too, and negatively** — the
+  POS does NOT render `delivery_address`, which is why the duplicate line in
+  `order_details` is permanent.
 - No Create-Customer CRM endpoint → we never create Lazywait customers.
 - No documented sandbox → live end-to-end waits on a test env/creds from Lazywait.
 - **No stock/86/snooze endpoint exists.** Corrected 2026-08-20: this line

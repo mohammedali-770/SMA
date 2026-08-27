@@ -53,9 +53,29 @@ Deno.serve(async (req: Request) => {
   const orderId = order?.id ? String(order.id) : null;
   if (!orderId) return json({ error: 'Order was not created.' }, 400);
 
-  // Best-effort synchronous POS sync for pickup orders (delivery is 'blocked' at
-  // insert). Fully guarded — a POS/network problem never fails the order.
-  if (String(order?.order_type) === 'pickup') {
+  // Best-effort synchronous POS sync, for PICKUP AND DELIVERY alike. Fully
+  // guarded — a POS/network problem never fails the order.
+  //
+  // This used to read `if (order_type === 'pickup')`, which was correct only
+  // while `set_lazywait_initial_sync` parked every delivery order at `blocked`
+  // on INSERT: kicking the worker for an order it would refuse was pointless.
+  // Migration 20260827120000 removed that trigger branch and worker v6 sends
+  // delivery, so the gate became a leftover — and an expensive one. A delivery
+  // order fell through to the once-a-minute cron instead, which is exactly the
+  // 18-45 s the owner measured between placing an order and the branch number
+  // appearing (SM-2026-000059 42.3 s, -60 32.2 s, -61 17.8 s, -62 44.6 s — all
+  // first-attempt successes, so the wait was the tick, never the POS).
+  //
+  // It also explains the false push. The "order received" push below fires
+  // AFTER this block, so for pickup it followed a real sync attempt; for
+  // delivery the block was skipped entirely and the customer was told the
+  // kitchen had their order before anything had been sent. Closing the gate
+  // makes the ordering honest for both.
+  //
+  // This was the FIFTH place the pickup-only assumption was written down —
+  // after the insert trigger, `buildCreateOrderPayload`, `confirm_order_payment`
+  // and the watchdog's R1/R7.
+  {
     try {
       const admin = adminClient();
       const cfg = await getProviderConfig(admin, 'lazywait');
@@ -73,27 +93,31 @@ Deno.serve(async (req: Request) => {
     } catch { /* never block/fail the order on a POS hiccup — background retry covers it */ }
   }
 
-  // Best-effort "order received" push (cash/order-first path — the order now
-  // exists with status 'received'). push-dispatch is master-flag gated and
-  // idempotent per (order,status); a push failure never affects the order.
-  // The task is REGISTERED with the Edge Runtime (waitUntil) so returning the
-  // response cannot kill it mid-flight; when waitUntil is unavailable the
-  // call is awaited, bounded by its 4s timeout.
-  try {
-    const url = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (url && serviceKey) {
-      const pushPromise = fetch(`${url}/functions/v1/push-dispatch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ action: 'order_status', orderId, status: 'received' }),
-        signal: AbortSignal.timeout(4000),
-      }).then(() => undefined, () => undefined); // never throws
-      const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
-      if (runtime?.waitUntil) runtime.waitUntil(pushPromise);
-      else await pushPromise;
-    }
-  } catch { /* notification is best-effort only */ }
+  // NO "order received" push is sent from here, deliberately — removed
+  // 2026-08-27. Do not put one back without reading this.
+  //
+  // This used to fire `order_status/received` unconditionally, whose copy is
+  // "We received your order and sent it to the kitchen" / "استلمنا طلبك وتم
+  // إرساله إلى المطبخ". That is a claim about the BRANCH, and it was made
+  // whether or not the branch had heard of the order: for delivery the sync
+  // block above was skipped entirely, so the customer was told the kitchen had
+  // their food before anything had been sent anywhere. The owner's instruction
+  // was exact — it "shall not happen until the order is reached lazywait".
+  //
+  // The POS outcome now owns the customer's first message, because only the POS
+  // outcome knows the truth. `record_lazywait_sync` enqueues one deduplicated
+  // event per transition and `lazywait-sync` dispatches it in the same
+  // invocation this function just triggered:
+  //
+  //   reached the branch  -> pos_confirmed             "confirmed by the restaurant"
+  //   retryable failure   -> pos_retrying              "we are retrying, do not reorder"
+  //   ambiguous outcome   -> pos_confirmation_required "we are verifying"
+  //   terminal failure    -> pos_failed                "we could not send it"
+  //
+  // So the customer still hears within a second or two on the happy path — and
+  // whatever they hear is true. `STATUS_COPY.received` is retained in
+  // push-dispatch for the admin status path, which is a real transition made by
+  // a human and is unaffected.
 
   // Return ONLY the customer-safe projection of the fresh RLS-scoped row, so the
   // client sees the branch (POS) number if it arrived in time. The internal SM-…

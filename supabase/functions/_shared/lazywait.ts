@@ -392,11 +392,12 @@ export interface CreateOrderInput {
    * `orders.is_comped` — the customer is a comped member and the order total is
    * 0.00.
    *
-   * Without this the branch is told NOTHING: no order-level money is sent at
-   * all (see the money note in buildCreateOrderPayload) and each line carries
-   * its undiscounted menu price, so a comped ticket is byte-for-byte
-   * indistinguishable from a full-price one. The cashier would have no way to
-   * know why nobody is paying.
+   * Each line carries its UNDISCOUNTED menu price, so without this the cashier
+   * has no words for why nobody is paying. Since 2026-08-27 the ticket also
+   * prints `Subtotal 9.00 / Discount 9.00 / Total 0.00`, so the numbers
+   * corroborate the label — but before that no order-level money was sent at
+   * all and a comped ticket was byte-for-byte indistinguishable from a
+   * full-price one, which is the hole this was written to close.
    *
    * It is a LABEL in the free-text note, deliberately NOT the `is_paid`
    * contract flag. The distinction is the point: `is_paid` changes the POS's
@@ -415,6 +416,39 @@ export interface CreateOrderInput {
    * (Q3), so there is nowhere to put them that Lazywait has confirmed.
    */
   deliveryAddress?: DeliveryAddressInput | string | null;
+  /**
+   * Order-level money. When omitted the ticket prints `0.00` for subtotal, VAT
+   * and total — which is what every ticket did before 2026-08-27, and what made
+   * a 28.00 cash order unreadable to the driver.
+   */
+  money?: CreateOrderMoneyInput | null;
+}
+
+/**
+ * Order-level money for the ticket, taken **verbatim** from the order snapshot.
+ *
+ * Every field is a stored column, never a recomputation: `subtotal`,
+ * `vat_amount`, `total`, `delivery_fee` and the three discount columns are what
+ * `compute_order_snapshot` already decided and what the customer's own receipt
+ * shows. Copying them means the ticket cannot disagree with what was charged,
+ * and there is no new rounding anywhere in this path.
+ *
+ * **Everything here is VAT-INCLUSIVE**, because our prices are. `tax` is the VAT
+ * *contained within* `total`, not an amount to be added to it — for a 28.00
+ * order, `total` 28.00 and `tax` 3.65. The printed template already says
+ * "Total includes VAT", which is the same convention.
+ */
+export interface CreateOrderMoneyInput {
+  /** `orders.subtotal` — the lines before discounts, VAT-inclusive. */
+  subtotal: number;
+  /** Every discount summed: coupon + loyalty + comp. */
+  discount?: number | null;
+  /** `orders.vat_amount` — the VAT CONTAINED WITHIN `total`. */
+  tax?: number | null;
+  /** `orders.total` — what the customer actually pays. The number that matters. */
+  total: number;
+  /** `orders.delivery_fee`. Only meaningful on a delivery order. */
+  deliveryFee?: number | null;
 }
 
 /** The subset of `orders.address_snapshot` that can be written to a ticket. */
@@ -765,8 +799,9 @@ export function mapOrderItemRows(rows: Array<Record<string, unknown>>): CreateOr
  * normal sync failure with the API's own message — which is a better answer
  * than a hypothetical.
  *
- * Money stays absent for delivery exactly as for pickup, including
- * `order_delivery_fee`: see the money note below (Q9).
+ * Money is sent as of 2026-08-27, for pickup and delivery alike, copied verbatim
+ * from the order snapshot — see the money note below for what ticket #3 proved
+ * and what is still deliberately withheld (`tax_percentage`, `is_paid`).
  *
  * Returns a blockedReason instead of throwing so the worker can record it.
  */
@@ -849,15 +884,61 @@ export function buildCreateOrderPayload(input: CreateOrderInput): BuildResult {
 
   if (typeof input.isPaid === 'boolean') payload.is_paid = input.isPaid;
 
-  // MONEY, deliberately absent. The contract carries subtotal/discount/tax/
-  // tax_percentage/total/order_delivery_fee, and its example computes
-  // total = subtotal × 1.15 — i.e. tax ADDED ON TOP of the item prices. Ours are
-  // VAT-INCLUSIVE, so those fields cannot be filled from our numbers without
-  // deciding a question the document does not answer: what the POS does with
-  // prices when the tax fields are absent (which is the case today, and pickup
-  // tickets are correct). Sending a guessed subtotal/tax/total would disagree
-  // with what the customer was charged. Recorded as Q9 in
-  // docs/lazywait-delivery-open-questions.md instead.
+  // ---- MONEY (Q9, answered by a printed ticket on 2026-08-27) -------------
+  //
+  // Until this was wired, no money field was sent at all, and ticket #3 printed
+  // `Subtotal 0.00 / VAT 0.00 / Total 0.00` for a CASH order really worth 28.00.
+  // A driver reading that has no idea what to collect. It was never a delivery
+  // bug — pickup sent nothing either — but delivery made it dangerous, because
+  // the food leaves the building.
+  //
+  // WHAT THE TICKET SETTLED. The contract's example computes
+  // `total = subtotal × 1.15`, tax added on top, while our prices are
+  // VAT-inclusive; the open question was whether the POS COMPUTES or DISPLAYS.
+  // Ticket #3 answers it: we sent no money and it printed 0.00 for all three. A
+  // POS that computed a subtotal from the lines would have printed 28.00, since
+  // the lines were there at 23.00 and 5.00. **It displays what it is given.**
+  //
+  // So every value below is copied VERBATIM from the order snapshot —
+  // `orders.subtotal`, `orders.vat_amount`, `orders.total`, `orders.delivery_fee`
+  // and the three discount columns. Nothing is recomputed here, which is the
+  // whole point: these are the same numbers on the customer's receipt, so the
+  // ticket cannot disagree with what was charged, and no rounding is introduced.
+  //
+  // `tax` is the VAT CONTAINED WITHIN `total`, not an amount added to it. The
+  // printed template already says "Total includes VAT".
+  //
+  // `tax_percentage` is deliberately NOT sent. It is optional, the explicit
+  // `tax` amount carries the same information, and a percentage is exactly the
+  // kind of field that could invite the POS to recompute `subtotal × 1.15` and
+  // print 32.20 on a 28.00 order. Adding an unknown trigger to a customer-facing
+  // money figure is not worth the tidiness.
+  //
+  // Line prices are UNCHANGED and stay VAT-inclusive. They match what the
+  // customer saw in the app and have printed correctly for weeks; re-basing them
+  // exclusive would put prices on the ticket the customer never agreed to.
+  //
+  // `is_paid` is still NOT sent — that remains the CLAUDE.md §6 financial signal
+  // reserved for a separate owner decision. Telling a cashier what an order is
+  // worth is not the same as telling the POS it has been paid.
+  if (input.money) {
+    const m = input.money;
+    // subtotal and total are ALWAYS sent when money is supplied, including a
+    // 0.00 total: a comped order printing `Total 0.00` next to the
+    // COMPLIMENTARY label is precisely the intended ticket.
+    payload.subtotal = round2(Number(m.subtotal ?? 0));
+    payload.total = round2(Number(m.total ?? 0));
+    // The rest are omitted when zero, matching every other optional field here:
+    // a 0.00 VAT line on a comped ticket is noise, not information.
+    const discount = round2(Number(m.discount ?? 0));
+    if (discount > 0) payload.discount = discount;
+    const tax = round2(Number(m.tax ?? 0));
+    if (tax > 0) payload.tax = tax;
+    // Contract field is `order_delivery_fee`, NOT `delivery_fee`, and it is
+    // meaningless on a pickup ticket.
+    const fee = round2(Number(m.deliveryFee ?? 0));
+    if (isDelivery && fee > 0) payload.order_delivery_fee = fee;
+  }
 
   return { ok: true, payload };
 }

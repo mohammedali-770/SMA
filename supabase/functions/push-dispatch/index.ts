@@ -91,6 +91,17 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
 // POS confirmation-lifecycle copy (EN/AR). Body strings are the EXACT approved
 // customer messages. Data-free like STATUS_COPY. These correspond to the four
 // deduplicated pos_sync transitions the sync worker/reaper enqueue.
+//
+// WORDING, corrected 2026-08-27. `pos_retrying` and `pos_confirmation_required`
+// used to end "Please do not place another order." / "فضلاً لا تنشئ طلبًا
+// جديدًا." The intent was "do not DUPLICATE this order while we sort it out";
+// what it actually reads as — and the owner read it this way, in Arabic — is
+// "do not order from us again". Telling a customer that at the exact moment
+// something has gone wrong is the worst possible time to sound like a rejection.
+//
+// Both now say "no need to place it again" and pair it with what we are doing
+// about it, so the same instruction lands as reassurance rather than a ban. Keep
+// that shape: this copy is read by someone who is already worried.
 type PosSyncStatus = 'pos_retrying' | 'pos_confirmed' | 'pos_confirmation_required' | 'pos_failed';
 const POS_SYNC_COPY: Record<PosSyncStatus, { en: { title: string; body: string }; ar: { title: string; body: string } }> = {
   pos_confirmed: {
@@ -100,21 +111,21 @@ const POS_SYNC_COPY: Record<PosSyncStatus, { en: { title: string; body: string }
   pos_retrying: {
     en: {
       title: 'Confirming your order…',
-      body: 'We received your order, but could not yet confirm that it reached the restaurant. We are retrying automatically. Please do not place another order.',
+      body: 'We have your order and are confirming it with the restaurant. No need to place it again — we will update you shortly.',
     },
     ar: {
       title: 'جارٍ تأكيد طلبك…',
-      body: 'استلمنا طلبك، لكن لم نتمكن من تأكيد وصوله إلى المطعم حتى الآن.\nنعيد المحاولة تلقائيًا. فضلاً لا تنشئ طلبًا جديدًا.',
+      body: 'طلبك لدينا ونعمل على تأكيده مع المطعم.\nلا داعي لإعادة إرساله — سنوافيك بالتحديث قريبًا.',
     },
   },
   pos_confirmation_required: {
     en: {
       title: 'Verifying your order',
-      body: 'We could not verify whether your order reached the restaurant. Our team is reviewing it. Please do not place another order.',
+      body: 'We are checking whether your order reached the restaurant. No need to place it again — our team is on it and will update you.',
     },
     ar: {
       title: 'جارٍ التحقق من طلبك',
-      body: 'تعذر علينا التحقق من وصول طلبك إلى المطعم.\nفريقنا يراجع الطلب. فضلاً لا تنشئ طلبًا جديدًا.',
+      body: 'نتحقق من وصول طلبك إلى المطعم.\nلا داعي لإعادة إرساله — فريقنا يتابع الأمر وسيوافيك.',
     },
   },
   pos_failed: {

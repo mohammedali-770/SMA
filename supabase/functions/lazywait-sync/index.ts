@@ -135,7 +135,9 @@ Deno.serve(async (req: Request) => {
           p_log_status: 'skipped',
           p_error: 'already_created_no_resend',
           // If a prior failure was already surfaced, close it with "confirmed".
-          p_notify_status: order.first_pos_sync_failure_at != null ? 'pos_confirmed' : null,
+          // Every success tells the customer, not just one that follows a
+          // failure. See the note on dispatchPendingPosSync below.
+          p_notify_status: 'pos_confirmed',
         });
         continue;
       }
@@ -185,8 +187,12 @@ Deno.serve(async (req: Request) => {
       // `isPaid` is deliberately NOT passed: `is_paid` is a confirmed contract
       // field, but telling a cashier an order needs no cash is a financial
       // signal and payment work is frozen (CLAUDE.md §6). Wiring it is a
-      // separate owner decision. Totals are omitted too — see the money note in
-      // `buildCreateOrderPayload` and Q9 in the open-questions document.
+      // separate owner decision.
+      //
+      // Order TOTALS are passed as of 2026-08-27 (Q9). That is a different
+      // thing from `is_paid`: it tells the branch what the order is worth, not
+      // that it has been settled. Every value is a stored snapshot column,
+      // copied verbatim — see the money note in `buildCreateOrderPayload`.
       const built = buildCreateOrderPayload({
         clientId: lw.clientId,
         branchId: (branch as { lazywait_branch_id?: string } | null)?.lazywait_branch_id ?? null,
@@ -194,10 +200,11 @@ Deno.serve(async (req: Request) => {
         customerName: String(order.customer_name ?? 'Guest'),
         items: mappedItems,
         orderDetails: (order.notes as string | null) ?? null,
-        // The ONLY thing that tells the branch this ticket is free. No
-        // order-level money is sent and the lines carry menu prices, so
-        // without the label a comped ticket looks exactly like a paid one.
-        // It is a note, not the `is_paid` contract flag - see CreateOrderInput.
+        // What tells the branch, in words, that this ticket is free. The lines
+        // carry undiscounted menu prices, so the label is what explains why
+        // nobody is paying; the totals sent below corroborate it with
+        // `Total 0.00`. It is a note, not the `is_paid` contract flag — see
+        // CreateOrderInput.
         isComped: Boolean(order.is_comped),
         customerId: crmCustomerId,
         customerPhone: (order.customer_phone as string | null) ?? null,
@@ -211,6 +218,20 @@ Deno.serve(async (req: Request) => {
           description?: string | null;
           national_short_address?: string | null;
         } | null) ?? null,
+        // Straight from the claimed row — `claim_lazywait_sync_batch` returns
+        // `SETOF orders`, so these are the authoritative snapshot values and no
+        // extra read is needed. Discounts are summed because the contract has
+        // ONE `discount` field while we track coupon, loyalty and comp
+        // separately; the sum is what came off this order's price.
+        money: {
+          subtotal: Number(order.subtotal ?? 0),
+          discount: Number(order.discount_amount ?? 0)
+            + Number(order.loyalty_discount_amount ?? 0)
+            + Number(order.comp_discount_amount ?? 0),
+          tax: Number(order.vat_amount ?? 0),
+          total: Number(order.total ?? 0),
+          deliveryFee: Number(order.delivery_fee ?? 0),
+        },
       });
 
       if (!built.ok) {
@@ -274,7 +295,7 @@ Deno.serve(async (req: Request) => {
           p_patch: { lazywait_sync_state: 'synced', sync_last_error: null,
             synced_at: order.synced_at ?? new Date().toISOString() },
           p_log_status: 'skipped', p_error: 'already_created_no_resend',
-          p_notify_status: priorFailureGate ? 'pos_confirmed' : null,
+          p_notify_status: 'pos_confirmed',
         });
         continue;
       }
@@ -387,8 +408,7 @@ Deno.serve(async (req: Request) => {
           p_log_status: 'success',
           p_request: reqMeta,
           p_response: trimmedResponse,
-          // Only announce "confirmed" if the customer previously saw a failure.
-          p_notify_status: priorFailureAt ? 'pos_confirmed' : null,
+          p_notify_status: 'pos_confirmed',
         });
         continue;
       }
@@ -507,8 +527,93 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  return json({ status: 'ok', ...summary, reaped }, 200);
+  // Drain the POS-lifecycle notifications this run (and any earlier one) queued.
+  // Rows enqueued moments ago by record_lazywait_sync are already committed, so
+  // the fast path — order-intake kicks this worker, an order syncs, its
+  // 'pos_confirmed' event goes out — completes inside this single invocation,
+  // a second or two after the customer pressed the button.
+  const notified = await dispatchPendingPosSync(admin);
+
+  return json({ status: 'ok', ...summary, reaped, notified }, 200);
 });
+
+/**
+ * How many queued POS-lifecycle events one run will dispatch. Bounded so a
+ * backlog cannot turn a sync tick into an unbounded fan-out; the next tick
+ * takes the rest.
+ */
+const POS_NOTIFY_DRAIN_LIMIT = 20;
+
+/**
+ * Send the queued customer messages about what happened at the POS.
+ *
+ * WHY THIS EXISTS. `record_lazywait_sync` and `reap_stale_lazywait_syncs`
+ * enqueue deduplicated `notification_log` rows (kind='pos_sync', send_status
+ * 'pending') for the four lifecycle transitions, and `push-dispatch` has a
+ * complete `pos_sync` action that renders and sends one. Until 2026-08-27
+ * **nothing connected the two**: no cron, no trigger, no caller. Rows would have
+ * sat 'pending' for ever.
+ *
+ * It had never shown, and the reason is worth stating: no sync has ever failed,
+ * and `pos_confirmed` used to be gated behind a prior failure — so not one
+ * pos_sync row had ever been written. The first genuine POS failure would have
+ * been met with silence, exactly when a customer most needs to be told "we are
+ * retrying, please do not order again".
+ *
+ * This worker is the right home. It already runs every minute, it is already the
+ * thing that produces most of these events, and `order-intake` already invokes
+ * it synchronously on checkout — so the confirmation push rides the same
+ * invocation that created it instead of waiting for a tick.
+ *
+ * SAFETY. This is a pure CONSUMER: it never invents an event, it only forwards
+ * rows a producer already committed. `push-dispatch` re-validates every one
+ * against the order's CURRENT state (`pos_sync_status_matches`) and marks a
+ * stale event 'superseded' rather than sending it, and its fenced claim makes
+ * delivery at-most-once under concurrent dispatchers. So a slow or duplicated
+ * drain cannot double-send and cannot send something no longer true.
+ *
+ * Entirely best-effort: a push problem must never affect an order. Every failure
+ * is swallowed and the row is simply retried on a later tick.
+ */
+async function dispatchPendingPosSync(
+  admin: ReturnType<typeof adminClient>,
+): Promise<{ found: number; dispatched: number }> {
+  const out = { found: 0, dispatched: 0 };
+  try {
+    const url = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !serviceKey) return out;
+
+    // Oldest first: a customer waiting on a failure message should not be
+    // overtaken by a fresher confirmation.
+    const { data: pending } = await admin
+      .from('notification_log')
+      .select('order_id, status')
+      .eq('kind', 'pos_sync')
+      .eq('send_status', 'pending')
+      .order('created_at', { ascending: true })
+      .limit(POS_NOTIFY_DRAIN_LIMIT);
+
+    const rows = (pending ?? []) as Array<{ order_id: string | null; status: string | null }>;
+    out.found = rows.length;
+
+    for (const row of rows) {
+      if (!row.order_id || !row.status) continue;
+      try {
+        const res = await fetch(`${url}/functions/v1/push-dispatch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ action: 'pos_sync', orderId: row.order_id, status: row.status }),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (res.ok) out.dispatched++;
+      } catch { /* transient; the row stays 'pending' for the next tick */ }
+    }
+  } catch (e) {
+    console.error('pos_sync drain failed (non-fatal):', safeErr(e instanceof Error ? e.message : String(e)));
+  }
+  return out;
+}
 
 /** Truncate + strip anything token-shaped from an error string before storing. */
 function safeErr(msg: string | null | undefined): string {

@@ -55,6 +55,7 @@ import {
   shouldResendCreateOrder,
   type CreateOrderAddonInput,
   type CreateOrderItemInput,
+  type CreateOrderMoneyInput,
   type CreateOrderOutcome,
   type BuildResult,
   type LazywaitConfig,
@@ -407,6 +408,21 @@ export interface CreateOrderRequest {
   };
 
   /**
+   * Order-level money — CONFIRMED and UNGATED as of 2026-08-27 (Q9 answered by
+   * a printed ticket: the POS displays what it is given rather than computing).
+   *
+   * Forwarded straight to the audited builder, which copies each value verbatim
+   * from the order snapshot. It sits outside `allowAssumedFields` on purpose:
+   * these are contract fields, and omitting them is what made real tickets
+   * print `Total 0.00` on a 28.00 cash order.
+   *
+   * Note `delivery.fee` below is the OLD gated route to `order_delivery_fee`.
+   * When both are supplied the gated one wins, because the assumed block runs
+   * last and is an explicit opt-in override. Prefer `money.deliveryFee`.
+   */
+  money?: CreateOrderMoneyInput | null;
+
+  /**
    * Escape hatch for any other assumed field name. Also GATED and always
    * identity-stripped (order_ref/order_id/order_number/order_date removed).
    */
@@ -443,12 +459,20 @@ export function serializeCreateOrder(req: CreateOrderRequest): BuildResult {
     customerPhone: req.customerPhone,
     isPaid: req.isPaid,
     deliveryAddress: req.delivery?.address ?? null,
+    // Without this the typed client silently dropped every total, so a caller
+    // using LazywaitV2Client.createOrder kept printing 0.00 tickets while the
+    // worker printed correct ones. Caught in review on #277; the "two builders
+    // cannot drift" test now supplies `money` so it would fail again.
+    money: req.money ?? null,
   });
   if (!confirmed.ok || !assumed) return confirmed;
 
   // ---- What is STILL assumed, and therefore still gated --------------------
-  // Coordinates appear nowhere in the contract, and the money fields are
-  // unresolved (Q9: the vendor example adds tax on top, our prices include it).
+  // Coordinates appear nowhere in the contract. The MONEY fields are no longer
+  // among the unresolved ones — Q9 was answered on 2026-08-27 and they are sent
+  // through `money` above, ungated. `delivery.fee` survives here only as the
+  // pre-existing gated route to the same key; it runs last, so an explicit
+  // opt-in caller can still override.
   const payload = confirmed.payload;
 
   const d = req.delivery;
