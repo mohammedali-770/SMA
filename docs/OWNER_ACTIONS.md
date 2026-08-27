@@ -1269,22 +1269,28 @@ all first-attempt successes). Removing the gate should put the branch number on
 the confirmation screen in ~1-2 s. Fix is merged and tested; it needs a deploy of
 `order-intake`, which has not been redeployed for this.
 
-**E. Decide the `received` push copy — still not honest.** The push says "We
-received your order and sent it to the kitchen" / "استلمنا طلبك وتم إرساله إلى
-المطبخ" unconditionally. Fixing D means it now fires *after* a real sync attempt
-rather than before one, but the wording still claims success even when the sync
-failed. Options, none yet chosen because this is a LIVE customer channel (§7):
+**E.** ~~Decide the `received` push copy — still not honest.~~ **DECIDED AND
+BUILT 2026-08-27.** The owner chose accuracy over immediacy: *"I prefer the
+accurate and little slow option."*
 
-1. only send `received` when the order actually reached the POS, and let the
-   existing `pos_retrying` / `pos_confirmation_required` / `pos_failed` copy own
-   the failure story — needs the worker's `pos_confirmed` widened so a *late*
-   success still notifies, otherwise a slow-but-successful sync goes silent;
-2. soften the copy to "we've received your order and are sending it to the
-   restaurant", which is always true and needs no timing logic, at the cost of a
-   second push when the branch number arrives.
+`order-intake` no longer pushes at all. The POS outcome owns the customer's first
+message — `pos_confirmed` on success, `pos_retrying` / `pos_confirmation_required`
+/ `pos_failed` otherwise — and `pos_confirmed` now fires on **every** success
+rather than only after a prior failure.
 
-Option 1 is more accurate, option 2 is simpler and cannot go silent. Owner
-decision.
+**Building it uncovered a live gap worth its own line.** Those four messages were
+enqueued into `notification_log` as `kind='pos_sync'`, `push-dispatch` had a
+complete action to send them, and **nothing connected the two** — no cron, no
+trigger, no caller. Zero such rows had ever existed, because no sync had ever
+failed and `pos_confirmed` was gated behind a failure. The first real POS failure
+would have been met with silence. `lazywait-sync` now drains that queue every
+run, and on the happy path within the same invocation `order-intake` triggers, so
+the customer hears in a second or two.
+
+**Needs a deploy** (§5) of BOTH `lazywait-sync` and `order-intake` — they are two
+halves of one change, and deploying only one is worse than neither: `order-intake`
+alone removes the push and nothing replaces it; `lazywait-sync` alone sends
+`pos_confirmed` alongside the old `received` and the customer gets two.
 
 ### A decision recorded rather than taken
 

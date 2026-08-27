@@ -160,14 +160,52 @@ about the branch made before the branch had heard of the order.
 because no runtime test can: the handler imports Deno-only modules, so Vitest
 cannot execute it and `deno check` only typechecks.
 
-**Still open.** The `received` copy asserts "sent it to the kitchen"
-*unconditionally*, so a **failed** sync still produces that claim — the ordering
-fix means it follows a real attempt, not that it reflects the outcome. Fixing it
-properly needs the `pos_sync` notification rows to actually be dispatched, and
-**nothing currently drains them**: `record_lazywait_sync` and the reaper enqueue
-`kind='pos_sync'` rows, `push-dispatch` has a complete `pos_sync` action to send
-them, and no cron, trigger or caller connects the two. It has never shown because
-no sync has ever failed. See `docs/OWNER_ACTIONS.md` §22-E.
+### The POS outcome owns the customer's first message
+
+**`order-intake` no longer sends any push.** It used to fire
+`order_status/received` unconditionally — *"we received your order and sent it to
+the kitchen"* — which is a claim about the **branch**, made whether or not the
+branch had heard of the order.
+
+The POS outcome now owns that message, because only the POS outcome knows the
+truth:
+
+| Outcome | Event | What the customer is told |
+| --- | --- | --- |
+| reached the branch | `pos_confirmed` | "confirmed by the restaurant" |
+| retryable failure | `pos_retrying` | "we are retrying, please do not order again" |
+| ambiguous | `pos_confirmation_required` | "we are verifying" |
+| terminal failure | `pos_failed` | "we could not send it" |
+
+`pos_confirmed` now fires on **every** success. It used to be gated behind a
+prior failure, which is why **not one `pos_sync` row had ever been written** — and
+why the next problem went unnoticed for so long.
+
+### The gap this uncovered: nothing was sending them
+
+`record_lazywait_sync` and `reap_stale_lazywait_syncs` enqueued deduplicated
+`kind='pos_sync'` rows, and `push-dispatch` has a complete `pos_sync` action to
+render and send one. **Nothing connected the two** — no cron, no trigger on
+`notification_log` (only a status normaliser and an `updated_at` setter), and no
+caller anywhere. Those rows would have sat `pending` for ever.
+
+It had never shown because no sync had ever failed *and* `pos_confirmed` was
+gated behind a failure, so the queue had never held a single row. The first real
+POS failure would have been met with silence — precisely when a customer most
+needs to hear "we are retrying, please do not order again".
+
+`lazywait-sync` now drains that queue (`dispatchPendingPosSync`, bounded at
+`POS_NOTIFY_DRAIN_LIMIT`) at the end of every run. It is the right home: it
+already runs every minute, it produces most of these events, and `order-intake`
+already invokes it synchronously at checkout — so on the happy path the
+confirmation push rides the very invocation that created it, a second or two
+after the customer pressed the button, rather than waiting for a tick.
+
+The drain is a pure **consumer** and never invents an event. `push-dispatch`
+re-validates each one against the order's current state
+(`pos_sync_status_matches`, marking a stale event `superseded` rather than
+sending it) and its fenced claim keeps delivery at-most-once, so a slow or
+duplicated drain can neither double-send nor send something no longer true.
 
 ## 5. Customer resend — proven-not-sent only
 

@@ -680,10 +680,10 @@ That gate was the **fifth** place the pickup-only assumption was written down,
 after the insert trigger, `buildCreateOrderPayload`, `confirm_order_payment` and
 the watchdog's R1/R7.
 
-**Still true, and not fixed by this:** the `received` copy asserts "sent it to
-the kitchen" unconditionally, so a *failed* sync still produces that claim. The
-ordering fix means it now follows a real attempt, but the copy does not yet
-reflect the outcome. See `docs/OWNER_ACTIONS.md` §22.
+**Also fixed, 2026-08-27:** `order-intake` no longer sends any push at all. The
+POS outcome owns the customer's first message, and `lazywait-sync` now drains the
+`pos_sync` notification queue that — until this change — **nothing was
+draining**. Detail in `docs/ORDER_CONFIRMATION_FLOW.md`.
 
 ### Two POS-side defects the first ticket exposed
 
