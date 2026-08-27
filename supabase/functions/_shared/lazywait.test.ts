@@ -311,8 +311,11 @@ describe('buildCreateOrderPayload — confirmed contract (owner-supplied 2026-08
   it('DEDUPES a repeated address part — SM-2026-000059 carried its address four times', () => {
     // The live defect: the app let the same text be saved as BOTH the label and
     // the directions, so the composed line repeated it, and order_details then
-    // repeated the whole line again.
-    const same = 'الناصرة جنب بقالة الرحمة';
+    // repeated the whole line again. Synthetic address on purpose — the real one
+    // is a customer's home (CLAUDE.md §9). Kept in Arabic because that is the
+    // case that matters here: `toLowerCase()` is a no-op on Arabic, so dedupe
+    // has to work on exact match alone.
+    const same = 'حي الاختبار، مبنى ٣';
     const r = buildCreateOrderPayload({
       clientId: 'C', branchId: 'B', orderType: 'delivery', customerName: 'A', items,
       deliveryAddress: { label: same, description: same, national_short_address: null },

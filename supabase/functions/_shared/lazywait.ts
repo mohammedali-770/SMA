@@ -470,11 +470,12 @@ export function formatDeliveryAddress(
   //
   // DEDUPED, because nothing stops a customer saving the same text as both the
   // label and the directions — and SM-2026-000059, the first delivery order to
-  // reach the POS, did exactly that. Its line composed as
-  // "الناصرة جنب بقالة الرحمة · الناصرة جنب بقالة الرحمة", and because the same string is
-  // repeated into `order_details` (see DELIVERY_TICKET_PREFIX) the ticket
-  // carried that address FOUR times. Compare case-insensitively on the trimmed
-  // value; keep the first occurrence, and keep its original casing.
+  // reach the POS, did exactly that. Its line composed as `X · X` for one
+  // address, and because that line is repeated into `order_details` (see
+  // DELIVERY_TICKET_PREFIX) the ticket carried the address FOUR times. The real
+  // value is not quoted here: it is a customer's home (CLAUDE.md §9). Compare
+  // case-insensitively on the trimmed value; keep the first occurrence, and
+  // keep its original casing.
   const parts: string[] = [];
   const seen = new Set<string>();
   for (const raw of [addr.label, addr.national_short_address, addr.description]) {

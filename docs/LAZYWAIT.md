@@ -613,8 +613,10 @@ sent; the destination is composed from `orders.address_snapshot`
 **Repeated parts are deduped**, case-insensitively on the trimmed value, keeping
 the first occurrence. Nothing stops a customer saving the same text as both the
 label and the directions, and SM-2026-000059 did exactly that: its line composed
-as `الناصرة جنب بقالة الرحمة · الناصرة جنب بقالة الرحمة`, which — repeated again
-into `order_details` — put the same address on the ticket four times.
+as `X · X` for a single address, which — repeated again into `order_details` —
+put that address on the ticket four times. The real value is deliberately not
+quoted anywhere in this repository; it is a customer's home address
+(CLAUDE.md §9).
 
 **The address is sent twice, deliberately.** Whether the POS *renders*
 `delivery_address` is Q8 and is not answerable from the API, so the same string
