@@ -1205,9 +1205,19 @@ difference on the v4 deploy of this same function.
    whether the POS renders the dedicated field. If a real ticket shows it, the
    duplicate line can be dropped — on evidence, not in advance. **Only a human
    looking at paper can close this.**
-2. **Apply `20260827130000_watchdog_delivery_coverage`** (§5, not frozen). Until
-   it is applied, watchdog rules R1 and R7 remain blind to failed **paid
-   delivery** orders — see `docs/MIGRATIONS.md` §38.
+2. ~~**Apply `20260827130000_watchdog_delivery_coverage`** (§5, not frozen).~~
+   **DONE 2026-08-27 10:40:53 UTC**, live version `20260827104053`, history
+   116 → 117. R1 and R7 now cover paid delivery orders; verified afterwards with
+   0 pickup filters left in the function, all nine in-body comment probes
+   present, the money-path hashes unchanged, and cron run 26076 succeeding over
+   11 rules. Detail: `docs/MIGRATIONS.md` §38.
+
+### One consequence worth stating
+
+With the watchdog migration applied, **`20260824100000_moyasar_payment_provider`
+is now the only unapplied migration in the repository.** An instruction like
+"apply the outstanding migrations" therefore has exactly one possible target, and
+that target is the frozen one (§6). Name the file explicitly, always.
 
 ### A decision recorded rather than taken
 
