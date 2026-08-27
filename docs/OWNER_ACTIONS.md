@@ -1199,18 +1199,48 @@ difference on the v4 deploy of this same function.
 
 ### What is still open
 
-1. **Q8 — look at a printed delivery ticket.** The address is deliberately sent
-   twice: in the confirmed `delivery_address` field and again inside
-   `order_details` behind `التوصيل إلى / DELIVER TO:`. Nothing in the API says
-   whether the POS renders the dedicated field. If a real ticket shows it, the
-   duplicate line can be dropped — on evidence, not in advance. **Only a human
-   looking at paper can close this.**
+1. ~~**Q8 — look at a printed delivery ticket.**~~ **DONE 2026-08-27** — ticket
+   #3 / invoice 24 inspected. **The POS does NOT render `delivery_address`.**
+   `Order Type: Delivery` prints, but there is no address row anywhere on the
+   ticket; the destination appears only in the `order_details` note. The
+   duplication is therefore **load-bearing and permanent** — without it this
+   ticket would have reached the kitchen with no destination. Detail:
+   `docs/LAZYWAIT.md`.
+
+   That ticket surfaced three further items, below.
 2. ~~**Apply `20260827130000_watchdog_delivery_coverage`** (§5, not frozen).~~
    **DONE 2026-08-27 10:40:53 UTC**, live version `20260827104053`, history
    116 → 117. R1 and R7 now cover paid delivery orders; verified afterwards with
    0 pickup filters left in the function, all nine in-body comment probes
    present, the money-path hashes unchanged, and cron run 26076 succeeding over
    11 rules. Detail: `docs/MIGRATIONS.md` §38.
+
+### Opened by the first printed ticket (2026-08-27)
+
+**A. Redeploy `lazywait-sync` to pick up the address dedupe** (§5). The fix
+merged in `c4b46c1` at 10:40 UTC; the running worker is **v6, deployed 08:40**,
+so it does not have it. SM-2026-000059's saved address has identical `label` and
+`description`, so its ticket printed the address twice inside one note line. The
+code is correct and tested; it just is not live.
+
+**B. Report the Arabic reversal to Lazywait — vendor bug, not ours.** The
+printed ticket reverses Arabic word order, including in **the shop's own header
+and tagline**, which this repository never sends (`الناصرة ،ثابت بن حسان شارع`
+for `شارع حسان بن ثابت، الناصرة`; `الموحد رقمنا على اتصل` for
+`اتصل على رقمنا الموحد`). Their receipt renderer is not applying the Unicode
+bidirectional algorithm. The header is a clean repro that does not involve our
+integration. **Do not work around it by pre-reversing our text** — it would
+break when they fix it and be wrong in every other surface that reads the field.
+
+**C. Decide what money to send to the POS (Q9).** Ticket #3 printed
+`Subtotal 0.00 / VAT 0.00 / Total 0.00` for a **cash** order whose real total is
+**28.00**, with the line items showing 23.00 and 5.00. A driver reading it has
+no idea what to collect. This affects pickup identically — no money has ever
+been sent — but delivery makes it dangerous because the food leaves with a
+driver. Proposed resolution, needing vendor confirmation and one test order:
+send the VAT-exclusive decomposition, which is self-consistent whether the POS
+displays the fields or recomputes `subtotal × 1.15`. This changes what money
+prints on a customer receipt, so it is an owner decision either way.
 
 ### One consequence worth stating
 

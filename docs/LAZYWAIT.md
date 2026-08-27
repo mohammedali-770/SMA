@@ -618,13 +618,23 @@ put that address on the ticket four times. The real value is deliberately not
 quoted anywhere in this repository; it is a customer's home address
 (CLAUDE.md §9).
 
-**The address is sent twice, deliberately.** Whether the POS *renders*
-`delivery_address` is Q8 and is not answerable from the API, so the same string
-is repeated inside `order_details` behind `التوصيل إلى / DELIVER TO:` — the note
-field the branch already reads. A ticket that reaches the kitchen without a
-destination is the worst outcome available, and this costs one line to remove.
-Once a real ticket shows the dedicated field rendered, the duplication can go —
-on evidence, not in advance.
+**The address is sent twice, and Q8 now says it must stay that way.**
+
+The printed ticket for SM-2026-000059 (ticket #3, invoice 24) was inspected on
+2026-08-27. It prints `Order Type: Delivery` — so `order_type` is accepted *and*
+displayed — but there is **no delivery-address row anywhere on it**. The
+destination appears **only** in the note line, as
+`التوصيل إلى / DELIVER TO: …`, printed below `Payments`.
+
+**Q8 is therefore answered, and the answer is the unwelcome one: the POS does
+not render `delivery_address`.** Had the builder trusted that confirmed contract
+field alone, this ticket would have reached the kitchen with no destination on
+it — food made, nobody knowing where it goes, which is the exact failure the
+duplication exists to prevent. The `order_details` copy is not belt-and-braces
+any more; it is the only thing carrying the address.
+
+Do **not** remove it. If a future ticket ever shows a rendered
+`delivery_address` row, revisit then — on evidence, as before.
 
 A delivery order whose snapshot yields **no** usable address is blocked with
 `missing_delivery_address` rather than sent: better no ticket than a ticket the
@@ -634,6 +644,52 @@ driver cannot use.
 was `set_lazywait_initial_sync`, a BEFORE INSERT trigger that parked every
 delivery order at `blocked` before the worker could claim it. That is why
 SM-2026-000057 died with `sync_attempt_count = 0`.
+
+### Two POS-side defects the first ticket exposed
+
+Both were found on ticket #3 and neither is fixable from our payload.
+
+**1. The POS reverses Arabic word order.** On the printed ticket the shop's own
+header reads `الناصرة ،ثابت بن حسان شارع` where it should read
+`شارع حسان بن ثابت، الناصرة`, and its tagline reads `الموحد رقمنا على اتصل`
+where it should read `اتصل على رقمنا الموحد`. Both are **word-for-word reversed,
+with the comma displaced to the wrong side** — the signature of a renderer that
+prints Arabic in logical order without applying the Unicode bidirectional
+algorithm.
+
+That header is the POS's own data. **We never send it.** So the fault is in
+Lazywait's receipt renderer, not in anything this repository controls, and the
+header is a clean vendor repro that does not involve our integration at all.
+Our `التوصيل إلى / DELIVER TO:` note is mangled by the same bug.
+
+**Do not "fix" this by pre-reversing our Arabic.** It would break the day the
+vendor fixes the renderer, and it would be wrong everywhere else the field is
+read — their dashboard, any export, any other template. Report it with the
+header as evidence.
+
+**2. Order totals print as 0.00.** Ticket #3 shows the two line items at 23.00
+and 5.00, then `Subtotal 0.00`, `VAT 0.00`, `Total 0.00`. SM-2026-000059 is a
+**cash** order with a real total of **28.00**, not comped — so a driver reading
+that ticket has no idea what to collect.
+
+This is Q9 arriving in practice. We deliberately send no order-level money
+(see the money note in `buildCreateOrderPayload`) because the contract's example
+computes `total = subtotal × 1.15`, i.e. VAT **added on top**, while our stored
+prices are VAT-**inclusive**; filling those fields blind would print a wrong
+number on a customer's receipt. The printed evidence now shows the cost of
+sending nothing: zeros.
+
+It is **not a delivery bug** — no money is sent for pickup either, so every
+ticket has had this. Delivery only makes it dangerous, because the food leaves
+the building with a driver.
+
+The promising resolution, still to be confirmed with the vendor and tested on one
+order before being trusted: send the VAT-**exclusive** decomposition
+(`subtotal` 24.35, `tax` 3.65, `total` 28.00, with line prices likewise
+exclusive). That is self-consistent under *both* readings — a POS that displays
+the fields verbatim shows 28.00, and a POS that recomputes `subtotal × 1.15`
+also reaches 28.00. Rounding across many lines needs checking before it ships.
+Changing what money prints on a customer receipt is an owner decision.
 
 ### Still intentionally NOT sent (do not invent)
 `latitude`/`longitude` (the contract has **no** coordinate field anywhere), the
