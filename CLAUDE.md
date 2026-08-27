@@ -181,7 +181,7 @@ trigger nor worker v6 can produce it — so the guard parks exactly these four a
 nothing reachable. Re-driving any of them would create a real kitchen ticket for
 food nobody is waiting for, and is a §5 live write regardless.
 
-**Two repository files are unapplied. One of them is the frozen one.**
+**ONE repository file is unapplied, and it is the frozen one.**
 
 | File | Status |
 | --- | --- |
@@ -199,9 +199,9 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827100000_comp_members_by_phone.sql` | Applied 2026-08-27, live version `20260827063746`. |
 | `20260827110000_comp_erasure.sql` | Applied 2026-08-27, live version `20260827064044`. |
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
-| `20260827130000_watchdog_delivery_coverage.sql` | **UNAPPLIED.** Awaiting owner approval. Not frozen. Removes the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which went blind to failed **paid delivery** orders the moment delivery went live. |
+| `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
 
-The honest statement is therefore **112 repository files / 116 live rows / two unapplied files: one awaiting ordinary owner approval (`20260827130000_watchdog_delivery_coverage`), and one — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+The honest statement is therefore **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -211,14 +211,18 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-It is once again the *only* outstanding file, which makes it more dangerous
-rather than less: with one file left, "apply the outstanding migrations" reads
-like a no-op and is in fact the one instruction that would break the §6 freeze.
-The 2026-08-26 and 2026-08-27 comp applications are the worked examples of doing
-this correctly — each target named explicitly, one call per file, with Moyasar's
-continued absence verified afterwards (2026-08-27: zero `%moyasar%` functions,
-zero history rows, `provider_name` still `tap`, still disabled). Any
-`supabase migration` operation must still name its target explicitly.
+**As of 2026-08-27 10:40 UTC this is once again literally true: Moyasar is the
+ONLY unapplied file in the repository.** That makes it more dangerous rather than
+less — with one file left, "apply the outstanding migrations" reads like a no-op
+and is in fact the one instruction that would break the §6 freeze. There is no
+longer any other file such an instruction could plausibly mean.
+
+The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
+correctly — each target named explicitly, one call per file, with Moyasar's
+continued absence verified afterwards (most recently 2026-08-27 after the
+watchdog application: zero `%moyasar%` functions, zero history rows,
+`provider_name` still `tap`, still disabled). Any `supabase migration` operation
+must still name its target explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 
