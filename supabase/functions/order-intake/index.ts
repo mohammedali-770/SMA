@@ -20,7 +20,38 @@ import { getProviderConfig } from '../_shared/secrets.ts';
  * `sync_trigger_secret` is read server-side and sent as the x-sync-secret header
  * — it never reaches the app or the response.
  */
-const SYNC_TIMEOUT_MS = 11_000;
+/**
+ * How long checkout will wait for the POS before returning the order without a
+ * branch number.
+ *
+ * CUT FROM 11 s TO 5 s ON 2026-08-27, because the bottleneck moved. Once the
+ * kick was targeted and the reaper, push drain and CRM lookup came off the
+ * awaited path, everything WE do collapsed to ~1.2-1.5 s — measured on
+ * SM-2026-000068: worker boot + config 1.08 s, claim and three reads 2 ms
+ * apart, and only 68 ms between the reads and the pre-send gate.
+ *
+ * What is left is Lazywait's own Create Order call, and it is erratic:
+ *
+ *     SM-2026-000065   1.57 s
+ *     SM-2026-000067   2.40 s
+ *     SM-2026-000068   8.02 s
+ *
+ * An 11 s ceiling meant a slow POS could hold a customer on a spinner for 11 s
+ * and then still fail to show a number. 5 s covers our ~1.5 s overhead plus a
+ * POS call of ~3.5 s — comfortably above the two normal observations — and
+ * bails fast on the pathological one.
+ *
+ * TIMING OUT IS NOT A FAILURE, and that is what makes this safe. The abort only
+ * stops order-intake WAITING; the worker keeps running and finishes the sync
+ * (observed directly on SM-2026-000064, where the abort fired and the order got
+ * its number anyway). The customer sees the "number pending" state and receives
+ * the branch number by push about a second after the POS confirms — a push that
+ * only ever says "confirmed" when the POS really has the order.
+ *
+ * So the trade is: on a slow POS the number arrives a second or two later by
+ * push instead of on first paint, and in exchange nobody waits 11 s for it.
+ */
+const SYNC_TIMEOUT_MS = 5_000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

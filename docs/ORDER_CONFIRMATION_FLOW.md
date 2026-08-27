@@ -209,6 +209,51 @@ and cannot be sent at all, yet its checkout previously blocked for up to the ful
 11 s while the worker reaped and drained up to five *other* customers' orders.
 Targeting ends that too.
 
+### The bottleneck moved to Lazywait, and the timeout moved with it
+
+Two more orders settled it. Once the CRM lookup came off the awaited path as
+well, **everything we do collapsed to about 1.2 s** — measured on
+SM-2026-000068: worker boot and configuration 1.08 s, the claim and all three
+catalog reads within 2 ms of each other, and **68 ms** between the reads and the
+pre-send gate, where a 3.47 s CRM search used to sit.
+
+What is left is Lazywait's own Create Order call, and it is erratic:
+
+| Order | Create Order call | Lines |
+| --- | --- | --- |
+| SM-2026-000065 | 1.57 s | 1 |
+| SM-2026-000066 | 1.62 s | 2 |
+| SM-2026-000067 | 2.40 s | 2 |
+| SM-2026-000068 | **8.02 s** | 1 |
+
+The slowest was the **smallest** order, so it is not payload size. On -000068
+that call was **82%** of the entire wait.
+
+`SYNC_TIMEOUT_MS` therefore drops from **11 s to 5 s**. It covers our ~1.5 s plus
+a POS call of ~3.5 s — comfortably above the three normal observations — and
+bails fast on the pathological one instead of holding a customer on a spinner
+for eleven seconds and *still* failing to show a number.
+
+**Timing out is not a failure, and that is what makes the cut safe.** The abort
+only stops `order-intake` waiting; the worker keeps running and finishes the
+sync. That is observed, not assumed — on SM-2026-000064 the abort fired and the
+order got its branch number anyway. The customer sees the "number pending" state
+and the number arrives by push about a second after the POS confirms, from a
+push that only ever says "confirmed" when the POS really has the order.
+
+So the trade is: on a slow POS the number arrives a second or two later by push
+instead of on first paint, and in exchange nobody waits 11 s for it.
+
+The variance itself is a question for the vendor rather than something to
+engineer around indefinitely — the evidence pack is
+[`Lazywait_Create_Order_Latency_20260827.md`](integrations/Lazywait_Create_Order_Latency_20260827.md).
+
+**Do NOT also shorten the Create Order `timeoutMs` in `lazywaitFetch`** (15 s).
+That one is the boundary between proven-not-sent and may-have-been-sent: a
+timeout there is classified `ambiguous` and routes to `confirmation_required`
+rather than a resend, because Create Order has no idempotency key. Shortening it
+would turn slow-but-successful tickets into orders a human must verify by hand.
+
 ### The push must follow the send, not precede it
 
 The "order received" push fires **after** the sync block, and that ordering is
