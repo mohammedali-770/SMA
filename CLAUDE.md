@@ -201,7 +201,7 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
 | `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
 
-**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and one new **unapplied** file has since been added.
+**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
 
 **Re-read live 2026-08-28, AFTER the state-machine apply: 115 repository files / 120 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260828182228` (`customer_order_state_inflight`, applied 18:22:28 UTC on explicit owner approval; ledger row 75).
 
@@ -217,9 +217,10 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**It was briefly false on 2026-08-28 — two files were unapplied for about four
-hours — and is true again as of 18:22:28 UTC.** Moyasar is once more the ONLY
-unapplied file:
+**It was briefly false on 2026-08-28 — and by under five minutes.** PR #287 put
+`20260828090000_customer_order_state_inflight.sql` on the default branch at
+**18:17:34 UTC**; it was applied at **18:22:28 UTC**, 4 minutes 54 seconds later.
+Moyasar is once more the ONLY unapplied file:
 
 | File | Status |
 | --- | --- |
