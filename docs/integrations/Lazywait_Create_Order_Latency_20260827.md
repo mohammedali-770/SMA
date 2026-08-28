@@ -102,5 +102,13 @@ resend, because Create Order has no idempotency key. Shortening it would convert
 slow-but-successful tickets into orders a human has to verify by hand.
 
 The customer-facing wait was addressed instead by cutting `SYNC_TIMEOUT_MS` in
-`order-intake` from 11 s to 5 s — see the note on that constant. That bounds how
-long checkout waits without touching how the POS outcome is classified.
+`order-intake` from 11 s to 5 s — a different constant, which bounds how long
+checkout waits without touching how the POS outcome is classified.
+
+**That cut was reverted to 11 s on 2026-08-28** and is not currently in force. It
+was correct in itself but shipped without the two mobile changes that make
+returning mid-send presentable, and a customer was shown "we could not verify
+whether the branch received this order" on an order that had synced as ticket #2
+in 7.30 s. Re-cut it once a build ships the client half — detail in
+`docs/ORDER_CONFIRMATION_FLOW.md`. **None of this changes the question being put
+to Lazywait, or the four measurements it rests on.**

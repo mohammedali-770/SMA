@@ -24,34 +24,46 @@ import { getProviderConfig } from '../_shared/secrets.ts';
  * How long checkout will wait for the POS before returning the order without a
  * branch number.
  *
- * CUT FROM 11 s TO 5 s ON 2026-08-27, because the bottleneck moved. Once the
- * kick was targeted and the reaper, push drain and CRM lookup came off the
- * awaited path, everything WE do collapsed to ~1.2-1.5 s — measured on
- * SM-2026-000068: worker boot + config 1.08 s, claim and three reads 2 ms
- * apart, and only 68 ms between the reads and the pre-send gate.
- *
- * What is left is Lazywait's own Create Order call, and it is erratic:
+ * CUT TO 5 s ON 2026-08-27 AND REVERTED TO 11 s ON 2026-08-28. The measurements
+ * behind the cut still stand — once the kick was targeted and the reaper, push
+ * drain and CRM lookup came off the awaited path, everything WE do collapsed to
+ * ~1.2-1.5 s (SM-2026-000068: worker boot + config 1.08 s, claim and three
+ * reads 2 ms apart, 68 ms from the reads to the pre-send gate), and what is
+ * left is Lazywait's own erratic Create Order call:
  *
  *     SM-2026-000065   1.57 s
  *     SM-2026-000067   2.40 s
  *     SM-2026-000068   8.02 s
  *
- * An 11 s ceiling meant a slow POS could hold a customer on a spinner for 11 s
- * and then still fail to show a number. 5 s covers our ~1.5 s overhead plus a
- * POS call of ~3.5 s — comfortably above the two normal observations — and
- * bails fast on the pathological one.
+ * The cut was reverted anyway, because it was shipped WITHOUT its client half
+ * and that broke a customer-visible promise. Returning at 5 s hands the app a
+ * row that is `syncing` with `pos_create_attempted_at` already set — the marker
+ * is written immediately before the POST leaves — and the confirmation screen
+ * read that as ambiguous, showing "we could not verify whether the branch
+ * received this order" on a healthy order. SM-2026-000070 was synced as ticket
+ * #2 in 7.30 s with zero failed attempts, and its customer was shown that
+ * screen and a "confirmed" push at the same time.
  *
- * TIMING OUT IS NOT A FAILURE, and that is what makes this safe. The abort only
- * stops order-intake WAITING; the worker keeps running and finishes the sync
- * (observed directly on SM-2026-000064, where the abort fired and the order got
- * its number anyway). The customer sees the "number pending" state and receives
- * the branch number by push about a second after the POS confirms — a push that
- * only ever says "confirmed" when the POS really has the order.
+ * Two client changes make 5 s safe, and BOTH need an app build to reach a
+ * customer:
  *
- * So the trade is: on a slow POS the number arrives a second or two later by
- * push instead of on first paint, and in exchange nobody waits 11 s for it.
+ *   1. deriveCustomerOrderState must test `syncing` before the phase marker
+ *      (fixed 2026-08-28 in apps/mobile/src/features/orders/orderConfirmation.ts);
+ *   2. the receipt must poll at 2 s while the number is pending rather than 25 s
+ *      (nextReceiptPollMs, apps/mobile/src/features/orders/ordersRefresh.ts).
+ *
+ * Until a build ships both, 11 s is the value that keeps the number on first
+ * paint for every observed order — SM-2026-000070 included.
+ *
+ * TIMING OUT IS NOT A FAILURE. The abort only stops order-intake WAITING; the
+ * worker keeps running and finishes the sync (observed on SM-2026-000064). That
+ * remains true at either value; it is not what made 5 s unsafe.
+ *
+ * RE-CUT THIS TO 5 s once a build carrying both client changes is out, not
+ * before. It is a one-constant change with a tripwire in
+ * _shared/orderIntakeSyncWiring.test.ts.
  */
-const SYNC_TIMEOUT_MS = 5_000;
+const SYNC_TIMEOUT_MS = 11_000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });

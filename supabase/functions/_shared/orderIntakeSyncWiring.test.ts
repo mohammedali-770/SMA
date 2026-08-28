@@ -221,10 +221,20 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c).toMatch(/await Promise\.all\(\[\s*admin\.from\('branches'\)/);
   });
 
-  it('bounds the customer wait at 5 s, not 11 s', () => {
+  it('bounds the customer wait at 11 s until a build ships the client half', () => {
+    // Cut to 5 s on 2026-08-27, reverted on 2026-08-28. Returning mid-send hands
+    // the app a `syncing` row that ALREADY carries pos_create_attempted_at, and
+    // the confirmation screen read that as "we could not verify whether the
+    // branch received this order" — shown to a customer on SM-2026-000070, which
+    // was synced as ticket #2 in 7.30 s with zero failed attempts.
+    //
+    // Re-cut to 5 s only once a shipped build carries BOTH client changes: the
+    // syncing-before-marker ordering in orderConfirmation.ts, and
+    // nextReceiptPollMs in ordersRefresh.ts. The measurements that justified the
+    // cut still stand; only its client half was missing.
     const c = code('order-intake');
-    expect(c).toContain('const SYNC_TIMEOUT_MS = 5_000;');
-    expect(c).not.toContain('11_000');
+    expect(c).toContain('const SYNC_TIMEOUT_MS = 11_000;');
+    expect(c).not.toContain('5_000');
   });
 
   it('does NOT shorten the Create Order timeout, which means something else', () => {
