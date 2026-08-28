@@ -254,4 +254,45 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c).toContain('AbortSignal.timeout(SYNC_TIMEOUT_MS)');
     expect(c).toContain("'x-sync-secret'");
   });
+
+  it('starts the provider-config read BEFORE placing the order', () => {
+    // The config read uses the service-role client and does not depend on the
+    // order, so running it strictly afterwards cost a full extra CROSS-REGION
+    // round trip on the customer's awaited path. The database is in
+    // eu-central-1 while a Dammam customer's function executes in ap-south-1 or
+    // eu-central-2, so every PostgREST call is intercontinental — that ordering
+    // was worth roughly a whole round trip for no reason.
+    const c = code('order-intake');
+    const cfgStart = c.indexOf('cfgPromise = getProviderConfig(');
+    const place = c.indexOf("supa.rpc('place_customer_order'");
+    expect(cfgStart, 'cfgPromise assignment not found').toBeGreaterThan(-1);
+    expect(place, 'place_customer_order call not found').toBeGreaterThan(-1);
+    expect(cfgStart).toBeLessThan(place);
+    // And it must be AWAITED only inside the sync block, not before the order.
+    expect(c.indexOf('await cfgPromise')).toBeGreaterThan(place);
+  });
+
+  it('never lets a missing service-role env fail the order', () => {
+    // adminClient() THROWS when SUPABASE_SERVICE_ROLE_KEY is absent. It used to
+    // sit inside the sync block's try/catch; hoisting it bare to start the
+    // config read early would turn a misconfigured environment into a failed
+    // checkout — the exact opposite of "a POS problem can NEVER fail the order".
+    const c = code('order-intake');
+    const guarded = /try\s*\{[^}]*const admin = adminClient\(\);/s.test(c);
+    expect(guarded, 'adminClient() must stay inside a try').toBe(true);
+    expect(c).toContain('cfgPromise = Promise.resolve(null)');
+  });
+
+  it('logs timing as numbers only — no order contents, no customer data', () => {
+    // The timing line exists because apportioning this latency from OUTSIDE
+    // produced a confident wrong answer once already (it blamed Deno cold
+    // start; a 15-minute idle test then measured 828 ms). It must not become a
+    // PII leak in the process.
+    const c = code('order-intake');
+    const log = c.slice(c.indexOf("at: 'order-intake.timing'"), c.indexOf('return json({ order: fresh })'));
+    expect(log).toContain('total_ms');
+    for (const forbidden of ['orderId', 'order.', 'placed', 'fresh', 'body.', 'auth', 'secret']) {
+      expect(log, `timing log must not reference ${forbidden}`).not.toContain(forbidden);
+    }
+  });
 });

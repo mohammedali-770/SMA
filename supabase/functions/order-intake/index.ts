@@ -76,6 +76,49 @@ Deno.serve(async (req: Request) => {
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
 
   const supa = userClient(auth);
+
+  // TIMING. Every hop here is CROSS-REGION and that is the whole cost story.
+  // The database is in eu-central-1 (Frankfurt); a customer in Dammam has this
+  // function executed in ap-south-1 (Mumbai) or eu-central-2 (Zurich), so each
+  // PostgREST call pays an intercontinental round trip. Measured 2026-08-28 on
+  // the same worker function: p50 556 ms across 442 in-region cron invocations
+  // versus 5934 ms for the single ap-south-1 order kick.
+  //
+  // These marks are logged once per request so the breakdown is a measurement
+  // rather than an inference. The previous attempt to apportion this time from
+  // outside — subtracting known work from execution_time_ms — produced a
+  // confident and WRONG answer (it blamed Deno cold start, which a 15-minute
+  // idle test then disproved at 828 ms). Numbers only; no order contents, no
+  // customer data.
+  const t0 = Date.now();
+  const mark: Record<string, number> = {};
+
+  // The provider config is read with the SERVICE-ROLE client and does not depend
+  // on the order, so it is started HERE rather than after place_customer_order.
+  // It used to run strictly afterwards, which cost a full extra cross-region
+  // round trip on the customer's awaited path for no ordering reason.
+  //
+  // `.catch` rather than a bare promise: an unawaited rejection would be an
+  // unhandled promise rejection before the sync block's try/catch can see it.
+  // A null here degrades exactly as a missing config already did — the sync
+  // block skips the kick and the background worker picks the order up.
+  //
+  // adminClient() itself is inside the guard too. It THROWS when the
+  // service-role env is missing, and it used to sit inside the sync block's
+  // try/catch — hoisting it bare would have turned a misconfigured environment
+  // into a failed checkout, breaking the rule that a POS problem can never fail
+  // the order.
+  let cfgPromise: Promise<Awaited<ReturnType<typeof getProviderConfig>>>;
+  try {
+    const admin = adminClient();
+    cfgPromise = getProviderConfig(admin, 'lazywait')
+      .then((c) => { mark.config = Date.now() - t0; return c; })
+      .catch(() => { mark.config = Date.now() - t0; return null; });
+  } catch {
+    mark.config = Date.now() - t0;
+    cfgPromise = Promise.resolve(null);
+  }
+
   // place_order is no longer granted to `authenticated`; the customer path goes
   // through place_customer_order, a thin wrapper with identical pricing/loyalty/
   // idempotency that returns a customer-safe projection (migration 20260724200000).
@@ -90,6 +133,7 @@ Deno.serve(async (req: Request) => {
     p_idempotency_key: body.idempotencyKey ?? null,
     p_payment_method: body.paymentMethod ?? null,
   });
+  mark.place = Date.now() - t0;
   if (error) return json({ error: error.message }, 400);
 
   const order = placed as Record<string, unknown> | null;
@@ -120,8 +164,8 @@ Deno.serve(async (req: Request) => {
   // and the watchdog's R1/R7.
   {
     try {
-      const admin = adminClient();
-      const cfg = await getProviderConfig(admin, 'lazywait');
+      // Already in flight since before place_customer_order — usually resolved.
+      const cfg = await cfgPromise;
       const secret = String((cfg?.secretConfig as Record<string, unknown>)?.sync_trigger_secret ?? '');
       const url = Deno.env.get('SUPABASE_URL');
       const anon = Deno.env.get('SUPABASE_ANON_KEY');
@@ -147,6 +191,7 @@ Deno.serve(async (req: Request) => {
         });
       }
     } catch { /* never block/fail the order on a POS hiccup — background retry covers it */ }
+    mark.sync = Date.now() - t0;
   }
 
   // NO "order received" push is sent from here, deliberately — removed
@@ -193,5 +238,19 @@ Deno.serve(async (req: Request) => {
     )
     .eq('id', orderId)
     .maybeSingle();
+  mark.reread = Date.now() - t0;
+
+  // One line, numbers only. config/place are concurrent, so `config` may be
+  // larger than `place` without either having waited on the other.
+  console.log(JSON.stringify({
+    at: 'order-intake.timing',
+    config_ms: mark.config ?? null,
+    place_ms: mark.place ?? null,
+    sync_ms: mark.sync ?? null,
+    reread_ms: mark.reread ?? null,
+    sync_span_ms: mark.sync != null && mark.place != null ? mark.sync - mark.place : null,
+    reread_span_ms: mark.reread != null && mark.sync != null ? mark.reread - mark.sync : null,
+    total_ms: Date.now() - t0,
+  }));
   return json({ order: fresh });
 });
