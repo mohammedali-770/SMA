@@ -278,7 +278,19 @@ export const orders = {
    *
    * The response deliberately carries NO reason and NO counter — only an opaque
    * outcome plus the freshly derived state, so the attempt limit is never
-   * disclosed to the client. The UI renders from `state` alone.
+   * disclosed to the client.
+   *
+   * DO NOT RENDER FROM `state`. This comment used to end "the UI renders from
+   * `state` alone", and that was never what the caller did: ReceiptScreen
+   * discards this response and re-reads the row, deriving locally — "the RPC's
+   * own outcome is advisory, the row is the truth". That accident is the
+   * OUTERMOST of three barriers that kept a SQL/TypeScript divergence in
+   * customer_order_state off a customer screen on 2026-08-28 (the others: the
+   * read contract grants raw columns, never a state string, and every surface
+   * derives locally) — and it is the only one a future caller could remove by
+   * following this comment as it used to read. The two implementations are kept
+   * in step by features/orders/orderConfirmationSqlParity.test.ts, but the row
+   * remains the authority for what is displayed; `state` is advisory only.
    */
   requestResend: async (id: string) =>
     ok<{ outcome: 'accepted' | 'unavailable'; state: string }>(

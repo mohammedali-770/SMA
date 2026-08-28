@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **114**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827150000_menu_display_order.sql`.
+Migration files in the repository: **115**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260828090000_customer_order_state_inflight.sql`.
 
 ## Tables
 
@@ -132,7 +132,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
 | `current_staff_branch_id` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `customer_manual_pos_resend_eligibility` | 1 | `20260813143000_manual_only_pos_resend.sql` |
-| `customer_order_state` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
+| `customer_order_state` | 2 | `20260828090000_customer_order_state_inflight.sql` |
 | `customer_pos_resend_eligibility` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_limit` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_window` | 1 | `20260724120000_order_confirmation_state_machine.sql` |

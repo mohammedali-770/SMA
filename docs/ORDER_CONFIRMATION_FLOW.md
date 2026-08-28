@@ -288,6 +288,84 @@ Lazywait's call is the real bottleneck. It should be re-applied as its own chang
 **after** a build ships the client half, not before. There is a tripwire on the
 constant in `supabase/functions/_shared/orderIntakeSyncWiring.test.ts`.
 
+### The SQL authority had the same bug, and nothing was comparing the two
+
+`public.customer_order_state` is the documented server authority; the TypeScript
+`deriveCustomerOrderState` is its mirror. PR #286 fixed only the mirror, which a
+review bot flagged. The SQL really did carry the same marker-before-`syncing`
+ordering — confirmed by reading the **deployed** function body rather than the
+repository file (`marker_evaluated_first = true`).
+
+**It reached no customer screen**, and it is worth being precise about why,
+because the reason is not the one that first suggests itself. Three barriers
+stand, not one: the customer read contract grants raw columns and never a state
+string; `ConfirmationHero` and `OrderCard` both derive locally from those
+columns; and `ReceiptScreen.tsx:180` **discards the RPC's response entirely** —
+*"the RPC's own outcome is advisory, the row is the truth"*.
+
+Producing the wrong value at all takes a race: `request_customer_pos_resend` has
+to be called while the row is `syncing` with the marker set, which in the normal
+flow means a Resend button rendered from a snapshot that has since gone stale.
+So the exposure was narrow. What makes it worth fixing anyway is that the
+outermost barrier is an accident `api.ts` documented the *opposite* of ("the UI
+renders from `state` alone"), so the next person to follow that written contract
+removes it. That comment is now corrected.
+
+**Resend safety was never at risk**, and that is structural rather than lucky:
+`request_customer_pos_resend` branches on `customer_manual_pos_resend_eligibility`,
+a separate predicate over raw columns, and calls `customer_order_state` only
+*after* the accept/refuse decision, to fill an advisory field. Reordering the
+state function cannot turn a refused resend into an accepted one.
+**`customer_manual_pos_resend_eligibility` must NOT receive the same reorder** —
+its marker-first ordering is correct there, since an in-flight order must never
+be resent when Create Order has no idempotency key.
+
+#### The deeper finding: parity was never enforced, and had already drifted
+
+The migration's own header claimed *"both sides are unit-tested against the same
+case table so they cannot drift"*. There was no shared case table — two
+hand-maintained lists in different CI jobs — and they had **already** drifted:
+for `failed` with a future `sync_next_attempt_at` the SQL said
+`sending_to_branch` (a leftover auto-retry arm) while the TypeScript said
+`branch_failed_retry_available`. Both suites green — for **15 days**, from
+`f7515e5` on 2026-08-13, which introduced the manual-resend-only migration and
+the TypeScript change in the *same commit* while leaving this SQL clause behind.
+The TypeScript was right: that policy removed automatic retries.
+
+Worse, the SQL half could not have caught it. `sql-suites.yml` deliberately has
+no workflow-level `paths:` filter — so the gate always reports and is safe to
+require — but its `changes` job computes `relevant` from a path regex covering
+`supabase/(migrations|tests)/`, `supabase/seed.sql` and `.github/sql-ci/`, and the
+`suites` job is gated `if: needs.changes.outputs.relevant == 'true'`. A
+**TypeScript-only diff — precisely the shape that causes this drift — therefore
+runs the workflow, reports green, and executes no SQL assertions at all.** Adding
+a case to the SQL suite would not have gone red on PR #286.
+
+So parity is now enforced from the side that always runs:
+`apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` resolves the
+latest migration that defines the function, strips its comments, and pins **clause
+order** — `ref` before in-flight before marker before queued — plus the absence of
+any `p_next_attempt_at` arm and the eligibility predicate's marker-first ordering,
+asserting the matching inputs against the real TypeScript implementation.
+
+**What it does and does not cover, stated plainly:** it pins the clauses that
+actually drifted, not the whole CASE. The refund, payment-gate, channel and
+budget clauses are unconstrained by it. It is a tripwire on the known failure
+mode, not a proof of equivalence.
+
+It was mutation-tested rather than assumed: reintroducing either historical
+divergence turns it red, as does a future migration redefining the function in
+different casing or line wrapping, and as does wrongly "aligning" the eligibility
+predicate. A pure reformat stays green, so it will not cry wolf on a formatter.
+
+`20260828090000_customer_order_state_inflight.sql` carries both corrections. It is
+**unapplied pending owner approval** — applying it is a §5 action — so until then
+Production still disagrees with the TypeScript on **both** counts: the in-flight
+case and the stale auto-retry arm. Harmlessly, for the reasons above. Note the
+consequence for the tripwire: it resolves the latest migration in the
+*repository*, which is the definition the repository intends, not the body
+currently live in Production.
+
 **No staleness clock was added to the in-flight case.** A worker that dies
 mid-POST leaves `syncing` for up to ten minutes before the reaper routes it to
 `confirmation_required`, and during that window the screen says "sending" rather

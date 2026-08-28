@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**153 TypeScript test files declaring 2373 test blocks, plus 60 SQL suites.**
+**154 TypeScript test files declaring 2378 test blocks, plus 60 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -105,7 +105,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-59 files, 866 declared test blocks.
+60 files, 871 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -140,6 +140,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
 | `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 5 | customer_order_state — SQL/TS parity |
 | `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
