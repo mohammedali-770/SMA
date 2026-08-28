@@ -288,11 +288,45 @@ describe('targeted kick and deferred off-path work', () => {
     // produced a confident wrong answer once already (it blamed Deno cold
     // start; a 15-minute idle test then measured 828 ms). It must not become a
     // PII leak in the process.
+    //
+    // ALLOWLIST, not a blacklist, and over the WHOLE payload — the first
+    // version of this test did neither and was shown two escapes in review: it
+    // sliced from the `at` key onward, so an identifier added ABOVE `at` was
+    // never scanned, and it blacklisted a handful of names, so `customerId` or
+    // `email` passed anywhere. Both were reproduced before this rewrite.
     const c = code('order-intake');
-    const log = c.slice(c.indexOf("at: 'order-intake.timing'"), c.indexOf('return json({ order: fresh })'));
-    expect(log).toContain('total_ms');
-    for (const forbidden of ['orderId', 'order.', 'placed', 'fresh', 'body.', 'auth', 'secret']) {
-      expect(log, `timing log must not reference ${forbidden}`).not.toContain(forbidden);
+    const open = c.indexOf('console.log(JSON.stringify({');
+    expect(open, 'timing log not found').toBeGreaterThan(-1);
+    const payload = c.slice(c.indexOf('{', open) + 1, c.indexOf('}));', open));
+
+    const entries = payload
+      .split('\n')
+      .map((l) => l.replace(/\/\/.*$/, '').trim())
+      .filter(Boolean)
+      .map((l) => {
+        const m = /^(\w+):\s*(.+?),?$/.exec(l);
+        expect(m, `unparsed line in the timing payload: ${l}`).not.toBeNull();
+        return [(m as RegExpExecArray)[1], (m as RegExpExecArray)[2]] as const;
+      });
+
+    // Every key is known and expected — an added key fails here.
+    expect(entries.map(([k]) => k).sort()).toEqual([
+      'at', 'config_ms', 'place_ms', 'reread_ms', 'reread_span_ms',
+      'sync_ms', 'sync_span_ms', 'total_ms',
+    ]);
+
+    // Every VALUE may only mention these identifiers. Anything reaching for an
+    // order, a customer, a body field or a secret fails, whatever it is called.
+    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'Date', 'now', 't0', 'null']);
+    for (const [key, value] of entries) {
+      if (key === 'at') {
+        expect(value).toBe("'order-intake.timing'");
+        continue;
+      }
+      expect(value, `${key} must not contain a string literal`).not.toMatch(/['"`]/);
+      for (const ident of value.match(/[A-Za-z_$][\w$]*/g) ?? []) {
+        expect(ALLOWED.has(ident), `timing value for ${key} references ${ident}`).toBe(true);
+      }
     }
   });
 });
