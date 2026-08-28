@@ -201,11 +201,11 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
 | `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
 
-**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and one new **unapplied** file has since been added.
+**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
 
-**Re-read live 2026-08-28: 115 repository files / 119 live history rows / TWO unapplied files.** Latest live version `20260827195309`.
+**Re-read live 2026-08-28, AFTER the state-machine apply: 115 repository files / 120 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260828182228` (`customer_order_state_inflight`, applied 18:22:28 UTC on explicit owner approval; ledger row 75).
 
-**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, on 2026-08-28. Say so plainly because **`docs/MIGRATIONS.md` has no ledger rows for the two 2026-08-27 applications** (`product_images_bucket`, `menu_display_order`) — they were applied without being recorded, which is a gap in the ledger and not something these counts should be read as covering. Writing those rows is a documentation change; it needs somebody who holds the approval and timing detail for those two applies.
+**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, on 2026-08-28. Say so plainly because the two 2026-08-27 applications (`product_images_bucket`, `menu_display_order`) were applied **without being recorded at the time**. They now have ledger rows — **73 and 74 in `docs/MIGRATIONS.md`** — but those are deliberately **GAP ROWS**: they carry only what a live read proves (that each is applied, and under which version), and their `repo skel` / `live skel` / `class` columns are `?` rather than `=`/`B` because no content comparison was ever made. **Approval, timing, mechanism and post-apply verification for those two remain unknown and unrecorded.** Closing them properly still needs somebody who holds that detail; the rows exist so the gap is visible instead of silent, not because it is filled.
 
 The superseded statement was **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence for THAT figure: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
@@ -217,21 +217,26 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**This was literally true from 2026-08-27 10:40 UTC until 2026-08-28, and is no
-longer.** There are now **TWO** unapplied files:
+**It was briefly false on 2026-08-28 — and by under five minutes.** PR #287 put
+`20260828090000_customer_order_state_inflight.sql` on the default branch at
+**18:17:34 UTC**; it was applied at **18:22:28 UTC**, 4 minutes 54 seconds later.
+Moyasar is once more the ONLY unapplied file:
 
 | File | Status |
 | --- | --- |
-| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent 2026-08-28: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260828090000_customer_order_state_inflight.sql` | **UNAPPLIED, awaiting owner approval.** Reorders `public.customer_order_state` so an in-flight send reads as "sending" rather than "may have been sent", and drops a stale auto-retry arm. Pure function replacement — no table read or written, no grant change, and it cannot affect resend safety (`request_customer_pos_resend` branches on `customer_manual_pos_resend_eligibility`, never on this function). |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-08-28 apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
-**The danger this section warns about is now WORSE, not better.** With one file
-left, "apply the outstanding migrations" was already the one instruction that
-would break the §6 freeze. With two, the instruction now has a *plausible*
-referent — somebody may genuinely mean the state-machine file — and a bulk apply
-would sweep Moyasar in alongside it, because `20260824100000` sorts ahead of
-`20260828090000`. **Name the target explicitly. Never apply both in one call,
-and never apply "whatever is outstanding".**
+**So the danger is back to its most acute form.** With exactly one file left,
+"apply the outstanding migrations" reads like a no-op and is in fact the one
+instruction that would break the §6 freeze — there is no other file such an
+instruction could plausibly mean. **Name the target explicitly. Never apply
+"whatever is outstanding".**
+
+The 2026-08-28 apply is the worked example of doing it right under exactly that
+ambiguity: two files were outstanding, the instruction said "the migration"
+singular, the referent was fixed by the sentence it answered, only that file was
+sent, and Moyasar's continued absence was verified afterwards.
 
 The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
 correctly — each target named explicitly, one call per file, with Moyasar's
