@@ -288,6 +288,104 @@ Lazywait's call is the real bottleneck. It should be re-applied as its own chang
 **after** a build ships the client half, not before. There is a tripwire on the
 constant in `supabase/functions/_shared/orderIntakeSyncWiring.test.ts`.
 
+### The SQL authority had the same bug, and nothing was comparing the two
+
+`public.customer_order_state` is the documented server authority; the TypeScript
+`deriveCustomerOrderState` is its mirror. PR #286 fixed only the mirror, which a
+review bot flagged. The SQL really did carry the same marker-before-`syncing`
+ordering — confirmed by reading the **deployed** function body rather than the
+repository file (`marker_evaluated_first = true`).
+
+**It reached no customer screen**, and it is worth being precise about why,
+because the reason is not the one that first suggests itself. Three barriers
+stand, not one: the customer read contract grants raw columns and never a state
+string; `ConfirmationHero` and `OrderCard` both derive locally from those
+columns; and `ReceiptScreen.tsx:180` **discards the RPC's response entirely** —
+*"the RPC's own outcome is advisory, the row is the truth"*.
+
+Producing the wrong value at all takes a race: `request_customer_pos_resend` has
+to be called while the row is `syncing` with the marker set, which in the normal
+flow means a Resend button rendered from a snapshot that has since gone stale.
+So the exposure was narrow. What makes it worth fixing anyway is that the
+outermost barrier is an accident `api.ts` documented the *opposite* of ("the UI
+renders from `state` alone"), so the next person to follow that written contract
+removes it. That comment is now corrected.
+
+**Resend safety was never at risk**, and that is structural rather than lucky:
+`request_customer_pos_resend` branches on `customer_manual_pos_resend_eligibility`,
+a separate predicate over raw columns, and calls `customer_order_state` only
+*after* the accept/refuse decision, to fill an advisory field. Reordering the
+state function cannot turn a refused resend into an accepted one.
+**`customer_manual_pos_resend_eligibility` must NOT receive the same reorder** —
+its marker-first ordering is correct there, since an in-flight order must never
+be resent when Create Order has no idempotency key.
+
+#### The deeper finding: parity was never enforced, and had already drifted
+
+The migration's own header claimed *"both sides are unit-tested against the same
+case table so they cannot drift"*. There was no shared case table — two
+hand-maintained lists in different CI jobs — and they had **already** drifted:
+for `failed` with a future `sync_next_attempt_at` the SQL said
+`sending_to_branch` (a leftover auto-retry arm) while the TypeScript said
+`branch_failed_retry_available`. Both suites green — for **15 days**, from
+`f7515e5` on 2026-08-13, which introduced the manual-resend-only migration and
+the TypeScript change in the *same commit* while leaving this SQL clause behind.
+The TypeScript was right: that policy removed automatic retries.
+
+Worse, the SQL half could not have caught it. `sql-suites.yml` deliberately has
+no workflow-level `paths:` filter — so the gate always reports and is safe to
+require — but its `changes` job computes `relevant` from a path regex covering
+`supabase/(migrations|tests)/`, `supabase/seed.sql` and `.github/sql-ci/`, and the
+`suites` job is gated `if: needs.changes.outputs.relevant == 'true'`. A
+**TypeScript-only diff — precisely the shape that causes this drift — therefore
+runs the workflow, reports green, and executes no SQL assertions at all.** Adding
+a case to the SQL suite would not have gone red on PR #286.
+
+So parity is now enforced from the side that always runs:
+`apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` resolves the
+latest migration defining the function, strips its comments, and pins the
+**complete ordered clause sequence** of both `customer_order_state` and
+`customer_manual_pos_resend_eligibility`, plus the readable order relations, the
+absence of any `p_next_attempt_at` arm, and the matching inputs against the real
+TypeScript implementation. It also ties the SQL `customer_pos_resend_limit()`
+literal to `CUSTOMER_RESEND_LIMIT`, which nothing previously connected.
+
+**Sampling was not enough, and that was proven rather than argued.** An earlier
+version pinned four representative clauses; three mutations walked straight
+through it — a clause inserted *above* all four preserves their relative order
+(reintroducing the SM-2026-000070 screen for any resent order), flipping the
+resend budget's `<` to `<=`, and swapping the eligibility predicate's
+`then 'not_failed'` to `then 'eligible'`, which would make an in-flight order
+resendable and duplicate a live kitchen ticket. Pinning the whole sequence closes
+all three: any insertion, deletion, reorder, predicate edit or result change is
+red and must be re-approved deliberately.
+
+The mutation matrix it is held to:
+
+| Mutation | Expected | Result |
+| --- | --- | --- |
+| Marker moved back ahead of in-flight | red | ✅ |
+| Auto-retry arm restored | red | ✅ |
+| Clause inserted above the sampled needles | red | ✅ |
+| Resend budget `<` → `<=` | red | ✅ |
+| Future migration reintroducing the bug, uppercase + wrapped | red | ✅ |
+| Eligibility marker arm commented out | red | ✅ |
+| Eligibility result swapped to `'eligible'` | red | ✅ |
+| SQL resend limit changed to 5 | red | ✅ |
+| Nested block comment hiding a clause | red | ✅ |
+| Pure reformat / wrapped clause | **green** | ✅ |
+
+The last row matters as much as the others: a tripwire that cries wolf on a
+formatter gets disabled.
+
+`20260828090000_customer_order_state_inflight.sql` carries both corrections. It is
+**unapplied pending owner approval** — applying it is a §5 action — so until then
+Production still disagrees with the TypeScript on **both** counts: the in-flight
+case and the stale auto-retry arm. Harmlessly, for the reasons above. Note the
+consequence for the tripwire: it resolves the latest migration in the
+*repository*, which is the definition the repository intends, not the body
+currently live in Production.
+
 **No staleness clock was added to the in-flight case.** A worker that dies
 mid-POST leaves `syncing` for up to ten minutes before the reaper routes it to
 `confirmation_required`, and during that window the screen says "sending" rather

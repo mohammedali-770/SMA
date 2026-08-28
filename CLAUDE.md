@@ -201,7 +201,13 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
 | `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
 
-The honest statement is therefore **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and one new **unapplied** file has since been added.
+
+**Re-read live 2026-08-28: 115 repository files / 119 live history rows / TWO unapplied files.** Latest live version `20260827195309`.
+
+**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, on 2026-08-28. Say so plainly because **`docs/MIGRATIONS.md` has no ledger rows for the two 2026-08-27 applications** (`product_images_bucket`, `menu_display_order`) — they were applied without being recorded, which is a gap in the ledger and not something these counts should be read as covering. Writing those rows is a documentation change; it needs somebody who holds the approval and timing detail for those two applies.
+
+The superseded statement was **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence for THAT figure: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -211,18 +217,28 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**As of 2026-08-27 10:40 UTC this is once again literally true: Moyasar is the
-ONLY unapplied file in the repository.** That makes it more dangerous rather than
-less — with one file left, "apply the outstanding migrations" reads like a no-op
-and is in fact the one instruction that would break the §6 freeze. There is no
-longer any other file such an instruction could plausibly mean.
+**This was literally true from 2026-08-27 10:40 UTC until 2026-08-28, and is no
+longer.** There are now **TWO** unapplied files:
+
+| File | Status |
+| --- | --- |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent 2026-08-28: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260828090000_customer_order_state_inflight.sql` | **UNAPPLIED, awaiting owner approval.** Reorders `public.customer_order_state` so an in-flight send reads as "sending" rather than "may have been sent", and drops a stale auto-retry arm. Pure function replacement — no table read or written, no grant change, and it cannot affect resend safety (`request_customer_pos_resend` branches on `customer_manual_pos_resend_eligibility`, never on this function). |
+
+**The danger this section warns about is now WORSE, not better.** With one file
+left, "apply the outstanding migrations" was already the one instruction that
+would break the §6 freeze. With two, the instruction now has a *plausible*
+referent — somebody may genuinely mean the state-machine file — and a bulk apply
+would sweep Moyasar in alongside it, because `20260824100000` sorts ahead of
+`20260828090000`. **Name the target explicitly. Never apply both in one call,
+and never apply "whatever is outstanding".**
 
 The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
 correctly — each target named explicitly, one call per file, with Moyasar's
-continued absence verified afterwards (most recently 2026-08-27 after the
-watchdog application: zero `%moyasar%` functions, zero history rows,
-`provider_name` still `tap`, still disabled). Any `supabase migration` operation
-must still name its target explicitly.
+continued absence verified afterwards (most recently 2026-08-28: zero
+`%moyasar%` functions, zero history rows, `provider_name` still `tap`, still
+disabled). Any `supabase migration` operation must still name its target
+explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

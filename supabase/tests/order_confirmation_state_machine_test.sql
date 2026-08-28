@@ -20,6 +20,14 @@
 --
 -- PARITY: the derivation cases below mirror
 -- apps/mobile/src/features/orders/orderConfirmation.test.ts. Change both together.
+--
+-- "Change both together" is a request, not a control, and on its own it failed
+-- twice in silence — these two suites run in different jobs against different
+-- artifacts, so neither can contradict the other into a red build, and a
+-- TypeScript-only diff does not run this file at all. Since 2026-08-28 the
+-- actual control is apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts,
+-- which reads the migration's CASE body from the always-run vitest suite. Add
+-- cases here for coverage; rely on that file for enforcement.
 -- ============================================================================
 begin;
 
@@ -75,14 +83,31 @@ begin
   perform pg_temp.expect_state(pg_temp.st('online','pending','synced','#42'),
     'payment_pending', 'payment gate precedes branch confirmation');
 
-  -- In-flight / auto-retrying is "sending", not a failure.
+  -- An in-flight send is "sending", not a failure. NOTHING is auto-retrying
+  -- any more — see the legacy-retry-time case below, which asserts the opposite
+  -- of what this heading said until 2026-08-28.
   perform pg_temp.expect_state(pg_temp.st('cash','pending','pending',null),
     'sending_to_branch', 'cash pending');
   perform pg_temp.expect_state(pg_temp.st('online','paid','syncing',null),
     'sending_to_branch', 'syncing');
+  -- The IN-FLIGHT case, and the one that was missing. pos_create_attempted_at is
+  -- stamped immediately BEFORE the POST leaves, so `syncing` + marker is the
+  -- normal window of every order, not an anomaly. The only `syncing` case here
+  -- used to leave p_marker at its NULL default, so the shape that actually
+  -- reaches a customer went untested and the SQL disagreed with the TypeScript
+  -- mirror for it — showing "we could not verify whether the branch received
+  -- this order" on a healthy order (SM-2026-000070, ticket #2 in 7.30 s).
+  perform pg_temp.expect_state(
+    pg_temp.st('online','paid','syncing',null,null,null,now()-interval '5s'),
+    'sending_to_branch', 'in-flight send is not ambiguous');
+  -- A FAILED row with a future sync_next_attempt_at is NOT "still trying". The
+  -- manual-resend-only policy (20260813143000) removed automatic retries and the
+  -- column is legacy data. This asserted 'sending_to_branch' until 2026-08-28
+  -- while the TypeScript mirror asserted 'branch_failed_retry_available' for the
+  -- same input — both suites green, because nothing compared them.
   perform pg_temp.expect_state(
     pg_temp.st('online','paid','failed',null,null,now()+interval '1m'),
-    'sending_to_branch', 'auto-retry still queued');
+    'branch_failed_retry_available', 'legacy future retry time is ignored');
 
   -- (B) Every ambiguous shape routes to verification.
   perform pg_temp.expect_state(pg_temp.st('online','paid','confirmation_required',null),
@@ -92,6 +117,19 @@ begin
   perform pg_temp.expect_state(
     pg_temp.st('online','paid','dead_letter',null,null,null,now()-interval '1m'),
     'verifying_with_branch', 'may-have-been-sent marker');
+  -- A marker that OUTLIVED its send stays ambiguous on every non-syncing state:
+  -- the POST left and we never learned its fate. Only the in-flight case moved.
+  perform pg_temp.expect_state(
+    pg_temp.st('online','paid','pending',null,null,null,now()-interval '1m'),
+    'verifying_with_branch', 'marker outlived the send (pending)');
+  perform pg_temp.expect_state(
+    pg_temp.st('online','paid','failed',null,null,null,now()-interval '1m'),
+    'verifying_with_branch', 'marker outlived the send (failed)');
+  -- A syncing row that ALREADY holds a ref is ambiguous: the ref test must stay
+  -- ahead of the in-flight test.
+  perform pg_temp.expect_state(
+    pg_temp.st('online','paid','syncing','#5',null,null,now()-interval '5s'),
+    'verifying_with_branch', 'syncing with a ref is still ambiguous');
   -- Ambiguity outranks the retry budget: an ambiguous order must NEVER fall
   -- through to a final failure, because that would auto-refund an order the
   -- branch may have accepted.
