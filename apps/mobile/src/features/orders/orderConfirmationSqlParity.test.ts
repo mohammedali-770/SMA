@@ -59,14 +59,37 @@ function stripSqlComments(sql: string): string {
 }
 
 /**
- * Remove whitespace entirely and lower-case, so formatting cannot fake either a
- * divergence or a match. A clause wrapped across lines, re-indented, or given a
- * space after a comma by a formatter must compare equal to the same clause on
- * one line — otherwise this tripwire cries wolf on a pgFormatter pass and gets
- * disabled, which is worse than not having it.
+ * Remove whitespace and lower-case OUTSIDE quoted literals only, so formatting
+ * cannot fake either a divergence or a match — while the literals themselves,
+ * which ARE the returned state values, compare byte-exact.
+ *
+ * Both halves matter. Normalising everything would let a future definition
+ * return 'SENDING_TO_BRANCH' or 'sending_to_branch ' and still match the
+ * expected needle, even though Postgres treats those as different values the
+ * TypeScript has never heard of. Normalising nothing would turn a pgFormatter
+ * pass red, and a tripwire that cries wolf gets disabled.
+ *
+ * `''` inside a literal is Postgres's escaped single quote and stays inside it.
  */
 function normalize(sql: string): string {
-  return stripSqlComments(sql).replace(/\s+/g, '').toLowerCase();
+  const src = stripSqlComments(sql);
+  let out = '';
+  let inLiteral = false;
+  for (let i = 0; i < src.length; i += 1) {
+    const c = src[i];
+    if (inLiteral) {
+      out += c;
+      if (c === "'") {
+        if (src[i + 1] === "'") { out += "'"; i += 1; continue; }
+        inLiteral = false;
+      }
+      continue;
+    }
+    if (c === "'") { inLiteral = true; out += c; continue; }
+    if (/\s/.test(c)) continue;
+    out += c.toLowerCase();
+  }
+  return out;
 }
 
 function migrationFiles(): string[] {
@@ -103,7 +126,12 @@ function definitionBody(fn: string): string {
   const sql = stripSqlComments(readFileSync(new URL(file, MIGRATIONS_DIR), 'utf8'));
   const m = re.exec(sql);
   expect(m, `definition of ${fn} not found in ${file} after comment stripping`).not.toBeNull();
-  const start = sql.indexOf('select case', (m as RegExpExecArray).index);
+  // Case-insensitive, like the definition regex above: a future migration
+  // written in conventional uppercase SQL must be READ, not rejected.
+  const caseRe = /select\s+case/i;
+  const after = sql.slice((m as RegExpExecArray).index);
+  const cm = caseRe.exec(after);
+  const start = cm ? (m as RegExpExecArray).index + cm.index : -1;
   const end = sql.indexOf('$$;', start);
   expect(start, `CASE expression not found for ${fn} in ${file}`).toBeGreaterThan(-1);
   expect(end, `end of ${fn} body not found in ${file}`).toBeGreaterThan(start);
