@@ -229,20 +229,71 @@ What is left is Lazywait's own Create Order call, and it is erratic:
 The slowest was the **smallest** order, so it is not payload size. On -000068
 that call was **82%** of the entire wait.
 
-`SYNC_TIMEOUT_MS` therefore drops from **11 s to 5 s**. It covers our ~1.5 s plus
-a POS call of ~3.5 s — comfortably above the three normal observations — and
-bails fast on the pathological one instead of holding a customer on a spinner
-for eleven seconds and *still* failing to show a number.
+`SYNC_TIMEOUT_MS` was therefore cut from **11 s to 5 s** on 2026-08-27. It covers
+our ~1.5 s plus a POS call of ~3.5 s — comfortably above the three normal
+observations — and bails fast on the pathological one instead of holding a
+customer on a spinner for eleven seconds and *still* failing to show a number.
 
-**Timing out is not a failure, and that is what makes the cut safe.** The abort
-only stops `order-intake` waiting; the worker keeps running and finishes the
-sync. That is observed, not assumed — on SM-2026-000064 the abort fired and the
-order got its branch number anyway. The customer sees the "number pending" state
-and the number arrives by push about a second after the POS confirms, from a
-push that only ever says "confirmed" when the POS really has the order.
+**Timing out is not a failure.** The abort only stops `order-intake` waiting; the
+worker keeps running and finishes the sync. That is observed, not assumed — on
+SM-2026-000064 the abort fired and the order got its branch number anyway. The
+customer sees the "number pending" state and the number arrives once the POS
+confirms, from a push that only ever says "confirmed" when the POS really has the
+order.
 
-So the trade is: on a slow POS the number arrives shortly after first paint
-instead of on it, and in exchange nobody waits 11 s for it.
+So the intended trade is: on a slow POS the number arrives shortly after first
+paint instead of on it, and in exchange nobody waits 11 s for it.
+
+### The cut was reverted on 2026-08-28, because it shipped without its client half
+
+**This section originally called the cut safe. It was not — not as shipped.** The
+server change was deployed as `order-intake` v7 while both client changes that
+make it safe were still sitting in a branch, and one of them had not been written
+at all. The next real order paid for it.
+
+SM-2026-000070 was **completely healthy**: `synced`, ticket **#2**, in **7.30 s**,
+`sync_attempt_count 0`, `first_pos_sync_failure_at` NULL,
+`pos_confirmation_reason` NULL. The database never held `confirmation_required`
+for it. Its customer was nonetheless shown **"تعذر التحقق مما إذا كان الفرع قد
+استلم هذا الطلب"** — *we could not verify whether the branch received this order*
+— while simultaneously receiving a `pos_confirmed` push. Two contradictory
+answers about an order that worked perfectly.
+
+The mechanism is an ordering bug in `deriveCustomerOrderState` that the 11 s
+ceiling had been hiding. `pos_create_attempted_at` is written by
+`begin_lazywait_create_attempt` **immediately before the POST leaves**, so an
+in-flight order always carries the marker. The derivation tested that marker
+*before* it tested `syncing`, so any order checkout returned on mid-send rendered
+the ambiguous-failure copy. At 11 s a 7.30 s order had already reached `synced`
+before checkout returned, so the screen showed `#2` and nobody ever saw the
+branch. At 5 s it became the **default** for every order slower than five
+seconds.
+
+Two things follow, and both are now done:
+
+- **`deriveCustomerOrderState` tests `syncing` before the marker** (fixed
+  2026-08-28). `ref != null` deliberately stays ahead of it — a syncing row that
+  already holds a ref really is ambiguous — and a marker that *outlived* its send
+  (`pending`/`failed`/`dead_letter`) still reads as ambiguous. Only the actively
+  in-flight case moved. `sending_to_branch` and `verifying_with_branch` are both
+  `canResend: false` with `showBranchNumber: true`, so the never-resend guarantee
+  is untouched; the tone changes from `warning` to `info`.
+- **`SYNC_TIMEOUT_MS` is back at 11 s**, and stays there until a shipped app build
+  carries both that fix and `nextReceiptPollMs` below. The revert needs no build,
+  restores the behaviour SM-2026-000070 would have had, and is the only half of
+  this that reaches a customer today.
+
+The 5 s cut is still the right end state — the measurements above stand and
+Lazywait's call is the real bottleneck. It should be re-applied as its own change
+**after** a build ships the client half, not before. There is a tripwire on the
+constant in `supabase/functions/_shared/orderIntakeSyncWiring.test.ts`.
+
+**No staleness clock was added to the in-flight case.** A worker that dies
+mid-POST leaves `syncing` for up to ten minutes before the reaper routes it to
+`confirmation_required`, and during that window the screen says "sending" rather
+than "verifying". That is the right trade: the customer can act on neither state,
+the reaper owns the transition, and under-alarming on a rare crashed worker is
+far cheaper than alarming on every normal order.
 
 **That sentence originally said "a second or two later by push", and it was
 wrong** — caught in review before the cut shipped. The `pos_confirmed` push is
