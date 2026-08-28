@@ -254,4 +254,79 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c).toContain('AbortSignal.timeout(SYNC_TIMEOUT_MS)');
     expect(c).toContain("'x-sync-secret'");
   });
+
+  it('starts the provider-config read BEFORE placing the order', () => {
+    // The config read uses the service-role client and does not depend on the
+    // order, so running it strictly afterwards cost a full extra CROSS-REGION
+    // round trip on the customer's awaited path. The database is in
+    // eu-central-1 while a Dammam customer's function executes in ap-south-1 or
+    // eu-central-2, so every PostgREST call is intercontinental — that ordering
+    // was worth roughly a whole round trip for no reason.
+    const c = code('order-intake');
+    const cfgStart = c.indexOf('cfgPromise = getProviderConfig(');
+    const place = c.indexOf("supa.rpc('place_customer_order'");
+    expect(cfgStart, 'cfgPromise assignment not found').toBeGreaterThan(-1);
+    expect(place, 'place_customer_order call not found').toBeGreaterThan(-1);
+    expect(cfgStart).toBeLessThan(place);
+    // And it must be AWAITED only inside the sync block, not before the order.
+    expect(c.indexOf('await cfgPromise')).toBeGreaterThan(place);
+  });
+
+  it('never lets a missing service-role env fail the order', () => {
+    // adminClient() THROWS when SUPABASE_SERVICE_ROLE_KEY is absent. It used to
+    // sit inside the sync block's try/catch; hoisting it bare to start the
+    // config read early would turn a misconfigured environment into a failed
+    // checkout — the exact opposite of "a POS problem can NEVER fail the order".
+    const c = code('order-intake');
+    const guarded = /try\s*\{[^}]*const admin = adminClient\(\);/s.test(c);
+    expect(guarded, 'adminClient() must stay inside a try').toBe(true);
+    expect(c).toContain('cfgPromise = Promise.resolve(null)');
+  });
+
+  it('logs timing as numbers only — no order contents, no customer data', () => {
+    // The timing line exists because apportioning this latency from OUTSIDE
+    // produced a confident wrong answer once already (it blamed Deno cold
+    // start; a 15-minute idle test then measured 828 ms). It must not become a
+    // PII leak in the process.
+    //
+    // ALLOWLIST, not a blacklist, and over the WHOLE payload — the first
+    // version of this test did neither and was shown two escapes in review: it
+    // sliced from the `at` key onward, so an identifier added ABOVE `at` was
+    // never scanned, and it blacklisted a handful of names, so `customerId` or
+    // `email` passed anywhere. Both were reproduced before this rewrite.
+    const c = code('order-intake');
+    const open = c.indexOf('console.log(JSON.stringify({');
+    expect(open, 'timing log not found').toBeGreaterThan(-1);
+    const payload = c.slice(c.indexOf('{', open) + 1, c.indexOf('}));', open));
+
+    const entries = payload
+      .split('\n')
+      .map((l) => l.replace(/\/\/.*$/, '').trim())
+      .filter(Boolean)
+      .map((l) => {
+        const m = /^(\w+):\s*(.+?),?$/.exec(l);
+        expect(m, `unparsed line in the timing payload: ${l}`).not.toBeNull();
+        return [(m as RegExpExecArray)[1], (m as RegExpExecArray)[2]] as const;
+      });
+
+    // Every key is known and expected — an added key fails here.
+    expect(entries.map(([k]) => k).sort()).toEqual([
+      'at', 'config_ms', 'place_ms', 'reread_ms', 'reread_span_ms',
+      'sync_ms', 'sync_span_ms', 'total_ms',
+    ]);
+
+    // Every VALUE may only mention these identifiers. Anything reaching for an
+    // order, a customer, a body field or a secret fails, whatever it is called.
+    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'Date', 'now', 't0', 'null']);
+    for (const [key, value] of entries) {
+      if (key === 'at') {
+        expect(value).toBe("'order-intake.timing'");
+        continue;
+      }
+      expect(value, `${key} must not contain a string literal`).not.toMatch(/['"`]/);
+      for (const ident of value.match(/[A-Za-z_$][\w$]*/g) ?? []) {
+        expect(ALLOWED.has(ident), `timing value for ${key} references ${ident}`).toBe(true);
+      }
+    }
+  });
 });

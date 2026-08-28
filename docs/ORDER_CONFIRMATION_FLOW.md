@@ -450,6 +450,79 @@ timeout there is classified `ambiguous` and routes to `confirmation_required`
 rather than a resend, because Create Order has no idempotency key. Shortening it
 would turn slow-but-successful tickets into orders a human must verify by hand.
 
+### The real bottleneck is the region gap, measured 2026-08-28
+
+The checkout wait is dominated by **cross-region round trips**, not by our SQL and
+not by cold start. Both of those were measured and ruled out:
+
+- **`place_customer_order` is 1.7 ms.** Profiled on a disposable database built
+  from the full migration chain — 0.39 ms pricing, 1.29 ms writes. It stays flat
+  at **51,173 orders / 154,108 order items** (1.29 ms), with 98 index scans and
+  **zero sequential scans**; `order_number` comes from a sequence and the
+  idempotency lookup is indexed. Production's 216 ms mean for the same call is
+  therefore transport, not logic.
+- **Cold start is not the cause.** After fifteen minutes idle, `order-intake`
+  answered in **828 ms** — indistinguishable from warm calls in the same burst.
+  An earlier inference that blamed Deno module loading for ~2.6 s was wrong, and
+  is recorded here because it was stated confidently before being tested.
+
+What the evidence actually shows: the database is in **`eu-central-1`**
+(Frankfurt), while a customer in Dammam has the function executed in
+**`ap-south-1`** (Mumbai) or **`eu-central-2`** (Zurich). The control is the same
+worker function on the same deployment:
+
+| Edge region | Invocations | p50 |
+| --- | --- | --- |
+| `eu-central-1` — cron, same region as the database | 442 | **556 ms** |
+| `ap-south-1` — the order kick, routed to the customer | 1 | **5934 ms** |
+
+Consistent with that, the two orders that happened to route through Zurich had
+the two lowest function-start-to-transaction times of six (1272 ms and 1218 ms,
+against a Mumbai mean of 2819 ms).
+
+So every PostgREST call on the order path is intercontinental, and the path makes
+roughly nine of them.
+
+#### What was removed, and what deliberately was not
+
+`order-intake` now starts the provider-config read **before** `place_customer_order`
+instead of after it. The read uses the service-role client and does not depend on
+the order, so the old ordering cost a full extra cross-region round trip for no
+reason. `adminClient()` stays inside a `try`: it throws when the service-role env
+is missing, and hoisting it bare would turn a misconfigured environment into a
+failed checkout — the opposite of the rule that a POS problem can never fail the
+order.
+
+Three things on that path look redundant and are **not**:
+
+- **the worker's own `getProviderConfig`** is its authentication gate. The
+  function runs with `verify_jwt = false`, so the `x-sync-secret` comparison is
+  the only thing standing in front of it, and it cannot trust a secret supplied
+  by the caller. It also cannot run concurrently with the claim, because that
+  would let an unauthenticated caller flip orders to `syncing` before being
+  rejected;
+- **the `orders.update` that persists the ref before `record_lazywait_sync`** is
+  crash safety. If the isolate dies between the POST and the record, the ref is
+  already stored and the reaper recovers the row to `synced` instead of
+  re-POSTing. Create Order has no idempotency key, so collapsing these two writes
+  would risk a duplicate kitchen ticket;
+- **the reaper and the CRM lookup** are already off the awaited path in targeted
+  mode (deferred, not skipped — the kick is one of only two reaping drivers).
+
+The remaining lever inside our control is a migration that merges
+`claim_lazywait_sync_one` with the three catalog reads into one round trip. That
+is a schema change and a separate owner decision, not done here.
+
+**The instrumentation is the point of this change as much as the saved hop.**
+`order-intake` now logs one line of timings per request — numbers only, no order
+contents and no customer data, with a test pinning that. Apportioning this
+latency from outside produced a confident wrong answer once already; the next
+order will give exact per-hop figures instead.
+
+**None of this closes the region gap itself.** Frankfurt serving Dammam is the
+root cause, and moving regions is a project-level decision rather than a code
+change.
+
 ### The push must follow the send, not precede it
 
 The "order received" push fires **after** the sync block, and that ordering is
