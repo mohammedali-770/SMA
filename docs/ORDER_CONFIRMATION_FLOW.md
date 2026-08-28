@@ -378,13 +378,40 @@ The mutation matrix it is held to:
 The last row matters as much as the others: a tripwire that cries wolf on a
 formatter gets disabled.
 
-`20260828090000_customer_order_state_inflight.sql` carries both corrections. It is
-**unapplied pending owner approval** — applying it is a §5 action — so until then
-Production still disagrees with the TypeScript on **both** counts: the in-flight
-case and the stale auto-retry arm. Harmlessly, for the reasons above. Note the
-consequence for the tripwire: it resolves the latest migration in the
-*repository*, which is the definition the repository intends, not the body
-currently live in Production.
+`20260828090000_customer_order_state_inflight.sql` carries both corrections and
+was **applied to Production on 2026-08-28 at 18:22:28 UTC** on explicit owner
+approval (live version `20260828182228`; ledger row 75 in `docs/MIGRATIONS.md`).
+SQL and TypeScript now agree.
+
+Verified behaviourally rather than by reading the body — the five cases were
+executed against the live function:
+
+| Input | Before | After | TypeScript |
+| --- | --- | --- | --- |
+| `syncing` + marker | `verifying_with_branch` | **`sending_to_branch`** | `sending_to_branch` |
+| `failed` + future `sync_next_attempt_at` | `sending_to_branch` | **`branch_failed_retry_available`** | `branch_failed_retry_available` |
+| `syncing` + ref | `verifying_with_branch` | `verifying_with_branch` | same |
+| marker outlived the send | `verifying_with_branch` | `verifying_with_branch` | same |
+| `synced` + usable ref | `confirmed_by_branch` | `confirmed_by_branch` | same |
+
+**The duplicate-ticket guard was confirmed intact**, which is the property worth
+checking rather than assuming: `customer_manual_pos_resend_eligibility` hashes
+unchanged and still returns `may_have_sent` for an in-flight order, and
+`request_customer_pos_resend` hashes unchanged. The money path
+(`place_order`, `compute_order_snapshot`) hashes identically before and after,
+and no order row was touched.
+
+One measurement error worth recording, because it is the kind that produces a
+false "verified": the first probe for the removed auto-retry arm searched the
+whole `pg_get_functiondef` for `p_next_attempt_at` and reported it **still
+present**. That string includes the parameter list, and the parameter is retained
+deliberately so `CREATE OR REPLACE` replaces the function rather than adding an
+overload. Scoped to the CASE body the arm is absent, and the overload count is 1.
+
+Note what the tripwire does and does not track: it resolves the latest migration
+in the *repository*, which is the definition the repository intends. That now
+matches Production, but the two are separate facts and only the first is what the
+test checks.
 
 **No staleness clock was added to the in-flight case.** A worker that dies
 mid-POST leaves `syncing` for up to ten minutes before the reaper routes it to
