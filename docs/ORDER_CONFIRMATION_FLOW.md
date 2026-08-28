@@ -343,20 +343,40 @@ a case to the SQL suite would not have gone red on PR #286.
 
 So parity is now enforced from the side that always runs:
 `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` resolves the
-latest migration that defines the function, strips its comments, and pins **clause
-order** — `ref` before in-flight before marker before queued — plus the absence of
-any `p_next_attempt_at` arm and the eligibility predicate's marker-first ordering,
-asserting the matching inputs against the real TypeScript implementation.
+latest migration defining the function, strips its comments, and pins the
+**complete ordered clause sequence** of both `customer_order_state` and
+`customer_manual_pos_resend_eligibility`, plus the readable order relations, the
+absence of any `p_next_attempt_at` arm, and the matching inputs against the real
+TypeScript implementation. It also ties the SQL `customer_pos_resend_limit()`
+literal to `CUSTOMER_RESEND_LIMIT`, which nothing previously connected.
 
-**What it does and does not cover, stated plainly:** it pins the clauses that
-actually drifted, not the whole CASE. The refund, payment-gate, channel and
-budget clauses are unconstrained by it. It is a tripwire on the known failure
-mode, not a proof of equivalence.
+**Sampling was not enough, and that was proven rather than argued.** An earlier
+version pinned four representative clauses; three mutations walked straight
+through it — a clause inserted *above* all four preserves their relative order
+(reintroducing the SM-2026-000070 screen for any resent order), flipping the
+resend budget's `<` to `<=`, and swapping the eligibility predicate's
+`then 'not_failed'` to `then 'eligible'`, which would make an in-flight order
+resendable and duplicate a live kitchen ticket. Pinning the whole sequence closes
+all three: any insertion, deletion, reorder, predicate edit or result change is
+red and must be re-approved deliberately.
 
-It was mutation-tested rather than assumed: reintroducing either historical
-divergence turns it red, as does a future migration redefining the function in
-different casing or line wrapping, and as does wrongly "aligning" the eligibility
-predicate. A pure reformat stays green, so it will not cry wolf on a formatter.
+The mutation matrix it is held to:
+
+| Mutation | Expected | Result |
+| --- | --- | --- |
+| Marker moved back ahead of in-flight | red | ✅ |
+| Auto-retry arm restored | red | ✅ |
+| Clause inserted above the sampled needles | red | ✅ |
+| Resend budget `<` → `<=` | red | ✅ |
+| Future migration reintroducing the bug, uppercase + wrapped | red | ✅ |
+| Eligibility marker arm commented out | red | ✅ |
+| Eligibility result swapped to `'eligible'` | red | ✅ |
+| SQL resend limit changed to 5 | red | ✅ |
+| Nested block comment hiding a clause | red | ✅ |
+| Pure reformat / wrapped clause | **green** | ✅ |
+
+The last row matters as much as the others: a tripwire that cries wolf on a
+formatter gets disabled.
 
 `20260828090000_customer_order_state_inflight.sql` carries both corrections. It is
 **unapplied pending owner approval** — applying it is a §5 action — so until then
