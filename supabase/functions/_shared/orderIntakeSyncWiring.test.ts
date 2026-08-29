@@ -311,13 +311,13 @@ describe('targeted kick and deferred off-path work', () => {
 
     // Every key is known and expected — an added key fails here.
     expect(entries.map(([k]) => k).sort()).toEqual([
-      'at', 'config_ms', 'place_ms', 'reread_ms', 'reread_span_ms',
-      'sync_ms', 'sync_span_ms', 'total_ms',
+      'at', 'config_ms', 'entry_ms', 'parse_ms', 'place_ms', 'reread_ms',
+      'reread_span_ms', 'sync_ms', 'sync_span_ms', 'total_ms', 'upload_span_ms',
     ]);
 
     // Every VALUE may only mention these identifiers. Anything reaching for an
     // order, a customer, a body field or a secret fails, whatever it is called.
-    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'Date', 'now', 't0', 'null']);
+    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'entry', 'parse', 'Date', 'now', 't0', 'null']);
     for (const [key, value] of entries) {
       if (key === 'at') {
         expect(value).toBe("'order-intake.timing'");
@@ -328,5 +328,26 @@ describe('targeted kick and deferred off-path work', () => {
         expect(ALLOWED.has(ident), `timing value for ${key} references ${ident}`).toBe(true);
       }
     }
+  });
+  it('starts the clock on the FIRST line of the handler', () => {
+    // The first version set t0 after `await req.json()` and under-reported the
+    // invocation by 2062 ms — total_ms 7129 against the platform's
+    // execution_time_ms 9191 for the same request. Everything in front of it
+    // (gateway JWT verification, isolate boot, and the phone uploading the
+    // request body) was invisible, and it was the largest unexplained block in
+    // checkout. If t0 drifts back below req.json(), that blind spot reopens
+    // silently — the numbers still look plausible, they are just missing two
+    // seconds. Hence a positional assertion rather than a comment.
+    const c = code('order-intake');
+    const serve = c.indexOf('Deno.serve(');
+    const t0 = c.indexOf('const t0 = Date.now();');
+    const parse = c.indexOf('await req.json()');
+    const auth = c.indexOf("req.headers.get('Authorization')");
+    expect(t0, 't0 not found').toBeGreaterThan(-1);
+    expect(t0).toBeGreaterThan(serve);
+    expect(t0, 't0 must precede the Authorization check').toBeLessThan(auth);
+    expect(t0, 't0 must precede req.json() — that await is the body upload').toBeLessThan(parse);
+    // And exactly one t0, so a second declaration cannot shadow it.
+    expect(c.split('const t0 = Date.now();').length - 1).toBe(1);
   });
 });

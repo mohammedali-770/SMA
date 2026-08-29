@@ -519,6 +519,55 @@ contents and no customer data, with a test pinning that. Apportioning this
 latency from outside produced a confident wrong answer once already; the next
 order will give exact per-hop figures instead.
 
+#### First measured order, and what it corrected
+
+SM-2026-000072 (2026-08-28 20:26 UTC) was the first order through the
+instrumentation: POS ticket **#4**, first attempt, `confirmed_by_branch`, push
+correct, 5.69 s from order row to synced. Its timing line read
+
+    config_ms 1016 · place_ms 1341 · sync_span_ms 5249 · reread_span_ms 539 · total_ms 7129
+
+and immediately exposed a defect in the instrumentation itself. The platform
+reported **execution_time_ms 9191** for the same invocation — **2062 ms that the
+log could not see**, because `t0` was set *after* `await req.json()`. Everything
+in front of it (gateway JWT verification, isolate boot, and the phone uploading
+the request body) was invisible, and it was the largest unexplained block in
+checkout.
+
+`t0` is now the **first line** of the handler, with `entry_ms`, `parse_ms` and
+`upload_span_ms` decomposing the front. `total_ms` should therefore track
+`execution_time_ms` to within ~100 ms; if the two diverge again, the mark has
+drifted, and a positional test asserts `t0` precedes both the Authorization check
+and `req.json()`.
+
+**That 2062 ms is probably not cross-region database latency.** A cold-start test
+measured 828 ms end-to-end *including* a full PostgREST round trip, so boot
+cannot be two seconds; request-body upload over mobile data is the more plausible
+bulk, and that is client network time rather than something the backend can fix.
+Stated as a hypothesis, which is exactly what the new marks exist to settle.
+
+#### The parallelisation is NOT yet shown to help
+
+Recorded because the opposite was briefly claimed. Within the instrumented window
+the overlap did happen — `config_ms` 1016 and `place_ms` 1341 share a `t0`, so
+sequentially those two would have cost ~2357 ms. But the **totals** are
+
+| Order | Version | execution_time_ms | Edge region |
+| --- | --- | --- | --- |
+| SM-2026-000066 | v5 | 9897 | — |
+| SM-2026-000068 | v6 | 11401 | eu-central-2 |
+| SM-2026-000069 | v7 | 10645 | ap-south-1 |
+| SM-2026-000070 | v7 | 7926 | ap-south-1 |
+| SM-2026-000071 | **v8** (sequential) | 9802 | ap-south-1 |
+| SM-2026-000072 | **v9** (parallel) | 9191 | ap-south-1 |
+
+611 ms apart, of which Lazywait's own call accounts for 258 ms, leaving roughly
+**350 ms** attributable — well inside a spread that runs 7926-11401 ms, with
+**n = 1 on each side**. Region is not the confound here (both ap-south-1), and
+time-to-order-creation is unchanged (2837 ms versus 2680 ms), which is expected
+since the config read previously ran *after* `place_customer_order` and never
+delayed order creation. **No improvement is established.**
+
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
 change.

@@ -66,14 +66,31 @@ import { getProviderConfig } from '../_shared/secrets.ts';
 const SYNC_TIMEOUT_MS = 11_000;
 
 Deno.serve(async (req: Request) => {
+  // FIRST LINE, deliberately. The first version of this instrumentation set t0
+  // AFTER `await req.json()`, and on the first real order it under-reported the
+  // invocation by 2062 ms: total_ms said 7129 while the platform's
+  // execution_time_ms for the same invocation said 9191. Everything in front of
+  // the old t0 — gateway JWT verification, isolate boot, and the phone
+  // UPLOADING THE REQUEST BODY — was invisible, and it was the single largest
+  // unexplained block in checkout. Measuring from here is what makes total_ms
+  // comparable with execution_time_ms; if the two ever diverge again, this mark
+  // has drifted.
+  const t0 = Date.now();
+  const mark: Record<string, number> = {};
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const auth = req.headers.get('Authorization');
   if (!auth) return json({ error: 'Authentication required' }, 401);
+  mark.entry = Date.now() - t0;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  // parse − entry is the request BODY UPLOAD from the device. It is client
+  // network time, not ours, and separating it stops it being misattributed to
+  // cross-region database latency.
+  mark.parse = Date.now() - t0;
 
   const supa = userClient(auth);
 
@@ -90,8 +107,9 @@ Deno.serve(async (req: Request) => {
   // confident and WRONG answer (it blamed Deno cold start, which a 15-minute
   // idle test then disproved at 828 ms). Numbers only; no order contents, no
   // customer data.
-  const t0 = Date.now();
-  const mark: Record<string, number> = {};
+  //
+  // t0 and `mark` are declared at the very top of the handler — see the note
+  // there on why measuring from the first line is load-bearing.
 
   // The provider config is read with the SERVICE-ROLE client and does not depend
   // on the order, so it is started HERE rather than after place_customer_order.
@@ -244,12 +262,15 @@ Deno.serve(async (req: Request) => {
   // larger than `place` without either having waited on the other.
   console.log(JSON.stringify({
     at: 'order-intake.timing',
+    entry_ms: mark.entry ?? null,
+    parse_ms: mark.parse ?? null,
     config_ms: mark.config ?? null,
     place_ms: mark.place ?? null,
     sync_ms: mark.sync ?? null,
     reread_ms: mark.reread ?? null,
     sync_span_ms: mark.sync != null && mark.place != null ? mark.sync - mark.place : null,
     reread_span_ms: mark.reread != null && mark.sync != null ? mark.reread - mark.sync : null,
+    upload_span_ms: mark.parse != null && mark.entry != null ? mark.parse - mark.entry : null,
     total_ms: Date.now() - t0,
   }));
   return json({ order: fresh });
