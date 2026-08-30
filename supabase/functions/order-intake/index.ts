@@ -32,11 +32,17 @@ import {
  * READ THE HEADER OF `_shared/rest.ts` BEFORE REPEATING THE REASON. The change
  * was made to shrink the 2351 ms front measured on SM-2026-000073, on the
  * theory that module evaluation was a large part of it. Measurement after the
- * deploy refuted that: this function's `booted` event reads 23 ms with
- * supabase-js and 23 ms without. The dependency is still better gone — the
- * hottest customer path should not carry one it does not need, and the
- * replacement has executable tests the old path never had — but it bought no
- * measurable latency, and the front is unexplained again.
+ * deploy refuted the MECHANISM: this function's `booted` event reads 23 ms with
+ * supabase-js and 23 ms without, so isolate boot is not where two seconds were
+ * hiding.
+ *
+ * What that does NOT establish is what the whole front now costs. No
+ * authenticated order has run on this version yet, and the only v11 request so
+ * far was an `OPTIONS` preflight, which returns before the auth check and does
+ * no body read and no PostgREST call — not comparable. The dependency is still
+ * better gone (the hottest customer path should not carry one it does not need,
+ * and the replacement has executable tests the old path never had), but treat
+ * the latency effect as UNMEASURED, not as zero.
  *
  * Keep it that way. `restNoSupabaseJs.test.ts` walks this file's import graph
  * and fails if any file in it references the package in CODE — a type-only
@@ -103,10 +109,13 @@ const SYNC_TIMEOUT_MS = 11_000;
  *
  * Compare `isolate_age_ms` near zero (a cold request) against the platform's
  * `execution_time_ms` minus this handler's `total_ms`: that difference is the
- * front. It is 2351 ms on the one cold order measured so far, and what it
- * consists of is NOT known — removing the npm dependency did not move it, and
- * the runtime's own `booted` metric says why (23 ms either way). Do not
- * attribute it again without a measurement that separates the parts.
+ * front. It was 2351 ms on the one cold order measured so far, and what it
+ * consists of is NOT known. Isolate boot is ruled OUT as the large term — the
+ * runtime's own `booted` metric reads 23 ms with the npm dependency and 23 ms
+ * without — but the front itself has not been re-measured on this version,
+ * because that needs a real authenticated order and none has run yet. Do not
+ * attribute it again without a measurement that separates the parts, and do not
+ * report it as unchanged either.
  */
 const MODULE_LOADED_AT = Date.now();
 

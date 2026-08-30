@@ -716,10 +716,21 @@ verified against the base branch rather than assumed:
 Folding either into a transport swap is the "second change riding along" that
 §15 of `CLAUDE.md` exists to prevent.
 
-**What this does not do.** It does not remove measurable boot cost — see the
-`booted` table above, which is the third performance claim this document has had
-to retract. It does not touch round trips either; the region gap is untouched and
-remains the larger term.
+**What this does not do, and what is still unmeasured.** It does not remove
+measurable BOOT cost — see the `booted` table above, which is the third
+performance claim this document has had to retract.
+
+Be precise about the limit of that result, because the temptation is to round it
+up into "the change made no difference". What was measured is the `booted` event.
+The **full front** — `execution_time_ms − total_ms` — has NOT been re-measured on
+version 11, because that needs a real authenticated order and none has run since
+the deploy. The only post-deploy request so far was an `OPTIONS` preflight, which
+returns before the auth check and performs no body read and no PostgREST call, so
+it is not comparable to a checkout. Treat the effect on the front as **open**, not
+as zero.
+
+It does not touch round trips either; the region gap is untouched and remains the
+larger term.
 
 **Deployed 2026-08-30 as version 11** on explicit owner approval, after PR #291
 merged as `23e911b`. Bundle: three files (`order-intake/index.ts`,

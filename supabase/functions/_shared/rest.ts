@@ -24,12 +24,17 @@
  * loading it costs ~23 ms either way. Module evaluation was never two seconds,
  * and the 2351 ms front remains UNEXPLAINED.
  *
- * So what is this module for now? Not a latency fix — it does not measurably
- * shrink boot, and no claim that it does should be reintroduced. What it does
- * do is keep the hottest customer path free of a dependency it does not need,
- * behind executable tests it never had. That is worth having on its own terms;
- * it is not what it was sold as, and the record says so rather than
- * retro-fitting a better reason.
+ * So what is this module for now? Not a boot-time fix — `booted` is unchanged,
+ * and no claim that it shrinks boot should be reintroduced. Whether it moves the
+ * FULL front is a separate question and is still open: that needs an
+ * authenticated order on this version, and the only post-deploy request so far
+ * was an `OPTIONS` preflight, which short-circuits before the auth check and
+ * touches no database. Unmeasured is not the same as zero, in either direction.
+ *
+ * What the module does do is keep the hottest customer path free of a dependency
+ * it does not need, behind executable tests it never had. That is worth having
+ * on its own terms; it is not what it was sold as, and the record says so rather
+ * than retro-fitting a better reason.
  *
  * This module is the replacement for the three calls order-intake actually
  * made.
