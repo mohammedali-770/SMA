@@ -109,9 +109,10 @@
     },
     {
       "id": "order-lifecycle",
-      "why": "The confirmation flow spans the app, the POS and the receipt a cashier reads. Its documentation is what makes a customer complaint traceable.",
+      "why": "The confirmation flow spans the app, the POS and the receipt a cashier reads. Its documentation is what makes a customer complaint traceable. The PostgREST transport `supabase/functions/_shared/rest*.ts` was added on 2026-08-30, when order-intake dropped its supabase-js dependency; it is listed because the rule otherwise fires only on the entrypoint, so work that moved order-path behaviour into the shared module and left index.ts untouched would pass the documentation gate in silence.",
       "sources": [
         "supabase/functions/order-intake/**",
+        "supabase/functions/_shared/rest*.ts",
         "apps/mobile/src/features/orders/**",
         "apps/mobile/src/features/checkout/**"
       ],

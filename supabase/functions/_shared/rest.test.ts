@@ -75,7 +75,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('cleanSelect — the whitespace rule that PostgREST has no room for', () => {
+describe('cleanSelect — whitespace stripped exactly as postgrest-js stripped it', () => {
+  // NOT because PostgREST would reject the unstripped string — it would not, and
+  // an earlier comment here claimed otherwise. Its parser has the space
+  // character inside the identifier charset and trims each identifier, which was
+  // confirmed read-only against live PostgREST. Stripping is fidelity, plus the
+  // fact that an INTERNAL space is preserved as part of an identifier, so the
+  // tolerance only covers spaces that sit next to a delimiter.
   it('strips every unquoted whitespace character', () => {
     expect(cleanSelect('id, status, order_type')).toBe('id,status,order_type');
     expect(cleanSelect('a(b, c(d, e))')).toBe('a(b,c(d,e))');
@@ -89,10 +95,11 @@ describe('cleanSelect — the whitespace rule that PostgREST has no room for', (
   });
 
   it('matches the algorithm postgrest-js applied to the same input', () => {
-    // Reimplementation of PostgrestQueryBuilder.select's cleaner, v2.112.4,
-    // run over the real order-intake column list. If cleanSelect ever drifts,
-    // this fails on the exact string that matters.
-    const source = readFileSync(new URL('../order-intake/index.ts', import.meta.url), 'utf8');
+    // Reimplementation of PostgrestQueryBuilder.select's cleaner, v2, run over
+    // the real order-intake column list. If cleanSelect ever drifts, this fails
+    // on the exact string that matters. The algorithm is unchanged across every
+    // v2 release checked.
+      const source = readFileSync(new URL('../order-intake/index.ts', import.meta.url), 'utf8');
     const literal = /const ORDER_SELECT =([\s\S]*?);\n/.exec(source);
     expect(literal, 'ORDER_SELECT literal not found').not.toBeNull();
     // eslint-disable-next-line no-new-func

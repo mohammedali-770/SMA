@@ -22,19 +22,28 @@
  * source-shape tripwires. The wiring tests could only ever assert that the code
  * looks right.
  *
- * FIDELITY IS THE POINT. Every behaviour below was read out of the exact
- * package the function was running, `@supabase/postgrest-js@2.112.4` and
- * `@supabase/supabase-js@2.112.4`, not from documentation or memory. Where this
- * file deliberately differs from that package it says so in place. The goal of
- * the change that introduced it was to remove ONE thing — the dependency — and
- * to leave every observable behaviour alone.
+ * FIDELITY IS THE POINT. Every behaviour below was read out of package source —
+ * `@supabase/postgrest-js` and `@supabase/supabase-js` 2.112.4, from the Deno
+ * cache — and not from documentation or memory. Stated precisely, because
+ * `npm:@supabase/supabase-js@2` is a FLOATING specifier: it resolves at build
+ * time, so which 2.x the deployed function actually bundled is not something
+ * this repository records. 2.112.4 is what Deno resolves here and 2.110.0 is
+ * what the repo's node_modules holds; the two produce identical requests apart
+ * from the version string in `X-Client-Info`. Where a behaviour CHANGED within
+ * v2 it is called out in place — `maybeSingle()` is the one that did, at
+ * 2.100.1.
+ *
+ * Where this file deliberately differs it says so in place. The goal of the
+ * change that introduced it was to remove ONE thing — the dependency — and to
+ * leave every observable behaviour alone.
  *
  * SECRETS. `restProviderConfig` reads `integration_settings.secret_config` with
  * the service-role identity. That value must never be returned to a client, put
  * in a log line, or included in an error. It is the same contract as
  * `getProviderConfig` in `secrets.ts`, which is the supabase-js-based twin of
- * this function; `restProviderConfigWiring.test.ts` asserts the two read the
- * same table, columns and filter so they cannot drift apart unnoticed.
+ * this function; `rest.test.ts` ("the two provider-config readers must not
+ * drift") asserts they read the same table, the same columns and the same
+ * filter, so they cannot drift apart unnoticed.
  */
 
 // ===========================================================================
@@ -153,14 +162,32 @@ export interface RestResult<T> {
  * Remove whitespace from a `select` column list, ignoring whitespace inside
  * double-quoted identifiers.
  *
- * THIS IS NOT COSMETIC. PostgREST's `select` grammar has no room for spaces;
- * `select=a, b` is a parse error, not a tolerated variant. postgrest-js strips
- * whitespace for you (`PostgrestQueryBuilder.select`, v2.112.4), which is why
- * the order-intake column list could be written across several concatenated
- * lines with a space after every comma and still work. A hand-written client
- * that forwards that string unchanged gets a 400 and returns no order — for
- * every customer, immediately. Byte-for-byte the same algorithm, for that
- * reason.
+ * WHY, STATED CORRECTLY — an earlier version of this comment gave a reason that
+ * is false, and review caught it. It claimed `select=a, b` is a PostgREST parse
+ * error and that forwarding the string unstripped would 400 every checkout. It
+ * does not. PostgREST's own parser puts the space character *inside* the
+ * identifier charset and then `T.strip`s each identifier
+ * (`QueryParams.hs`: `pIdentifierChar = letter <|> digit <|> oneOf "_ $"`), so
+ * `select=id, status` parses to the same two columns. That was confirmed
+ * read-only against this project's live PostgREST: `select=id, name_en` on
+ * `branches` returns 200 with both columns projected correctly, while a genuine
+ * parse error still returns PGRST100/400.
+ *
+ * Strip anyway, for two reasons that ARE true:
+ *
+ *   1. Fidelity. It is what postgrest-js put on the wire
+ *      (`PostgrestQueryBuilder.select`, v2), and the goal of this module is to
+ *      change the dependency and nothing else.
+ *   2. The tolerance is not general. Whitespace is trimmed only where it is
+ *      adjacent to a delimiter; an *internal* space is PRESERVED as part of the
+ *      identifier — PostgREST's own doctest parses `identifier with spaces` as
+ *      one column name. Today's string is saved only by where its spaces happen
+ *      to fall.
+ *
+ * The correction matters more than the conclusion. Left as it was, a reviewer
+ * who checked the claim would have found it false and might reasonably have
+ * deleted the stripping — which would then fail SILENTLY on the next select
+ * that is shaped differently, rather than loudly on this one.
  */
 export function cleanSelect(columns: string): string {
   let quoted = false;
@@ -187,8 +214,12 @@ export function cleanSelect(columns: string): string {
  * Replicated rather than dropped. Removing it would be a second change riding
  * along with the dependency removal, and it would change what a customer sees
  * on a transient 503: today the order re-read retries and the branch number
- * still arrives; without it the response carries `order: null` and the app has
- * to fall back to polling. Tune it later, visibly, on its own.
+ * still arrives; without it the response carries `order: null` at HTTP 200 —
+ * and `placeAndSync` in apps/mobile/src/services/api.ts THROWS on that
+ * (`if (!res.order) throw new Error('Order was not created.')`), telling a
+ * customer their order failed when it exists. There is no polling fallback for
+ * that case; an earlier version of this comment said there was. Tune the retry
+ * later, visibly, on its own.
  */
 const MAX_RETRIES = 3;
 const RETRYABLE_STATUS = [503, 520];
@@ -384,7 +415,8 @@ export interface RestProviderConfig {
  * row is missing" contract.
  *
  * Two implementations of one read is a drift risk, so it is guarded rather than
- * hoped about: `restProviderConfigWiring.test.ts` pins both against each other.
+ * hoped about: `rest.test.ts` pins both against each other — same table, same
+ * columns, same filter, same `ProviderType` union.
  * The alternative — making `secrets.ts` dependency-free and sharing it — would
  * have put a supabase-js `import type` back into order-intake's import graph,
  * and the property worth having is that NOTHING order-intake imports mentions

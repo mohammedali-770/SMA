@@ -271,7 +271,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 29 | order-intake — immediate POS sync, and no premature promise |
-| `supabase/functions/_shared/rest.test.ts` | 35 | cleanSelect — the whitespace rule that PostgREST has no room for |
+| `supabase/functions/_shared/rest.test.ts` | 35 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 4 | order-intake carries no npm dependency |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |
 | `supabase/functions/_shared/tapRefund.test.ts` | 18 | classifyRefundResponse — confirmed success |

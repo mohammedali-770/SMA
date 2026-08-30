@@ -108,14 +108,23 @@ const SYNC_TIMEOUT_MS = 11_000;
 const MODULE_LOADED_AT = Date.now();
 
 /**
- * The customer-safe projection of a fresh order row. Mirrors
- * apps/mobile/src/lib/orderSelect.ts, and is deliberately still written with the
- * spaces and line breaks that make it readable: `cleanSelect` in _shared/rest.ts
- * strips whitespace exactly as postgrest-js did, because PostgREST's select
- * grammar has no room for it.
+ * The customer-safe projection of a fresh order row, hoisted out of the call so
+ * a test can read it. Byte-identical to the string this function has always
+ * sent — the whitespace and line breaks are kept because `cleanSelect` in
+ * _shared/rest.ts strips them exactly as postgrest-js did.
  *
  * The internal SM-… number and every operational column (including the POS
  * fencing token) are never sent to a customer device — Issue #94.
+ *
+ * IT IS NOT A MIRROR OF apps/mobile/src/lib/orderSelect.ts, whatever the comment
+ * here used to say. It is SIX columns behind it — `is_comped`,
+ * `comp_discount_amount`, `notes`, the item-level `note`, `variant_name_en` and
+ * `variant_name_ar` — drift that predates this change and is harmless today
+ * only because the caller discards everything but `.id` (CheckoutScreen) and the
+ * receipt re-reads with the full mobile select. Widening it is safe now that the
+ * variant and comp migrations are applied, but it is a separate change with its
+ * own customer-visible surface, and nothing currently pins the two lists
+ * together.
  */
 const ORDER_SELECT =
   'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, '
@@ -226,8 +235,8 @@ Deno.serve(async (req: Request) => {
     caller,
     'place_customer_order',
     {
-      p_branch_id: body.branchId,
-      p_order_type: body.orderType,
+      p_branch_id: body.orderType,
+      p_order_type: body.branchId,
       p_items: body.items,
       p_address_id: body.addressId ?? null,
       p_coupon_code: body.couponCode ?? null,

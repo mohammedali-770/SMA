@@ -631,10 +631,10 @@ behaviour was read out of the exact packages the function was running
 
 | Behaviour | Why it had to be replicated |
 | --- | --- |
-| `select` whitespace stripping | PostgREST's grammar has no room for spaces. The order column list is written across concatenated lines with a space after every comma; forwarding it unchanged is a 400 on every checkout. |
+| `select` whitespace stripping | **Fidelity, not a 400** — and the first draft of this row said otherwise. PostgREST tolerates `select=id, status`: its parser has the space character inside the identifier charset and trims each identifier, confirmed read-only against this project's live PostgREST. Stripping is kept because it is what went on the wire before, and because an *internal* space is preserved as part of an identifier, so the tolerance only covers spaces adjacent to a delimiter. Recorded rather than quietly fixed, because a reviewer who checked the false claim could reasonably have deleted the stripping — which would then fail silently on a differently-shaped select rather than loudly on this one. |
 | `maybeSingle()` collapse | It is a **client-side rule**, not an `Accept` header. Zero rows → `null`, one row → the object, more than one → PGRST116/406. Sending `vnd.pgrst.object+json` instead would turn "no such row" into an error. |
 | transport failure → `error`, not a throw | `postgrest-js` swallows the rejection and returns `{ error, status: 0 }`. Checkout answers 400 with a message; rejecting instead would surface as an unhandled 500. |
-| GET retry (3×, 1 s/2 s/4 s, on a network error or 503/520) | On by default in `postgrest-js`. Dropping it would be a second change riding along, and would turn a transient 503 on the re-read into `order: null`. POST is **not** retried — `place_customer_order` creates an order. |
+| GET retry (3×, 1 s/2 s/4 s, on a network error or 503/520) | On by default in `postgrest-js`. Dropping it would be a second change riding along, and would turn a transient 503 on the re-read into `order: null` at HTTP 200 — which `placeAndSync` throws on (`'Order was not created.'`), telling a customer their order failed when it exists. POST is **not** retried: `place_customer_order` creates an order. |
 
 One header differs on purpose: `X-Client-Info` now reads `sma-edge-rest/1`, which
 identifies these requests in the platform logs and is how the change can be
@@ -654,10 +654,43 @@ rule, error mapping, retry — rather than source shape, which is what every oth
 guard around this function is limited to. `restNoSupabaseJs.test.ts` walks the
 import graph from `order-intake/index.ts` and fails if any file in it references
 the package in code, type-only imports included; that graph is also the deploy
-bundle, and the test pins it at three files.
+bundle, and the test pins it at three files
+(`order-intake/index.ts`, `_shared/cors.ts`, `_shared/rest.ts` — down from four).
 
-**What this does not do.** It removes boot cost, not round trips. The region gap
-is untouched and remains the larger term.
+**A version caveat worth stating.** `npm:@supabase/supabase-js@2` is a *floating*
+specifier resolved at build time, so which 2.x the deployed function bundled is
+not something this repository records. The behaviours above were read from
+2.112.4 source; 2.110.0 is what `node_modules` holds, and the two issue identical
+requests apart from the version string in `X-Client-Info`. One behaviour did
+change inside v2 — `maybeSingle()` moved from a server-enforced `Accept` header
+to the client-side collapse at **2.100.1** — and it is the collapse that is
+replicated.
+
+**Two things this deliberately does NOT fix**, both pre-existing and both
+verified against the base branch rather than assumed:
+
+- the order re-read **discards its error**, so a failed re-read returns
+  `{"order": null}` at HTTP 200 and `placeAndSync` throws *"Order was not
+  created."* on an order that exists. The base branch does the same;
+- `ORDER_SELECT` is **six columns behind** `apps/mobile/src/lib/orderSelect.ts`
+  (`is_comped`, `comp_discount_amount`, `notes`, the item-level `note`,
+  `variant_name_en`, `variant_name_ar`). Harmless today because the caller keeps
+  only `.id` and the receipt re-reads with the full mobile select, and nothing
+  pins the two lists together.
+
+Folding either into a transport swap is the "second change riding along" that
+§15 of `CLAUDE.md` exists to prevent.
+
+**What this does not do, and what is not yet measured.** It removes boot cost,
+not round trips; the region gap is untouched and remains the larger term. And
+**no post-change measurement exists** — nothing carrying
+`X-Client-Info: sma-edge-rest/1` has been observed, because this has not been
+deployed (a `CLAUDE.md` §5 action). What is supportable today is that the front
+on one cold request was 2351 ms and that module evaluation is part of it; the
+share attributable to supabase-js specifically has never been separated, n = 1.
+Against a whole-invocation spread of 7926-11401 ms across six orders, a single
+post-deploy observation would not establish an improvement either — this document
+already carries one retracted performance claim made on n = 1 per side.
 
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
