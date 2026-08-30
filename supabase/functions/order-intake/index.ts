@@ -200,12 +200,17 @@ Deno.serve(async (req: Request) => {
   // (Zurich), so each PostgREST call pays an intercontinental round trip.
   //
   // Measured per-request on 2026-08-30 from the gateway's own `origin_time`,
-  // same worker function, same minute, same statements: `integration_settings`
-  // cost 934 ms from Mumbai against 35 ms from Frankfurt. Within one cold
-  // isolate the shape is ~0.7-1.3 s on the FIRST call and ~170-200 ms
-  // thereafter, so most of it is connection setup rather than flat latency.
-  // (This supersedes an earlier p50-of-whole-invocations comparison that had
-  // n = 1 on one side; see docs/ORDER_CONFIRMATION_FLOW.md.)
+  // same worker function, same minute, IDENTICAL statements:
+  // `integration_settings` cost 934 ms from Mumbai against 35 ms from
+  // Frankfurt, `reap_stale_lazywait_syncs` 525 against 30, `notification_log`
+  // 179 against 26. (This supersedes an earlier p50-of-whole-invocations
+  // comparison that had n = 1 on one side.)
+  //
+  // The spread WITHIN Mumbai — 1265 ms down to 165 ms — is NOT explained. A
+  // draft of this comment attributed it to per-isolate connection setup;
+  // review rejected that, correctly, because the calls do different work, two
+  // of them are concurrent, and the sequence is not monotonic. See
+  // docs/ORDER_CONFIRMATION_FLOW.md before acting on it either way.
   //
   // The OTHER part is the boot this function no longer pays for an npm module
   // graph — see MODULE_LOADED_AT above.

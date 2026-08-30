@@ -490,12 +490,16 @@ worker function on the same deployment** ran from two colos inside the same
 minute, one invoked by the order kick (Mumbai, routed to the customer) and one by
 the cron tick (Frankfurt, in-region). Identical queries:
 
-| Query | from **BOM** (Mumbai) | from **FRA** (Frankfurt) |
-| --- | ---: | ---: |
-| `GET integration_settings` | **934 ms** | **35 ms** |
-| `POST reap_stale_lazywait_syncs` | 525 ms | 30 ms |
-| `POST claim_lazywait_sync_one` / `_batch` | 165 ms | 26 ms |
-| `GET notification_log` | 179 ms | 26 ms |
+| Query | from **BOM** (Mumbai) | from **FRA** (Frankfurt) | ratio |
+| --- | ---: | ---: | ---: |
+| `GET integration_settings` | **934 ms** | **35 ms** | 27× |
+| `POST reap_stale_lazywait_syncs` | 525 ms | 30 ms | 18× |
+| `GET notification_log` | 179 ms | 26 ms | 7× |
+
+Three genuinely identical statements. A fourth near-pair — `claim_lazywait_sync_one`
+165 ms from Mumbai against `claim_lazywait_sync_batch` 26 ms from Frankfurt — is
+excluded from the table on purpose: they are different functions, and a table
+whose point is "same statement" should not contain one that is not.
 
 **This supersedes the p50 comparison that stood here** (556 ms across 442
 in-region cron invocations against 5934 ms for a single `ap-south-1` order kick).
@@ -503,30 +507,58 @@ That compared whole invocations doing different amounts of work, with n = 1 on
 one side. This compares the same statement, from the same function, in the same
 minute, timed by the gateway.
 
-#### And it is not uniform latency — most of it is connection setup
+#### The spread WITHIN Mumbai is unexplained — and one tempting reading of it is
+#### a hypothesis, not a finding
 
-The Mumbai numbers within a single cold isolate fall in a clear shape. From
-`order-intake` (all three carrying `X-Client-Info: sma-edge-rest/1`):
+The Mumbai calls are not uniform. From `order-intake` (all three carrying
+`X-Client-Info: sma-edge-rest/1`) and from `lazywait-sync` on the same order:
 
 | Call | origin_time |
 | --- | ---: |
-| `POST rpc/place_customer_order` — first | **1265 ms** |
-| `GET integration_settings` — first, concurrent | **919 ms** |
-| `GET orders` — later, same isolate | **195 ms** |
+| `POST rpc/place_customer_order` (order-intake, concurrent with the next) | **1265 ms** |
+| `GET integration_settings` (order-intake, concurrent with the above) | **919 ms** |
+| `GET integration_settings` (worker, its first call) | 934 ms |
+| `POST reap_stale_lazywait_syncs` | 525 ms |
+| `GET branches` / `GET profiles` (issued concurrently) | 519 / 522 ms |
+| `PATCH orders` | 535 ms |
+| `POST claim_lazywait_sync_one` | 165 ms |
+| `GET order_items` (concurrent with branches/profiles) | 168 ms |
+| `POST begin_lazywait_create_attempt` | 184 ms |
+| `POST record_lazywait_sync` | 196 ms |
+| `GET notification_log` | 179 ms |
+| `GET orders` (order-intake, its last call) | 195 ms |
 
-and from `lazywait-sync` on the same order: 934 ms on its first call, then 525,
-519, 522, then 165, 168, 184, 196, 179. So a warm cross-region round trip is
-**~170-200 ms**, and each cold isolate pays roughly **0.7-1.3 s once** to
-establish its connection.
+**A first draft of this section read that as connection setup** — "each cold
+isolate pays 0.7-1.3 s once, then ~170-200 ms per call" — and review was right to
+reject it. The data does not support it:
+
+- the calls differ in what they *do*. `place_customer_order` writes an order in a
+  transaction; `notification_log` is a small select. Comparing them measures the
+  queries, not the connection;
+- the sequence is **not** monotonic. `claim_lazywait_sync_one` (165 ms) ran early
+  and was cheap; `PATCH orders` (535 ms) ran late and was expensive. "First call
+  expensive, rest cheap" is contradicted by the order's own log;
+- several of the elevated calls are **concurrent** — `place`/`config` by design,
+  and `branches`/`profiles`/`order_items` in one `Promise.all` — so contention or
+  pool behaviour is at least as good an explanation.
+
+**What is established** is the cross-colo difference in the table above, on
+identical statements. **What is not** is how the Mumbai spread divides between
+connection establishment, query cost, concurrency and pool state.
+
+Testing it is cheap and nobody has done it: issue the *same* trivial statement
+several times from one cold isolate and read the `origin_time` series. Until
+somebody does, do not let this section argue for reducing isolates over reducing
+queries, or the reverse.
 
 For scale, the customer's own phone (Riyadh colo, `supabase-js/…; runtime=react-native`)
 read `branches` in 109 ms and `orders` in 108 ms in the same window — **the
-handset reaches Frankfurt faster than our Edge Function in Mumbai does**, because
-the handset's connection is already open.
+handset reaches Frankfurt faster than our Edge Function in Mumbai does on most of
+its calls.** Whether that is the handset's open connection or something else is
+the same open question.
 
-So every PostgREST call on the order path is intercontinental, the path makes
-roughly nine of them, and the first call from each isolate costs several times
-the rest.
+So every PostgREST call on the order path is intercontinental, and the path makes
+roughly nine of them. That much is measured.
 
 #### What was removed, and what deliberately was not
 
