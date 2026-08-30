@@ -206,11 +206,18 @@ Deno.serve(async (req: Request) => {
   // 179 against 26. (This supersedes an earlier p50-of-whole-invocations
   // comparison that had n = 1 on one side.)
   //
-  // The spread WITHIN Mumbai — 1265 ms down to 165 ms — is NOT explained. A
-  // draft of this comment attributed it to per-isolate connection setup;
-  // review rejected that, correctly, because the calls do different work, two
-  // of them are concurrent, and the sequence is not monotonic. See
-  // docs/ORDER_CONFIRMATION_FLOW.md before acting on it either way.
+  // The per-call cost is BIMODAL, not a spread: 64 repetitions of one identical
+  // statement measured ~120 ms or ~305 ms and almost nothing between, flipping
+  // within a single isolate in both directions. So it is not query cost, not
+  // the first call, and not per-isolate setup — an earlier draft of this
+  // comment claimed the last of those and was wrong.
+  //
+  // The practical consequence, opposite to what that draft implied: removing a
+  // QUERY removes a real per-call cost, while removing an isolate removes
+  // nothing measurable. HOW MUCH a query is worth on THIS path is not known —
+  // 120/305 ms was a trivial select measured from IAD, and this path runs RPCs
+  // and writes from BOM. docs/ORDER_CONFIRMATION_FLOW.md has the data and the
+  // warning.
   //
   // The OTHER part is the boot this function no longer pays for an npm module
   // graph — see MODULE_LOADED_AT above.

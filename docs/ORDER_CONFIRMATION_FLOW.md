@@ -546,10 +546,74 @@ reject it. The data does not support it:
 identical statements. **What is not** is how the Mumbai spread divides between
 connection establishment, query cost, concurrency and pool state.
 
-Testing it is cheap and nobody has done it: issue the *same* trivial statement
-several times from one cold isolate and read the `origin_time` series. Until
-somebody does, do not let this section argue for reducing isolates over reducing
-queries, or the reverse.
+**That test has now been run**, by a throwaway Edge Function since deleted. Its
+method, for anyone repeating it: issue **one byte-identical statement eight times
+strictly sequentially** from a fresh isolate, reporting `isolate_age_ms`, and read
+both the client-side elapsed time and the gateway's `origin_time`. Repeating the
+identical statement is the whole trick — it makes query cost a constant, so it
+cannot explain any difference between call 1 and call N — and sequential
+execution removes the concurrency confound.
+
+Eight runs, **64 measurements of the same statement**, from `IAD` (us-east-1)
+against the database in `eu-central-1`. Client-side timings tracked `origin_time`
+within ~10 ms, so essentially all of the cost is at or behind the gateway rather
+than in the function's own networking.
+
+**The result is bimodal, and sharply so:**
+
+| Mode | n | min | median | max |
+| --- | ---: | ---: | ---: | ---: |
+| fast | 30 | 105 ms | **120 ms** | 143 ms |
+| slow | 34 | 212 ms | **305 ms** | 509 ms |
+
+Exactly **one** of 64 values (212 ms) falls between the two modes. This is not a
+spread around a mean; it is two states, roughly 2.5× apart.
+
+**The connection-setup reading is refuted, three ways:**
+
+- **it is not the first call.** Per-call means across the eight runs read 299,
+  213, 212, 195, 262, 236, 186, 186 — no trend, and call 5 is slower than call 4.
+  Two of eight runs had a *fast* first call (137 ms, 132 ms);
+- **it flips WITHIN one isolate, in both directions.** Run 4 went slow-fast-fast-fast-slow-fast-fast-fast
+  (three transitions), run 6 three, run 8 two. A once-per-isolate cost cannot do
+  that;
+- **it is not the table.** The trailing read of a *different* table shows the same
+  two modes (105-121 ms against 290-331 ms).
+
+So the per-call cost is selected per request by something behind the gateway that
+this codebase does not control. The fast mode, ~120 ms, is close to the IAD↔FRA
+network round trip; the slow mode at ~2.5× is *consistent with* extra round trips
+for connection establishment — but that reading is an interpretation, and the
+measurement stops at "bimodal, and not explained by query, position, isolate or
+table".
+
+**What this means for optimisation work**, which is the reason to care:
+
+- **fewer queries helps**, because there is a real per-call cost that is not
+  query work. How much is **not established by this experiment** — see the
+  warning below;
+- **fewer isolates does not.** There is no measured per-isolate cost to amortise.
+  An earlier draft of this section argued the opposite and was wrong;
+- **being closer to the database helps most**, because the *fast* mode is itself a
+  network round trip. In-region calls in the table above are 26-35 ms against
+  120-305 ms from a distant colo, on identical statements.
+
+> **Do not carry these constants onto the order path.** 120-305 ms is the cost of
+> a *trivial `select id ... limit 1`* measured from **`IAD`**. A Saudi customer is
+> served from `BOM` or `eu-central-2`, and the order path is not trivial selects —
+> it is RPCs and writes (`place_customer_order` opens a transaction) whose
+> database work differs. Using this range to price the pending
+> `claim_lazywait_sync_one` + catalog-reads merge would present an unmeasured
+> result as established, and could misprioritise it against the region move.
+>
+> A draft of this section did exactly that, quoting a saving of "~360-900 ms".
+> Review caught it. **The saving from removing an order-path query is not
+> quantified**; measuring it means running the same repeated-identical-statement
+> method against the actual statements, from the colo that actually serves
+> customers.
+
+What generalises from the experiment is the **structure** — bimodal,
+position-independent, not per-isolate — not the numbers.
 
 For scale, the customer's own phone (Riyadh colo, `supabase-js/…; runtime=react-native`)
 read `branches` in 109 ms and `orders` in 108 ms in the same window — **the
