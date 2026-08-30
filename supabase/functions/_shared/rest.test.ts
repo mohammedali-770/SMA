@@ -168,6 +168,25 @@ describe('restSelectMaybeSingle', () => {
   });
 });
 
+describe('filter values cannot escape into the query', () => {
+  it('percent-encodes & and = so a value cannot add a clause', () => {
+    // Structural, not a validation: `URLSearchParams` encodes the separators,
+    // so no filter value can introduce `or=`, `limit=` or a second filter. The
+    // ids this module is passed are server-derived uuids today, but the guard
+    // that matters is the one that survives somebody later passing something
+    // else — and the refactor this blocks is building the query string by
+    // concatenation, which would look equivalent and would not be.
+    const calls = mockFetch([jsonResponse([])]);
+    return restSelectMaybeSingle(CALLER, 'orders', 'id', { id: 'eq.x&or=(id.gt.0)&limit=100' })
+      .then(() => {
+        const url = new URL(calls[0].url);
+        expect([...url.searchParams.keys()].sort()).toEqual(['id', 'select']);
+        expect(url.searchParams.get('id')).toBe('eq.x&or=(id.gt.0)&limit=100');
+        expect(calls[0].url).toContain('id=eq.x%26or%3D');
+      });
+  });
+});
+
 describe('the two odd 404 shapes postgrest-js special-cases', () => {
   it('a 404 with an ARRAY body is an empty success, not an error', async () => {
     // An embedded-resource miss. The order re-read embeds order_items, so this
