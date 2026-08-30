@@ -1,6 +1,7 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
 import {
   callerTarget,
+  isRow,
   restProviderConfig,
   restRpc,
   restSelectMaybeSingle,
@@ -219,8 +220,10 @@ Deno.serve(async (req: Request) => {
   // and writes from BOM. docs/ORDER_CONFIRMATION_FLOW.md has the data and the
   // warning.
   //
-  // The OTHER part is the boot this function no longer pays for an npm module
-  // graph — see MODULE_LOADED_AT above.
+  // There is no second term to point at here. An earlier version of this comment
+  // said "the OTHER part is the boot this function no longer pays for an npm
+  // module graph", which the `booted` measurement retired: 23 ms with the
+  // dependency and 23 ms without.
   //
   // These marks are logged once per request so the breakdown is a measurement
   // rather than an inference. The previous attempt to apportion this time from
@@ -381,6 +384,39 @@ Deno.serve(async (req: Request) => {
   );
   mark.reread = Date.now() - t0;
 
+  // THE ORDER EXISTS. place_customer_order committed it and returned its id —
+  // that is what `orderId` above was derived from, and the request would already
+  // have returned 400 if it had not. So a re-read that yields no usable row is a
+  // REPORTING failure, never an order failure, and the response must not imply
+  // otherwise.
+  //
+  // It used to. The error was discarded and `fresh` returned as-is, so a failed
+  // re-read answered HTTP 200 with {"order": null} — and `placeAndSync` in
+  // apps/mobile/src/services/api.ts throws 'Order was not created.' on exactly
+  // that, which the app renders as "Something went wrong." A customer was told
+  // their order had failed while it sat in the database, and could reasonably
+  // place it again. Only the stable cart idempotency key made that survivable,
+  // and only until they edited the cart.
+  //
+  // `isRow` rather than `fresh ?? order`, and the difference is not pedantic: a
+  // 404 carrying an ARRAY body — reachable through the `order_items(...)` embed
+  // this very select uses — comes back as `[]`, which is TRUTHY. `??` would keep
+  // it, the client's `!res.order` guard would pass it through, and `order.id`
+  // would be undefined. That is worse than the bug being fixed. See the note on
+  // isRow in _shared/rest.ts for all six shapes.
+  //
+  // Falling back costs only the `order_items` embed and the POS fields the sync
+  // may just have written: place_customer_order's projection carries the same 24
+  // scalar keys in the same order (migration 20260724200000). A stale POS number
+  // simply means the receipt shows it as pending and polls, which is the designed
+  // behaviour for an order that has not synced yet.
+  //
+  // This is the house pattern for a post-write read-back — payment-webhook,
+  // tapVerify and moyasarVerify all degrade to the write's own return — and it is
+  // stricter than all three, which use `??`.
+  const rereadUsable = isRow(fresh);
+  const responseOrder = rereadUsable ? fresh : order;
+
   // One line, numbers only. config/place are concurrent, so `config` may be
   // larger than `place` without either having waited on the other.
   console.log(JSON.stringify({
@@ -395,7 +431,12 @@ Deno.serve(async (req: Request) => {
     sync_span_ms: mark.sync != null && mark.place != null ? mark.sync - mark.place : null,
     reread_span_ms: mark.reread != null && mark.sync != null ? mark.reread - mark.sync : null,
     body_read_ms: mark.parse != null && mark.entry != null ? mark.parse - mark.entry : null,
+    // Whether the re-read produced a usable row, so a silent fallback is visible
+    // in production instead of only in a customer's confusion. A BOOLEAN derived
+    // from the shape — never the error message, which PostgREST can populate with
+    // echoed values, and never anything off the row itself.
+    reread_ok: rereadUsable,
     total_ms: Date.now() - t0,
   }));
-  return json({ order: fresh });
+  return json({ order: responseOrder });
 });
