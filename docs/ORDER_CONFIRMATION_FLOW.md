@@ -535,16 +535,38 @@ the request body) was invisible, and it was the largest unexplained block in
 checkout.
 
 `t0` is now the **first line** of the handler, with `entry_ms`, `parse_ms` and
-`upload_span_ms` decomposing the front. `total_ms` should therefore track
-`execution_time_ms` to within ~100 ms; if the two diverge again, the mark has
-drifted, and a positional test asserts `t0` precedes both the Authorization check
-and `req.json()`.
+`body_read_ms` decomposing what the handler can see. A positional test asserts
+`t0` precedes both the Authorization check and `req.json()`.
 
-**That 2062 ms is probably not cross-region database latency.** A cold-start test
-measured 828 ms end-to-end *including* a full PostgREST round trip, so boot
-cannot be two seconds; request-body upload over mobile data is the more plausible
-bulk, and that is client network time rather than something the backend can fix.
-Stated as a hypothesis, which is exactly what the new marks exist to settle.
+**It still does not measure the whole invocation, and an earlier revision of this
+section wrongly said it would.** Review raised that as a P1 and it was correct:
+the module's three imports — one of them `npm:@supabase/supabase-js` — are
+evaluated at isolate boot *before* `Deno.serve` registers the callback, and
+gateway JWT verification happens before that again. So
+
+> `execution_time_ms − total_ms` is positive **by construction**, and that
+> residual **is** the front.
+
+It is quantified by subtraction from the logs — a method, not a target. Expecting
+the two numbers to converge would be expecting the wrong thing.
+
+Two consequences worth stating precisely:
+
+- **`body_read_ms` is a lower bound**, not the device's upload. The runtime may
+  buffer part of the body before the callback runs, and anything buffered that
+  early is invisible. It was briefly named `upload_span_ms`, which asserted more
+  than it can measure.
+- **`isolate_age_ms`** (`t0 − MODULE_LOADED_AT`, stamped at module scope) is the
+  one piece of the front observable from inside: near zero means this request
+  paid module evaluation, a large value means it landed on a warm isolate. A test
+  pins that stamp outside the handler, because inside it would equal `t0` and
+  report a constant zero while still looking like a measurement.
+
+**So what the 2062 ms on SM-2026-000072 was remains open.** A cold-start test
+measured 828 ms end-to-end *including* a full PostgREST round trip, so isolate
+boot alone cannot be two seconds — but body upload over mobile data is a
+hypothesis, not a finding, and `isolate_age_ms` is what will start to separate
+the two.
 
 #### The parallelisation is NOT yet shown to help
 

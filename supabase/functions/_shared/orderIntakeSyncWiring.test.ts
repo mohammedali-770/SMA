@@ -311,13 +311,14 @@ describe('targeted kick and deferred off-path work', () => {
 
     // Every key is known and expected — an added key fails here.
     expect(entries.map(([k]) => k).sort()).toEqual([
-      'at', 'config_ms', 'entry_ms', 'parse_ms', 'place_ms', 'reread_ms',
-      'reread_span_ms', 'sync_ms', 'sync_span_ms', 'total_ms', 'upload_span_ms',
+      'at', 'body_read_ms', 'config_ms', 'entry_ms', 'isolate_age_ms',
+      'parse_ms', 'place_ms', 'reread_ms', 'reread_span_ms', 'sync_ms',
+      'sync_span_ms', 'total_ms',
     ]);
 
     // Every VALUE may only mention these identifiers. Anything reaching for an
     // order, a customer, a body field or a secret fails, whatever it is called.
-    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'entry', 'parse', 'Date', 'now', 't0', 'null']);
+    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'entry', 'parse', 'Date', 'now', 't0', 'MODULE_LOADED_AT', 'null']);
     for (const [key, value] of entries) {
       if (key === 'at') {
         expect(value).toBe("'order-intake.timing'");
@@ -349,5 +350,30 @@ describe('targeted kick and deferred off-path work', () => {
     expect(t0, 't0 must precede req.json() — that await is the body upload').toBeLessThan(parse);
     // And exactly one t0, so a second declaration cannot shadow it.
     expect(c.split('const t0 = Date.now();').length - 1).toBe(1);
+  });
+  it('stamps isolate boot at MODULE scope, outside the handler', () => {
+    // t0 on the first line of the callback is NOT the invocation start: the
+    // imports (one of them npm:@supabase/supabase-js) are evaluated at isolate
+    // boot before Deno.serve registers anything, and gateway JWT verification
+    // happens before that again. Review raised this as a P1 against a revision
+    // that claimed total_ms would converge with execution_time_ms.
+    //
+    // MODULE_LOADED_AT is the one piece of that front observable from inside,
+    // so it must sit OUTSIDE the handler — inside, it would just equal t0 and
+    // report a constant zero while looking like a measurement.
+    const c = code('order-intake');
+    const decl = c.indexOf('const MODULE_LOADED_AT = Date.now();');
+    const serve = c.indexOf('Deno.serve(');
+    expect(decl, 'MODULE_LOADED_AT not found').toBeGreaterThan(-1);
+    expect(decl, 'MODULE_LOADED_AT must be declared before Deno.serve').toBeLessThan(serve);
+    expect(c).toContain('isolate_age_ms: t0 - MODULE_LOADED_AT');
+  });
+
+  it('does not claim the body read is the device upload', () => {
+    // body_read_ms is a LOWER BOUND: the runtime may buffer part of the body
+    // before the callback runs. The earlier name asserted otherwise.
+    const c = code('order-intake');
+    expect(c).not.toContain('upload_span_ms');
+    expect(c).toContain('body_read_ms');
   });
 });
