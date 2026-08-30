@@ -12,7 +12,7 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 
 **Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list on a schedule; it cannot compare content.
 
-**Privilege column.** *service role* means the function constructs an admin client and can bypass RLS. Those functions are the ones to read first in a security review — the caller’s identity is not the thing limiting what they can touch.
+**Privilege column.** *service role* means the function constructs a service-role identity (`adminClient()`, or `serviceTarget()` on the dependency-free PostgREST path) and can bypass RLS. Those functions are the ones to read first in a security review — the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.
 
 | Function | Purpose | Deployment | Highest privilege |
 | --- | --- | --- | --- |
@@ -66,6 +66,9 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/moyasarVerify.ts`
 - `_shared/orderIntakeSyncWiring.test.ts`
 - `_shared/paymentSync.ts`
+- `_shared/rest.test.ts`
+- `_shared/rest.ts`
+- `_shared/restNoSupabaseJs.test.ts`
 - `_shared/secrets.ts`
 - `_shared/supabaseClient.ts`
 - `_shared/tap.test.ts`

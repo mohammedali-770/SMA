@@ -461,10 +461,17 @@ not by cold start. Both of those were measured and ruled out:
   **zero sequential scans**; `order_number` comes from a sequence and the
   idempotency lookup is indexed. Production's 216 ms mean for the same call is
   therefore transport, not logic.
-- **Cold start is not the cause.** After fifteen minutes idle, `order-intake`
-  answered in **828 ms** — indistinguishable from warm calls in the same burst.
-  An earlier inference that blamed Deno module loading for ~2.6 s was wrong, and
-  is recorded here because it was stated confidently before being tested.
+- **Cold start is not the *whole* cause — but it was real, and this bullet used
+  to overstate its own result.** After fifteen minutes idle, `order-intake`
+  answered in **828 ms**, which refuted an earlier confident inference blaming
+  Deno module loading for ~2.6 s. What that test could not tell anybody is
+  whether the isolate it hit was actually cold: `isolate_age_ms` did not exist
+  yet. Once it did, **SM-2026-000073 (2026-08-30) caught a genuinely cold
+  request** — `isolate_age_ms: 3` — and its front measured **2351 ms**
+  (`execution_time_ms 11024` against the handler's own `total_ms 8673`). Boot and
+  module evaluation were therefore worth removing, and the npm dependency has
+  been (below). Both facts stand: the 828 ms observation was real, and so is the
+  2351 ms; the first simply did not measure what it was taken to measure.
 
 What the evidence actually shows: the database is in **`eu-central-1`**
 (Frankfurt), while a customer in Dammam has the function executed in
@@ -486,12 +493,12 @@ roughly nine of them.
 #### What was removed, and what deliberately was not
 
 `order-intake` now starts the provider-config read **before** `place_customer_order`
-instead of after it. The read uses the service-role client and does not depend on
-the order, so the old ordering cost a full extra cross-region round trip for no
-reason. `adminClient()` stays inside a `try`: it throws when the service-role env
-is missing, and hoisting it bare would turn a misconfigured environment into a
-failed checkout — the opposite of the rule that a POS problem can never fail the
-order.
+instead of after it. The read uses the service-role identity and does not depend
+on the order, so the old ordering cost a full extra cross-region round trip for
+no reason. `serviceTarget()` — `adminClient()` before the dependency removal
+below — stays inside a `try`: it throws when the service-role env is missing, and
+hoisting it bare would turn a misconfigured environment into a failed checkout —
+the opposite of the rule that a POS problem can never fail the order.
 
 Three things on that path look redundant and are **not**:
 
@@ -562,11 +569,26 @@ Two consequences worth stating precisely:
   pins that stamp outside the handler, because inside it would equal `t0` and
   report a constant zero while still looking like a measurement.
 
-**So what the 2062 ms on SM-2026-000072 was remains open.** A cold-start test
-measured 828 ms end-to-end *including* a full PostgREST round trip, so isolate
-boot alone cannot be two seconds — but body upload over mobile data is a
-hypothesis, not a finding, and `isolate_age_ms` is what will start to separate
-the two.
+**The 2062 ms on SM-2026-000072 is no longer open. SM-2026-000073 answered it,
+and the answer was not the one this section leaned towards.**
+
+    isolate_age_ms 3 · entry_ms 0 · parse_ms 1 · config_ms 961 · place_ms 1393
+    sync_span_ms 6589 · reread_span_ms 690 · body_read_ms 1 · total_ms 8673
+
+against the platform's `execution_time_ms 11024`. Two readings settle it:
+
+- **`body_read_ms: 1` refutes the body-upload hypothesis.** The body was already
+  buffered before the callback fired, so the device's uplink is not in this
+  number at all. It was recorded above as a hypothesis rather than a finding,
+  which is the only reason retiring it costs nothing.
+- **`isolate_age_ms: 3` confirms a cold boot.** The isolate was three
+  milliseconds old, so this request paid module resolution and evaluation. The
+  residual **2351 ms** is gateway JWT verification + isolate spawn + module
+  evaluation — and the `npm:@supabase/supabase-js` module graph was the bulk of
+  the last of those.
+
+The order itself was healthy throughout: POS ticket **#1**, first attempt, zero
+failed attempts, `confirmed_by_branch`, 6.64 s from order row to synced.
 
 #### The parallelisation is NOT yet shown to help
 
@@ -590,6 +612,53 @@ time-to-order-creation is unchanged (2837 ms versus 2680 ms), which is expected
 since the config read previously ran *after* `place_customer_order` and never
 delayed order creation. **No improvement is established.**
 
+#### The npm dependency came off the boot path (2026-08-30)
+
+`order-intake` no longer imports `npm:@supabase/supabase-js@2`. It talks to
+PostgREST through [`_shared/rest.ts`](../supabase/functions/_shared/rest.ts) —
+plain `fetch` over Web-standard APIs — for the three calls it actually made: the
+provider-config read, `place_customer_order`, and the order re-read.
+
+**Why the import and not something inside the handler.** Imports are evaluated at
+**isolate boot, before `Deno.serve` registers the callback**, so no mark inside
+the handler can see them. That is why the cost went unattributed while three
+other explanations were tried and discarded, and why `isolate_age_ms` — the one
+piece of the front observable from inside — is what finally identified it.
+
+**The rewrite changes the dependency and nothing else, deliberately.** Every
+behaviour was read out of the exact packages the function was running
+(`postgrest-js@2.112.4`, `supabase-js@2.112.4`) and replicated:
+
+| Behaviour | Why it had to be replicated |
+| --- | --- |
+| `select` whitespace stripping | PostgREST's grammar has no room for spaces. The order column list is written across concatenated lines with a space after every comma; forwarding it unchanged is a 400 on every checkout. |
+| `maybeSingle()` collapse | It is a **client-side rule**, not an `Accept` header. Zero rows → `null`, one row → the object, more than one → PGRST116/406. Sending `vnd.pgrst.object+json` instead would turn "no such row" into an error. |
+| transport failure → `error`, not a throw | `postgrest-js` swallows the rejection and returns `{ error, status: 0 }`. Checkout answers 400 with a message; rejecting instead would surface as an unhandled 500. |
+| GET retry (3×, 1 s/2 s/4 s, on a network error or 503/520) | On by default in `postgrest-js`. Dropping it would be a second change riding along, and would turn a transient 503 on the re-read into `order: null`. POST is **not** retried — `place_customer_order` creates an order. |
+
+One header differs on purpose: `X-Client-Info` now reads `sma-edge-rest/1`, which
+identifies these requests in the platform logs and is how the change can be
+confirmed on a live request rather than assumed.
+
+**The identity split is the security property to protect.** `place_customer_order`
+and the order re-read run as `callerTarget(auth)` — the customer's own JWT,
+forwarded verbatim, so `auth.uid()` and RLS apply exactly as before.
+`serviceTarget()` bypasses RLS and is constructed **once**, inside the existing
+`try`, for the integration secret only. Passing it to either customer-facing call
+would change no response shape and no test output, so
+`orderIntakeSyncWiring.test.ts` pins the identity of each call site.
+
+**Guards.** `rest.ts` is Web-standard-only and therefore *executable* under
+Vitest, so `rest.test.ts` tests real behaviour — URLs, headers, the collapse
+rule, error mapping, retry — rather than source shape, which is what every other
+guard around this function is limited to. `restNoSupabaseJs.test.ts` walks the
+import graph from `order-intake/index.ts` and fails if any file in it references
+the package in code, type-only imports included; that graph is also the deploy
+bundle, and the test pins it at three files.
+
+**What this does not do.** It removes boot cost, not round trips. The region gap
+is untouched and remains the larger term.
+
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
 change.
@@ -603,8 +672,10 @@ attempt. For delivery the block was skipped entirely, so the customer was told
 about the branch made before the branch had heard of the order.
 
 `orderIntakeSyncWiring.test.ts` now pins the ordering positionally in the source,
-because no runtime test can: the handler imports Deno-only modules, so Vitest
-cannot execute it and `deno check` only typechecks.
+because no runtime test can: the handler itself uses `Deno.serve`, so Vitest
+cannot execute it and `deno check` only typechecks. Its PostgREST transport
+(`_shared/rest.ts`) *is* executable and is tested as such — the limit is the
+handler, not everything it touches.
 
 ### The POS outcome owns the customer's first message
 

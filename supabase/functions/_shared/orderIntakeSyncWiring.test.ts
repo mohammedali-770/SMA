@@ -263,8 +263,8 @@ describe('targeted kick and deferred off-path work', () => {
     // eu-central-2, so every PostgREST call is intercontinental — that ordering
     // was worth roughly a whole round trip for no reason.
     const c = code('order-intake');
-    const cfgStart = c.indexOf('cfgPromise = getProviderConfig(');
-    const place = c.indexOf("supa.rpc('place_customer_order'");
+    const cfgStart = c.indexOf('cfgPromise = restProviderConfig(');
+    const place = c.indexOf("'place_customer_order'");
     expect(cfgStart, 'cfgPromise assignment not found').toBeGreaterThan(-1);
     expect(place, 'place_customer_order call not found').toBeGreaterThan(-1);
     expect(cfgStart).toBeLessThan(place);
@@ -273,14 +273,53 @@ describe('targeted kick and deferred off-path work', () => {
   });
 
   it('never lets a missing service-role env fail the order', () => {
-    // adminClient() THROWS when SUPABASE_SERVICE_ROLE_KEY is absent. It used to
+    // serviceTarget() THROWS when SUPABASE_SERVICE_ROLE_KEY is absent — the same
+    // contract adminClient() had, and rest.test.ts pins the message. It used to
     // sit inside the sync block's try/catch; hoisting it bare to start the
     // config read early would turn a misconfigured environment into a failed
     // checkout — the exact opposite of "a POS problem can NEVER fail the order".
     const c = code('order-intake');
-    const guarded = /try\s*\{[^}]*const admin = adminClient\(\);/s.test(c);
-    expect(guarded, 'adminClient() must stay inside a try').toBe(true);
+    const guarded = /try\s*\{[^}]*const admin = serviceTarget\(\);/s.test(c);
+    expect(guarded, 'serviceTarget() must stay inside a try').toBe(true);
     expect(c).toContain('cfgPromise = Promise.resolve(null)');
+  });
+
+  it('runs BOTH customer-facing calls as the caller, never as the service role', () => {
+    // The security property the transport rewrite could most easily lose. The
+    // supabase-js version got it from `userClient(auth)`, which forwarded the
+    // request's Authorization header; the fetch version gets it from
+    // `callerTarget(auth)`. Passing the service-role identity to either call
+    // would BYPASS RLS — place_customer_order would no longer bind to
+    // auth.uid(), and the re-read would hand any authenticated caller any order
+    // whose id it could name. Nothing about the response shape would change, so
+    // no functional test would notice.
+    const c = code('order-intake');
+    expect(c).toContain('const caller = callerTarget(auth);');
+
+    // Each call site names its identity as the first argument.
+    expect(c).toMatch(/restRpc<[\s\S]*?>\(\s*caller,\s*'place_customer_order',/);
+    expect(c).toMatch(/restSelectMaybeSingle<[\s\S]*?>\(\s*caller,\s*'orders',/);
+
+    // And the service identity is constructed exactly once, for the config read
+    // only. A second occurrence is the shape this test exists to catch.
+    expect(c.split('serviceTarget()').length - 1).toBe(1);
+    const svc = c.indexOf('serviceTarget()');
+    const cfg = c.indexOf('restProviderConfig(');
+    expect(cfg).toBeGreaterThan(svc);
+    expect(c.slice(svc, cfg)).not.toContain('orders');
+  });
+
+  it('carries no npm dependency — the cold start it was costing was the point', () => {
+    // Full import-graph walk lives in restNoSupabaseJs.test.ts; this is the
+    // single-file half, kept here so a reviewer reading the order-intake
+    // tripwires sees the constraint without having to know the other file
+    // exists.
+    // `code()` rather than `source()`: the file's own header explains why the
+    // package is gone and therefore has to name it. Prose is not an import.
+    const c = code('order-intake');
+    expect(c).not.toContain('@supabase/supabase-js');
+    expect(c).not.toContain('supabaseClient.ts');
+    expect(c).toContain("from '../_shared/rest.ts'");
   });
 
   it('logs timing as numbers only — no order contents, no customer data', () => {
@@ -353,10 +392,15 @@ describe('targeted kick and deferred off-path work', () => {
   });
   it('stamps isolate boot at MODULE scope, outside the handler', () => {
     // t0 on the first line of the callback is NOT the invocation start: the
-    // imports (one of them npm:@supabase/supabase-js) are evaluated at isolate
-    // boot before Deno.serve registers anything, and gateway JWT verification
-    // happens before that again. Review raised this as a P1 against a revision
-    // that claimed total_ms would converge with execution_time_ms.
+    // imports are evaluated at isolate boot before Deno.serve registers
+    // anything, and gateway JWT verification happens before that again. Review
+    // raised this as a P1 against a revision that claimed total_ms would
+    // converge with execution_time_ms.
+    //
+    // It then earned its keep. On SM-2026-000073 it read 3 ms — the request had
+    // paid a cold boot — which is what identified npm:@supabase/supabase-js as
+    // the thing worth removing from this function's import graph, and what will
+    // show whether removing it helped.
     //
     // MODULE_LOADED_AT is the one piece of that front observable from inside,
     // so it must sit OUTSIDE the handler — inside, it would just equal t0 and
