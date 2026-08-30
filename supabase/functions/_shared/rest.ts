@@ -1,24 +1,43 @@
 /**
  * PostgREST over plain `fetch` — no `npm:@supabase/supabase-js`.
  *
- * WHY THIS EXISTS. `order-intake` sits on the customer's awaited checkout path,
- * and importing supabase-js cost it a cold start. The imports of an Edge
- * Function are evaluated at ISOLATE BOOT, before `Deno.serve` registers the
- * handler, so nothing inside the handler can see that cost — which is precisely
- * why it went unattributed for so long. It was finally measured on
- * SM-2026-000073 (2026-08-30): `isolate_age_ms: 3` proved the request had paid
- * a cold boot, and `execution_time_ms 11024` against the handler's own
- * `total_ms 8673` put the unobservable front at 2351 ms — gateway JWT
- * verification, isolate spawn and module evaluation, everything that happens
- * before the callback runs.
+ * WHY THIS EXISTS — AND WHY THE ORIGINAL REASON WAS WRONG.
  *
- * How much of that 2351 ms is THIS package rather than the gateway or the spawn
- * has never been separated, and n = 1. The honest statement is that module
- * evaluation sits inside the front and this was the only module worth removing
- * from it; "supabase-js was the bulk of it" would be an inference wearing a
- * measurement's clothes, which is the error this function's own history is a
- * record of. This module is the replacement for the three calls order-intake
- * actually made.
+ * This module was written to take `npm:@supabase/supabase-js@2` off
+ * `order-intake`'s boot path, on the theory that evaluating that module graph
+ * was a large part of the 2351 ms front measured on SM-2026-000073
+ * (`isolate_age_ms: 3`, `execution_time_ms 11024` against the handler's own
+ * `total_ms 8673`). Imports ARE evaluated before `Deno.serve` registers the
+ * handler, so nothing inside the handler can see them, and that made the theory
+ * comfortable and unfalsifiable from where anyone was looking.
+ *
+ * IT IS FALSE, and the disproof was in the same log stream all along — the
+ * runtime emits its own `booted` event, and nobody had queried it:
+ *
+ *     05:19:04  v10  WITH supabase-js     26 ms
+ *     05:33:48  v10  WITH supabase-js     23 ms   <- SM-2026-000073 itself
+ *     06:52:50  v11  WITHOUT supabase-js  23 ms   <- first boot of a new deploy
+ *
+ * Identical. Supabase bundles an Edge Function into an eszip at DEPLOY time
+ * (hence the `ezbr_sha256` on every deployment), so npm resolution happens then,
+ * not at boot; at runtime the whole graph is already inside the bundle and
+ * loading it costs ~23 ms either way. Module evaluation was never two seconds,
+ * and the 2351 ms front remains UNEXPLAINED.
+ *
+ * So what is this module for now? Not a boot-time fix — `booted` is unchanged,
+ * and no claim that it shrinks boot should be reintroduced. Whether it moves the
+ * FULL front is a separate question and is still open: that needs an
+ * authenticated order on this version, and the only post-deploy request so far
+ * was an `OPTIONS` preflight, which short-circuits before the auth check and
+ * touches no database. Unmeasured is not the same as zero, in either direction.
+ *
+ * What the module does do is keep the hottest customer path free of a dependency
+ * it does not need, behind executable tests it never had. That is worth having
+ * on its own terms; it is not what it was sold as, and the record says so rather
+ * than retro-fitting a better reason.
+ *
+ * This module is the replacement for the three calls order-intake actually
+ * made.
  *
  * PURITY, in the established style of `lazywaitApi.ts` and `lazywaitCatalog.ts`:
  * Web-standard APIs only — no `npm:` specifiers, and no bare `Deno.*` reference

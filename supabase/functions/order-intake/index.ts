@@ -25,16 +25,24 @@ import {
  * `sync_trigger_secret` is read server-side and sent as the x-sync-secret header
  * — it never reaches the app or the response.
  *
- * NO npm DEPENDENCY, DELIBERATELY. This function talks to PostgREST through
+ * NO npm DEPENDENCY. This function talks to PostgREST through
  * `_shared/rest.ts`, plain `fetch` over Web-standard APIs, instead of
- * `npm:@supabase/supabase-js@2`. Imports are evaluated at ISOLATE BOOT, before
- * `Deno.serve` registers this handler, so the cost of that module graph was
- * invisible to every measurement taken from inside the handler — which is
- * exactly why it went unattributed while three other explanations were tried and
- * discarded. SM-2026-000073 (2026-08-30) finally caught it: `isolate_age_ms: 3`
- * proved the request paid a cold boot, and the platform's `execution_time_ms`
- * of 11024 against this handler's own `total_ms` of 8673 left 2351 ms in front
- * of the callback that no in-handler mark could reach.
+ * `npm:@supabase/supabase-js@2`.
+ *
+ * READ THE HEADER OF `_shared/rest.ts` BEFORE REPEATING THE REASON. The change
+ * was made to shrink the 2351 ms front measured on SM-2026-000073, on the
+ * theory that module evaluation was a large part of it. Measurement after the
+ * deploy refuted the MECHANISM: this function's `booted` event reads 23 ms with
+ * supabase-js and 23 ms without, so isolate boot is not where two seconds were
+ * hiding.
+ *
+ * What that does NOT establish is what the whole front now costs. No
+ * authenticated order has run on this version yet, and the only v11 request so
+ * far was an `OPTIONS` preflight, which returns before the auth check and does
+ * no body read and no PostgREST call — not comparable. The dependency is still
+ * better gone (the hottest customer path should not carry one it does not need,
+ * and the replacement has executable tests the old path never had), but treat
+ * the latency effect as UNMEASURED, not as zero.
  *
  * Keep it that way. `restNoSupabaseJs.test.ts` walks this file's import graph
  * and fails if any file in it references the package in CODE — a type-only
@@ -99,11 +107,15 @@ const SYNC_TIMEOUT_MS = 11_000;
  * it was right: the imports above are evaluated here, before any callback runs,
  * and gateway JWT verification happens before that again.
  *
- * It is also the instrument that made the npm dependency's cost visible in the
- * first place, and the one that will show whether removing it helped. Compare
- * `isolate_age_ms` near zero (a cold request) against the platform's
+ * Compare `isolate_age_ms` near zero (a cold request) against the platform's
  * `execution_time_ms` minus this handler's `total_ms`: that difference is the
- * front, and shrinking it is the whole point of the dependency removal.
+ * front. It was 2351 ms on the one cold order measured so far, and what it
+ * consists of is NOT known. Isolate boot is ruled OUT as the large term — the
+ * runtime's own `booted` metric reads 23 ms with the npm dependency and 23 ms
+ * without — but the front itself has not been re-measured on this version,
+ * because that needs a real authenticated order and none has run yet. Do not
+ * attribute it again without a measurement that separates the parts, and do not
+ * report it as unchanged either.
  */
 const MODULE_LOADED_AT = Date.now();
 
