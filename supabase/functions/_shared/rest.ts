@@ -31,10 +31,12 @@
  * The FULL front is a separate question, and real orders have since answered part
  * of it. On three cold orders, one per version, all executed from BOM, the
  * residual `execution_time_ms - total_ms` was 2351 ms on v10 (with the
- * dependency) and 1130 ms / 1123 ms on v11 and v12 (without), with the region,
- * the database work and the handler's own marks held constant. The front did
- * move, by roughly 1.2 s, and the two dependency-free orders agree to within
- * 7 ms.
+ * dependency) and 1130 ms / 1123 ms on v11 and v12 (without). The region was the
+ * same, and the residual excludes everything inside `total_ms` by construction —
+ * which is what makes the three comparable, NOT that the rest held constant. It
+ * did not: `sync_span_ms` and `reread_span_ms` both moved sharply, and
+ * `total_ms` with them. The front did move, by roughly 1.2 s, and the two
+ * dependency-free orders agree to within 7 ms.
  *
  * That is a correlation on n = 1 against n = 2, not a controlled result, and the
  * MECHANISM is still open: `booted` reads 18-23 ms across all three, so whatever

@@ -927,11 +927,27 @@ cold orders, one per version, all executed from BOM:
 | SM-2026-000074 | v11 | **no** | 8704 | 7574 | **1130 ms** | 18 ms |
 | SM-2026-000075 | v12 | **no** | 7973 | 6850 | **1123 ms** | 18 ms |
 
-The confounds were checked rather than waved away: the same edge region for all
-three, `place_customer_order` origin_time 1361 / 1265 / 1273 ms, the config read
-919-982 ms, the re-read 179-195 ms, and the handler's own marks within 4%. The
-residual is the only term that moved — and the two dependency-free orders agree to
-within **7 ms**.
+**Why the three are comparable — and what did *not* hold still.** All three ran
+from the same edge region, and the residual is `execution_time_ms − total_ms`, so
+every mark the handler's own clock covers is arithmetically *outside* it. That is
+the whole control, and it needs to be, because several handler marks moved a great
+deal:
+
+| mark | v10 | v11 | v12 | spread |
+| --- | --- | --- | --- | --- |
+| `config_ms` | 961 | 947 | 982 | 3.7% |
+| `place_ms` | 1393 | 1291 | 1305 | 7.9% |
+| `sync_span_ms` | 6589 | 6073 | 5335 | 23.5% |
+| `reread_span_ms` | 690 | 210 | 210 | 228.6% |
+| `total_ms` | 8673 | 7574 | 6850 | 26.6% |
+
+So **"only the residual moved" would be false.** `sync_span_ms` is Lazywait's own
+Create Order, and `reread_span_ms` fell by two thirds — tracking its gateway
+`origin_time` of 676 / 195 / 190 ms, so that drop is database-side, not transport.
+None of it can reach the residual, which is exactly why the comparison survives
+it. On the gateway side `place_customer_order` origin_time was 1361 / 1265 /
+1273 ms: the database path was comparable, **not** constant. What holds without
+qualification is that the two dependency-free residuals agree to within **7 ms**.
 
 **Read it as a correlation, not a controlled result.** n = 1 with the dependency
 against n = 2 without, which is the same evidence shape as the retracted v8→v9

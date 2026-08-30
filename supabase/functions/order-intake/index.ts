@@ -44,10 +44,25 @@ import {
  *     SM-2026-000074  v11  without  exec  8704  total 7574  residual 1130 ms
  *     SM-2026-000075  v12  without  exec  7973  total 6850  residual 1123 ms
  *
- * The confounds were checked, not waved away: same edge region for all three,
- * `place_customer_order` origin_time 1361 / 1265 / 1273 ms, and this handler's
- * own marks within 4%. The residual is the only term that moved, and the two
- * dependency-free orders agree to within 7 ms.
+ * WHY THE THREE ARE COMPARABLE, stated exactly, because the loose version of
+ * this was wrong. All three ran from the same edge region, and the residual is
+ * `execution_time_ms - total_ms` — so every mark this handler's own clock covers
+ * is arithmetically OUTSIDE it. That is the entire control, and it has to be,
+ * because several of those marks moved a great deal:
+ *
+ *     config_ms       961 /  947 /  982    3.7%
+ *     place_ms       1393 / 1291 / 1305    7.9%
+ *     sync_span_ms   6589 / 6073 / 5335   23.5%
+ *     reread_span_ms  690 /  210 /  210  228.6%
+ *     total_ms       8673 / 7574 / 6850   26.6%
+ *
+ * So "only the residual moved" would be FALSE — `sync_span_ms` is Lazywait's own
+ * Create Order, and `reread_span_ms` fell by two thirds, tracking its gateway
+ * origin_time (676 / 195 / 190 ms). None of it can reach the residual, which is
+ * why the comparison survives it. On the gateway side `place_customer_order`
+ * origin_time was 1361 / 1265 / 1273 ms: the database path was comparable, not
+ * constant. What holds without qualification is that the two dependency-free
+ * residuals agree to within 7 ms.
  *
  * State the limits alongside it. This is n = 1 with the dependency against n = 2
  * without — a correlation, not a controlled result. And it is STILL NOT BOOT:
