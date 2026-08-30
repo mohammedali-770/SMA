@@ -174,6 +174,34 @@ export interface RestError {
  * way. In particular a NETWORK failure is an `error`, never a rejected promise —
  * see `restFetch`.
  */
+/**
+ * Is this a usable PostgREST ROW — a non-null object that is not an array?
+ *
+ * WHY THIS EXISTS RATHER THAN `??`. A caller wanting "did the read give me a row,
+ * or should I fall back?" cannot ask `result.error`, and cannot use `data ?? x`.
+ * `restSelectMaybeSingle` signals failure in SIX ways and `error` is null in three
+ * of them:
+ *
+ *   transport failure / abort   error set     status 0        data null
+ *   PostgREST 4xx / 5xx         error set     status 4xx/5xx  data null
+ *   multiple rows (PGRST116)    error set     status 406      data null
+ *   zero rows                   error NULL    status 200      data null
+ *   404 with an empty body      error NULL    status 204      data null
+ *   404 with an ARRAY body      error NULL    status 200      data []      <-- the trap
+ *
+ * The last one is why `??` is not enough: `[]` is TRUTHY, so `data ?? fallback`
+ * keeps the empty array and hands the caller something shaped like a result that
+ * has none of a row's fields. It is not hypothetical — `restFetch` reaches that
+ * branch through an embedded resource, and the order re-read in `order-intake`
+ * embeds `order_items(...)`.
+ *
+ * So the honest question is about the SHAPE of what came back, which is what this
+ * asks. Exported so it is executable under Vitest, not merely asserted about.
+ */
+export function isRow(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export interface RestResult<T> {
   data: T | null;
   error: RestError | null;

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   callerTarget,
   cleanSelect,
+  isRow,
   restProviderConfig,
   restRpc,
   restSelectMaybeSingle,
@@ -175,6 +176,58 @@ describe('restSelectMaybeSingle', () => {
     expect(data).toBeNull();
     expect(error?.message).toBe('permission denied for table orders');
     expect(status).toBe(403);
+  });
+});
+
+describe('isRow — the shape test that `??` cannot do', () => {
+  // EXECUTABLE, which is the point. order-intake's fallback decision rests on
+  // this predicate, and a source-shape tripwire could only assert that the call
+  // is spelled correctly. These assert what it DOES.
+
+  it('accepts a row', () => {
+    expect(isRow({ id: 'o1' })).toBe(true);
+    expect(isRow({})).toBe(true); // an empty object is still an object
+  });
+
+  it('REJECTS an empty array — the case `??` gets wrong', () => {
+    // A 404 with an array body comes back as `[]` with NO error, and `[]` is
+    // truthy. `data ?? fallback` keeps it; order-intake would then answer with
+    // something shaped like a result that has none of a row's fields, and the
+    // client would navigate to /receipt/undefined.
+    expect(isRow([])).toBe(false);
+    expect(isRow([{ id: 'o1' }])).toBe(false);
+  });
+
+  it('rejects every other failure shape restSelectMaybeSingle can return', () => {
+    expect(isRow(null)).toBe(false);
+    expect(isRow(undefined)).toBe(false);
+  });
+
+  it('rejects primitives, which a scalar RPC could return', () => {
+    for (const v of ['', 'o1', 0, 1, false, true]) {
+      expect(isRow(v), JSON.stringify(v)).toBe(false);
+    }
+  });
+
+  it('agrees with restSelectMaybeSingle end to end on every non-retrying shape', async () => {
+    // Run against the real transport, so the table in isRow's own doc comment is
+    // verified rather than asserted. The transport-failure row is omitted here
+    // ONLY because it pays the genuine 1s/2s/4s retry and would need fake timers;
+    // it returns `data: null` and is covered in the retry describe above.
+    const cases: Array<[string, () => void, boolean]> = [
+      ['one row', () => mockFetch([jsonResponse([{ id: 'o1' }])]), true],
+      ['zero rows', () => mockFetch([jsonResponse([])]), false],
+      ['PostgREST 4xx', () => mockFetch([jsonResponse({ message: 'nope' }, 403)]), false],
+      ['multiple rows (PGRST116)', () => mockFetch([jsonResponse([{ id: 'a' }, { id: 'b' }])]), false],
+      ['404 + array body', () => mockFetch([jsonResponse([], 404)]), false],
+      ['404 + empty body', () => mockFetch([new Response('', { status: 404 })]), false],
+    ];
+    for (const [name, arrange, expected] of cases) {
+      arrange();
+      const { data } = await restSelectMaybeSingle(CALLER, 'orders', 'id', { id: 'eq.o1' });
+      expect(isRow(data), name).toBe(expected);
+      vi.unstubAllGlobals();
+    }
   });
 });
 

@@ -835,20 +835,83 @@ change inside v2 — `maybeSingle()` moved from a server-enforced `Accept` heade
 to the client-side collapse at **2.100.1** — and it is the collapse that is
 replicated.
 
-**Two things this deliberately does NOT fix**, both pre-existing and both
-verified against the base branch rather than assumed:
+**Two things that transport swap deliberately did NOT fix**, both pre-existing
+and both verified against the base branch rather than assumed. Folding either into
+a transport swap would have been the "second change riding along" that §15 of
+`CLAUDE.md` exists to prevent. **The first has since been fixed on its own — see
+below. The second is still open.**
 
-- the order re-read **discards its error**, so a failed re-read returns
+- ~~the order re-read **discards its error**, so a failed re-read returns
   `{"order": null}` at HTTP 200 and `placeAndSync` throws *"Order was not
-  created."* on an order that exists. The base branch does the same;
+  created."* on an order that exists~~ — **fixed 2026-08-30, see "A failed
+  re-read is a reporting failure" below;**
 - `ORDER_SELECT` is **six columns behind** `apps/mobile/src/lib/orderSelect.ts`
   (`is_comped`, `comp_discount_amount`, `notes`, the item-level `note`,
   `variant_name_en`, `variant_name_ar`). Harmless today because the caller keeps
   only `.id` and the receipt re-reads with the full mobile select, and nothing
-  pins the two lists together.
+  pins the two lists together. **Still open.**
 
-Folding either into a transport swap is the "second change riding along" that
-§15 of `CLAUDE.md` exists to prevent.
+### A failed re-read is a reporting failure, not an order failure
+
+After `place_customer_order` commits, `order-intake` re-reads the row so the
+response can carry the POS number the sync may just have written. That read's
+error was discarded and the row returned as-is, so **a failed re-read answered
+HTTP 200 with `{"order": null}`** — and `placeAndSync`
+(`apps/mobile/src/services/api.ts`) throws *"Order was not created."* on exactly
+that, which the app renders as **"Something went wrong."**
+
+The order was in the database the whole time. The customer was told it had failed
+and could reasonably place it again. It was survivable only because `cart.clear()`
+runs *after* the await, so the cart and its idempotency key both persist and a
+retry returns the same order — and only until the customer edits the cart, which
+rotates the key and buys a duplicate.
+
+**The fix returns `place_customer_order`'s own projection when the re-read yields
+no usable row.** The order's existence is not in doubt at that point: `orderId`
+came from the RPC's return and the handler already answered 400 if it was absent.
+Falling back costs the `order_items` embed and the POS fields the sync may just
+have written — the 24 scalar keys are identical, in the same order — so the
+receipt shows the branch number as pending and polls for it, which is the designed
+behaviour for an order that has not synced yet.
+
+This is the house pattern for a post-write read-back: `payment-webhook`,
+`_shared/tapVerify.ts` and `_shared/moyasarVerify.ts` all degrade to the write's
+own return rather than reporting a failure.
+
+#### Why it is a shape test and not `?? `
+
+All three of those precedents use `??`, and here that would have been **worse than
+the bug**. `restSelectMaybeSingle` signals failure six ways and `error` is null in
+three of them:
+
+| case | `error` | `status` | `data` |
+| --- | --- | --- | --- |
+| transport failure / abort | set | `0` | `null` |
+| PostgREST 4xx/5xx | set | 4xx/5xx | `null` |
+| multiple rows (PGRST116) | set | `406` | `null` |
+| zero rows | **null** | `200` | `null` |
+| 404 + empty body | **null** | `204` | `null` |
+| **404 + array body** | **null** | `200` | **`[]`** |
+
+The last is reachable *through the `order_items(...)` embed this very select
+uses*, and `[]` is **truthy**. `fresh ?? order` would keep it, the client's
+`!res.order` guard would pass it through, and `order.id` would be `undefined` —
+sending the customer to `/receipt/undefined`.
+
+So the predicate is `isRow(...)` in `_shared/rest.ts`: a non-null object that is
+not an array. It is exported precisely so it is **executable** under Vitest —
+`rest.test.ts` drives all six shapes through the real transport and asserts the
+verdict, rather than asserting that the call is spelled correctly.
+
+The timing log gains one boolean, `reread_ok`, so a silent fallback is visible in
+production rather than only in a customer's confusion. It is computed into a local
+first: putting `isRow(fresh)` inline would have brought the row itself into the
+payload's scope, and the log's identifier allowlist exists to make that
+impossible.
+
+**No client change, deliberately.** `api.ts`'s `!res.order` guard stays as
+defence, and leaving the app untouched means this reaches customers on the
+**already-installed build**.
 
 **What this does not do, and what is still unmeasured.** It does not remove
 measurable BOOT cost — see the `booted` table above, which is the third

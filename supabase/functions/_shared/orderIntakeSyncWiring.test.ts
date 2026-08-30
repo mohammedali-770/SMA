@@ -379,9 +379,42 @@ describe('targeted kick and deferred off-path work', () => {
       + 'order_items(id, name_en, name_ar, unit_price, quantity, '
       + 'order_item_modifiers(id, name_en, name_ar, price))',
     );
-    // And the response returns THAT read, not something else.
+    // And the response is built from THAT read, not from some other query.
     expect(c).toMatch(/const \{ data: fresh \} = await restSelectMaybeSingle/);
-    expect(c).toContain('return json({ order: fresh });');
+    expect(c).toContain('return json({ order: responseOrder });');
+  });
+
+  it('NEVER answers 200 with a null order once the order exists', () => {
+    // THE DEFECT THIS CLOSES. The re-read's error was discarded and `fresh`
+    // returned as-is, so a failed re-read answered HTTP 200 with
+    // {"order": null} — and placeAndSync throws 'Order was not created.' on
+    // exactly that, which the app shows as "Something went wrong." on an order
+    // sitting in the database. Only the stable cart idempotency key made it
+    // survivable, and only until the customer edited their cart.
+    //
+    // By the time the re-read runs, `orderId` is non-null (the handler returned
+    // 400 otherwise), so the order is committed. The response must reflect that.
+    const c = code('order-intake');
+    expect(c).toContain('const responseOrder = rereadUsable ? fresh : order;');
+    expect(c).toContain('return json({ order: responseOrder });');
+    // The raw re-read must not be what goes back.
+    expect(c).not.toContain('return json({ order: fresh })');
+  });
+
+  it('tests the SHAPE of the re-read, because `??` is not enough', () => {
+    // `restSelectMaybeSingle` reports failure six ways and `error` is null in
+    // three. One of them — a 404 with an ARRAY body, reachable through the
+    // `order_items(...)` embed this select uses — yields `[]`, which is TRUTHY.
+    // `fresh ?? order` would keep it, the client's `!res.order` guard would pass
+    // it through, and `order.id` would be undefined: worse than the bug.
+    //
+    // isRow is executable and tested for real in rest.test.ts; this pins that
+    // order-intake uses it rather than a nullish coalesce.
+    const c = code('order-intake');
+    expect(c).toContain('const rereadUsable = isRow(fresh);');
+    expect(c).not.toMatch(/fresh\s*\?\?/);
+    expect(c).toMatch(/^\s*isRow,$/m); // imported from _shared/rest.ts, not redefined
+    expect(c).not.toMatch(/function isRow/);
   });
 
   it('carries no npm dependency — the cold start it was costing was the point', () => {
@@ -433,13 +466,17 @@ describe('targeted kick and deferred off-path work', () => {
     // Every key is known and expected — an added key fails here.
     expect(entries.map(([k]) => k).sort()).toEqual([
       'at', 'body_read_ms', 'config_ms', 'entry_ms', 'isolate_age_ms',
-      'parse_ms', 'place_ms', 'reread_ms', 'reread_span_ms', 'sync_ms',
-      'sync_span_ms', 'total_ms',
+      'parse_ms', 'place_ms', 'reread_ms', 'reread_ok', 'reread_span_ms',
+      'sync_ms', 'sync_span_ms', 'total_ms',
     ]);
 
     // Every VALUE may only mention these identifiers. Anything reaching for an
     // order, a customer, a body field or a secret fails, whatever it is called.
-    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'entry', 'parse', 'Date', 'now', 't0', 'MODULE_LOADED_AT', 'null']);
+    // `rereadUsable` is a boolean computed from the row's SHAPE, not the row.
+    // `fresh` itself is deliberately NOT on this list: the whole point of the
+    // allowlist is that no expression in this payload can reach order contents,
+    // and `reread_ok: isRow(fresh)` inline would have put the row in scope here.
+    const ALLOWED = new Set(['mark', 'config', 'place', 'sync', 'reread', 'entry', 'parse', 'Date', 'now', 't0', 'MODULE_LOADED_AT', 'null', 'rereadUsable']);
     for (const [key, value] of entries) {
       if (key === 'at') {
         expect(value).toBe("'order-intake.timing'");
