@@ -174,6 +174,13 @@ export interface RestError {
  * way. In particular a NETWORK failure is an `error`, never a rejected promise —
  * see `restFetch`.
  */
+export interface RestResult<T> {
+  data: T | null;
+  error: RestError | null;
+  /** 0 for a transport-level failure, mirroring postgrest-js. */
+  status: number;
+}
+
 /**
  * Is this a usable PostgREST ROW — a non-null object that is not an array?
  *
@@ -200,13 +207,6 @@ export interface RestError {
  */
 export function isRow(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-export interface RestResult<T> {
-  data: T | null;
-  error: RestError | null;
-  /** 0 for a transport-level failure, mirroring postgrest-js. */
-  status: number;
 }
 
 // ===========================================================================
