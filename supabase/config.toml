@@ -127,10 +127,3 @@ verify_jwt = false
 # Vault/dedicated-secret authenticated cron gateway into account-delete-process.
 [functions.account-delete-scheduler]
 verify_jwt = false
-
-# THROWAWAY diagnostic — delete with the function once the connection-setup
-# question in docs/ORDER_CONFIRMATION_FLOW.md is answered. Read-only, runs as
-# `anon` against a publicly-readable table, holds no service-role key and writes
-# nothing. verify_jwt stays true so it cannot be invoked anonymously.
-[functions.latency-probe]
-verify_jwt = true

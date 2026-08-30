@@ -212,9 +212,12 @@ Deno.serve(async (req: Request) => {
   // the first call, and not per-isolate setup — an earlier draft of this
   // comment claimed the last of those and was wrong.
   //
-  // The practical consequence, which is the opposite of what that draft implied:
-  // removing a QUERY from this path removes 120-305 ms; removing an isolate
-  // removes nothing measurable. docs/ORDER_CONFIRMATION_FLOW.md has the data.
+  // The practical consequence, opposite to what that draft implied: removing a
+  // QUERY removes a real per-call cost, while removing an isolate removes
+  // nothing measurable. HOW MUCH a query is worth on THIS path is not known —
+  // 120/305 ms was a trivial select measured from IAD, and this path runs RPCs
+  // and writes from BOM. docs/ORDER_CONFIRMATION_FLOW.md has the data and the
+  // warning.
   //
   // The OTHER part is the boot this function no longer pays for an npm module
   // graph — see MODULE_LOADED_AT above.

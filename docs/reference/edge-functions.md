@@ -21,7 +21,6 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `account-delete-scheduler` | Vault-authenticated scheduler gateway | by hand | service role |
 | `auth-send-sms-whatsapp` | Supabase Auth **Send SMS Hook** (verify_jwt=false) | by hand | service role |
 | `email-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |
-| `latency-probe` | a THROWAWAY diagnostic. Delete it once the question below is answered; it exists to settle one thing and has no place in the product | by hand | caller JWT |
 | `lazywait-catalog` | admin-initiated, SERVER-SIDE catalog pull | by hand | service role |
 | `lazywait-sync` | server-side POS sync worker (invoked by a schedule/cron, NOT by the app). Claims due orders (FOR UPDATE SKIP LOCKED), pushes each to the confirmed… | by hand | service role |
 | `lazywait-webhook` | inbound receiver for Lazywait POS callbacks | by hand | service role |

@@ -546,14 +546,18 @@ reject it. The data does not support it:
 identical statements. **What is not** is how the Mumbai spread divides between
 connection establishment, query cost, concurrency and pool state.
 
-**That test has now been run.** `latency-probe`, a throwaway diagnostic
-(`supabase/functions/latency-probe/`), issues one byte-identical statement eight
-times **sequentially** from a fresh isolate — so query cost is a constant,
-concurrency is removed, and `isolate_age_ms` distinguishes cold from warm. Eight
-runs, **64 measurements of the same statement**, from `IAD` (us-east-1) against
-the database in `eu-central-1`. Client-side timings tracked the gateway's
-`origin_time` within ~10 ms, so essentially all of the cost is at or behind the
-gateway rather than in the function's own networking.
+**That test has now been run**, by a throwaway Edge Function since deleted. Its
+method, for anyone repeating it: issue **one byte-identical statement eight times
+strictly sequentially** from a fresh isolate, reporting `isolate_age_ms`, and read
+both the client-side elapsed time and the gateway's `origin_time`. Repeating the
+identical statement is the whole trick — it makes query cost a constant, so it
+cannot explain any difference between call 1 and call N — and sequential
+execution removes the concurrency confound.
+
+Eight runs, **64 measurements of the same statement**, from `IAD` (us-east-1)
+against the database in `eu-central-1`. Client-side timings tracked `origin_time`
+within ~10 ms, so essentially all of the cost is at or behind the gateway rather
+than in the function's own networking.
 
 **The result is bimodal, and sharply so:**
 
@@ -585,17 +589,31 @@ table".
 
 **What this means for optimisation work**, which is the reason to care:
 
-- **fewer queries helps, linearly.** Every PostgREST call on the order path costs
-  120-305 ms from a distant colo, whatever else is true. Removing one removes
-  that;
+- **fewer queries helps**, because there is a real per-call cost that is not
+  query work. How much is **not established by this experiment** — see the
+  warning below;
 - **fewer isolates does not.** There is no measured per-isolate cost to amortise.
   An earlier draft of this section argued the opposite and was wrong;
 - **being closer to the database helps most**, because the *fast* mode is itself a
-  network round trip. In-region calls in the table above are 26-35 ms.
+  network round trip. In-region calls in the table above are 26-35 ms against
+  120-305 ms from a distant colo, on identical statements.
 
-Measured from `IAD`; a customer in Saudi Arabia is served from `BOM` or
-`eu-central-2`, so the absolute numbers differ. What generalises is the
-structure — bimodal, position-independent, not per-isolate — not the constants.
+> **Do not carry these constants onto the order path.** 120-305 ms is the cost of
+> a *trivial `select id ... limit 1`* measured from **`IAD`**. A Saudi customer is
+> served from `BOM` or `eu-central-2`, and the order path is not trivial selects —
+> it is RPCs and writes (`place_customer_order` opens a transaction) whose
+> database work differs. Using this range to price the pending
+> `claim_lazywait_sync_one` + catalog-reads merge would present an unmeasured
+> result as established, and could misprioritise it against the region move.
+>
+> A draft of this section did exactly that, quoting a saving of "~360-900 ms".
+> Review caught it. **The saving from removing an order-path query is not
+> quantified**; measuring it means running the same repeated-identical-statement
+> method against the actual statements, from the colo that actually serves
+> customers.
+
+What generalises from the experiment is the **structure** — bimodal,
+position-independent, not per-isolate — not the numbers.
 
 For scale, the customer's own phone (Riyadh colo, `supabase-js/…; runtime=react-native`)
 read `branches` in 109 ms and `orders` in 108 ms in the same window — **the
