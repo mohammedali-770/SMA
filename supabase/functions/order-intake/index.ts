@@ -195,11 +195,22 @@ Deno.serve(async (req: Request) => {
   const caller = callerTarget(auth);
 
   // TIMING. Every hop here is CROSS-REGION and that is a large part of the cost
-  // story. The database is in eu-central-1 (Frankfurt); a customer in Dammam has
-  // this function executed in ap-south-1 (Mumbai) or eu-central-2 (Zurich), so
-  // each PostgREST call pays an intercontinental round trip. Measured 2026-08-28
-  // on the same worker function: p50 556 ms across 442 in-region cron
-  // invocations versus 5934 ms for the single ap-south-1 order kick.
+  // story. The database is in eu-central-1 (Frankfurt); a customer in Saudi
+  // Arabia has this function executed in ap-south-1 (Mumbai) or eu-central-2
+  // (Zurich), so each PostgREST call pays an intercontinental round trip.
+  //
+  // Measured per-request on 2026-08-30 from the gateway's own `origin_time`,
+  // same worker function, same minute, IDENTICAL statements:
+  // `integration_settings` cost 934 ms from Mumbai against 35 ms from
+  // Frankfurt, `reap_stale_lazywait_syncs` 525 against 30, `notification_log`
+  // 179 against 26. (This supersedes an earlier p50-of-whole-invocations
+  // comparison that had n = 1 on one side.)
+  //
+  // The spread WITHIN Mumbai — 1265 ms down to 165 ms — is NOT explained. A
+  // draft of this comment attributed it to per-isolate connection setup;
+  // review rejected that, correctly, because the calls do different work, two
+  // of them are concurrent, and the sequence is not monotonic. See
+  // docs/ORDER_CONFIRMATION_FLOW.md before acting on it either way.
   //
   // The OTHER part is the boot this function no longer pays for an npm module
   // graph — see MODULE_LOADED_AT above.

@@ -450,7 +450,7 @@ timeout there is classified `ambiguous` and routes to `confirmation_required`
 rather than a resend, because Create Order has no idempotency key. Shortening it
 would turn slow-but-successful tickets into orders a human must verify by hand.
 
-### The real bottleneck is the region gap, measured 2026-08-28
+### The real bottleneck is the region gap, measured directly 2026-08-30
 
 The checkout wait is dominated by **cross-region round trips**, not by our SQL and
 not by cold start. Both of those were measured and ruled out:
@@ -468,27 +468,97 @@ not by cold start. Both of those were measured and ruled out:
   whether the isolate it hit was actually cold: `isolate_age_ms` did not exist
   yet. Once it did, **SM-2026-000073 (2026-08-30) caught a genuinely cold
   request** — `isolate_age_ms: 3` — and its front measured **2351 ms**
-  (`execution_time_ms 11024` against the handler's own `total_ms 8673`). Boot and
-  module evaluation were therefore worth removing, and the npm dependency has
-  been (below). Both facts stand: the 828 ms observation was real, and so is the
-  2351 ms; the first simply did not measure what it was taken to measure.
+  (`execution_time_ms 11024` against the handler's own `total_ms 8673`). Both
+  facts stand: the 828 ms observation was real, and so is the 2351 ms; the first
+  simply did not measure what it was taken to measure.
 
-What the evidence actually shows: the database is in **`eu-central-1`**
-(Frankfurt), while a customer in Dammam has the function executed in
-**`ap-south-1`** (Mumbai) or **`eu-central-2`** (Zurich). The control is the same
-worker function on the same deployment:
+  **This bullet used to end by concluding that boot "was therefore worth
+  removing".** It was not — see the `booted` table below, which measures 23 ms
+  with the npm dependency and 23 ms without. The conclusion is struck rather than
+  quietly deleted, because it stood in this document contradicting its own
+  retraction three sections later.
 
-| Edge region | Invocations | p50 |
-| --- | --- | --- |
-| `eu-central-1` — cron, same region as the database | 442 | **556 ms** |
-| `ap-south-1` — the order kick, routed to the customer | 1 | **5934 ms** |
+What the evidence shows: the database is in **`eu-central-1`** (Frankfurt), while
+a customer in Saudi Arabia has the Edge Function executed in **`ap-south-1`**
+(Mumbai) or **`eu-central-2`** (Zurich).
 
-Consistent with that, the two orders that happened to route through Zurich had
-the two lowest function-start-to-transaction times of six (1272 ms and 1218 ms,
-against a Mumbai mean of 2819 ms).
+#### The control, measured per-request on 2026-08-30
+
+The gateway records `response.origin_time` on every REST call — how long the
+database itself took, excluding the client. During SM-2026-000074 the **same
+worker function on the same deployment** ran from two colos inside the same
+minute, one invoked by the order kick (Mumbai, routed to the customer) and one by
+the cron tick (Frankfurt, in-region). Identical queries:
+
+| Query | from **BOM** (Mumbai) | from **FRA** (Frankfurt) | ratio |
+| --- | ---: | ---: | ---: |
+| `GET integration_settings` | **934 ms** | **35 ms** | 27× |
+| `POST reap_stale_lazywait_syncs` | 525 ms | 30 ms | 18× |
+| `GET notification_log` | 179 ms | 26 ms | 7× |
+
+Three genuinely identical statements. A fourth near-pair — `claim_lazywait_sync_one`
+165 ms from Mumbai against `claim_lazywait_sync_batch` 26 ms from Frankfurt — is
+excluded from the table on purpose: they are different functions, and a table
+whose point is "same statement" should not contain one that is not.
+
+**This supersedes the p50 comparison that stood here** (556 ms across 442
+in-region cron invocations against 5934 ms for a single `ap-south-1` order kick).
+That compared whole invocations doing different amounts of work, with n = 1 on
+one side. This compares the same statement, from the same function, in the same
+minute, timed by the gateway.
+
+#### The spread WITHIN Mumbai is unexplained — and one tempting reading of it is
+#### a hypothesis, not a finding
+
+The Mumbai calls are not uniform. From `order-intake` (all three carrying
+`X-Client-Info: sma-edge-rest/1`) and from `lazywait-sync` on the same order:
+
+| Call | origin_time |
+| --- | ---: |
+| `POST rpc/place_customer_order` (order-intake, concurrent with the next) | **1265 ms** |
+| `GET integration_settings` (order-intake, concurrent with the above) | **919 ms** |
+| `GET integration_settings` (worker, its first call) | 934 ms |
+| `POST reap_stale_lazywait_syncs` | 525 ms |
+| `GET branches` / `GET profiles` (issued concurrently) | 519 / 522 ms |
+| `PATCH orders` | 535 ms |
+| `POST claim_lazywait_sync_one` | 165 ms |
+| `GET order_items` (concurrent with branches/profiles) | 168 ms |
+| `POST begin_lazywait_create_attempt` | 184 ms |
+| `POST record_lazywait_sync` | 196 ms |
+| `GET notification_log` | 179 ms |
+| `GET orders` (order-intake, its last call) | 195 ms |
+
+**A first draft of this section read that as connection setup** — "each cold
+isolate pays 0.7-1.3 s once, then ~170-200 ms per call" — and review was right to
+reject it. The data does not support it:
+
+- the calls differ in what they *do*. `place_customer_order` writes an order in a
+  transaction; `notification_log` is a small select. Comparing them measures the
+  queries, not the connection;
+- the sequence is **not** monotonic. `claim_lazywait_sync_one` (165 ms) ran early
+  and was cheap; `PATCH orders` (535 ms) ran late and was expensive. "First call
+  expensive, rest cheap" is contradicted by the order's own log;
+- several of the elevated calls are **concurrent** — `place`/`config` by design,
+  and `branches`/`profiles`/`order_items` in one `Promise.all` — so contention or
+  pool behaviour is at least as good an explanation.
+
+**What is established** is the cross-colo difference in the table above, on
+identical statements. **What is not** is how the Mumbai spread divides between
+connection establishment, query cost, concurrency and pool state.
+
+Testing it is cheap and nobody has done it: issue the *same* trivial statement
+several times from one cold isolate and read the `origin_time` series. Until
+somebody does, do not let this section argue for reducing isolates over reducing
+queries, or the reverse.
+
+For scale, the customer's own phone (Riyadh colo, `supabase-js/…; runtime=react-native`)
+read `branches` in 109 ms and `orders` in 108 ms in the same window — **the
+handset reaches Frankfurt faster than our Edge Function in Mumbai does on most of
+its calls.** Whether that is the handset's open connection or something else is
+the same open question.
 
 So every PostgREST call on the order path is intercontinental, and the path makes
-roughly nine of them.
+roughly nine of them. That much is measured.
 
 #### What was removed, and what deliberately was not
 
@@ -742,9 +812,33 @@ preflight returning the handler's own CORS values (proof the graph loads), an
 unauthenticated `GET` refused 401 by the gateway, and no other Edge Function's
 version or `ezbr_sha256` changed — the payment functions included.
 
-**Still to confirm on the next real order:** a request carrying
-`X-Client-Info: sma-edge-rest/1` in the PostgREST logs, which is what proves the
-new transport is the one doing the work.
+#### Confirmed on the first v11 order — SM-2026-000074, 2026-08-30 07:53 UTC
+
+Healthy: delivery, cash, POS ticket **#2**, first attempt, zero failed attempts,
+`confirmed_by_branch`, **5.84 s** from order row to synced with Lazywait's own
+Create Order taking 3.38 s of it.
+
+**The transport is doing the work.** Three gateway records carry
+`X-Client-Info: sma-edge-rest/1`, and they are exactly the three calls this
+function makes — `rpc/place_customer_order`, `integration_settings`, `orders` —
+all 200. That was the outstanding confirmation.
+
+    isolate_age_ms 4 · entry_ms 0 · parse_ms 0 · config_ms 947 · place_ms 1291
+    sync_span_ms 6073 · reread_span_ms 210 · body_read_ms 0 · total_ms 7574
+
+`booted` 18 ms, `execution_time_ms` 8704, so the front was **1130 ms** against
+2351 ms on the v10 order, both cold (`isolate_age_ms` 4 and 3).
+
+**That is not an improvement claim, and must not be turned into one.** It is
+n = 1 on each side — the exact evidence shape behind the retracted v8→v9
+parallelisation claim recorded above — against an observed whole-invocation
+spread of 7926-11401 ms. Establishing an effect needs several cold v11 orders
+compared on `execution_time_ms − total_ms`, reported with n and spread.
+
+What the same order *does* settle is where the money goes, and it is not the
+front: **~1.1 s front, ~2.2 s cross-region database, 3.4 s Lazywait, ~0.4 s
+everything else.** The dependency removal was never positioned to touch the two
+largest terms.
 
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
