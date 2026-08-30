@@ -45,12 +45,35 @@ function stripComments(src: string): string {
     .split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');
 }
 
-function resolveImports(fileUrl: URL): URL[] {
-  const src = readFileSync(fileUrl, 'utf8');
+/**
+ * EVERY module specifier in a file, not only the `from` ones. Review found the
+ * first version followed `from` alone, which misses three shapes that all pull a
+ * module in for real:
+ *
+ *   import './side-effect.ts';        // no `from` at all
+ *   await import('./lazy.ts');        // dynamic
+ *   export { x } from './re.ts';      // re-export
+ *
+ * A relative one missed by the walker drops a file out of the graph — and the
+ * graph is the deploy bundle, so the manifest below would still read three
+ * files while the deployed function failed at boot on a missing import. An npm
+ * one missed by the walker defeats the whole point of the file.
+ */
+function specifiers(src: string): string[] {
+  const out: string[] = [];
+  // `import ... from 'x'` and `export ... from 'x'`
+  for (const m of src.matchAll(/\bfrom\s*['"]([^'"]+)['"]/g)) out.push(m[1]);
+  // bare side-effect `import 'x'`
+  for (const m of src.matchAll(/\bimport\s*['"]([^'"]+)['"]/g)) out.push(m[1]);
+  // dynamic `import('x')`
+  for (const m of src.matchAll(/\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) out.push(m[1]);
+  return out;
+}
+
+function resolveImports(fileUrl: URL, src: string): URL[] {
   // Relative specifiers only — a bare or npm: specifier is not a repository
   // file and is handled by the assertions below, not by recursion.
-  const specifiers = [...src.matchAll(/\bfrom\s+['"](\.[^'"]+)['"]/g)].map((m) => m[1]);
-  return specifiers.map((s) => new URL(s, fileUrl));
+  return specifiers(src).filter((sp) => sp.startsWith('.')).map((sp) => new URL(sp, fileUrl));
 }
 
 function importGraph(entry: URL): Map<string, string> {
@@ -60,8 +83,9 @@ function importGraph(entry: URL): Map<string, string> {
     const url = queue.shift() as URL;
     const key = fileURLToPath(url).slice(fileURLToPath(FUNCTIONS).length);
     if (seen.has(key)) continue;
-    seen.set(key, stripComments(readFileSync(url, 'utf8')));
-    queue.push(...resolveImports(url));
+    const src = stripComments(readFileSync(url, 'utf8'));
+    seen.set(key, src);
+    queue.push(...resolveImports(url, src));
   }
   return seen;
 }
@@ -75,11 +99,27 @@ describe('order-intake carries no npm dependency', () => {
     }
   });
 
-  it('has no npm: specifier at all', () => {
+  it('has no npm: or bare specifier at all', () => {
     for (const [file, src] of graph) {
-      const npm = [...src.matchAll(/\bfrom\s+['"](npm:[^'"]+)['"]/g)].map((m) => m[1]);
-      expect(npm, `${file} imports ${npm.join(', ')}`).toEqual([]);
+      const external = specifiers(src).filter((sp) => !sp.startsWith('.'));
+      expect(external, `${file} imports ${external.join(', ')}`).toEqual([]);
     }
+  });
+
+  it('reaches every specifier shape, not only `import … from`', () => {
+    // Guards the walker itself. If `specifiers()` is narrowed back to `from`,
+    // these stop being seen and both assertions above go quiet while the
+    // dependency is back.
+    const sample = [
+      "import './a.ts';",
+      "import x from './b.ts';",
+      "export { y } from './c.ts';",
+      "const z = await import('./d.ts');",
+      "import 'npm:heavy@1';",
+    ].join('\n');
+    expect(specifiers(sample).sort()).toEqual(
+      ['./a.ts', './b.ts', './c.ts', './d.ts', 'npm:heavy@1'].sort(),
+    );
   });
 
   it('is exactly the three files the deploy must send', () => {

@@ -8,9 +8,17 @@
  * why it went unattributed for so long. It was finally measured on
  * SM-2026-000073 (2026-08-30): `isolate_age_ms: 3` proved the request had paid
  * a cold boot, and `execution_time_ms 11024` against the handler's own
- * `total_ms 8673` put the unobservable front at 2351 ms. The supabase-js module
- * graph is the bulk of it. This module is the replacement for the three calls
- * order-intake actually made.
+ * `total_ms 8673` put the unobservable front at 2351 ms — gateway JWT
+ * verification, isolate spawn and module evaluation, everything that happens
+ * before the callback runs.
+ *
+ * How much of that 2351 ms is THIS package rather than the gateway or the spawn
+ * has never been separated, and n = 1. The honest statement is that module
+ * evaluation sits inside the front and this was the only module worth removing
+ * from it; "supabase-js was the bulk of it" would be an inference wearing a
+ * measurement's clothes, which is the error this function's own history is a
+ * record of. This module is the replacement for the three calls order-intake
+ * actually made.
  *
  * PURITY, in the established style of `lazywaitApi.ts` and `lazywaitCatalog.ts`:
  * Web-standard APIs only — no `npm:` specifiers, and no bare `Deno.*` reference
@@ -228,12 +236,23 @@ const retryDelayMs = (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000);
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * `maybeSingle` is applied HERE rather than by the caller, and that placement is
+ * load-bearing rather than tidy. In postgrest-js the collapse sits inside the
+ * `res.ok` branch of `processResponse` (2.112.4, lines 469-485), so the
+ * 404-with-an-array-body case in the `else` branch NEVER reaches it and comes
+ * back as a bare `[]` even under `maybeSingle()`. Collapsing afterwards — which
+ * an earlier revision of this file did — turns that `[]` into `null`, a
+ * divergence the caller can see. Mirroring the structure makes the parity
+ * obvious rather than something to re-derive.
+ */
 async function restFetch(
   target: RestTarget,
   method: 'GET' | 'POST',
   url: URL,
-  body?: unknown,
+  opts: { body?: unknown; maybeSingle?: boolean } = {},
 ): Promise<RestResult<unknown>> {
+  const { body, maybeSingle = false } = opts;
   const headers: Record<string, string> = {
     apikey: target.apikey,
     Authorization: target.authorization,
@@ -265,10 +284,11 @@ async function restFetch(
           : JSON.stringify(body ?? {}, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
       });
     } catch (e) {
-      const err = e as { name?: string; message?: string };
+      const err = e as { name?: string; message?: string; code?: string };
       // An abort is the caller's own decision and is never retried, matching
-      // postgrest-js. It still returns as an `error` rather than throwing.
-      const abort = err?.name === 'AbortError';
+      // postgrest-js — which tests BOTH arms, because runtimes disagree on how
+      // they signal it. It still returns as an `error` rather than throwing.
+      const abort = err?.name === 'AbortError' || err?.code === 'ABORT_ERR';
       if (!abort && RETRYABLE_METHODS.includes(method) && attempt < MAX_RETRIES) {
         await sleep(retryDelayMs(attempt));
         attempt += 1;
@@ -303,13 +323,31 @@ async function restFetch(
 
     const text = await res.text();
     if (res.ok) {
-      if (text === '') return { data: null, error: null, status: res.status };
-      try {
-        return { data: JSON.parse(text), error: null, status: res.status };
-      } catch {
-        // postgrest-js reports unparseable success bodies as `{ message: body }`.
-        return { data: null, error: { message: text }, status: res.status };
+      let data: unknown = null;
+      if (text !== '') {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          // postgrest-js reports unparseable success bodies as `{ message: body }`.
+          return { data: null, error: { message: text }, status: res.status };
+        }
       }
+      if (maybeSingle && Array.isArray(data)) {
+        if (data.length > 1) {
+          return {
+            data: null,
+            error: {
+              code: 'PGRST116',
+              details: `Results contain ${data.length} rows, application/vnd.pgrst.object+json requires 1 row`,
+              hint: null,
+              message: 'JSON object requested, multiple (or no) rows returned',
+            },
+            status: 406,
+          };
+        }
+        return { data: data.length === 1 ? data[0] : null, error: null, status: res.status };
+      }
+      return { data, error: null, status: res.status };
     }
     try {
       const parsed = JSON.parse(text);
@@ -336,13 +374,16 @@ async function restFetch(
 /**
  * `from(table).select(columns).<filters>.maybeSingle()`.
  *
- * MAYBESINGLE IS A CLIENT-SIDE RULE, not a header. postgrest-js v2.112.4 does
- * NOT send `Accept: application/vnd.pgrst.object+json` for `maybeSingle()` —
+ * MAYBESINGLE IS A CLIENT-SIDE RULE, not a header. postgrest-js (since 2.100.1)
+ * does NOT send `Accept: application/vnd.pgrst.object+json` for `maybeSingle()` —
  * that is `single()`. It requests the ordinary array and then collapses it:
  * one row becomes the object, zero rows become null, and MORE THAN ONE becomes
  * a PGRST116 error with status 406. Sending the object header instead would
  * turn "no such row" into a 406 error, which is the opposite of what
  * `maybeSingle` means and would make a missing order look like a failure.
+ *
+ * The collapse itself lives in `restFetch`, deliberately — see the note there on
+ * why doing it out here silently diverged on the 404-with-array case.
  */
 export async function restSelectMaybeSingle<T>(
   target: RestTarget,
@@ -354,24 +395,8 @@ export async function restSelectMaybeSingle<T>(
   url.searchParams.set('select', cleanSelect(columns));
   for (const [key, value] of Object.entries(filters)) url.searchParams.append(key, value);
 
-  const res = await restFetch(target, 'GET', url);
-  if (res.error) return { data: null, error: res.error, status: res.status };
-
-  const rows = res.data;
-  if (!Array.isArray(rows)) return { data: (rows ?? null) as T | null, error: null, status: res.status };
-  if (rows.length > 1) {
-    return {
-      data: null,
-      error: {
-        code: 'PGRST116',
-        details: `Results contain ${rows.length} rows, application/vnd.pgrst.object+json requires 1 row`,
-        hint: null,
-        message: 'JSON object requested, multiple (or no) rows returned',
-      },
-      status: 406,
-    };
-  }
-  return { data: (rows.length === 1 ? rows[0] : null) as T | null, error: null, status: res.status };
+  const res = await restFetch(target, 'GET', url, { maybeSingle: true });
+  return { data: res.data as T | null, error: res.error, status: res.status };
 }
 
 /**
@@ -392,7 +417,7 @@ export async function restRpc<T>(
   args: Record<string, unknown>,
 ): Promise<RestResult<T>> {
   const url = new URL(`${target.baseUrl}/rest/v1/rpc/${fn}`);
-  const res = await restFetch(target, 'POST', url, args);
+  const res = await restFetch(target, 'POST', url, { body: args });
   return { data: res.data as T | null, error: res.error, status: res.status };
 }
 

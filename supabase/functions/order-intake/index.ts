@@ -144,10 +144,15 @@ Deno.serve(async (req: Request) => {
   //
   // It does NOT recover the rest. Gateway JWT verification, isolate spawn and
   // module evaluation all happen before this callback is invoked, so
-  // `execution_time_ms - total_ms` remains positive BY CONSTRUCTION. That
-  // residual IS the front; it is quantified by subtraction in the logs, not by
-  // expecting the two numbers to converge. Review raised this as a P1 against
-  // an earlier revision of this file that claimed they would.
+  // `execution_time_ms - total_ms` remains positive BY CONSTRUCTION. It is
+  // quantified by subtraction in the logs, not by expecting the two numbers to
+  // converge. Review raised this as a P1 against an earlier revision that
+  // claimed they would.
+  //
+  // Call that residual the front only loosely: it is mostly the front, but it
+  // also carries the tail after the total_ms stamp — serialising this response
+  // and returning it. Small, and unmeasured, which is the reason to say so
+  // rather than to round it away.
   const t0 = Date.now();
   const mark: Record<string, number> = {};
 
@@ -235,8 +240,8 @@ Deno.serve(async (req: Request) => {
     caller,
     'place_customer_order',
     {
-      p_branch_id: body.orderType,
-      p_order_type: body.branchId,
+      p_branch_id: body.branchId,
+      p_order_type: body.orderType,
       p_items: body.items,
       p_address_id: body.addressId ?? null,
       p_coupon_code: body.couponCode ?? null,

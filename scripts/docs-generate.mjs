@@ -261,14 +261,26 @@ function generateEdgeFunctions() {
     const src = existsSync(entry) ? read(entry) : '';
     const summary = headerSummary(src, name);
     const automated = deployText.includes(name) ? 'workflow' : 'by hand';
-    // Two ways to hold the service-role key, and the column means the
-    // PRIVILEGE, not the helper. `adminClient()` (supabase-js) was the only one
-    // until order-intake dropped that dependency for `serviceTarget()` in
-    // _shared/rest.ts — at which point this heuristic quietly relabelled a
-    // function that still reads an integration secret as `caller JWT`. Anything
-    // that can construct the service-role identity belongs in the first column
-    // of a security review, whichever transport it uses to spend it.
-    const usesAdmin = /\badminClient\b|\bserviceTarget\b/.test(src) ? 'service role' : 'caller JWT';
+    // The column means the PRIVILEGE, not the helper, so match every way a
+    // function can come to hold the service-role key:
+    //
+    //   adminClient()    the supabase-js helper, the original and still the
+    //                    common case;
+    //   serviceTarget()  the same on the dependency-free PostgREST path
+    //                    (_shared/rest.ts), added when order-intake dropped
+    //                    supabase-js — before which this heuristic relabelled a
+    //                    function that still reads an integration secret as
+    //                    `caller JWT`;
+    //   the env var      read directly. `account-delete-scheduler` builds its
+    //                    own client from SUPABASE_SERVICE_ROLE_KEY and uses
+    //                    neither helper, so BOTH earlier versions of this
+    //                    heuristic printed `caller JWT` for the function that
+    //                    deletes accounts — the one row a security reviewer
+    //                    using this column as an index could least afford to
+    //                    skip.
+    const usesAdmin = /\badminClient\b|\bserviceTarget\b|\bSUPABASE_SERVICE_ROLE_KEY\b/.test(src)
+      ? 'service role'
+      : 'caller JWT';
     return `| \`${cell(name)}\` | ${cell(summary || '—')} | ${automated} | ${usesAdmin} |`;
   });
 
@@ -285,7 +297,7 @@ function generateEdgeFunctions() {
     [
       '**Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list on a schedule; it cannot compare content.',
       '',
-      '**Privilege column.** *service role* means the function constructs a service-role identity (`adminClient()`, or `serviceTarget()` on the dependency-free PostgREST path) and can bypass RLS. Those functions are the ones to read first in a security review — the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.',
+      '**Privilege column.** *service role* means the function can obtain the service-role key — through `adminClient()`, through `serviceTarget()` on the dependency-free PostgREST path, or by reading `SUPABASE_SERVICE_ROLE_KEY` itself — and can therefore bypass RLS. Those functions are the ones to read first in a security review: the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.',
       '',
       '| Function | Purpose | Deployment | Highest privilege |',
       '| --- | --- | --- | --- |',

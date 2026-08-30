@@ -584,8 +584,15 @@ against the platform's `execution_time_ms 11024`. Two readings settle it:
 - **`isolate_age_ms: 3` confirms a cold boot.** The isolate was three
   milliseconds old, so this request paid module resolution and evaluation. The
   residual **2351 ms** is gateway JWT verification + isolate spawn + module
-  evaluation — and the `npm:@supabase/supabase-js` module graph was the bulk of
-  the last of those.
+  evaluation, plus the short tail after the `total_ms` stamp (serialising the
+  response and returning it) — everything the handler's own clock cannot reach,
+  on both sides.
+
+  **How that 2351 ms divides is not measured.** `npm:@supabase/supabase-js` sat
+  inside the module-evaluation term and was the only module worth removing from
+  it, which is why it was removed; its own share has never been separated, and
+  n = 1. Saying it "was the bulk" would be an inference wearing a measurement's
+  clothes — the error class this section has already had to retract twice.
 
 The order itself was healthy throughout: POS ticket **#1**, first attempt, zero
 failed attempts, `confirmed_by_branch`, 6.64 s from order row to synced.
@@ -626,8 +633,11 @@ other explanations were tried and discarded, and why `isolate_age_ms` — the on
 piece of the front observable from inside — is what finally identified it.
 
 **The rewrite changes the dependency and nothing else, deliberately.** Every
-behaviour was read out of the exact packages the function was running
-(`postgrest-js@2.112.4`, `supabase-js@2.112.4`) and replicated:
+behaviour was read out of package source — `postgrest-js` and `supabase-js`
+2.112.4, from the Deno cache — and replicated. Stated that way rather than as
+"the packages the function was running", because `npm:@supabase/supabase-js@2` is
+a floating specifier resolved at build time and this repository records nowhere
+which 2.x the deployed bundle contained:
 
 | Behaviour | Why it had to be replicated |
 | --- | --- |

@@ -22,9 +22,12 @@ import {
  * headers, whitespace in `select`, maybeSingle's collapse rule, the error
  * mapping, and the retry policy.
  *
- * The reference for all of it is the package this replaced —
- * `@supabase/postgrest-js@2.112.4` and `@supabase/supabase-js@2.112.4`, read
- * from the Deno cache the function was actually running, not from documentation.
+ * The reference for all of it is package source — `@supabase/postgrest-js` and
+ * `@supabase/supabase-js` 2.112.4, read from the Deno cache, not from
+ * documentation. Not "the package the function was running": `npm:…@2` floats,
+ * and which 2.x the deployed bundle contained is recorded nowhere. Where a
+ * behaviour changed inside v2 the boundary is named — `maybeSingle()` at
+ * 2.100.1 is the one that did.
  */
 
 const ENV: Record<string, string> = {
@@ -195,13 +198,20 @@ describe('filter values cannot escape into the query', () => {
 });
 
 describe('the two odd 404 shapes postgrest-js special-cases', () => {
-  it('a 404 with an ARRAY body is an empty success, not an error', async () => {
+  it('a 404 with an ARRAY body is an empty success, and maybeSingle does NOT collapse it', async () => {
     // An embedded-resource miss. The order re-read embeds order_items, so this
     // path is reachable rather than theoretical.
+    //
+    // The `[]` rather than `null` is the point, and it is not a nicety: in
+    // postgrest-js the maybeSingle collapse sits INSIDE the `res.ok` branch of
+    // processResponse, while this case is handled in the `else` branch, so the
+    // collapse never runs on it. An earlier revision of rest.ts collapsed
+    // afterwards and quietly returned `null` here — a divergence the caller can
+    // see, in a file whose entire claim is that it changes only the dependency.
     mockFetch([jsonResponse([], 404)]);
     const { data, error, status } = await restSelectMaybeSingle(CALLER, 'orders', 'id', {});
     expect(error).toBeNull();
-    expect(data).toBeNull();
+    expect(data).toEqual([]);
     expect(status).toBe(200);
   });
 
@@ -265,12 +275,18 @@ describe('a transport failure is an error, never a rejection', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('an aborted GET is not retried either', async () => {
-    const abort = Object.assign(new Error('aborted'), { name: 'AbortError' });
-    const calls = mockFetch([abort]);
-    const { status } = await restSelectMaybeSingle(CALLER, 'orders', 'id', {});
-    expect(calls).toHaveLength(1);
-    expect(status).toBe(0);
+  it('an aborted GET is not retried either — BOTH signalling arms', async () => {
+    // postgrest-js tests `name === 'AbortError' || code === 'ABORT_ERR'`,
+    // because runtimes disagree on which one they set. Checking only `name`
+    // means an abort on one runtime is retried three times with 7 s of sleeps
+    // on the customer's awaited path.
+    for (const shape of [{ name: 'AbortError' }, { name: 'Error', code: 'ABORT_ERR' }]) {
+      const calls = mockFetch([Object.assign(new Error('aborted'), shape)]);
+      const { status } = await restSelectMaybeSingle(CALLER, 'orders', 'id', {});
+      expect(calls, JSON.stringify(shape)).toHaveLength(1);
+      expect(status).toBe(0);
+      vi.unstubAllGlobals();
+    }
   });
 });
 
@@ -311,6 +327,16 @@ describe('retry — replicated from postgrest-js rather than dropped', () => {
     await vi.advanceTimersByTimeAsync(1_500);
     await p;
     expect(calls).toHaveLength(2);
+  });
+
+  it('does NOT retry a POST on 503 either — the status path, not just transport', async () => {
+    // The transport-path test above proves a network error is not retried. This
+    // is the other arm: `shouldRetry` gates on the method for status retries
+    // too, and a POST retried on a 503 would create a second order.
+    const calls = mockFetch([new Response('', { status: 503 }), jsonResponse({ id: 'o1' })]);
+    const res = await runWithTimers(restRpc(CALLER, 'place_customer_order', {}));
+    expect(calls).toHaveLength(1);
+    expect(res.status).toBe(503);
   });
 
   it('does not retry a status that is not 503/520', async () => {
@@ -434,12 +460,15 @@ describe('the two provider-config readers must not drift', () => {
     expect(union(rest)).toEqual(union(secrets));
   });
 
-  it('neither of them logs the secret', () => {
+  it('neither of them logs ANYTHING — the only claim worth making here', () => {
+    // Deliberately not a keyword check on the word "secret": a blacklist over
+    // identifier names is the shape that has already been shown two escapes in
+    // this repository. Both readers handle `secret_config`, and neither has any
+    // business emitting a log line at all, so the assertion is that there are
+    // ZERO console calls in either file. That cannot be dodged by renaming.
     for (const [name, src] of [['secrets.ts', secrets], ['rest.ts', rest]] as const) {
-      const logs = src.match(/console\.(log|info|warn|error)\([^\n]*/g) ?? [];
-      for (const line of logs) {
-        expect(line, `${name} logs near secret_config`).not.toMatch(/secret/i);
-      }
+      const logs = src.replace(/\/\*[\s\S]*?\*\//g, '').match(/\bconsole\.\w+\(/g) ?? [];
+      expect(logs, `${name} must not log`).toEqual([]);
     }
   });
 });

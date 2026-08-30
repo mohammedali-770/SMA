@@ -309,6 +309,81 @@ describe('targeted kick and deferred off-path work', () => {
     expect(c.slice(svc, cfg)).not.toContain('orders');
   });
 
+  it('maps every place_customer_order argument to the right body field', () => {
+    // THIS TEST EXISTS BECAUSE THE SWAP HAPPENED. A review agent mutated
+    // `p_branch_id: body.orderType, p_order_type: body.branchId` into the
+    // working tree to see whether anything caught it. Nothing did — the whole
+    // suite stayed green, `deno check` passed (both sides are `unknown` off
+    // `body`), and the mutation was swept into a commit by `git add -A` and
+    // pushed.
+    //
+    // The live consequence would have been total: `p_branch_id` is `uuid` and
+    // `p_order_type` is the `order_type` enum, so every checkout would have
+    // 400'd on a cast error. Loud, but only once it reached a customer — and
+    // nine layers of tripwire around this function had nothing to say about the
+    // argument list itself.
+    //
+    // Pin the whole mapping, not a sample. Every line of it is a place where
+    // one identifier can be substituted for another and still typecheck.
+    const c = code('order-intake');
+    const m = /'place_customer_order',\s*\{([\s\S]*?)\n\s*\},/.exec(c);
+    expect(m, 'place_customer_order argument object not found').not.toBeNull();
+    const args = (m as RegExpExecArray)[1]
+      .split('\n').map((l) => l.trim()).filter(Boolean).join(' ');
+    expect(args).toBe(
+      'p_branch_id: body.branchId, '
+      + 'p_order_type: body.orderType, '
+      + 'p_items: body.items, '
+      + 'p_address_id: body.addressId ?? null, '
+      + 'p_coupon_code: body.couponCode ?? null, '
+      + 'p_notes: body.notes ?? null, '
+      + 'p_loyalty_points: body.loyaltyPoints ?? 0, '
+      + 'p_idempotency_key: body.idempotencyKey ?? null, '
+      + 'p_payment_method: body.paymentMethod ?? null,',
+    );
+  });
+
+  it('filters the re-read with the eq. operator on the server-derived id', () => {
+    // `{ id: orderId }` instead of `{ id: `eq.${orderId}` }` is a one-character
+    // slip that typechecks, keeps every other assertion in this file green, and
+    // sends PostgREST a filter with no operator. Nothing else pins it.
+    const c = code('order-intake');
+    expect(c).toMatch(/\{ id: `eq\.\$\{orderId\}` \}/);
+  });
+
+  it('asks the config reader for lazywait, and nothing else', () => {
+    // Changing the provider string silently disables the POS kick — cfg comes
+    // back null or disabled, the block is skipped, and the order falls through
+    // to the once-a-minute cron. That is the 18-45 s regression this function
+    // already shipped once, reachable again through a one-word edit.
+    const c = code('order-intake');
+    expect(c).toMatch(/restProviderConfig\(admin, 'lazywait'\)/);
+  });
+
+  it('sends the same customer-safe column list it always sent', () => {
+    // Hoisting the select into a constant made it editable without touching a
+    // call site. The projection is a privacy surface — Issue #94 — so pin the
+    // whole string, not just the embed. Compare against the base branch when
+    // this fails: a deliberate widening needs its own reasoning.
+    const c = code('order-intake');
+    const m = /const ORDER_SELECT =([\s\S]*?);\n/.exec(c);
+    expect(m, 'ORDER_SELECT not found').not.toBeNull();
+    // eslint-disable-next-line no-new-func
+    const columns = new Function(`return (${(m as RegExpExecArray)[1]})`)() as string;
+    expect(columns).toBe(
+      'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, '
+      + 'subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, '
+      + 'loyalty_points_earned, payment_status, payment_method, lazywait_order_number, '
+      + 'lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, '
+      + 'pos_create_attempted_at, pos_customer_retry_count, refund_state, '
+      + 'order_items(id, name_en, name_ar, unit_price, quantity, '
+      + 'order_item_modifiers(id, name_en, name_ar, price))',
+    );
+    // And the response returns THAT read, not something else.
+    expect(c).toMatch(/const \{ data: fresh \} = await restSelectMaybeSingle/);
+    expect(c).toContain('return json({ order: fresh });');
+  });
+
   it('carries no npm dependency — the cold start it was costing was the point', () => {
     // Full import-graph walk lives in restNoSupabaseJs.test.ts; this is the
     // single-file half, kept here so a reviewer reading the order-intake
@@ -334,6 +409,13 @@ describe('targeted kick and deferred off-path work', () => {
     // never scanned, and it blacklisted a handful of names, so `customerId` or
     // `email` passed anywhere. Both were reproduced before this rewrite.
     const c = code('order-intake');
+    // EXACTLY ONE log call in the whole file, and it is the timing line. The
+    // earlier version took `indexOf` of the first `console.log(JSON.stringify({`
+    // and scanned only that, so a SECOND console call added anywhere below it —
+    // logging the order, the body, the caller — was never examined at all.
+    const calls = c.match(/\bconsole\.\w+\(/g) ?? [];
+    expect(calls, 'order-intake must make exactly one log call').toEqual(['console.log(']);
+
     const open = c.indexOf('console.log(JSON.stringify({');
     expect(open, 'timing log not found').toBeGreaterThan(-1);
     const payload = c.slice(c.indexOf('{', open) + 1, c.indexOf('}));', open));
