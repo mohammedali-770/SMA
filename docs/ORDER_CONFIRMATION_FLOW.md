@@ -626,11 +626,36 @@ PostgREST through [`_shared/rest.ts`](../supabase/functions/_shared/rest.ts) —
 plain `fetch` over Web-standard APIs — for the three calls it actually made: the
 provider-config read, `place_customer_order`, and the order re-read.
 
-**Why the import and not something inside the handler.** Imports are evaluated at
-**isolate boot, before `Deno.serve` registers the callback**, so no mark inside
-the handler can see them. That is why the cost went unattributed while three
-other explanations were tried and discarded, and why `isolate_age_ms` — the one
-piece of the front observable from inside — is what finally identified it.
+**The reason it was done is FALSE, and this section records that rather than
+rewriting it.** The argument was: imports are evaluated at isolate boot, before
+`Deno.serve` registers the callback, so no mark inside the handler can see them
+— which made module evaluation the natural suspect for the 2351 ms front and
+made the suspicion unfalsifiable from where anyone was looking.
+
+The runtime emits its own `booted` event, and nobody had queried it. Measured
+2026-08-30, after the deploy:
+
+| Time (UTC) | Version | supabase-js | `booted` |
+| --- | --- | --- | --- |
+| 05:19:04 | v10 | yes | 26 ms |
+| 05:33:48 | v10 — **SM-2026-000073 itself** | yes | **23 ms** |
+| 06:52:50 | v11 — first boot of a brand-new deploy | **no** | **23 ms** |
+
+Identical. Supabase bundles an Edge Function into an **eszip at deploy time**
+(the `ezbr_sha256` on every deployment), so npm resolution happens then, not at
+boot; at runtime the graph is already inside the bundle and loading it costs
+~23 ms either way. **Module evaluation was never two seconds. The 2351 ms front
+is unexplained again.**
+
+Corroborating: a bare `OPTIONS` request to the fresh v11 deployment — the one
+that carried its first boot — measured `execution_time_ms` **175 ms**, and 47 ms
+on the next. A cold invocation of this function through the gateway costs
+somewhere near a tenth of what the front on SM-2026-000073 was.
+
+**What the change is still worth.** The hottest customer path no longer carries a
+dependency it does not need, and the replacement has executable tests the old
+path never had. Both are real. Neither is a latency improvement, and no claim
+that this shrinks boot should be reintroduced.
 
 **The rewrite changes the dependency and nothing else, deliberately.** Every
 behaviour was read out of package source — `postgrest-js` and `supabase-js`
@@ -691,16 +716,24 @@ verified against the base branch rather than assumed:
 Folding either into a transport swap is the "second change riding along" that
 §15 of `CLAUDE.md` exists to prevent.
 
-**What this does not do, and what is not yet measured.** It removes boot cost,
-not round trips; the region gap is untouched and remains the larger term. And
-**no post-change measurement exists** — nothing carrying
-`X-Client-Info: sma-edge-rest/1` has been observed, because this has not been
-deployed (a `CLAUDE.md` §5 action). What is supportable today is that the front
-on one cold request was 2351 ms and that module evaluation is part of it; the
-share attributable to supabase-js specifically has never been separated, n = 1.
-Against a whole-invocation spread of 7926-11401 ms across six orders, a single
-post-deploy observation would not establish an improvement either — this document
-already carries one retracted performance claim made on n = 1 per side.
+**What this does not do.** It does not remove measurable boot cost — see the
+`booted` table above, which is the third performance claim this document has had
+to retract. It does not touch round trips either; the region gap is untouched and
+remains the larger term.
+
+**Deployed 2026-08-30 as version 11** on explicit owner approval, after PR #291
+merged as `23e911b`. Bundle: three files (`order-intake/index.ts`,
+`_shared/cors.ts`, `_shared/rest.ts`), down from four, `verify_jwt` unchanged at
+`true`, `ezbr_sha256` `e7b34beb…` → `c200588e…`. Zero orders were in flight.
+Verified after: the three deployed files read back matching the merged branch,
+`supabaseClient.ts` and `secrets.ts` absent from the bundle, an `OPTIONS`
+preflight returning the handler's own CORS values (proof the graph loads), an
+unauthenticated `GET` refused 401 by the gateway, and no other Edge Function's
+version or `ezbr_sha256` changed — the payment functions included.
+
+**Still to confirm on the next real order:** a request carrying
+`X-Client-Info: sma-edge-rest/1` in the PostgREST logs, which is what proves the
+new transport is the one doing the work.
 
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
