@@ -12,13 +12,13 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 
 **Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list on a schedule; it cannot compare content.
 
-**Privilege column.** *service role* means the function constructs an admin client and can bypass RLS. Those functions are the ones to read first in a security review — the caller’s identity is not the thing limiting what they can touch.
+**Privilege column.** *service role* means the function can obtain the service-role key — through `adminClient()`, through `serviceTarget()` on the dependency-free PostgREST path, or by reading `SUPABASE_SERVICE_ROLE_KEY` itself — and can therefore bypass RLS. Those functions are the ones to read first in a security review: the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.
 
 | Function | Purpose | Deployment | Highest privilege |
 | --- | --- | --- | --- |
 | `account-delete-process` | service-role processor for the account-deletion queue (verify_jwt=false; authenticated by the service-role bearer or a Vault-backed shared secret… | by hand | service role |
 | `account-delete-request` | authenticated customer requests deletion of their OWN account (verify_jwt=true). Two actions: | by hand | service role |
-| `account-delete-scheduler` | Vault-authenticated scheduler gateway | by hand | caller JWT |
+| `account-delete-scheduler` | Vault-authenticated scheduler gateway | by hand | service role |
 | `auth-send-sms-whatsapp` | Supabase Auth **Send SMS Hook** (verify_jwt=false) | by hand | service role |
 | `email-test-config` | ADMIN-only (verify_jwt=true + is_admin check) | by hand | service role |
 | `lazywait-catalog` | admin-initiated, SERVER-SIDE catalog pull | by hand | service role |
@@ -66,6 +66,9 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/moyasarVerify.ts`
 - `_shared/orderIntakeSyncWiring.test.ts`
 - `_shared/paymentSync.ts`
+- `_shared/rest.test.ts`
+- `_shared/rest.ts`
+- `_shared/restNoSupabaseJs.test.ts`
 - `_shared/secrets.ts`
 - `_shared/supabaseClient.ts`
 - `_shared/tap.test.ts`

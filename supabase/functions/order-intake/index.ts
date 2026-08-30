@@ -1,6 +1,11 @@
 import { corsHeaders, json } from '../_shared/cors.ts';
-import { adminClient, userClient } from '../_shared/supabaseClient.ts';
-import { getProviderConfig } from '../_shared/secrets.ts';
+import {
+  callerTarget,
+  restProviderConfig,
+  restRpc,
+  restSelectMaybeSingle,
+  serviceTarget,
+} from '../_shared/rest.ts';
 
 /**
  * order-intake — authenticated "create order + sync to POS" orchestration.
@@ -19,6 +24,23 @@ import { getProviderConfig } from '../_shared/secrets.ts';
  * The Lazywait payload/logic live only in the worker (unchanged), and the
  * `sync_trigger_secret` is read server-side and sent as the x-sync-secret header
  * — it never reaches the app or the response.
+ *
+ * NO npm DEPENDENCY, DELIBERATELY. This function talks to PostgREST through
+ * `_shared/rest.ts`, plain `fetch` over Web-standard APIs, instead of
+ * `npm:@supabase/supabase-js@2`. Imports are evaluated at ISOLATE BOOT, before
+ * `Deno.serve` registers this handler, so the cost of that module graph was
+ * invisible to every measurement taken from inside the handler — which is
+ * exactly why it went unattributed while three other explanations were tried and
+ * discarded. SM-2026-000073 (2026-08-30) finally caught it: `isolate_age_ms: 3`
+ * proved the request paid a cold boot, and the platform's `execution_time_ms`
+ * of 11024 against this handler's own `total_ms` of 8673 left 2351 ms in front
+ * of the callback that no in-handler mark could reach.
+ *
+ * Keep it that way. `restNoSupabaseJs.test.ts` walks this file's import graph
+ * and fails if any file in it references the package in CODE — a type-only
+ * import included, because "the bundler erases it" is a belief about somebody
+ * else's build step and an import graph is a fact about this one. Comments are
+ * stripped first, which is why this paragraph may name it.
  */
 /**
  * How long checkout will wait for the POS before returning the order without a
@@ -74,11 +96,44 @@ const SYNC_TIMEOUT_MS = 11_000;
  * This is the only part of the pre-handler front observable from inside the
  * function, and it exists because putting t0 on the first line of the callback
  * is NOT the same as measuring the invocation. Review raised that as a P1 and
- * it was right: the three imports above — one of them npm:@supabase/supabase-js
- * — are evaluated here, before any callback runs, and gateway JWT verification
- * happens before that again.
+ * it was right: the imports above are evaluated here, before any callback runs,
+ * and gateway JWT verification happens before that again.
+ *
+ * It is also the instrument that made the npm dependency's cost visible in the
+ * first place, and the one that will show whether removing it helped. Compare
+ * `isolate_age_ms` near zero (a cold request) against the platform's
+ * `execution_time_ms` minus this handler's `total_ms`: that difference is the
+ * front, and shrinking it is the whole point of the dependency removal.
  */
 const MODULE_LOADED_AT = Date.now();
+
+/**
+ * The customer-safe projection of a fresh order row, hoisted out of the call so
+ * a test can read it. Byte-identical to the string this function has always
+ * sent — the whitespace and line breaks are kept because `cleanSelect` in
+ * _shared/rest.ts strips them exactly as postgrest-js did.
+ *
+ * The internal SM-… number and every operational column (including the POS
+ * fencing token) are never sent to a customer device — Issue #94.
+ *
+ * IT IS NOT A MIRROR OF apps/mobile/src/lib/orderSelect.ts, whatever the comment
+ * here used to say. It is SIX columns behind it — `is_comped`,
+ * `comp_discount_amount`, `notes`, the item-level `note`, `variant_name_en` and
+ * `variant_name_ar` — drift that predates this change and is harmless today
+ * only because the caller discards everything but `.id` (CheckoutScreen) and the
+ * receipt re-reads with the full mobile select. Widening it is safe now that the
+ * variant and comp migrations are applied, but it is a separate change with its
+ * own customer-visible surface, and nothing currently pins the two lists
+ * together.
+ */
+const ORDER_SELECT =
+  'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, '
+  + 'subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, '
+  + 'loyalty_points_earned, payment_status, payment_method, lazywait_order_number, '
+  + 'lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, '
+  + 'pos_create_attempted_at, pos_customer_retry_count, refund_state, '
+  + 'order_items(id, name_en, name_ar, unit_price, quantity, '
+  + 'order_item_modifiers(id, name_en, name_ar, price))';
 
 Deno.serve(async (req: Request) => {
   // FIRST LINE of the callback, deliberately — but NOT the start of the
@@ -89,10 +144,15 @@ Deno.serve(async (req: Request) => {
   //
   // It does NOT recover the rest. Gateway JWT verification, isolate spawn and
   // module evaluation all happen before this callback is invoked, so
-  // `execution_time_ms - total_ms` remains positive BY CONSTRUCTION. That
-  // residual IS the front; it is quantified by subtraction in the logs, not by
-  // expecting the two numbers to converge. Review raised this as a P1 against
-  // an earlier revision of this file that claimed they would.
+  // `execution_time_ms - total_ms` remains positive BY CONSTRUCTION. It is
+  // quantified by subtraction in the logs, not by expecting the two numbers to
+  // converge. Review raised this as a P1 against an earlier revision that
+  // claimed they would.
+  //
+  // Call that residual the front only loosely: it is mostly the front, but it
+  // also carries the tail after the total_ms stamp — serialising this response
+  // and returning it. Small, and unmeasured, which is the reason to say so
+  // rather than to round it away.
   const t0 = Date.now();
   const mark: Record<string, number> = {};
 
@@ -110,47 +170,58 @@ Deno.serve(async (req: Request) => {
   // have buffered part or all of the body before invoking this callback, and
   // anything buffered that early is invisible here. Named body_read_ms rather
   // than upload_span_ms for exactly that reason — the earlier name asserted
-  // something this cannot measure.
+  // something this cannot measure. Measured 1 ms on SM-2026-000073, which
+  // refuted the body-upload explanation for the front outright.
   mark.parse = Date.now() - t0;
 
-  const supa = userClient(auth);
+  // THE CALLER'S OWN IDENTITY. `auth` is forwarded verbatim, so auth.uid() and
+  // every RLS policy apply exactly as they do from the app. Both customer-facing
+  // calls below — place_customer_order and the order re-read — run as this and
+  // MUST keep running as this; the service-role identity constructed inside the
+  // try further down bypasses RLS entirely and is for the integration secret
+  // and nothing else.
+  const caller = callerTarget(auth);
 
-  // TIMING. Every hop here is CROSS-REGION and that is the whole cost story.
-  // The database is in eu-central-1 (Frankfurt); a customer in Dammam has this
-  // function executed in ap-south-1 (Mumbai) or eu-central-2 (Zurich), so each
-  // PostgREST call pays an intercontinental round trip. Measured 2026-08-28 on
-  // the same worker function: p50 556 ms across 442 in-region cron invocations
-  // versus 5934 ms for the single ap-south-1 order kick.
+  // TIMING. Every hop here is CROSS-REGION and that is a large part of the cost
+  // story. The database is in eu-central-1 (Frankfurt); a customer in Dammam has
+  // this function executed in ap-south-1 (Mumbai) or eu-central-2 (Zurich), so
+  // each PostgREST call pays an intercontinental round trip. Measured 2026-08-28
+  // on the same worker function: p50 556 ms across 442 in-region cron
+  // invocations versus 5934 ms for the single ap-south-1 order kick.
+  //
+  // The OTHER part is the boot this function no longer pays for an npm module
+  // graph — see MODULE_LOADED_AT above.
   //
   // These marks are logged once per request so the breakdown is a measurement
   // rather than an inference. The previous attempt to apportion this time from
   // outside — subtracting known work from execution_time_ms — produced a
-  // confident and WRONG answer (it blamed Deno cold start, which a 15-minute
-  // idle test then disproved at 828 ms). Numbers only; no order contents, no
-  // customer data.
+  // confident and WRONG answer (it blamed Deno cold start generically, which a
+  // 15-minute idle test then disproved at 828 ms). Numbers only; no order
+  // contents, no customer data.
   //
   // t0 and `mark` are declared at the very top of the handler — see the note
   // there on why measuring from the first line is load-bearing.
 
-  // The provider config is read with the SERVICE-ROLE client and does not depend
-  // on the order, so it is started HERE rather than after place_customer_order.
-  // It used to run strictly afterwards, which cost a full extra cross-region
-  // round trip on the customer's awaited path for no ordering reason.
+  // The provider config is read with the SERVICE-ROLE identity and does not
+  // depend on the order, so it is started HERE rather than after
+  // place_customer_order. It used to run strictly afterwards, which cost a full
+  // extra cross-region round trip on the customer's awaited path for no ordering
+  // reason.
   //
   // `.catch` rather than a bare promise: an unawaited rejection would be an
   // unhandled promise rejection before the sync block's try/catch can see it.
   // A null here degrades exactly as a missing config already did — the sync
   // block skips the kick and the background worker picks the order up.
   //
-  // adminClient() itself is inside the guard too. It THROWS when the
+  // serviceTarget() itself is inside the guard too. It THROWS when the
   // service-role env is missing, and it used to sit inside the sync block's
   // try/catch — hoisting it bare would have turned a misconfigured environment
   // into a failed checkout, breaking the rule that a POS problem can never fail
   // the order.
-  let cfgPromise: Promise<Awaited<ReturnType<typeof getProviderConfig>>>;
+  let cfgPromise: Promise<Awaited<ReturnType<typeof restProviderConfig>>>;
   try {
-    const admin = adminClient();
-    cfgPromise = getProviderConfig(admin, 'lazywait')
+    const admin = serviceTarget();
+    cfgPromise = restProviderConfig(admin, 'lazywait')
       .then((c) => { mark.config = Date.now() - t0; return c; })
       .catch(() => { mark.config = Date.now() - t0; return null; });
   } catch {
@@ -161,17 +232,25 @@ Deno.serve(async (req: Request) => {
   // place_order is no longer granted to `authenticated`; the customer path goes
   // through place_customer_order, a thin wrapper with identical pricing/loyalty/
   // idempotency that returns a customer-safe projection (migration 20260724200000).
-  const { data: placed, error } = await supa.rpc('place_customer_order', {
-    p_branch_id: body.branchId,
-    p_order_type: body.orderType,
-    p_items: body.items,
-    p_address_id: body.addressId ?? null,
-    p_coupon_code: body.couponCode ?? null,
-    p_notes: body.notes ?? null,
-    p_loyalty_points: body.loyaltyPoints ?? 0,
-    p_idempotency_key: body.idempotencyKey ?? null,
-    p_payment_method: body.paymentMethod ?? null,
-  });
+  //
+  // A transport failure here comes back as `error`, not as a throw — restRpc
+  // keeps postgrest-js's contract precisely so this stays a 400 with a message
+  // rather than becoming an unhandled 500.
+  const { data: placed, error } = await restRpc<Record<string, unknown>>(
+    caller,
+    'place_customer_order',
+    {
+      p_branch_id: body.branchId,
+      p_order_type: body.orderType,
+      p_items: body.items,
+      p_address_id: body.addressId ?? null,
+      p_coupon_code: body.couponCode ?? null,
+      p_notes: body.notes ?? null,
+      p_loyalty_points: body.loyaltyPoints ?? 0,
+      p_idempotency_key: body.idempotencyKey ?? null,
+      p_payment_method: body.paymentMethod ?? null,
+    },
+  );
   mark.place = Date.now() - t0;
   if (error) return json({ error: error.message }, 400);
 
@@ -260,23 +339,16 @@ Deno.serve(async (req: Request) => {
   // a human and is unaffected.
 
   // Return ONLY the customer-safe projection of the fresh RLS-scoped row, so the
-  // client sees the branch (POS) number if it arrived in time. The internal SM-…
-  // number and every operational column (including the POS fencing token) are
-  // never sent to a customer device — Issue #94. The column list mirrors
-  // apps/mobile/src/lib/orderSelect.ts.
-  const { data: fresh } = await supa
-    .from('orders')
-    .select(
-      'id, status, order_type, created_at, branch_id, branch_name_en, branch_name_ar, '
-      + 'subtotal, delivery_fee, discount_amount, loyalty_discount_amount, vat_amount, total, '
-      + 'loyalty_points_earned, payment_status, payment_method, lazywait_order_number, '
-      + 'lazywait_sync_state, lazywait_ref, sync_blocked_reason, sync_next_attempt_at, '
-      + 'pos_create_attempted_at, pos_customer_retry_count, refund_state, '
-      + 'order_items(id, name_en, name_ar, unit_price, quantity, '
-      + 'order_item_modifiers(id, name_en, name_ar, price))',
-    )
-    .eq('id', orderId)
-    .maybeSingle();
+  // client sees the branch (POS) number if it arrived in time. Read as the
+  // CALLER, never as the service role — the column list is customer-safe but the
+  // ROW is scoped by RLS, and reading it with the service-role identity would
+  // hand any authenticated caller any order whose id it could name.
+  const { data: fresh } = await restSelectMaybeSingle<Record<string, unknown>>(
+    caller,
+    'orders',
+    ORDER_SELECT,
+    { id: `eq.${orderId}` },
+  );
   mark.reread = Date.now() - t0;
 
   // One line, numbers only. config/place are concurrent, so `config` may be
