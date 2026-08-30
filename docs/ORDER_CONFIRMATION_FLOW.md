@@ -1033,10 +1033,21 @@ nothing:
   unauthenticated `GET` or `POST` does *not* test the code: under
   `verify_jwt: true` the gateway refuses it with `UNAUTHORIZED_NO_AUTH_HEADER`
   before the function is invoked at all, which is not this handler's 401.
-- **`isRow` reads back positioned *before* `RestResult`.** That ordering is
-  `bd4c196`'s; the follow-up that moves it below the interface is deliberately
-  unmerged, so this confirms the deployed copy and the default branch still agree
-  rather than merely that some recent revision shipped.
+- **`isRow` read back positioned *before* `RestResult`.** That ordering was
+  `bd4c196`'s, and when the deploy was verified the follow-up moving it below the
+  interface was still unmerged — so the check confirmed the deployed copy and the
+  default branch agreed, rather than merely that some recent revision had shipped.
+
+  **That is no longer the state, and the check cannot be repeated as written.**
+  The move has since merged, so the branch has `isRow` *after* `RestResult` while
+  deployed v12 still has it before. Together with the comment corrections above,
+  the deployed bundle now differs from the default branch by **a moved
+  declaration and a body of comments — and by nothing else**. Neither can change
+  behaviour: `RestResult` is a type and erases at compile time, and `isRow` is a
+  function declaration, so hoisting makes its position irrelevant to any caller.
+  **No redeploy is owed for either**; the next deploy with a reason of its own
+  carries both. The equivalent check on a future deploy has to be a full readback
+  against the merged branch, not this one-line ordering tell.
 
 **SM-2026-000075 — the fallback shipped without disturbing the happy path.**
 
