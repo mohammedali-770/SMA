@@ -65,15 +65,53 @@ import { getProviderConfig } from '../_shared/secrets.ts';
  */
 const SYNC_TIMEOUT_MS = 11_000;
 
+/**
+ * Stamped when the MODULE is evaluated — i.e. at isolate boot, before
+ * Deno.serve even registers the handler. `t0 - MODULE_LOADED_AT` at handler
+ * entry is therefore the isolate's age: near zero means this request paid the
+ * boot and module evaluation, a large value means it landed on a warm isolate.
+ *
+ * This is the only part of the pre-handler front observable from inside the
+ * function, and it exists because putting t0 on the first line of the callback
+ * is NOT the same as measuring the invocation. Review raised that as a P1 and
+ * it was right: the three imports above — one of them npm:@supabase/supabase-js
+ * — are evaluated here, before any callback runs, and gateway JWT verification
+ * happens before that again.
+ */
+const MODULE_LOADED_AT = Date.now();
+
 Deno.serve(async (req: Request) => {
+  // FIRST LINE of the callback, deliberately — but NOT the start of the
+  // invocation, and the difference matters. The first version set t0 after
+  // `await req.json()` and under-reported by 2062 ms on the first real order
+  // (total_ms 7129 against the platform's execution_time_ms 9191). Moving it
+  // here recovers the header checks and the body read.
+  //
+  // It does NOT recover the rest. Gateway JWT verification, isolate spawn and
+  // module evaluation all happen before this callback is invoked, so
+  // `execution_time_ms - total_ms` remains positive BY CONSTRUCTION. That
+  // residual IS the front; it is quantified by subtraction in the logs, not by
+  // expecting the two numbers to converge. Review raised this as a P1 against
+  // an earlier revision of this file that claimed they would.
+  const t0 = Date.now();
+  const mark: Record<string, number> = {};
+
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
   const auth = req.headers.get('Authorization');
   if (!auth) return json({ error: 'Authentication required' }, 401);
+  mark.entry = Date.now() - t0;
 
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  // parse − entry is the handler-side BODY READ plus JSON decode. It is a LOWER
+  // BOUND on the device's upload, not the upload itself: the runtime may already
+  // have buffered part or all of the body before invoking this callback, and
+  // anything buffered that early is invisible here. Named body_read_ms rather
+  // than upload_span_ms for exactly that reason — the earlier name asserted
+  // something this cannot measure.
+  mark.parse = Date.now() - t0;
 
   const supa = userClient(auth);
 
@@ -90,8 +128,9 @@ Deno.serve(async (req: Request) => {
   // confident and WRONG answer (it blamed Deno cold start, which a 15-minute
   // idle test then disproved at 828 ms). Numbers only; no order contents, no
   // customer data.
-  const t0 = Date.now();
-  const mark: Record<string, number> = {};
+  //
+  // t0 and `mark` are declared at the very top of the handler — see the note
+  // there on why measuring from the first line is load-bearing.
 
   // The provider config is read with the SERVICE-ROLE client and does not depend
   // on the order, so it is started HERE rather than after place_customer_order.
@@ -244,12 +283,16 @@ Deno.serve(async (req: Request) => {
   // larger than `place` without either having waited on the other.
   console.log(JSON.stringify({
     at: 'order-intake.timing',
+    isolate_age_ms: t0 - MODULE_LOADED_AT,
+    entry_ms: mark.entry ?? null,
+    parse_ms: mark.parse ?? null,
     config_ms: mark.config ?? null,
     place_ms: mark.place ?? null,
     sync_ms: mark.sync ?? null,
     reread_ms: mark.reread ?? null,
     sync_span_ms: mark.sync != null && mark.place != null ? mark.sync - mark.place : null,
     reread_span_ms: mark.reread != null && mark.sync != null ? mark.reread - mark.sync : null,
+    body_read_ms: mark.parse != null && mark.entry != null ? mark.parse - mark.entry : null,
     total_ms: Date.now() - t0,
   }));
   return json({ order: fresh });
