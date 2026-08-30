@@ -22,14 +22,26 @@
  * (hence the `ezbr_sha256` on every deployment), so npm resolution happens then,
  * not at boot; at runtime the whole graph is already inside the bundle and
  * loading it costs ~23 ms either way. Module evaluation was never two seconds,
- * and the 2351 ms front remains UNEXPLAINED.
+ * and what the 2351 ms front CONSISTS OF remains unexplained — see the next
+ * paragraph for what later measurement did, and did not, settle.
  *
  * So what is this module for now? Not a boot-time fix — `booted` is unchanged,
- * and no claim that it shrinks boot should be reintroduced. Whether it moves the
- * FULL front is a separate question and is still open: that needs an
- * authenticated order on this version, and the only post-deploy request so far
- * was an `OPTIONS` preflight, which short-circuits before the auth check and
- * touches no database. Unmeasured is not the same as zero, in either direction.
+ * and no claim that it shrinks boot should be reintroduced.
+ *
+ * The FULL front is a separate question, and real orders have since answered part
+ * of it. On three cold orders, one per version, all executed from BOM, the
+ * residual `execution_time_ms - total_ms` was 2351 ms on v10 (with the
+ * dependency) and 1130 ms / 1123 ms on v11 and v12 (without), with the region,
+ * the database work and the handler's own marks held constant. The front did
+ * move, by roughly 1.2 s, and the two dependency-free orders agree to within
+ * 7 ms.
+ *
+ * That is a correlation on n = 1 against n = 2, not a controlled result, and the
+ * MECHANISM is still open: `booted` reads 18-23 ms across all three, so whatever
+ * moved is invisible to the runtime's own boot metric. A larger eszip taking
+ * longer to fetch and unpack BEFORE that timer starts would fit, and is not
+ * established. Two mechanisms have already been asserted here and withdrawn;
+ * measure before naming a third. `order-intake/index.ts` carries the table.
  *
  * What the module does do is keep the hottest customer path free of a dependency
  * it does not need, behind executable tests it never had. That is worth having

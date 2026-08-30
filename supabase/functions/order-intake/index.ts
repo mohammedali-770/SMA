@@ -37,13 +37,32 @@ import {
  * supabase-js and 23 ms without, so isolate boot is not where two seconds were
  * hiding.
  *
- * What that does NOT establish is what the whole front now costs. No
- * authenticated order has run on this version yet, and the only v11 request so
- * far was an `OPTIONS` preflight, which returns before the auth check and does
- * no body read and no PostgREST call — not comparable. The dependency is still
- * better gone (the hottest customer path should not carry one it does not need,
- * and the replacement has executable tests the old path never had), but treat
- * the latency effect as UNMEASURED, not as zero.
+ * THE FRONT ITSELF DID MOVE, though, and that is measured rather than assumed.
+ * Three cold orders, one per version, all executed from BOM:
+ *
+ *     SM-2026-000073  v10  with     exec 11024  total 8673  residual 2351 ms
+ *     SM-2026-000074  v11  without  exec  8704  total 7574  residual 1130 ms
+ *     SM-2026-000075  v12  without  exec  7973  total 6850  residual 1123 ms
+ *
+ * The confounds were checked, not waved away: same edge region for all three,
+ * `place_customer_order` origin_time 1361 / 1265 / 1273 ms, and this handler's
+ * own marks within 4%. The residual is the only term that moved, and the two
+ * dependency-free orders agree to within 7 ms.
+ *
+ * State the limits alongside it. This is n = 1 with the dependency against n = 2
+ * without — a correlation, not a controlled result. And it is STILL NOT BOOT:
+ * `booted` reads 18-23 ms on all three, so whatever costs ~1.2 s is invisible to
+ * the runtime's own boot metric. A larger eszip taking longer to fetch and unpack
+ * BEFORE that timer starts would fit, and is NOT established. Two mechanisms have
+ * already been named here and withdrawn — module evaluation, then per-isolate
+ * connection setup. Measure before naming a third.
+ *
+ * An earlier revision of this paragraph read "no authenticated order has run on
+ * this version yet, and the only v11 request so far was an `OPTIONS` preflight".
+ * It was already false when it was deployed — SM-2026-000074 had run on v11 three
+ * hours earlier — and it is recorded rather than deleted because it is the same
+ * failure as the two withdrawn mechanisms: a claim about measurement, made
+ * without doing one.
  *
  * Keep it that way. `restNoSupabaseJs.test.ts` walks this file's import graph
  * and fails if any file in it references the package in CODE — a type-only
@@ -110,13 +129,13 @@ const SYNC_TIMEOUT_MS = 11_000;
  *
  * Compare `isolate_age_ms` near zero (a cold request) against the platform's
  * `execution_time_ms` minus this handler's `total_ms`: that difference is the
- * front. It was 2351 ms on the one cold order measured so far, and what it
- * consists of is NOT known. Isolate boot is ruled OUT as the large term — the
- * runtime's own `booted` metric reads 23 ms with the npm dependency and 23 ms
- * without — but the front itself has not been re-measured on this version,
- * because that needs a real authenticated order and none has run yet. Do not
- * attribute it again without a measurement that separates the parts, and do not
- * report it as unchanged either.
+ * front, plus the short tail after the `total_ms` stamp. Measured on three cold
+ * orders, one per version — 2351 ms on v10, then 1130 ms and 1123 ms on the two
+ * dependency-free versions; the file header carries the table and the confound
+ * checks. Isolate boot is ruled OUT as the large term at either value: the
+ * runtime's own `booted` metric reads 18-23 ms across all three. What the
+ * remaining ~1.1 s consists of is still NOT known. Do not attribute it without a
+ * measurement that separates the parts.
  */
 const MODULE_LOADED_AT = Date.now();
 

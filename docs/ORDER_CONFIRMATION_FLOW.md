@@ -913,18 +913,43 @@ impossible.
 defence, and leaving the app untouched means this reaches customers on the
 **already-installed build**.
 
-**What this does not do, and what is still unmeasured.** It does not remove
-measurable BOOT cost — see the `booted` table above, which is the third
+**What the transport swap does not do** — this block and the deploy record below
+it belong to the dependency removal above, not to the re-read fix. It does not
+remove measurable BOOT cost: see the `booted` table above, which is the third
 performance claim this document has had to retract.
 
-Be precise about the limit of that result, because the temptation is to round it
-up into "the change made no difference". What was measured is the `booted` event.
-The **full front** — `execution_time_ms − total_ms` — has NOT been re-measured on
-version 11, because that needs a real authenticated order and none has run since
-the deploy. The only post-deploy request so far was an `OPTIONS` preflight, which
-returns before the auth check and performs no body read and no PostgREST call, so
-it is not comparable to a checkout. Treat the effect on the front as **open**, not
-as zero.
+**The full front is a different question, and it has since been measured.** Three
+cold orders, one per version, all executed from BOM:
+
+| Order | Version | supabase-js | `execution_time_ms` | `total_ms` | residual | `booted` |
+| --- | --- | --- | --- | --- | --- | --- |
+| SM-2026-000073 | v10 | yes | 11024 | 8673 | **2351 ms** | 23 ms |
+| SM-2026-000074 | v11 | **no** | 8704 | 7574 | **1130 ms** | 18 ms |
+| SM-2026-000075 | v12 | **no** | 7973 | 6850 | **1123 ms** | 18 ms |
+
+The confounds were checked rather than waved away: the same edge region for all
+three, `place_customer_order` origin_time 1361 / 1265 / 1273 ms, the config read
+919-982 ms, the re-read 179-195 ms, and the handler's own marks within 4%. The
+residual is the only term that moved — and the two dependency-free orders agree to
+within **7 ms**.
+
+**Read it as a correlation, not a controlled result.** n = 1 with the dependency
+against n = 2 without, which is the same evidence shape as the retracted v8→v9
+parallelisation claim recorded above, set against an observed whole-invocation
+spread of 7926-11401 ms.
+
+**And it is still not boot.** `booted` reads 18-23 ms on all three, so whatever
+costs ~1.2 s is invisible to the runtime's own boot metric. A larger eszip taking
+longer to fetch and unpack *before* that timer starts would fit, and is **not
+established**. Two mechanisms have already been asserted in this document and
+withdrawn — module evaluation, then per-isolate connection setup. Measure before
+naming a third.
+
+This block used to say the front "has NOT been re-measured on version 11, because
+that needs a real authenticated order and none has run since the deploy". That was
+false on the branch it merged on: SM-2026-000074 is recorded three paragraphs
+below, with its front at 1130 ms. A document contradicting itself across two
+screens is precisely what §14 exists to prevent.
 
 It does not touch round trips either; the region gap is untouched and remains the
 larger term.
@@ -970,6 +995,48 @@ largest terms.
 **None of this closes the region gap itself.** Frankfurt serving Dammam is the
 root cause, and moving regions is a project-level decision rather than a code
 change.
+
+#### Version 12, and the first order through the re-read fix — SM-2026-000075
+
+**Deployed 2026-08-30 as version 12** on explicit owner approval, after PR #295
+merged as `bd4c196`. That is the re-read fix above; the redeploy also carried the
+comment corrections that had been accumulating undeployed. The bundle is unchanged
+in shape — the same three files, `verify_jwt` still `true`, `import_map` `false`,
+`ezbr_sha256` `c200588e…` → `6e497cea…`. Zero orders were in flight.
+
+Verified after the deploy: the three files read back matching the merged branch,
+`SYNC_TIMEOUT_MS = 11_000` and the RPC argument mapping untouched,
+`supabaseClient.ts` and `secrets.ts` absent, `booted` 18-32 ms with no module
+error, and no other Edge Function's version or `ezbr_sha256` changed. Two of those
+checks are worth stating in full because the obvious version of each proves
+nothing:
+
+- **The `OPTIONS` probe is the one that shows the module graph loads.** It returns
+  the handler's own literal `ok` and its three `Access-Control-*` values, and
+  reaching that line requires `_shared/rest.ts` to have been evaluated. An
+  unauthenticated `GET` or `POST` does *not* test the code: under
+  `verify_jwt: true` the gateway refuses it with `UNAUTHORIZED_NO_AUTH_HEADER`
+  before the function is invoked at all, which is not this handler's 401.
+- **`isRow` reads back positioned *before* `RestResult`.** That ordering is
+  `bd4c196`'s; the follow-up that moves it below the interface is deliberately
+  unmerged, so this confirms the deployed copy and the default branch still agree
+  rather than merely that some recent revision shipped.
+
+**SM-2026-000075 — the fallback shipped without disturbing the happy path.**
+
+    isolate_age_ms 4 · entry_ms 0 · parse_ms 1 · config_ms 982 · place_ms 1305
+    sync_span_ms 5335 · reread_span_ms 210 · body_read_ms 1 · reread_ok true
+    total_ms 6850
+
+`reread_ok: true` — the new key is live and the fallback did **not** fire, which
+is what a healthy order has to show, since this change only alters the failure
+path. The order: delivery, cash, POS ticket **#3**, first attempt, zero failed
+attempts, **5.46 s** from order row to synced, no `sync_blocked_reason`, no
+`sync_last_error`. Its three gateway records again carry
+`X-Client-Info: sma-edge-rest/1`.
+
+Its residual of **1123 ms** is the second dependency-free row in the front table
+above.
 
 ### The push must follow the send, not precede it
 
