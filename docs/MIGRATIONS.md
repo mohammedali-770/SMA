@@ -3739,3 +3739,21 @@ three revisions — sampling four clauses let five mutations through, and the
 replacement had two more holes found in review — and is mutation-tested against
 13 cases, 11 of which must go red and 2 of which must stay green. The green ones
 matter: a tripwire that fails on a reformat gets deleted.
+
+## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
+
+`20260831130000_otp_login_rate_limit.sql`. **Not applied, and its paired
+`auth-send-sms-whatsapp` deploy is a second, separate §5 action.** Apply the
+migration FIRST: the function calls the RPC, and against a database without it
+the gate errors — which fails open, so login still works but the throttle
+silently does not exist.
+
+Adds `public.otp_login_rate_limit(text,int,int,int)`. Full reasoning, including
+why `otp_begin_send` could not be reused and the two honest limits of the design,
+is in `docs/WHATSAPP_LOGIN.md` §7.2.
+
+Tested against a disposable PostgreSQL 16 cluster: 116 migrations replayed onto an
+empty database, the new `otp_login_rate_limit_test.sql` passing, no suite
+regressions. Mutation-tested, each confirmed red then reverted: counting only
+`auth_login` (the anti-alternation property), an hourly off-by-one, dropping the
+per-phone filter, and granting execute to `authenticated`.

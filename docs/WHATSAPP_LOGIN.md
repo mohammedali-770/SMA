@@ -280,6 +280,63 @@ login path in §2 is unaffected in every respect.
 
 ---
 
+## 7.2 Rate limiting on the login path (added 2026-08-31)
+
+**What was unprotected.** There are two OTP senders in `_shared/whatsappSend.ts`:
+
+| sender | limiting |
+| --- | --- |
+| `sendOtpViaWhatsApp` — phone **verification** | `otp_begin_send`: cooldown / hourly / daily. Protected. |
+| `deliverOtpTemplate` — the raw sender | **none** |
+
+`auth-send-sms-whatsapp` — the Send SMS Hook every real customer login goes
+through — called `deliverOtpTemplate` **directly**. So the login path had no
+per-phone cooldown, no per-IP cap and no daily ceiling in our code. The only
+throttle was Supabase Auth's own project-wide SMS rate limit, which is dashboard
+state and is **not verifiable from the repository** (§4 item 4 asks you to keep it
+on; nothing here can confirm you did).
+
+Both failure directions were real. At a low default, genuine customers get locked
+out on a busy evening. Raised, every attempted login is a **billable** Meta
+authentication-template message an attacker can pump.
+
+**Why the protected sender could not simply be reused.** `otp_begin_send` does two
+things: it enforces the limits *and* inserts an `otp_challenges` row holding a
+hashed OTP. On the login path **Supabase Auth is the sole OTP authority** — the
+hook delivers a code Supabase already generated and deliberately stores no
+challenge. Routing login through it would mint a **second** code and store it,
+leaving the verification path able to match a code the customer was never sent.
+
+So `otp_login_rate_limit` (migration `20260831130000`) is the same three checks,
+in the same order, with the same defaults — and **no challenge write**.
+
+**The counter is `whatsapp_message_logs`**, which already records one row per send
+attempt on both paths and already carries the `(phone_e164, created_at desc)`
+index this needs. It counts **both** message types (`auth_login` and `otp_send`)
+on purpose: counting only the login type would let an attacker alternate between
+the two senders for double the budget. A SQL suite asserts exactly that property.
+
+**Two honest limits, stated rather than buried.**
+
+- It is a **check, not a reservation**. The counter row is written after the send,
+  so two simultaneous requests can both observe the same state and both pass. It
+  bounds the rate; it does not serialise it. Making it exact would need a
+  reservation row — reintroducing the challenge write this exists to avoid.
+- It **fails open** on an RPC error, deliberately. A limiter that cannot be
+  reached must not become an outage of the entire login system. The 429 is for a
+  real limit decision, never for infrastructure trouble.
+
+The refusal reason is **not** echoed to the caller — `cooldown` versus
+`daily_limit` would tell an enumerator how much traffic a given number has already
+had. The function is `service_role`-only for the same reason: it is otherwise a
+membership oracle over customer phone numbers.
+
+**Ordering, when this is applied and deployed.** Apply the migration **first**. The
+function calls the RPC, so deploying it against a database without the function
+would make the gate error on every login — which fails open, so login still
+works, but the throttle would silently not exist. Both steps are separate §5
+owner actions.
+
 ## 8. Customer profile behavior
 
 - On first phone login, GoTrue inserts `auth.users`; the `handle_new_user`

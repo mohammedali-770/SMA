@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **115**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260828090000_customer_order_state_inflight.sql`.
+Migration files in the repository: **116**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260831130000_otp_login_rate_limit.sql`.
 
 ## Tables
 
@@ -226,6 +226,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `otp_consume` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_get_active_challenge` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_increment_attempt` | 1 | `20260710140000_whatsapp_otp.sql` |
+| `otp_login_rate_limit` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `place_order` | 13 | `20260826100000_comp_order_totals.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
