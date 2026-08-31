@@ -78,6 +78,53 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
 | 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |
 | 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
+| 12 | `UNPAID_ORDER_NOT_SYNCED` | critical | **not** paid, not cancelled, older than 15 min, `lazywait_sync_state ∈ {syncing,blocked}`, and not intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
+| 13 | `UNPAID_ORDER_DEAD_LETTER` | critical | **not** paid, not cancelled, `lazywait_sync_state='dead_letter'`. |
+
+### Why 12 and 13 exist, and why they are narrower than they look
+
+**R1 and R7 cannot see a cash order.** Both require `payment_status = 'paid'` and
+R1 a non-null `paid_at`. A cash order is `pending` with `paid_at` NULL for its
+entire life. Measured 2026-08-31: **63 of 65 orders are `payment_method='cash'`**;
+the only two `paid` orders are comped, total 0.00, already synced. So the rules
+that answer *"the order exists and the kitchen never got it"* had no population to
+match.
+
+That is not theoretical. SM-2026-000057 died silently, and
+SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days raising nothing
+until a human cancelled them by hand.
+
+**The gap is narrower than "cash is uncovered", and the scope follows the gap
+rather than the headline.** Reading each rule rather than assuming:
+
+| state, for a cash order | covered by |
+| --- | --- |
+| `pending`, `failed` | **R10 `OVERDUE_SYNC_RETRY` already** — it carries no payment filter. Warning. |
+| `syncing`, `blocked` | nothing — R10 excludes these states, R1 needs `paid` |
+| `dead_letter` | nothing — R7 needs `paid` |
+
+So R12 takes `{syncing, blocked}` and R13 takes `dead_letter`, and **no more** —
+adding `pending`/`failed` would raise two incidents for every order R10 already
+covers. Whether a stuck `pending` cash order deserves *critical* rather than R10's
+*warning* is a severity policy question, not a coverage gap, and is left open
+rather than changed quietly.
+
+**They cannot double-report with their paid twins**: both gate on
+`payment_status is distinct from 'paid'`, so an order matches R1 or R12, never
+both. `order_integrity_watchdog_test.sql` asserts that disjointness directly —
+including a paid order sitting in `blocked`, which must raise R1 alone — and
+asserts the R10/R12 disjointness on an aged `pending` fixture that would raise
+both if R12 were ever widened.
+
+**The `delivery_schema_unconfirmed` exclusion is load-bearing, and that is
+measured rather than assumed.** Against Production read-only on 2026-08-31: with
+the exclusion R12 matches **0** rows; without it, **4** — exactly the four
+delivery orders deliberately parked and marked `not_retryable`. Applying this
+raises nothing today.
+
+`confirmation_required` remains deliberately uncovered, for the reasons in the
+scope note inside the function: it is the designed human-verification resting
+place and already has `list_pos_confirmation_required()` and the admin feed.
 
 **Not implemented — `R12 REFUND_STUCK`:** there is no refunds table or refund
 lifecycle anywhere in the schema, so the rule is intentionally omitted (a

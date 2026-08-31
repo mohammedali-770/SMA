@@ -153,7 +153,12 @@ begin
   update public.orders set sync_last_error = 'LazyWait 400: {"customer_name":"SECRET_NAME","phone":"+966SECRETPHONE"}' where order_number='W-R7-TP';
   perform pg_temp.oiw_order('W-R8-TP','synced','pending','pickup','received','   ');                                                   -- R8 whitespace ref
   perform pg_temp.oiw_order('W-R9-TP','failed','pending','pickup','received','REFX', null, now()+interval '5m');                       -- R9 usable ref, non-synced
-  perform pg_temp.oiw_order('W-R10-TP','pending','pending','pickup','received',null, null, now()-interval '11m');                      -- R10 overdue
+  -- Aged past R12's 15m threshold ON PURPOSE: R10 still fires (retry overdue
+  -- >10m), and if R12 were ever widened from ('syncing','blocked') to include
+  -- pending/failed, this same order would raise BOTH rules. The disjointness
+  -- assertion below is what turns that into a test failure instead of a
+  -- production double-page.
+  perform pg_temp.oiw_order('W-R10-TP','pending','pending','pickup','received',null, null, now()-interval '11m', now()-interval '20m'); -- R10 overdue
   perform pg_temp.oiw_order('W-R10-FUTURE','failed','pending','pickup','received',null, null, now()+interval '5m');                    -- future retry
   perform pg_temp.oiw_order('W-R10-RECENT','pending','pending','pickup','received',null, null, now()-interval '5m');                   -- overdue < 10m
   perform pg_temp.oiw_order('W-R11-TP','awaiting_payment','pending','pickup','received',null,null,null, now()-interval '25h');         -- R11 (after cutoff)
@@ -171,6 +176,38 @@ begin
   perform pg_temp.oiw_pay((select id from public.orders where order_number='W-R3-BAD2'),'paid',10,'W-R3-AGE-REF','W-R3-AGE-TXN', now()-interval '2m');  -- < 3m
   perform pg_temp.oiw_order('W-R3-OKORD','synced','paid','pickup','received','REFR3');                                                 -- has paid order
   perform pg_temp.oiw_pay((select id from public.orders where order_number='W-R3-OKORD'),'paid',10,'W-R3-OK-REF','W-R3-OK-TXN');
+
+  -- R12 UNPAID_ORDER_NOT_SYNCED: cash orders stuck in the states nothing else
+  -- covers. 'syncing' and 'blocked' only — R10 already covers pending/failed for
+  -- cash, and duplicating it here would raise two incidents for one order.
+  perform pg_temp.oiw_order('W-R12-SYNCING','syncing','pending','pickup','received',null,
+                            null, null, now()-interval '20m');                        -- R12 TP
+  perform pg_temp.oiw_order('W-R12-BLOCKED','blocked','pending','delivery','received',null,
+                            null, null, now()-interval '20m', 10,
+                            'missing_item_mapping');                                  -- R12 TP
+  -- Negatives that must NOT fire R12:
+  perform pg_temp.oiw_order('W-R12-DELVPARK','blocked','pending','delivery','received',null,
+                            null, null, now()-interval '20m', 10,
+                            'delivery_schema_unconfirmed');   -- deliberately parked
+  perform pg_temp.oiw_order('W-R12-YOUNG','blocked','pending','pickup','received',null,
+                            null, null, now()-interval '5m', 10,
+                            'missing_item_mapping');          -- inside the 15m grace
+  perform pg_temp.oiw_order('W-R12-CANCEL','blocked','pending','pickup','cancelled',null,
+                            null, null, now()-interval '20m', 10,
+                            'missing_item_mapping');          -- cancelled
+  -- A PAID order in the same state must fire R1 only, never R12 — that disjointness
+  -- is what stops one order raising two incidents.
+  perform pg_temp.oiw_order('W-R12-PAIDTWIN','blocked','paid','pickup','received',null,
+                            now()-interval '20m', null, now()-interval '20m', 10,
+                            'missing_item_mapping');          -- R1 TP, NOT R12
+
+  -- R13 UNPAID_ORDER_DEAD_LETTER: R7's population minus the payment requirement.
+  perform pg_temp.oiw_order('W-R13-TP','dead_letter','pending','pickup','received',null,
+                            null, null, now()-interval '20m');                        -- R13 TP
+  update public.orders set sync_last_error = 'LazyWait 400: {"customer_name":"SECRET_NAME"}'
+    where order_number='W-R13-TP';
+  perform pg_temp.oiw_order('W-R13-CANCEL','dead_letter','pending','pickup','cancelled',null,
+                            null, null, now()-interval '20m');                        -- cancelled
 
   -- R4: mismatch (amount 90 vs total 100) and a match (100 vs 100).
   v_r4 := pg_temp.oiw_order('W-R4-ORD','synced','paid','pickup','received','REFR4', null,null,null,100);
@@ -194,32 +231,60 @@ begin
   -- run bookkeeping
   if (select status from public.order_integrity_runs where id=v_run) <> 'success' then
     raise exception 'MATRIX FAILED: run not success'; end if;
-  if (select rules_evaluated from public.order_integrity_runs where id=v_run) <> 11 then
-    raise exception 'MATRIX FAILED: rules_evaluated <> 11'; end if;
+  if (select rules_evaluated from public.order_integrity_runs where id=v_run) <> 13 then
+    raise exception 'MATRIX FAILED: rules_evaluated <> 13'; end if;
 
   -- per-rule detection counts
-  if (select count(*) from public.order_integrity_incidents where rule_code='PAID_ORDER_NOT_SYNCED') <> 2 then
+  if (select count(*) from public.order_integrity_incidents where rule_code='PAID_ORDER_NOT_SYNCED') <> 3 then
     raise exception 'MATRIX FAILED: R1 count %', (select count(*) from public.order_integrity_incidents where rule_code='PAID_ORDER_NOT_SYNCED'); end if;
+  -- R12 has two true positives (syncing + blocked); R13 has one.
+  if (select count(*) from public.order_integrity_incidents where rule_code='UNPAID_ORDER_NOT_SYNCED') <> 2 then
+    raise exception 'MATRIX FAILED: R12 count %', (select count(*) from public.order_integrity_incidents where rule_code='UNPAID_ORDER_NOT_SYNCED'); end if;
+  -- DISJOINTNESS: the paid twin sits in the same state and must raise R1 only.
+  if exists (select 1 from public.order_integrity_incidents i join public.orders o on o.id=i.order_id
+              where o.order_number='W-R12-PAIDTWIN' and i.rule_code='UNPAID_ORDER_NOT_SYNCED') then
+    raise exception 'MATRIX FAILED: a paid order raised the UNPAID rule (double-report)'; end if;
+  if not exists (select 1 from public.order_integrity_incidents i join public.orders o on o.id=i.order_id
+              where o.order_number='W-R12-PAIDTWIN' and i.rule_code='PAID_ORDER_NOT_SYNCED') then
+    raise exception 'MATRIX FAILED: the paid twin did not raise R1'; end if;
+  -- NO ORDER may carry both a paid rule and its unpaid twin.
+  if exists (select i.order_id from public.order_integrity_incidents i
+             where i.rule_code in ('PAID_ORDER_NOT_SYNCED','UNPAID_ORDER_NOT_SYNCED')
+             group by i.order_id having count(distinct i.rule_code) > 1) then
+    raise exception 'MATRIX FAILED: an order raised both the paid and unpaid not-synced rules'; end if;
+  if exists (select i.order_id from public.order_integrity_incidents i
+             where i.rule_code in ('PAID_ORDER_DEAD_LETTER','UNPAID_ORDER_DEAD_LETTER')
+             group by i.order_id having count(distinct i.rule_code) > 1) then
+    raise exception 'MATRIX FAILED: an order raised both the paid and unpaid dead-letter rules'; end if;
+  -- R12 must not overlap R10 either. R10 covers pending/failed for cash already
+  -- (it has no payment filter), so R12 takes only the states R10 excludes. If it
+  -- is ever widened, W-R10-TP raises both and this fires.
+  if exists (select i.order_id from public.order_integrity_incidents i
+             where i.rule_code in ('OVERDUE_SYNC_RETRY','UNPAID_ORDER_NOT_SYNCED')
+             group by i.order_id having count(distinct i.rule_code) > 1) then
+    raise exception 'MATRIX FAILED: an order raised both OVERDUE_SYNC_RETRY and UNPAID_ORDER_NOT_SYNCED (double-report)'; end if;
   -- exactly one incident per single-TP rule
   if exists (select rc from (values
       ('PAID_ORDER_AWAITING_PAYMENT'),('CAPTURED_PAYMENT_WITHOUT_ORDER'),('PAYMENT_AMOUNT_MISMATCH'),
       ('DUPLICATE_PROVIDER_REFERENCE'),('MULTIPLE_SUCCESSFUL_CAPTURES'),('PAID_ORDER_DEAD_LETTER'),
       ('SYNCED_WITHOUT_USABLE_REFERENCE'),('REFERENCE_WITH_NON_SYNCED_STATE'),('OVERDUE_SYNC_RETRY'),
-      ('ABANDONED_AWAITING_PAYMENT')) v(rc)
+      ('ABANDONED_AWAITING_PAYMENT'),('UNPAID_ORDER_DEAD_LETTER')) v(rc)
     where (select count(*) from public.order_integrity_incidents i where i.rule_code=v.rc) <> 1) then
     raise exception 'MATRIX FAILED: a single-TP rule did not produce exactly one incident'; end if;
 
-  -- total detected / opened (R1 gives 2, the other 10 rules give 1 each = 12)
-  if (select incidents_detected from public.order_integrity_runs where id=v_run) <> 12 then
-    raise exception 'MATRIX FAILED: incidents_detected <> 12 -> %', (select incidents_detected from public.order_integrity_runs where id=v_run); end if;
-  if (select incidents_opened from public.order_integrity_runs where id=v_run) <> 12 then
-    raise exception 'MATRIX FAILED: incidents_opened <> 12'; end if;
+  -- total detected / opened: R1 gives 3 (two originals + the paid twin), R12 gives
+  -- 2, and the other 11 rules give 1 each = 16.
+  if (select incidents_detected from public.order_integrity_runs where id=v_run) <> 16 then
+    raise exception 'MATRIX FAILED: incidents_detected <> 16 -> %', (select incidents_detected from public.order_integrity_runs where id=v_run); end if;
+  if (select incidents_opened from public.order_integrity_runs where id=v_run) <> 16 then
+    raise exception 'MATRIX FAILED: incidents_opened <> 16'; end if;
 
   -- excluded / clean / intentionally-uncovered orders produced NO incident.
   if exists (select 1 from public.order_integrity_incidents i join public.orders o on o.id=i.order_id
               where o.order_number in ('W-R1-AGE','W-R1-CANCEL','W-R1-DELVBLOCK','W-SYNCED-OK','W-EXCLUDED',
                                        'W-R10-FUTURE','W-R10-RECENT','W-R11-LEGACY','W-R4-OKORD','W-R3-OKORD','W-R3-BAD2',
-                                       'W-CONF-REQ')) then
+                                       'W-CONF-REQ',
+                                       'W-R12-DELVPARK','W-R12-YOUNG','W-R12-CANCEL','W-R13-CANCEL')) then
     raise exception 'MATRIX FAILED: an excluded/clean/uncovered order produced an incident'; end if;
   -- confirmation_required is deliberately uncovered (handled by the verification feed).
   if exists (select 1 from public.order_integrity_incidents i join public.orders o on o.id=i.order_id
@@ -244,6 +309,11 @@ begin
   if (select safe_details->>'has_last_error' from public.order_integrity_incidents
         where rule_code='PAID_ORDER_DEAD_LETTER') <> 'true' then
     raise exception 'MATRIX FAILED: R7 has_last_error not surfaced'; end if;
+  -- R13 carries the same PII hazard as R7 and must redact it the same way. The
+  -- '%SECRET%' assertions above already cover W-R13-TP's seeded error body.
+  if (select safe_details->>'has_last_error' from public.order_integrity_incidents
+        where rule_code='UNPAID_ORDER_DEAD_LETTER') <> 'true' then
+    raise exception 'MATRIX FAILED: R13 has_last_error not surfaced'; end if;
 
   -- After a single scan (critical detection_count=1) NO 'opened' alert is eligible yet.
   if (select count(*) from public.order_integrity_alert_outbox) <> 0 then
