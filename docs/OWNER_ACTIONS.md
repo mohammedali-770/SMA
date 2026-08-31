@@ -1410,6 +1410,63 @@ and the deploy, so the old worker blocked it. **None was re-driven**: that is a
 §5 live write and would create a real kitchen ticket for food nobody is waiting
 for. Leaving them parked is the current decision, reversible at any time.
 
+## 23. `latency-probe` — an orphan diagnostic function awaiting deletion
+
+**Status:** OWNER ACTION. One dashboard deletion. Nothing else is blocked on it.
+
+**What it was.** A throwaway diagnostic deployed on 2026-08-30 to settle whether
+the within-region spread in PostgREST call latency was per-isolate connection
+setup. It answered its question — the per-call cost is **bimodal**, roughly
+120 ms against 305 ms measured from IAD, and is **not** connection setup — and
+that finding is recorded in `docs/ORDER_CONFIRMATION_FLOW.md`. Its source was
+removed from the repository the same day.
+
+**It is inert, and that is verified rather than assumed.** Read back live on
+2026-08-31 (`get_edge_function`): version 2, `ACTIVE`, `verify_jwt: true`, and
+the entire body is one `Deno.serve` returning HTTP **410** with a fixed JSON
+string. **No database call, no secret, no outbound request of any kind.**
+
+The stub exists rather than nothing because `verify_jwt = true` does **not** make
+an Edge Function private — the anon JWT is bundled into the mobile app and
+satisfies gateway verification, as `whatsapp-send-otp` already documents. In its
+original form the probe let anyone holding the public key drive nine database
+reads per request. Replacing the body removed that surface completely; deleting
+the slug is the remaining tidy-up.
+
+**Why bother, if it is harmless.** Because §15 records exactly how this goes
+wrong: **two orphan diagnostic functions** sat undetected in this project until
+they were found and deleted on 2026-08-19. This is a third. A slug that no
+document accounts for is one nobody can explain in six months — and until this
+section existed, `latency-probe` appeared **nowhere** in the repository, its only
+record being the chat session that retired it.
+
+### No agent session can do this — verified 2026-08-31, do not re-litigate
+
+| route | result |
+| --- | --- |
+| MCP Supabase tools | `deploy_edge_function`, `get_edge_function`, `list_edge_functions` only. **No delete.** (`delete_branch` is for development branches, not functions.) |
+| `supabase` CLI | not on `PATH`, not in `node_modules/.bin`, not installed |
+| Management API token | `SUPABASE_ACCESS_TOKEN` unset; **no Supabase environment variable exists at all**; no stored credential at `~/.supabase/access-token` or `~/.config/supabase/` |
+| installing the CLI | pointless — `supabase functions delete` needs that same token or an interactive login |
+
+**This is NOT a reason to create `SUPABASE_ACCESS_TOKEN`.** See §15: the token
+cannot be scoped to a project or organisation, this repository is public, and the
+recorded recommendation is not to add it. §15 also observes that its absence has
+been *doing the work of a control* — four runs of a mis-triggered
+`deploy-functions.yml` died only because the secret did not exist. Deleting one
+retired diagnostic does not justify arming that.
+
+### The action
+
+Supabase dashboard → project `wxfmmnihidsdyemasstf` → **Edge Functions** →
+`latency-probe` → **Delete function**.
+
+Safe to delete outright: it is absent from the repository, no other Edge Function
+calls it, and the app has never known it existed.
+
+**On completion**, per the closeout rule below: delete this section, recording the
+verification date and a `list_edge_functions` readback showing the slug gone.
+
 ## Owner-action closeout rule
 
 When an item is completed:

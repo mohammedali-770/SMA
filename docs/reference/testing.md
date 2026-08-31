@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**151 TypeScript test files declaring 2319 test blocks, plus 59 SQL suites.**
+**156 TypeScript test files declaring 2441 test blocks, plus 60 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -62,6 +62,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/loyalty_reason_history_safe_test.sql`
 - `supabase/tests/loyalty_reason_no_order_number_test.sql`
 - `supabase/tests/manual_only_pos_resend_test.sql`
+- `supabase/tests/menu_display_order_test.sql`
 - `supabase/tests/moyasar_begin_attempt_test.sql`
 - `supabase/tests/operations_alerts_activation_test.sql`
 - `supabase/tests/operations_alerts_digest_test.sql`
@@ -104,7 +105,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-59 files, 853 declared test blocks.
+60 files, 874 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -127,7 +128,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | 32 | lineTotal |
 | `apps/mobile/src/features/checkout/vatLabel.test.ts` | 8 | the checkout VAT label carries the configured rate |
 | `apps/mobile/src/features/checkout/webviewPolicy.test.ts` | 16 | decideNavigation — allow (Tap ecosystem) |
-| `apps/mobile/src/features/menu/menuSections.test.ts` | 23 | menuItemKey (branch-selection crash regression) |
+| `apps/mobile/src/features/menu/menuSections.test.ts` | 27 | menuItemKey (branch-selection crash regression) |
 | `apps/mobile/src/features/notifications/notificationPolicy.test.ts` | 20 | resolveNotificationRoute (allow-listed internal routes ONLY) |
 | `apps/mobile/src/features/notifications/pushDeviceOwnership.test.ts` | 8 | cross-account token transfer (Codex P1 scenarios) |
 | `apps/mobile/src/features/notifications/sendLifecycle.test.ts` | 12 | order-status send lifecycle (claim / retry semantics) |
@@ -138,8 +139,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/order/orderContext.test.ts` | 17 | isBranchOpen |
 | `apps/mobile/src/features/order/orderNote.test.ts` | 16 | checkOrderNote |
 | `apps/mobile/src/features/order/variantSelection.test.ts` | 13 | makeCartItemId — the tier is part of the identity |
-| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 16 | reference and channel safety |
-| `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 2 | isTerminalOrderStatus |
+| `apps/mobile/src/features/orders/orderConfirmation.test.ts` | 19 | reference and channel safety |
+| `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` | 8 | customer_order_state — SQL/TS parity |
+| `apps/mobile/src/features/orders/ordersRefresh.test.ts` | 8 | isTerminalOrderStatus |
 | `apps/mobile/src/features/otp/otpAutofill.test.ts` | 23 | normalizeCode |
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
 | `apps/mobile/src/features/profile/addressForm.test.ts` | 34 | validateAddressForm — a complete address |
@@ -170,7 +172,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-75 files, 1001 declared test blocks.
+77 files, 1029 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -233,6 +235,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/legal.test.ts` | 6 | legal document registry |
 | `src/lib/mappers.test.ts` | 27 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
+| `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/moyasarAdminTest.test.ts` | 9 | canRunMoyasarAdminTestCheckout |
 | `src/lib/numericField.test.ts` | 13 | parseNumericCommit — inputs that must never persist a zero |
 | `src/lib/observability/devTest.test.ts` | 3 | admin dev Sentry test facility |
@@ -244,6 +247,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/orderIntegrityTriage.test.ts` | 7 | canTriageRole (admin-only triage) |
 | `src/lib/payment.test.ts` | 13 | checkout payment availability |
 | `src/lib/productEditMapper.test.ts` | 2 | product write mapping |
+| `src/lib/productImages.test.ts` | 15 | product image type gate |
 | `src/lib/reports.test.ts` | 8 | buildCouponUsage |
 | `src/lib/roles.test.ts` | 6 | role surface routing |
 | `src/lib/supportContact.test.ts` | 15 | placeholder guard (no placeholder ever reaches a customer) |
@@ -252,7 +256,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-16 files, 458 declared test blocks.
+18 files, 531 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -266,7 +270,9 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/lazywaitCatalog.test.ts` | 27 | extractCatalogList (response envelope) |
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
-| `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 8 | order-intake — immediate POS sync, and no premature promise |
+| `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
+| `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
+| `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
 | `supabase/functions/_shared/tap.test.ts` | 31 | formatTapAmount / currencyDecimals |
 | `supabase/functions/_shared/tapRefund.test.ts` | 18 | classifyRefundResponse — confirmed success |
 | `supabase/functions/_shared/whatsapp.test.ts` | 18 | normalizePhoneE164 |

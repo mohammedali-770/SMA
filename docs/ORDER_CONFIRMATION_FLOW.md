@@ -148,6 +148,923 @@ leftover, and delivery fell through to the cron:
 the wait for the next tick, and the 18-45 s spread is only where in the minute
 each order happened to land.
 
+### The kick is TARGETED, and it was 253 ms from failing
+
+Closing the delivery gate fixed *which* orders got a kick. It did not fix what
+the kick then did, and measuring one healthy order exposed that:
+
+| SM-2026-000065, 8.06 s to the POS | |
+| --- | --- |
+| order-intake overhead + gateway | 1.04 s |
+| worker boot + a duplicate `integration_settings` read | 0.24 s |
+| `reap_stale_lazywait_syncs` | 0.89 s |
+| claim | 0.16 s |
+| three SERIAL reads (branches, order_items, profiles) | 0.69 s |
+| **CRM customer search** | **3.47 s** |
+| **`POST /pos/orders/create`** | **1.57 s** |
+
+**The POS was never the problem.** The one irreducible external call is 1.6 s;
+the other ~6.5 s was ours. Then `dispatchPendingPosSync` added another 3.4 s
+*after* the branch number was already known — inside the invocation the
+customer's checkout was still awaiting. That request took **10.747 s against an
+11 s abort**: 253 ms of headroom. On SM-2026-000064 the abort appears to have
+actually fired, and the order number arrived by luck.
+
+Four changes, and the reasoning matters more than the numbers:
+
+- **The kick names ONE order.** It used to send `{limit: 5}`, and
+  `claim_lazywait_sync_batch` orders by `created_at` **ascending** while the
+  worker processes serially — so the customer's brand-new order was handled
+  **last** of whatever the batch claimed. Their checkout blocked while other
+  people's orders were sent to the POS. `claim_lazywait_sync_one` already
+  existed, unused, with a byte-identical predicate apart from the id filter.
+  Draining the queue was never this function's job; the cron owns that.
+- **The push drain is deferred**, not removed. It cannot change the number the
+  customer is waiting on, yet it was a third of the awaited time. Delivery stays
+  at-most-once because `claim_pos_sync_notification` fences the claim, and a row
+  left `pending` by a teardown is taken by the next tick — delayed, never
+  dropped.
+- **The reaper is deferred, NOT skipped**, and that distinction is deliberate.
+  Skipping saves the same 0.9 s, but `reap_stale_lazywait_syncs` has exactly one
+  production caller, so the cron and this kick are also its only two reaping
+  drivers — and they do not share a failure mode (the cron returns early without
+  invoking anything if the vault secret `lazywait_sync_project_url` is missing;
+  the kick builds its URL from `SUPABASE_URL`). Deleting the redundant driver
+  would let one missing secret stop all reaping, and a **cash** order stranded in
+  `syncing` with no ref is invisible to the watchdog too, since R1 and R7 both
+  require `payment_status = 'paid'`.
+- **The CRM lookup is capped at 1.5 s on the kick path** and keeps its 8 s on the
+  cron path. It returned nothing on both measured orders, and it cannot do
+  otherwise yet: `profiles.lazywait_customer_id` has never been populated for
+  anybody. It also sits *before* `begin_lazywait_create_attempt`, so every
+  millisecond it burns is deadline budget spent before that gate re-checks
+  `pos_sync_deadline_at` — capping it is safety-positive, not merely faster.
+
+The three per-order reads now issue concurrently. `SYNC_TIMEOUT_MS` stays at
+11 s deliberately: it is a **ceiling**, not a target, and with the awaited work
+now bounded at roughly 4-5 s the point is that it should never be reached.
+
+**An unclaimed win worth stating:** an ONLINE order sits at `awaiting_payment`
+and cannot be sent at all, yet its checkout previously blocked for up to the full
+11 s while the worker reaped and drained up to five *other* customers' orders.
+Targeting ends that too.
+
+### The bottleneck moved to Lazywait, and the timeout moved with it
+
+Two more orders settled it. Once the CRM lookup came off the awaited path as
+well, **everything we do collapsed to about 1.2 s** — measured on
+SM-2026-000068: worker boot and configuration 1.08 s, the claim and all three
+catalog reads within 2 ms of each other, and **68 ms** between the reads and the
+pre-send gate, where a 3.47 s CRM search used to sit.
+
+What is left is Lazywait's own Create Order call, and it is erratic:
+
+| Order | Create Order call | Lines |
+| --- | --- | --- |
+| SM-2026-000065 | 1.57 s | 1 |
+| SM-2026-000066 | 1.62 s | 2 |
+| SM-2026-000067 | 2.40 s | 2 |
+| SM-2026-000068 | **8.02 s** | 1 |
+
+The slowest was the **smallest** order, so it is not payload size. On -000068
+that call was **82%** of the entire wait.
+
+`SYNC_TIMEOUT_MS` was therefore cut from **11 s to 5 s** on 2026-08-27. It covers
+our ~1.5 s plus a POS call of ~3.5 s — comfortably above the three normal
+observations — and bails fast on the pathological one instead of holding a
+customer on a spinner for eleven seconds and *still* failing to show a number.
+
+**Timing out is not a failure.** The abort only stops `order-intake` waiting; the
+worker keeps running and finishes the sync. That is observed, not assumed — on
+SM-2026-000064 the abort fired and the order got its branch number anyway. The
+customer sees the "number pending" state and the number arrives once the POS
+confirms, from a push that only ever says "confirmed" when the POS really has the
+order.
+
+So the intended trade is: on a slow POS the number arrives shortly after first
+paint instead of on it, and in exchange nobody waits 11 s for it.
+
+### The cut was reverted on 2026-08-28, because it shipped without its client half
+
+**This section originally called the cut safe. It was not — not as shipped.** The
+server change was deployed as `order-intake` v7 while both client changes that
+make it safe were still sitting in a branch, and one of them had not been written
+at all. The next real order paid for it.
+
+SM-2026-000070 was **completely healthy**: `synced`, ticket **#2**, in **7.30 s**,
+`sync_attempt_count 0`, `first_pos_sync_failure_at` NULL,
+`pos_confirmation_reason` NULL. The database never held `confirmation_required`
+for it. Its customer was nonetheless shown **"تعذر التحقق مما إذا كان الفرع قد
+استلم هذا الطلب"** — *we could not verify whether the branch received this order*
+— while simultaneously receiving a `pos_confirmed` push. Two contradictory
+answers about an order that worked perfectly.
+
+The mechanism is an ordering bug in `deriveCustomerOrderState` that the 11 s
+ceiling had been hiding. `pos_create_attempted_at` is written by
+`begin_lazywait_create_attempt` **immediately before the POST leaves**, so an
+in-flight order always carries the marker. The derivation tested that marker
+*before* it tested `syncing`, so any order checkout returned on mid-send rendered
+the ambiguous-failure copy. At 11 s a 7.30 s order had already reached `synced`
+before checkout returned, so the screen showed `#2` and nobody ever saw the
+branch. At 5 s it became the **default** for every order slower than five
+seconds.
+
+Two things follow, and both are now done:
+
+- **`deriveCustomerOrderState` tests `syncing` before the marker** (fixed
+  2026-08-28). `ref != null` deliberately stays ahead of it — a syncing row that
+  already holds a ref really is ambiguous — and a marker that *outlived* its send
+  (`pending`/`failed`/`dead_letter`) still reads as ambiguous. Only the actively
+  in-flight case moved. `sending_to_branch` and `verifying_with_branch` are both
+  `canResend: false` with `showBranchNumber: true`, so the never-resend guarantee
+  is untouched; the tone changes from `warning` to `info`.
+- **`SYNC_TIMEOUT_MS` is back at 11 s**, and stays there until a shipped app build
+  carries both that fix and `nextReceiptPollMs` below. The revert needs no build,
+  restores the behaviour SM-2026-000070 would have had, and is the only half of
+  this that reaches a customer today.
+
+The 5 s cut is still the right end state — the measurements above stand and
+Lazywait's call is the real bottleneck. It should be re-applied as its own change
+**after** a build ships the client half, not before. There is a tripwire on the
+constant in `supabase/functions/_shared/orderIntakeSyncWiring.test.ts`.
+
+### The SQL authority had the same bug, and nothing was comparing the two
+
+`public.customer_order_state` is the documented server authority; the TypeScript
+`deriveCustomerOrderState` is its mirror. PR #286 fixed only the mirror, which a
+review bot flagged. The SQL really did carry the same marker-before-`syncing`
+ordering — confirmed by reading the **deployed** function body rather than the
+repository file (`marker_evaluated_first = true`).
+
+**It reached no customer screen**, and it is worth being precise about why,
+because the reason is not the one that first suggests itself. Three barriers
+stand, not one: the customer read contract grants raw columns and never a state
+string; `ConfirmationHero` and `OrderCard` both derive locally from those
+columns; and `ReceiptScreen.tsx:180` **discards the RPC's response entirely** —
+*"the RPC's own outcome is advisory, the row is the truth"*.
+
+Producing the wrong value at all takes a race: `request_customer_pos_resend` has
+to be called while the row is `syncing` with the marker set, which in the normal
+flow means a Resend button rendered from a snapshot that has since gone stale.
+So the exposure was narrow. What makes it worth fixing anyway is that the
+outermost barrier is an accident `api.ts` documented the *opposite* of ("the UI
+renders from `state` alone"), so the next person to follow that written contract
+removes it. That comment is now corrected.
+
+**Resend safety was never at risk**, and that is structural rather than lucky:
+`request_customer_pos_resend` branches on `customer_manual_pos_resend_eligibility`,
+a separate predicate over raw columns, and calls `customer_order_state` only
+*after* the accept/refuse decision, to fill an advisory field. Reordering the
+state function cannot turn a refused resend into an accepted one.
+**`customer_manual_pos_resend_eligibility` must NOT receive the same reorder** —
+its marker-first ordering is correct there, since an in-flight order must never
+be resent when Create Order has no idempotency key.
+
+#### The deeper finding: parity was never enforced, and had already drifted
+
+The migration's own header claimed *"both sides are unit-tested against the same
+case table so they cannot drift"*. There was no shared case table — two
+hand-maintained lists in different CI jobs — and they had **already** drifted:
+for `failed` with a future `sync_next_attempt_at` the SQL said
+`sending_to_branch` (a leftover auto-retry arm) while the TypeScript said
+`branch_failed_retry_available`. Both suites green — for **15 days**, from
+`f7515e5` on 2026-08-13, which introduced the manual-resend-only migration and
+the TypeScript change in the *same commit* while leaving this SQL clause behind.
+The TypeScript was right: that policy removed automatic retries.
+
+Worse, the SQL half could not have caught it. `sql-suites.yml` deliberately has
+no workflow-level `paths:` filter — so the gate always reports and is safe to
+require — but its `changes` job computes `relevant` from a path regex covering
+`supabase/(migrations|tests)/`, `supabase/seed.sql` and `.github/sql-ci/`, and the
+`suites` job is gated `if: needs.changes.outputs.relevant == 'true'`. A
+**TypeScript-only diff — precisely the shape that causes this drift — therefore
+runs the workflow, reports green, and executes no SQL assertions at all.** Adding
+a case to the SQL suite would not have gone red on PR #286.
+
+So parity is now enforced from the side that always runs:
+`apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` resolves the
+latest migration defining the function, strips its comments, and pins the
+**complete ordered clause sequence** of both `customer_order_state` and
+`customer_manual_pos_resend_eligibility`, plus the readable order relations, the
+absence of any `p_next_attempt_at` arm, and the matching inputs against the real
+TypeScript implementation. It also ties the SQL `customer_pos_resend_limit()`
+literal to `CUSTOMER_RESEND_LIMIT`, which nothing previously connected.
+
+**Sampling was not enough, and that was proven rather than argued.** An earlier
+version pinned four representative clauses; three mutations walked straight
+through it — a clause inserted *above* all four preserves their relative order
+(reintroducing the SM-2026-000070 screen for any resent order), flipping the
+resend budget's `<` to `<=`, and swapping the eligibility predicate's
+`then 'not_failed'` to `then 'eligible'`, which would make an in-flight order
+resendable and duplicate a live kitchen ticket. Pinning the whole sequence closes
+all three: any insertion, deletion, reorder, predicate edit or result change is
+red and must be re-approved deliberately.
+
+The mutation matrix it is held to:
+
+| Mutation | Expected | Result |
+| --- | --- | --- |
+| Marker moved back ahead of in-flight | red | ✅ |
+| Auto-retry arm restored | red | ✅ |
+| Clause inserted above the sampled needles | red | ✅ |
+| Resend budget `<` → `<=` | red | ✅ |
+| Future migration reintroducing the bug, uppercase + wrapped | red | ✅ |
+| Eligibility marker arm commented out | red | ✅ |
+| Eligibility result swapped to `'eligible'` | red | ✅ |
+| SQL resend limit changed to 5 | red | ✅ |
+| Nested block comment hiding a clause | red | ✅ |
+| Pure reformat / wrapped clause | **green** | ✅ |
+
+The last row matters as much as the others: a tripwire that cries wolf on a
+formatter gets disabled.
+
+`20260828090000_customer_order_state_inflight.sql` carries both corrections and
+was **applied to Production on 2026-08-28 at 18:22:28 UTC** on explicit owner
+approval (live version `20260828182228`; ledger row 75 in `docs/MIGRATIONS.md`).
+SQL and TypeScript now agree.
+
+Verified behaviourally rather than by reading the body — the five cases were
+executed against the live function:
+
+| Input | Before | After | TypeScript |
+| --- | --- | --- | --- |
+| `syncing` + marker | `verifying_with_branch` | **`sending_to_branch`** | `sending_to_branch` |
+| `failed` + future `sync_next_attempt_at` | `sending_to_branch` | **`branch_failed_retry_available`** | `branch_failed_retry_available` |
+| `syncing` + ref | `verifying_with_branch` | `verifying_with_branch` | same |
+| marker outlived the send | `verifying_with_branch` | `verifying_with_branch` | same |
+| `synced` + usable ref | `confirmed_by_branch` | `confirmed_by_branch` | same |
+
+**The duplicate-ticket guard was confirmed intact**, which is the property worth
+checking rather than assuming: `customer_manual_pos_resend_eligibility` hashes
+unchanged and still returns `may_have_sent` for an in-flight order, and
+`request_customer_pos_resend` hashes unchanged. The money path
+(`place_order`, `compute_order_snapshot`) hashes identically before and after,
+and no order row was touched.
+
+One measurement error worth recording, because it is the kind that produces a
+false "verified": the first probe for the removed auto-retry arm searched the
+whole `pg_get_functiondef` for `p_next_attempt_at` and reported it **still
+present**. That string includes the parameter list, and the parameter is retained
+deliberately so `CREATE OR REPLACE` replaces the function rather than adding an
+overload. Scoped to the CASE body the arm is absent, and the overload count is 1.
+
+Note what the tripwire does and does not track: it resolves the latest migration
+in the *repository*, which is the definition the repository intends. That now
+matches Production, but the two are separate facts and only the first is what the
+test checks.
+
+**No staleness clock was added to the in-flight case.** A worker that dies
+mid-POST leaves `syncing` for up to ten minutes before the reaper routes it to
+`confirmation_required`, and during that window the screen says "sending" rather
+than "verifying". That is the right trade: the customer can act on neither state,
+the reaper owns the transition, and under-alarming on a rare crashed worker is
+far cheaper than alarming on every normal order.
+
+**That sentence originally said "a second or two later by push", and it was
+wrong** — caught in review before the cut shipped. The `pos_confirmed` push is
+**data-free** and `NotificationTapBridge` only navigates when the notification is
+**tapped**, so a customer sitting on the receipt was not being refreshed by it at
+all. They would have waited for the next `RECEIPT_POLL_MS` tick — **25 seconds**
+— to see a number the server had held for twenty of them. Cutting the timeout
+without noticing that would have made the 5-11 s band *worse* than before, which
+is the exact band the cut exists to serve.
+
+So the receipt now **polls every 2 s while the branch number is still missing**
+(`nextReceiptPollMs`), falling back to the 25 s interval once it arrives, and
+bounded to a 90 s window so a number that is never coming is not polled for
+indefinitely. It is a self-scheduling timeout rather than `setInterval`, because
+an interval cannot change its delay.
+
+Deliberately **independent of push delivery**: a poll still works when the
+customer denied notifications, when Expo is slow, and when the push is simply
+never displayed. Tying the number's arrival to a notification would make it
+depend on a channel that is allowed to fail.
+
+The variance itself is a question for the vendor rather than something to
+engineer around indefinitely — the evidence pack is
+[`Lazywait_Create_Order_Latency_20260827.md`](integrations/Lazywait_Create_Order_Latency_20260827.md).
+
+**Do NOT also shorten the Create Order `timeoutMs` in `lazywaitFetch`** (15 s).
+That one is the boundary between proven-not-sent and may-have-been-sent: a
+timeout there is classified `ambiguous` and routes to `confirmation_required`
+rather than a resend, because Create Order has no idempotency key. Shortening it
+would turn slow-but-successful tickets into orders a human must verify by hand.
+
+### The real bottleneck is the region gap, measured directly 2026-08-30
+
+The checkout wait is dominated by **cross-region round trips**, not by our SQL and
+not by cold start. Both of those were measured and ruled out:
+
+- **`place_customer_order` is 1.7 ms.** Profiled on a disposable database built
+  from the full migration chain — 0.39 ms pricing, 1.29 ms writes. It stays flat
+  at **51,173 orders / 154,108 order items** (1.29 ms), with 98 index scans and
+  **zero sequential scans**; `order_number` comes from a sequence and the
+  idempotency lookup is indexed. Production's 216 ms mean for the same call is
+  therefore transport, not logic.
+- **Cold start is not the *whole* cause — but it was real, and this bullet used
+  to overstate its own result.** After fifteen minutes idle, `order-intake`
+  answered in **828 ms**, which refuted an earlier confident inference blaming
+  Deno module loading for ~2.6 s. What that test could not tell anybody is
+  whether the isolate it hit was actually cold: `isolate_age_ms` did not exist
+  yet. Once it did, **SM-2026-000073 (2026-08-30) caught a genuinely cold
+  request** — `isolate_age_ms: 3` — and its front measured **2351 ms**
+  (`execution_time_ms 11024` against the handler's own `total_ms 8673`). Both
+  facts stand: the 828 ms observation was real, and so is the 2351 ms; the first
+  simply did not measure what it was taken to measure.
+
+  **This bullet used to end by concluding that boot "was therefore worth
+  removing".** It was not — see the `booted` table below, which measures 23 ms
+  with the npm dependency and 23 ms without. The conclusion is struck rather than
+  quietly deleted, because it stood in this document contradicting its own
+  retraction three sections later.
+
+What the evidence shows: the database is in **`eu-central-1`** (Frankfurt), while
+a customer in Saudi Arabia has the Edge Function executed in **`ap-south-1`**
+(Mumbai) or **`eu-central-2`** (Zurich).
+
+#### The control, measured per-request on 2026-08-30
+
+The gateway records `response.origin_time` on every REST call — how long the
+database itself took, excluding the client. During SM-2026-000074 the **same
+worker function on the same deployment** ran from two colos inside the same
+minute, one invoked by the order kick (Mumbai, routed to the customer) and one by
+the cron tick (Frankfurt, in-region). Identical queries:
+
+| Query | from **BOM** (Mumbai) | from **FRA** (Frankfurt) | ratio |
+| --- | ---: | ---: | ---: |
+| `GET integration_settings` | **934 ms** | **35 ms** | 27× |
+| `POST reap_stale_lazywait_syncs` | 525 ms | 30 ms | 18× |
+| `GET notification_log` | 179 ms | 26 ms | 7× |
+
+Three genuinely identical statements. A fourth near-pair — `claim_lazywait_sync_one`
+165 ms from Mumbai against `claim_lazywait_sync_batch` 26 ms from Frankfurt — is
+excluded from the table on purpose: they are different functions, and a table
+whose point is "same statement" should not contain one that is not.
+
+**This supersedes the p50 comparison that stood here** (556 ms across 442
+in-region cron invocations against 5934 ms for a single `ap-south-1` order kick).
+That compared whole invocations doing different amounts of work, with n = 1 on
+one side. This compares the same statement, from the same function, in the same
+minute, timed by the gateway.
+
+#### The spread WITHIN Mumbai is unexplained — and one tempting reading of it is
+#### a hypothesis, not a finding
+
+The Mumbai calls are not uniform. From `order-intake` (all three carrying
+`X-Client-Info: sma-edge-rest/1`) and from `lazywait-sync` on the same order:
+
+| Call | origin_time |
+| --- | ---: |
+| `POST rpc/place_customer_order` (order-intake, concurrent with the next) | **1265 ms** |
+| `GET integration_settings` (order-intake, concurrent with the above) | **919 ms** |
+| `GET integration_settings` (worker, its first call) | 934 ms |
+| `POST reap_stale_lazywait_syncs` | 525 ms |
+| `GET branches` / `GET profiles` (issued concurrently) | 519 / 522 ms |
+| `PATCH orders` | 535 ms |
+| `POST claim_lazywait_sync_one` | 165 ms |
+| `GET order_items` (concurrent with branches/profiles) | 168 ms |
+| `POST begin_lazywait_create_attempt` | 184 ms |
+| `POST record_lazywait_sync` | 196 ms |
+| `GET notification_log` | 179 ms |
+| `GET orders` (order-intake, its last call) | 195 ms |
+
+**A first draft of this section read that as connection setup** — "each cold
+isolate pays 0.7-1.3 s once, then ~170-200 ms per call" — and review was right to
+reject it. The data does not support it:
+
+- the calls differ in what they *do*. `place_customer_order` writes an order in a
+  transaction; `notification_log` is a small select. Comparing them measures the
+  queries, not the connection;
+- the sequence is **not** monotonic. `claim_lazywait_sync_one` (165 ms) ran early
+  and was cheap; `PATCH orders` (535 ms) ran late and was expensive. "First call
+  expensive, rest cheap" is contradicted by the order's own log;
+- several of the elevated calls are **concurrent** — `place`/`config` by design,
+  and `branches`/`profiles`/`order_items` in one `Promise.all` — so contention or
+  pool behaviour is at least as good an explanation.
+
+**What is established** is the cross-colo difference in the table above, on
+identical statements. **What is not** is how the Mumbai spread divides between
+connection establishment, query cost, concurrency and pool state.
+
+**That test has now been run**, by a throwaway Edge Function since deleted. Its
+method, for anyone repeating it: issue **one byte-identical statement eight times
+strictly sequentially** from a fresh isolate, reporting `isolate_age_ms`, and read
+both the client-side elapsed time and the gateway's `origin_time`. Repeating the
+identical statement is the whole trick — it makes query cost a constant, so it
+cannot explain any difference between call 1 and call N — and sequential
+execution removes the concurrency confound.
+
+Eight runs, **64 measurements of the same statement**, from `IAD` (us-east-1)
+against the database in `eu-central-1`. Client-side timings tracked `origin_time`
+within ~10 ms, so essentially all of the cost is at or behind the gateway rather
+than in the function's own networking.
+
+**The result is bimodal, and sharply so:**
+
+| Mode | n | min | median | max |
+| --- | ---: | ---: | ---: | ---: |
+| fast | 30 | 105 ms | **120 ms** | 143 ms |
+| slow | 34 | 212 ms | **305 ms** | 509 ms |
+
+Exactly **one** of 64 values (212 ms) falls between the two modes. This is not a
+spread around a mean; it is two states, roughly 2.5× apart.
+
+**The connection-setup reading is refuted, three ways:**
+
+- **it is not the first call.** Per-call means across the eight runs read 299,
+  213, 212, 195, 262, 236, 186, 186 — no trend, and call 5 is slower than call 4.
+  Two of eight runs had a *fast* first call (137 ms, 132 ms);
+- **it flips WITHIN one isolate, in both directions.** Run 4 went slow-fast-fast-fast-slow-fast-fast-fast
+  (three transitions), run 6 three, run 8 two. A once-per-isolate cost cannot do
+  that;
+- **it is not the table.** The trailing read of a *different* table shows the same
+  two modes (105-121 ms against 290-331 ms).
+
+So the per-call cost is selected per request by something behind the gateway that
+this codebase does not control. The fast mode, ~120 ms, is close to the IAD↔FRA
+network round trip; the slow mode at ~2.5× is *consistent with* extra round trips
+for connection establishment — but that reading is an interpretation, and the
+measurement stops at "bimodal, and not explained by query, position, isolate or
+table".
+
+**What this means for optimisation work**, which is the reason to care:
+
+- **fewer queries helps**, because there is a real per-call cost that is not
+  query work. How much is **not established by this experiment** — see the
+  warning below;
+- **fewer isolates does not.** There is no measured per-isolate cost to amortise.
+  An earlier draft of this section argued the opposite and was wrong;
+- **being closer to the database helps most**, because the *fast* mode is itself a
+  network round trip. In-region calls in the table above are 26-35 ms against
+  120-305 ms from a distant colo, on identical statements.
+
+> **Do not carry these constants onto the order path.** 120-305 ms is the cost of
+> a *trivial `select id ... limit 1`* measured from **`IAD`**. A Saudi customer is
+> served from `BOM` or `eu-central-2`, and the order path is not trivial selects —
+> it is RPCs and writes (`place_customer_order` opens a transaction) whose
+> database work differs. Using this range to price the pending
+> `claim_lazywait_sync_one` + catalog-reads merge would present an unmeasured
+> result as established, and could misprioritise it against the region move.
+>
+> A draft of this section did exactly that, quoting a saving of "~360-900 ms".
+> Review caught it. **The saving from removing an order-path query is not
+> quantified**; measuring it means running the same repeated-identical-statement
+> method against the actual statements, from the colo that actually serves
+> customers.
+
+What generalises from the experiment is the **structure** — bimodal,
+position-independent, not per-isolate — not the numbers.
+
+For scale, the customer's own phone (Riyadh colo, `supabase-js/…; runtime=react-native`)
+read `branches` in 109 ms and `orders` in 108 ms in the same window — **the
+handset reaches Frankfurt faster than our Edge Function in Mumbai does on most of
+its calls.** Whether that is the handset's open connection or something else is
+the same open question.
+
+So every PostgREST call on the order path is intercontinental, and the path makes
+roughly nine of them. That much is measured.
+
+#### What was removed, and what deliberately was not
+
+`order-intake` now starts the provider-config read **before** `place_customer_order`
+instead of after it. The read uses the service-role identity and does not depend
+on the order, so the old ordering cost a full extra cross-region round trip for
+no reason. `serviceTarget()` — `adminClient()` before the dependency removal
+below — stays inside a `try`: it throws when the service-role env is missing, and
+hoisting it bare would turn a misconfigured environment into a failed checkout —
+the opposite of the rule that a POS problem can never fail the order.
+
+Three things on that path look redundant and are **not**:
+
+- **the worker's own `getProviderConfig`** is its authentication gate. The
+  function runs with `verify_jwt = false`, so the `x-sync-secret` comparison is
+  the only thing standing in front of it, and it cannot trust a secret supplied
+  by the caller. It also cannot run concurrently with the claim, because that
+  would let an unauthenticated caller flip orders to `syncing` before being
+  rejected;
+- **the `orders.update` that persists the ref before `record_lazywait_sync`** is
+  crash safety. If the isolate dies between the POST and the record, the ref is
+  already stored and the reaper recovers the row to `synced` instead of
+  re-POSTing. Create Order has no idempotency key, so collapsing these two writes
+  would risk a duplicate kitchen ticket;
+- **the reaper and the CRM lookup** are already off the awaited path in targeted
+  mode (deferred, not skipped — the kick is one of only two reaping drivers).
+
+The remaining lever inside our control is a migration that merges
+`claim_lazywait_sync_one` with the three catalog reads into one round trip. That
+is a schema change and a separate owner decision, not done here.
+
+**The instrumentation is the point of this change as much as the saved hop.**
+`order-intake` now logs one line of timings per request — numbers only, no order
+contents and no customer data, with a test pinning that. Apportioning this
+latency from outside produced a confident wrong answer once already; the next
+order will give exact per-hop figures instead.
+
+#### First measured order, and what it corrected
+
+SM-2026-000072 (2026-08-28 20:26 UTC) was the first order through the
+instrumentation: POS ticket **#4**, first attempt, `confirmed_by_branch`, push
+correct, 5.69 s from order row to synced. Its timing line read
+
+    config_ms 1016 · place_ms 1341 · sync_span_ms 5249 · reread_span_ms 539 · total_ms 7129
+
+and immediately exposed a defect in the instrumentation itself. The platform
+reported **execution_time_ms 9191** for the same invocation — **2062 ms that the
+log could not see**, because `t0` was set *after* `await req.json()`. Everything
+in front of it (gateway JWT verification, isolate boot, and the phone uploading
+the request body) was invisible, and it was the largest unexplained block in
+checkout.
+
+`t0` is now the **first line** of the handler, with `entry_ms`, `parse_ms` and
+`body_read_ms` decomposing what the handler can see. A positional test asserts
+`t0` precedes both the Authorization check and `req.json()`.
+
+**It still does not measure the whole invocation, and an earlier revision of this
+section wrongly said it would.** Review raised that as a P1 and it was correct:
+the module's three imports — one of them `npm:@supabase/supabase-js` — are
+evaluated at isolate boot *before* `Deno.serve` registers the callback, and
+gateway JWT verification happens before that again. So
+
+> `execution_time_ms − total_ms` is positive **by construction**, and that
+> residual **is** the front.
+
+It is quantified by subtraction from the logs — a method, not a target. Expecting
+the two numbers to converge would be expecting the wrong thing.
+
+Two consequences worth stating precisely:
+
+- **`body_read_ms` is a lower bound**, not the device's upload. The runtime may
+  buffer part of the body before the callback runs, and anything buffered that
+  early is invisible. It was briefly named `upload_span_ms`, which asserted more
+  than it can measure.
+- **`isolate_age_ms`** (`t0 − MODULE_LOADED_AT`, stamped at module scope) is the
+  one piece of the front observable from inside: near zero means this request
+  paid module evaluation, a large value means it landed on a warm isolate. A test
+  pins that stamp outside the handler, because inside it would equal `t0` and
+  report a constant zero while still looking like a measurement.
+
+**The 2062 ms on SM-2026-000072 is no longer open. SM-2026-000073 answered it,
+and the answer was not the one this section leaned towards.**
+
+    isolate_age_ms 3 · entry_ms 0 · parse_ms 1 · config_ms 961 · place_ms 1393
+    sync_span_ms 6589 · reread_span_ms 690 · body_read_ms 1 · total_ms 8673
+
+against the platform's `execution_time_ms 11024`. Two readings settle it:
+
+- **`body_read_ms: 1` refutes the body-upload hypothesis.** The body was already
+  buffered before the callback fired, so the device's uplink is not in this
+  number at all. It was recorded above as a hypothesis rather than a finding,
+  which is the only reason retiring it costs nothing.
+- **`isolate_age_ms: 3` confirms a cold boot.** The isolate was three
+  milliseconds old, so this request paid module resolution and evaluation. The
+  residual **2351 ms** is gateway JWT verification + isolate spawn + module
+  evaluation, plus the short tail after the `total_ms` stamp (serialising the
+  response and returning it) — everything the handler's own clock cannot reach,
+  on both sides.
+
+  **How that 2351 ms divides is not measured.** `npm:@supabase/supabase-js` sat
+  inside the module-evaluation term and was the only module worth removing from
+  it, which is why it was removed; its own share has never been separated, and
+  n = 1. Saying it "was the bulk" would be an inference wearing a measurement's
+  clothes — the error class this section has already had to retract twice.
+
+The order itself was healthy throughout: POS ticket **#1**, first attempt, zero
+failed attempts, `confirmed_by_branch`, 6.64 s from order row to synced.
+
+#### The parallelisation is NOT yet shown to help
+
+Recorded because the opposite was briefly claimed. Within the instrumented window
+the overlap did happen — `config_ms` 1016 and `place_ms` 1341 share a `t0`, so
+sequentially those two would have cost ~2357 ms. But the **totals** are
+
+| Order | Version | execution_time_ms | Edge region |
+| --- | --- | --- | --- |
+| SM-2026-000066 | v5 | 9897 | — |
+| SM-2026-000068 | v6 | 11401 | eu-central-2 |
+| SM-2026-000069 | v7 | 10645 | ap-south-1 |
+| SM-2026-000070 | v7 | 7926 | ap-south-1 |
+| SM-2026-000071 | **v8** (sequential) | 9802 | ap-south-1 |
+| SM-2026-000072 | **v9** (parallel) | 9191 | ap-south-1 |
+
+611 ms apart, of which Lazywait's own call accounts for 258 ms, leaving roughly
+**350 ms** attributable — well inside a spread that runs 7926-11401 ms, with
+**n = 1 on each side**. Region is not the confound here (both ap-south-1), and
+time-to-order-creation is unchanged (2837 ms versus 2680 ms), which is expected
+since the config read previously ran *after* `place_customer_order` and never
+delayed order creation. **No improvement is established.**
+
+#### The npm dependency came off the boot path (2026-08-30)
+
+`order-intake` no longer imports `npm:@supabase/supabase-js@2`. It talks to
+PostgREST through [`_shared/rest.ts`](../supabase/functions/_shared/rest.ts) —
+plain `fetch` over Web-standard APIs — for the three calls it actually made: the
+provider-config read, `place_customer_order`, and the order re-read.
+
+**The reason it was done is FALSE, and this section records that rather than
+rewriting it.** The argument was: imports are evaluated at isolate boot, before
+`Deno.serve` registers the callback, so no mark inside the handler can see them
+— which made module evaluation the natural suspect for the 2351 ms front and
+made the suspicion unfalsifiable from where anyone was looking.
+
+The runtime emits its own `booted` event, and nobody had queried it. Measured
+2026-08-30, after the deploy:
+
+| Time (UTC) | Version | supabase-js | `booted` |
+| --- | --- | --- | --- |
+| 05:19:04 | v10 | yes | 26 ms |
+| 05:33:48 | v10 — **SM-2026-000073 itself** | yes | **23 ms** |
+| 06:52:50 | v11 — first boot of a brand-new deploy | **no** | **23 ms** |
+
+Identical. Supabase bundles an Edge Function into an **eszip at deploy time**
+(the `ezbr_sha256` on every deployment), so npm resolution happens then, not at
+boot; at runtime the graph is already inside the bundle and loading it costs
+~23 ms either way. **Module evaluation was never two seconds. The 2351 ms front
+is unexplained again.**
+
+Corroborating: a bare `OPTIONS` request to the fresh v11 deployment — the one
+that carried its first boot — measured `execution_time_ms` **175 ms**, and 47 ms
+on the next. A cold invocation of this function through the gateway costs
+somewhere near a tenth of what the front on SM-2026-000073 was.
+
+**What the change is still worth.** The hottest customer path no longer carries a
+dependency it does not need, and the replacement has executable tests the old
+path never had. Both are real. Neither is a latency improvement, and no claim
+that this shrinks boot should be reintroduced.
+
+**The rewrite changes the dependency and nothing else, deliberately.** Every
+behaviour was read out of package source — `postgrest-js` and `supabase-js`
+2.112.4, from the Deno cache — and replicated. Stated that way rather than as
+"the packages the function was running", because `npm:@supabase/supabase-js@2` is
+a floating specifier resolved at build time and this repository records nowhere
+which 2.x the deployed bundle contained:
+
+| Behaviour | Why it had to be replicated |
+| --- | --- |
+| `select` whitespace stripping | **Fidelity, not a 400** — and the first draft of this row said otherwise. PostgREST tolerates `select=id, status`: its parser has the space character inside the identifier charset and trims each identifier, confirmed read-only against this project's live PostgREST. Stripping is kept because it is what went on the wire before, and because an *internal* space is preserved as part of an identifier, so the tolerance only covers spaces adjacent to a delimiter. Recorded rather than quietly fixed, because a reviewer who checked the false claim could reasonably have deleted the stripping — which would then fail silently on a differently-shaped select rather than loudly on this one. |
+| `maybeSingle()` collapse | It is a **client-side rule**, not an `Accept` header. Zero rows → `null`, one row → the object, more than one → PGRST116/406. Sending `vnd.pgrst.object+json` instead would turn "no such row" into an error. |
+| transport failure → `error`, not a throw | `postgrest-js` swallows the rejection and returns `{ error, status: 0 }`. Checkout answers 400 with a message; rejecting instead would surface as an unhandled 500. |
+| GET retry (3×, 1 s/2 s/4 s, on a network error or 503/520) | On by default in `postgrest-js`. Dropping it would be a second change riding along, and would turn a transient 503 on the re-read into `order: null` at HTTP 200 — which `placeAndSync` throws on (`'Order was not created.'`), telling a customer their order failed when it exists. POST is **not** retried: `place_customer_order` creates an order. |
+
+One header differs on purpose: `X-Client-Info` now reads `sma-edge-rest/1`, which
+identifies these requests in the platform logs and is how the change can be
+confirmed on a live request rather than assumed.
+
+**The identity split is the security property to protect.** `place_customer_order`
+and the order re-read run as `callerTarget(auth)` — the customer's own JWT,
+forwarded verbatim, so `auth.uid()` and RLS apply exactly as before.
+`serviceTarget()` bypasses RLS and is constructed **once**, inside the existing
+`try`, for the integration secret only. Passing it to either customer-facing call
+would change no response shape and no test output, so
+`orderIntakeSyncWiring.test.ts` pins the identity of each call site.
+
+**Guards.** `rest.ts` is Web-standard-only and therefore *executable* under
+Vitest, so `rest.test.ts` tests real behaviour — URLs, headers, the collapse
+rule, error mapping, retry — rather than source shape, which is what every other
+guard around this function is limited to. `restNoSupabaseJs.test.ts` walks the
+import graph from `order-intake/index.ts` and fails if any file in it references
+the package in code, type-only imports included; that graph is also the deploy
+bundle, and the test pins it at three files
+(`order-intake/index.ts`, `_shared/cors.ts`, `_shared/rest.ts` — down from four).
+
+**A version caveat worth stating.** `npm:@supabase/supabase-js@2` is a *floating*
+specifier resolved at build time, so which 2.x the deployed function bundled is
+not something this repository records. The behaviours above were read from
+2.112.4 source; 2.110.0 is what `node_modules` holds, and the two issue identical
+requests apart from the version string in `X-Client-Info`. One behaviour did
+change inside v2 — `maybeSingle()` moved from a server-enforced `Accept` header
+to the client-side collapse at **2.100.1** — and it is the collapse that is
+replicated.
+
+**Two things that transport swap deliberately did NOT fix**, both pre-existing
+and both verified against the base branch rather than assumed. Folding either into
+a transport swap would have been the "second change riding along" that §15 of
+`CLAUDE.md` exists to prevent. **The first has since been fixed on its own — see
+below. The second is still open.**
+
+- ~~the order re-read **discards its error**, so a failed re-read returns
+  `{"order": null}` at HTTP 200 and `placeAndSync` throws *"Order was not
+  created."* on an order that exists~~ — **fixed 2026-08-30, see "A failed
+  re-read is a reporting failure" below;**
+- `ORDER_SELECT` is **six columns behind** `apps/mobile/src/lib/orderSelect.ts`
+  (`is_comped`, `comp_discount_amount`, `notes`, the item-level `note`,
+  `variant_name_en`, `variant_name_ar`). Harmless today because the caller keeps
+  only `.id` and the receipt re-reads with the full mobile select, and nothing
+  pins the two lists together. **Still open.**
+
+### A failed re-read is a reporting failure, not an order failure
+
+After `place_customer_order` commits, `order-intake` re-reads the row so the
+response can carry the POS number the sync may just have written. That read's
+error was discarded and the row returned as-is, so **a failed re-read answered
+HTTP 200 with `{"order": null}`** — and `placeAndSync`
+(`apps/mobile/src/services/api.ts`) throws *"Order was not created."* on exactly
+that, which the app renders as **"Something went wrong."**
+
+The order was in the database the whole time. The customer was told it had failed
+and could reasonably place it again. It was survivable only because `cart.clear()`
+runs *after* the await, so the cart and its idempotency key both persist and a
+retry returns the same order — and only until the customer edits the cart, which
+rotates the key and buys a duplicate.
+
+**The fix returns `place_customer_order`'s own projection when the re-read yields
+no usable row.** The order's existence is not in doubt at that point: `orderId`
+came from the RPC's return and the handler already answered 400 if it was absent.
+Falling back costs the `order_items` embed and the POS fields the sync may just
+have written — the 24 scalar keys are identical, in the same order — so the
+receipt shows the branch number as pending and polls for it, which is the designed
+behaviour for an order that has not synced yet.
+
+This is the house pattern for a post-write read-back: `payment-webhook`,
+`_shared/tapVerify.ts` and `_shared/moyasarVerify.ts` all degrade to the write's
+own return rather than reporting a failure.
+
+#### Why it is a shape test and not `?? `
+
+All three of those precedents use `??`, and here that would have been **worse than
+the bug**. `restSelectMaybeSingle` signals failure six ways and `error` is null in
+three of them:
+
+| case | `error` | `status` | `data` |
+| --- | --- | --- | --- |
+| transport failure / abort | set | `0` | `null` |
+| PostgREST 4xx/5xx | set | 4xx/5xx | `null` |
+| multiple rows (PGRST116) | set | `406` | `null` |
+| zero rows | **null** | `200` | `null` |
+| 404 + empty body | **null** | `204` | `null` |
+| **404 + array body** | **null** | `200` | **`[]`** |
+
+The last is reachable *through the `order_items(...)` embed this very select
+uses*, and `[]` is **truthy**. `fresh ?? order` would keep it, the client's
+`!res.order` guard would pass it through, and `order.id` would be `undefined` —
+sending the customer to `/receipt/undefined`.
+
+So the predicate is `isRow(...)` in `_shared/rest.ts`: a non-null object that is
+not an array. It is exported precisely so it is **executable** under Vitest —
+`rest.test.ts` drives all six shapes through the real transport and asserts the
+verdict, rather than asserting that the call is spelled correctly.
+
+The timing log gains one boolean, `reread_ok`, so a silent fallback is visible in
+production rather than only in a customer's confusion. It is computed into a local
+first: putting `isRow(fresh)` inline would have brought the row itself into the
+payload's scope, and the log's identifier allowlist exists to make that
+impossible.
+
+**No client change, deliberately.** `api.ts`'s `!res.order` guard stays as
+defence, and leaving the app untouched means this reaches customers on the
+**already-installed build**.
+
+**What the transport swap does not do** — this block and the deploy record below
+it belong to the dependency removal above, not to the re-read fix. It does not
+remove measurable BOOT cost: see the `booted` table above, which is the third
+performance claim this document has had to retract.
+
+**The full front is a different question, and it has since been measured.** Three
+cold orders, one per version, all executed from BOM:
+
+| Order | Version | supabase-js | `execution_time_ms` | `total_ms` | residual | `booted` |
+| --- | --- | --- | --- | --- | --- | --- |
+| SM-2026-000073 | v10 | yes | 11024 | 8673 | **2351 ms** | 23 ms |
+| SM-2026-000074 | v11 | **no** | 8704 | 7574 | **1130 ms** | 18 ms |
+| SM-2026-000075 | v12 | **no** | 7973 | 6850 | **1123 ms** | 18 ms |
+
+**Why the three are comparable — and what did *not* hold still.** All three ran
+from the same edge region, and the residual is `execution_time_ms − total_ms`, so
+every mark the handler's own clock covers is arithmetically *outside* it. That is
+the whole control, and it needs to be, because several handler marks moved a great
+deal:
+
+| mark | v10 | v11 | v12 | spread |
+| --- | --- | --- | --- | --- |
+| `config_ms` | 961 | 947 | 982 | 3.7% |
+| `place_ms` | 1393 | 1291 | 1305 | 7.9% |
+| `sync_span_ms` | 6589 | 6073 | 5335 | 23.5% |
+| `reread_span_ms` | 690 | 210 | 210 | 228.6% |
+| `total_ms` | 8673 | 7574 | 6850 | 26.6% |
+
+So **"only the residual moved" would be false.** `sync_span_ms` is Lazywait's own
+Create Order, and `reread_span_ms` fell by two thirds — tracking its gateway
+`origin_time` of 676 / 195 / 190 ms, so that drop is database-side, not transport.
+None of it can reach the residual, which is exactly why the comparison survives
+it. On the gateway side `place_customer_order` origin_time was 1361 / 1265 /
+1273 ms: the database path was comparable, **not** constant. What holds without
+qualification is that the two dependency-free residuals agree to within **7 ms**.
+
+**Read it as a correlation, not a controlled result.** n = 1 with the dependency
+against n = 2 without, which is the same evidence shape as the retracted v8→v9
+parallelisation claim recorded above, set against an observed whole-invocation
+spread of 7926-11401 ms.
+
+**And it is still not boot.** `booted` reads 18-23 ms on all three, so whatever
+costs ~1.2 s is invisible to the runtime's own boot metric. A larger eszip taking
+longer to fetch and unpack *before* that timer starts would fit, and is **not
+established**. Two mechanisms have already been asserted in this document and
+withdrawn — module evaluation, then per-isolate connection setup. Measure before
+naming a third.
+
+This block used to say the front "has NOT been re-measured on version 11, because
+that needs a real authenticated order and none has run since the deploy". That was
+false on the branch it merged on: SM-2026-000074 is recorded three paragraphs
+below, with its front at 1130 ms. A document contradicting itself across two
+screens is precisely what §14 exists to prevent.
+
+It does not touch round trips either; the region gap is untouched and remains the
+larger term.
+
+**Deployed 2026-08-30 as version 11** on explicit owner approval, after PR #291
+merged as `23e911b`. Bundle: three files (`order-intake/index.ts`,
+`_shared/cors.ts`, `_shared/rest.ts`), down from four, `verify_jwt` unchanged at
+`true`, `ezbr_sha256` `e7b34beb…` → `c200588e…`. Zero orders were in flight.
+Verified after: the three deployed files read back matching the merged branch,
+`supabaseClient.ts` and `secrets.ts` absent from the bundle, an `OPTIONS`
+preflight returning the handler's own CORS values (proof the graph loads), an
+unauthenticated `GET` refused 401 by the gateway, and no other Edge Function's
+version or `ezbr_sha256` changed — the payment functions included.
+
+#### Confirmed on the first v11 order — SM-2026-000074, 2026-08-30 07:53 UTC
+
+Healthy: delivery, cash, POS ticket **#2**, first attempt, zero failed attempts,
+`confirmed_by_branch`, **5.84 s** from order row to synced with Lazywait's own
+Create Order taking 3.38 s of it.
+
+**The transport is doing the work.** Three gateway records carry
+`X-Client-Info: sma-edge-rest/1`, and they are exactly the three calls this
+function makes — `rpc/place_customer_order`, `integration_settings`, `orders` —
+all 200. That was the outstanding confirmation.
+
+    isolate_age_ms 4 · entry_ms 0 · parse_ms 0 · config_ms 947 · place_ms 1291
+    sync_span_ms 6073 · reread_span_ms 210 · body_read_ms 0 · total_ms 7574
+
+`booted` 18 ms, `execution_time_ms` 8704, so the front was **1130 ms** against
+2351 ms on the v10 order, both cold (`isolate_age_ms` 4 and 3).
+
+**That is not an improvement claim, and must not be turned into one.** It is
+n = 1 on each side — the exact evidence shape behind the retracted v8→v9
+parallelisation claim recorded above — against an observed whole-invocation
+spread of 7926-11401 ms. Establishing an effect needs several cold v11 orders
+compared on `execution_time_ms − total_ms`, reported with n and spread.
+
+What the same order *does* settle is where the money goes, and it is not the
+front: **~1.1 s front, ~2.2 s cross-region database, 3.4 s Lazywait, ~0.4 s
+everything else.** The dependency removal was never positioned to touch the two
+largest terms.
+
+**None of this closes the region gap itself.** Frankfurt serving Dammam is the
+root cause, and moving regions is a project-level decision rather than a code
+change.
+
+#### Version 12, and the first order through the re-read fix — SM-2026-000075
+
+**Deployed 2026-08-30 as version 12** on explicit owner approval, after PR #295
+merged as `bd4c196`. That is the re-read fix above; the redeploy also carried the
+comment corrections that had been accumulating undeployed. The bundle is unchanged
+in shape — the same three files, `verify_jwt` still `true`, `import_map` `false`,
+`ezbr_sha256` `c200588e…` → `6e497cea…`. Zero orders were in flight.
+
+Verified after the deploy: the three files read back matching the merged branch,
+`SYNC_TIMEOUT_MS = 11_000` and the RPC argument mapping untouched,
+`supabaseClient.ts` and `secrets.ts` absent, `booted` 18-32 ms with no module
+error, and no other Edge Function's version or `ezbr_sha256` changed. Two of those
+checks are worth stating in full because the obvious version of each proves
+nothing:
+
+- **The `OPTIONS` probe is the one that shows the module graph loads.** It returns
+  the handler's own literal `ok` and its three `Access-Control-*` values, and
+  reaching that line requires `_shared/rest.ts` to have been evaluated. An
+  unauthenticated `GET` or `POST` does *not* test the code: under
+  `verify_jwt: true` the gateway refuses it with `UNAUTHORIZED_NO_AUTH_HEADER`
+  before the function is invoked at all, which is not this handler's 401.
+- **`isRow` read back positioned *before* `RestResult`.** That ordering was
+  `bd4c196`'s, and when the deploy was verified the follow-up moving it below the
+  interface was still unmerged — so the check confirmed the deployed copy and the
+  default branch agreed, rather than merely that some recent revision had shipped.
+
+  **That is no longer the state, and the check cannot be repeated as written.**
+  The move has since merged, so the branch has `isRow` *after* `RestResult` while
+  deployed v12 still has it before. Together with the comment corrections above,
+  the deployed bundle now differs from the default branch by **a moved
+  declaration and a body of comments — and by nothing else**. Neither can change
+  behaviour: `RestResult` is a type and erases at compile time, and `isRow` is a
+  function declaration, so hoisting makes its position irrelevant to any caller.
+  **No redeploy is owed for either**; the next deploy with a reason of its own
+  carries both. The equivalent check on a future deploy has to be a full readback
+  against the merged branch, not this one-line ordering tell.
+
+**SM-2026-000075 — the fallback shipped without disturbing the happy path.**
+
+    isolate_age_ms 4 · entry_ms 0 · parse_ms 1 · config_ms 982 · place_ms 1305
+    sync_span_ms 5335 · reread_span_ms 210 · body_read_ms 1 · reread_ok true
+    total_ms 6850
+
+`reread_ok: true` — the new key is live and the fallback did **not** fire, which
+is what a healthy order has to show, since this change only alters the failure
+path. The order: delivery, cash, POS ticket **#3**, first attempt, zero failed
+attempts, **5.46 s** from order row to synced, no `sync_blocked_reason`, no
+`sync_last_error`. Its three gateway records again carry
+`X-Client-Info: sma-edge-rest/1`.
+
+Its residual of **1123 ms** is the second dependency-free row in the front table
+above.
+
 ### The push must follow the send, not precede it
 
 The "order received" push fires **after** the sync block, and that ordering is
@@ -157,8 +1074,10 @@ attempt. For delivery the block was skipped entirely, so the customer was told
 about the branch made before the branch had heard of the order.
 
 `orderIntakeSyncWiring.test.ts` now pins the ordering positionally in the source,
-because no runtime test can: the handler imports Deno-only modules, so Vitest
-cannot execute it and `deno check` only typechecks.
+because no runtime test can: the handler itself uses `Deno.serve`, so Vitest
+cannot execute it and `deno check` only typechecks. Its PostgREST transport
+(`_shared/rest.ts`) *is* executable and is tested as such — the limit is the
+handler, not everything it touches.
 
 ### The POS outcome owns the customer's first message
 

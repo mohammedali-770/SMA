@@ -18,8 +18,6 @@ import {
 import { INITIAL_BRAND_SETTINGS, INITIAL_LOYALTY_SETTINGS } from '../data/initialData';
 import { PaymentMethodSettings } from './payment';
 
-const FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&h=400&q=80';
 
 // ---------------------------------------------------------------------------
 // Catalog
@@ -96,9 +94,13 @@ export function mapProduct(
     descriptionEn: p.description_en ?? '',
     descriptionAr: p.description_ar ?? '',
     price: Number(p.price),
-    imageUrl: p.image_url ?? FALLBACK_IMAGE,
+    // Empty, NOT a stock photo. The dashboard must show the administrator
+    // which products genuinely have no image — substituting one here would
+    // make the menu look complete and make an upload look like a no-op.
+    imageUrl: p.image_url ?? '',
     calories: p.calories ?? 0,
     isActive: p.is_active,
+    sortOrder: p.sort_order ?? 0,
     modifierGroupIds: links.filter(l => l.product_id === p.id).map(l => l.group_id),
     variants: variants
       .filter(v => v.product_id === p.id)

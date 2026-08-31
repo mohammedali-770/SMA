@@ -105,6 +105,12 @@ export interface Product {
   imageUrl: string;
   calories: number;
   isActive: boolean;
+  /**
+   * Display rank WITHIN its category, set by an administrator. Compared only
+   * against other products in the same category — `reorder_products` is
+   * category-scoped, so the value is meaningless across categories.
+   */
+  sortOrder: number;
   modifierGroupIds: string[];
   /** Orderable price tiers, cheapest-relevant order. Empty = a single price. */
   variants: ProductVariant[];

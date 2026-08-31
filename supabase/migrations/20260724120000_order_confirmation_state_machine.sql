@@ -198,8 +198,23 @@ grant execute on function public.pos_confirmation_channel_active(text, text) to 
 -- ---- 4. customer_order_state(): THE authority ------------------------------
 -- Maps authoritative columns to exactly ONE customer-visible state. Pure (no
 -- table access), STABLE (reads now() for the retry window). The mobile app mirrors
--- this function in apps/mobile/src/features/orders/orderConfirmation.ts; both
--- sides are unit-tested against the same case table so they cannot drift.
+-- this function in apps/mobile/src/features/orders/orderConfirmation.ts.
+--
+-- SUPERSEDED 2026-08-28 by 20260828090000_customer_order_state_inflight.sql,
+-- which moves the in-flight test ahead of the phase marker and drops the stale
+-- auto-retry arm. Read that file for the current body; this one is history.
+--
+-- The sentence that stood here — "both sides are unit-tested against the same
+-- case table so they cannot drift" — was FALSE and cost a customer the wrong
+-- screen. There was no shared case table: two hand-maintained lists in
+-- different CI jobs, which had already drifted twice without either going red.
+-- Parity is now enforced by
+-- apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts, which runs
+-- in the always-run vitest suite and reads the LATEST migration defining this
+-- function — since 2026-08-28 that is 20260828090000, NOT this file. It has to
+-- come from that side: sql-suites.yml gates its `suites` job on a path regex
+-- covering supabase/(migrations|tests), so a TypeScript-only change — exactly
+-- the diff shape that drifts — executes no SQL assertions at all.
 --
 -- Returned states — payment and branch acceptance are never collapsed together:
 --   payment_pending                  online, not yet verified paid

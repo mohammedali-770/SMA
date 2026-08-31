@@ -834,6 +834,75 @@ blocks the order (no match → continue). No Create-Customer endpoint is confirm
 — we don't create Lazywait customers, and `customer_id`/`customer_cell` are NOT
 sent to Create Order.
 
+**DEFERRED off the checkout kick entirely (2026-08-27, second revision).**
+Capping it at 1.5 s was not enough: on SM-2026-000067 the search spent the
+**whole cap** and still returned nothing, so the customer waited 1.5 s for a
+value that could not arrive. It now runs AFTER the response on the kick path,
+alongside the push drain, and keeps its full inline 8 s on the cron path.
+
+**It was deferred rather than deleted, and that distinction is the whole
+design.** Moving it "to the cron path" would have looked equivalent and been a
+silent feature removal: the kick now syncs every order the moment it is placed,
+so every observed cron tick reports `claimed: 0` — a search that only ran there
+would never run at all, and `profiles.lazywait_customer_id` would stay null for
+ever. Deferring keeps the backfill alive, so the NEXT order for that customer
+can carry `customer_id`, while THIS ticket simply uses whatever link is already
+stored. The link is a nice-to-have on the ticket; the order number is not.
+
+The superseded first attempt, kept because the measurements are the argument:
+**time-boxed to 1.5 s on the checkout kick, 8 s on the cron.** This
+lookup measured **3.47 s** on SM-2026-000065 and 3.68 s on -000064 — larger than
+the `POST /pos/orders/create` call itself — and returned nothing both times. It
+cannot yet do otherwise: `profiles.lazywait_customer_id` has never been populated
+for anybody (0 of 10 rows), so there is no stored link for a match to supersede.
+
+Its old 8 s ceiling alone exceeded most of `order-intake`'s whole 11 s budget, so
+one slow CRM response could spend the entire window and leave the customer with
+no branch number for an order that synced perfectly.
+
+Capping it is **safety-positive, not merely faster**: the search sits *before*
+`begin_lazywait_create_attempt`, so every millisecond it burns is deadline budget
+spent before that gate re-checks `pos_sync_deadline_at`. The stored link is still
+read and used; only the refresh is bounded, and the cron path — where nothing is
+waiting — keeps the full 8 s so a slow CRM still gets its chance to establish the
+link.
+
+## The worker has two modes, and the fast one syncs exactly one order
+
+`lazywait-sync` behaves differently depending on who invoked it. Nothing about
+the payload, the claim predicate or the retry rules differs — only *how much* it
+does before returning.
+
+| | **Targeted** (`{orderId}`) | **Untargeted** (`{limit: n}`) |
+| --- | --- | --- |
+| Invoked by | `order-intake`, per checkout | cron job 2, and the post-payment handoff in `_shared/paymentSync.ts` |
+| Claim | `claim_lazywait_sync_one` | `claim_lazywait_sync_batch` |
+| `reap_stale_lazywait_syncs` | runs, **deferred** past the response | runs, awaited |
+| Notification drain | runs, **deferred** past the response | runs, awaited |
+| CRM search | **deferred past the response** (8 s there) | 8 s, inline |
+
+Untargeted is byte-for-byte the old behaviour. Targeted exists because the kick
+used to send `{limit: 5}`, and `claim_lazywait_sync_batch` orders by `created_at`
+**ascending** while the worker processes serially — so the customer's brand-new
+order was handled **last** of whatever the batch claimed, and their checkout
+blocked while other people's orders were sent to the POS.
+
+**The reaper is deferred, never skipped**, and the distinction is the point.
+`reap_stale_lazywait_syncs` has exactly one production caller — this worker — so
+the cron and the checkout kick are also its only two reaping drivers, and they do
+**not** share a failure mode: `invoke_lazywait_sync_processor()` returns early
+without invoking anything when the vault secret `lazywait_sync_project_url` is
+missing, whereas the kick builds its URL from `SUPABASE_URL`. Skipping the reaper
+on the kick path would save the same ~0.9 s and leave one missing secret able to
+stop all reaping — and a **cash** order stranded in `syncing` with no ref is
+invisible to the watchdog as well, since R1 and R7 both require
+`payment_status = 'paid'`.
+
+Deferring is safe because everything the reaper decides is time-thresholded
+(`STALE_SYNC_TIMEOUT_MINUTES` = 10), so nothing it would act on can have become
+stale during the invocation that deferred it. Both deferrals degrade to
+*awaiting* — never to skipping — on a runtime without `EdgeRuntime.waitUntil`.
+
 ## Online payment (prepared, not live)
 After the Geidea webhook verifies a payment and `confirm_order_payment` marks the
 local order paid, `payment-webhook` best-effort calls

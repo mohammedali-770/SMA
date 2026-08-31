@@ -203,8 +203,23 @@ export interface DbCustomerOrder {
   refund_state?: string | null;
 }
 
+/**
+ * `order_items` is OPTIONAL, and that is not laziness.
+ *
+ * `orders.byId` and `orders.listWithItems` always select it, so on those paths it
+ * is always there. `placeAndSync` is the exception: when the order-intake
+ * function's post-commit re-read yields no usable row it falls back to
+ * `place_customer_order`'s own projection, which is the same 24 scalar columns
+ * with NO line items. That response is correct and the order is real — it simply
+ * cannot carry an embed the RPC never returned.
+ *
+ * Declaring the field required would make that a lie the compiler cannot catch,
+ * because the response is cast unchecked at the `functions.invoke` boundary. The
+ * only reader is `mapOrder` (lib/mappers.ts), which already defends with `?? []`,
+ * and the sole `placeAndSync` caller keeps `.id` alone.
+ */
 export type DbCustomerOrderWithItems = DbCustomerOrder & {
-  order_items: (Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'> & {
+  order_items?: (Pick<DbOrderItem, 'id' | 'name_en' | 'name_ar' | 'unit_price' | 'quantity'> & {
     note?: string | null;
     order_item_modifiers: Pick<DbOrderItemModifier, 'id' | 'name_en' | 'name_ar' | 'price'>[];
   })[];
