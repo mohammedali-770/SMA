@@ -243,10 +243,20 @@ pickup-only, and delivery orders are still held at `blocked` /
 `delivery_schema_unconfirmed`". That stopped being true when migration
 `20260827120000` removed the insert-time block and `lazywait-sync` v6 shipped.
 
-**Q1 — ANSWERED, accepted.** `order_type: "delivery"` is accepted. Seven
-delivery orders have created real POS tickets — SM-2026-000059 → #3 through
-SM-2026-000065 → #9, consecutively — every one on the first attempt
-(`sync_attempt_count` 0, no retries).
+**Q1 — ANSWERED, accepted.** `order_type: "delivery"` is accepted.
+
+**On the day it was answered (2026-08-27):** seven delivery orders created real
+POS tickets — SM-2026-000059 → #3 through SM-2026-000065 → #9, consecutively —
+every one on the first attempt (`sync_attempt_count` 0, no retries).
+
+**Re-read live 2026-08-31: seventeen delivery orders are `synced`, and all
+seventeen went first attempt.** The claim is dated rather than restated, because
+the previous revision wrote a bare "Seven" that was already wrong within days.
+
+One caveat that the "consecutively" above can mislead on: **the `#N` is the
+POS's own per-day ticket number, not a global sequence.** Across those seventeen
+orders the numbers run #1–#9 and repeat. So a ticket number identifies an order
+only together with its date, and two orders can legitimately both be "#3".
 
 **Q8 — ANSWERED, negatively.** The POS does **not** render `delivery_address`.
 The printed ticket shows `Order Type: Delivery` but no address row; the
@@ -270,7 +280,7 @@ for the genuinely-assumed remainder.
 ### Assumed field names/shapes (please correct)
 | Assumed field | Assumed shape | Used for | Status |
 |---|---|---|---|
-| ~~`order_type: "delivery"`~~ | string | delivery create | **Q1 ANSWERED 2026-08-27 — accepted.** Five orders created real tickets (#3 … #9), all first-attempt. No longer an assumption. |
+| ~~`order_type: "delivery"`~~ | string | delivery create | **Q1 ANSWERED 2026-08-27 — accepted.** Seven orders created real tickets that day (#3 … #9), all first-attempt; seventeen as of 2026-08-31, still all first-attempt. No longer an assumption. |
 | `order_status_id` for a new delivery order | string | delivery create | Q1 — `"new-order"` is the documented *pickup* value |
 | `order_deliveries[]` element shape | unknown | delivery | Q2 — empty array in the example; almost certainly where delivery lives. **Not implemented** — we do not guess an element |
 | `delivery_address` contents | string | delivery | Q2 — field name confirmed, required contents are not |

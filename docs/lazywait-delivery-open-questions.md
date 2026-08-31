@@ -121,20 +121,33 @@ still never marked `synced` unless the POS actually accepts it.
    that computed would have produced a non-zero total there. Original question
    kept below.
 
-   ~~Are the money fields VAT-**inclusive** or VAT-**exclusive**?~~ The contract carries `subtotal`, `discount`, `tax`,
-   `tax_percentage`, `total` and `order_delivery_fee`, and its example computes
-   `total = 34.5` from `subtotal = 30` and `tax = 4.5` at `tax_percentage = 15`
-   — i.e. tax **added on top** of the item prices. Ours are VAT-**inclusive**
-   (KSA), and `place_order` derives `vat_amount` by extracting the VAT portion
-   *out of* the payable total. The example also does not say what the POS does
-   with prices when the tax fields are **absent**, which is the case today and
-   is the only case that matters for the pickup tickets currently in Production.
-   Until that is settled, **no totals field is sent** — sending a guessed
-   `subtotal`/`tax`/`total` would put a number on the ticket that disagrees with
-   what the customer was charged. Two sub-questions:
-   - when `tax`/`tax_percentage` are omitted, does the POS apply its own
-     configured tax to `order_items[].price`, or treat the prices as final?
-   - is there a flag that declares the submitted prices tax-inclusive?
+   **The original question, retained as a record and fully superseded.** Read
+   everything in the quote below as what was unknown on 2026-08-24, not as
+   current behaviour. Its closing claim — "no totals field is sent" — is now the
+   *opposite* of what happens, and a half-applied strikethrough left it reading
+   as live text under an ANSWERED heading. That is why it is quoted whole rather
+   than struck by the sentence.
+
+   > Are the money fields VAT-**inclusive** or VAT-**exclusive**? The contract
+   > carries `subtotal`, `discount`, `tax`, `tax_percentage`, `total` and
+   > `order_delivery_fee`, and its example computes `total = 34.5` from
+   > `subtotal = 30` and `tax = 4.5` at `tax_percentage = 15` — i.e. tax
+   > **added on top** of the item prices. Ours are VAT-**inclusive** (KSA), and
+   > `place_order` derives `vat_amount` by extracting the VAT portion *out of*
+   > the payable total. The example also does not say what the POS does with
+   > prices when the tax fields are **absent**, which is the case today and is
+   > the only case that matters for the pickup tickets currently in Production.
+   > Until that is settled, **no totals field is sent** — sending a guessed
+   > `subtotal`/`tax`/`total` would put a number on the ticket that disagrees
+   > with what the customer was charged. Two sub-questions:
+   >
+   > - when `tax`/`tax_percentage` are omitted, does the POS apply its own
+   >   configured tax to `order_items[].price`, or treat the prices as final?
+   > - is there a flag that declares the submitted prices tax-inclusive?
+
+   **Both sub-questions are moot.** The tax fields are no longer omitted, and
+   ticket #9 showed the POS rendering what we send verbatim rather than applying
+   its own tax — which answers the first, and makes the second unnecessary.
 10. **OPEN (new, 2026-08-24)** — Does the POS **add** `addons[].price` to
    `order_items[].price`, or does it treat the item price as already inclusive
    of its add-ons? This is a real-money question, and the current

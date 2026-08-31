@@ -1397,9 +1397,12 @@ database cannot distinguish "Expo accepted it" from "the customer saw it", and
 nothing here should be read as proof a notification was displayed. What *is*
 proved is the ordering and the copy.
 
-**One more limit worth stating: all eleven of today's orders belong to the same
-customer account, on one device.** The pipeline is proved end to end; fan-out
-across a varied device base is not exercised by any of this.
+**One more limit worth stating: every order placed on 2026-08-27 — all fifteen
+of them — belongs to the same customer account, on one device.** (Re-counted
+live on 2026-08-31; an earlier revision of this paragraph said "eleven of today's
+orders", which was the count at the moment it was written and undated, so it went
+stale the same afternoon.) The pipeline is proved end to end; fan-out across a
+varied device base is not exercised by any of this.
 
 ### A decision recorded rather than taken
 

@@ -74,8 +74,12 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 5 | `DUPLICATE_PROVIDER_REFERENCE` | critical | one paid provider reference (`reference_transaction`/`provider_ref`) maps to **> 1 distinct order**. |
 | 6 | `MULTIPLE_SUCCESSFUL_CAPTURES` | critical | **> 1** paid `payment_records` row for a single order. |
 | 7 | `PAID_ORDER_DEAD_LETTER` | critical | paid order of **either** type, not cancelled, `lazywait_sync_state='dead_letter'`. |
+| 8 | `SYNCED_WITHOUT_USABLE_REFERENCE` | critical | `lazywait_sync_state='synced'` but the stored `lazywait_ref` is not usable (missing / whitespace-only). |
+| 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
+| 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |
+| 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
 
-> ### ⚠ R1 and R7 currently match NOTHING, and the incident that prompted today's fix is still uncovered
+> ### ⚠ R1 and R7 currently match NOTHING, and the incident that prompted the 2026-08-27 fix is still uncovered
 >
 > Removing the `order_type = 'pickup'` filter on 2026-08-27 was necessary and is
 > verified live (0 pickup filters in the deployed body). **It was not
@@ -109,10 +113,6 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 > Closing this needs a rule keyed on *sync* state and age rather than on
 > payment — cash orders included. That is a change to alerting behaviour and a
 > separate owner decision; it is recorded here rather than done quietly.
-| 8 | `SYNCED_WITHOUT_USABLE_REFERENCE` | critical | `lazywait_sync_state='synced'` but the stored `lazywait_ref` is not usable (missing / whitespace-only). |
-| 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
-| 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |
-| 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
 
 **Not implemented — `R12 REFUND_STUCK`:** there is no refunds table or refund
 lifecycle anywhere in the schema, so the rule is intentionally omitted (a
