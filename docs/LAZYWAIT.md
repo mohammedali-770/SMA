@@ -26,8 +26,8 @@ by the owner on **2026-08-24** and matching the live
 `integration_settings.public_config.base_url` in Production, last written
 2026-07-24. Every pickup order that has synced went there.
 
-Two things in source still name the **production** host. The first was a trap
-until 2026-08-24; the second still is:
+Two things in source still name the **production** host. Both were traps; both
+are now closed — the first on 2026-08-24, the second on 2026-08-31:
 
 - `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
   `https://apiv2.lazywait.com/v1`. It **used to be a fallback**: the worker
@@ -36,9 +36,18 @@ until 2026-08-24; the second still is:
   fallback is **gone** — see "Missing `base_url` fails closed" below. The
   constant itself is deliberately left unchanged, because it names what the
   applied `20260708130000` migration seeded into Production.
-- The admin Integrations card shows the production URL as its input
+- The admin Integrations card used to show the production URL as its input
   **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
-  wrong host could get typed back in.
+  wrong host could get typed back in. **Fixed 2026-08-31**: it now suggests the
+  dev host, and `IntegrationCard.test.ts` asserts both that it names the live
+  host and that it does not name the production one. The negative assertion is
+  the load-bearing half — the fail-closed guard rejects a blank or malformed
+  `base_url`, but a well-formed URL pointing at the wrong POS would be accepted,
+  and every order sent there would look successful.
+
+  This one survived a year of being written down. It was recorded here as a known
+  trap and still shipped, which is the argument for pinning a claim with a test
+  rather than a sentence.
 
 The `20260708130000` migration also seeds the production URL as a default. That
 file is applied history and must never be edited; the live row overrides it.
