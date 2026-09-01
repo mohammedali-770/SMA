@@ -1061,12 +1061,16 @@ character directly, so the file is byte-identical to what is running
 check into an argument each time, which is how a real mismatch eventually gets
 waved through.
 
-**Still unanswered, and larger than the name.** The same ticket shows Subtotal,
-VAT and Total all **0.00** on a cash order for 7.00, with the line flagged
-`** Non-Taxable`. We deliberately send no money fields (open question Q9), and
-the flag suggests the POS is treating our lines as free text rather than catalog
-references. That needs an answer from Lazywait with ticket #2 / invoice 19 in
-front of them, not a guess from us — see [`LAZYWAIT.md`](LAZYWAIT.md).
+**The 0.00 half of this is FIXED (2026-08-27).** That ticket showed Subtotal, VAT
+and Total all **0.00** on a cash order for 7.00, because no money field was sent
+at all. Money is now sent, and it prints: ticket **#9** for SM-2026-000065 shows
+`Subtotal 84.00 / VAT 10.96 / Total 84.00`, matching the stored order exactly.
+See §22 and [`LAZYWAIT.md`](LAZYWAIT.md).
+
+**The `** Non-Taxable` line flag is a separate question and is NOT settled by
+that.** It suggests the POS may treat our lines as free text rather than catalog
+references, which is about item mapping rather than order totals. It still wants
+an answer from Lazywait with a ticket in front of them, not a guess from us.
 
 **Decided and implemented 2026-08-25 (was open from PR #256).** The owner chose
 both: a multi-tier product **opens a picker** rather than being added from the
@@ -1253,9 +1257,10 @@ recomputation, no new rounding, the same numbers as the customer's receipt.
 `docs/LAZYWAIT.md`.
 
 **Deployed** 2026-08-27 in `lazywait-sync` **v8** — read back and hash-verified
-byte-identical to the merged branch. See the deploy table at the end of this
-section. What remains is one live order to confirm the printed ticket carries the
-right total; no command can establish that.
+byte-identical to the merged branch — and **confirmed on printed paper the same
+day**: ticket **#9** for SM-2026-000065 shows `Subtotal 84.00 / VAT 10.96 /
+Total 84.00` against a stored total of 84.00 and `vat_amount` 10.96. Q9 is
+closed. See the deploy table at the end of this section.
 
 No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
 so the worker already had every money column.
@@ -1343,9 +1348,61 @@ file. Worth knowing which of the three carries the stronger proof.
 `lazywait-sync` v8 has returned 200 on every cron tick since (11:50 onward), so
 the new drain boots and runs clean.
 
-**Still unproven, and only one order can prove it:** that a real ticket now shows
-the correct total, that the branch number appears in a second or two, and that
-exactly one push arrives saying the restaurant has the order.
+### Proven end to end by SM-2026-000065 (ticket #9), 2026-08-27
+
+Four things no deploy could establish were confirmed on one live delivery
+order — two of them by the owner reading the printed ticket.
+
+| Claim | Result |
+| --- | --- |
+| The ticket shows the right total | **Yes.** `Subtotal 84.00 / VAT 10.96 / Total 84.00`, against a stored total of 84.00 and `vat_amount` 10.96 (`84 × 15/115` to the halala). Line items sum to the subtotal, so the ticket is internally consistent. |
+| The branch number arrives in a second or two | **8.1 s**, first attempt, zero retries. Placed 18:19:38, at the POS 18:19:46 — **before** the 18:20:00 cron tick, so this was the synchronous kick and not the backstop. |
+| Exactly one push, and only once the POS has it | **Yes.** One `pos_sync/pos_confirmed`, `targeted 1 / sent 1 / failed 0`, **3.6 s after** the POS accepted the order. No `order_status/received` row exists. |
+| The address prints once, not four times | **Yes.** This order's saved address still has `label` = `description`, so the dedupe was genuinely exercised, and the DELIVER TO line carries it once. |
+
+**The push fix is visible as a sign change**, which is the clearest evidence in
+the whole record:
+
+Both columns are measured against `orders.synced_at` — the moment Lazywait
+accepted the order. **Enqueued** is `notification_log.created_at`, **sent** is
+`updated_at` after the dispatcher finished.
+
+| Order | Push | Enqueued | Sent |
+| --- | --- | --- | --- |
+| SM-2026-000059 | `order_status/received` | **−39.5 s** | **−38.7 s** |
+| SM-2026-000060 | `order_status/received` | **−29.8 s** | **−28.7 s** |
+| SM-2026-000061 | `order_status/received` | **−16.2 s** | **−15.5 s** |
+| SM-2026-000062 | `order_status/received` | **−42.8 s** | **−42.1 s** |
+| SM-2026-000063 | `order_status/received` | **−20.7 s** | **−19.8 s** |
+| SM-2026-000064 | `pos_sync/pos_confirmed` | **+0.2 s** | **+5.3 s** |
+| SM-2026-000065 | `pos_sync/pos_confirmed` | **+0.2 s** | **+3.6 s** |
+
+The negative numbers are the defect the owner reported: "we sent it to the
+kitchen" reaching the customer up to 42.8 seconds *before* the kitchen had
+anything. The positive ones are the fix, carrying honest copy.
+
+**Read the enqueued column for the guarantee, not the sent one.** +0.2 s is not
+a race won by a fifth of a second. `record_lazywait_sync` writes the
+`notification_log` row inside the **same transaction** as the state change, and
+for `pos_confirmed` only when the authoritative post-update row — captured via
+`RETURNING` — is `synced` with a usable ref. The ordering therefore holds by
+construction, and would still hold if Lazywait took five minutes. The sent
+figure varies with dispatcher latency and guarantees nothing. Every one of the
+seven rows was `targeted 1 / sent 1 / failed 0` on `attempt_count` 1.
+
+**`sent` means Expo accepted the ticket, not that a phone displayed it.**
+`push-dispatch` counts `sent` on an Expo ticket returned `ok`, and it performs
+no receipt polling — its own comment records that as a follow-up. So the
+database cannot distinguish "Expo accepted it" from "the customer saw it", and
+nothing here should be read as proof a notification was displayed. What *is*
+proved is the ordering and the copy.
+
+**One more limit worth stating: every order placed on 2026-08-27 — all fifteen
+of them — belongs to the same customer account, on one device.** (Re-counted
+live on 2026-08-31; an earlier revision of this paragraph said "eleven of today's
+orders", which was the count at the moment it was written and undated, so it went
+stale the same afternoon.) The pipeline is proved end to end; fan-out across a
+varied device base is not exercised by any of this.
 
 ### A decision recorded rather than taken
 

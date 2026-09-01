@@ -108,9 +108,11 @@ export const LAZYWAIT_BASE_URL_NOT_CONFIGURED = 'lazywait_base_url_not_configure
  * `ambiguous -> confirmation_required`. So a mistyped host would mark real
  * customer orders as needing manual confirmation — exactly the outcome the
  * fail-closed guard exists to prevent, reached by a typo instead of a blank.
- * That is not hypothetical: the admin Integrations card still offers the
- * PRODUCTION host as its input placeholder, so hand-editing that field is the
- * likeliest way a bad value arrives.
+ * The admin Integrations card used to make that concrete by offering the
+ * PRODUCTION host as its input placeholder; that was fixed on 2026-08-31 and is
+ * pinned by `src/components/admin/IntegrationCard.test.ts`. Hand-editing the
+ * field is still the likeliest way a bad value arrives — the card no longer
+ * suggests one.
  */
 export const LAZYWAIT_BASE_URL_INVALID = 'lazywait_base_url_invalid';
 

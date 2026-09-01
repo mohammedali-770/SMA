@@ -58,7 +58,7 @@ Set each order type deliberately.
 - [ ] required address guidance/landmark behavior is understood by staff;
 - [ ] branch has an agreed operational handling/dispatch process.
 
-The current Lazywait integration intentionally treats `delivery_schema_unconfirmed` as a safety block rather than inventing a provider payload that has not been validated. Do not enable a customer-facing delivery operation unless the branch has a verified current process for handling the resulting orders.
+**Updated 2026-08-27.** The Lazywait integration *used* to treat `delivery_schema_unconfirmed` as a safety block rather than invent an unvalidated provider payload. That block is gone: the delivery payload has been validated against the live POS, and delivery orders now create real tickets. `delivery_schema_unconfirmed` survives only on four historical orders and can no longer be produced. The operational requirement is unchanged and now matters more, not less: do not enable a customer-facing delivery operation unless the branch has a verified current process for handling the resulting orders, because those orders now reach the kitchen.
 
 ## 5. Operating hours / open-close process
 
