@@ -26,8 +26,8 @@ by the owner on **2026-08-24** and matching the live
 `integration_settings.public_config.base_url` in Production, last written
 2026-07-24. Every pickup order that has synced went there.
 
-Two things in source still name the **production** host. The first was a trap
-until 2026-08-24; the second still is:
+Two things in source still name the **production** host. Both were traps; both
+are now closed — the first on 2026-08-24, the second on 2026-08-31:
 
 - `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
   `https://apiv2.lazywait.com/v1`. It **used to be a fallback**: the worker
@@ -36,9 +36,18 @@ until 2026-08-24; the second still is:
   fallback is **gone** — see "Missing `base_url` fails closed" below. The
   constant itself is deliberately left unchanged, because it names what the
   applied `20260708130000` migration seeded into Production.
-- The admin Integrations card shows the production URL as its input
+- The admin Integrations card used to show the production URL as its input
   **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
-  wrong host could get typed back in.
+  wrong host could get typed back in. **Fixed 2026-08-31**: it now suggests the
+  dev host, and `IntegrationCard.test.ts` asserts both that it names the live
+  host and that it does not name the production one. The negative assertion is
+  the load-bearing half — the fail-closed guard rejects a blank or malformed
+  `base_url`, but a well-formed URL pointing at the wrong POS would be accepted,
+  and every order sent there would look successful.
+
+  This one survived a year of being written down. It was recorded here as a known
+  trap and still shipped, which is the argument for pinning a claim with a test
+  rather than a sentence.
 
 The `20260708130000` migration also seeds the production URL as a default. That
 file is applied history and must never be edited; the live row overrides it.
@@ -68,8 +77,10 @@ malformed URL; the catch there returns `status: 0`, and
 `classifyCreateOrderResult({status: 0})` is `ambiguous → confirmation_required`.
 So a mistyped host would mark real customer orders as needing manual
 confirmation — the exact outcome this guard exists to prevent, reached by a typo
-instead of a blank. That is not hypothetical while the admin card still offers
-the *production* host as its input placeholder (see "Still open" below).
+instead of a blank. The admin card **used** to make that concrete by offering the
+*production* host as its input placeholder; that was fixed on 2026-08-31 and is
+pinned by `IntegrationCard.test.ts`. The guard still matters — it is what catches
+a hand-typed malformed value — but the card no longer suggests a wrong one.
 
 The check is deliberately **narrow**: it asks only "would `fetch` accept this?",
 via the same `URL` parse the platform performs plus an `http`/`https` protocol
@@ -112,10 +123,13 @@ Deno-only modules, so Vitest cannot execute them).
 
 **Still open (not changed here):**
 
-- The admin Integrations card still offers the production host as its input
-  **placeholder** (`src/components/admin/IntegrationCard.tsx`) — the most likely
-  way a wrong value gets typed back in. Changing it is a separate UI decision the
-  owner has not asked for.
+- ~~The admin Integrations card still offers the production host as its input
+  **placeholder**~~ — **FIXED 2026-08-31.** It now suggests the dev host, and
+  `IntegrationCard.test.ts` asserts both that it names the live host and that it
+  does not name the production one in any form. The negative assertion is the
+  load-bearing half: this guard rejects a blank or malformed `base_url`, but a
+  well-formed URL pointing at the wrong POS would be accepted and every order
+  sent there would look successful.
 - `_shared/paymentSync.ts` still reads `base_url ?? DEFAULT_BASE_URL`. It is
   under the CLAUDE.md §6 payment freeze and was not touched. The residual risk is
   small and bounded: `pushLazywaitOnlinePayment` only runs for an order that
