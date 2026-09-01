@@ -68,6 +68,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `order_refunds` | `20260724120000_order_confirmation_state_machine.sql` | 0 | 1 |
 | `orders` | `20260707120500_orders.sql` | 7 | 2 |
 | `otp_challenges` | `20260710140000_whatsapp_otp.sql` | 1 | **none declared** |
+| `otp_send_reservations` | `20260831130000_otp_login_rate_limit.sql` | 0 | **none declared** |
 | `payment_records` | `20260707121300_payments_and_sync.sql` | 3 | 1 |
 | `product_modifier_groups` | `20260707120200_catalog.sql` | 0 | 1 |
 | `product_variants` | `20260824120000_product_variants.sql` | 0 | 2 |
@@ -222,11 +223,12 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_note_normalized` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_refund_due` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
-| `otp_begin_send` | 1 | `20260710140000_whatsapp_otp.sql` |
+| `otp_begin_send` | 2 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_consume` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_get_active_challenge` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_increment_attempt` | 1 | `20260710140000_whatsapp_otp.sql` |
-| `otp_login_rate_limit` | 1 | `20260831130000_otp_login_rate_limit.sql` |
+| `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
+| `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `place_order` | 13 | `20260826100000_comp_order_totals.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |

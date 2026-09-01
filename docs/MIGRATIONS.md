@@ -3742,18 +3742,29 @@ matter: a tripwire that fails on a reformat gets deleted.
 
 ## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
 
-`20260831130000_otp_login_rate_limit.sql`. **Not applied, and its paired
-`auth-send-sms-whatsapp` deploy is a second, separate §5 action.** Apply the
-migration FIRST: the function calls the RPC, and against a database without it
-the gate errors — which fails open, so login still works but the throttle
-silently does not exist.
+`20260831130000_otp_login_rate_limit.sql`. **Not applied.** It now implies **two**
+separate function deploys as well — `auth-send-sms-whatsapp` and
+`whatsapp-send-otp`, because `otp_begin_send` changed. Apply the migration
+**first**: both functions call RPCs it defines.
 
-Adds `public.otp_login_rate_limit(text,int,int,int)`. Full reasoning, including
-why `otp_begin_send` could not be reused and the two honest limits of the design,
-is in `docs/WHATSAPP_LOGIN.md` §7.2.
+Adds `otp_send_reservations` plus `otp_reserve_send` / `otp_release_send`, and
+redefines `otp_begin_send` so both senders share one budget.
 
-Tested against a disposable PostgreSQL 16 cluster: 116 migrations replayed onto an
-empty database, the new `otp_login_rate_limit_test.sql` passing, no suite
-regressions. Mutation-tested, each confirmed red then reverted: counting only
-`auth_login` (the anti-alternation property), an hourly off-by-one, dropping the
-per-phone filter, and granting execute to `authenticated`.
+**Redesigned after review.** The first version counted `whatsapp_message_logs`,
+which is written *after* delivery — so a concurrent burst all read the same empty
+history and all passed, and the limiter bound nothing precisely when it mattered.
+It is now a reservation taken under `pg_advisory_xact_lock(hashtext(phone))`, with
+a release path so a failed delivery does not burn a customer's quota. Full
+reasoning: `docs/WHATSAPP_LOGIN.md` §7.2.
+
+Tested on a disposable PostgreSQL 16 cluster: 116 migrations replayed onto an
+empty database, **59/61 suites passing, 0 new failures**. Mutation-tested, each
+red then reverted — removing the advisory lock (fails `NOT_SERIALISED`),
+`otp_begin_send` no longer reserving (breaks the shared budget), and release
+ignoring its id.
+
+**A harness gap closed alongside it.** Five suites read `test.dblink_conninfo` and
+nothing ever set it, so every concurrency suite in this repository has been
+**skipping in CI since it was written** — reporting the same green as a pass.
+`.github/sql-ci/run.sh` now supplies each suite a conninfo for its own clone. All
+five run; all five pass.

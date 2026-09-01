@@ -80,41 +80,52 @@ Deno.serve(async (req: Request) => {
   const cfg = await resolveWhatsAppConfig(admin, pickLanguage(publicConfig));
   if (!cfg) return hookError(503, 'WhatsApp login is temporarily unavailable');
 
-  // 6) Rate-limit BEFORE sending. This path calls deliverOtpTemplate directly —
-  //    the raw sender, which does no limiting — so without this the only throttle
-  //    on real customer login is Supabase Auth's own project-wide SMS cap, which
-  //    is dashboard state and not verifiable from here. Every attempt is a
-  //    billable Meta authentication-template message.
+  // 6) RESERVE a send before delivering. This path calls deliverOtpTemplate
+  //    directly — the raw sender, which does no limiting — so without this the
+  //    only throttle on real customer login is Supabase Auth's project-wide SMS
+  //    cap, which is dashboard state and not verifiable from here. Every attempt
+  //    is a billable Meta authentication-template message.
   //
-  //    It cannot reuse otp_begin_send: that also writes an `otp_challenges` row
-  //    holding a hashed OTP, and on this path Supabase Auth is the sole OTP
-  //    authority — minting a second code here would let the verification path
-  //    match a code the customer was never sent. `otp_login_rate_limit` is the
-  //    same three checks with the same defaults and no challenge write.
+  //    A reservation, not a check. The budget is consumed BEFORE the send, under
+  //    a per-phone advisory lock, because a post-send counter lets every request
+  //    in a concurrent burst read the same empty history and all pass — which is
+  //    precisely the abuse this exists to stop.
   //
-  //    Fail OPEN on an RPC error, deliberately. A limiter that cannot be reached
-  //    must not become an outage of the entire login system; the refusal below is
-  //    for a real limit decision, not for infrastructure trouble.
-  const { data: gateRows, error: gateErr } = await admin.rpc('otp_login_rate_limit', {
+  //    It cannot reuse the challenge path: otp_begin_send also writes an
+  //    `otp_challenges` row holding a hashed OTP, and here Supabase Auth is the
+  //    sole OTP authority — minting a second code would let verification match a
+  //    code the customer was never sent. Both functions now share one budget
+  //    through `otp_send_reservations`.
+  //
+  //    Fails OPEN on an RPC error, deliberately: a limiter that cannot be reached
+  //    must not become an outage of the entire login system.
+  const { data: gateRows, error: gateErr } = await admin.rpc('otp_reserve_send', {
     p_phone: norm.e164,
+    p_purpose: 'auth_login',
     p_cooldown_seconds: cfg.cooldownSeconds,
     p_max_per_hour: cfg.maxPerHour,
     p_max_per_day: cfg.maxPerDay,
   });
-  if (!gateErr) {
-    const gate = Array.isArray(gateRows) ? gateRows[0] : gateRows;
-    // 429 so Supabase surfaces it as rate limiting rather than a delivery fault.
-    // The reason is NOT echoed to the caller: 'cooldown' vs 'daily_limit' tells an
-    // enumerator how much traffic a given number has already had.
-    if (gate && gate.allowed === false) {
-      return hookError(429, 'Too many verification codes requested. Please wait and try again.');
-    }
+  const gate = gateErr ? null : (Array.isArray(gateRows) ? gateRows[0] : gateRows);
+  // 429 so Supabase surfaces rate limiting rather than a delivery fault. The
+  // reason is NOT echoed: 'cooldown' vs 'daily_limit' would tell an enumerator
+  // how much traffic a given number has already had.
+  if (gate && gate.allowed === false) {
+    return hookError(429, 'Too many verification codes requested. Please wait and try again.');
   }
 
   // 7) Deliver Supabase's OTP over WhatsApp. Success → 200 {}; anything else →
   //    an error so Supabase surfaces "couldn't send the code".
   const outcome = await deliverOtpTemplate(admin, cfg, norm.e164, parsed.data.otp, 'auth_login');
-  if (outcome !== 'sent') return hookError(502, 'Failed to deliver the verification code');
+  if (outcome !== 'sent') {
+    // Hand the budget back. A Meta outage would otherwise burn every customer's
+    // daily quota while delivering nothing. Best-effort: a failed release costs
+    // one slot, never correctness, so it must not mask the delivery error.
+    if (gate?.reservation_id) {
+      await admin.rpc('otp_release_send', { p_reservation_id: gate.reservation_id });
+    }
+    return hookError(502, 'Failed to deliver the verification code');
+  }
 
   return hookOk();
 });
