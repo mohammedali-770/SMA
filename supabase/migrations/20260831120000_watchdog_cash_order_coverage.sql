@@ -433,7 +433,9 @@ begin
     -- confirmation_required is actively surfaced elsewhere, so it is intentionally
     -- not duplicated here. A warning-level rule for paid orders stuck in it past the
     -- POS deadline is a documented v2 candidate (see docs/ORDER_INTEGRITY_WATCHDOG.md),
-    -- pending owner approval — this v1 stays at the approved 11-rule scope.
+    -- pending owner approval. (That sentence read "this v1 stays at the approved
+    -- 11-rule scope" when copied from 20260827130000; this file adds R12/R13, so
+    -- the scope is now 13. The confirmation_required exclusion above is unchanged.)
 
     select count(*) into v_detected from _det;
 

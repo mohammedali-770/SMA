@@ -59,7 +59,7 @@ are considered safe operational identifiers and are shown.
 
 ---
 
-## 3. Rules (11 supported)
+## 3. Rules (13 supported)
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
@@ -126,10 +126,17 @@ raises nothing today.
 scope note inside the function: it is the designed human-verification resting
 place and already has `list_pos_confirmation_required()` and the admin feed.
 
-**Not implemented — `R12 REFUND_STUCK`:** there is no refunds table or refund
+**Not implemented — `REFUND_STUCK`:** there is no refunds table or refund
 lifecycle anywhere in the schema, so the rule is intentionally omitted (a
 provider-side stuck refund is not determinable from our database). Documented
 here so the omission is explicit, not an oversight.
+
+It is deliberately **not numbered**. It was written as "R12" while only 11 rules
+existed; R12 is now `UNPAID_ORDER_NOT_SYNCED`, and a document using one ordinal
+for both an implemented rule and an unimplemented proposal is worse than one that
+numbers only what exists. The ordinals in the table above are positions in that
+table — the `rule_code` is the identifier that matters, and it is what
+`order_integrity_config.rule_enabled` and the admin filter key on.
 
 **Out of scope for v1 — provider-side capture reconciliation:** R3 detects the
 *database* invariant (a captured payment row with no paid order). Detecting "the
@@ -154,7 +161,7 @@ pending owner approval.
 All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 **no Production order IDs are hard-coded in the scanner logic.**
 
-- `rule_enabled` — per-rule on/off map (all 11 supported rules default `true`).
+- `rule_enabled` — per-rule on/off map (all 13 supported rules default `true`).
   Setting a rule to `false` freezes it: its active incidents stop being updated
   **and stop being resolved** (they neither advance clean-counts nor close).
 - `abandoned_awaiting_payment_since` — seeded to `now()` at apply time, so all
