@@ -1,8 +1,19 @@
 # Lazywait — Delivery Payload Open Questions
 
-Delivery orders are intentionally **not** synced to the Lazywait POS. That has
-not changed: the owner supplied a Create Order contract on **2026-08-24**, but it
-documents a **pickup** order and says nothing about delivery.
+> **SUPERSEDED IN PART, 2026-08-27 — delivery IS live.** This document opened by
+> saying delivery orders are "intentionally **not** synced to the Lazywait POS"
+> and that this "has not changed". It changed. Migration `20260827120000` removed
+> the insert-time block and `lazywait-sync` v6 shipped the same day; seven
+> delivery orders have since created real POS tickets (#3 … #9), all on the first
+> attempt. **Q1, Q8 and Q9 are now answered on printed paper**, joining Q2, Q4,
+> Q5, Q6 and Q7. **Exactly two remain genuinely open: Q3** (coordinates, which
+> the contract has nowhere) **and Q10** (whether the POS sums `addons[].price`).
+> Both are inert — the fields behind them are not sent, and Q10 cannot activate
+> until a modifier is mapped.
+
+The original framing, kept because the reasoning behind the remaining questions
+depends on it: the owner supplied a Create Order contract on **2026-08-24**, but
+it documents a **pickup** order and says nothing about delivery.
 
 What the contract did change is the pickup payload. `POST /pos/orders/create`
 requires only `client_id`, `branch_id` and a non-empty `order_items`; everything
@@ -13,14 +24,18 @@ under Q4–Q7 below. See `docs/integrations/Lazywait_API_Reference.md` for the
 field-by-field state, including the caveat that the contract was read from the
 **dev** host.
 
-Until the questions still marked OPEN are answered, delivery orders are held at
+**No longer true as of 2026-08-27.** Delivery orders *were* held at
 `lazywait_sync_state = 'blocked'` with `sync_blocked_reason =
-'delivery_schema_unconfirmed'` (set in `set_lazywait_initial_sync`), and the
-sync worker's queue only claims `pending`/`failed` — so a delivery order can
-never be sent with unconfirmed fields, and is never marked `synced` unless the
-POS actually accepts it. The Admin Live Orders screen surfaces this as
-"Delivery Lazywait sync is blocked pending Lazywait delivery payload
-confirmation."
+'delivery_schema_unconfirmed'` (set in `set_lazywait_initial_sync`). That branch
+is gone: delivery orders now enqueue as `pending` and are claimed like any other.
+Four historical orders still carry the reason and are `not_retryable`; nothing
+reachable can produce it again.
+
+What still protects the remaining open questions is **not** the block but the
+payload itself: the fields behind Q3 are simply not sent and stay behind
+`allowAssumedFields` (default OFF), and Q10 stays inert while no modifier
+carries a `lazywait_addon_id`. An order is
+still never marked `synced` unless the POS actually accepts it.
 
 ## Questions for Lazywait
 
@@ -77,32 +92,62 @@ confirmation."
    the live worker deliberately does **not** set it. Telling a cashier that an
    order needs no cash is a financial signal, and payment work is frozen
    (CLAUDE.md §6) — wiring it is a separate owner decision.
-8. **OPEN — and now the ONE that matters most.** Delivery orders reach the POS
-   as of 2026-08-27, so this stops being theoretical: it is answered by looking
-   at the first real delivery ticket. The address is sent twice (confirmed
-   `delivery_address`, plus a `التوصيل إلى / DELIVER TO:` line inside
-   `order_details`) precisely because this is unverified. If the ticket shows
-   the dedicated field, the note duplication can be dropped — on evidence.
+8. **ANSWERED 2026-08-27, negatively — and the duplication is now permanent.**
+   The owner read a real delivery ticket: it shows `Order Type: Delivery` but
+   **no address row at all**. The POS does **not** render the confirmed
+   top-level `delivery_address`. The destination reaches the kitchen only
+   through the `التوصيل إلى / DELIVER TO:` line inside `order_details`.
+
+   So the duplication that existed "precisely because this is unverified" is
+   what is actually doing the work, and dropping it would put a delivery ticket
+   in front of a driver with nowhere to go. Keep both. Confirmed again on ticket
+   **#9**, where the deduped address printed **once** on that line.
 
    ~~Can the driver/cashier see the customer delivery location or
    address clearly? Unanswerable from the contract, which documents field names
    rather than what the POS renders. It depends on Q2's `order_deliveries[]`
    shape and needs a look at a real delivery ticket.~~
-9. **OPEN (new, 2026-08-24)** — Are the money fields VAT-**inclusive** or
-   VAT-**exclusive**? The contract carries `subtotal`, `discount`, `tax`,
-   `tax_percentage`, `total` and `order_delivery_fee`, and its example computes
-   `total = 34.5` from `subtotal = 30` and `tax = 4.5` at `tax_percentage = 15`
-   — i.e. tax **added on top** of the item prices. Ours are VAT-**inclusive**
-   (KSA), and `place_order` derives `vat_amount` by extracting the VAT portion
-   *out of* the payable total. The example also does not say what the POS does
-   with prices when the tax fields are **absent**, which is the case today and
-   is the only case that matters for the pickup tickets currently in Production.
-   Until that is settled, **no totals field is sent** — sending a guessed
-   `subtotal`/`tax`/`total` would put a number on the ticket that disagrees with
-   what the customer was charged. Two sub-questions:
-   - when `tax`/`tax_percentage` are omitted, does the POS apply its own
-     configured tax to `order_items[].price`, or treat the prices as final?
-   - is there a flag that declares the submitted prices tax-inclusive?
+9. **ANSWERED 2026-08-27 — the POS displays what we send; it does not
+   recompute.** Money is now sent, and ticket **#9** (SM-2026-000065) printed
+   `Subtotal 84.00 / VAT 10.96 / Total 84.00` against a stored total of 84.00.
+   Both sub-questions below are settled by that single ticket: the POS did
+   **not** add 10.96 on top to print 94.96, and it did not re-derive anything
+   from `order_items[].price`. It rendered our numbers verbatim, so our
+   VAT-**inclusive** convention survives the trip intact and the ticket agrees
+   with what the customer was charged.
+
+   Corroborating evidence from before money was sent: ticket #3 printed
+   `0.00` for all three totals while its line items showed real prices — a POS
+   that computed would have produced a non-zero total there. Original question
+   kept below.
+
+   **The original question, retained as a record and fully superseded.** Read
+   everything in the quote below as what was unknown on 2026-08-24, not as
+   current behaviour. Its closing claim — "no totals field is sent" — is now the
+   *opposite* of what happens, and a half-applied strikethrough left it reading
+   as live text under an ANSWERED heading. That is why it is quoted whole rather
+   than struck by the sentence.
+
+   > Are the money fields VAT-**inclusive** or VAT-**exclusive**? The contract
+   > carries `subtotal`, `discount`, `tax`, `tax_percentage`, `total` and
+   > `order_delivery_fee`, and its example computes `total = 34.5` from
+   > `subtotal = 30` and `tax = 4.5` at `tax_percentage = 15` — i.e. tax
+   > **added on top** of the item prices. Ours are VAT-**inclusive** (KSA), and
+   > `place_order` derives `vat_amount` by extracting the VAT portion *out of*
+   > the payable total. The example also does not say what the POS does with
+   > prices when the tax fields are **absent**, which is the case today and is
+   > the only case that matters for the pickup tickets currently in Production.
+   > Until that is settled, **no totals field is sent** — sending a guessed
+   > `subtotal`/`tax`/`total` would put a number on the ticket that disagrees
+   > with what the customer was charged. Two sub-questions:
+   >
+   > - when `tax`/`tax_percentage` are omitted, does the POS apply its own
+   >   configured tax to `order_items[].price`, or treat the prices as final?
+   > - is there a flag that declares the submitted prices tax-inclusive?
+
+   **Both sub-questions are moot.** The tax fields are no longer omitted, and
+   ticket #9 showed the POS rendering what we send verbatim rather than applying
+   its own tax — which answers the first, and makes the second unnecessary.
 10. **OPEN (new, 2026-08-24)** — Does the POS **add** `addons[].price` to
    `order_items[].price`, or does it treat the item price as already inclusive
    of its add-ons? This is a real-money question, and the current

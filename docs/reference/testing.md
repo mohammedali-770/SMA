@@ -180,6 +180,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/BranchEditModal.test.tsx` | 4 | BranchEditModal — working hours |
 | `src/components/admin/BranchPoliciesPanel.test.tsx` | 11 | BranchPoliciesPanel — branch deletion |
 | `src/components/admin/CompMembersPanel.test.tsx` | 12 | CompMembersPanel |
+| `src/components/admin/IntegrationCard.test.ts` | 4 | Lazywait base_url placeholder |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
