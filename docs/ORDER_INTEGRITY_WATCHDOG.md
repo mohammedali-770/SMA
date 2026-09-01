@@ -59,7 +59,7 @@ are considered safe operational identifiers and are shown.
 
 ---
 
-## 3. Rules (11 supported)
+## 3. Rules (13 supported)
 
 Severity `critical` = a paid customer or a money/POS-consistency problem;
 `warning` = an operational backlog worth watching. Each incident is
@@ -78,8 +78,10 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 | 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
 | 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |
 | 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
+| 12 | `UNPAID_ORDER_NOT_SYNCED` | critical | **not** paid, not cancelled, older than 15 min, `lazywait_sync_state ∈ {syncing,blocked}`, and not intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
+| 13 | `UNPAID_ORDER_DEAD_LETTER` | critical | **not** paid, not cancelled, `lazywait_sync_state='dead_letter'`. |
 
-> ### ⚠ R1 and R7 currently match NOTHING, and the incident that prompted the 2026-08-27 fix is still uncovered
+> ### ✅ CLOSED by R12/R13 — R1 and R7 could not see a cash order, and every real order is cash
 >
 > Removing the `order_type = 'pickup'` filter on 2026-08-27 was necessary and is
 > verified live (0 pickup filters in the deployed body). **It was not
@@ -110,14 +112,68 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 > not quote that number as a health signal until a rule exists that can fire on
 > a cash order.
 >
-> Closing this needs a rule keyed on *sync* state and age rather than on
-> payment — cash orders included. That is a change to alerting behaviour and a
-> separate owner decision; it is recorded here rather than done quietly.
+> **This is now closed.** Rules 12 and 13 are exactly that — keyed on sync
+> state and age rather than on payment. The callout is kept rather than deleted
+> because it is the evidence for why those rules exist, and because "0 incidents
+> in 26 313 runs" is still not a health signal on its own. Its figures are from
+> 2026-08-27 and are left at that date; the section below re-measures.
 
-**Not implemented — `R12 REFUND_STUCK`:** there is no refunds table or refund
+### Why 12 and 13 exist, and why they are narrower than they look
+
+**R1 and R7 cannot see a cash order.** Both require `payment_status = 'paid'` and
+R1 a non-null `paid_at`. A cash order is `pending` with `paid_at` NULL for its
+entire life. Measured 2026-08-31: **63 of 65 orders are `payment_method='cash'`**;
+the only two `paid` orders are comped, total 0.00, already synced. So the rules
+that answer *"the order exists and the kitchen never got it"* had no population to
+match.
+
+That is not theoretical. SM-2026-000057 died silently, and
+SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days raising nothing
+until a human cancelled them by hand.
+
+**The gap is narrower than "cash is uncovered", and the scope follows the gap
+rather than the headline.** Reading each rule rather than assuming:
+
+| state, for a cash order | covered by |
+| --- | --- |
+| `pending`, `failed` | **R10 `OVERDUE_SYNC_RETRY` already** — it carries no payment filter. Warning. |
+| `syncing`, `blocked` | nothing — R10 excludes these states, R1 needs `paid` |
+| `dead_letter` | nothing — R7 needs `paid` |
+
+So R12 takes `{syncing, blocked}` and R13 takes `dead_letter`, and **no more** —
+adding `pending`/`failed` would raise two incidents for every order R10 already
+covers. Whether a stuck `pending` cash order deserves *critical* rather than R10's
+*warning* is a severity policy question, not a coverage gap, and is left open
+rather than changed quietly.
+
+**They cannot double-report with their paid twins**: both gate on
+`payment_status is distinct from 'paid'`, so an order matches R1 or R12, never
+both. `order_integrity_watchdog_test.sql` asserts that disjointness directly —
+including a paid order sitting in `blocked`, which must raise R1 alone — and
+asserts the R10/R12 disjointness on an aged `pending` fixture that would raise
+both if R12 were ever widened.
+
+**The `delivery_schema_unconfirmed` exclusion is load-bearing, and that is
+measured rather than assumed.** Against Production read-only on 2026-08-31: with
+the exclusion R12 matches **0** rows; without it, **4** — exactly the four
+delivery orders deliberately parked and marked `not_retryable`. Applying this
+raises nothing today.
+
+`confirmation_required` remains deliberately uncovered, for the reasons in the
+scope note inside the function: it is the designed human-verification resting
+place and already has `list_pos_confirmation_required()` and the admin feed.
+
+**Not implemented — `REFUND_STUCK`:** there is no refunds table or refund
 lifecycle anywhere in the schema, so the rule is intentionally omitted (a
 provider-side stuck refund is not determinable from our database). Documented
 here so the omission is explicit, not an oversight.
+
+It is deliberately **not numbered**. It was written as "R12" while only 11 rules
+existed; R12 is now `UNPAID_ORDER_NOT_SYNCED`, and a document using one ordinal
+for both an implemented rule and an unimplemented proposal is worse than one that
+numbers only what exists. The ordinals in the table above are positions in that
+table — the `rule_code` is the identifier that matters, and it is what
+`order_integrity_config.rule_enabled` and the admin filter key on.
 
 **Out of scope for v1 — provider-side capture reconciliation:** R3 detects the
 *database* invariant (a captured payment row with no paid order). Detecting "the
@@ -142,7 +198,7 @@ pending owner approval.
 All tunables live in this table as auditable data (`updated_by` / `updated_at`);
 **no Production order IDs are hard-coded in the scanner logic.**
 
-- `rule_enabled` — per-rule on/off map (all 11 supported rules default `true`).
+- `rule_enabled` — per-rule on/off map (all 13 supported rules default `true`).
   Setting a rule to `false` freezes it: its active incidents stop being updated
   **and stop being resolved** (they neither advance clean-counts nor close).
 - `abandoned_awaiting_payment_since` — seeded to `now()` at apply time, so all
