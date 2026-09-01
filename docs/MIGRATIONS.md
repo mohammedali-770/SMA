@@ -3752,6 +3752,74 @@ replacement had two more holes found in review — and is mutation-tested agains
 13 cases, 11 of which must go red and 2 of which must stay green. The green ones
 matter: a tripwire that fails on a reformat gets deleted.
 
+## 40. Cash-order watchdog coverage — WRITTEN, NOT APPLIED (2026-08-31)
+
+`20260831120000_watchdog_cash_order_coverage.sql`. **Not applied. Applying it is a
+separate §5 owner action and the target must be named explicitly** — see the
+warning in CLAUDE.md §8 about "apply the outstanding migrations", which would
+otherwise mean the frozen Moyasar file.
+
+**What it fixes.** R1 `PAID_ORDER_NOT_SYNCED` and R7 `PAID_ORDER_DEAD_LETTER` are
+the rules that answer *"the order exists and the kitchen never got it"*. Both
+require `payment_status = 'paid'`. Read live on 2026-08-31: **63 of 65 orders are
+`payment_method='cash'`**, therefore `payment_status='pending'` with `paid_at`
+NULL for their whole life; the only two `paid` orders are comped, total 0.00, and
+already synced. So on a cash-only launch those rules had no population to match —
+and SM-2026-000057 died silently while SM-2026-000027/-000028/-000029 sat
+`blocked` for ~18 days raising nothing.
+
+**Scope follows the measured gap, not the headline.** R10 `OVERDUE_SYNC_RETRY`
+carries **no** payment filter, so cash orders in `pending`/`failed` were already
+covered at warning severity. The genuinely uncovered states are `syncing`,
+`blocked` and `dead_letter`. R12 takes the first two, R13 the third, and nothing
+more — widening further would double-report against R10.
+
+**Additive by construction.** Every pre-existing rule is byte-identical: diffing
+the redefined function against `20260827130000`'s gives **54 lines added, zero
+removed or altered**. New rule codes default to enabled through the existing
+`coalesce((v_rules->>'CODE'),'true') <> 'false'` pattern, so no
+`order_integrity_config` row is required.
+
+**Pre-apply measurement, read-only against Production:**
+
+| predicate | rows that would fire today |
+| --- | --- |
+| R12 with the `delivery_schema_unconfirmed` exclusion | **0** |
+| R12 without it | **4** — exactly the deliberately parked delivery orders |
+| R13 | **0** |
+
+So applying it raises no incident today, and the exclusion is load-bearing rather
+than decorative.
+
+**Tested rather than asserted.** The full SQL harness was run locally against a
+disposable PostgreSQL 16 cluster — 116 migrations replayed onto an empty
+database, **58/60 suites passing, 0 new failures** (2 pre-existing quarantined).
+`order_integrity_watchdog_test.sql` gains fixtures for both rules and three
+disjointness assertions (R1↔R12, R7↔R13, R10↔R12).
+
+Mutation-tested, each confirmed red then reverted:
+
+| mutation | caught |
+| --- | --- |
+| drop the `delivery_schema_unconfirmed` exclusion | yes |
+| widen R12 to `pending`/`failed` (double-reports with R10) | yes — **only after** a test gap was found and closed |
+| drop the `payment_status is distinct from 'paid'` gate | yes |
+
+The middle row is worth keeping: the first run of that mutation **passed**,
+because the R10 fixture was younger than R12's 15-minute threshold and so could
+not overlap. The fixture was aged and an explicit R10↔R12 disjointness assertion
+added; only then did the mutation fail. A mutation that passes is the test's
+problem, not the mutation's.
+
+**Ownership gap closed in the same change.** `docs/ownership.json` had **no rule
+covering `supabase/migrations/**` at all** — which is precisely how the
+delivery-sync and watchdog migrations changed live behaviour without their owning
+documents moving. Two rules were added: `database-migrations` →
+`docs/MIGRATIONS.md`, and `watchdog-rules` → `docs/ORDER_INTEGRITY_WATCHDOG.md`.
+Each lists exactly **one** document on purpose: `scripts/docs-check-ownership.mjs`
+satisfies a rule when **any** listed doc is touched, so a second entry would let
+the ledger be skipped by editing something else.
+
 ## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
 
 `20260831130000_otp_login_rate_limit.sql`. **Not applied.** It now implies **two**

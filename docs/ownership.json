@@ -134,6 +134,26 @@
       ]
     },
     {
+      "id": "database-migrations",
+      "why": "NO RULE COVERED supabase/migrations AT ALL until 2026-08-31, which is how migrations that changed live behaviour reached Production without their owning document moving. The delivery-sync migration retired a safety block, and the watchdog migration changed which orders raise a critical incident; neither triggered a documentation requirement, because every rule here keyed on application source. A migration is the one change class that alters Production behaviour without any application code changing at all. Exactly one doc is listed on purpose: docs-check-ownership.mjs satisfies a rule when ANY listed doc is touched, so a second entry here would let the ledger be skipped by editing something else.",
+      "sources": [
+        "supabase/migrations/**"
+      ],
+      "docs": [
+        "docs/MIGRATIONS.md"
+      ]
+    },
+    {
+      "id": "watchdog-rules",
+      "why": "The watchdog's rule set is the answer to 'would we find out if an order never reached the kitchen?', and it lives in a migration rather than in application source, so the order-integrity rule above cannot see it. Its own document carries the rule table an operator reads to know what is covered; a rule added or removed without that table moving makes the table actively misleading rather than merely stale. Single doc, for the same OR-semantics reason as database-migrations.",
+      "sources": [
+        "supabase/migrations/*watchdog*.sql"
+      ],
+      "docs": [
+        "docs/ORDER_INTEGRITY_WATCHDOG.md"
+      ]
+    },
+    {
       "id": "maps",
       "why": "The map provider is switchable and its tokens are client-visible. Setup and constraints are documented so the next person does not ship an unrestricted key.",
       "sources": [
