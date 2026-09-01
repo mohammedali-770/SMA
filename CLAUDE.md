@@ -242,10 +242,17 @@ instruction that does not name a file is not an instruction to apply anything;
 ask which one.
 
 The 2026-09-01 apply is the current worked example, and it is the one that
-matches today's shape: two files were outstanding, and the owner named the target
-by its version — "apply 20260831120000" — leaving nothing to infer. One call, that
-file only, with the merged copy hashed before sending and Moyasar's continued
-absence verified afterwards. Ledger row 76.
+matches today's shape. **THREE repository files were unapplied when the
+instruction was given** — Moyasar, `20260831120000_watchdog_cash_order_coverage`
+(merged 11:04:53 UTC) and `20260831130000_otp_login_rate_limit` (merged 11:11:39
+UTC) — and the owner named the target by its version, "apply 20260831120000",
+leaving nothing to infer. One call, that file only, with the merged copy hashed
+before sending and Moyasar's continued absence verified afterwards. Two remained
+outstanding **after** it, which is the count the rest of this section describes;
+do not read that figure back onto the moment of the instruction. Ledger row 76.
+
+That is the shape to notice: the more files are outstanding, the more an unnamed
+target costs, and naming one by version is what makes the count irrelevant.
 
 The 2026-08-28 apply is the worked example of doing it right when the instruction
 does NOT name a file: two files were outstanding, the instruction said "the
