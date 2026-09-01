@@ -122,10 +122,30 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 
 **R1 and R7 cannot see a cash order.** Both require `payment_status = 'paid'` and
 R1 a non-null `paid_at`. A cash order is `pending` with `paid_at` NULL for its
-entire life. Measured 2026-08-31: **63 of 65 orders are `payment_method='cash'`**;
-the only two `paid` orders are comped, total 0.00, already synced. So the rules
-that answer *"the order exists and the kitchen never got it"* had no population to
-match.
+entire life. Measured 2026-08-31, and **re-measured 2026-09-01 during the apply**:
+**63 of 65 orders are `payment_status='pending'`**; the only two `paid` orders are
+comped, total 0.00, already synced. So the rules that answer *"the order exists and
+the kitchen never got it"* had no population to match.
+
+**That figure was first written as "63 of 65 orders are `payment_method='cash'`",
+which attributed the count to the wrong column, and it is worth keeping the
+correction visible rather than quietly overwriting it.** The live breakdown is:
+
+| `payment_method` / `payment_status` | orders |
+| --- | --- |
+| `cash` / `pending` | 59 |
+| `cash` / `paid` | **2** — the comped, zero-total orders |
+| `online` / `pending` | 3 |
+| NULL / `pending` | 1 |
+| **total** | **65** |
+
+So `payment_method='cash'` is **61**, not 63, and — the part the wrong column
+actually obscured — **cash does not imply `pending`**: both `paid` orders are
+themselves cash-method comped orders. That is precisely why R12 and R13 key on
+`payment_status is distinct from 'paid'` and never on `payment_method`. Keying on
+the method would have matched those two already-synced comped orders and missed
+the 3 `online`/`pending` ones. The rules as written are unaffected; only the
+sentence describing them was wrong.
 
 That is not theoretical. SM-2026-000057 died silently, and
 SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days raising nothing
