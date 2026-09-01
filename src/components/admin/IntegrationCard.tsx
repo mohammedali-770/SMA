@@ -108,7 +108,14 @@ export const PROVIDER_SPECS: Record<DbIntegrationSetting['provider_type'], Provi
     subtitle: 'POS order sync — server-side only. Secrets never leave the server.',
     providerOptions: ['lazywait'],
     publicFields: [
-      { key: 'base_url', label: 'API Base URL', type: 'text', placeholder: 'https://apiv2.lazywait.com/v1' },
+      // The DEV host is the LIVE POS — owner-confirmed 2026-08-24, and the value
+      // in Production's `integration_settings.public_config.base_url`. This
+      // placeholder used to offer the PRODUCTION host, which `docs/LAZYWAIT.md`
+      // named as the way "the wrong host could get typed back in". The
+      // fail-closed guard rejects a blank or malformed URL; it cannot reject a
+      // well-formed wrong one, so the suggestion itself has to be right.
+      // Pinned by IntegrationCard.test.ts.
+      { key: 'base_url', label: 'API Base URL', type: 'text', placeholder: 'https://apiv2-dev.lazywait.com/v1' },
       { key: 'client_id', label: 'Client ID', type: 'text', placeholder: 'vAK1AmUr…' },
     ],
     secretFields: [
