@@ -181,7 +181,7 @@ trigger nor worker v6 can produce it — so the guard parks exactly these four a
 nothing reachable. Re-driving any of them would create a real kitchen ticket for
 food nobody is waiting for, and is a §5 live write regardless.
 
-**SUPERSEDED — as of 2026-09-01 TWO repository files are unapplied, not one.** This table is kept because its per-file apply record is still accurate, but its heading is not: `20260831130000_otp_login_rate_limit.sql` merged later and is also unapplied. See the 2026-09-01 re-read further down for the current figures and for why the count matters more than it looks.
+**SUPERSEDED — this table is kept for its per-file apply record, not for its counts.** It briefly understated the outstanding set on 2026-09-01, when `20260831130000_otp_login_rate_limit.sql` merged unapplied and made it TWO; that file has since been applied, so the count is back to one. Do not read a total off this table — see the 2026-09-01 re-read further down, and note that one applied row there still carries undelivered deploy debt.
 
 | File | Status |
 | --- | --- |
@@ -203,9 +203,11 @@ food nobody is waiting for, and is a §5 live write regardless.
 
 **Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
 
-**Re-read live 2026-09-01, AFTER the watchdog cash-coverage apply: 117 repository files / 121 live history rows / TWO unapplied files.** Latest live version `20260901115457` (`20260831120000_watchdog_cash_order_coverage`, applied 11:54:57 UTC on explicit owner approval; ledger row 76).
+**Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
 
-**Read the word TWO before acting on anything in this section.** Every safety argument written below was composed while exactly one file was outstanding, and several of them say so in those words. That is no longer true, and the difference is not cosmetic — it is the difference between an ambiguous instruction having one possible referent and having two. The superseded statement was **115 repository files / 120 live history rows / ONE unapplied file — Moyasar, unapplied on purpose**, latest live version `20260828182228` (`customer_order_state_inflight`, applied 2026-08-28 18:22:28 UTC; ledger row 75).
+**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied but its feature is **not live**: the two Edge Functions that call the RPCs it defines have not been deployed, so the customer login path it exists to protect is still unrate-limited. An applied migration is no longer a safe proxy for "this is done" — see the deploy debt below.
+
+Earlier statements of this figure, kept because the reasoning attached to each is still worth reading: **117 files / 121 rows / TWO unapplied** after the watchdog apply at 11:54:57 UTC (ledger row 76), and before that **115 files / 120 rows / ONE unapplied** at `20260828182228` (ledger row 75).
 
 **Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, re-run on 2026-09-01. Say so plainly because the two 2026-08-27 applications (`product_images_bucket`, `menu_display_order`) were applied **without being recorded at the time**. They now have ledger rows — **73 and 74 in `docs/MIGRATIONS.md`** — but those are deliberately **GAP ROWS**: they carry only what a live read proves (that each is applied, and under which version), and their `repo skel` / `live skel` / `class` columns are `?` rather than `=`/`B` because no content comparison was ever made. **Approval, timing, mechanism and post-apply verification for those two remain unknown and unrecorded.** Closing them properly still needs somebody who holds that detail; the rows exist so the gap is visible instead of silent, not because it is filled.
 
@@ -219,27 +221,48 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Two files are unapplied as of 2026-09-01, and only one of them is frozen:**
+**ONE file is unapplied as of 2026-09-01, and it is the frozen one:**
 
 | File | Status |
 | --- | --- |
-| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260831130000_otp_login_rate_limit.sql` | **UNAPPLIED, awaiting a separate owner decision.** Merged in PR #301; not frozen, not forgotten. Verified absent 2026-09-01: no `otp_send_reservations` table, no `otp_reserve_send` / `otp_release_send` functions, zero history rows. **Applying it implies TWO Edge Function deploys afterwards, in this order:** `auth-send-sms-whatsapp`, then `whatsapp-send-otp` — both call RPCs this migration defines, so the migration must go first and the functions must not be deployed against a database that lacks it. Each deploy is its own §5 action. |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. **Its feature is NOT live** — see the deploy debt below. |
 | `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
 | `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
-**The danger has changed shape, and is worse rather than better.** While exactly
-one file was outstanding, "apply the outstanding migrations" was at least
-unambiguous in its target: it could only have meant Moyasar, so the instruction
-read as obviously wrong. With **two** outstanding — one frozen, one merely
-awaiting a decision — the same phrase now has a plausible-sounding referent, and
-an agent that reasons "they clearly mean the OTP one, not the frozen one" would
-sweep Moyasar in alongside it. `20260824100000` sorts **ahead** of
-`20260831130000`, so a bulk apply reaches the frozen file **first**.
+**So the danger is back to its most acute form.** With exactly one file left,
+"apply the outstanding migrations" reads like a no-op and is in fact the one
+instruction that would break the §6 freeze — there is no other file such an
+instruction could plausibly mean.
 
 **Name the target explicitly. Never apply "whatever is outstanding".** An
 instruction that does not name a file is not an instruction to apply anything;
 ask which one.
+
+### Open deploy debt — an applied migration is not a delivered feature
+
+`20260831130000_otp_login_rate_limit` is applied, and **nothing a customer
+experiences has changed yet**. Two Edge Function deploys remain, and the order is
+not cosmetic:
+
+1. **`auth-send-sms-whatsapp`** — the Supabase Auth Send SMS Hook, i.e. every real
+   customer login. The deployed copy still calls `deliverOtpTemplate` directly, so
+   **the login OTP path is still unrate-limited**, and every attempt is a billable
+   Meta authentication-template message. This deploy is what actually closes the
+   hole the migration was written for.
+2. **`whatsapp-send-otp`** — the phone-verification path, which shares the budget.
+
+Each is a separate §5 owner action. Both call RPCs the migration defines, which is
+why the migration went first; neither may be deployed against a database lacking
+it.
+
+**The intermediate state is safe, and that was checked rather than hoped for.**
+The deployed `whatsapp-send-otp` keeps working because `otp_begin_send` kept its
+13-argument signature, return shape and reason strings — only the source of its
+counts moved, from `otp_challenges` to the shared reservation table. Verified
+after the apply: overload count **1**, so nothing became ambiguous.
+
+Do not read "applied" in the table above as "done" for this row.
 
 The 2026-09-01 apply is the current worked example, and it is the one that
 matches today's shape. **THREE repository files were unapplied when the
@@ -253,6 +276,12 @@ do not read that figure back onto the moment of the instruction. Ledger row 76.
 
 That is the shape to notice: the more files are outstanding, the more an unnamed
 target costs, and naming one by version is what makes the count irrelevant.
+
+**`20260831130000_otp_login_rate_limit` was applied the same day, at 12:46:15 UTC,
+the same way** — "apply 20260831130000", the target named by version, one call,
+with the merged file hashed before sending and Moyasar's absence re-verified
+afterwards (ledger row 77). Two applies an hour apart, each on its own approval,
+each naming its own file: approval for one is never approval for the next (§5).
 
 The 2026-08-28 apply is the worked example of doing it right when the instruction
 does NOT name a file: two files were outstanding, the instruction said "the

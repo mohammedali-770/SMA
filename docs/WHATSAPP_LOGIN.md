@@ -365,6 +365,46 @@ implies **two** deploys — `auth-send-sms-whatsapp` and `whatsapp-send-otp`
 
 On first apply the reservation table is empty, so per-phone limits reset once.
 
+### STATUS 2026-09-01 — the migration is APPLIED, the feature is NOT LIVE
+
+`20260831130000_otp_login_rate_limit` was applied to Production at **12:46:15
+UTC** on explicit owner approval (live version `20260901124615`, history 121 →
+122; ledger row 77 in `docs/MIGRATIONS.md`). **Neither Edge Function has been
+deployed.**
+
+**Read that as: the hole this section describes is still open.** The deployed
+`auth-send-sms-whatsapp` still calls `deliverOtpTemplate` directly, so the login
+path has no per-phone cooldown, hourly or daily cap today, exactly as described
+above. The database is merely ready for the fix. Do not cite this section as
+evidence that login is rate-limited.
+
+| | |
+| --- | --- |
+| `otp_send_reservations` | created, RLS on, **0 policies** (deny-by-default), **0 rows** |
+| `otp_reserve_send` / `otp_release_send` | created, 1 overload each, `service_role` only |
+| `otp_begin_send` | redefined in place — signature byte-identical, overload count still **1** |
+| exposure | `anon` and `authenticated`: no table select/insert, no execute on any of the three |
+| advisors | 0 ERROR; the only finding naming a new object is the expected "RLS enabled, but no policies exist" |
+
+**What remains, in this order** — each a separate §5 owner action:
+
+1. **Deploy `auth-send-sms-whatsapp`.** This is the one that actually closes the
+   billing hole; until it ships, nothing above is enforced on login.
+2. **Deploy `whatsapp-send-otp`.** The verification path, so it shares the budget.
+
+**The intermediate state is safe, and that was verified rather than assumed.**
+The deployed `whatsapp-send-otp` keeps working against the new `otp_begin_send`
+because the signature, return shape and reason strings (`ok` / `cooldown` /
+`hourly_limit` / `daily_limit`) are unchanged — only the source of its counts
+moved, from `otp_challenges` to the shared reservation table. There were **0**
+`otp_challenges` rows in the preceding two days, so the one-time limit reset at
+apply time throttled and freed nobody.
+
+Behaviour was proven on the disposable local cluster via
+`supabase/tests/otp_login_rate_limit_test.sql`, **not** against Production —
+exercising it live would mean writing reservation rows, which an apply approval
+does not cover (§10).
+
 ## 8. Customer profile behavior
 
 - On first phone login, GoTrue inserts `auth.users`; the `handle_new_user`
