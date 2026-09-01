@@ -1,5 +1,13 @@
 # Lazywait single-branch pickup pilot — runbook
 
+> **HISTORICAL, 2026-08-27.** This runbook records the pickup pilot as it was
+> designed and run, when delivery was deliberately blocked at insert. Delivery
+> has since gone live (`20260827120000` + `lazywait-sync` v6), so the delivery
+> rows below — the enqueue table, checklist item **[C]** "Delivery sync verified
+> blocked", and failure drill **3** — describe behaviour that no longer exists
+> and are annotated in place. Do not run them as current acceptance criteria; see
+> `docs/LAZYWAIT.md` for how delivery behaves now.
+
 A controlled, reversible pilot that syncs **pickup** orders from **one** local
 branch (mapped to one Lazywait **test** branch) with **one or two simple
 products**. Nothing else is exercised: no delivery, no addons/modifiers, no
@@ -27,7 +35,7 @@ products**. Nothing else is exercised: no delivery, no addons/modifiers, no
 | Piece | Name | Notes |
 |---|---|---|
 | Order creation (SoT) | `place_order` RPC | pickup needs no address; `payment_status='pending'` |
-| Enqueue on insert | trigger `set_orders_lazywait_initial_sync` | pickup → `pending` (queued now); delivery → `blocked` (`delivery_schema_unconfirmed`) |
+| Enqueue on insert | trigger `set_orders_lazywait_initial_sync` | pickup → `pending` (queued now); delivery → `blocked` (`delivery_schema_unconfirmed`). ~~Delivery half no longer true~~ — since 2026-08-27 delivery also enqueues as `pending`. |
 | Catalog pull | Edge fn `lazywait-catalog` | admin-only (`verify_jwt` + `is_admin()`); caches to `lazywait_catalog_items` |
 | Mapping RPCs | `set_lazywait_mapping` / `clear_lazywait_mapping` | admin-only; write only id/price-ref columns |
 | Readiness | `lazywait_mapping_status()` | staff-only; counts + readiness + `secrets_configured` bool (no token) |
@@ -64,7 +72,7 @@ recommended.
 - [ ] **[C]** One or two **active** test products mapped (`products.lazywait_item_id` set); no other products need mapping for the pilot.
 - [ ] **[C]** No missing `lazywait_item_id` on the test products you will order.
 - [ ] **[C]** Order type used for the test is **pickup**.
-- [ ] **[C]** Delivery sync verified **blocked** (a delivery order shows `lazywait_sync_state='blocked'`, reason `delivery_schema_unconfirmed`, and is NOT sent).
+- [ ] ~~**[C]** Delivery sync verified **blocked** (a delivery order shows `lazywait_sync_state='blocked'`, reason `delivery_schema_unconfirmed`, and is NOT sent).~~ **Retired 2026-08-27** — delivery is live and this check would now correctly fail.
 - [ ] Admin **Lazywait Sync Monitor** visible and loading (branch mapping, readiness, per-order state).
 - [ ] **Retry** button visible on a blocked/failed test order and safe to press.
 - [ ] Logs visible: `integration_sync_logs` (per-attempt) and Edge Function logs (Supabase dashboard → Functions → Logs).
@@ -235,7 +243,7 @@ select status, error from public.integration_sync_logs
 |---|---|---|
 | 1 | **Missing branch mapping** — clear the branch mapping, place a pickup order | `lazywait_sync_state='blocked'`, `sync_blocked_reason='missing_branch_mapping'`; **not** sent; a `skipped` sync log; local order unaffected |
 | 2 | **Missing product mapping** — order a product with no `lazywait_item_id` | `blocked`, `sync_blocked_reason='missing_item_mapping'`; not sent |
-| 3 | **Delivery order** — place a delivery order | `blocked`, `delivery_schema_unconfirmed` at insert; never sent |
+| 3 | ~~**Delivery order** — place a delivery order~~ | ~~`blocked`, `delivery_schema_unconfirmed` at insert; never sent~~ **Retired 2026-08-27** — a delivery order now syncs and creates a real POS ticket. |
 | 4 | **Auth failure** — set an invalid `api_token`, trigger a run | order → `blocked` (`auth_invalid_key`), no retry storm; fix token + **Retry** |
 | 5 | **Retryable network/5xx** — (e.g. wrong `base_url` host, or Lazywait 5xx) | order → `failed`, `sync_attempt_count++`, `sync_next_attempt_at=now()+backoff`; auto-retries; after 8 attempts → `dead_letter` |
 | 6 | **Stale `syncing` reaper** — set a test order to `syncing` with an old `updated_at` (SQL below), trigger a run | ref-less row → `failed` (requeued) / `dead_letter`; a row *with* a `lazywait_ref` → recovered to `synced` (never re-sent); a `recovered_*` `integration_sync_logs` row is written |

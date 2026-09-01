@@ -307,7 +307,7 @@ no blocked orders).
    `categories.lazywait_category_id`, and `order_item_modifiers` joined to
    `modifiers.lazywait_addon_id` — map them with `mapOrderItemRows`, read the
    stored CRM link and optionally refresh it by phone, then
-   `buildCreateOrderPayload` (pickup-only, validates mapping).
+   `buildCreateOrderPayload` (pickup **and** delivery, validates mapping).
 4. `POST /pos/orders/create`; on success save `order_ref`→`lazywait_ref`,
    `order_id`, `order_number`, `order_status_id`→`lazywait_status`, mark
    `synced`; on failure classify + retry/block/dead-letter. Every attempt writes
@@ -633,6 +633,12 @@ answers Q1 — Lazywait **accepts `order_type: "delivery"`**.
 `order_type: "delivery"` and the confirmed top-level `delivery_address` are
 sent; the destination is composed from `orders.address_snapshot`
 (`label · national_short_address · description`).
+
+**Confirmed on a real ticket, 2026-08-27.** SM-2026-000065 (ticket #9) was placed
+with a saved address whose `label` still equals its `description`, so the dedupe
+was genuinely exercised rather than merely present — and the printed DELIVER TO
+line carries the address **once**. Before the fix the same shape put it on the
+ticket four times.
 
 **Repeated parts are deduped**, case-insensitively on the trimmed value, keeping
 the first occurrence. Nothing stops a customer saving the same text as both the

@@ -67,17 +67,52 @@ fingerprinted `RULE_CODE:ENTITY_ID` (one **active** incident per fingerprint).
 
 | # | Rule code | Sev | Fires when |
 |---|-----------|-----|------------|
-| 1 | `PAID_ORDER_NOT_SYNCED` | critical | paid pickup, not cancelled, `paid_at` > 5 min ago, `lazywait_sync_state ∈ {pending,failed,syncing,blocked}`, and NOT intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
+| 1 | `PAID_ORDER_NOT_SYNCED` | critical | paid order of **either** type, not cancelled, `paid_at` > 5 min ago, `lazywait_sync_state ∈ {pending,failed,syncing,blocked}`, and NOT intentionally held (`sync_blocked_reason <> 'delivery_schema_unconfirmed'`). |
 | 2 | `PAID_ORDER_AWAITING_PAYMENT` | critical | order is paid but still `lazywait_sync_state='awaiting_payment'` (the paid→pending flip was missed). |
 | 3 | `CAPTURED_PAYMENT_WITHOUT_ORDER` | critical | `payment_records.status='paid'` for > 3 min but no corresponding **paid** order (DB-invariant variant — see §4). |
 | 4 | `PAYMENT_AMOUNT_MISMATCH` | critical | a paid payment record's `round(amount,2)` differs from its order's `round(total,2)`. |
 | 5 | `DUPLICATE_PROVIDER_REFERENCE` | critical | one paid provider reference (`reference_transaction`/`provider_ref`) maps to **> 1 distinct order**. |
 | 6 | `MULTIPLE_SUCCESSFUL_CAPTURES` | critical | **> 1** paid `payment_records` row for a single order. |
-| 7 | `PAID_ORDER_DEAD_LETTER` | critical | paid pickup, not cancelled, `lazywait_sync_state='dead_letter'`. |
+| 7 | `PAID_ORDER_DEAD_LETTER` | critical | paid order of **either** type, not cancelled, `lazywait_sync_state='dead_letter'`. |
 | 8 | `SYNCED_WITHOUT_USABLE_REFERENCE` | critical | `lazywait_sync_state='synced'` but the stored `lazywait_ref` is not usable (missing / whitespace-only). |
 | 9 | `REFERENCE_WITH_NON_SYNCED_STATE` | critical | a usable `lazywait_ref` exists but state is not `synced` (and not cancelled). |
 | 10 | `OVERDUE_SYNC_RETRY` | warning | `pending`/`failed`, not cancelled, retry is due (`sync_next_attempt_at <= now()` or null) AND overdue by > 10 min. Never fires before the scheduled retry time. |
 | 11 | `ABANDONED_AWAITING_PAYMENT` | warning | unpaid `awaiting_payment` order older than 24 h (legacy checkouts excluded by the config cutoff — see §4). |
+
+> ### ⚠ R1 and R7 currently match NOTHING, and the incident that prompted the 2026-08-27 fix is still uncovered
+>
+> Removing the `order_type = 'pickup'` filter on 2026-08-27 was necessary and is
+> verified live (0 pickup filters in the deployed body). **It was not
+> sufficient.** Both rules also require `payment_status = 'paid'` and a non-null
+> `paid_at`, and that population is empty:
+>
+> | Measured 2026-08-27, live | |
+> | --- | --- |
+> | Orders ever `payment_status='paid'` | **2** — both comped, `total` 0.00, already synced |
+> | **Paid DELIVERY orders ever** | **0** |
+> | Orders `payment_status='pending'` | **53** |
+> | Incidents raised, in 26 313 watchdog runs | **0** |
+>
+> Every real customer order is `payment_method='cash'`, so it is `pending` and
+> `paid_at` is NULL for its whole life. **SM-2026-000057 — the cash delivery
+> order that died silently and prompted all of this — would still raise
+> nothing**, because R1 and R7 need `paid`, and R10 `OVERDUE_SYNC_RETRY` matches
+> only `lazywait_sync_state in ('pending','failed')`, which excludes `blocked`.
+>
+> Corroborating evidence that this is a real blind spot rather than a
+> theoretical one: SM-2026-000027/-000028/-000029 sat at
+> `blocked`/`missing_branch_mapping` from 2026-07-23 — *after* the watchdog's
+> first run — and raised zero incidents for roughly 18 days, until they were
+> cancelled by hand.
+>
+> **So "0 incidents in 26 313 runs" is not evidence of a clean system.** It is
+> equally consistent with critical rules that have no population to match. Do
+> not quote that number as a health signal until a rule exists that can fire on
+> a cash order.
+>
+> Closing this needs a rule keyed on *sync* state and age rather than on
+> payment — cash orders included. That is a change to alerting behaviour and a
+> separate owner decision; it is recorded here rather than done quietly.
 
 **Not implemented — `R12 REFUND_STUCK`:** there is no refunds table or refund
 lifecycle anywhere in the schema, so the rule is intentionally omitted (a
