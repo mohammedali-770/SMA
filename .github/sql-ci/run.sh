@@ -149,7 +149,21 @@ while IFS= read -r f; do
   dropdb --if-exists "$db"
   createdb -T "$TEMPLATE_DB" "$db"
 
-  if psql_on "$db" -f "$f" >/dev/null 2>"$ERR"; then
+  # Hand every suite a conninfo for its OWN clone, so the five suites that need a
+  # genuine second session actually run instead of skipping.
+  #
+  # WHY THIS MATTERS. Those suites guard CONCURRENCY — single-claim safety on
+  # refunds, pre-send races on the POS worker, and the per-phone lock on OTP
+  # reservations. Every one of them opens with a `SKIP … (no
+  # test.dblink_conninfo)` when the setting is absent, and nothing set it, so all
+  # five have been skipping in CI since they were written. A suite that skips
+  # reports the same green as a suite that passes.
+  #
+  # The connection points at "$db" — this suite's own clone — so a second session
+  # sees exactly the fixtures the suite committed and nothing from any other.
+  if psql_on "$db" \
+       -c "select set_config('test.dblink_conninfo', 'host=${PGHOST:-127.0.0.1} port=${PGPORT:-5432} user=${PGUSER:-postgres} dbname=$db', false)" \
+       -f "$f" >/dev/null 2>"$ERR"; then
     if is_known "$name"; then
       # A quarantined suite that passes means the list is stale. Failing here
       # is what stops known-failing.txt decaying into a permanent ignore-list.

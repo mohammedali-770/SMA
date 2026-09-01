@@ -280,6 +280,91 @@ login path in §2 is unaffected in every respect.
 
 ---
 
+## 7.2 Rate limiting on the login path (added 2026-08-31)
+
+**What was unprotected.** There are two OTP senders in `_shared/whatsappSend.ts`:
+
+| sender | limiting |
+| --- | --- |
+| `sendOtpViaWhatsApp` — phone **verification** | `otp_begin_send`: cooldown / hourly / daily |
+| `deliverOtpTemplate` — the raw sender | **none** |
+
+`auth-send-sms-whatsapp` — the Send SMS Hook every real customer login goes
+through — called `deliverOtpTemplate` **directly**. So login had no per-phone
+cooldown, no per-IP cap and no daily ceiling in our code. The only throttle was
+Supabase Auth's own project-wide SMS limit, which is dashboard state and **not
+verifiable from the repository**. Every attempt is a **billable** Meta
+authentication-template message.
+
+### A reservation, not a check — and the first attempt got this wrong
+
+The first version of this fix counted rows in `whatsapp_message_logs`. That table
+is written **after** the Meta POST returns, so under concurrency every request in
+a burst reads the same pre-send history, every one sees room, and every one sends.
+It was documented as "a check, not a reservation" that "bounds the rate". Review
+pointed out that under a burst it bounds *nothing*, which is correct — it would
+have shipped a limiter that fails exactly when it is needed.
+
+The budget is now consumed **before** the send:
+
+1. `pg_advisory_xact_lock(hashtext(phone))` — serialises callers for the **same
+   number only**, so two different customers never contend;
+2. count reservations in the window;
+3. refuse, or **insert the reservation** and return its id.
+
+Steps 2 and 3 are inside the lock, so count-then-insert cannot interleave. The
+lock is transaction-scoped: it releases on commit *or* rollback, so a failed call
+cannot wedge a number.
+
+`otp_release_send` hands the budget back when delivery fails — otherwise a Meta
+outage would burn every customer's daily quota while delivering nothing. Bounded
+residual risk, stated rather than hidden: someone who can reliably force delivery
+failure for **one** number can retry that number freely. It costs our API calls,
+not delivered messages, and cannot reach any other number.
+
+### The budget is shared, in both directions
+
+The first version claimed counting both message types stopped an attacker
+alternating between the senders. It did not: `otp_begin_send` counted
+`otp_challenges` and never saw login sends, so a caller could spend the login
+allowance and then a **separate** verification allowance. The test asserted only
+the direction that happened to work.
+
+Both senders now take their limits from `otp_send_reservations`, under the same
+per-phone lock. The suite asserts **both** directions.
+
+**One deliberate asymmetry:** `otp_begin_send` does **not** release. That path has
+always consumed budget at challenge creation rather than on delivery success, and
+changing that is a behaviour change to a live path — not something to fold into a
+rate-limit fix.
+
+### What is actually tested
+
+`supabase/tests/otp_login_rate_limit_test.sql` asserts nine properties, including
+the boundary (4 against a cap of 5 allowed, the 5th refused), release being
+id-scoped and idempotent, and the shared budget both ways.
+
+The concurrency case uses **dblink for a genuine second session**: session A
+reserves inside an open transaction and holds the lock; session B attempts the
+same number with a short `lock_timeout` and must time out. An earlier draft seeded
+*committed* rows instead — which passes with or without the lock, and so proved
+nothing. Removing the lock now makes the suite fail with `NOT_SERIALISED`.
+
+**That suite would have skipped in CI.** Five suites read
+`test.dblink_conninfo`, nothing set it, and each opens with a loud `SKIP` when it
+is absent — so every concurrency guarantee in this repository has been skipping
+since it was written, reporting the same green as a passing suite.
+`.github/sql-ci/run.sh` now hands each suite a conninfo for its own clone. All
+five run; none skip.
+
+### Ordering, when this is applied and deployed
+
+Apply the migration **first**. It defines the RPCs both functions call. It now
+implies **two** deploys — `auth-send-sms-whatsapp` and `whatsapp-send-otp`
+(because `otp_begin_send` changed). Each is a separate §5 action.
+
+On first apply the reservation table is empty, so per-phone limits reset once.
+
 ## 8. Customer profile behavior
 
 - On first phone login, GoTrue inserts `auth.users`; the `handle_new_user`

@@ -3819,3 +3819,32 @@ documents moving. Two rules were added: `database-migrations` →
 Each lists exactly **one** document on purpose: `scripts/docs-check-ownership.mjs`
 satisfies a rule when **any** listed doc is touched, so a second entry would let
 the ledger be skipped by editing something else.
+
+## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
+
+`20260831130000_otp_login_rate_limit.sql`. **Not applied.** It now implies **two**
+separate function deploys as well — `auth-send-sms-whatsapp` and
+`whatsapp-send-otp`, because `otp_begin_send` changed. Apply the migration
+**first**: both functions call RPCs it defines.
+
+Adds `otp_send_reservations` plus `otp_reserve_send` / `otp_release_send`, and
+redefines `otp_begin_send` so both senders share one budget.
+
+**Redesigned after review.** The first version counted `whatsapp_message_logs`,
+which is written *after* delivery — so a concurrent burst all read the same empty
+history and all passed, and the limiter bound nothing precisely when it mattered.
+It is now a reservation taken under `pg_advisory_xact_lock(hashtext(phone))`, with
+a release path so a failed delivery does not burn a customer's quota. Full
+reasoning: `docs/WHATSAPP_LOGIN.md` §7.2.
+
+Tested on a disposable PostgreSQL 16 cluster: 116 migrations replayed onto an
+empty database, **59/61 suites passing, 0 new failures**. Mutation-tested, each
+red then reverted — removing the advisory lock (fails `NOT_SERIALISED`),
+`otp_begin_send` no longer reserving (breaks the shared budget), and release
+ignoring its id.
+
+**A harness gap closed alongside it.** Five suites read `test.dblink_conninfo` and
+nothing ever set it, so every concurrency suite in this repository has been
+**skipping in CI since it was written** — reporting the same green as a pass.
+`.github/sql-ci/run.sh` now supplies each suite a conninfo for its own clone. All
+five run; all five pass.
