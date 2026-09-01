@@ -181,7 +181,7 @@ trigger nor worker v6 can produce it — so the guard parks exactly these four a
 nothing reachable. Re-driving any of them would create a real kitchen ticket for
 food nobody is waiting for, and is a §5 live write regardless.
 
-**ONE repository file is unapplied, and it is the frozen one.**
+**SUPERSEDED — as of 2026-09-01 TWO repository files are unapplied, not one.** This table is kept because its per-file apply record is still accurate, but its heading is not: `20260831130000_otp_login_rate_limit.sql` merged later and is also unapplied. See the 2026-09-01 re-read further down for the current figures and for why the count matters more than it looks.
 
 | File | Status |
 | --- | --- |
@@ -203,9 +203,11 @@ food nobody is waiting for, and is a §5 live write regardless.
 
 **Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
 
-**Re-read live 2026-08-28, AFTER the state-machine apply: 115 repository files / 120 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260828182228` (`customer_order_state_inflight`, applied 18:22:28 UTC on explicit owner approval; ledger row 75).
+**Re-read live 2026-09-01, AFTER the watchdog cash-coverage apply: 117 repository files / 121 live history rows / TWO unapplied files.** Latest live version `20260901115457` (`20260831120000_watchdog_cash_order_coverage`, applied 11:54:57 UTC on explicit owner approval; ledger row 76).
 
-**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, on 2026-08-28. Say so plainly because the two 2026-08-27 applications (`product_images_bucket`, `menu_display_order`) were applied **without being recorded at the time**. They now have ledger rows — **73 and 74 in `docs/MIGRATIONS.md`** — but those are deliberately **GAP ROWS**: they carry only what a live read proves (that each is applied, and under which version), and their `repo skel` / `live skel` / `class` columns are `?` rather than `=`/`B` because no content comparison was ever made. **Approval, timing, mechanism and post-apply verification for those two remain unknown and unrecorded.** Closing them properly still needs somebody who holds that detail; the rows exist so the gap is visible instead of silent, not because it is filled.
+**Read the word TWO before acting on anything in this section.** Every safety argument written below was composed while exactly one file was outstanding, and several of them say so in those words. That is no longer true, and the difference is not cosmetic — it is the difference between an ambiguous instruction having one possible referent and having two. The superseded statement was **115 repository files / 120 live history rows / ONE unapplied file — Moyasar, unapplied on purpose**, latest live version `20260828182228` (`customer_order_state_inflight`, applied 2026-08-28 18:22:28 UTC; ledger row 75).
+
+**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, re-run on 2026-09-01. Say so plainly because the two 2026-08-27 applications (`product_images_bucket`, `menu_display_order`) were applied **without being recorded at the time**. They now have ledger rows — **73 and 74 in `docs/MIGRATIONS.md`** — but those are deliberately **GAP ROWS**: they carry only what a live read proves (that each is applied, and under which version), and their `repo skel` / `live skel` / `class` columns are `?` rather than `=`/`B` because no content comparison was ever made. **Approval, timing, mechanism and post-apply verification for those two remain unknown and unrecorded.** Closing them properly still needs somebody who holds that detail; the rows exist so the gap is visible instead of silent, not because it is filled.
 
 The superseded statement was **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence for THAT figure: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
@@ -217,30 +219,51 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**It was briefly false on 2026-08-28 — and by under five minutes.** PR #287 put
-`20260828090000_customer_order_state_inflight.sql` on the default branch at
-**18:17:34 UTC**; it was applied at **18:22:28 UTC**, 4 minutes 54 seconds later.
-Moyasar is once more the ONLY unapplied file:
+**Two files are unapplied as of 2026-09-01, and only one of them is frozen:**
 
 | File | Status |
 | --- | --- |
-| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-08-28 apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260831130000_otp_login_rate_limit.sql` | **UNAPPLIED, awaiting a separate owner decision.** Merged in PR #301; not frozen, not forgotten. Verified absent 2026-09-01: no `otp_send_reservations` table, no `otp_reserve_send` / `otp_release_send` functions, zero history rows. **Applying it implies TWO Edge Function deploys afterwards, in this order:** `auth-send-sms-whatsapp`, then `whatsapp-send-otp` — both call RPCs this migration defines, so the migration must go first and the functions must not be deployed against a database that lacks it. Each deploy is its own §5 action. |
+| `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
 | `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
-**So the danger is back to its most acute form.** With exactly one file left,
-"apply the outstanding migrations" reads like a no-op and is in fact the one
-instruction that would break the §6 freeze — there is no other file such an
-instruction could plausibly mean. **Name the target explicitly. Never apply
-"whatever is outstanding".**
+**The danger has changed shape, and is worse rather than better.** While exactly
+one file was outstanding, "apply the outstanding migrations" was at least
+unambiguous in its target: it could only have meant Moyasar, so the instruction
+read as obviously wrong. With **two** outstanding — one frozen, one merely
+awaiting a decision — the same phrase now has a plausible-sounding referent, and
+an agent that reasons "they clearly mean the OTP one, not the frozen one" would
+sweep Moyasar in alongside it. `20260824100000` sorts **ahead** of
+`20260831130000`, so a bulk apply reaches the frozen file **first**.
 
-The 2026-08-28 apply is the worked example of doing it right under exactly that
-ambiguity: two files were outstanding, the instruction said "the migration"
-singular, the referent was fixed by the sentence it answered, only that file was
-sent, and Moyasar's continued absence was verified afterwards.
+**Name the target explicitly. Never apply "whatever is outstanding".** An
+instruction that does not name a file is not an instruction to apply anything;
+ask which one.
+
+The 2026-09-01 apply is the current worked example, and it is the one that
+matches today's shape. **THREE repository files were unapplied when the
+instruction was given** — Moyasar, `20260831120000_watchdog_cash_order_coverage`
+(merged 11:04:53 UTC) and `20260831130000_otp_login_rate_limit` (merged 11:11:39
+UTC) — and the owner named the target by its version, "apply 20260831120000",
+leaving nothing to infer. One call, that file only, with the merged copy hashed
+before sending and Moyasar's continued absence verified afterwards. Two remained
+outstanding **after** it, which is the count the rest of this section describes;
+do not read that figure back onto the moment of the instruction. Ledger row 76.
+
+That is the shape to notice: the more files are outstanding, the more an unnamed
+target costs, and naming one by version is what makes the count irrelevant.
+
+The 2026-08-28 apply is the worked example of doing it right when the instruction
+does NOT name a file: two files were outstanding, the instruction said "the
+migration" singular, the referent was fixed by the sentence it answered, only that
+file was sent, and Moyasar's continued absence was verified afterwards. Note what
+made that safe — a referent recoverable from the immediately preceding exchange,
+not a guess about which file the owner probably meant.
 
 The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
 correctly — each target named explicitly, one call per file, with Moyasar's
-continued absence verified afterwards (most recently 2026-08-28: zero
+continued absence verified afterwards (most recently 2026-09-01: zero
 `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still
 disabled). Any `supabase migration` operation must still name its target
 explicitly.
