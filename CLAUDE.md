@@ -181,7 +181,7 @@ trigger nor worker v6 can produce it — so the guard parks exactly these four a
 nothing reachable. Re-driving any of them would create a real kitchen ticket for
 food nobody is waiting for, and is a §5 live write regardless.
 
-**SUPERSEDED — this table is kept for its per-file apply record, not for its counts.** It briefly understated the outstanding set on 2026-09-01, when `20260831130000_otp_login_rate_limit.sql` merged unapplied and made it TWO; that file has since been applied, so the count is back to one. Do not read a total off this table — see the 2026-09-01 re-read further down, and note that one applied row there still carries undelivered deploy debt.
+**SUPERSEDED — this table is kept for its per-file apply record, not for its counts.** It briefly understated the outstanding set on 2026-09-01, when `20260831130000_otp_login_rate_limit.sql` merged unapplied and made it TWO; that file has since been applied, so the count is back to one. Do not read a total off this table — see the 2026-09-01 re-read further down.
 
 | File | Status |
 | --- | --- |
@@ -205,7 +205,7 @@ food nobody is waiting for, and is a §5 live write regardless.
 
 **Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
 
-**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied but its **login half is not live**: `auth-send-sms-whatsapp` has not been deployed, so the customer login path it exists to protect is still unrate-limited. (The verification half went live with the apply and needs no deploy — see below.) An applied migration is no longer a safe proxy for "this is done" — see the deploy debt below.
+**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied **and its deploy is done** — `auth-send-sms-whatsapp` v2 shipped 2026-09-02, so the customer login path is now rate-limited. The debt that sat here for a day is now closed; the section below is kept because the two lessons it produced are not — chief among them that an applied migration is never by itself a safe proxy for "this is done".
 
 Earlier statements of this figure, kept because the reasoning attached to each is still worth reading: **117 files / 121 rows / TWO unapplied** after the watchdog apply at 11:54:57 UTC (ledger row 76), and before that **115 files / 120 rows / ONE unapplied** at `20260828182228` (ledger row 75).
 
@@ -226,7 +226,7 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. **Its feature is NOT live** — see the deploy debt below. |
+| `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. Its `auth-send-sms-whatsapp` deploy landed 2026-09-02, so the feature is fully live. |
 | `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
 | `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
@@ -239,34 +239,33 @@ instruction could plausibly mean.
 instruction that does not name a file is not an instruction to apply anything;
 ask which one.
 
-### Open deploy debt — an applied migration is not a delivered feature
+### CLOSED 2026-09-02 — the deploy debt this section tracked is discharged
 
-`20260831130000_otp_login_rate_limit` is applied, and **the login path it was
-written for is still unprotected**. **Exactly ONE deploy remains:**
+`20260831130000_otp_login_rate_limit` was applied 2026-09-01, and
+**`auth-send-sms-whatsapp` was deployed as version 2 on 2026-09-02** on explicit
+owner approval, `verify_jwt` preserved at `false`. Every real customer login now
+reserves against the shared per-phone budget before the Meta send: 60 s cooldown,
+5/hour, 10/day, shared with the verification path in both directions. Verified
+after deploying without sending an OTP — the function boots (`GET` → hook-shaped
+405), the signature gate holds (unsigned `POST` → 401 at step 2), and the smoke
+test consumed nothing (`otp_send_reservations` still 0 rows). Detail:
+`docs/WHATSAPP_LOGIN.md`.
 
-**`auth-send-sms-whatsapp`** — the Supabase Auth Send SMS Hook, i.e. every real
-customer login. The deployed copy still calls `deliverOtpTemplate` directly, so
-**the login OTP path is still unrate-limited**, and every attempt is a billable
-Meta authentication-template message. It is a §5 owner action, and it calls RPCs
-the migration defines, which is why the migration went first.
+**Two lessons are kept, because they cost real effort to learn.**
 
-**The verification path is already live and needs no deploy.** `otp_begin_send`
-was replaced body-only under a byte-identical signature, so the already-deployed
-`whatsapp-send-otp` binding resolves to the new body — from the moment of the
-apply its limits come from the shared reservation table under the per-phone lock.
-Verified: PR #301's diff touches no file in that function's bundle, the deployed
-bundle read live carries the unchanged 13-argument call, and the overload count
-stayed **1**.
+**1. An applied migration is not a delivered feature.** For a day, `20260831130000`
+was applied while the login path it exists to protect stayed wide open. "Applied"
+in the table above says the schema moved, nothing more. Ask separately whether the
+code that uses it is deployed.
 
-**A caution worth keeping, because it nearly caused a pointless production write.**
-The migration's own header and `docs/WHATSAPP_LOGIN.md` both said the apply implied
-**two** deploys, reasoning that `otp_begin_send` had changed. A function body
-changing server-side does **not** require redeploying its caller when the signature
-is unchanged. Review caught it on PR #303. When a migration redefines a function,
-ask whether any caller's *code* changed — not merely whether the function did.
-
-Do not read "applied" in the table above as "done" for this row: the login half is
-still outstanding.
+**2. When a migration redefines a function, ask whether any CALLER'S CODE changed
+— not merely whether the function did.** This section, the migration's own header
+and `docs/WHATSAPP_LOGIN.md` all claimed the apply implied **two** deploys, adding
+`whatsapp-send-otp`. It implied one. A body-only replacement under an unchanged
+signature needs no redeploy of its callers: the existing binding resolves to the
+new body, so the verification path picked up the shared budget the moment the
+migration applied. Redeploying it would have been a production write that changed
+nothing. Review caught that on PR #303.
 
 The 2026-09-01 apply is the current worked example, and it is the one that
 matches today's shape. **THREE repository files were unapplied when the
