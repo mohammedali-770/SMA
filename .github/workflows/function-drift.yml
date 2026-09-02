@@ -3,8 +3,8 @@ name: Edge Function drift (read-only)
 # Answers a question nothing in this repository could answer before: WHICH Edge
 # Functions exist in production, and does that set match the repository?
 #
-# Why it matters: deploy-functions.yml covers 4 of the 21 functions in
-# supabase/functions/. The other 17 reach production by hand, and nothing records
+# Why it matters: deploy-functions.yml covers 4 of the 22 functions in
+# supabase/functions/. The other 18 reach production by hand, and nothing records
 # what is deployed or which commit it was built from. During an incident,
 # "roll back the function" currently means reading git history and guessing
 # (docs/ROLLBACK.md §2).
@@ -27,11 +27,21 @@ name: Edge Function drift (read-only)
 # account, every organisation and every project, into a PUBLIC repository's
 # secrets. §15 recommends against adding it and gives the safer alternative.
 
+# THE SCHEDULE WAS REMOVED ON 2026-09-02, and this is why.
+#
+# It used to run `cron: '0 6 * * 1-5'` — 06:00 UTC on weekdays, chosen so a drift
+# report would be waiting before the lunch service. But the list step below exits
+# 1 when SUPABASE_ACCESS_TOKEN is absent, and per docs/OWNER_ACTIONS.md §15 that
+# secret has never existed AND SHOULD NOT BE CREATED: a Supabase access token
+# cannot be scoped to one project, so putting one in this repository's secrets
+# would carry the whole account into it.
+#
+# So the schedule produced a red run five mornings a week that nobody was
+# permitted to fix. A workflow that always fails teaches everybody to ignore
+# failing workflows — including the ones that mean something. `workflow_dispatch`
+# keeps the tool available for the day the safer alternative in §15 is adopted;
+# the alarm that could never be silenced is gone.
 on:
-  schedule:
-    # 06:00 UTC = 09:00 Asia/Riyadh, so a weekday drift report is waiting before
-    # the lunch service rather than arriving mid-rush.
-    - cron: '0 6 * * 1-5'
   workflow_dispatch:
 
 permissions:

@@ -16,8 +16,21 @@ name: EAS Build Status (read-only)
 # removed on 2026-08-05 — read-only in what it does, but reachable from an
 # unreviewed branch, which is the part that matters. Editing a file is not a
 # sensible way to ask for a status check. Run it from the Actions tab.
+#
+# BUILD ID IS AN INPUT AS OF 2026-09-02. It used to be a literal env constant
+# (`BID: a168a7f1-…`), so every run — forever — re-reported the status of one
+# build from the past, and asking about the CURRENT build meant editing the
+# workflow, which is exactly the "editing a file to ask a question" pattern the
+# trigger note above exists to stop. The old value is kept as the default so an
+# argument-less run behaves as it always did.
 on:
   workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'EAS build id to poll (find it with `eas build:list`, or in the Expo dashboard URL).'
+        required: false
+        type: string
+        default: a168a7f1-bfc5-482c-85ae-4a3afce3aa76
 
 # Least privilege: this job only reads the checkout and queries EAS. Declared
 # explicitly rather than inheriting the repository default.
@@ -61,7 +74,7 @@ jobs:
 
       - name: Poll EAS build until it finishes
         env:
-          BID: a168a7f1-bfc5-482c-85ae-4a3afce3aa76
+          BID: ${{ inputs.build_id }}
           EXPO_NO_TELEMETRY: "1"
         run: |
           set +e
