@@ -1,7 +1,11 @@
 /**
  * Contact & Support channel policy — PURE and framework-free so the
  * sanitization + visibility rules are unit-tested under Node
- * (supportContact.test.ts) and consumed by the Legal & Support screen.
+ * (supportContact.test.ts, which lives beside the WEB copy) and consumed by the
+ * Legal & Support screen.
+ *
+ * MOBILE MIRROR of src/lib/supportContact.ts, enforced by
+ * src/lib/mirrorParity.test.ts — the two copies must stay code-identical.
  *
  * Security/UX rules this encodes:
  *  - Links are CONSTRUCTED here from validated fragments (digits, a vetted
