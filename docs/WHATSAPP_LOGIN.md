@@ -375,18 +375,27 @@ that changed nothing.
 
 On first apply the reservation table is empty, so per-phone limits reset once.
 
-### STATUS 2026-09-01 — the migration is APPLIED, the feature is NOT LIVE
+### STATUS 2026-09-02 — APPLIED and DEPLOYED. The login path is now rate-limited.
 
-`20260831130000_otp_login_rate_limit` was applied to Production at **12:46:15
-UTC** on explicit owner approval (live version `20260901124615`, history 121 →
-122; ledger row 77 in `docs/MIGRATIONS.md`). **Neither Edge Function has been
-deployed.**
+`20260831130000_otp_login_rate_limit` was applied to Production on **2026-09-01 at
+12:46:15 UTC** (live version `20260901124615`, history 121 → 122; ledger row 77 in
+`docs/MIGRATIONS.md`), and **`auth-send-sms-whatsapp` was deployed as version 2 on
+2026-09-02**, both on explicit owner approval.
 
-**Read that as: the hole this section describes is still open.** The deployed
-`auth-send-sms-whatsapp` still calls `deliverOtpTemplate` directly, so the login
-path has no per-phone cooldown, hourly or daily cap today, exactly as described
-above. The database is merely ready for the fix. Do not cite this section as
-evidence that login is rate-limited.
+**The hole described in §7.2 is closed.** Every real customer login now reserves
+against the shared per-phone budget before the Meta send. The effective limits
+come from `resolveWhatsAppConfig`: **60 s cooldown** (`resend_cooldown_seconds`),
+**5 per hour**, **10 per day** — shared with the phone-verification path, in both
+directions.
+
+**A refusal returns 429** with a deliberately generic message. The reason
+(`cooldown` / `hourly_limit` / `daily_limit`) is **not** echoed, because telling a
+caller which limit it hit reveals how much traffic a given number has already had.
+
+**It fails OPEN on an RPC error, by design.** If `otp_reserve_send` cannot be
+reached, the send proceeds. A limiter that is unreachable must not become an
+outage of the entire login system — the trade is a temporary loss of limiting, not
+a loss of login.
 
 | | |
 | --- | --- |
@@ -396,10 +405,25 @@ evidence that login is rate-limited.
 | exposure | `anon` and `authenticated`: no table select/insert, no execute on any of the three |
 | advisors | 0 ERROR; the only finding naming a new object is the expected "RLS enabled, but no policies exist" |
 
-**Exactly ONE deploy remains, and it is a §5 owner action:**
+**Nothing remains.** `auth-send-sms-whatsapp` was the one deploy this work
+required, and it shipped on 2026-09-02 as **version 2**, `verify_jwt` preserved at
+`false` (the hook is called by Supabase Auth with a Standard Webhooks signature,
+not a JWT — flipping that would break every login).
 
-**Deploy `auth-send-sms-whatsapp`.** It is the one that closes the billing hole;
-until it ships, nothing in §7.2 is enforced on login.
+**Verified after deploying, without sending anybody an OTP:**
+
+| check | result |
+| --- | --- |
+| the function boots | **yes** — `GET` returns the hook-shaped `405 Method not allowed` |
+| the signature gate holds | **yes** — an unsigned `POST` returns `401 Invalid signature`, at step 2, before any reservation or Meta send |
+| cost of that smoke test | **zero** — `otp_send_reservations` still 0 rows, no `whatsapp_message_logs` row |
+| bundle | all six files present live; the reservation call and the release call are both in the deployed `index.ts` |
+
+The boot check is the one that mattered: the deploy bundle flattens
+`../_shared/…` imports to `./…`, so a mistake there would have failed at module
+load and taken every login down. A live login test was deliberately **not**
+performed — it would send a billable authentication-template message to a real
+customer's number.
 
 ### The verification path needs NO deploy, and is already limited
 
