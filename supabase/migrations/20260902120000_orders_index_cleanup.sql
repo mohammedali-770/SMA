@@ -1,0 +1,90 @@
+-- Drop one duplicate and one dead index on `orders`, the hottest table.
+--
+-- Found by the 2026-09-02 dead-code audit. Both claims below were verified
+-- against Production READ-ONLY before this file was written; neither rests on
+-- reading the migrations alone.
+--
+-- ---------------------------------------------------------------------------
+-- 1. orders_lazywait_deadline_queue_idx DUPLICATES orders_lazywait_queue_idx
+-- ---------------------------------------------------------------------------
+-- Two indexes, different names, IDENTICAL definitions:
+--
+--   orders_lazywait_queue_idx           20260708130000_lazywait_integration.sql:93
+--   orders_lazywait_deadline_queue_idx  20260721120000_lazywait_confirmation_lifecycle.sql:1126
+--
+--   ON public.orders USING btree (sync_next_attempt_at)
+--   WHERE (lazywait_sync_state = ANY (ARRAY['pending'::text, 'failed'::text]))
+--
+-- That is `pg_get_indexdef` output for BOTH, live, differing only in the name.
+-- The second was added intending a deadline-bounded queue — its comment says
+-- "the claim predicate now also filters on the deadline, so index the due,
+-- in-budget rows" — but the predicate written was the same one already there.
+-- `create index if not exists` cannot dedupe across different names, so it
+-- silently became a second copy, and neither has ever been dropped.
+--
+-- The cost is on every write. `orders` takes an insert per customer order and a
+-- sync-state update on every worker attempt, retry and requeue, and each of
+-- those maintains BOTH copies for a single query benefit.
+--
+-- WHY THIS IS SAFE, and why the live scan counts are the proof rather than a
+-- statistic. Both are being used — 45,808 and 34,622 scans — which is exactly
+-- what you would expect from two interchangeable indexes: the planner picks one
+-- arbitrarily and the traffic splits. Because the definitions are identical,
+-- every query served by the dropped one is served by the survivor with the same
+-- plan and the same cost. Neither is unique, neither is primary, and neither
+-- backs a constraint (checked in pg_constraint, both null).
+--
+-- The OLDER name survives: docs/LAZYWAIT.md names `orders_lazywait_queue_idx`,
+-- and it carries the higher scan count.
+--
+-- ---------------------------------------------------------------------------
+-- 2. orders_sync_queue_idx is DEAD — nothing can use it
+-- ---------------------------------------------------------------------------
+--   20260707121200_perf_indexes.sql:31
+--   ON public.orders USING btree (created_at)
+--   WHERE (sync_status = ANY (ARRAY['not_synced'::sync_status, 'failed'::sync_status]))
+--
+-- The ONLY `where sync_status` anywhere in this repository is that index's own
+-- predicate. `sync_status` is still WRITTEN (record_lazywait_sync and the
+-- lifecycle functions maintain it) and PROJECTED (apps/mobile/src/lib/orderSelect.ts),
+-- but no query filters on it. The live queue predicate has been
+-- `lazywait_sync_state`, not `sync_status`, since 20260708130000 — which is what
+-- the surviving index above is for.
+--
+-- Live `idx_scan` is 0, and that is corroboration, NOT the argument. See the
+-- caution below.
+--
+-- ---------------------------------------------------------------------------
+-- A CAUTION, recorded so this file is not read as a licence to drop indexes
+-- ---------------------------------------------------------------------------
+-- Six OTHER indexes on `orders` also show idx_scan = 0 today:
+--
+--   orders_address_id_idx        orders_comped_idx
+--   orders_lazywait_order_id_idx orders_lazywait_ref_idx
+--   orders_refund_active_idx     orders_status_created_idx
+--
+-- THEY ARE NOT DEAD. `orders` holds 66 rows, and on a table that small the
+-- planner prefers a sequential scan regardless of what indexes exist. Each of
+-- those six has a real query behind it in source, and each will start being used
+-- the moment the table grows.
+--
+-- Zero scans proves nothing on its own. The two indexes dropped here are proven
+-- redundant by SOURCE — an identical definition, and a column no query filters
+-- on — with the statistics only agreeing.
+--
+-- ---------------------------------------------------------------------------
+-- Scope
+-- ---------------------------------------------------------------------------
+-- Indexes only. No table, function, policy, grant, trigger or enum is touched.
+-- `place_order` and `compute_order_snapshot` are not redefined, so the money
+-- path is untouched by construction rather than by assertion. No row is read or
+-- written. `if exists` makes it re-runnable.
+--
+-- `drop index` (not `concurrently`) takes a brief ACCESS EXCLUSIVE lock on
+-- `orders`. At 66 rows and 16 kB per index this is sub-millisecond. It is
+-- written this way deliberately: `drop index concurrently` cannot run inside a
+-- transaction block, and every migration here is applied transactionally.
+
+drop index if exists public.orders_lazywait_deadline_queue_idx;
+
+drop index if exists public.orders_sync_queue_idx;

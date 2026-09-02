@@ -805,6 +805,17 @@ by a printed ticket rather than by the vendor.
 - The queue index `orders_lazywait_queue_idx` pulls due `pending`/`failed` rows
   oldest-first. `requeue_lazywait_order(id)` (admin-only) resets to `pending`
   **and** clears `sync_attempt_count` so the retry gets a full attempt budget.
+- **There are currently TWO of that index, and this line named only one.** The
+  2026-09-02 audit found `orders_lazywait_deadline_queue_idx`
+  (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) with a definition
+  **identical** to `orders_lazywait_queue_idx` — same column, same predicate,
+  different name, so `create index if not exists` could not dedupe them. Both are
+  live and both are being scanned (45,808 and 34,622), which is what
+  interchangeable indexes look like. Every insert and every sync-state update on
+  `orders` maintains both for one query's benefit.
+  `20260902120000_orders_index_cleanup.sql` drops the duplicate; it is **written
+  and not applied** (a §5 owner action — see `docs/MIGRATIONS.md` §42). Until it
+  is applied, expect to see two.
 
 ### Stale-'syncing' reaper (crash/timeout recovery)
 `claim_lazywait_sync_batch` flips a whole batch to `syncing` up front, then the

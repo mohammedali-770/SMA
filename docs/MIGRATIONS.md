@@ -1136,7 +1136,7 @@ recorded as *repository-only / UNAPPLIED* from 2026-07-24 until 2026-07-29.
 | `order_refunds` | table | append-only refund attempt ledger; RLS staff-read-only |
 | `pos_confirmation_channel_active()` | function | does this order have a branch-confirmation step at all? |
 | `customer_order_state()` | function | THE authority mapping columns → one customer-visible state |
-| `customer_pos_resend_eligibility()` | function | pure proven-not-sent + budget predicate |
+| ~~`customer_pos_resend_eligibility()`~~ | function | pure proven-not-sent + budget predicate. **SUPERSEDED 2026-08-13** by `customer_manual_pos_resend_eligibility()` (8 args) in `20260813143000_manual_only_pos_resend.sql:104`, which is what the redefined `request_customer_pos_resend` calls. The 9-argument version still exists live and is still granted to `authenticated`, but nothing in production reaches it — only `order_confirmation_state_machine_test.sql:198-231` keeps it exercised. It is a pure predicate over its arguments, reads no rows and leaks nothing, so this is drift rather than exposure. Recorded by the 2026-09-02 audit, which found this table still naming it as the live predicate |
 | `request_customer_pos_resend()` | RPC (authenticated) | owner-scoped, row-locked, server-counted resend |
 | `order_refund_due()` + 2 triggers | predicate + triggers | automatic, path-independent refund enrollment |
 | `enforce_refund_state_transition()` | trigger | rejects invalid/out-of-order refund transitions |
@@ -3884,3 +3884,83 @@ nothing ever set it, so every concurrency suite in this repository has been
 **skipping in CI since it was written** — reporting the same green as a pass.
 `.github/sql-ci/run.sh` now supplies each suite a conninfo for its own clone. All
 five run; all five pass.
+
+---
+
+## 42. `orders` index cleanup — WRITTEN, NOT APPLIED (2026-09-02)
+
+`20260902120000_orders_index_cleanup.sql`. **Not applied.** Two `drop index if
+exists` statements and nothing else. Found by the 2026-09-02 dead-code audit;
+both claims were verified against Production **read-only** before the file was
+written.
+
+### What it drops, and why each is safe
+
+**`orders_lazywait_deadline_queue_idx` — an exact duplicate.** Live
+`pg_get_indexdef` for it and for `orders_lazywait_queue_idx` are identical apart
+from the name:
+
+```
+ON public.orders USING btree (sync_next_attempt_at)
+WHERE (lazywait_sync_state = ANY (ARRAY['pending'::text, 'failed'::text]))
+```
+
+The second (`20260721120000_lazywait_confirmation_lifecycle.sql:1126`) was added
+intending a *deadline-bounded* queue — its comment says "the claim predicate now
+also filters on the deadline" — but the predicate written was the one already
+present from `20260708130000_lazywait_integration.sql:93`. `create index if not
+exists` cannot dedupe across different names, so it silently became a second
+copy, and neither was ever dropped.
+
+**The live scan counts are the proof, not a statistic.** Both are in use —
+**45,808** and **34,622** scans — which is exactly what two interchangeable
+indexes look like: the planner picks one arbitrarily and the traffic splits.
+Because the definitions are identical, every query served by the dropped one is
+served by the survivor with the same plan. Neither is unique or primary and
+neither backs a constraint (`pg_constraint.conindid` → null for both). The
+**older** name survives: `docs/LAZYWAIT.md` names it, and it has the higher count.
+
+The cost being removed is on every write. `orders` takes an insert per customer
+order and a sync-state update on every worker attempt, retry and requeue, and
+each of those maintains both copies.
+
+**`orders_sync_queue_idx` — dead.** `20260707121200_perf_indexes.sql:31`,
+predicate `where sync_status in ('not_synced','failed')`. **The only
+`where sync_status` anywhere in the repository is that index's own predicate.**
+`sync_status` is still written and still projected
+(`apps/mobile/src/lib/orderSelect.ts`), but nothing filters on it — the live queue
+predicate has been `lazywait_sync_state` since `20260708130000`. Live `idx_scan`
+is 0.
+
+### A caution, because this section could otherwise be misread
+
+Six **other** indexes on `orders` also show `idx_scan = 0`:
+`orders_address_id_idx`, `orders_comped_idx`, `orders_lazywait_order_id_idx`,
+`orders_lazywait_ref_idx`, `orders_refund_active_idx`, `orders_status_created_idx`.
+
+**They are not dead.** `orders` holds 66 rows, and on a table that small the
+planner prefers a sequential scan whatever indexes exist. Each has a real query
+behind it in source and will start being used as the table grows. Zero scans
+proves nothing on its own. The two indexes here are proven redundant by
+**source** — an identical definition, and a column no query filters on — with the
+statistics merely agreeing.
+
+### Scope
+
+Indexes only. No table, function, policy, grant, trigger or enum. `place_order`
+and `compute_order_snapshot` are not redefined, so **the money path is untouched
+by construction rather than by assertion**. No row is read or written, and
+`if exists` makes it re-runnable.
+
+`drop index` rather than `drop index concurrently` is deliberate: `concurrently`
+cannot run inside a transaction block and every migration here is applied
+transactionally. At 66 rows and 16 kB per index the ACCESS EXCLUSIVE lock is
+sub-millisecond.
+
+### Applying it
+
+A §5 owner action, and it does **not** need a function deploy — no code names
+either index. When the instruction comes, name the file by version
+(`20260902120000`); per CLAUDE.md §8, an unnamed target is not an instruction to
+apply anything, and `20260824100000_moyasar_payment_provider` still sorts ahead of
+everything.

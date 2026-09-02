@@ -203,7 +203,9 @@ food nobody is waiting for, and is a §5 live write regardless.
 
 **Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
 
-**Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
+**Superseded 2026-09-02 by a new file: 118 repository files / 122 live history rows / TWO unapplied — Moyasar (frozen) and `20260902120000_orders_index_cleanup` (written, awaiting approval).** Latest live version is still `20260901124615`; nothing has been applied since.
+
+The statement it supersedes: **Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
 
 **The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied **and its deploy is done** — `auth-send-sms-whatsapp` v2 shipped 2026-09-02, so the customer login path is now rate-limited. The debt that sat here for a day is now closed; the section below is kept because the two lessons it produced are not — chief among them that an applied migration is never by itself a safe proxy for "this is done".
 
@@ -221,19 +223,23 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**ONE file is unapplied as of 2026-09-01, and it is the frozen one:**
+**TWO files are unapplied as of 2026-09-02. One is frozen; the other is not, and that is exactly what makes an unnamed instruction dangerous again:**
 
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260902120000_orders_index_cleanup.sql` | **UNAPPLIED, awaiting owner approval.** Two `drop index if exists` statements and nothing else: `orders_lazywait_deadline_queue_idx` (an exact duplicate of `orders_lazywait_queue_idx` — live `pg_get_indexdef` identical apart from the name) and `orders_sync_queue_idx` (dead; the only `where sync_status` in the repository is that index's own predicate). Indexes only — no function is redefined, so the money path is untouched by construction. Implies **no** deploy. Detail: `docs/MIGRATIONS.md` §42, `docs/OWNER_ACTIONS.md` §24. |
 | `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. Its `auth-send-sms-whatsapp` deploy landed 2026-09-02, so the feature is fully live. |
 | `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
 | `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
-**So the danger is back to its most acute form.** With exactly one file left,
-"apply the outstanding migrations" reads like a no-op and is in fact the one
-instruction that would break the §6 freeze — there is no other file such an
-instruction could plausibly mean.
+**The danger changed shape on 2026-09-02, and got worse rather than better.**
+While exactly one file was outstanding, "apply the outstanding migrations" was
+unmistakable: it could only mean Moyasar, so it read as obviously wrong. With a
+second, entirely benign file sitting beside it, the same instruction now has a
+*plausible* referent — and a bulk apply would sweep the frozen file in anyway,
+because `20260824100000` sorts ahead of `20260902120000`. An instruction that
+sounds reasonable and is wrong is more dangerous than one that sounds absurd.
 
 **Name the target explicitly. Never apply "whatever is outstanding".** An
 instruction that does not name a file is not an instruction to apply anything;
