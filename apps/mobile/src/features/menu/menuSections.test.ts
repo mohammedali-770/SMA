@@ -6,7 +6,8 @@ import type { Category, Product, ProductVariant } from '../../types/models';
 function product(id: string, over: Partial<Product> = {}): Product {
   return {
     id, categoryId: 'c1', nameEn: `Name ${id}`, nameAr: `اسم ${id}`, descriptionEn: `desc ${id}`,
-    descriptionAr: '', price: 10, imageUrl: '', calories: 0, isActive: true, modifierGroupIds: [],
+    descriptionAr: '', price: 10, imageUrl: '', calories: 0, isActive: true, sortOrder: 0,
+    modifierGroupIds: [],
     variants: [],
     ...over,
   };
@@ -185,5 +186,65 @@ describe('from-price — only claim a range when one exists', () => {
 
   it('does not depend on tier order — cheapest last still reads as a range', () => {
     expect(hasPriceRange(product('p', { variants: [tier('big', 30), tier('small', 12)] }))).toBe(true);
+  });
+});
+
+describe('product order within a category', () => {
+  it('follows sortOrder, not the order the products arrived in', () => {
+    // The administrator's ordering is the whole point; the input array is
+    // deliberately shuffled relative to it.
+    const sections = build({
+      products: [
+        product('p1', { sortOrder: 3, nameEn: 'Wings' }),
+        product('p2', { sortOrder: 1, nameEn: 'Cheese fries' }),
+        product('p3', { sortOrder: 2, nameEn: 'Fries' }),
+      ],
+    });
+    expect(sections[0].data.map((d) => d.product.nameEn)).toEqual(['Cheese fries', 'Fries', 'Wings']);
+  });
+
+  it('breaks ties by name so an UNORDERED menu is still stable', () => {
+    // This is today's live data: every product at sort_order 0. Without a
+    // tie-break the order is whatever the fetch happened to return, which can
+    // differ between two loads of the same menu.
+    const sections = build({
+      products: [
+        product('p1', { sortOrder: 0, nameEn: 'Wings' }),
+        product('p2', { sortOrder: 0, nameEn: 'Cheese fries' }),
+        product('p3', { sortOrder: 0, nameEn: 'Fries' }),
+      ],
+    });
+    expect(sections[0].data.map((d) => d.product.nameEn)).toEqual(['Cheese fries', 'Fries', 'Wings']);
+  });
+
+  it('does not mutate the caller\'s products array', () => {
+    // buildMenuSections is called on every keystroke in the search box; sorting
+    // the caller's array in place would reorder the app's catalog state.
+    const products = [
+      product('p1', { sortOrder: 2, nameEn: 'B' }),
+      product('p2', { sortOrder: 1, nameEn: 'A' }),
+    ];
+    const before = products.map((p) => p.id);
+    build({ products });
+    expect(products.map((p) => p.id)).toEqual(before);
+  });
+
+  it('orders within EACH category independently', () => {
+    // reorder_products is category-scoped, so rank 1 exists in every category.
+    const sections = buildMenuSections({
+      products: [
+        product('p1', { categoryId: 'c1', sortOrder: 2, nameEn: 'A2' }),
+        product('p2', { categoryId: 'c2', sortOrder: 1, nameEn: 'B1' }),
+        product('p3', { categoryId: 'c1', sortOrder: 1, nameEn: 'A1' }),
+        product('p4', { categoryId: 'c2', sortOrder: 2, nameEn: 'B2' }),
+      ],
+      categories: [category('c1', 1), category('c2', 2)],
+      branchId: 'b1',
+      query: '',
+      searchIndex: new Map(),
+      isOrderable: allAvailable,
+      hasModifiers: noModifiers,
+    });
+    expect(sections.map((s) => s.data.map((d) => d.product.nameEn))).toEqual([['A1', 'A2'], ['B1', 'B2']]);
   });
 });

@@ -73,36 +73,107 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'lazywait config missing client_id or api_token' }, 500);
   }
 
+  // TARGETED mode: order-intake passes the id of the order the customer is
+  // waiting on, so the kick syncs THAT order and nothing else. Untargeted
+  // (cron, and the post-payment handoff in _shared/paymentSync.ts) is unchanged.
+  //
+  // Why this exists. The kick used to send `{limit: 5}`, which claims up to five
+  // orders OLDEST-FIRST and processes them SERIALLY. The customer's order is the
+  // NEWEST, so it was handled LAST of whatever the batch picked up — the
+  // customer's checkout blocked while four other people's orders were sent to
+  // the POS. Measured on SM-2026-000065 the awaited call took 10.747 s against
+  // an 11 s abort: 253 ms of headroom, and on SM-2026-000064 the abort appears
+  // to have actually fired.
   let limit = 5;
-  try { const b = await req.json(); if (b && typeof b.limit === 'number') limit = b.limit; } catch { /* no body */ }
+  let targetOrderId: string | null = null;
+  try {
+    const b = await req.json();
+    if (b && typeof b.limit === 'number') limit = b.limit;
+    if (b && typeof b.orderId === 'string' && b.orderId) targetOrderId = b.orderId;
+  } catch { /* no body */ }
+  const targeted = targetOrderId !== null;
 
-  // Reap stale 'syncing' claims BEFORE claiming a fresh batch. If a previous run
-  // crashed/timed-out after claim_lazywait_sync_batch flipped a row to 'syncing'
-  // but before record_lazywait_sync ran, that row is stuck outside the queue
-  // predicate. reap_stale_lazywait_syncs recovers rows already carrying a POS
-  // ref to 'synced' (never re-POST — Create Order has no idempotency key) and
-  // requeues ref-less rows to 'failed' with backoff (or dead-letters at max
-  // attempts). Non-fatal: a reaper hiccup must not stop the sync run.
+  // Work the customer's response does not depend on, moved off the awaited path
+  // in targeted mode. `EdgeRuntime.waitUntil` keeps the isolate alive past the
+  // Response; the optional call is the same guarded shape used by
+  // account-delete-request/index.ts. On a platform without it, or in a local
+  // run, this degrades to awaiting — never to skipping.
+  const deferred: Promise<unknown>[] = [];
+  const runOffPath = async (work: () => Promise<unknown>): Promise<void> => {
+    if (!targeted) { await work(); return; }
+    const p = work();
+    deferred.push(p);
+    const rt = (globalThis as { EdgeRuntime?: { waitUntil(x: Promise<unknown>): void } }).EdgeRuntime;
+    if (rt?.waitUntil) { try { rt.waitUntil(p); return; } catch { /* fall through to await */ } }
+    await p;
+  };
+
+  // Reap stale 'syncing' claims. If a previous run crashed/timed-out after a
+  // claim flipped a row to 'syncing' but before record_lazywait_sync ran, that
+  // row is stuck outside the queue predicate. reap_stale_lazywait_syncs recovers
+  // rows already carrying a POS ref to 'synced' (never re-POST — Create Order
+  // has no idempotency key) and requeues ref-less rows to 'failed' with backoff
+  // (or dead-letters at max attempts). Non-fatal: a reaper hiccup must not stop
+  // the sync run.
+  //
+  // DEFERRED IN TARGETED MODE, NOT SKIPPED — and the difference matters.
+  // Skipping it on the kick path would be ~0.9 s cheaper in exactly the same
+  // way, but this RPC has only ONE production caller (here), so the worker's two
+  // independent drivers — the once-a-minute cron and this kick — are also its
+  // only two reaping drivers. They do NOT share a failure mode:
+  // `invoke_lazywait_sync_processor()` returns early without invoking anything
+  // when the vault secret `lazywait_sync_project_url` is missing, while the kick
+  // builds its URL from SUPABASE_URL and is unaffected. Deleting the redundant
+  // driver would mean one missing vault secret stops all reaping, and a cash
+  // order stuck in 'syncing' with no ref is invisible to the watchdog too (R1
+  // and R7 both require payment_status = 'paid'; R10 covers only
+  // 'pending'/'failed'). Deferring buys the identical 0.9 s and keeps both
+  // drivers alive.
+  //
+  // Ordering is safe because everything the reaper decides is time-thresholded
+  // (STALE_SYNC_TIMEOUT_MINUTES = 10), not event-driven: nothing it would act on
+  // can have become stale during this invocation.
+  // CRM link refreshes to run AFTER the response, on the targeted path. See the
+  // note at the search itself for why this is deferred rather than dropped.
+  const crmBackfills: Array<() => Promise<void>> = [];
+
   let reaped: Record<string, unknown> = {
     recovered_synced: 0, requeued: 0, dead_lettered: 0, confirmation_required: 0, deadline_failed: 0,
   };
-  const { data: reapData, error: reapErr } = await admin.rpc('reap_stale_lazywait_syncs', {
-    p_timeout_minutes: STALE_SYNC_TIMEOUT_MINUTES,
-    p_max_attempts: MAX_POS_ATTEMPTS,
+  await runOffPath(async () => {
+    const { data: reapData, error: reapErr } = await admin.rpc('reap_stale_lazywait_syncs', {
+      p_timeout_minutes: STALE_SYNC_TIMEOUT_MINUTES,
+      p_max_attempts: MAX_POS_ATTEMPTS,
+    });
+    if (reapErr) {
+      console.error('reap_stale_lazywait_syncs failed (non-fatal):', safeErr(reapErr.message));
+      return;
+    }
+    if (reapData && typeof reapData === 'object') {
+      reaped = reapData as Record<string, unknown>;
+      const n = Number(reaped.recovered_synced ?? 0) + Number(reaped.requeued ?? 0)
+        + Number(reaped.dead_lettered ?? 0) + Number(reaped.confirmation_required ?? 0)
+        + Number(reaped.deadline_failed ?? 0);
+      if (n > 0) console.log('reaped stale lazywait syncing rows:', JSON.stringify(reaped));
+    }
   });
-  if (reapErr) {
-    console.error('reap_stale_lazywait_syncs failed (non-fatal):', safeErr(reapErr.message));
-  } else if (reapData && typeof reapData === 'object') {
-    reaped = reapData as Record<string, unknown>;
-    const n = Number(reaped.recovered_synced ?? 0) + Number(reaped.requeued ?? 0)
-      + Number(reaped.dead_lettered ?? 0) + Number(reaped.confirmation_required ?? 0)
-      + Number(reaped.deadline_failed ?? 0);
-    if (n > 0) console.log('reaped stale lazywait syncing rows:', JSON.stringify(reaped));
-  }
 
-  // Claim a batch (flips them to 'syncing').
-  const { data: claimed, error: claimErr } =
-    await admin.rpc('claim_lazywait_sync_batch', { p_limit: limit });
+  // Claim (flips to 'syncing').
+  //
+  // TARGETED: claim_lazywait_sync_one takes the customer's order and only that
+  // one, so their checkout never waits behind somebody else's. The two RPCs
+  // carry BYTE-IDENTICAL predicates apart from the id filter and the ordering,
+  // so this widens nothing: the claim still requires 'pending', a due
+  // sync_next_attempt_at and an unexpired deadline, and still uses FOR UPDATE
+  // SKIP LOCKED, so a cron tick racing this kick cannot double-claim.
+  //
+  // DO NOT "restore" a ('pending','failed') filter here. The migration that
+  // first created these functions used it, but 20260813143000_manual_only_pos_resend
+  // narrowed BOTH to 'pending' alone, deliberately, to close the automatic
+  // resend path. The live definitions are the narrow ones.
+  const { data: claimed, error: claimErr } = targeted
+    ? await admin.rpc('claim_lazywait_sync_one', { p_order_id: targetOrderId })
+    : await admin.rpc('claim_lazywait_sync_batch', { p_limit: limit });
   if (claimErr) return json({ error: claimErr.message }, 500);
   const orders = (claimed ?? []) as Array<Record<string, unknown>>;
 
@@ -149,10 +220,19 @@ Deno.serve(async (req: Request) => {
       // their `modifiers.lazywait_addon_id`. Before the 2026-08-24 contract this
       // query fetched only name/qty/price/lazywait_item_id, so the add-on and
       // category mappings were unreachable from here at all.
-      const { data: branch } = await admin
-        .from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle();
-      const { data: items } = await admin
-        .from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', orderId);
+      //
+      // Issued CONCURRENTLY, including the profile read below: the three are
+      // independent (branch -> branchId, items -> mappedItems, profile -> the
+      // CRM fallback) and were costing ~0.69 s serially for no reason. All three
+      // run before the pre-send gate, so a rejection still lands on the
+      // proven-not-sent path.
+      const [{ data: branch }, { data: items }, profileRow] = await Promise.all([
+        admin.from('branches').select('lazywait_branch_id').eq('id', order.branch_id).maybeSingle(),
+        admin.from('order_items').select(ORDER_ITEM_SELECT).eq('order_id', orderId),
+        order.customer_id
+          ? admin.from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
 
       // `ORDER_ITEM_SELECT` is a plain string, so supabase-js cannot parse the
       // select at the type level and infers its GenericStringError fallback.
@@ -163,24 +243,67 @@ Deno.serve(async (req: Request) => {
       // ---- CRM customer link (best-effort, never blocks) -------------------
       // Read the stored link first so a CRM outage does not drop `customer_id`
       // from the ticket; a fresh match supersedes it.
-      let crmCustomerId: string | null = null;
-      if (order.customer_id) {
-        const { data: profile } = await admin
-          .from('profiles').select('lazywait_customer_id').eq('id', order.customer_id).maybeSingle();
-        crmCustomerId = (profile as { lazywait_customer_id?: string | null } | null)?.lazywait_customer_id ?? null;
-      }
+      let crmCustomerId: string | null =
+        (profileRow?.data as { lazywait_customer_id?: string | null } | null)?.lazywait_customer_id ?? null;
       const phone = normalizePhone(order.customer_phone as string | null);
-      if (phone && order.customer_id) {
-        try {
-          const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
-            method: 'GET', path: '/crm/customers/search', query: { query: phone }, timeoutMs: 8000,
-          });
-          const match = Array.isArray(crm.data) ? crm.data[0] : null;
-          if (crm.ok && match?.id) {
-            crmCustomerId = String(match.id);
-            await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', order.customer_id);
-          }
-        } catch { /* CRM match is optional; ignore */ }
+      const customerId = order.customer_id as string | null;
+      if (phone && customerId) {
+        // ---- The CRM search is DEFERRED on the kick path, not dropped ------
+        //
+        // It is the single most expensive thing the customer was waiting for:
+        // 3.47 s on SM-2026-000065, 3.68 s on -000064, and after being capped
+        // at 1.5 s it spent the ENTIRE cap and still returned nothing on -067.
+        // It has never once succeeded — `profiles.lazywait_customer_id` is null
+        // for all 10 profiles — so on today's data it is 1.5 s of guaranteed
+        // waiting for a value that is guaranteed not to arrive.
+        //
+        // WHY NOT SIMPLY MOVE IT TO THE CRON PATH. Because the cron never
+        // claims anything: the kick now syncs every order the moment it is
+        // placed, and every observed tick reports `claimed: 0`. A search that
+        // only runs on the cron path would therefore never run at all, and the
+        // link would stay null for ever — turning a latency fix into a silent
+        // feature removal.
+        //
+        // Deferring keeps both properties. THIS ticket uses whatever link is
+        // already stored (none, today), and the refresh runs after the response
+        // so the NEXT order for the same customer can carry `customer_id`. The
+        // link is a nice-to-have on the ticket; the customer's order number is
+        // not.
+        //
+        // It also sits before `begin_lazywait_create_attempt`, so every
+        // millisecond it burned was deadline budget spent before that gate
+        // re-checks `pos_sync_deadline_at`. Taking it off the path is
+        // safety-positive as well as faster.
+        const refreshCrmLink = async () => {
+          try {
+            const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
+              method: 'GET', path: '/crm/customers/search', query: { query: phone },
+              timeoutMs: 8000,
+            });
+            const match = Array.isArray(crm.data) ? crm.data[0] : null;
+            if (crm.ok && match?.id) {
+              await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', customerId);
+            }
+          } catch { /* CRM match is optional; ignore */ }
+        };
+
+        if (targeted) {
+          crmBackfills.push(refreshCrmLink);
+        } else {
+          // Cron path: nothing is waiting, so keep the original inline search
+          // AND let a fresh match supersede the stored link on this ticket.
+          try {
+            const crm = await lazywaitFetch<Array<{ id?: string }>>(lw, {
+              method: 'GET', path: '/crm/customers/search', query: { query: phone },
+              timeoutMs: 8000,
+            });
+            const match = Array.isArray(crm.data) ? crm.data[0] : null;
+            if (crm.ok && match?.id) {
+              crmCustomerId = String(match.id);
+              await admin.from('profiles').update({ lazywait_customer_id: match.id }).eq('id', customerId);
+            }
+          } catch { /* CRM match is optional; ignore */ }
+        }
       }
 
       // ---- Build the confirmed Create Order payload ------------------------
@@ -530,11 +653,29 @@ Deno.serve(async (req: Request) => {
   // Drain the POS-lifecycle notifications this run (and any earlier one) queued.
   // Rows enqueued moments ago by record_lazywait_sync are already committed, so
   // the fast path — order-intake kicks this worker, an order syncs, its
-  // 'pos_confirmed' event goes out — completes inside this single invocation,
-  // a second or two after the customer pressed the button.
-  const notified = await dispatchPendingPosSync(admin);
+  // 'pos_confirmed' event goes out — still completes inside this invocation.
+  //
+  // DEFERRED in targeted mode: push delivery cannot change the POS number the
+  // customer's checkout is blocked on, yet it was a THIRD of the awaited time
+  // (measured 3.36 s on SM-2026-000065, 5.05 s on -000064) and is what pushed
+  // that request to within 253 ms of the 11 s abort. The push still goes out
+  // moments later, from the same invocation — the customer is simply no longer
+  // waiting on it before their receipt renders.
+  //
+  // Safe because delivery is at-most-once regardless of who drains:
+  // claim_pos_sync_notification flips pending -> processing under a fenced
+  // claim, so a deferred drain racing the cron's cannot double-send. And if the
+  // isolate is torn down before the claim commits, the row is still 'pending'
+  // and the next cron tick takes it — delayed, never dropped.
+  let notified: unknown = { found: 0, dispatched: 0 };
+  await runOffPath(async () => {
+    notified = await dispatchPendingPosSync(admin);
+    // After the push, because a customer waiting to hear their order reached
+    // the kitchen matters more than a CRM link nobody sees.
+    for (const backfill of crmBackfills) await backfill();
+  });
 
-  return json({ status: 'ok', ...summary, reaped, notified }, 200);
+  return json({ status: 'ok', ...summary, reaped, notified, targeted }, 200);
 });
 
 /**

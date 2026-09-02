@@ -113,12 +113,22 @@ export function statusTone(status: string): PillTone {
   }
 }
 
-/** Rule codes offered in the filter. Order is the displayed order. */
+/**
+ * Rule codes offered in the filter. Order is the displayed order.
+ *
+ * THIS LIST MUST MATCH THE RULES THE WATCHDOG ACTUALLY EVALUATES. It is the only
+ * source for the dropdown (`IntegrityFilters.tsx`), so a code missing here means
+ * incidents that exist, page somebody, and then cannot be filtered like every
+ * other rule. Nothing tied the two together until 2026-08-31 — the rules live in
+ * a migration and this list is TypeScript, so they drifted silently the moment
+ * R12/R13 were added. `integrityRuleParity.test.ts` now pins them.
+ */
 export const RULE_CODES = [
   'PAID_ORDER_NOT_SYNCED', 'PAID_ORDER_AWAITING_PAYMENT', 'CAPTURED_PAYMENT_WITHOUT_ORDER',
   'PAYMENT_AMOUNT_MISMATCH', 'DUPLICATE_PROVIDER_REFERENCE', 'MULTIPLE_SUCCESSFUL_CAPTURES',
   'PAID_ORDER_DEAD_LETTER', 'SYNCED_WITHOUT_USABLE_REFERENCE', 'REFERENCE_WITH_NON_SYNCED_STATE',
   'OVERDUE_SYNC_RETRY', 'ABANDONED_AWAITING_PAYMENT',
+  'UNPAID_ORDER_NOT_SYNCED', 'UNPAID_ORDER_DEAD_LETTER',
 ];
 
 /** Short display form for a branch/order uuid. */

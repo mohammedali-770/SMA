@@ -26,8 +26,8 @@ by the owner on **2026-08-24** and matching the live
 `integration_settings.public_config.base_url` in Production, last written
 2026-07-24. Every pickup order that has synced went there.
 
-Two things in source still name the **production** host. The first was a trap
-until 2026-08-24; the second still is:
+Two things in source still name the **production** host. Both were traps; both
+are now closed — the first on 2026-08-24, the second on 2026-08-31:
 
 - `DEFAULT_BASE_URL` (`supabase/functions/_shared/lazywait.ts`) is
   `https://apiv2.lazywait.com/v1`. It **used to be a fallback**: the worker
@@ -36,9 +36,18 @@ until 2026-08-24; the second still is:
   fallback is **gone** — see "Missing `base_url` fails closed" below. The
   constant itself is deliberately left unchanged, because it names what the
   applied `20260708130000` migration seeded into Production.
-- The admin Integrations card shows the production URL as its input
+- The admin Integrations card used to show the production URL as its input
   **placeholder** (`src/components/admin/IntegrationCard.tsx`), which is how the
-  wrong host could get typed back in.
+  wrong host could get typed back in. **Fixed 2026-08-31**: it now suggests the
+  dev host, and `IntegrationCard.test.ts` asserts both that it names the live
+  host and that it does not name the production one. The negative assertion is
+  the load-bearing half — the fail-closed guard rejects a blank or malformed
+  `base_url`, but a well-formed URL pointing at the wrong POS would be accepted,
+  and every order sent there would look successful.
+
+  This one survived a year of being written down. It was recorded here as a known
+  trap and still shipped, which is the argument for pinning a claim with a test
+  rather than a sentence.
 
 The `20260708130000` migration also seeds the production URL as a default. That
 file is applied history and must never be edited; the live row overrides it.
@@ -68,8 +77,10 @@ malformed URL; the catch there returns `status: 0`, and
 `classifyCreateOrderResult({status: 0})` is `ambiguous → confirmation_required`.
 So a mistyped host would mark real customer orders as needing manual
 confirmation — the exact outcome this guard exists to prevent, reached by a typo
-instead of a blank. That is not hypothetical while the admin card still offers
-the *production* host as its input placeholder (see "Still open" below).
+instead of a blank. The admin card **used** to make that concrete by offering the
+*production* host as its input placeholder; that was fixed on 2026-08-31 and is
+pinned by `IntegrationCard.test.ts`. The guard still matters — it is what catches
+a hand-typed malformed value — but the card no longer suggests a wrong one.
 
 The check is deliberately **narrow**: it asks only "would `fetch` accept this?",
 via the same `URL` parse the platform performs plus an `http`/`https` protocol
@@ -112,10 +123,13 @@ Deno-only modules, so Vitest cannot execute them).
 
 **Still open (not changed here):**
 
-- The admin Integrations card still offers the production host as its input
-  **placeholder** (`src/components/admin/IntegrationCard.tsx`) — the most likely
-  way a wrong value gets typed back in. Changing it is a separate UI decision the
-  owner has not asked for.
+- ~~The admin Integrations card still offers the production host as its input
+  **placeholder**~~ — **FIXED 2026-08-31.** It now suggests the dev host, and
+  `IntegrationCard.test.ts` asserts both that it names the live host and that it
+  does not name the production one in any form. The negative assertion is the
+  load-bearing half: this guard rejects a blank or malformed `base_url`, but a
+  well-formed URL pointing at the wrong POS would be accepted and every order
+  sent there would look successful.
 - `_shared/paymentSync.ts` still reads `base_url ?? DEFAULT_BASE_URL`. It is
   under the CLAUDE.md §6 payment freeze and was not touched. The residual risk is
   small and bounded: `pushLazywaitOnlinePayment` only runs for an order that
@@ -293,7 +307,7 @@ no blocked orders).
    `categories.lazywait_category_id`, and `order_item_modifiers` joined to
    `modifiers.lazywait_addon_id` — map them with `mapOrderItemRows`, read the
    stored CRM link and optionally refresh it by phone, then
-   `buildCreateOrderPayload` (pickup-only, validates mapping).
+   `buildCreateOrderPayload` (pickup **and** delivery, validates mapping).
 4. `POST /pos/orders/create`; on success save `order_ref`→`lazywait_ref`,
    `order_id`, `order_number`, `order_status_id`→`lazywait_status`, mark
    `synced`; on failure classify + retry/block/dead-letter. Every attempt writes
@@ -620,6 +634,12 @@ answers Q1 — Lazywait **accepts `order_type: "delivery"`**.
 sent; the destination is composed from `orders.address_snapshot`
 (`label · national_short_address · description`).
 
+**Confirmed on a real ticket, 2026-08-27.** SM-2026-000065 (ticket #9) was placed
+with a saved address whose `label` still equals its `description`, so the dedupe
+was genuinely exercised rather than merely present — and the printed DELIVER TO
+line carries the address **once**. Before the fix the same shape put it on the
+ticket four times.
+
 **Repeated parts are deduped**, case-insensitively on the trimmed value, keeping
 the first occurrence. Nothing stops a customer saving the same text as both the
 label and the directions, and SM-2026-000059 did exactly that: its line composed
@@ -827,6 +847,75 @@ normalized (E.164) phone; on match save `profiles.lazywait_customer_id`. Never
 blocks the order (no match → continue). No Create-Customer endpoint is confirmed
 — we don't create Lazywait customers, and `customer_id`/`customer_cell` are NOT
 sent to Create Order.
+
+**DEFERRED off the checkout kick entirely (2026-08-27, second revision).**
+Capping it at 1.5 s was not enough: on SM-2026-000067 the search spent the
+**whole cap** and still returned nothing, so the customer waited 1.5 s for a
+value that could not arrive. It now runs AFTER the response on the kick path,
+alongside the push drain, and keeps its full inline 8 s on the cron path.
+
+**It was deferred rather than deleted, and that distinction is the whole
+design.** Moving it "to the cron path" would have looked equivalent and been a
+silent feature removal: the kick now syncs every order the moment it is placed,
+so every observed cron tick reports `claimed: 0` — a search that only ran there
+would never run at all, and `profiles.lazywait_customer_id` would stay null for
+ever. Deferring keeps the backfill alive, so the NEXT order for that customer
+can carry `customer_id`, while THIS ticket simply uses whatever link is already
+stored. The link is a nice-to-have on the ticket; the order number is not.
+
+The superseded first attempt, kept because the measurements are the argument:
+**time-boxed to 1.5 s on the checkout kick, 8 s on the cron.** This
+lookup measured **3.47 s** on SM-2026-000065 and 3.68 s on -000064 — larger than
+the `POST /pos/orders/create` call itself — and returned nothing both times. It
+cannot yet do otherwise: `profiles.lazywait_customer_id` has never been populated
+for anybody (0 of 10 rows), so there is no stored link for a match to supersede.
+
+Its old 8 s ceiling alone exceeded most of `order-intake`'s whole 11 s budget, so
+one slow CRM response could spend the entire window and leave the customer with
+no branch number for an order that synced perfectly.
+
+Capping it is **safety-positive, not merely faster**: the search sits *before*
+`begin_lazywait_create_attempt`, so every millisecond it burns is deadline budget
+spent before that gate re-checks `pos_sync_deadline_at`. The stored link is still
+read and used; only the refresh is bounded, and the cron path — where nothing is
+waiting — keeps the full 8 s so a slow CRM still gets its chance to establish the
+link.
+
+## The worker has two modes, and the fast one syncs exactly one order
+
+`lazywait-sync` behaves differently depending on who invoked it. Nothing about
+the payload, the claim predicate or the retry rules differs — only *how much* it
+does before returning.
+
+| | **Targeted** (`{orderId}`) | **Untargeted** (`{limit: n}`) |
+| --- | --- | --- |
+| Invoked by | `order-intake`, per checkout | cron job 2, and the post-payment handoff in `_shared/paymentSync.ts` |
+| Claim | `claim_lazywait_sync_one` | `claim_lazywait_sync_batch` |
+| `reap_stale_lazywait_syncs` | runs, **deferred** past the response | runs, awaited |
+| Notification drain | runs, **deferred** past the response | runs, awaited |
+| CRM search | **deferred past the response** (8 s there) | 8 s, inline |
+
+Untargeted is byte-for-byte the old behaviour. Targeted exists because the kick
+used to send `{limit: 5}`, and `claim_lazywait_sync_batch` orders by `created_at`
+**ascending** while the worker processes serially — so the customer's brand-new
+order was handled **last** of whatever the batch claimed, and their checkout
+blocked while other people's orders were sent to the POS.
+
+**The reaper is deferred, never skipped**, and the distinction is the point.
+`reap_stale_lazywait_syncs` has exactly one production caller — this worker — so
+the cron and the checkout kick are also its only two reaping drivers, and they do
+**not** share a failure mode: `invoke_lazywait_sync_processor()` returns early
+without invoking anything when the vault secret `lazywait_sync_project_url` is
+missing, whereas the kick builds its URL from `SUPABASE_URL`. Skipping the reaper
+on the kick path would save the same ~0.9 s and leave one missing secret able to
+stop all reaping — and a **cash** order stranded in `syncing` with no ref is
+invisible to the watchdog as well, since R1 and R7 both require
+`payment_status = 'paid'`.
+
+Deferring is safe because everything the reaper decides is time-thresholded
+(`STALE_SYNC_TIMEOUT_MINUTES` = 10), so nothing it would act on can have become
+stale during the invocation that deferred it. Both deferrals degrade to
+*awaiting* — never to skipping — on a runtime without `EdgeRuntime.waitUntil`.
 
 ## Online payment (prepared, not live)
 After the Geidea webhook verifies a payment and `confirm_order_payment` marks the

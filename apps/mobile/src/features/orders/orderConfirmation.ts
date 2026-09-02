@@ -69,11 +69,33 @@ export function deriveCustomerOrderState(o: OrderConfirmationInput): CustomerOrd
   if (o.syncState === 'confirmation_required') return 'verifying_with_branch';
   if (o.syncState === 'synced') return 'verifying_with_branch';
   if (o.ref != null) return 'verifying_with_branch';
+
+  // A send that is STILL IN FLIGHT is not ambiguous — it is merely unfinished.
+  // pos_create_attempted_at is written by begin_lazywait_create_attempt
+  // IMMEDIATELY BEFORE the POST leaves, so every normal order carries the marker
+  // for the whole time it is syncing. Testing the marker ahead of this made the
+  // confirmation screen tell customers "we could not verify whether the branch
+  // received this order" on perfectly healthy orders — SM-2026-000070 was synced
+  // as ticket #2 in 7.30 s with zero failed attempts, and its customer saw that
+  // screen and a "confirmed" push at the same moment. It only became reachable
+  // once checkout started returning while the send was still in flight.
+  //
+  // Deliberately no staleness clock. A worker that dies mid-POST leaves `syncing`
+  // for up to ten minutes before the reaper routes it to confirmation_required,
+  // and during that window this says "sending" rather than "verifying". That is
+  // the right trade: the customer can act on neither state (both are
+  // canResend:false), the reaper owns the transition, and under-alarming on a
+  // rare crashed worker is far cheaper than alarming on every normal order.
+  if (o.syncState === 'syncing') return 'sending_to_branch';
+
+  // A marker that OUTLIVED its send — the row is pending, failed or dead_letter
+  // and still carries it — really is ambiguous: the POST left and we never
+  // learned what became of it.
   if (o.posCreateAttemptedAt != null) return 'verifying_with_branch';
 
-  // pending is either the first send or a customer-triggered resend. syncing is
-  // that one send in progress. Neither implies a future automatic retry.
-  if (o.syncState === 'pending' || o.syncState === 'syncing' || o.syncState === 'awaiting_payment') {
+  // pending is either the first send or a customer-triggered resend. Neither
+  // implies a future automatic retry.
+  if (o.syncState === 'pending' || o.syncState === 'awaiting_payment') {
     return 'sending_to_branch';
   }
 

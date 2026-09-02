@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **112**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260827130000_watchdog_delivery_coverage.sql`.
+Migration files in the repository: **117**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260831130000_otp_login_rate_limit.sql`.
 
 ## Tables
 
@@ -68,6 +68,7 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `order_refunds` | `20260724120000_order_confirmation_state_machine.sql` | 0 | 1 |
 | `orders` | `20260707120500_orders.sql` | 7 | 2 |
 | `otp_challenges` | `20260710140000_whatsapp_otp.sql` | 1 | **none declared** |
+| `otp_send_reservations` | `20260831130000_otp_login_rate_limit.sql` | 0 | **none declared** |
 | `payment_records` | `20260707121300_payments_and_sync.sql` | 3 | 1 |
 | `product_modifier_groups` | `20260707120200_catalog.sql` | 0 | 1 |
 | `product_variants` | `20260824120000_product_variants.sql` | 0 | 2 |
@@ -132,7 +133,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `current_app_role` | 1 | `20260707120100_profiles.sql` |
 | `current_staff_branch_id` | 1 | `20260820100500_ops_branch_scoping.sql` |
 | `customer_manual_pos_resend_eligibility` | 1 | `20260813143000_manual_only_pos_resend.sql` |
-| `customer_order_state` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
+| `customer_order_state` | 2 | `20260828090000_customer_order_state_inflight.sql` |
 | `customer_pos_resend_eligibility` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_limit` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `customer_pos_resend_window` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
@@ -217,15 +218,17 @@ A function defined by more than one migration has been redefined; the last defin
 | `order_integrity_incident_timeline` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_list_incidents` | 1 | `20260721170000_order_integrity_watchdog.sql` |
 | `order_integrity_suppress_incident` | 1 | `20260721170000_order_integrity_watchdog.sql` |
-| `order_integrity_watchdog` | 2 | `20260827130000_watchdog_delivery_coverage.sql` |
+| `order_integrity_watchdog` | 3 | `20260831120000_watchdog_cash_order_coverage.sql` |
 | `order_item_note_is_acceptable` | 1 | `20260821170000_order_item_notes.sql` |
 | `order_note_is_acceptable` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_note_normalized` | 1 | `20260819120000_order_note_length_limit.sql` |
 | `order_refund_due` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
-| `otp_begin_send` | 1 | `20260710140000_whatsapp_otp.sql` |
+| `otp_begin_send` | 2 | `20260831130000_otp_login_rate_limit.sql` |
 | `otp_consume` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_get_active_challenge` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `otp_increment_attempt` | 1 | `20260710140000_whatsapp_otp.sql` |
+| `otp_release_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
+| `otp_reserve_send` | 1 | `20260831130000_otp_login_rate_limit.sql` |
 | `place_customer_order` | 1 | `20260724200000_order_read_contracts.sql` |
 | `place_order` | 13 | `20260826100000_comp_order_totals.sql` |
 | `point_in_active_delivery_zone` | 1 | `20260710120000_delivery_zones.sql` |
@@ -238,6 +241,8 @@ A function defined by more than one migration has been redefined; the last defin
 | `record_whatsapp_message` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `register_push_device` | 1 | `20260714090000_push_notifications.sql` |
 | `release_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
+| `reorder_categories` | 1 | `20260827150000_menu_display_order.sql` |
+| `reorder_products` | 1 | `20260827150000_menu_display_order.sql` |
 | `request_customer_pos_resend` | 2 | `20260813143000_manual_only_pos_resend.sql` |
 | `requeue_lazywait_order` | 4 | `20260827120000_lazywait_delivery_sync.sql` |
 | `resolve_account_deletion_request` | 1 | `20260810120000_account_deletion_manual_review_resolution.sql` |

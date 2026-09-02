@@ -181,7 +181,7 @@ trigger nor worker v6 can produce it — so the guard parks exactly these four a
 nothing reachable. Re-driving any of them would create a real kitchen ticket for
 food nobody is waiting for, and is a §5 live write regardless.
 
-**ONE repository file is unapplied, and it is the frozen one.**
+**SUPERSEDED — this table is kept for its per-file apply record, not for its counts.** It briefly understated the outstanding set on 2026-09-01, when `20260831130000_otp_login_rate_limit.sql` merged unapplied and made it TWO; that file has since been applied, so the count is back to one. Do not read a total off this table — see the 2026-09-01 re-read further down.
 
 | File | Status |
 | --- | --- |
@@ -201,7 +201,17 @@ food nobody is waiting for, and is a §5 live write regardless.
 | `20260827120000_lazywait_delivery_sync.sql` | Applied 2026-08-27, live version `20260827082634`. Paired deploy `lazywait-sync` v6 done the same day. |
 | `20260827130000_watchdog_delivery_coverage.sql` | Applied 2026-08-27, live version `20260827104053`. Removed the `order_type = 'pickup'` filter from watchdog rules R1 and R7, which had gone blind to failed **paid delivery** orders the moment delivery went live. Verified after apply: 0 pickup filters remain in the function, all nine distinctive body comments intact, `place_order`/`compute_order_snapshot` hashes unchanged, and cron run 26076 (10:42 UTC) `success` over 11 rules. |
 
-The honest statement is therefore **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
+**Superseded 2026-08-28 — read the paragraph below this table before acting on any count here.** Two files were applied on 2026-08-27 that this table does not list (`20260827140000_product_images_bucket`, live version `20260827195223`; `20260827150000_menu_display_order`, live version `20260827195309`), and a third — `20260828090000_customer_order_state_inflight`, live version `20260828182228` — was added and applied on 2026-08-28. None of the three appear in the table below.
+
+**Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
+
+**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied **and its deploy is done** — `auth-send-sms-whatsapp` v2 shipped 2026-09-02, so the customer login path is now rate-limited. The debt that sat here for a day is now closed; the section below is kept because the two lessons it produced are not — chief among them that an applied migration is never by itself a safe proxy for "this is done".
+
+Earlier statements of this figure, kept because the reasoning attached to each is still worth reading: **117 files / 121 rows / TWO unapplied** after the watchdog apply at 11:54:57 UTC (ledger row 76), and before that **115 files / 120 rows / ONE unapplied** at `20260828182228` (ledger row 75).
+
+**Evidence for these figures is the live read itself**, not the ledger: `select count(*), max(version) from supabase_migrations.schema_migrations` plus `ls supabase/migrations/*.sql | wc -l` against the default branch, re-run on 2026-09-01. Say so plainly because the two 2026-08-27 applications (`product_images_bucket`, `menu_display_order`) were applied **without being recorded at the time**, and for five days their ledger rows — **73 and 74 in `docs/MIGRATIONS.md`** — were deliberate GAP ROWS carrying only what a live read proved. **Both were CLOSED on 2026-09-02.** The missing detail turned out never to have been lost: it was written on the day of the apply in **PR #282**, which was still sitting open and unmerged while the ledger said the detail was unknown. The lesson is worth more than the fix — before declaring a record unrecoverable, **read the open pull requests**. Its claims were corroborated rather than trusted (each file's sha256 prefix today matches the hash #282 recorded, and each live version stamp matches its claimed apply time to the second), and the fingerprint columns were **measured independently** rather than adopted from it, because #282's hashes compare repository files to repository files and prove nothing about live content.
+
+The superseded statement was **112 repository files / 117 live rows / exactly ONE unapplied file — Moyasar — unapplied on purpose.** Reconciled BY NAME against the default branch, because versions are apply-time stamps and filenames cannot be compared directly. Evidence for THAT figure: `docs/MIGRATIONS.md` §32 and §35, and `docs/MIGRATION_APPLICATION_20260822.md`; the older snapshot and its algebra are in `docs/MIGRATION_RECONCILIATION_20260812.md`.
 
 **Neither applied file is version-aligned, and that is not a defect.** `apply_migration` stamps an apply-time version, so live history carries `20260825061046` / `20260825061502` rather than the repository filenames. Realigning them is a **separate live history write requiring its own explicit owner approval** (`docs/MIGRATIONS.md` §9-D). Until then the repo filename versions are absent from `schema_migrations` by design — do not "repair" that.
 
@@ -211,18 +221,84 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**As of 2026-08-27 10:40 UTC this is once again literally true: Moyasar is the
-ONLY unapplied file in the repository.** That makes it more dangerous rather than
-less — with one file left, "apply the outstanding migrations" reads like a no-op
-and is in fact the one instruction that would break the §6 freeze. There is no
-longer any other file such an instruction could plausibly mean.
+**ONE file is unapplied as of 2026-09-01, and it is the frozen one:**
+
+| File | Status |
+| --- | --- |
+| `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. Its `auth-send-sms-whatsapp` deploy landed 2026-09-02, so the feature is fully live. |
+| `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
+| `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
+
+**So the danger is back to its most acute form.** With exactly one file left,
+"apply the outstanding migrations" reads like a no-op and is in fact the one
+instruction that would break the §6 freeze — there is no other file such an
+instruction could plausibly mean.
+
+**Name the target explicitly. Never apply "whatever is outstanding".** An
+instruction that does not name a file is not an instruction to apply anything;
+ask which one.
+
+### CLOSED 2026-09-02 — the deploy debt this section tracked is discharged
+
+`20260831130000_otp_login_rate_limit` was applied 2026-09-01, and
+**`auth-send-sms-whatsapp` was deployed as version 2 on 2026-09-02** on explicit
+owner approval, `verify_jwt` preserved at `false`. Every real customer login now
+reserves against the shared per-phone budget before the Meta send: 60 s cooldown,
+5/hour, 10/day, shared with the verification path in both directions. Verified
+after deploying without sending an OTP — the function boots (`GET` → hook-shaped
+405), the signature gate holds (unsigned `POST` → 401 at step 2), and the smoke
+test consumed nothing (`otp_send_reservations` still 0 rows). Detail:
+`docs/WHATSAPP_LOGIN.md`.
+
+**Two lessons are kept, because they cost real effort to learn.**
+
+**1. An applied migration is not a delivered feature.** For a day, `20260831130000`
+was applied while the login path it exists to protect stayed wide open. "Applied"
+in the table above says the schema moved, nothing more. Ask separately whether the
+code that uses it is deployed.
+
+**2. When a migration redefines a function, ask whether any CALLER'S CODE changed
+— not merely whether the function did.** This section, the migration's own header
+and `docs/WHATSAPP_LOGIN.md` all claimed the apply implied **two** deploys, adding
+`whatsapp-send-otp`. It implied one. A body-only replacement under an unchanged
+signature needs no redeploy of its callers: the existing binding resolves to the
+new body, so the verification path picked up the shared budget the moment the
+migration applied. Redeploying it would have been a production write that changed
+nothing. Review caught that on PR #303.
+
+The 2026-09-01 apply is the current worked example, and it is the one that
+matches today's shape. **THREE repository files were unapplied when the
+instruction was given** — Moyasar, `20260831120000_watchdog_cash_order_coverage`
+(merged 11:04:53 UTC) and `20260831130000_otp_login_rate_limit` (merged 11:11:39
+UTC) — and the owner named the target by its version, "apply 20260831120000",
+leaving nothing to infer. One call, that file only, with the merged copy hashed
+before sending and Moyasar's continued absence verified afterwards. Two remained
+outstanding **after** it, which is the count the rest of this section describes;
+do not read that figure back onto the moment of the instruction. Ledger row 76.
+
+That is the shape to notice: the more files are outstanding, the more an unnamed
+target costs, and naming one by version is what makes the count irrelevant.
+
+**`20260831130000_otp_login_rate_limit` was applied the same day, at 12:46:15 UTC,
+the same way** — "apply 20260831130000", the target named by version, one call,
+with the merged file hashed before sending and Moyasar's absence re-verified
+afterwards (ledger row 77). Two applies an hour apart, each on its own approval,
+each naming its own file: approval for one is never approval for the next (§5).
+
+The 2026-08-28 apply is the worked example of doing it right when the instruction
+does NOT name a file: two files were outstanding, the instruction said "the
+migration" singular, the referent was fixed by the sentence it answered, only that
+file was sent, and Moyasar's continued absence was verified afterwards. Note what
+made that safe — a referent recoverable from the immediately preceding exchange,
+not a guess about which file the owner probably meant.
 
 The 2026-08-26 and 2026-08-27 applications are the worked examples of doing this
 correctly — each target named explicitly, one call per file, with Moyasar's
-continued absence verified afterwards (most recently 2026-08-27 after the
-watchdog application: zero `%moyasar%` functions, zero history rows,
-`provider_name` still `tap`, still disabled). Any `supabase migration` operation
-must still name its target explicitly.
+continued absence verified afterwards (most recently 2026-09-01: zero
+`%moyasar%` functions, zero history rows, `provider_name` still `tap`, still
+disabled). Any `supabase migration` operation must still name its target
+explicitly.
 
 The large `docs/MIGRATIONS.md` A/B/C/F/H classification remains the historical full-fingerprint snapshot last recomputed Aug 7; do not extend those category counts by arithmetic alone.
 

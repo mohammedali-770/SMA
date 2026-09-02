@@ -1061,12 +1061,16 @@ character directly, so the file is byte-identical to what is running
 check into an argument each time, which is how a real mismatch eventually gets
 waved through.
 
-**Still unanswered, and larger than the name.** The same ticket shows Subtotal,
-VAT and Total all **0.00** on a cash order for 7.00, with the line flagged
-`** Non-Taxable`. We deliberately send no money fields (open question Q9), and
-the flag suggests the POS is treating our lines as free text rather than catalog
-references. That needs an answer from Lazywait with ticket #2 / invoice 19 in
-front of them, not a guess from us — see [`LAZYWAIT.md`](LAZYWAIT.md).
+**The 0.00 half of this is FIXED (2026-08-27).** That ticket showed Subtotal, VAT
+and Total all **0.00** on a cash order for 7.00, because no money field was sent
+at all. Money is now sent, and it prints: ticket **#9** for SM-2026-000065 shows
+`Subtotal 84.00 / VAT 10.96 / Total 84.00`, matching the stored order exactly.
+See §22 and [`LAZYWAIT.md`](LAZYWAIT.md).
+
+**The `** Non-Taxable` line flag is a separate question and is NOT settled by
+that.** It suggests the POS may treat our lines as free text rather than catalog
+references, which is about item mapping rather than order totals. It still wants
+an answer from Lazywait with a ticket in front of them, not a guess from us.
 
 **Decided and implemented 2026-08-25 (was open from PR #256).** The owner chose
 both: a multi-tier product **opens a picker** rather than being added from the
@@ -1253,9 +1257,10 @@ recomputation, no new rounding, the same numbers as the customer's receipt.
 `docs/LAZYWAIT.md`.
 
 **Deployed** 2026-08-27 in `lazywait-sync` **v8** — read back and hash-verified
-byte-identical to the merged branch. See the deploy table at the end of this
-section. What remains is one live order to confirm the printed ticket carries the
-right total; no command can establish that.
+byte-identical to the merged branch — and **confirmed on printed paper the same
+day**: ticket **#9** for SM-2026-000065 shows `Subtotal 84.00 / VAT 10.96 /
+Total 84.00` against a stored total of 84.00 and `vat_amount` 10.96. Q9 is
+closed. See the deploy table at the end of this section.
 
 No schema change was required: `claim_lazywait_sync_batch` returns `SETOF orders`,
 so the worker already had every money column.
@@ -1343,9 +1348,61 @@ file. Worth knowing which of the three carries the stronger proof.
 `lazywait-sync` v8 has returned 200 on every cron tick since (11:50 onward), so
 the new drain boots and runs clean.
 
-**Still unproven, and only one order can prove it:** that a real ticket now shows
-the correct total, that the branch number appears in a second or two, and that
-exactly one push arrives saying the restaurant has the order.
+### Proven end to end by SM-2026-000065 (ticket #9), 2026-08-27
+
+Four things no deploy could establish were confirmed on one live delivery
+order — two of them by the owner reading the printed ticket.
+
+| Claim | Result |
+| --- | --- |
+| The ticket shows the right total | **Yes.** `Subtotal 84.00 / VAT 10.96 / Total 84.00`, against a stored total of 84.00 and `vat_amount` 10.96 (`84 × 15/115` to the halala). Line items sum to the subtotal, so the ticket is internally consistent. |
+| The branch number arrives in a second or two | **8.1 s**, first attempt, zero retries. Placed 18:19:38, at the POS 18:19:46 — **before** the 18:20:00 cron tick, so this was the synchronous kick and not the backstop. |
+| Exactly one push, and only once the POS has it | **Yes.** One `pos_sync/pos_confirmed`, `targeted 1 / sent 1 / failed 0`, **3.6 s after** the POS accepted the order. No `order_status/received` row exists. |
+| The address prints once, not four times | **Yes.** This order's saved address still has `label` = `description`, so the dedupe was genuinely exercised, and the DELIVER TO line carries it once. |
+
+**The push fix is visible as a sign change**, which is the clearest evidence in
+the whole record:
+
+Both columns are measured against `orders.synced_at` — the moment Lazywait
+accepted the order. **Enqueued** is `notification_log.created_at`, **sent** is
+`updated_at` after the dispatcher finished.
+
+| Order | Push | Enqueued | Sent |
+| --- | --- | --- | --- |
+| SM-2026-000059 | `order_status/received` | **−39.5 s** | **−38.7 s** |
+| SM-2026-000060 | `order_status/received` | **−29.8 s** | **−28.7 s** |
+| SM-2026-000061 | `order_status/received` | **−16.2 s** | **−15.5 s** |
+| SM-2026-000062 | `order_status/received` | **−42.8 s** | **−42.1 s** |
+| SM-2026-000063 | `order_status/received` | **−20.7 s** | **−19.8 s** |
+| SM-2026-000064 | `pos_sync/pos_confirmed` | **+0.2 s** | **+5.3 s** |
+| SM-2026-000065 | `pos_sync/pos_confirmed` | **+0.2 s** | **+3.6 s** |
+
+The negative numbers are the defect the owner reported: "we sent it to the
+kitchen" reaching the customer up to 42.8 seconds *before* the kitchen had
+anything. The positive ones are the fix, carrying honest copy.
+
+**Read the enqueued column for the guarantee, not the sent one.** +0.2 s is not
+a race won by a fifth of a second. `record_lazywait_sync` writes the
+`notification_log` row inside the **same transaction** as the state change, and
+for `pos_confirmed` only when the authoritative post-update row — captured via
+`RETURNING` — is `synced` with a usable ref. The ordering therefore holds by
+construction, and would still hold if Lazywait took five minutes. The sent
+figure varies with dispatcher latency and guarantees nothing. Every one of the
+seven rows was `targeted 1 / sent 1 / failed 0` on `attempt_count` 1.
+
+**`sent` means Expo accepted the ticket, not that a phone displayed it.**
+`push-dispatch` counts `sent` on an Expo ticket returned `ok`, and it performs
+no receipt polling — its own comment records that as a follow-up. So the
+database cannot distinguish "Expo accepted it" from "the customer saw it", and
+nothing here should be read as proof a notification was displayed. What *is*
+proved is the ordering and the copy.
+
+**One more limit worth stating: every order placed on 2026-08-27 — all fifteen
+of them — belongs to the same customer account, on one device.** (Re-counted
+live on 2026-08-31; an earlier revision of this paragraph said "eleven of today's
+orders", which was the count at the moment it was written and undated, so it went
+stale the same afternoon.) The pipeline is proved end to end; fan-out across a
+varied device base is not exercised by any of this.
 
 ### A decision recorded rather than taken
 
@@ -1355,6 +1412,63 @@ SM-2026-000058 was placed in the 40-second window between the migration landing
 and the deploy, so the old worker blocked it. **None was re-driven**: that is a
 §5 live write and would create a real kitchen ticket for food nobody is waiting
 for. Leaving them parked is the current decision, reversible at any time.
+
+## 23. `latency-probe` — an orphan diagnostic function awaiting deletion
+
+**Status:** OWNER ACTION. One dashboard deletion. Nothing else is blocked on it.
+
+**What it was.** A throwaway diagnostic deployed on 2026-08-30 to settle whether
+the within-region spread in PostgREST call latency was per-isolate connection
+setup. It answered its question — the per-call cost is **bimodal**, roughly
+120 ms against 305 ms measured from IAD, and is **not** connection setup — and
+that finding is recorded in `docs/ORDER_CONFIRMATION_FLOW.md`. Its source was
+removed from the repository the same day.
+
+**It is inert, and that is verified rather than assumed.** Read back live on
+2026-08-31 (`get_edge_function`): version 2, `ACTIVE`, `verify_jwt: true`, and
+the entire body is one `Deno.serve` returning HTTP **410** with a fixed JSON
+string. **No database call, no secret, no outbound request of any kind.**
+
+The stub exists rather than nothing because `verify_jwt = true` does **not** make
+an Edge Function private — the anon JWT is bundled into the mobile app and
+satisfies gateway verification, as `whatsapp-send-otp` already documents. In its
+original form the probe let anyone holding the public key drive nine database
+reads per request. Replacing the body removed that surface completely; deleting
+the slug is the remaining tidy-up.
+
+**Why bother, if it is harmless.** Because §15 records exactly how this goes
+wrong: **two orphan diagnostic functions** sat undetected in this project until
+they were found and deleted on 2026-08-19. This is a third. A slug that no
+document accounts for is one nobody can explain in six months — and until this
+section existed, `latency-probe` appeared **nowhere** in the repository, its only
+record being the chat session that retired it.
+
+### No agent session can do this — verified 2026-08-31, do not re-litigate
+
+| route | result |
+| --- | --- |
+| MCP Supabase tools | `deploy_edge_function`, `get_edge_function`, `list_edge_functions` only. **No delete.** (`delete_branch` is for development branches, not functions.) |
+| `supabase` CLI | not on `PATH`, not in `node_modules/.bin`, not installed |
+| Management API token | `SUPABASE_ACCESS_TOKEN` unset; **no Supabase environment variable exists at all**; no stored credential at `~/.supabase/access-token` or `~/.config/supabase/` |
+| installing the CLI | pointless — `supabase functions delete` needs that same token or an interactive login |
+
+**This is NOT a reason to create `SUPABASE_ACCESS_TOKEN`.** See §15: the token
+cannot be scoped to a project or organisation, this repository is public, and the
+recorded recommendation is not to add it. §15 also observes that its absence has
+been *doing the work of a control* — four runs of a mis-triggered
+`deploy-functions.yml` died only because the secret did not exist. Deleting one
+retired diagnostic does not justify arming that.
+
+### The action
+
+Supabase dashboard → project `wxfmmnihidsdyemasstf` → **Edge Functions** →
+`latency-probe` → **Delete function**.
+
+Safe to delete outright: it is absent from the repository, no other Edge Function
+calls it, and the app has never known it existed.
+
+**On completion**, per the closeout rule below: delete this section, recording the
+verification date and a `list_edge_functions` readback showing the slug gone.
 
 ## Owner-action closeout rule
 

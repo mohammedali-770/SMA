@@ -448,13 +448,18 @@ production.
 | 69 | 20260827100000 | comp_members_by_phone | — | 20260827063746 | comp_members_by_phone | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:37:46 UTC — a comp can be attached to a PHONE NUMBER before that person has an account.** Owner's requirement: *"when the number of someone in comped customers enters the app, they should see the prices as 0."* Row 65 keyed membership on `profile_id`, which is backwards for how the decision is made — the owner knows the NUMBER, usually before that person has opened the app. Adds `comp_members.phone_e164` (canonical `+9665XXXXXXXX` by check constraint), makes `profile_id` **nullable**, moves the PK to a surrogate `id` because neither natural key is present on every row (5 of 10 live profiles carry no phone at all), adds two partial unique indexes and `comp_member_audit.target_phone`. **THE MONEY PATH IS NOT REDEFINED** — `place_order`, `compute_order_snapshot` and `insert_order_from_snapshot` are untouched, and both hashes were confirmed **unchanged across the apply** (`8bd7183832108abb25bcca6942dccd70`, `f955b748b698a1704533f4aaffb835cb`). That is the design, not an omission: a pending row has `profile_id` NULL and never matches the pricing lookup, which is correct because an unclaimed number has no account and cannot place an order. All **18** pre-existing cases in `comp_members_test.sql` pass unchanged, which is the evidence for the claim rather than an assertion about it. **The binding happens at the moment ownership is proven, and there are THREE such paths, not two** — the third was missed in the first commit and found in review: `handle_new_user`, `handle_auth_user_phone_confirmed`, and `mark_phone_verified`, which backs `whatsapp-verify-otp` and never touches Supabase Auth at all. Without a claim there a customer comped by number who verified that way would have been **charged in full forever**. Safe to claim there because `mark_phone_verified` is EXECUTE-able by `service_role` **alone** (verified live: `authenticated` false, `anon` false) and its only caller checks the requested number against `auth.users.phone` before consuming a matching OTP; case 22 asserts that grant so a future loosening fails the test rather than opening a hole quietly. **A second review finding, also real:** `admin_set_comp_member` resolved an account from an **unconfirmed** `auth.users.phone`, which is set at OTP *request* time — now requires `phone_confirmed_at`, or `profiles.phone_verified` on the fallback; an unresolved number stays PENDING and binds later. **Applying comped nobody:** `comp_members` still 1 row / **0 active** / 0 pending afterwards, the single existing row backfilled to canonical `+9665…`, audit still 2 rows, both comped orders unchanged at `total` 0.00. **A transcription slip during the apply was caught and corrected** — see §36. Bodies: `admin_set_comp_member` `55009930c7bfdac7d4e79864b83dcdff` (5 579), `claim_comp_membership` `2df644c097dc7fb2c4fbd3136573605b` (1 144), `handle_new_user` `3737461bfd0fcfb6e92766c04aba0175` (796), `handle_auth_user_phone_confirmed` `526ad4d149754e2eb5a9691ffd6ce458` (663), `mark_phone_verified` `fc71ade769b833fcad02a5fe5c907d4f` (478), `admin_list_comp_members` `0ae53f5ad305936a016fc287a3545ede` (866), `admin_list_comp_member_audit` `5184b90dc10e0a90f6d9d4718f3f166a` (878). **Version NOT aligned** (§9-D). Detail in §36 |
 | 70 | 20260827110000 | comp_erasure | — | 20260827064044 | comp_erasure | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 06:40:44 UTC, after row 69 which it depends on** — it reads `comp_member_audit.target_phone`, a column row 69 adds, so applying it first fails on an undefined column. Row 69 created a new place a customer's phone number is written, and **two of those places carry no FK back to the user**, so nothing in the existing deletion path would have removed them: an UNCLAIMED `comp_members` row holds `phone_e164` with `profile_id` NULL, so the `on delete cascade` that removes a claimed row never fires for it; and `comp_member_audit.target_phone` sits on the permanent trail whose `target_user_id` is deliberately `on delete set null` so "who was made free, and why" outlives the account — a raw phone number surviving there defeats exactly that intent, being the one field that re-identifies a customer who asked to be forgotten. `anonymize_account_data` now deletes the claimed membership by FK (which also matters for the anonymize-without-delete path, where a comp outliving its account would silently re-apply if the number were re-registered), deletes an unclaimed row by normalized value, and **nulls the number out of the audit while keeping the row**. Two new counts in the summary, `comp_memberships_deleted` and `comp_audit_phones_cleared`. Everything else is the live body carried over verbatim — the orders/addresses/devices/sessions/loyalty/OTP/WhatsApp work, the `auth.users`-then-profile phone precedence, and the `phone_purge_attempted` wording. Body `37e0162ca97f4bf5ff8ca3ab31ffd5c8` (4 282 chars). Covered by `comp_members_test.sql` case 20. **Version NOT aligned** (§9-D). |
 | 71 | 20260827120000 | lazywait_delivery_sync | — | 20260827082634 | lazywait_delivery_sync | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 08:26:34 UTC** on explicit owner approval, via MCP `apply_migration`. Opens the POS gate for delivery orders. Redefines four functions: `set_lazywait_initial_sync` (drops the branch that parked EVERY delivery order at `blocked`/`delivery_schema_unconfirmed` on INSERT — the reason SM-2026-000057 died with `sync_attempt_count = 0` while the customer was pushed "we sent it to the kitchen"); `lazywait_requeue_eligibility` (6-arg dropped, 7-arg created with `p_blocked_reason text default null`, refusing the now-retired `delivery_schema_unconfirmed` so three stale legacy rows — one 1 month 2 days old, all with `pos_sync_deadline_at` NULL — could not be swept into Retry); `requeue_lazywait_order` (passes the reason through); and `confirm_order_payment` (drops `order_type = 'pickup'` from both release clauses, which was a THIRD instance of the same filter and would have kept paid online deliveries out of the queue even with the trigger open). **The money path was verified, not assumed**: `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash identically before and after. Moyasar re-verified absent (0 functions, 0 rows, `provider_name` still `tap`, disabled). Paired with the `lazywait-sync` **v6** deploy the same day — the two are halves of one change: the migration alone admits a delivery order to a queue whose worker still refuses it, which is exactly what stranded SM-2026-000058 in the 40-second gap. Proven live by **SM-2026-000059**: POS ticket #3 at 10:15 UTC, 42 s end-to-end, first attempt, `success: true`. Covered by `lazywait_delivery_sync_test.sql` (8 cases; case 1 and case 6 verified failing against the pre-fix bodies). **Version NOT aligned** (§9-D). |
-| 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). **Current latest live version** |
+| 72 | 20260827130000 | watchdog_delivery_coverage | — | 20260827104053 | 20260827130000_watchdog_delivery_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 10:40:53 UTC** on explicit owner approval, via MCP `apply_migration`, immediately after PR #275 merged as `c4b46c1` and the file was hashed against its merged copy (`0298a4d9294f299b`, 24 857 bytes — identical). Redefines ONE function, `order_integrity_watchdog`, removing `and o.order_type = 'pickup'` from rules **R1 PAID_ORDER_NOT_SYNCED** and **R7 PAID_ORDER_DEAD_LETTER**. Both filters were correct while delivery was gated at insert and became a monitoring blind spot the moment row 71 let `confirm_order_payment` release paid deliveries into the sync queue — a paid delivery order could fail or dead-letter with no critical incident raised at all. **The body was extracted mechanically** from `20260721170000` with two `sed` substitutions rather than retyped; `diff` showed exactly two changed lines across 438. That method was chosen deliberately: hand-retyping a body is how comment drift reached four `pg_proc` entries during the comp application (§35). **Verified after apply**: pickup filters in the function 2 → **0**; R1's `sync_blocked_reason <> 'delivery_schema_unconfirmed'` exclusion deliberately retained; **nine distinctive in-body comment sentences all probed present**, so no comment drift; `place_order` (`8bd71838…`) and `compute_order_snapshot` (`f955b748…`) hash **unchanged**; Moyasar still absent (0 functions, 0 history rows). **Proven running**: cron run 26076 at 10:42:00 UTC, `success`, 11 rules evaluated, 68 ms, 0 incidents, no error code — the first tick after the apply. Covered by `order_integrity_watchdog_test.sql` (4 new cases; the suite fails at `DELIVERY R1 FAILED` when the migration is removed). **Version NOT aligned** (§9-D). |
+| 73 | 20260827140000 | product_images_bucket | `7975fabde4b5` | 20260827195223 | product_images_bucket | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:52:23 UTC** on explicit owner approval ("apply the two migrations"), via MCP `apply_migration`, one call, immediately after PR #281 merged as `1837ca6`, with the file hashed against its merged copy first (`606d06ed9466f091`). **WAS A GAP ROW UNTIL 2026-09-02; now closed from a recovered record.** The provenance above was never lost — it was written on the day of the apply in **PR #282**, which was still open six days later while this row said the detail was unknown. That pull request is the source for the approval, the UTC time, the mechanism and the merged commit. Two independent corroborations were required before adopting any of it: the repository file's sha256 prefix computed today is `606d06ed9466f091`, **identical to the hash #282 recorded**, and the live version stamp `20260827195223` matches the claimed 19:52:23 apply time to the second. **The `=` and the class are MEASURED here, not adopted from #282**, which is the distinction that matters: #282's hashes compare a repository file to a repository file and say nothing about live content. §4's skeleton transform was run on both sides today — `7975fabde4b5` over the repository file and `7975fabde4b5` over the live row's joined statements (1 statement, 3 370 stored chars). That is what earns `=` and class B; without it these columns would have stayed `?`. **Storage only; NO table change.** Creates the public `product-images` bucket (5 MB; `image/jpeg,image/png,image/webp`) and three `storage.objects` policies — insert/update/delete — each gated on `public.is_admin()`, i.e. role **and** AAL2. A deliberate near-copy of `20260712130000_homepage_banners.sql`'s storage half: a separate bucket rather than a folder inside `banner-images`, so a cleanup that empties banners can never delete the menu's photography. **Why it was needed:** Lazywait cannot supply product photos — `GET /menu/products/items` carries a `photo` key on 77 of 95 cached items and every value is null — so all 55 active products sat at `image_url` NULL with no way to fill it. **Verified live 2026-09-02** (the post-apply verification #282 recorded, re-run rather than quoted): bucket present, `public`, limit 5 242 880, MIME list exactly as intended; **3** product-image policies; the **3** `banner_images_*` policies **intact**. **No longer dormant.** #282 recorded the bucket as holding zero objects with no product carrying an image. Live today: **1 object in the bucket and 1 product with an image** — the feature has been used since. **Version NOT aligned** (§9-D). |
+| 74 | 20260827150000 | menu_display_order | `bcf06b0084a1` | 20260827195309 | menu_display_order | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-27 19:53:09 UTC**, 46 seconds after row 73, on the same explicit owner approval and by the same mechanism, with the file hashed against its merged copy first (`d89df6be3b2f2409`). **WAS A GAP ROW UNTIL 2026-09-02**, closed from **PR #282** on the same corroborated basis as row 73: the repository file's sha256 prefix computed today is `d89df6be3b2f2409`, matching #282's recorded hash, and the live stamp `20260827195309` matches the claimed time to the second. **The `=` and class B are measured, not adopted** — §4's transform gives `bcf06b0084a1` over the repository file and `bcf06b0084a1` over the live row's joined statements (1 statement, 7 505 stored chars). **NO table change**: adds `reorder_categories(uuid[])` and `reorder_products(uuid, uuid[])` — the missing WRITE side of two `sort_order` columns already honoured on the READ side. Measured before that apply: 5 active categories over 3 distinct `sort_order` values, and **55 active products sharing ONE value**, so item order within a category was whatever Postgres returned for a tied sort — unstable between queries. **The property that makes it safe:** each function writes the whole ordering in ONE statement from an array whose *position* is the rank (`with ordinality`), so a gap or duplicate rank is not a producible failure mode and no client-computed integer is trusted. `reorder_products` additionally takes `FOR UPDATE` on the category before counting and demands the **complete** membership — checking only that every id belongs to the category would let a product moved in concurrently keep a colliding inherited rank. `reorder_categories` deliberately allows a partial list (a new category defaults to 0 and sorts to the front, visible and one click from correct), and the migration records that asymmetry so it does not read as an oversight. **Verified live 2026-09-02:** both functions present, **both `SECURITY DEFINER`**, both gating on `is_admin()`. Covered by `menu_display_order_test.sql` (11 cases; the admin-gate case was proven to fail against an ungated copy). **Version NOT aligned** (§9-D). |
+| 75 | 20260828090000 | customer_order_state_inflight | `5a295c494ffc` | 20260828182228 | customer_order_state_inflight | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-08-28 18:22:28 UTC** on explicit owner approval ("apply the migration", given immediately after the session named this file and stated that applying it needed separate approval), via MCP `apply_migration`, one call, target named explicitly. Merged first as PR #287 squash `32a6f42`; the file was hashed from the **default branch** before sending (`d1126bcfc585fbf4fe3292b9b036bcd64d3b214f2621a1c7839833fe44af1922`) and confirmed identical to the branch copy CI had tested. Redefines **one** function, `public.customer_order_state`, with two corrections: the in-flight test `when p_sync_state = 'syncing' then 'sending_to_branch'` moves **ahead of** the phase-marker test, and the stale auto-retry arm (`p_sync_state = 'failed' and p_next_attempt_at > now()`) is deleted. **Why:** `pos_create_attempted_at` is stamped immediately before the Create Order POST leaves, so `syncing` + marker is the normal in-flight window of *every* order; the marker-first ordering therefore classified healthy orders as ambiguous. The TypeScript mirror was fixed in PR #286 (`d763d79`) after a customer was shown "we could not verify whether the branch received this order" for **SM-2026-000070** — synced as ticket #2 in 7.30 s, `sync_attempt_count 0`. The auto-retry arm predates the manual-resend-only policy — `20260813143000_manual_only_pos_resend.sql`, merged as `f7515e5` (PR #205) on 2026-08-13, which introduced the migration and the matching TypeScript change in the **same commit** while leaving this SQL clause behind. **That migration has no row in this ledger**, which stops at row 56 for 2026-07-29 and is an acknowledged subset (see the reconciliation note below the table) — cite the file, not a row number; SQL and TypeScript had disagreed on it for **15 days** with both suites green. **The `=` is earned rather than assumed:** §4's skeleton transform over the merged file gives `5a295c494ffc`, and over the exact statement text sent to `apply_migration` it gives `5a295c494ffc` — identical, because the file's entire 54-line header is `--` comments, which that transform strips. Content equivalence therefore holds by construction and was checked, not inferred. **Pure function replacement:** identical signature (`p_next_attempt_at` is retained as a parameter precisely so `CREATE OR REPLACE` replaces rather than adding an overload — confirmed after apply, overload count **1**), identical volatility (`stable`), `search_path` and grants; **no table is read or written**. **Verified after applying, behaviourally rather than only textually** — the five cases were executed against the live function: `syncing`+marker → `sending_to_branch` (was `verifying_with_branch`, THE fix); `failed`+future `sync_next_attempt_at` → `branch_failed_retry_available` (was `sending_to_branch`); and unchanged: `syncing`+ref → `verifying_with_branch`, marker-outlived-send → `verifying_with_branch`, `synced`+usable ref → `confirmed_by_branch`. All five now match the TypeScript mirror. The auto-retry arm is absent from the **CASE body** (`position('p_next_attempt_at' in <case body>) = 0`); an earlier probe that searched the full `pg_get_functiondef` reported it still present and was **wrong**, because that string includes the parameter list — the corrected measurement is the one recorded here. **The duplicate-ticket guard was confirmed intact, which is the safety-critical property:** `customer_manual_pos_resend_eligibility` hashes **unchanged** (`98a197ab4687350794ed5bf44c720a5a`) and still returns `may_have_sent` for an in-flight order, so a resend cannot be issued for an order whose POST is in flight — Create Order has no idempotency key. `request_customer_pos_resend` also hashes unchanged (`2c1f9d731fa54ec2d20a39be47844ec2`); it branches on the eligibility predicate, never on this function. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. **No order was touched:** 60 orders, 0 in flight at apply time, newest `updated_at` `15:45:12 UTC` — hours before the apply. Live history **119 → 120**. Covered by `order_confirmation_state_machine_test.sql` (in-flight, marker-outlived and syncing-with-ref cases added) and by the parity tripwire `apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts`, which runs in the always-run vitest suite because `sql-suites.yml` gates its `suites` job on `supabase/(migrations|tests)` and so cannot catch a TypeScript-only drift. **Version NOT aligned** — live carries the apply-time stamp `20260828182228` (§9-D). Superseded as latest live version by row 76 on 2026-09-01. |
+| 76 | 20260831120000 | watchdog_cash_order_coverage | `c7013f5ba491` | 20260901115457 | 20260831120000_watchdog_cash_order_coverage | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-01 11:54:57 UTC** on explicit owner approval ("apply 20260831120000" — the file named by the owner, in a message answering a report that named it and stated that applying it was a separate §5 action), via MCP `apply_migration`, **one call, target named explicitly**. That last point is not ceremony here: at apply time **two** repository files were outstanding, not one, and the other is the frozen Moyasar file — see the §6 note below and the correction to CLAUDE.md §8 that shipped with this row. Merged first as PR #300 squash `14da59f`, on the default branch at `44a27cf`; the file was hashed **from the merged default branch** immediately before sending (`5c607ea282a6418e631d6de6b54545fe58462f42b7f8b3cdda8fd8fdda10f4ea`, 553 lines / 29 639 bytes) and confirmed identical to the copy that CI and the local harness had tested. **Redefines exactly one function**, `public.order_integrity_watchdog`, adding two rules and changing nothing else: **R12 `UNPAID_ORDER_NOT_SYNCED`** (critical) and **R13 `UNPAID_ORDER_DEAD_LETTER`** (critical). A `diff` of this function body against row 72's shows **54 lines added and zero removed**, so every pre-existing rule is byte-identical and no existing incident can change fingerprint, shape or severity. **Why:** R1 and R7 — the two rules that answer *"the order exists and the kitchen never got it"* — both require `payment_status = 'paid'`, and R1 additionally a non-null `paid_at`. Live, only **2 of 65** orders have ever been `paid`, and both are comped zero-total orders that synced normally. So those critical rules had essentially no population to match, and an unpaid order stuck in `syncing`, `blocked` or `dead_letter` raised nothing at any severity. That is not theoretical: SM-2026-000057 died silently, and SM-2026-000027/-000028/-000029 sat `blocked` for roughly 18 days until a human cancelled them by hand. **The scope is deliberately narrower than "cash is uncovered", and this is the design rather than an oversight:** R10 `OVERDUE_SYNC_RETRY` carries **no** payment filter, so unpaid orders in `pending`/`failed` were already covered by it at warning severity. R12 therefore takes only `('syncing','blocked')` — the states R10 excludes and R1 cannot reach — so nothing double-reports under two rule codes. Whether a stuck `pending` order deserves critical rather than warning is a severity **policy** question and was left to the owner rather than changed quietly. **The `=` is earned rather than assumed:** §4's skeleton transform gives `c7013f5ba491` over the merged repository file, `c7013f5ba491` over the exact statement text sent to `apply_migration`, and `c7013f5ba491` over the live row's joined statements (1 statement, 29 607 stored chars) — three-way identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **Measured BEFORE applying, against Production read-only, and re-measured on the morning of the apply rather than reused from the day the file was written:** R12 with the `delivery_schema_unconfirmed` exclusion → **0** rows; R12 **without** it → **4** rows, exactly the four deliberately parked `not_retryable` delivery orders (SM-2026-000032, -000049, -000057, -000058); R13 → **0** rows. So the apply was predicted to raise **no incident**, and the exclusion is load-bearing rather than decorative — without it the first tick would have opened four critical incidents for food nobody is waiting for. **Verified after applying, from `pg_get_functiondef` rather than from the file:** overload count still **1** (no accidental second signature); **13** distinct rule guards in the live body once `--` comments are stripped, including both new codes. The raw grep reports 14 — the extra is the literal `'CODE'` inside the migration's own explanatory header comment, not a rule; comment-stripping is what distinguishes them, and the same stripping is what the parity test uses. **Money path unchanged:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent** immediately after: 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`. **No order was touched** — 0 orders in flight and 0 open incidents at apply time. Live history **120 → 121**. **Proven running, not merely defined**, which is the check a successful apply does not give you: cron run **29713** at 11:56:00 UTC — the first tick after the apply — `success`, **13** rules evaluated (up from 11 on run 29712 at 11:54:00), 0 incidents detected, 0 opened, 39 ms, no error code. Covered by `order_integrity_watchdog_test.sql` and by the parity tripwire `src/components/admin/view/integrity/integrityRuleParity.test.ts`, which asserts **set equality** between the admin filter's `RULE_CODES` and the rules in the latest migration defining the function — added because review, not a test, caught the dropdown falling behind. **One inaccuracy is carried in the applied file's header comment and is recorded here rather than edited away:** it says *"63 of 65 orders are `payment_method='cash'`"*, attributing the count to the wrong column. Live: `payment_status='pending'` is **63**; `payment_method='cash'` is **61**; and both `paid` orders are themselves cash-method comped orders, so cash does **not** imply pending. The file was left byte-identical because it is applied and its skeleton fingerprint is the evidence above; `docs/ORDER_INTEGRITY_WATCHDOG.md` carries the correction. **The rules are unaffected** — they key on `payment_status is distinct from 'paid'` and never on `payment_method`, which is the right predicate for exactly the reason the wrong column obscured. **Version NOT aligned** — live carries the apply-time stamp `20260901115457` (§9-D). Superseded as latest live version by row 77 the same day. |
+| 77 | 20260831130000 | otp_login_rate_limit | `5e2d98510696` | 20260901124615 | 20260831130000_otp_login_rate_limit | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-01 12:46:15 UTC** on explicit owner approval ("apply 20260831130000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #301 as `44a27cf`; the file was hashed from the **default branch** before sending (`e0d313c89cae67f0110646117cabc91486941c3761c458d2d7c64d871b0fe15a`, 231 lines / 11 363 bytes) and confirmed identical to the copy CI and the local harness had tested. **What it creates:** `public.otp_send_reservations` (5 columns, RLS enabled, **no policy by design**, `otp_send_reservations_phone_idx`), plus `otp_reserve_send(text,text,int,int,int)` and `otp_release_send(uuid)`. **What it redefines:** `otp_begin_send`, whose limits now come from the shared reservation table instead of `otp_challenges`. **Why:** `auth-send-sms-whatsapp` — the Supabase Auth Send SMS Hook, the path every real customer login takes — called `deliverOtpTemplate` directly, the raw sender, with no cooldown, hourly or daily cap in our code. Every attempt is a billable Meta authentication-template message. The protected sender could not simply be reused, because it also writes an `otp_challenges` row and on the login path Supabase Auth is the sole OTP authority, so reusing it would mint a second code the customer never receives. **Why a reservation and not a check, which is the whole design:** an earlier revision counted `whatsapp_message_logs`, written AFTER the Meta POST returns, so a simultaneous burst all read the same pre-send history, all saw room, and all sent — the limit bounded nothing. Review raised this as a P1 and was right. The budget is now consumed BEFORE the send under `pg_advisory_xact_lock(hashtext(phone))`, which serialises callers for the same number only. **Both reserving functions were probed live after the apply and carry that lock**; `otp_release_send` deliberately does not, being id-scoped and idempotent. **The `=` is earned rather than assumed:** §4's skeleton transform gives `5e2d98510696` over the merged repository file and `5e2d98510696` over the live row's joined statements (1 statement, 11 336 stored chars). **Pure replacement, not an overload:** `otp_begin_send` keeps a byte-identical 13-argument signature, verified against `20260710140000_whatsapp_otp.sql` before the apply and confirmed after — overload count **1**, body md5 `68475c1de0c9097a03fa921d4f7c3f1c` → `7d7625fe4894d37b73b8c719049c145f`. `otp_reserve_send` and `otp_release_send` are 1 overload each. **Exposure verified, which matters because the table holds customer phone numbers and any read of it reveals who was recently sent a code:** `anon` and `authenticated` have **no** select or insert on the table and **no** execute on any of the three functions; `service_role` has execute on all three; RLS is on with **0** policies (deny-by-default, as the migration intends); `otp_reserve_send` is SECURITY DEFINER with `search_path=public` pinned. Supabase security advisors afterwards: **0 ERROR**, and the only finding naming any new object is the expected *"RLS enabled, but no policies exist"*. **Money path untouched and verified rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb`, identical before and after. **Moyasar re-verified absent**: 0 `%moyasar%` functions, 0 history rows. Live history **121 → 122**. **Applied into a quiet system:** 0 rows in `otp_challenges` in the preceding 2 days, so the one-time reset of per-phone limits at apply time throttled or freed nobody, and the reservation table starts empty (**0 rows** after apply). **FULLY LIVE AS OF 2026-09-02.** The login half needed one deploy and got it: `auth-send-sms-whatsapp` shipped as **version 2** on 2026-09-02 on explicit owner approval, `verify_jwt` preserved at `false`. Every real customer login now reserves against the shared budget before the Meta send (60 s cooldown, 5/hour, 10/day). Verified without sending an OTP: the function boots (`GET` → hook-shaped 405), the signature gate holds (unsigned `POST` → 401, at step 2 before any reservation), and the smoke test consumed nothing — `otp_send_reservations` still 0 rows. For a day between apply and deploy the login path stayed unprotected, which is the row's own caution: an applied migration is not a delivered feature. **The VERIFICATION half went live with the apply, and needs no deploy at all.** `otp_begin_send` was replaced body-only under a byte-identical signature, so the already-deployed `whatsapp-send-otp` binding resolves to the new body: from 12:46:15 UTC its limits come from `otp_send_reservations` under the per-phone lock, and a verification send consumes budget the login path will see. Verified three ways — PR #301's diff touches no file in that function's bundle (`_shared/whatsappSend.ts` and `whatsapp-send-otp/` are absent from it); the **deployed bundle read live (v2)** carries the unchanged 13-argument `admin.rpc('otp_begin_send', …)` call; and the overload count stayed **1**, so the signature did not fork. Return shape and reason strings are unchanged, so the handler's branching is unaffected. **CORRECTION, recorded rather than edited away:** the applied file's own header says the apply *"implies TWO function deploys"*, and PR #301 put the same sentence into `docs/WHATSAPP_LOGIN.md`. It implies **one**. A function body changing server-side does not require redeploying its caller; redeploying `whatsapp-send-otp` would have been a production write that changed nothing. Review caught this on PR #303. The migration file is left byte-identical because its skeleton fingerprint is the evidence above; `docs/WHATSAPP_LOGIN.md` carries the correction. Covered by `supabase/tests/otp_login_rate_limit_test.sql` (9 properties, including the shared budget in **both** directions and a genuine second session over dblink for the concurrency case — removing the advisory lock makes it fail with `NOT_SERIALISED`). Behaviour was proven on the disposable local cluster, **not** against Production: exercising it live would mean writing reservation rows, which the apply approval does not cover (§10). **Version NOT aligned** — live carries the apply-time stamp `20260901124615` (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **72 repository / 73 live** rows.
+Reconciliation check: the rows above detail **77 repository / 78 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–72
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–77
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they were the most recent applications at the time (2026-08-25 and
 2026-08-26, §32 and §33), 62–63 because they are the applications of
@@ -473,6 +478,53 @@ opened the POS gate for delivery orders; 72 is `watchdog_delivery_coverage`,
 applied 10:40:53 UTC (§38), which closed the monitoring blind spot the first one
 created. Each was listed here as NOT APPLIED between the merge of its pull
 request (#274 and #275 respectively) and the owner approving the application.
+
+Row **76** is the same pattern again, one apply later:
+`watchdog_cash_order_coverage`, applied 2026-09-01 11:54:57 UTC, which closed the
+remaining half of the same monitoring gap — row 72 made the paid rules see
+delivery orders, and this one covers the UNPAID population those rules exclude,
+which is every real customer order. It was listed as NOT APPLIED between the
+merge of PR #300 (11:04:53 UTC) and the owner approving its application 50
+minutes later. Class B, so it adds one repository entry and one live entry, which
+is the movement from 75/76 to **76/77**.
+
+Row **77** is `otp_login_rate_limit`, applied 2026-09-01 12:46:15 UTC, an hour
+after row 76 and on its own separate approval. It is the first row here whose
+feature is **applied but only half live**: the verification path picked up the
+shared budget at the moment of the apply, because `otp_begin_send` was replaced
+body-only under an unchanged signature, but `auth-send-sms-whatsapp` has not been
+deployed, so the login path it exists to protect is still unrate-limited. Class B
+again, so the totals move to **77/78** above.
+
+Rows **73–75** were all written on 2026-08-28, and only one of them was written
+by the session that performed the application. **73 and 74 began as GAP ROWS and
+were CLOSED on 2026-09-02** — and how they were closed is the part worth reading.
+
+They were written from a live read alone, recording that the two migrations were
+applied and under which versions, with approval, timing, mechanism and
+verification left blank because that session did not hold them. The detail was
+never actually lost: it had been written on the day of the apply in **PR #282**,
+which sat open and unmerged for six days while this table said it was unknown.
+Nobody had to reconstruct anything — somebody had to look at the open pull
+requests. That is the §15 lesson arriving from the other direction: a stale
+picture of what exists is as costly as a stale picture of a branch.
+
+**The recovered claims were corroborated before being adopted, not trusted.** For
+each file the repository sha256 prefix computed on 2026-09-02 matches the hash
+#282 recorded, and the live version stamp matches its claimed apply time to the
+second. **The fingerprint columns were measured independently rather than
+imported**, because #282's hashes compare a repository file to a repository file
+and prove nothing about live content — §4's transform was run on both sides, and
+only because it matched did `repo skel` / `live skel` / `class` move from `?` to
+`=`/`B`. Had it not matched, those columns would have stayed `?` with the
+provenance still filled in.
+
+**75** is
+`customer_order_state_inflight`, applied 2026-08-28 18:22:28 UTC (§39), and it
+follows the same not-applied-for-a-while pattern as its predecessors — but
+briefly: PR #287 merged at **18:17:34 UTC** and the application landed
+**4 minutes 54 seconds later**, so the two-unapplied-file state that CLAUDE.md §8
+warns about existed on the default branch for under five minutes.
 
 > **Fingerprint normalisation, stated once.** The `=` on rows 59–60 was computed
 > with §4's documented transform and verified equal on both sides. The absolute
@@ -1114,8 +1166,13 @@ the refund lifecycle lives in a separate `refund_state` column, avoiding an
 
 ### Delivery-channel note (forward compatibility)
 
-Delivery orders are held at `blocked` / `delivery_schema_unconfirmed` because the
-Lazywait delivery Create Order schema is unconfirmed. Gating them on Lazywait
+**Superseded 2026-08-27 — delivery is live.** Delivery orders *were* held at
+`blocked` / `delivery_schema_unconfirmed` while the Lazywait delivery Create
+Order schema was unconfirmed; `20260827120000` removed that insert-time block and
+delivery orders now enqueue exactly like pickup. The design note below is kept
+because the reasoning still explains why participation is expressed in terms of
+sync state rather than order type — which is precisely what let delivery switch
+on without touching the confirmation channel. Gating them on Lazywait
 acceptance would mark every delivery order permanently unconfirmed and refund all
 of them. Participation is therefore decided by `pos_confirmation_channel_active()`,
 expressed in terms of the SYNC STATE rather than the order type: when Lazywait
@@ -3571,9 +3628,16 @@ the merged default branch.
   `order_ref e5d6bf08…`, `order_status_id new-order`. That answers Q1: Lazywait
   accepts `order_type: "delivery"`.
 
-**Q8 remains open** and no API response can close it: whether the POS *renders*
-`delivery_address`, or whether only the duplicated `order_details` line reaches
-the ticket. It needs a human to look at printed paper.
+**Q8 was closed the same day, by looking at printed paper — and the answer was
+the unwelcome one.** The POS does **not** render `delivery_address`. Ticket #3
+shows `Order Type: Delivery` but carries no address row at all; the destination
+reached the kitchen only through the duplicated `order_details` note. Had the
+builder trusted the confirmed contract field alone, that ticket would have
+reached the kitchen with no destination on it. The duplication is therefore
+permanent, not provisional.
+
+**Q9 followed on ticket #9** (SM-2026-000065, 2026-08-27): order totals are sent
+and they print — `Subtotal 84.00 / VAT 10.96 / Total 84.00`.
 
 ### Four parked delivery orders
 
@@ -3637,4 +3701,186 @@ function bodies that did exactly that. Extracting mechanically and then probing
 the result is the pair of habits that prevents it.
 
 **Moyasar is now the only unapplied file in the repository** — see CLAUDE.md §8
-for why that makes it more dangerous, not less.
+for why that makes it more dangerous, not less. (That was briefly untrue on
+2026-08-28, for the 4 minutes 54 seconds between PR #287 merging and
+`customer_order_state_inflight` being applied — §39.)
+
+## 39. The in-flight state-machine correction — APPLIED 2026-08-28 (row 75)
+
+`public.customer_order_state` is the documented server authority for what a
+customer is told about their order, and
+`apps/mobile/src/features/orders/orderConfirmation.ts` is its mirror. They had
+drifted, twice, and nothing in the repository could have noticed.
+
+**The visible failure.** SM-2026-000070 was synced as POS ticket **#2** in
+**7.30 s**, `sync_attempt_count 0`, `first_pos_sync_failure_at` NULL,
+`pos_confirmation_reason` NULL — the database never held
+`confirmation_required` for it. Its customer was nonetheless shown *"تعذر التحقق
+مما إذا كان الفرع قد استلم هذا الطلب"* — we could not verify whether the branch
+received this order — **and a `pos_confirmed` push at the same time**.
+
+The cause is clause order. `pos_create_attempted_at` is stamped by
+`begin_lazywait_create_attempt` immediately **before** the Create Order POST
+leaves, so `syncing` + marker is the normal in-flight window of *every* order,
+not an anomaly. Testing the marker before the in-flight state therefore
+classified healthy orders as ambiguous. It only became reachable when
+`order-intake`'s `SYNC_TIMEOUT_MS` was cut from 11 s to 5 s, making checkout
+return mid-send; at 11 s a 7.30 s order had already reached `synced`.
+
+**The second divergence, older and quieter.** For `failed` with a future
+`sync_next_attempt_at`, the SQL returned `sending_to_branch` — a leftover
+auto-retry arm — while the TypeScript returned `branch_failed_retry_available`.
+The TypeScript was right: `20260813143000_manual_only_pos_resend.sql`, merged as
+`f7515e5` (PR #205) on 2026-08-13, removed automatic retries and changed the
+TypeScript in the **same commit** while leaving the SQL clause behind. That
+disagreement stood for **15 days** with both test suites green.
+
+**Why neither suite caught either.** The migration's own header claimed *"both
+sides are unit-tested against the same case table so they cannot drift"*. There
+was no shared case table — two hand-maintained lists in different CI jobs. And
+`sql-suites.yml` gates its `suites` job on a path regex covering
+`supabase/(migrations|tests)`, so a TypeScript-only diff runs the workflow,
+reports green, and executes **no SQL assertions at all**.
+
+`20260828090000_customer_order_state_inflight.sql` corrects both clauses. It is a
+pure function replacement: identical signature — `p_next_attempt_at` is retained
+as a parameter precisely so `CREATE OR REPLACE` replaces rather than adding an
+overload — identical volatility, `search_path` and grants, and **no table is read
+or written**.
+
+**Verified behaviourally, by executing the function rather than reading it:**
+
+| Input | Before | After | TypeScript |
+| --- | --- | --- | --- |
+| `syncing` + marker | `verifying_with_branch` | **`sending_to_branch`** | matches |
+| `failed` + future `sync_next_attempt_at` | `sending_to_branch` | **`branch_failed_retry_available`** | matches |
+| `syncing` + ref | `verifying_with_branch` | unchanged | matches |
+| marker outlived the send | `verifying_with_branch` | unchanged | matches |
+| `synced` + usable ref | `confirmed_by_branch` | unchanged | matches |
+
+**The duplicate-ticket guard was confirmed intact**, which is the property that
+actually matters: `customer_manual_pos_resend_eligibility` hashes **unchanged**
+(`98a197ab4687350794ed5bf44c720a5a`) and still returns `may_have_sent` for an
+in-flight order, and `request_customer_pos_resend` hashes unchanged
+(`2c1f9d731fa54ec2d20a39be47844ec2`). Its marker-first ordering is **correct for
+its purpose** and must never be "aligned" with the state function — Create Order
+has no idempotency key, so a resend during an in-flight POST duplicates a live
+kitchen ticket. Money path unchanged: `place_order` `8bd71838…`,
+`compute_order_snapshot` `f955b748…`. No order row touched.
+
+**Two measurement errors, recorded because they nearly produced a false
+"verified".** The pre-apply baseline probe compared the marker's position against
+a needle (`p_sync_state='syncing'`) that could not exist in the *old* body, so
+`position()` returned 0 and the comparison inverted the answer. The post-apply
+probe for the deleted auto-retry arm searched the whole `pg_get_functiondef` for
+`p_next_attempt_at` and reported it still present — that string includes the
+parameter list. Scoped to the CASE body the arm is absent, and the overload count
+is 1. A probe that answers the wrong question is how a false verification gets
+written down.
+
+**The enforcement that was missing.**
+`apps/mobile/src/features/orders/orderConfirmationSqlParity.test.ts` now runs in
+the always-run vitest suite, resolves the latest migration defining each
+function, and pins the complete ordered clause sequence of both
+`customer_order_state` and `customer_manual_pos_resend_eligibility`. It took
+three revisions — sampling four clauses let five mutations through, and the
+replacement had two more holes found in review — and is mutation-tested against
+13 cases, 11 of which must go red and 2 of which must stay green. The green ones
+matter: a tripwire that fails on a reformat gets deleted.
+
+## 40. Cash-order watchdog coverage — WRITTEN, NOT APPLIED (2026-08-31)
+
+`20260831120000_watchdog_cash_order_coverage.sql`. **Not applied. Applying it is a
+separate §5 owner action and the target must be named explicitly** — see the
+warning in CLAUDE.md §8 about "apply the outstanding migrations", which would
+otherwise mean the frozen Moyasar file.
+
+**What it fixes.** R1 `PAID_ORDER_NOT_SYNCED` and R7 `PAID_ORDER_DEAD_LETTER` are
+the rules that answer *"the order exists and the kitchen never got it"*. Both
+require `payment_status = 'paid'`. Read live on 2026-08-31: **63 of 65 orders are
+`payment_method='cash'`**, therefore `payment_status='pending'` with `paid_at`
+NULL for their whole life; the only two `paid` orders are comped, total 0.00, and
+already synced. So on a cash-only launch those rules had no population to match —
+and SM-2026-000057 died silently while SM-2026-000027/-000028/-000029 sat
+`blocked` for ~18 days raising nothing.
+
+**Scope follows the measured gap, not the headline.** R10 `OVERDUE_SYNC_RETRY`
+carries **no** payment filter, so cash orders in `pending`/`failed` were already
+covered at warning severity. The genuinely uncovered states are `syncing`,
+`blocked` and `dead_letter`. R12 takes the first two, R13 the third, and nothing
+more — widening further would double-report against R10.
+
+**Additive by construction.** Every pre-existing rule is byte-identical: diffing
+the redefined function against `20260827130000`'s gives **54 lines added, zero
+removed or altered**. New rule codes default to enabled through the existing
+`coalesce((v_rules->>'CODE'),'true') <> 'false'` pattern, so no
+`order_integrity_config` row is required.
+
+**Pre-apply measurement, read-only against Production:**
+
+| predicate | rows that would fire today |
+| --- | --- |
+| R12 with the `delivery_schema_unconfirmed` exclusion | **0** |
+| R12 without it | **4** — exactly the deliberately parked delivery orders |
+| R13 | **0** |
+
+So applying it raises no incident today, and the exclusion is load-bearing rather
+than decorative.
+
+**Tested rather than asserted.** The full SQL harness was run locally against a
+disposable PostgreSQL 16 cluster — 116 migrations replayed onto an empty
+database, **58/60 suites passing, 0 new failures** (2 pre-existing quarantined).
+`order_integrity_watchdog_test.sql` gains fixtures for both rules and three
+disjointness assertions (R1↔R12, R7↔R13, R10↔R12).
+
+Mutation-tested, each confirmed red then reverted:
+
+| mutation | caught |
+| --- | --- |
+| drop the `delivery_schema_unconfirmed` exclusion | yes |
+| widen R12 to `pending`/`failed` (double-reports with R10) | yes — **only after** a test gap was found and closed |
+| drop the `payment_status is distinct from 'paid'` gate | yes |
+
+The middle row is worth keeping: the first run of that mutation **passed**,
+because the R10 fixture was younger than R12's 15-minute threshold and so could
+not overlap. The fixture was aged and an explicit R10↔R12 disjointness assertion
+added; only then did the mutation fail. A mutation that passes is the test's
+problem, not the mutation's.
+
+**Ownership gap closed in the same change.** `docs/ownership.json` had **no rule
+covering `supabase/migrations/**` at all** — which is precisely how the
+delivery-sync and watchdog migrations changed live behaviour without their owning
+documents moving. Two rules were added: `database-migrations` →
+`docs/MIGRATIONS.md`, and `watchdog-rules` → `docs/ORDER_INTEGRITY_WATCHDOG.md`.
+Each lists exactly **one** document on purpose: `scripts/docs-check-ownership.mjs`
+satisfies a rule when **any** listed doc is touched, so a second entry would let
+the ledger be skipped by editing something else.
+
+## 41. Login-path OTP rate limit — WRITTEN, NOT APPLIED (2026-08-31)
+
+`20260831130000_otp_login_rate_limit.sql`. **Not applied.** It now implies **two**
+separate function deploys as well — `auth-send-sms-whatsapp` and
+`whatsapp-send-otp`, because `otp_begin_send` changed. Apply the migration
+**first**: both functions call RPCs it defines.
+
+Adds `otp_send_reservations` plus `otp_reserve_send` / `otp_release_send`, and
+redefines `otp_begin_send` so both senders share one budget.
+
+**Redesigned after review.** The first version counted `whatsapp_message_logs`,
+which is written *after* delivery — so a concurrent burst all read the same empty
+history and all passed, and the limiter bound nothing precisely when it mattered.
+It is now a reservation taken under `pg_advisory_xact_lock(hashtext(phone))`, with
+a release path so a failed delivery does not burn a customer's quota. Full
+reasoning: `docs/WHATSAPP_LOGIN.md` §7.2.
+
+Tested on a disposable PostgreSQL 16 cluster: 116 migrations replayed onto an
+empty database, **59/61 suites passing, 0 new failures**. Mutation-tested, each
+red then reverted — removing the advisory lock (fails `NOT_SERIALISED`),
+`otp_begin_send` no longer reserving (breaks the shared budget), and release
+ignoring its id.
+
+**A harness gap closed alongside it.** Five suites read `test.dblink_conninfo` and
+nothing ever set it, so every concurrency suite in this repository has been
+**skipping in CI since it was written** — reporting the same green as a pass.
+`.github/sql-ci/run.sh` now supplies each suite a conninfo for its own clone. All
+five run; all five pass.
