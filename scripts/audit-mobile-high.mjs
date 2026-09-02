@@ -22,15 +22,23 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
-const EXCEPTION_EXPIRES = '2026-09-10';
+// Re-reviewed 2026-09-02: still no patched release, and no upgrade escapes it.
+// Both advisories cover `<=2.0.2` and 2.0.2 IS the latest published version
+// (2025-04-02; nothing published since), so npm reports the vulnerable range as
+// `*` — every released version is affected. Upgrading the dependent does not
+// help either: metro@0.87.0, the current latest, still declares
+// `image-size: ^1.0.2`. Extending the date is therefore a judgement that the
+// reachability argument below still holds, NOT a way to make CI green — the
+// distinction §5 of docs/DEPENDENCY_ADVISORIES.md insists on.
+const EXCEPTION_EXPIRES = '2026-10-02';
 const ALLOWED = new Map([
   ['GHSA-w3rx-r6r6-pgpr', {
     package: 'image-size',
-    reason: 'ICNS parser infinite-loop DoS; no patched release as of 2026-08-10',
+    reason: 'ICNS parser infinite-loop DoS; no patched release as of 2026-09-02 (latest 2.0.2 is itself affected)',
   }],
   ['GHSA-5p2g-fcmc-qvqq', {
     package: 'image-size',
-    reason: 'JXL/HEIF parser infinite-loop DoS; no patched release as of 2026-08-10',
+    reason: 'JXL/HEIF parser infinite-loop DoS; no patched release as of 2026-09-02 (latest 2.0.2 is itself affected)',
   }],
 ]);
 
