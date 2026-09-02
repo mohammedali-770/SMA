@@ -1,0 +1,24 @@
+# Generated — regenerate with the owning script, never format by hand.
+docs/reference/
+src/design-system/generated/
+apps/mobile/src/design-system/generated/
+
+# Build output and dependencies.
+dist/
+apps/mobile/dist/
+node_modules/
+**/node_modules/
+
+# Lockfiles: npm owns their formatting.
+package-lock.json
+apps/mobile/package-lock.json
+
+# Prose. The documentation set is hand-formatted for line-by-line reviewability
+# and CONTRIBUTING.md sets its own conventions; reflowing it would produce an
+# enormous diff and gain nothing.
+*.md
+
+# SQL: migrations are immutable once applied (CLAUDE.md §8) and Prettier has no
+# PostgreSQL parser anyway.
+supabase/migrations/
+supabase/tests/

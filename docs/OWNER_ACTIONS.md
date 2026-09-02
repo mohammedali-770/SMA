@@ -501,6 +501,16 @@ name `Design system`. The authoritative list of emitted contexts is generated at
 
 **Status:** OWNER DECISION.
 
+> **`function-drift.yml` no longer runs on a schedule (2026-09-02).** It used to
+> fire `cron: '0 6 * * 1-5'`, and its list step exits 1 when this token is absent
+> — which, per this section, it always is and should stay. So the schedule
+> produced a **red run five mornings a week that nobody was permitted to fix**,
+> because the only fix was creating the secret this section argues against. A
+> workflow that always fails teaches everybody to ignore failing workflows,
+> including the ones that mean something. `workflow_dispatch` is kept, so the tool
+> is one click away the day the safer alternative below is adopted. Nothing about
+> the decision recorded here changes.
+
 This section exists because two workflows told readers to consult "§0" and there
 was no §0 — the pointer was broken, so the warning it carried had nowhere to
 land. This is that content.

@@ -143,6 +143,30 @@ The reason is required. It lands in history where a reviewer sees it.
 
 What this is not for: deferring documentation you intend to write later. An exemption used that way removes the only signal that the document is now wrong, which is worse than never having had the rule. If the change alters behaviour, write the sentence — it is usually one sentence.
 
+### 3. Source must stay readable (added 2026-09-02)
+
+`scripts/format-check.mjs` runs in `design-system.yml` and enforces exactly two things on a pull request's own diff:
+
+1. **A file added on this branch must be Prettier-clean.** New code is free to be held to the standard; nothing existing is disturbed.
+2. **A file changed on this branch must not be machine-compressed** — mean line length at most 100 characters.
+
+Rule 2 is the one that matters. The 2026-09-02 audit found **14 source files committed compressed**: `AccountSettingsScreen.tsx` is one line of 1,968 characters, `ProfileScreen.tsx` is 20 lines holding 7 KB. Every change to one of those diffs as a whole-file rewrite, which defeats review — and the change-control rules in `CLAUDE.md` §15 are built entirely on reading diffs. It happened because the repository had **no formatter at all**: `npm run lint` is `tsc --noEmit`, which has no opinion about layout.
+
+**Why not simply "Prettier must pass on changed files"?** That was measured and rejected: **318 of 400** tracked TypeScript files are not currently Prettier-clean, so the gate would attach a several-hundred-line reformat to every one-line bugfix — and there are no rendering tests here to prove a JSX reformat changed nothing.
+
+`npm run format -- <path>` runs Prettier for real on whatever you point it at.
+
+**Paying one of the 14 down, and the squash-merge trap.** Reformatting a file rewrites every line of it, so `git blame` afterwards attributes the whole file to your commit. For the three small files done in the first pass that costs nothing worth avoiding; for `HomeMenuScreen.tsx` (16 KB) or `ProfileScreen.tsx` (7 KB) it would.
+
+`git` solves this with a `.git-blame-ignore-revs` file listing formatting-only revisions, which GitHub reads automatically. **This repository squash-merges** — every pull request lands as a single commit with one parent — so a dedicated formatting commit on a branch is *never* an ancestor of the merged history, and listing it does nothing at all. That was tried, and caught in review on #312; check it yourself with `git merge-base --is-ancestor <sha> origin/claude/project-build-ie4b56`.
+
+A working entry therefore takes **two pull requests**, because a commit cannot name its own future squash SHA:
+
+1. one pull request that changes **nothing but formatting**, merged to some SHA `S`;
+2. a follow-up that creates or appends to `.git-blame-ignore-revs` with `S`.
+
+There is no `.git-blame-ignore-revs` in the repository yet — whoever does step 1 first creates it in step 2. Never add an entry for a commit that exists only on a branch.
+
 ## Review checklist
 
 Before requesting review on a change that touches behaviour:

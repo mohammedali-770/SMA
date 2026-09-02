@@ -67,9 +67,13 @@ jobs:
     steps:
       # Actions are pinned to commit SHAs, not floating tags: a tag can be
       # repointed, and this job runs on pull_request against the default branch.
+      # fetch-depth: 0 is required by the formatting step: it diffs this branch
+      # against its merge base with the target, and a shallow clone has no merge
+      # base to find. Every other step here reads only the working tree.
       - name: Checkout
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Node
@@ -101,6 +105,23 @@ jobs:
 
       - name: Token mirrors in sync and design-system code is token-pure
         run: npm run design-system:check
+
+      # The brand mark is generated the same way the tokens are, and drifting is
+      # the same class of failure. `logo:check` existed and NO workflow ran it,
+      # so a hand-edited logo asset could land unnoticed (found 2026-09-02).
+      - name: Brand mark matches its generator
+        run: npm run logo:check
+
+      # Two narrow rules on this branch's diff: a file ADDED here must be
+      # Prettier-clean, and a file CHANGED here must not be machine-compressed.
+      # NOT "Prettier must pass on everything" — 318 of 400 tracked TypeScript
+      # files would fail that today, so it would attach a several-hundred-line
+      # reformat to every one-line fix. The header of scripts/format-check.mjs
+      # has the measurements. Needs the merge base, hence fetch-depth: 0 above.
+      - name: Formatting (new files) and no machine-compressed source
+        env:
+          FORMAT_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: npm run format:check
 
       - name: Typecheck (web)
         run: npm run lint
