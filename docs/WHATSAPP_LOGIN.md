@@ -359,9 +359,19 @@ five run; none skip.
 
 ### Ordering, when this is applied and deployed
 
-Apply the migration **first**. It defines the RPCs both functions call. It now
-implies **two** deploys — `auth-send-sms-whatsapp` and `whatsapp-send-otp`
-(because `otp_begin_send` changed). Each is a separate §5 action.
+Apply the migration **first**. It defines the RPCs `auth-send-sms-whatsapp`
+calls.
+
+**CORRECTED 2026-09-01 — this paragraph, and the migration's own header, said the
+apply implies TWO deploys, `auth-send-sms-whatsapp` and `whatsapp-send-otp`. It
+implies ONE.** The reasoning behind the second was that `otp_begin_send` changed,
+but a function body changing server-side does not require redeploying its caller:
+the signature is byte-identical, so the deployed call still binds and simply
+executes the new body. `whatsapp-send-otp` is not modified by this work at all —
+it does not appear in PR #301's diff, and the bundle deployed in Production
+already contains the unchanged 13-argument `admin.rpc('otp_begin_send', …)` call
+in `_shared/whatsappSend.ts`. Redeploying it would have been a production write
+that changed nothing.
 
 On first apply the reservation table is empty, so per-phone limits reset once.
 
@@ -386,19 +396,45 @@ evidence that login is rate-limited.
 | exposure | `anon` and `authenticated`: no table select/insert, no execute on any of the three |
 | advisors | 0 ERROR; the only finding naming a new object is the expected "RLS enabled, but no policies exist" |
 
-**What remains, in this order** — each a separate §5 owner action:
+**Exactly ONE deploy remains, and it is a §5 owner action:**
 
-1. **Deploy `auth-send-sms-whatsapp`.** This is the one that actually closes the
-   billing hole; until it ships, nothing above is enforced on login.
-2. **Deploy `whatsapp-send-otp`.** The verification path, so it shares the budget.
+**Deploy `auth-send-sms-whatsapp`.** It is the one that closes the billing hole;
+until it ships, nothing in §7.2 is enforced on login.
 
-**The intermediate state is safe, and that was verified rather than assumed.**
-The deployed `whatsapp-send-otp` keeps working against the new `otp_begin_send`
-because the signature, return shape and reason strings (`ok` / `cooldown` /
-`hourly_limit` / `daily_limit`) are unchanged — only the source of its counts
-moved, from `otp_challenges` to the shared reservation table. There were **0**
-`otp_challenges` rows in the preceding two days, so the one-time limit reset at
-apply time throttled and freed nobody.
+### The verification path needs NO deploy, and is already limited
+
+An earlier revision of this section listed `whatsapp-send-otp` as a second
+required deploy. That was wrong, and the correction matters because it would have
+meant a production write that accomplished nothing.
+
+The migration replaced `otp_begin_send`'s **body** under a byte-identical
+13-argument signature. A caller does not need redeploying for that — the existing
+binding resolves to the new body. So the verification path did not merely keep
+working; **it started using the shared reservation budget at 12:46:15 UTC, the
+moment the migration was applied.** Its limits now come from
+`otp_send_reservations` under the same per-phone advisory lock as the login path
+will, and a verification send consumes budget the login path can see. That is live
+today.
+
+Checked three ways rather than reasoned about:
+
+| evidence | result |
+| --- | --- |
+| files changed by PR #301 (`44a27cf`) | 8 files; the only Edge Function touched is `auth-send-sms-whatsapp/index.ts`. `_shared/whatsappSend.ts` and `whatsapp-send-otp/` are absent from the diff |
+| the **deployed** `whatsapp-send-otp` bundle (v2), read live | its embedded `_shared/whatsappSend.ts` carries the unchanged 13-argument `admin.rpc('otp_begin_send', …)` call |
+| `otp_begin_send` after the apply | overload count **1** — the signature did not fork, so nothing became ambiguous |
+
+Return shape and reason strings (`ok` / `cooldown` / `hourly_limit` /
+`daily_limit`) are unchanged, so the handler's branching is unaffected. There were
+**0** `otp_challenges` rows in the preceding two days, so the one-time limit reset
+at apply time throttled and freed nobody.
+
+**One unrelated observation, recorded rather than acted on:** the deployed bundle
+is not byte-identical to the repository copy — the deployed source carries no
+JSDoc blocks and condensed helpers, and it was deployed 2026-08-10, before these
+files first appear in git history (`624872d` adds them as new files). The exported
+surface and the RPC call site match. That drift predates this work, is not caused
+by the migration, and is not a reason to deploy as part of it.
 
 Behaviour was proven on the disposable local cluster via
 `supabase/tests/otp_login_rate_limit_test.sql`, **not** against Production —

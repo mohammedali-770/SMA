@@ -205,7 +205,7 @@ food nobody is waiting for, and is a §5 live write regardless.
 
 **Re-read live 2026-09-01, AFTER the OTP rate-limit apply: 117 repository files / 122 live history rows / ONE unapplied file — Moyasar, unapplied on purpose.** Latest live version `20260901124615` (`20260831130000_otp_login_rate_limit`, applied 12:46:15 UTC on explicit owner approval; ledger row 77).
 
-**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied but its feature is **not live**: the two Edge Functions that call the RPCs it defines have not been deployed, so the customer login path it exists to protect is still unrate-limited. An applied migration is no longer a safe proxy for "this is done" — see the deploy debt below.
+**The count went 2 → 1 by an apply, not by a correction, and there is now a DIFFERENT kind of debt in its place.** `20260831130000` is applied but its **login half is not live**: `auth-send-sms-whatsapp` has not been deployed, so the customer login path it exists to protect is still unrate-limited. (The verification half went live with the apply and needs no deploy — see below.) An applied migration is no longer a safe proxy for "this is done" — see the deploy debt below.
 
 Earlier statements of this figure, kept because the reasoning attached to each is still worth reading: **117 files / 121 rows / TWO unapplied** after the watchdog apply at 11:54:57 UTC (ledger row 76), and before that **115 files / 120 rows / ONE unapplied** at `20260828182228` (ledger row 75).
 
@@ -241,28 +241,32 @@ ask which one.
 
 ### Open deploy debt — an applied migration is not a delivered feature
 
-`20260831130000_otp_login_rate_limit` is applied, and **nothing a customer
-experiences has changed yet**. Two Edge Function deploys remain, and the order is
-not cosmetic:
+`20260831130000_otp_login_rate_limit` is applied, and **the login path it was
+written for is still unprotected**. **Exactly ONE deploy remains:**
 
-1. **`auth-send-sms-whatsapp`** — the Supabase Auth Send SMS Hook, i.e. every real
-   customer login. The deployed copy still calls `deliverOtpTemplate` directly, so
-   **the login OTP path is still unrate-limited**, and every attempt is a billable
-   Meta authentication-template message. This deploy is what actually closes the
-   hole the migration was written for.
-2. **`whatsapp-send-otp`** — the phone-verification path, which shares the budget.
+**`auth-send-sms-whatsapp`** — the Supabase Auth Send SMS Hook, i.e. every real
+customer login. The deployed copy still calls `deliverOtpTemplate` directly, so
+**the login OTP path is still unrate-limited**, and every attempt is a billable
+Meta authentication-template message. It is a §5 owner action, and it calls RPCs
+the migration defines, which is why the migration went first.
 
-Each is a separate §5 owner action. Both call RPCs the migration defines, which is
-why the migration went first; neither may be deployed against a database lacking
-it.
+**The verification path is already live and needs no deploy.** `otp_begin_send`
+was replaced body-only under a byte-identical signature, so the already-deployed
+`whatsapp-send-otp` binding resolves to the new body — from the moment of the
+apply its limits come from the shared reservation table under the per-phone lock.
+Verified: PR #301's diff touches no file in that function's bundle, the deployed
+bundle read live carries the unchanged 13-argument call, and the overload count
+stayed **1**.
 
-**The intermediate state is safe, and that was checked rather than hoped for.**
-The deployed `whatsapp-send-otp` keeps working because `otp_begin_send` kept its
-13-argument signature, return shape and reason strings — only the source of its
-counts moved, from `otp_challenges` to the shared reservation table. Verified
-after the apply: overload count **1**, so nothing became ambiguous.
+**A caution worth keeping, because it nearly caused a pointless production write.**
+The migration's own header and `docs/WHATSAPP_LOGIN.md` both said the apply implied
+**two** deploys, reasoning that `otp_begin_send` had changed. A function body
+changing server-side does **not** require redeploying its caller when the signature
+is unchanged. Review caught it on PR #303. When a migration redefines a function,
+ask whether any caller's *code* changed — not merely whether the function did.
 
-Do not read "applied" in the table above as "done" for this row.
+Do not read "applied" in the table above as "done" for this row: the login half is
+still outstanding.
 
 The 2026-09-01 apply is the current worked example, and it is the one that
 matches today's shape. **THREE repository files were unapplied when the
