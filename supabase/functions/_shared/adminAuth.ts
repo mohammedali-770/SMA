@@ -12,8 +12,15 @@
  * (`profile?.role === 'admin' ? user.id : null`) and so survived a lexical sweep
  * for `role !== 'admin'`; it is fixed too, and is the one that mattered most —
  * `verify_jwt = false` makes that check its only gate, and its broadcast cannot
- * be recalled. Only payment-test-config keeps the defect, deliberately, under the
- * CLAUDE.md §6 payment freeze.
+ * be recalled.
+ *
+ * `payment-test-config` was fixed too, on 2026-08-24, under the narrow exception
+ * recorded in CLAUDE.md §6 — it is not a read-only diagnostics endpoint, since
+ * its `verify_order` action reaches `validateAndConfirmTapCharge` and can drive
+ * payment-state writes on real orders. It calls `decideAdminAuthorization` at
+ * index.ts:73 like every other admin function. NO admin Edge Function keeps the
+ * defect today. (This paragraph said the opposite until 2026-09-02, pointing
+ * readers at a hole that had been closed for nine days.)
  *
  * It was NOT universal: lazywait-catalog/index.ts:36-39 has asked is_admin()
  * since 20260807, and is the precedent this file follows.

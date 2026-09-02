@@ -931,6 +931,43 @@ webhook secret (checked against the raw body AND re-serialized JSON). Invalid �
 `lazywait_status` (does NOT auto-flip the customer-facing local status). Unknown
 events are verified, logged, and accepted (200) — never throw.
 
+### Two silent failure modes, fixed 2026-09-02 (source only — see Deployment)
+
+Both were the same shape: **a result that was never looked at.** supabase-js
+resolves with `{ error }` rather than throwing, so a write that failed reads
+exactly like one that succeeded unless somebody destructures it.
+
+**1. A missing webhook secret returned 200.** The handler answered
+`{status:'ignored', reason:'webhook secret not configured'}` with a **200**, which
+is an acknowledgement — it tells Lazywait the delivery succeeded, so the event is
+never retried and is gone for good. A configuration slip would have silently
+discarded real POS callbacks for as long as it lasted. It now returns **503**,
+which keeps the event in Lazywait's retry queue and is exactly what
+`whatsapp-webhook` already did for the identical condition. Two functions, one
+rule.
+
+**2. The log row claimed success unconditionally.** The `orders` update ran as
+`.eq('id', …).then(() => {}, () => {})` — the result discarded — and the
+`integration_sync_logs` insert that followed hardcoded `status: 'success'` with
+`error: null`. A dropped POS status change left behind a row asserting it had
+landed, which is the worst shape a log can take: it is the row an operator reads
+when they are trying to work out what happened. The status now comes from
+`syncLogOutcome` in `_shared/syncLog.ts`, so a failed lookup or update produces
+`status:'failed'` plus a bounded, PII-free error string. The log insert's own
+failure is now `console.error`'d instead of swallowed — losing the log must not
+fail an authenticated callback, but "best effort" is not "unobservable".
+
+**Unchanged on purpose:** an authenticated callback whose `order_ref` we do not
+recognise is still a **200**. Making the POS retry a callback for an order that
+does not exist locally would achieve nothing. Both properties are pinned by
+`_shared/webhookReliabilityWiring.test.ts`.
+
+> **NOT YET DEPLOYED.** This is a source change. The running function still has
+> the old behaviour until `lazywait-webhook` is redeployed, which is an owner
+> action under CLAUDE.md §5. The live `webhook_secret` is configured (verified
+> read-only 2026-09-02), so today only the false-`success` logging is active; the
+> 200-on-missing-secret path is latent.
+
 ## Admin monitoring
 Admin → Settings → Integrations → **Lazywait Sync Monitor**: branch mapping
 (with unmapped count), per-order sync state / POS ref / attempts / blocked-reason

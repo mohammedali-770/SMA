@@ -7,6 +7,7 @@ import { corsHeaders, json } from '../_shared/cors.ts';
 import { adminClient } from '../_shared/supabaseClient.ts';
 import { getProviderConfig } from '../_shared/secrets.ts';
 import { hmacSha256Hex, timingSafeEqual, sanitizeProviderResponse } from '../_shared/whatsapp.ts';
+import { syncLogOutcome } from '../_shared/syncLog.ts';
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -56,7 +57,7 @@ Deno.serve(async (req: Request) => {
         const statuses = Array.isArray(ch?.value?.statuses) ? ch.value.statuses : [];
         for (const st of statuses) {
           const safe = sanitizeProviderResponse({ messages: [{ id: st?.id }], error: st?.errors?.[0] });
-          await admin.rpc('record_whatsapp_message', {
+          const { error: rpcError } = await admin.rpc('record_whatsapp_message', {
             p_phone: st?.recipient_id ? `+${String(st.recipient_id).replace(/^\+/, '')}` : null,
             p_message_type: 'status',
             p_template_name: null,
@@ -66,6 +67,14 @@ Deno.serve(async (req: Request) => {
             p_error_message_safe: safe.error_message,
             p_raw: { status: st?.status ?? null, id: safe.message_id, error_code: safe.error_code },
           });
+          // supabase-js RESOLVES with `{ error }` rather than throwing, so this
+          // RPC could fail on every single delivery report and neither the catch
+          // below nor the 200 return would notice. Delivery-status logging could
+          // be 100% lossy while the function looked healthy. Never phone-number:
+          // `syncLogOutcome` keeps only the Postgres code and a bounded message.
+          if (rpcError) {
+            console.error('whatsapp-webhook: record_whatsapp_message failed', syncLogOutcome(rpcError).error);
+          }
         }
       }
     }
