@@ -53,6 +53,7 @@ npm run docs:check      # what CI runs: drift + ownership
 | Remove a restaurant branch | [Branch deletion](BRANCH_DELETION.md) |
 | Restore data | [Backup and recovery](BACKUP_RECOVERY.md) |
 | See what needs a decision from the owner | [Owner actions](OWNER_ACTIONS.md) |
+| Judge whether the product can launch at all | [Go-live readiness](GO_LIVE_READINESS.md) |
 
 ### I am releasing
 

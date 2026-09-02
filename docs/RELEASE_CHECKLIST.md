@@ -13,7 +13,7 @@ Before release work:
 - [ ] No direct production-branch push/merge is being used.
 - [ ] Any action that requires explicit owner approval has that approval in the conversation.
 - [ ] Payment/refund code is untouched unless a separate payment exception was explicitly approved.
-- [ ] Push is LIVE: any change to notification copy, targeting or dispatch behaviour is a change to real customer messaging and was explicitly approved. Marketing stays opt-in (`promos_enabled` default FALSE).
+- [ ] Push is LIVE: any change to notification copy, targeting or dispatch behaviour is a change to real customer messaging and was explicitly approved. Marketing is **opt-OUT** since the owner decision of 2026-08-20 — `DEFAULT_DEVICE_PREFS` sets `promosEnabled: true`, so granting the OS notification prompt enrols the device in offers, and the Profile toggle is the opt-out (CLAUDE.md §7). The column default `push_devices.promos_enabled` stays FALSE and never decides a live device's targeting.
 
 See `CLAUDE.md`.
 
@@ -149,6 +149,12 @@ Before native store submission, a real device must exercise the native bundle.
 PR #200 completed source retention; this physical-device validation remains a separate gate.
 
 ## 8. App Store / Play submission
+
+**Store *policy* readiness is a separate, one-time gate:
+[`GO_LIVE_READINESS.md`](GO_LIVE_READINESS.md)** covers Apple's guidelines, Google
+Play's requirements and Saudi PDPL, with each item traced to its source standard.
+Work that gate before the first submission; the list below is the per-release
+re-check.
 
 Re-check these live immediately before submission; do not copy old audit status forward:
 
