@@ -1480,34 +1480,25 @@ calls it, and the app has never known it existed.
 **On completion**, per the closeout rule below: delete this section, recording the
 verification date and a `list_edge_functions` readback showing the slug gone.
 
-## 24. `orders` index cleanup — written 2026-09-02, awaiting apply
+## 24. `orders` index cleanup — DONE 2026-09-02 (closed)
 
-**Status:** OWNER ACTION — a single `apply_migration` call, no deploy.
+**Status:** COMPLETE. No action outstanding.
 
-`supabase/migrations/20260902120000_orders_index_cleanup.sql` drops two indexes
-on `orders` and does nothing else. Both were found by the 2026-09-02 dead-code
-audit and verified against Production read-only.
+`20260902120000_orders_index_cleanup` was applied on **2026-09-02 12:37:37 UTC**
+on explicit approval naming the target by version, in one MCP `apply_migration`
+call. Live version `20260902123737`; history **122 → 123**.
 
-| Index | Why |
-| --- | --- |
-| `orders_lazywait_deadline_queue_idx` | **Exact duplicate** of `orders_lazywait_queue_idx` — live `pg_get_indexdef` is identical apart from the name. Both are being scanned (45,808 / 34,622), which is what interchangeable indexes look like. Every insert and every sync-state update on `orders` maintains both. |
-| `orders_sync_queue_idx` | **Dead.** The only `where sync_status` in the whole repository is that index's own predicate; the live queue predicate is `lazywait_sync_state`. `idx_scan` = 0. |
+Verified after the apply: `orders` index count **18 → 16** (exactly the two
+intended, nothing else), the survivor `orders_lazywait_queue_idx` present and
+valid, and — the check that actually matters — the live sync-queue predicate
+still plans as `Index Scan using orders_lazywait_queue_idx`. `place_order` and
+`compute_order_snapshot` hash identically before and after; Moyasar re-verified
+absent; security advisors 0 ERROR. No function deploy was implied or performed.
 
-**What makes it low risk:** indexes only — no table, function, policy, grant,
-trigger or enum. `place_order` and `compute_order_snapshot` are not redefined, so
-the money path is untouched by construction. Neither index is unique, primary, or
-backing a constraint. `if exists` makes it re-runnable. At 66 rows the ACCESS
-EXCLUSIVE lock is sub-millisecond.
-
-**No function deploy is implied** — no code names either index.
-
-**When you approve it, name the file by version: `20260902120000`.** Per
-CLAUDE.md §8 an unnamed target is not an instruction to apply anything, and
-`20260824100000_moyasar_payment_provider` still sorts ahead of everything and is
-frozen under §6.
-
-Full reasoning, including the six *other* zero-scan indexes that are **not** dead
-and must not be swept in with these: `docs/MIGRATIONS.md` §42.
+Kept as one paragraph rather than deleted, because the entry it replaces was a
+pending action and a reader arriving from `docs/MIGRATIONS.md` §42 or CLAUDE.md
+§8 should find its outcome here rather than a gap. Full record: `MIGRATIONS.md`
+§42 and ledger row 78.
 
 ---
 
