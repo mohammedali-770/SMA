@@ -71,11 +71,14 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/restNoSupabaseJs.test.ts`
 - `_shared/secrets.ts`
 - `_shared/supabaseClient.ts`
+- `_shared/syncLog.test.ts`
+- `_shared/syncLog.ts`
 - `_shared/tap.test.ts`
 - `_shared/tap.ts`
 - `_shared/tapRefund.test.ts`
 - `_shared/tapRefund.ts`
 - `_shared/tapVerify.ts`
+- `_shared/webhookReliabilityWiring.test.ts`
 - `_shared/whatsapp.test.ts`
 - `_shared/whatsapp.ts`
 - `_shared/whatsappSend.ts`

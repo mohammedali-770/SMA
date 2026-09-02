@@ -147,6 +147,24 @@ The hook secret goes into the app (step 6 below), not into git.
 4. (Only for delivery-status webhooks — not required for login) the existing
    `whatsapp-webhook` function + App Secret + verify token.
 
+   > **Delivery-status logging could fail silently, fixed in source 2026-09-02.**
+   > `whatsapp-webhook` awaited `admin.rpc('record_whatsapp_message', …)` without
+   > destructuring its result. supabase-js RESOLVES with `{ error }` rather than
+   > throwing, so an RPC that failed on every single delivery report would have
+   > been caught by neither the surrounding `catch` nor the `{status:'ok'}` 200 —
+   > `whatsapp_message_logs` could have been 100% lossy while the function looked
+   > perfectly healthy. The result is now checked and a failure is `console.error`'d
+   > through `syncLogOutcome`, which keeps only the Postgres code and a bounded
+   > message, so **no recipient phone number can reach the log line**.
+   >
+   > The **200 is deliberate and unchanged**: an authenticated event we could not
+   > store is still an event we accepted, and making Meta retry it would not help.
+   > Pinned by `_shared/webhookReliabilityWiring.test.ts`.
+   >
+   > **NOT YET DEPLOYED** — a redeploy of `whatsapp-webhook` is an owner action
+   > under CLAUDE.md §5. Nothing about signature verification, the App Secret, the
+   > verify token or the login path is touched by this change.
+
 ---
 
 ## 6. Admin: turn it on (once 4 + 5 are done)
