@@ -481,9 +481,36 @@ does not cover (§10).
 ## 9. Previous phone-verification feature
 
 Kept, **secondary, still disabled**. `whatsapp-send-otp` / `whatsapp-verify-otp`
-+ `otp_challenges` remain for *profile phone verification only* (Profile screen,
-relabeled "Verify phone number — this does not sign you in"). They never issue a
-session and are not part of login. `otp_challenges` is logs/secondary only.
++ `otp_challenges` remain for *profile phone verification only*. They never issue
+a session and are not part of login. `otp_challenges` is logs/secondary only.
+
+### The customer-facing surface is gone (2026-09-02)
+
+The Profile screen no longer has a "Verify phone number" card. Its entry point
+was removed on **2026-08-13** in `99dc6dd` (the approved iOS UX batch), which
+deleted both the import and the `{profile ? <VerifyPhoneWhatsApp /> : null}` line
+but left the component file behind. That orphan — and the `whatsappOtp`
+send/verify wrapper in `apps/mobile/src/services/api.ts` that only it used — were
+deleted on **2026-09-02**.
+
+**Nothing regressed, because the card had become redundant.** Every successful
+OTP login sets `auth.users.phone_confirmed_at`, and the
+`handle_auth_user_phone_confirmed` trigger writes `profiles.phone_verified = true`
+and calls `claim_comp_membership`. A customer who can sign in is already verified.
+
+**What this leaves, and it is worth stating plainly:**
+
+| Function | Deployed | Callers now |
+| --- | --- | --- |
+| `whatsapp-send-otp` | yes (v2) | the admin console's test-send (`src/lib/api.ts`) |
+| `whatsapp-verify-otp` | yes (v2) | **none** |
+
+`whatsapp-verify-otp` is now a deployed function with no caller anywhere. It was
+deliberately **not** deleted: removing a deployed Edge Function is an owner action
+under CLAUDE.md §5, and it backs `mark_phone_verified()` — the third of the three
+comp-membership binding paths (`docs/DISCOUNTS_CAMPAIGNS.md`). The other two
+(`handle_new_user`, `handle_auth_user_phone_confirmed`) both fire on login, so
+comp binding still works; what is gone is the redundancy, not the mechanism.
 
 Both now use `normalizeSaudiPhoneE164`, so profile verification follows the same
 Saudi-only rule as login. `whatsapp-test-config` (admin diagnostics send) and

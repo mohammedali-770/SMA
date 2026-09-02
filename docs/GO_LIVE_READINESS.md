@@ -134,6 +134,8 @@ has, so it is a verification list rather than an aspiration.
 | G3 | Menu content ready | ⬜ | 55 active products; **1** now carries an image. Decide whether launching with mostly image-less products is acceptable. |
 | G4 | Store listing assets | ⬜ | Screenshots, description, category, support contact — in both languages. |
 | G5 | Terms, refund and delivery policy match behaviour | ⬜ | Especially if launching cash-only: the policy must not promise card payment or online refunds. |
+| G6 | **Campaigns / promo codes are not a launch feature** | ⚠️ known gap | The schema (`campaigns`, `campaign_redemptions`, `compute_campaign_discount`) is applied to Production, but **there is no UI in either app** — no admin tab, no customer entry point — and `place_order` has no campaign awareness, so `global_limit`/`per_user_limit` are unenforced and no redemption row is ever written. Established by the 2026-09-02 dead-code audit. **Do not advertise promo codes at launch.** Detail: `docs/DISCOUNTS_CAMPAIGNS.md` Part 1. |
+| G7 | **A failed refund is invisible to operators** | ⚠️ known gap | `list_failed_order_refunds()` is live and correctly admin-gated (role **and** AAL2), but **no admin screen calls it** and `order_refunds` is not read anywhere in `src/` or `apps/`. If a refund fails there is no surface that shows it. FROZEN under §6, so recorded rather than fixed — but it matters the moment G1/G2 are answered. |
 
 ---
 
@@ -149,7 +151,8 @@ has, so it is a verification list rather than an aspiration.
 
 **Accepted or decided risks, recorded rather than re-argued:** A4/B2 (opt-out
 marketing push, accepted 2026-08-20), C2 (`ACCESS_FINE_LOCATION` breadth),
-E2 (single admin), D5 (`image-size` exception until 2026-10-02).
+E2 (single admin), D5 (`image-size` exception until 2026-10-02), G6 (campaigns
+built but unreachable), G7 (no operator view of failed refunds).
 
 **The largest unknowns are legal, not technical.** Everything in section A except
 A6 needs somebody who is not an engineer.

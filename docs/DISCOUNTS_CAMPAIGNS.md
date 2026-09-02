@@ -25,6 +25,30 @@ until the integration described in Assumption 1 is built — and that work is
 gated on the eight open questions below, which are business decisions, not
 engineering ones. Nothing else is deployed, and no campaign row exists.
 
+### There is also no way to reach it from either app (recorded 2026-09-02)
+
+The 2026-09-02 dead-code audit established a fact this document did not state:
+**the campaigns feature has no user interface at all.**
+
+- `src/lib/campaigns.ts` — 148 lines: `campaignsApi` (list/create/update/delete
+  plus a `compute_campaign_discount` preview), `selectLiveCampaigns`,
+  `formatCampaignSummary`. Its **only importer in the whole repository is its own
+  test file.**
+- There is **no Campaigns tab**. `ADMIN_NAV` has 13 entries and all 13 are routed;
+  none of them is campaigns. The two `campaign` matches in `SettingsPanel.tsx` are
+  the *loyalty* toggle ("Active Rewards Campaign"), a different feature.
+- `grep -il campaign apps/mobile/src` returns **nothing** — the customer app has
+  no campaign surface either, so no customer can enter a code.
+- `campaign_redemptions` is therefore written **only by `discounts_campaigns_test.sql`**,
+  which is why `global_limit` and `per_user_limit` are unenforced in practice.
+
+**The module was deliberately kept rather than deleted.** It is finished,
+server-authoritative work whose schema is already applied; deleting it would
+discard a design that has to be rewritten the day the eight questions below get
+answered, and would save nothing operationally, because the tables and the RPC
+would still be live. What it needed was this paragraph, so nobody mistakes it for
+a working feature and nobody deletes it as rot.
+
 ## What this slice adds
 
 - **`supabase/migrations/20260728120000_discounts_campaigns.sql`**

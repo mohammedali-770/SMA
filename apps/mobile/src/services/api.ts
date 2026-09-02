@@ -493,47 +493,31 @@ export const addresses = {
 // ---------------------------------------------------------------------------
 // Profile (self-service writes)
 // ---------------------------------------------------------------------------
-export const profile = {
-  /**
-   * Update the signed-in customer's name.
-   *
-   * Authorization is entirely server-side and already existed before this call
-   * did: `profiles` grants UPDATE on (full_name, phone_number, email) to
-   * `authenticated` only, and the `profiles_update_own_or_admin` policy scopes it
-   * to `id = auth.uid()`. The `.eq('id', user.id)` here is a guard against an
-   * accidental table-wide update, not the authorization itself — a forged id
-   * simply matches no row the policy allows.
-   *
-   * Only `full_name` is writable through this path. Phone number is owned by the
-   * verification flow and role is not customer-writable at all.
-   */
-  async updateName(fullName: string): Promise<DbProfile> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('You must be signed in to update your profile.');
-    return okCoded<DbProfile>(
-      await supabase.from('profiles').update({ full_name: fullName }).eq('id', user.id).select('*').single(),
-    );
-  },
-};
+// (Removed `profile.updateName` on 2026-09-02 — it had no call site anywhere in
+//  the repository. `updateCustomerProfile` in features/profile/profileService.ts
+//  supersedes it: same guarded write, plus `email`, and it is what EditableName
+//  actually calls. The authorization argument below moved with it — `profiles`
+//  grants UPDATE on (full_name, phone_number, email) to `authenticated` only and
+//  `profiles_update_own_or_admin` scopes it to `id = auth.uid()`.)
 
 // ---------------------------------------------------------------------------
-// WhatsApp OTP (phone verification). The app never generates or trusts the code;
-// send/verify happen server-side via Edge Functions (rate-limited, hashed). The
-// user JWT is auto-attached by supabase-js so a successful verify can mark the
-// signed-in user's phone verified. No provider token ever reaches the app.
+// WhatsApp OTP (profile phone verification) — REMOVED FROM THE APP 2026-09-02
 // ---------------------------------------------------------------------------
-export const whatsappOtp = {
-  async send(phone: string, language: 'ar' | 'en', purpose = 'phone_verification'): Promise<{ status: string; message?: string }> {
-    const { data, error } = await supabase.functions.invoke('whatsapp-send-otp', { body: { phone, purpose, language } });
-    if (error) throw new Error(error.message);
-    return data as { status: string; message?: string };
-  },
-  async verify(phone: string, code: string, purpose = 'phone_verification'): Promise<{ verified: boolean; session?: boolean; message?: string }> {
-    const { data, error } = await supabase.functions.invoke('whatsapp-verify-otp', { body: { phone, code, purpose } });
-    if (error) throw new Error(error.message);
-    return data as { verified: boolean; session?: boolean; message?: string };
-  },
-};
+// `whatsappOtp.send`/`.verify` wrapped the `whatsapp-send-otp` and
+// `whatsapp-verify-otp` Edge Functions for the Profile verification card. That
+// card lost its entry point on 2026-08-13 (99dc6dd, the approved iOS UX batch)
+// and the component was deleted on 2026-09-02, leaving these two wrappers with
+// no caller anywhere in the repository.
+//
+// Nothing is lost: the OTP LOGIN path does not go through here at all — it uses
+// Supabase Auth (see the `auth` section above), and the
+// `handle_auth_user_phone_confirmed` trigger sets `profiles.phone_verified` on
+// every successful login, which is what made the Profile card redundant.
+//
+// BOTH EDGE FUNCTIONS ARE STILL DEPLOYED. `whatsapp-send-otp` keeps a caller in
+// the admin console's test-send (src/lib/api.ts); `whatsapp-verify-otp` now has
+// none. Deleting a deployed function is an owner action under CLAUDE.md §5 —
+// see docs/WHATSAPP_LOGIN.md.
 
 // ---------------------------------------------------------------------------
 // Push devices (customer-owned rows; RLS restricts every operation to

@@ -59,7 +59,7 @@ Screens are thin. Behaviour lives in feature modules, each of which keeps its pu
 | `orders` | 10 |
 | `otp` | 7 |
 | `product` | 1 |
-| `profile` | 12 |
+| `profile` | 11 |
 
 ## Admin console panels
 

@@ -4,9 +4,6 @@
  */
 export const STRINGS = {
   en: {
-    appName: 'Spicy Meal',
-    tagline: 'Hot, Crispy, Fresh and Golden Bites',
-
     // common
     retry: 'Try Again',
     loading: 'Loading…',
@@ -18,7 +15,6 @@ export const STRINGS = {
     errTimeout: 'That took too long. Please try again.',
     errRateLimited: 'Too many attempts. Please wait a moment and try again.',
     errServer: 'Something went wrong on our side. Please try again shortly.',
-    sar: 'SAR',
     cancel: 'Cancel',
     close: 'Close',
     back: 'Back',
@@ -26,9 +22,7 @@ export const STRINGS = {
     // customer login — WhatsApp only, Saudi mobiles only (Supabase Phone Auth).
     // The screen carries the brand lockup and the field, nothing else: there is
     // deliberately no heading or explanatory paragraph above the input.
-    loginWithWhatsapp: 'Login with WhatsApp',
     phoneNumberLabel: 'Mobile number',
-    saudiNumbersOnly: 'Saudi mobile numbers only (+966).',
     loginContinue: 'Continue',
     loginCodeOnWhatsapp: 'Your verification code will arrive on WhatsApp',
     weSentLoginCode: 'We sent a login code to your WhatsApp.',
@@ -45,13 +39,10 @@ export const STRINGS = {
 
     // branch
     selectBranch: 'Select Branch',
-    changeBranch: 'Change',
-    tapToChooseBranch: 'Tap to choose your branch',
     open: 'Open',
     closed: 'Closed',
     deliveryFee: 'Delivery Fee',
     minOrder: 'Min. order',
-    noBranches: 'No branches available right now.',
     branchClosedNotice: 'This branch is currently closed. You can browse, but ordering is disabled.',
 
     // menu / home
@@ -66,11 +57,9 @@ export const STRINGS = {
     productBlockedByOptions: 'A required choice is out of stock at this branch right now.',
     soldOutNow: 'Sold out just now',
     soldOutBody: 'These items sold out while you were ordering. Remove them to continue.',
-    soldOutRemove: 'Remove and continue',
     customizeAdd: 'Customize & Add',
     kcal: 'kcal',
     noProducts: 'No items match your search.',
-    selectBranchFirst: 'Choose a branch to see the menu',
     selectBranchCta: 'Select a branch',
 
     // order-type / branch / delivery selection flow
@@ -78,19 +67,15 @@ export const STRINGS = {
     otPickup: 'Pickup',
     otDelivery: 'Delivery',
     otPickupBranch: 'Select pickup branch',
-    otDeliveryAddress: 'Select delivery address',
     otSavedAddresses: 'Saved addresses',
     otNoSaved: 'No saved addresses yet.',
     otAddAddress: 'Add new address',
-    otLocationDesc: 'Location description / nearby landmark',
-    otLocationDescPlaceholder: 'Example: near Al Salam grocery, beside the mosque',
     otConfirmLocation: 'Confirm location',
     otResolving: 'Finding a branch for your location…',
     otDeliveryUnavailable: 'Sorry, delivery is not available for your selected location right now.',
     otNoDeliveryZones: 'Delivery is not available right now. Please choose pickup.',
     otChange: 'Change',
     otSelectToOrder: 'Select order type to start ordering',
-    otDeliveringFrom: 'Delivered from',
     otKmAway: 'km',
     otMapMoveHint: 'Move the pin to your exact location',
     otUseMyLocation: 'Use my location',
@@ -124,14 +109,11 @@ export const STRINGS = {
     payOnline: 'Online Payment',
     cashOnDelivery: 'Cash on Delivery',
     cashOnPickup: 'Cash on Pickup',
-    deliveryLocation: 'Delivery location',
     legalSupport: 'Legal & Support',
-    fillRequiredFields: 'Please fill in all required fields.',
     increaseQty: 'Increase quantity',
     decreaseQty: 'Decrease quantity',
 
     // product
-    chooseOptions: 'Choose your options',
     required: 'Required',
     optional: 'Optional',
     quantity: 'Quantity',
@@ -165,7 +147,6 @@ export const STRINGS = {
     notesPlaceholder: 'Add a note (e.g. extra spicy, no onions)',
     useLoyalty: 'Redeem loyalty points',
     pointsAvailable: 'points available',
-    redeemHint: 'Points are redeemed and validated by the server at checkout.',
     discount: 'Discount',
     loyaltyDiscount: 'Loyalty discount',
     compDiscount: 'Complimentary',
@@ -203,8 +184,6 @@ export const STRINGS = {
     payNotCompleted: 'Payment was not completed. You can continue or try again.',
     payContinue: 'Continue payment',
     branchClosedError: 'This branch is closed. Please choose an open branch.',
-    minOrderError: 'Below the branch minimum for delivery.',
-
     // receipt
     // 'orderPlaced' / 'orderPlacedSub' / 'orderRef' were REMOVED with Issue #94.
     // They were the unconditional "Order placed!" hero and the "Ref:" label for
@@ -270,8 +249,6 @@ export const STRINGS = {
     // WhatsApp phone verification
     verifyPhoneTitle: 'Verify phone number',
     verifyPhoneSub: 'Confirm phone ownership via WhatsApp. This does not sign you in.',
-    phoneVerifiedBadge: 'Verified',
-    enterPhoneNumber: 'Enter your phone number',
     sendCodeWhatsapp: 'Send code via WhatsApp',
     weSentWhatsappCode: 'We sent a verification code to your WhatsApp',
     enterVerificationCode: 'Enter verification code',
@@ -279,7 +256,6 @@ export const STRINGS = {
     resendCode: 'Resend code',
     resendIn: 'Resend in',
     invalidOrExpiredCode: 'Invalid or expired code',
-    phoneVerifiedSuccess: 'Phone verified successfully',
     whatsappNotAvailable: 'WhatsApp verification is not available right now.',
 
     // account deletion
@@ -378,9 +354,6 @@ export const STRINGS = {
     oc_maps_google: 'Google Maps',
   },
   ar: {
-    appName: 'سبايسي ميل',
-    tagline: 'حار، مقرمش، طازج ولقيمات ذهبية',
-
     retry: 'إعادة المحاولة',
     loading: 'جارٍ التحميل…',
     somethingWentWrong: 'حدث خطأ ما.',
@@ -389,15 +362,12 @@ export const STRINGS = {
     errTimeout: 'استغرقت العملية وقتاً طويلاً. حاول مرة أخرى.',
     errRateLimited: 'محاولات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
     errServer: 'حدث خطأ لدينا. حاول مرة أخرى بعد قليل.',
-    sar: 'ر.س',
     cancel: 'إلغاء',
     close: 'إغلاق',
     back: 'رجوع',
 
     // تسجيل دخول العميل عبر واتساب فقط — أرقام سعودية فقط (مصادقة الجوال في Supabase)
-    loginWithWhatsapp: 'تسجيل الدخول عبر واتساب',
     phoneNumberLabel: 'رقم الجوال',
-    saudiNumbersOnly: 'أرقام الجوال السعودية فقط (+966).',
     loginContinue: 'متابعة',
     loginCodeOnWhatsapp: 'سيصلك رمز التحقق عبر WhatsApp',
     weSentLoginCode: 'أرسلنا رمز الدخول إلى واتساب الخاص بك.',
@@ -413,13 +383,10 @@ export const STRINGS = {
     whatsappLoginNotAvailableSub: 'يرجى المحاولة بعد قليل. وإذا تكرر الأمر تواصل معنا وسنساعدك في الدخول.',
 
     selectBranch: 'اختر الفرع',
-    changeBranch: 'تغيير',
-    tapToChooseBranch: 'اضغط لاختيار الفرع',
     open: 'مفتوح',
     closed: 'مغلق',
     deliveryFee: 'رسوم التوصيل',
     minOrder: 'الحد الأدنى',
-    noBranches: 'لا توجد فروع متاحة حالياً.',
     branchClosedNotice: 'هذا الفرع مغلق حالياً. يمكنك التصفح، لكن الطلب غير متاح.',
 
     searchPlaceholder: 'ابحث عن برجر، مقبلات…',
@@ -433,11 +400,9 @@ export const STRINGS = {
     productBlockedByOptions: 'أحد الخيارات المطلوبة غير متوفر في هذا الفرع حالياً.',
     soldOutNow: 'نفد الصنف للتو',
     soldOutBody: 'نفدت هذه الأصناف أثناء إتمام طلبك. احذفها للمتابعة.',
-    soldOutRemove: 'حذف الأصناف والمتابعة',
     customizeAdd: 'تخصيص وإضافة',
     kcal: 'سعرة',
     noProducts: 'لا توجد عناصر مطابقة لبحثك.',
-    selectBranchFirst: 'اختر فرعاً لعرض القائمة',
     selectBranchCta: 'اختر فرعاً',
 
     // اختيار نوع الطلب / الفرع / التوصيل
@@ -445,19 +410,15 @@ export const STRINGS = {
     otPickup: 'استلام من الفرع',
     otDelivery: 'توصيل',
     otPickupBranch: 'اختر فرع الاستلام',
-    otDeliveryAddress: 'اختر عنوان التوصيل',
     otSavedAddresses: 'العناوين المحفوظة',
     otNoSaved: 'لا توجد عناوين محفوظة بعد.',
     otAddAddress: 'إضافة عنوان جديد',
-    otLocationDesc: 'وصف الموقع / معلم قريب',
-    otLocationDescPlaceholder: 'مثال: بقالة السلام، بجانب المسجد',
     otConfirmLocation: 'تأكيد الموقع',
     otResolving: 'جارٍ البحث عن فرع لموقعك…',
     otDeliveryUnavailable: 'عذراً، التوصيل غير متاح للموقع المحدد حالياً.',
     otNoDeliveryZones: 'التوصيل غير متاح حالياً. يرجى اختيار الاستلام من الفرع.',
     otChange: 'تعديل',
     otSelectToOrder: 'اختر نوع الطلب لبدء الطلب',
-    otDeliveringFrom: 'التوصيل من',
     otKmAway: 'كم',
     otMapMoveHint: 'حرّك الدبوس إلى موقعك بالضبط',
     otUseMyLocation: 'استخدم موقعي',
@@ -491,13 +452,10 @@ export const STRINGS = {
     payOnline: 'الدفع الإلكتروني',
     cashOnDelivery: 'نقداً عند التوصيل',
     cashOnPickup: 'نقداً عند الاستلام',
-    deliveryLocation: 'موقع التوصيل',
     legalSupport: 'المستندات والدعم',
-    fillRequiredFields: 'يرجى تعبئة جميع الحقول المطلوبة.',
     increaseQty: 'زيادة الكمية',
     decreaseQty: 'إنقاص الكمية',
 
-    chooseOptions: 'اختر خياراتك',
     required: 'إجباري',
     optional: 'اختياري',
     quantity: 'الكمية',
@@ -529,7 +487,6 @@ export const STRINGS = {
     notesPlaceholder: 'أضف ملاحظة (مثال: حار إضافي، بدون بصل)',
     useLoyalty: 'استبدال نقاط الولاء',
     pointsAvailable: 'نقطة متاحة',
-    redeemHint: 'يتم استبدال النقاط والتحقق منها من قبل الخادم عند الدفع.',
     discount: 'الخصم',
     loyaltyDiscount: 'خصم الولاء',
     compDiscount: 'ضيافة',
@@ -565,8 +522,6 @@ export const STRINGS = {
     payNotCompleted: 'لم يكتمل الدفع. يمكنك المتابعة أو المحاولة مرة أخرى.',
     payContinue: 'متابعة الدفع',
     branchClosedError: 'هذا الفرع مغلق. الرجاء اختيار فرع مفتوح.',
-    minOrderError: 'أقل من الحد الأدنى للفرع للتوصيل.',
-
     orderNumber: 'رقم الطلب',
     paymentStatus: 'الدفع',
     paymentPending: 'قيد الانتظار / غير مدفوع',
@@ -621,8 +576,6 @@ export const STRINGS = {
     // التحقق من الجوال عبر واتساب
     verifyPhoneTitle: 'التحقق من رقم الجوال',
     verifyPhoneSub: 'أكِّد ملكية رقمك عبر واتساب. هذا لا يسجّل دخولك.',
-    phoneVerifiedBadge: 'موثّق',
-    enterPhoneNumber: 'أدخل رقم جوالك',
     sendCodeWhatsapp: 'إرسال الرمز عبر واتساب',
     weSentWhatsappCode: 'أرسلنا رمز التحقق إلى واتساب الخاص بك',
     enterVerificationCode: 'أدخل رمز التحقق',
@@ -630,7 +583,6 @@ export const STRINGS = {
     resendCode: 'إعادة إرسال الرمز',
     resendIn: 'إعادة الإرسال خلال',
     invalidOrExpiredCode: 'رمز غير صالح أو منتهي الصلاحية',
-    phoneVerifiedSuccess: 'تم التحقق من رقم جوالك بنجاح',
     whatsappNotAvailable: 'التحقق عبر واتساب غير متاح حالياً.',
 
     // حذف الحساب

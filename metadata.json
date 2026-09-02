@@ -1,6 +1,6 @@
 {
   "name": "Spicy Meal",
-  "description": "Saudi fast-food brand customer mobile app emulator and administrative order/menu dashboard.",
+  "description": "Spicy Meal — Saudi fast-food ordering: an Expo/React Native customer app and a Vite admin console, both on Supabase, with Lazywait POS integration.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": []
 }

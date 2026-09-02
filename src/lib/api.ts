@@ -236,11 +236,6 @@ export interface LazywaitImportResult {
   products: { created: number; updated: number; deactivated: number };
   branches: { created: number; updated: number };
 }
-export interface DbLoyaltyTransaction {
-  id: string; profile_id: string; order_id: string | null;
-  type: 'earn' | 'redeem' | 'adjustment'; points: number;
-  balance_after: number | null; reason: string | null; created_at: string;
-}
 /** NON-secret projection of an integration_settings row (secrets never sent). */
 export interface DbIntegrationSetting {
   provider_type: 'payment' | 'sms' | 'push' | 'lazywait' | 'whatsapp' | 'email';
@@ -346,10 +341,6 @@ export const loyalty = {
       p_customer_id: customerId, p_delta: delta, p_reason: reason ?? null,
     }));
   },
-  /** The signed-in customer's loyalty ledger (RLS: own rows; staff see all). */
-  myLedger: async () =>
-    ok<DbLoyaltyTransaction[]>(await supabase
-      .from('loyalty_transactions').select('*').order('created_at', { ascending: false })),
 };
 
 // ---------------------------------------------------------------------------
@@ -771,8 +762,6 @@ export const orders = {
   stats: async () => ok<AdminOrderStats>(await supabase.rpc('admin_order_stats')),
   items: async (orderId: string) =>
     ok<DbOrderItem[]>(await supabase.from('order_items').select('*').eq('order_id', orderId)),
-  itemModifiers: async (orderItemId: string) =>
-    ok<DbOrderItemModifier[]>(await supabase.from('order_item_modifiers').select('*').eq('order_item_id', orderItemId)),
   /**
    * Admin only — enforced INSIDE the SECURITY DEFINER `admin_set_order_status`
    * RPC (`is_admin()`), the same predicate the old `orders_admin_update` policy

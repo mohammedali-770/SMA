@@ -112,13 +112,6 @@ export interface Product {
   variants: ProductVariant[];
 }
 
-export interface ProductBranchAvailability {
-  productId: string;
-  branchId: string;
-  isAvailable: boolean;
-  stockQuantity: number;
-}
-
 export interface ModifierGroup {
   id: string;
   nameAr: string;
@@ -274,15 +267,16 @@ export interface BrandSettings {
   termsAr: string;
 }
 
-export interface LazywaitSettings {
-  baseUrl: string;
-  apiKey: string;
-  clientId: string;
-  isEnabled: boolean;
-  isMenuSyncEnabled: boolean;
-  isStockSyncEnabled: boolean;
-  isOrderSyncEnabled: boolean;
-}
+// (Removed ProductBranchAvailability, LazywaitSettings, SmsSettings,
+//  NotificationSettings and IntegrationEvent on 2026-09-02 — each occurred
+//  exactly once in the repository, at its own declaration. They are prototype-era
+//  shapes: the three *Settings ones modelled provider credentials as CLIENT types
+//  (`apiKey`), which is the same defect recorded in src/data/initialData.ts, and
+//  IntegrationEvent described a SIMULATED gateway message for the retired
+//  emulator. Real provider config lives in integration_settings; the admin UI
+//  reads only the non-secret projection. PaymentSettings is deliberately left in
+//  place — it is unused too, but it is payment-shaped and CLAUDE.md §6 is
+//  cheaper to respect than to argue with.)
 
 export interface PaymentSettings {
   providerName: 'paytabs' | 'hyperpay' | 'moyasar' | 'sandbox';
@@ -290,34 +284,6 @@ export interface PaymentSettings {
   publicKey: string;
   secretKey: string;
   isEnabled: boolean;
-}
-
-export interface SmsSettings {
-  providerName: 'unifonic' | 'twilio' | 'mobily' | 'sandbox';
-  apiKey: string;
-  senderId: string;
-  isEnabled: boolean;
-}
-
-export interface NotificationSettings {
-  providerName: 'expo' | 'onesignal' | 'sandbox';
-  apiKey: string;
-  isEnabled: boolean;
-}
-
-/**
- * A simulated outbound message from the SMS or push-notification gateway,
- * recorded when an order is placed or its status changes — but only while the
- * relevant provider toggle is enabled. Surfaced in the admin activity log so
- * the SMS/push settings visibly do something instead of being dead config.
- */
-export interface IntegrationEvent {
-  id: string;
-  createdAt: string; // ISO timestamp
-  channel: 'sms' | 'push';
-  provider: string;
-  recipient: string;
-  message: string;
 }
 
 export interface LoyaltySettings {

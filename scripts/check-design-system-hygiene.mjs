@@ -279,13 +279,15 @@ for (const full of legacyScanFiles) {
  * Surfaces that have completed their design-system migration. Kept as a record,
  * and as a guard that these files continue to exist.
  *
- * Add files here as each surface lands. Do not remove entries.
+ * Add files here as each surface lands. Do not remove entries — a surface that
+ * is DELETED moves to RETIRED_SURFACES below rather than vanishing, so the
+ * record survives while the existence guard stops failing on a file nobody
+ * ships any more.
  */
 const MIGRATED_SURFACES = [
   // Surface 1 — Authentication
   'apps/mobile/src/features/auth/LoginScreen.tsx',
   'apps/mobile/src/features/auth/PhoneOtpLogin.tsx',
-  'apps/mobile/src/features/profile/VerifyPhoneWhatsApp.tsx',
   'apps/mobile/src/components/SaudiPhoneInput.tsx',
   'apps/mobile/src/features/otp/OtpCodeInput.tsx',
   // Surface 2 — Home + Menu
@@ -340,6 +342,18 @@ const MIGRATED_SURFACES = [
   'apps/mobile/src/features/profile/AddressEditScreen.tsx',
   'apps/mobile/src/features/profile/view/AddressCard.tsx',
 ];
+
+/**
+ * Surfaces that were migrated and have since been DELETED. Not checked for
+ * existence — the point is the record, not the file.
+ *
+ *  - apps/mobile/src/features/profile/VerifyPhoneWhatsApp.tsx
+ *    Migrated with Surface 1. Its entry point was removed from ProfileScreen on
+ *    2026-08-13 (99dc6dd, the approved iOS UX batch) and the file was left
+ *    behind with no importer; deleted 2026-09-02. Profile re-verification is
+ *    redundant now — every OTP login sets `profiles.phone_verified` through the
+ *    `handle_auth_user_phone_confirmed` trigger.
+ */
 
 const LEGACY_IMPORT = /from\s+['"][^'"]*(\/theme|\/components\/Button)['"]/;
 

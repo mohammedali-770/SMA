@@ -10,6 +10,18 @@
  * The pure helpers below are DISPLAY-ONLY — which auto-apply promos are live,
  * and a human label for an offer. They mirror the campaigns public RLS the
  * mobile app relies on, and they never decide a charge.
+ *
+ * NOT WIRED — READ THIS BEFORE CHANGING OR DELETING IT (recorded 2026-09-02).
+ * Nothing imports this module except its own test. There is no Campaigns tab in
+ * the admin console and no campaign surface in the customer app, so no operator
+ * can create a campaign and no customer can redeem one. `place_order` has no
+ * campaign awareness either, so `campaign_redemptions` is never written and
+ * `global_limit` / `per_user_limit` are unenforced.
+ *
+ * It is kept ON PURPOSE. The schema and `compute_campaign_discount` are APPLIED
+ * to Production; deleting this file would throw away the finished client half of
+ * a live server contract while changing nothing operationally. The remaining work
+ * and the eight business questions gating it are in docs/DISCOUNTS_CAMPAIGNS.md.
  */
 import { supabase } from './supabase';
 

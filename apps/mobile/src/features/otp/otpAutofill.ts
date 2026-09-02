@@ -9,8 +9,9 @@
  *
  * Scope: this module only ever READS/normalizes an incoming code and computes
  * box state. It never sends anything, never generates a code, and never talks to
- * a provider — the existing verify path (auth.verifyPhone / whatsappOtp.verify)
- * stays the sole authority.
+ * a provider — the existing verify path (`auth.verifyPhone`) stays the sole
+ * authority. It was two paths until 2026-09-02, when the profile
+ * phone-verification card and its `whatsappOtp.verify` wrapper were deleted.
  */
 import { toAsciiDigits } from '../../lib/phone';
 

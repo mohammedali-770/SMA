@@ -1,6 +1,6 @@
 /**
- * Resend-cooldown timer shared by both OTP screens — the exact logic that
- * previously lived duplicated in PhoneOtpLogin and VerifyPhoneWhatsApp:
+ * Resend-cooldown timer for the OTP screens — the exact logic that once lived
+ * duplicated in PhoneOtpLogin and the since-deleted VerifyPhoneWhatsApp:
  * startCooldown(n) shows n seconds and counts down once per second to 0;
  * resetCooldown() stops and clears immediately; the interval is torn down on
  * unmount. Timing and semantics are unchanged (1s interval, floor at 0).
