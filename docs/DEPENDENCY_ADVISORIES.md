@@ -28,7 +28,7 @@ Expo packages that have no non-breaking fix (§3.1). Gating at moderate would
 fail every PR on something this repository cannot fix, and a gate that is always
 red is a gate everybody learns to ignore.
 
-As of **2026-08-10**, the web tree is clean at high/critical. The mobile tree has
+As of **2026-09-02**, the web tree is clean at high/critical. The mobile tree has
 two reviewed direct HIGH advisories in `image-size`; npm propagates those two
 advisories to 15 high dependency records. They are the only current high-level
 exception and are bounded by §3.2 and by the CI script itself.
@@ -82,10 +82,10 @@ audit, and remove this exception when the advisories disappear.
 | **Advisories** | `GHSA-w3rx-r6r6-pgpr` / CVE-2025-71330; `GHSA-5p2g-fcmc-qvqq` / CVE-2025-71329 |
 | **Severity** | High |
 | **Affected according to GitHub Advisory Database** | `<= 2.0.2` |
-| **Patched release as of review** | None (`first_patched_version: null` for both reviewed advisories) |
+| **Patched release as of review** | None. The latest published version **is itself affected** — see the 2026-09-02 re-review below |
 | **Reachability in SMA** | Transitive Node build tooling through Metro/Expo; not executable code shipped in the customer application bundle |
-| **Reviewed** | 2026-08-10 |
-| **Exception expires** | **2026-09-10** |
+| **Reviewed** | 2026-08-10; **re-reviewed 2026-09-02** |
+| **Exception expires** | **2026-10-02** (extended from 2026-09-10 on the re-review below) |
 | **Clear when** | A patched `image-size`/Expo/Metro dependency path is released and can be adopted without an unsafe SDK regression |
 
 Both advisories describe crafted image buffers that can make `image-size` enter
@@ -99,12 +99,41 @@ that the only direct HIGH advisory objects are exactly these two GHSAs on
 `image-size`, then proves every other HIGH record belongs to `image-size`'s
 recursive npm `effects` closure. Any critical advisory, another direct high
 advisory, another high dependency path, an unexpected audit shape, or expiry on
-2026-09-10 fails the gate.
+2026-10-02 fails the gate.
 
 `npm audit fix --force` is not accepted as the remedy here because the current
 suggestion changes the Expo SDK/toolchain line rather than applying a released
 `image-size` patch. Re-review immediately when the upstream advisory gains a
 patched version; do not extend the expiry merely to make CI green.
+
+#### Re-review 2026-09-02 — extended to 2026-10-02
+
+The 2026-09-10 expiry was approaching, and an expiry that lapses fails the gate
+closed and blocks **every** merge. So this was re-reviewed ahead of it rather than
+on the day. **The conclusion is that no fix exists to adopt** — the extension is
+that finding, not a convenience.
+
+| question | answer, measured 2026-09-02 |
+| --- | --- |
+| Is there a patched `image-size`? | **No.** Both advisories cover `<= 2.0.2`, and **2.0.2 is the latest published version** — released 2025-04-02, with nothing published since. `npm audit` reports the vulnerable range as `*` |
+| Is there a patched line on 1.x? | **No.** The `legacy` dist-tag is `1.2.1`, which is what the lockfile pins. There is no `1.2.2` |
+| Does upgrading the dependent escape it? | **No.** `metro@0.87.0`, the current latest (installed: `0.84.4`), still declares `image-size: ^1.0.2`. npm's own tree lists metro `>=0.85.0` as still depending on a vulnerable `image-size` |
+| Does `fixAvailable: true` mean anything? | **No — and it is worth not stopping there.** npm reports it because it believes a dependent change could help; since the advisory range covers every published version, no upgrade path resolves it |
+| Does the reachability argument still hold? | **Yes.** `isDirect: false`, `effects: ['metro']`, and the sole immediate parent is `metro`, which is in `ALLOWED_IMMEDIATE_PARENTS`. Still build tooling, still absent from the customer bundle |
+
+Nothing about the gate's logic was weakened: the three boundary checks are
+unchanged, and only the date and the two `reason` strings moved. A third direct
+HIGH advisory, a critical, or a new immediate runtime parent still fails CI.
+
+**The exploit path remains a build-time one:** an attacker would need a crafted
+ICNS/JXL/HEIF file to reach the bundler during a build. That is a meaningfully
+different exposure from shipped customer code, which is the whole basis of this
+exception — and it is why the exception is time-boxed rather than permanent.
+
+Next re-review **2026-10-02**. If upstream still has not published a fix by then,
+the honest options are to extend again on the same evidence or to accept that this
+advisory pair is effectively permanent for as long as SMA builds with Metro — at
+which point it deserves a decision rather than another month.
 
 ## 4. Resolved
 
