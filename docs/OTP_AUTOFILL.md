@@ -3,8 +3,18 @@
 Client-side autofill for the one-time code, wired into the **existing** OTP verify
 paths. Autofill only ever **reads** an incoming code and hands it to the code the
 app already used — it never sends, generates, stores, or verifies a code itself.
-Supabase Auth (login) and the `whatsapp-verify-otp` Edge Function (profile
-verification) remain the sole authorities.
+Supabase Auth remains the sole authority.
+
+> **Changed 2026-09-02.** There used to be *two* verify authorities: Supabase Auth
+> for login, and the `whatsapp-verify-otp` Edge Function for the Profile
+> phone-verification card. That card lost its entry point on 2026-08-13
+> (`99dc6dd`, the approved iOS UX batch) and the orphaned component was deleted on
+> 2026-09-02, along with its `whatsappOtp` client wrapper. **Login is now the only
+> OTP surface in the app**, which costs nothing: the
+> `handle_auth_user_phone_confirmed` trigger sets `profiles.phone_verified` on
+> every successful login, so the card was verifying something login had already
+> proven. The Edge Function is still deployed and untouched — see
+> `docs/WHATSAPP_LOGIN.md` §9.
 
 ## What shipped in this slice
 
@@ -21,7 +31,7 @@ so one implementation covers all three targets.
 | `src/features/otp/OtpPasteAssist.tsx` | One-tap paste affordance, shown only when the clipboard holds something and the code is incomplete. |
 | `src/features/otp/OtpResendTimer.tsx` | Owns the resend countdown so its per-second tick cannot re-render the code field. |
 | `src/features/auth/PhoneOtpLogin.tsx` | Login screen — code step uses `OtpCodeInput` + `useOtpAutofill`; the same `verify()` path is reused. |
-| `src/features/profile/VerifyPhoneWhatsApp.tsx` | Profile phone-verification card — same wiring. |
+| ~~`src/features/profile/VerifyPhoneWhatsApp.tsx`~~ | Profile phone-verification card — same wiring. **Deleted 2026-09-02**; its entry point had been gone since 2026-08-13. |
 
 ### Why one input, not six boxes
 
@@ -118,9 +128,10 @@ customer where the platform is reliable: copy in WhatsApp, one tap here.
 ## Assumptions
 
 - **OTP length is 6.** Supabase Phone Auth issues a 6-digit token by default, and
-  the profile-verification flow already hard-required exactly 6 digits. Login
-  previously accepted 4–8 digits in its regex (unchanged); the boxes render 6. If
-  Auth is ever configured for a different length, update `DEFAULT_OTP_LENGTH`.
+  the (since-deleted) profile-verification flow already hard-required exactly 6
+  digits. Login previously accepted 4–8 digits in its regex (unchanged); the boxes
+  render 6. If Auth is ever configured for a different length, update
+  `DEFAULT_OTP_LENGTH`.
 - The Expo web build (react-native-web) is the "web" target for issue #97; the
   separate `src/` web app uses email/password and has no phone-OTP screen, so
   WebOTP belongs on the mobile OTP screens, not there.

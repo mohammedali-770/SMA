@@ -57,7 +57,6 @@ export function DeleteAccountScreen() {
   const [pendingStatus, setPendingStatus] = useState<string>('queued');
   const [acknowledged, setAcknowledged] = useState(false);
   const [method, setMethod] = useState<ReverifyMethod | null>(null);
-  const [otpAvailable, setOtpAvailable] = useState(false);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -97,17 +96,17 @@ export function DeleteAccountScreen() {
       // the password reauth; if neither is possible, show the support state.
       const choice = chooseReverifyMethod({ otp: otpDeliverable(res.status), reauth: res.reauthAvailable !== false });
       if (choice === 'otp') {
-        setOtpAvailable(true); setMethod('otp');
+        setMethod('otp');
         if (res.status === 'sent') setNotice(t('weSentWhatsappCode'));
         startCooldown(OTP_RESEND_COOLDOWN_SECONDS);
       } else if (choice === 'reauth') {
-        setOtpAvailable(false); setMethod('reauth'); setNotice(t('delOtpUnavailable'));
+        setMethod('reauth'); setNotice(t('delOtpUnavailable'));
       } else {
         setPhase('unavailable');
       }
     } catch (e) {
       // Offline / transient → still allow the password fallback.
-      setOtpAvailable(false); setMethod('reauth');
+      setMethod('reauth');
       setError(isLikelyOffline(e) ? t('delOffline') : t('delOtpUnavailable'));
     } finally { setBusy(false); }
   }, [lang, t, startCooldown]);
@@ -120,7 +119,7 @@ export function DeleteAccountScreen() {
   }, [acknowledged, sendOtp]);
 
   const usePasswordInstead = () => {
-    resetCooldown(); setOtpAvailable(false); setMethod('reauth'); setError(null); setNotice(null); setCode('');
+    resetCooldown(); setMethod('reauth'); setError(null); setNotice(null); setCode('');
   };
 
   const doSubmit = useCallback(async () => {

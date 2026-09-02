@@ -1,10 +1,11 @@
 /**
- * Small OTP-flow helpers shared by the WhatsApp login screen (PhoneOtpLogin)
- * and the profile phone-verification card (VerifyPhoneWhatsApp). PURE and
- * framework-free so they are unit-tested under Node (otpInput.test.ts).
+ * Small OTP-flow helpers for the WhatsApp login screen (PhoneOtpLogin). PURE
+ * and framework-free so they are unit-tested under Node (otpInput.test.ts).
  *
- * Extracted VERBATIM from the two screens — both already used exactly these
- * rules; nothing here changes send/verify behavior, API payloads, or timing.
+ * Extracted VERBATIM from the screens that used them; nothing here changes
+ * send/verify behavior, API payloads, or timing. They were shared with the
+ * profile phone-verification card until that surface was deleted on 2026-09-02
+ * (its entry point had been gone since 99dc6dd) — login is the only caller now.
  */
 
 /** Seconds the resend button stays disabled after a code is sent (both flows). */

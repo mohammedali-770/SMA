@@ -33,8 +33,7 @@ The *job name* is what GitHub reports as a status check context. When configurin
 | Command | Runs |
 | --- | --- |
 | `npm run build` | `npm --prefix apps/mobile ci --no-audit --no-fund && vite build && npm --prefix apps/mobile run build:web` |
-| `npm run build:site` | `vite build` |
-| `npm run clean` | `rm -rf dist server.js` |
+| `npm run clean` | `rm -rf dist` |
 | `npm run design-system:check` | `node scripts/sync-design-system.mjs --check && node scripts/check-design-system-hygiene.mjs` |
 | `npm run design-system:sync` | `node scripts/sync-design-system.mjs` |
 | `npm run dev` | `vite --port=3000 --host=0.0.0.0` |
@@ -56,5 +55,4 @@ The *job name* is what GitHub reports as a status check context. When configurin
 - `scripts/check-design-system-hygiene.mjs` — Guards the NEW design-system code against re-introducing raw values
 - `scripts/docs-check-ownership.mjs` — Enforces the documentation ownership map in docs/ownership.json
 - `scripts/docs-generate.mjs` — Generates the machine-derived half of the documentation set
-- `scripts/migrate-mobile-runtime-theme.mjs` — Conservative one-shot codemod for the retained System/Light/Dark feature
 - `scripts/sync-design-system.mjs` — Mirrors the canonical design-system modules into each app
