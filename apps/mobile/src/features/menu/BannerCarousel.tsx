@@ -1,11 +1,27 @@
 /**
- * Homepage promotional banners — shown BELOW the branch selector and ABOVE the
- * search bar. Self-contained: it fetches its own data (RLS returns only active,
- * in-window rows) so a slow/failed banner fetch never blocks menu rendering.
+ * Homepage promotional banners. Presentational: the rows are fetched by
+ * `useHomeBanners` (below) and passed in, so a slow or failed banner fetch never
+ * blocks menu rendering. RLS returns only active, in-window rows.
+ *
+ * POSITION CHANGED 2026-08-27. It used to sit BELOW the branch selector and
+ * ABOVE the search bar, as fixed chrome. Between that and the pinned search +
+ * category chips, roughly three menu items fit on a phone — the menu was a
+ * letterbox. It is now the SCROLLING list's header, so it is on screen at rest
+ * and gets out of the way the moment the customer scrolls.
  *
  *  - 0 active banners  -> renders nothing (the area collapses; search moves up).
  *  - 1 active banner   -> a single static banner.
  *  - 2+ active banners -> an auto-rotating, swipeable carousel with dots + loop.
+ *
+ * THE FETCH IS HOISTED, and that is load-bearing rather than tidiness. This
+ * component used to fetch its own rows on mount. That was fine while it was
+ * fixed chrome mounted with the screen — the request ran concurrently with the
+ * menu load and was usually done before the list appeared. As the list HEADER it
+ * mounts only after the menu has loaded and rendered, which serialised the two
+ * requests: the header would sit at zero height, then expand by width*6/16 once
+ * the rows arrived and shove the visible menu down. `useHomeBanners` is called
+ * by the screen instead, so the request still starts at screen mount and the
+ * header has its data by the time it exists. Review caught this on PR #280.
  *
  * Aspect ratio ~16:6 (short, never tall), rounded corners, cover-fit (no
  * distortion). A banner whose image fails to load is skipped, not crashed.
@@ -24,9 +40,35 @@ import { makeStyles } from '../../theme/makeStyles';
 const ROTATE_MS = 4000;
 const RATIO = 6 / 16; // height = width * 6/16 (~2.67:1) — short banner.
 
-export function BannerCarousel() {
-  const styles = useStyles();
+/**
+ * Fetch the active banners. Call this from the SCREEN, not from the carousel,
+ * so the request starts when the screen mounts rather than when the list header
+ * finally does — see the note above. Errors yield an empty list, so a slow or
+ * failed banner fetch never blocks or breaks the menu.
+ */
+export function useHomeBanners(): HomeBanner[] {
   const [banners, setBanners] = useState<HomeBanner[]>([]);
+  useEffect(() => {
+    let alive = true;
+    catalog
+      .banners()
+      .then((rows) => { if (alive) setBanners(rows.map(mapBanner).filter((b) => b.imageUrl)); })
+      .catch(() => { if (alive) setBanners([]); });
+    return () => { alive = false; };
+  }, []);
+  return banners;
+}
+
+export function BannerCarousel({ banners, inset = true }: {
+  /** Rows from `useHomeBanners`, owned by the screen so the fetch is not
+   *  deferred until this component mounts. */
+  banners: HomeBanner[];
+  /**
+   * Apply the component's own horizontal margin. Pass `false` when the parent
+   * already pads (e.g. a list `contentContainerStyle`), or the inset doubles.
+   */
+  inset?: boolean }) {
+  const styles = useStyles();
   const [failed, setFailed] = useState<Record<string, true>>({});
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
@@ -40,16 +82,6 @@ export function BannerCarousel() {
       return () => setFocused(false);
     }, []),
   );
-
-  // Independent fetch — errors just yield an empty (hidden) banner area.
-  useEffect(() => {
-    let alive = true;
-    catalog
-      .banners()
-      .then((rows) => { if (alive) setBanners(rows.map(mapBanner).filter((b) => b.imageUrl)); })
-      .catch(() => { if (alive) setBanners([]); });
-    return () => { alive = false; };
-  }, []);
 
   const visible = banners.filter((b) => !failed[b.id]);
   const count = visible.length;
@@ -89,7 +121,7 @@ export function BannerCarousel() {
   };
 
   return (
-    <View style={styles.wrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+    <View style={inset ? styles.wrap : styles.wrapFlush} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {width > 0 && (
         <View style={[styles.frame, { height }]}>
           {count === 1 ? (
@@ -144,6 +176,8 @@ function BannerImage({
 
 const useStyles = makeStyles((colors) => ({
   wrap: { marginHorizontal: space.s4, marginTop: space.s3 },
+  // Parent already pads horizontally; keep only the vertical rhythm.
+  wrapFlush: { marginBottom: space.s4 },
   frame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: colors.appSurface2, width: '100%' },
   dots: { position: 'absolute', bottom: space.s2, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },

@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, SectionList, TextInput, View, type LayoutChangeEvent, type SectionListData, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BannerCarousel } from './BannerCarousel';
+import { BannerCarousel, useHomeBanners } from './BannerCarousel';
 import { buildMenuSections, buildSearchIndex, menuItemKey, type MenuSection, type MenuSectionItem } from './menuSections';
 import { AlertIcon, DishIcon, SearchIcon } from '../../components/Icons';
 import { OpenClosedBadge } from '../../components/OpenClosedBadge';
@@ -40,9 +40,22 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
   const branchOpen = branchIsOpen(selectedBranch); const searchIndex = useMemo(() => buildSearchIndex(products), [products]); const hasModifiers = useCallback((p: Product) => groupsForProduct(p).length > 0, [groupsForProduct]);
   const sections = useMemo(() => buildMenuSections({ products, categories, branchId: selectedBranchId, query: search, searchIndex, isOrderable, hasModifiers }), [products, categories, selectedBranchId, search, searchIndex, isOrderable, hasModifiers]);
   const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken[] }) => { const section = viewableItems.find((v) => v.section)?.section as MenuSection | undefined; if (section) setActiveCatId((prev) => prev === section.category.id ? prev : section.category.id); }, []);
+  // Fetched HERE rather than inside BannerCarousel so the request starts when
+  // the screen mounts, concurrently with the menu load. The carousel is the
+  // list header now, so it does not exist until the menu has rendered — a
+  // fetch owned by it would start only then, and the header would expand late
+  // and shove the visible rows down. Review caught that on PR #280.
+  const banners = useHomeBanners();
   const pendingScroll = useRef<{ sectionIndex: number; retried: boolean } | null>(null);
+  // The banner is the list header, so every row sits that much further down.
+  // scrollToLocation already accounts for it (VirtualizedList tracks the header
+  // in its frame offsets); the onScrollToIndexFailed FALLBACK below does not,
+  // because it does raw arithmetic on averageItemLength. Measured rather than
+  // computed from the 16:6 ratio, since the header collapses to zero when there
+  // are no active banners.
+  const headerHeight = useRef(0);
   const scrollToCategory = (catId: string) => { setActiveCatId(catId); const sectionIndex = sections.findIndex((s) => s.category.id === catId); if (sectionIndex < 0) return; pendingScroll.current = { sectionIndex, retried: false }; listRef.current?.scrollToLocation({ sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }); };
-  const onScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => { listRef.current?.getScrollResponder()?.scrollTo({ y: info.averageItemLength * info.index, animated: false }); const pending = pendingScroll.current; if (pending && !pending.retried) { pending.retried = true; setTimeout(() => listRef.current?.scrollToLocation({ sectionIndex: pending.sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }), 120); } };
+  const onScrollToIndexFailed = (info: { index: number; averageItemLength: number }) => { listRef.current?.getScrollResponder()?.scrollTo({ y: headerHeight.current + info.averageItemLength * info.index, animated: false }); const pending = pendingScroll.current; if (pending && !pending.retried) { pending.retried = true; setTimeout(() => listRef.current?.scrollToLocation({ sectionIndex: pending.sectionIndex, itemIndex: 0, viewOffset: SECTION_HEADER_OFFSET, animated: true }), 120); } };
   const activeCatIdResolved = activeCatId ?? sections[0]?.category.id ?? null;
   useEffect(() => { const off = activeCatIdResolved ? chipOffsets.current[activeCatIdResolved] : null; if (off) chipScrollRef.current?.scrollTo({ x: Math.max(0, off.x - space.s4), animated: true }); }, [activeCatIdResolved]);
   // `needsChoice` covers modifier groups AND multi-tier products. A tiered
@@ -62,14 +75,17 @@ export function HomeMenuScreen({ suppressInvalidRedirect = false }: { suppressIn
       <Text variant="heading" numberOfLines={1}>{pick(orderCtx.context.branchNameEn, orderCtx.context.branchNameAr)}</Text>{orderCtx.context.orderType === 'delivery' ? <Text variant="caption" tone="secondary" numberOfLines={1}>{[orderCtx.context.deliveryDescription, orderCtx.context.deliveryFee != null ? `${t('deliveryFee')} ${formatSAR(orderCtx.context.deliveryFee, lang)}` : null].filter(Boolean).join(' · ')}</Text> : null}</View>
       <View style={styles.changeBtn}><Text variant="label" tone="ember" align="center">{t('otChange')}</Text></View>
     </Pressable> : null}
-    <BannerCarousel />
-    {loading ? <MenuSkeleton /> : error ? <ErrorView message={error} onRetry={reload} retryLabel={t('retry')} icon={<AlertIcon />} fallbackTitle={pick("The menu didn't load", 'تعذّر تحميل القائمة')} /> : !orderCtx.valid ? <LoadingView label={t('loading')} /> : <>
+    {/* The banner is NOT fixed chrome. It is the menu list's header, so it
+        scrolls away and gives the vertical space back to the food — see
+        BannerCarousel's header comment. It is still rendered statically in the
+        states below that have no list to attach a header to. */}
+    {loading ? <MenuSkeleton /> : error ? <><BannerCarousel banners={banners} /><ErrorView message={error} onRetry={reload} retryLabel={t('retry')} icon={<AlertIcon />} fallbackTitle={pick("The menu didn't load", 'تعذّر تحميل القائمة')} /></> : !orderCtx.valid ? <LoadingView label={t('loading')} /> : <>
       {!branchOpen ? <View style={styles.closedNotice}><Text variant="label" style={{ color: colors.danger }}>{t('branchClosedNotice')}</Text></View> : null}
       <View style={[styles.searchWrap, rtlRow]}><SearchIcon color={colors.appText3} /><TextInput value={search} onChangeText={setSearch} placeholder={t('searchPlaceholder')} placeholderTextColor={colors.appText3} style={[styles.searchInput, rtlText]} autoCapitalize="none" returnKeyType="search" /></View>
       {sections.length > 0 ? <View style={styles.chipsWrap}><ScrollView ref={chipScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chips, isRTL && styles.chipsRTL]} onContentSizeChange={() => { if (isRTL) chipScrollRef.current?.scrollToEnd({ animated: false }); }}>
         {sections.map((s) => <SelectableChip key={s.category.id} label={pick(s.category.nameEn, s.category.nameAr)} selected={s.category.id === activeCatIdResolved} onPress={() => scrollToCategory(s.category.id)} onLayout={(e: LayoutChangeEvent) => { chipOffsets.current[s.category.id] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width }; }} />)}
       </ScrollView></View> : null}
-      {sections.length === 0 ? <EmptyView icon={<DishIcon />} title={t('noProducts')} /> : <SectionList ref={listRef} sections={sections} keyExtractor={menuItemKey} renderItem={renderItem} renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => <Text variant="title" style={styles.sectionTitle}>{pick(section.category.nameEn, section.category.nameAr)}</Text>} renderSectionFooter={SectionFooter} ItemSeparatorComponent={ItemSeparator} stickySectionHeadersEnabled={false} onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={VIEWABILITY_CONFIG} onScrollToIndexFailed={onScrollToIndexFailed} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={9} contentContainerStyle={{ padding: space.s4, paddingBottom: cart.count > 0 ? 120 : space.s6 }} showsVerticalScrollIndicator={false} />}
+      {sections.length === 0 ? <><BannerCarousel banners={banners} /><EmptyView icon={<DishIcon />} title={t('noProducts')} /></> : <SectionList ref={listRef} sections={sections} keyExtractor={menuItemKey} renderItem={renderItem} renderSectionHeader={({ section }: { section: SectionListData<MenuSectionItem, MenuSection> }) => <Text variant="title" style={styles.sectionTitle}>{pick(section.category.nameEn, section.category.nameAr)}</Text>} renderSectionFooter={SectionFooter} ItemSeparatorComponent={ItemSeparator} ListHeaderComponent={<View onLayout={(e: LayoutChangeEvent) => { headerHeight.current = e.nativeEvent.layout.height; }}><BannerCarousel banners={banners} inset={false} /></View>} stickySectionHeadersEnabled={false} onViewableItemsChanged={onViewableItemsChanged} viewabilityConfig={VIEWABILITY_CONFIG} onScrollToIndexFailed={onScrollToIndexFailed} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={9} contentContainerStyle={{ padding: space.s4, paddingBottom: cart.count > 0 ? 120 : space.s6 }} showsVerticalScrollIndicator={false} />}
     </>}
     {cart.count > 0 ? <View style={[styles.cartBar, { paddingBottom: insets.bottom + space.s2 }]}><Pressable style={[styles.cartBtn, rtlRow]} onPress={() => router.push('/cart')} accessibilityRole="button"><View style={styles.cartCount}><Text variant="label" tone="onEmber" align="center">{cart.count}</Text></View><Text variant="heading" tone="onEmber" style={{ flex: 1 }}>{t('myCart')}</Text><Price amount={cart.subtotal} size={typeScale.body.size} color={colors.onEmber} weight="700" /></Pressable></View> : null}
   </View>;
