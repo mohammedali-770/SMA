@@ -1,9 +1,16 @@
 /**
  * Contact & Support channel policy — PURE and framework-free so the
  * sanitization + visibility rules are unit-tested under Node
- * (supportContact.test.ts). WEB MIRROR of apps/mobile/src/lib/supportContact.ts —
- * keep the two in sync (same pattern as legal.ts). The admin panel uses these
- * validators to warn when a value would be hidden in the app.
+ * (supportContact.test.ts). WEB MIRROR of apps/mobile/src/lib/supportContact.ts.
+ * The admin panel uses these validators to warn when a value would be hidden in
+ * the app.
+ *
+ * THE MIRROR IS ENFORCED, not requested. src/lib/mirrorParity.test.ts fails if
+ * the two copies diverge by so much as a line of code. Change one, change the
+ * other. This header used to say "keep the two in sync" and rely on somebody
+ * reading it; the identical test file that used to sit beside the mobile copy is
+ * gone, because running the same 114 assertions twice against identical code
+ * bought nothing that the parity check does not.
  *
  * Security/UX rules this encodes:
  *  - Links are CONSTRUCTED here from validated fragments (digits, a vetted

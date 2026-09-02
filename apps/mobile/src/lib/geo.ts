@@ -1,6 +1,8 @@
 /**
  * Pure geometry helpers for delivery-zone UX (mobile). Mirrors the web app's
- * src/lib/geo.ts so both clients pre-check identically.
+ * src/lib/geo.ts so both clients pre-check identically — enforced by
+ * src/lib/mirrorParity.test.ts, which is also this file's only test coverage:
+ * pinning it to the web copy borrows src/lib/geo.test.ts.
  *
  * IMPORTANT: CLIENT-SIDE PRE-CHECK for user experience only. The server
  * (place_order + PostGIS `point_in_active_delivery_zone`) is the sole authority

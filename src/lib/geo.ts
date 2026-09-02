@@ -1,6 +1,11 @@
 /**
  * Pure geometry helpers for delivery-zone UX.
  *
+ * MIRRORED at apps/mobile/src/lib/geo.ts and held identical by
+ * src/lib/mirrorParity.test.ts. geo.test.ts beside this file is the only test
+ * either copy has, which is why the parity check matters: `pointInPolygon` is
+ * what the customer app's CheckoutScreen asks about delivery serviceability.
+ *
  * IMPORTANT: These are a CLIENT-SIDE PRE-CHECK for user experience only. The
  * server (place_order + PostGIS `point_in_active_delivery_zone`) is the sole
  * authority on whether a location is serviceable — never gate order submission
