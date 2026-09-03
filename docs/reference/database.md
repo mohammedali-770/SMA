@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **118**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260902120000_orders_index_cleanup.sql`.
+Migration files in the repository: **119**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260903120000_operations_alert_email_dispatch.sql`.
 
 ## Tables
 
@@ -52,9 +52,9 @@ The *RLS policies* column counts `create policy` statements across all migration
 | `modifiers` | `20260707120200_catalog.sql` | 1 | 3 |
 | `notification_log` | `20260714090000_push_notifications.sql` | 1 | 2 |
 | `operations_alert_events` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
-| `operations_alert_outbox` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
+| `operations_alert_outbox` | `20260723090000_smart_operations_alerts_digest.sql` | 1 | **none declared** |
 | `operations_alert_runs` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
-| `operations_alert_settings` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
+| `operations_alert_settings` | `20260723090000_smart_operations_alerts_digest.sql` | 1 | **none declared** |
 | `operations_alert_state` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
 | `operations_digest_runs` | `20260723090000_smart_operations_alerts_digest.sql` | 0 | **none declared** |
 | `ops_change_events` | `20260820130000_ops_change_events.sql` | 0 | 1 |
@@ -118,6 +118,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `claim_due_account_deletions` | 1 | `20260715120000_account_deletion.sql` |
 | `claim_lazywait_sync_batch` | 3 | `20260813143000_manual_only_pos_resend.sql` |
 | `claim_lazywait_sync_one` | 3 | `20260813143000_manual_only_pos_resend.sql` |
+| `claim_operations_alert_emails` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `claim_order_refund` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `claim_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `clear_branch_delivery_pause` | 1 | `20260820120500_branch_delivery_rpcs.sql` |
@@ -154,6 +155,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `enforce_single_default_address` | 1 | `20260801120000_address_single_default.sql` |
 | `expire_stale_order_refund_claims` | 1 | `20260729090000_payment_refund_scheduler.sql` |
 | `finalize_checkout_session` | 2 | `20260712170000_checkout_sessions_hardening.sql` |
+| `finalize_operations_alert_email` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `finalize_order_refund` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `finalize_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `guard_address_delete_live_checkout` | 1 | `20260801120100_checkout_session_address_fk_set_null.sql` |
@@ -192,21 +194,22 @@ A function defined by more than one migration has been redefined; the last defin
 | `open_order_refund_record` | 1 | `20260724120000_order_confirmation_state_machine.sql` |
 | `operations_alert_settings_get` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alert_settings_safe` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
-| `operations_alert_settings_update` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
+| `operations_alert_settings_update` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alert_timeline` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_admin_summary` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_derive` | 4 | `20260810113500_stranded_order_alert_and_index.sql` |
 | `operations_alerts_derive_pre_stranded` | 1 | `20260820160000_branch_availability_health_card.sql` |
+| `operations_alerts_dispatch_recipients` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alerts_evaluate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
-| `operations_alerts_outbox_for_event` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
+| `operations_alerts_outbox_for_event` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_alerts_render_event` | 3 | `20260820160000_branch_availability_health_card.sql` |
 | `operations_alerts_safe_bool` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_safe_int` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_sanitize_evidence` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_alerts_state_label` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_digest_build` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
-| `operations_digest_generate` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
+| `operations_digest_generate` | 2 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `operations_digest_list` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_digest_preview` | 1 | `20260723090000_smart_operations_alerts_digest.sql` |
 | `operations_health_overall_state` | 2 | `20260807150000_order_flow_health_card.sql` |
@@ -240,6 +243,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `record_order_sync` | 1 | `20260707121300_payments_and_sync.sql` |
 | `record_whatsapp_message` | 1 | `20260710140000_whatsapp_otp.sql` |
 | `register_push_device` | 1 | `20260714090000_push_notifications.sql` |
+| `release_operations_alert_email` | 1 | `20260903120000_operations_alert_email_dispatch.sql` |
 | `release_pos_sync_notification` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `reorder_categories` | 1 | `20260827150000_menu_display_order.sql` |
 | `reorder_products` | 1 | `20260827150000_menu_display_order.sql` |

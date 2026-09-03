@@ -24,6 +24,33 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-03 — there are now TWO unapplied repository files, and only
+> one of them is frozen.** The second is
+> `20260903120000_operations_alert_email_dispatch.sql`: operations alerts v2,
+> written and awaiting owner approval rather than held under a freeze. It exists
+> because the alert engine has never reached a human — every row it has produced
+> is `('in_app','recorded')` and stops in the database (X3 in
+> `GO_LIVE_READINESS.md`).
+>
+> It removes, for the **email channel only**, the three interlocks v1 used to
+> make external delivery impossible: the `operations_alert_outbox_v1_dormancy`
+> CHECK, the producers' hard-coded `'in_app'` channel, and the settings RPC's
+> outright refusal to set `external_dispatch_enabled`. `whatsapp` and `push`
+> remain structurally blocked by the replacement constraint. The v1 constraint's
+> own comment anticipated exactly this migration.
+>
+> **Applying it changes no behaviour.** The flag stays false, every producer gate
+> is `and external_dispatch_enabled`, and the file ends in a self-verification
+> block that raises if the flag moved or if a single `email` row exists. Sending
+> additionally requires deploying `operations-alert-dispatch` AND invoking it:
+> nothing calls the function yet, so enabling the flag queues mail rather than
+> sending it. Apply, deploy, enable and schedule are four separate §5 decisions.
+>
+> **The two unapplied files must never be applied together.**
+> `20260824100000_moyasar_payment_provider.sql` sorts ahead of this one, so any
+> bulk operation sweeps the frozen payment file in first. Name the target by
+> version, as every apply since 2026-08-26 has done.
+
 Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. Full evidence — pre-live gate,
 drift check, verification, advisors and rollback — is in
