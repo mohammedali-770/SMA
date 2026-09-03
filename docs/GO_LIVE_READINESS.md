@@ -252,13 +252,15 @@ These are recorded so the cash decision is made with its alternative priced hone
 ## Go / no-go summary
 
 **Revised 2026-09-03 by the addendum above. The 2026-09-02 list had three items; it
-now has eight, and the shape of the launch has changed with it.**
+now has nine, and the shape of the launch has changed with it.**
 
-**Decide this first, because it removes three of the eight:** cash-only, or card at
-launch? The system today *is* a cash system and enforces it end to end — 66 of 68
-orders are `payment_status='pending'` and the only two `paid` are comped zero-total.
-A cash launch is coherent now. A card launch is a provider decision plus merchant
-onboarding measured in weeks, and is not compatible with a one-week go-live.
+**Decide this first, because it is the difference between nine blockers and twelve:**
+cash-only, or card at launch? The nine below apply either way. Card payment does not
+remove any of them — it **adds** the three in the *Additionally* paragraph beneath the
+list. The system today *is* a cash system and enforces it end to end — 66 of 68 orders
+are `payment_status='pending'` and the only two `paid` are comped zero-total. A cash
+launch is coherent now. A card launch is a provider decision plus merchant onboarding
+measured in weeks, and is not compatible with a one-week go-live.
 
 **Hard blockers for a CASH launch (nine):**
 
