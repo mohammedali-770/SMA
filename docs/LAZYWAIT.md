@@ -973,11 +973,29 @@ recognise is still a **200**. Making the POS retry a callback for an order that
 does not exist locally would achieve nothing. Both properties are pinned by
 `_shared/webhookReliabilityWiring.test.ts`.
 
-> **NOT YET DEPLOYED.** This is a source change. The running function still has
-> the old behaviour until `lazywait-webhook` is redeployed, which is an owner
-> action under CLAUDE.md §5. The live `webhook_secret` is configured (verified
-> read-only 2026-09-02), so today only the false-`success` logging is active; the
-> 200-on-missing-secret path is latent.
+> **DEPLOYED 2026-09-02 as version 2** (v1 → v2), on explicit owner approval,
+> `verify_jwt` preserved at `false`. Both fixes are live.
+>
+> **The bundle was scoped to the change, deliberately.** `lazywait-webhook` had
+> not been redeployed since **2026-07-09**, so shipping the current repository
+> tree would also have swept in two months of unrelated drift — `_shared/lazywait.ts`
+> alone would have gone from 230 to 1 133 lines. That module is imported for
+> exactly ONE symbol here (`verifyWebhookSignature`), and the three functions this
+> handler actually reaches — `verifyWebhookSignature`, `hmacSha256Hex`,
+> `timingSafeEqual` — were verified **byte-identical** between the deployed copy
+> and the repository first. So the shared modules were re-sent unchanged and the
+> bundle diff is exactly: the new `index.ts` plus its new dependency
+> `_shared/syncLog.ts`. Signature verification is provably untouched.
+>
+> Verified after deploying, without sending a synthetic callback (a forged
+> payload would either prove only the signature gate or write a real log row):
+>
+> | check | result |
+> | --- | --- |
+> | `GET` unauthenticated | **405** `{"error":"Method not allowed"}` — from the handler, so `verify_jwt` is still off; a platform gate would have returned 401 |
+> | `POST` unsigned | **401** `{"error":"invalid signature"}` — and reaching that line proves it got PAST the `!secret` check, so config still reads and the new 503 branch correctly did not fire |
+> | bundle read back | `index.ts` byte-identical to the merged source; 503 branch, `syncLogOutcome`, `status: outcome.status` and the `console.error` guard all present; no swallowing `.then` in code |
+> | `integration_sync_logs` | 76 rows before and after — the probes wrote nothing |
 
 ## Admin monitoring
 Admin → Settings → Integrations → **Lazywait Sync Monitor**: branch mapping

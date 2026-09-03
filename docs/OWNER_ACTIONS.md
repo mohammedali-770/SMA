@@ -1502,6 +1502,54 @@ pending action and a reader arriving from `docs/MIGRATIONS.md` §42 or CLAUDE.md
 
 ---
 
+## 25. `whatsapp-webhook` cannot accept a single Meta delivery report
+
+**Status:** OWNER DECISION — configure it, or accept that delivery status is
+never received.
+
+Found on 2026-09-02 while verifying the `whatsapp-webhook` redeploy. An unsigned
+`POST` to the function returns **503 `webhook not configured`**, not the 401 the
+signature gate would give. The reason:
+
+| provider row | `app_secret` | `webhook_verify_token` |
+| --- | --- | --- |
+| `whatsapp` (`meta_cloud`) | **absent** | present |
+
+Key presence was read, never a value. The handler fails closed on a missing App
+Secret — which is correct, and is why the condition is silent rather than
+dangerous — so **every Meta delivery-status callback has been rejected with a 503
+for as long as the row has been in this state.**
+
+**This is pre-existing and was not caused by the redeploy.** The 503 branch is
+byte-identical in the version that was running before.
+
+**What it costs.** `whatsapp_message_logs` looks healthy at 30 rows, but every one
+of those comes from the *send* paths (`whatsapp-send-otp`,
+`auth-send-sms-whatsapp`) calling `record_whatsapp_message` directly. Nothing has
+ever arrived from the webhook, so there is **no delivery, read or failure status
+for any OTP ever sent** — you cannot currently tell whether a customer's login
+code was delivered. The reliability fix deployed on 2026-09-02 (checking the RPC
+result instead of ignoring it) is correct but unreachable until this is fixed: it
+runs only after a valid signature.
+
+### The action
+
+Meta Business Manager → the WhatsApp app → **App Secret**, then set it in
+Admin → Integrations → WhatsApp. That is a live secret write, so it is yours.
+
+Then confirm: an unsigned `POST` should return **401 `invalid signature`** rather
+than 503, and Meta's delivery reports should begin appearing in
+`whatsapp_message_logs` with `message_type = 'status'`.
+
+**Not urgent, and worth saying so.** Login works — the send path is unaffected and
+customers receive codes. What is missing is the observability of whether they
+did. Weigh it against the go-live checklist rather than treating it as an outage.
+
+**On completion**, per the closeout rule below: delete this section, recording the
+verification date and the 401-not-503 readback.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

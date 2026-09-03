@@ -161,9 +161,38 @@ The hook secret goes into the app (step 6 below), not into git.
    > store is still an event we accepted, and making Meta retry it would not help.
    > Pinned by `_shared/webhookReliabilityWiring.test.ts`.
    >
-   > **NOT YET DEPLOYED** — a redeploy of `whatsapp-webhook` is an owner action
-   > under CLAUDE.md §5. Nothing about signature verification, the App Secret, the
-   > verify token or the login path is touched by this change.
+   > **DEPLOYED 2026-09-02 as version 3** (v2 → v3), on explicit owner approval,
+   > `verify_jwt` preserved at `false`. Nothing about signature verification, the
+   > App Secret, the verify token or the login path was touched. The bundle was
+   > scoped to the change: the shared modules were re-sent unchanged after
+   > confirming the three symbols this handler reaches — `hmacSha256Hex`,
+   > `timingSafeEqual`, `sanitizeProviderResponse` — are **byte-identical** to the
+   > deployed copies, so the diff is the new `index.ts` plus `_shared/syncLog.ts`.
+   > The bundle was read back afterwards and `index.ts` is byte-identical to the
+   > merged source.
+   >
+   > **AND THE DEPLOY SURFACED SOMETHING THIS DOCUMENT DID NOT RECORD: the POST
+   > path has never been able to work.** An unsigned `POST` returns **503
+   > `webhook not configured`**, not 401 — because `integration_settings` for
+   > `provider_type='whatsapp'` has **no `app_secret` key** (verified read-only;
+   > key presence only, no value read). The handler fails closed on a missing App
+   > Secret, correctly, so *every* Meta delivery-status callback has been rejected
+   > with a 503 for as long as the row has been in this state.
+   >
+   > **This is pre-existing, not caused by the deploy** — the 503 branch is
+   > byte-identical in the v2 code that was running before. It also explains a
+   > figure that would otherwise mislead: `whatsapp_message_logs` holds 30 rows,
+   > and all of them come from the *send* paths (`whatsapp-send-otp`,
+   > `auth-send-sms-whatsapp`) calling `record_whatsapp_message` directly. None
+   > came from this webhook.
+   >
+   > So the reliability fix that just shipped here is **correct but currently
+   > unreachable**: the RPC-result check it adds runs only after a valid
+   > signature, and no request gets that far. It becomes live the moment
+   > `app_secret` is configured. See `docs/OWNER_ACTIONS.md` §25.
+   >
+   > The GET path is unaffected and works: `webhook_verify_token` IS present, and
+   > a GET with a wrong token correctly returns 403 without echoing the challenge.
 
 ---
 
