@@ -135,9 +135,14 @@ export function ProfileScreen() {
             `/account/delete`; the intermediate screen stays reachable from the
             legal list for anyone who arrives that way.
 
-            GATED ON AUTHENTICATION, NOT ON PROFILE DATA — deliberately unlike the
-            Addresses row above, which needs a profile because it renders the
-            address count. `status === 'signed_in'` with `profile === null` is
+            GATED ON AUTHENTICATION, NOT ON PROFILE DATA — deliberately unlike
+            the Addresses row above, which guards on `profile`. That guard is NOT a
+            data dependency, though this comment claimed it was: `addressCount`
+            comes from `useAddressBook()`, and AddressProvider reads only `status`
+            and `userId`. It is simply the guard that row has — which does mean a
+            signed-in customer with no profile row loses address management too.
+            Pre-existing and left alone; deletion is the one Apple requires to be
+            reachable. `status === 'signed_in'` with `profile === null` is
             reachable three ways in AuthProvider: a `fetch_success` carrying an
             authoritative null (no profile row), the synchronous `signed_in` in
             `onChange` before the deferred fetch resolves, and retry exhaustion
