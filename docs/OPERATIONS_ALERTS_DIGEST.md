@@ -53,7 +53,7 @@ anticipated the migration that would lift it. That is what
 | Recipients | derived from admin profiles at send time by `operations_alerts_dispatch_recipients()`. **No address is stored**, which was v1's stated property |
 | Delivery | at most once — a per-invocation fencing token on claim, and every completion write guarded by it |
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
-| Invocation | **None automatic.** No cron job and no admin action calls the function; an admin can invoke it manually. A scheduler is the outstanding piece — see `OWNER_ACTIONS.md` §28 |
+| Invocation | `pg_cron` every 5 minutes via `invoke_operations_alert_dispatch()` (`20260903130000`), with a Vault-held URL and trigger secret. The first version had **no caller at all** — review caught that on #328. An admin can still invoke it by hand |
 
 ### Why the floor defaults to critical
 
