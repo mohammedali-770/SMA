@@ -70,7 +70,7 @@ numbers, delivery addresses, map coordinates, and order history.
 | B4 | Privacy manifest / required-reason APIs | ⬜ | Enforced for the binary and its SDKs. Verify Expo, Sentry and Maps SDKs ship manifests. |
 | B5 | Encryption declaration | ✅ | `usesNonExemptEncryption: false` in `apps/mobile/app.json`. Confirm it stays true if cryptography is added. |
 | B6 | Reviewer test account and instructions | ⬜ | Login is **WhatsApp OTP to a Saudi mobile only** (`normalizeSaudiPhoneE164` — foreign numbers are rejected at the hook). A reviewer outside KSA cannot sign in unaided. This needs a working reviewer path, and it is easy to overlook. |
-| B7 | Public privacy policy and support URLs resolve without login | ⬜ | Also required by `RELEASE_CHECKLIST.md` §8. |
+| B7 | Public privacy policy and support URLs resolve without login | ⚠️ built 2026-09-03, verify live | Was ❌ in substance: `vercel.json` rewrote **every** path to the admin console shell, so no public policy URL existed at all — an in-app screen satisfies neither store. A public page now ships as a second Vite entry (`legal.html` + `src/legal/`, 3.9 kB, no admin bundle) serving the active `legal_documents` rows anonymously, at `/legal`, `/legal/<doc>` and the aliases `/privacy`, `/terms`, `/support`. **Still ⚠️ because source cannot prove a deployed URL**: after this merges and Vercel deploys, open `/privacy` signed out and confirm the policy text renders — a 200 alone proves nothing, since the catch-all also returns 200 while serving the admin shell. Then paste that URL into both store listings. Also required by `RELEASE_CHECKLIST.md` §8. |
 
 ---
 

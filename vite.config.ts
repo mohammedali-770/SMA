@@ -1,7 +1,7 @@
-import {sentryVitePlugin} from '@sentry/vite-plugin';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import {defineConfig} from 'vite';
+import { defineConfig } from 'vite';
 
 export default defineConfig(() => {
   // Source-map upload is OPT-IN and secret-gated: it activates only when the
@@ -18,15 +18,17 @@ export default defineConfig(() => {
       react(),
       tailwindcss(),
       ...(uploadSourceMaps
-        ? [sentryVitePlugin({
-            org: 'first-taste-trading-company',
-            project: 'react-native',
-            telemetry: false,
-            release: process.env.VERCEL_GIT_COMMIT_SHA
-              ? {name: `spicy-meal-web@${process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12)}`}
-              : undefined,
-            sourcemaps: {filesToDeleteAfterUpload: ['dist/**/*.map']},
-          })]
+        ? [
+            sentryVitePlugin({
+              org: 'first-taste-trading-company',
+              project: 'react-native',
+              telemetry: false,
+              release: process.env.VERCEL_GIT_COMMIT_SHA
+                ? { name: `spicy-meal-web@${process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12)}` }
+                : undefined,
+              sourcemaps: { filesToDeleteAfterUpload: ['dist/**/*.map'] },
+            }),
+          ]
         : []),
     ],
     // Vercel's system values are plain VERCEL_* env vars; Vite only exposes
@@ -37,15 +39,22 @@ export default defineConfig(() => {
     // string = absent; the runtime treats it as unset and falls back to
     // hostname heuristics. No secret is exposed here.
     define: {
-      'import.meta.env.VITE_VERCEL_ENV':
-        JSON.stringify(process.env.VERCEL_ENV ?? ''),
-      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA':
-        JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ''),
+      'import.meta.env.VITE_VERCEL_ENV': JSON.stringify(process.env.VERCEL_ENV ?? ''),
+      'import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA': JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ''),
     },
     build: {
       // 'hidden' emits maps without sourceMappingURL comments; combined with
       // filesToDeleteAfterUpload above, no map is ever publicly reachable.
       sourcemap: uploadSourceMaps ? ('hidden' as const) : false,
+      rollupOptions: {
+        // TWO ENTRIES, NOT ONE. `index.html` is the admin console. `legal.html`
+        // is the public policy page that App Store Connect and Play Console
+        // require a reviewer to be able to open with no account — see
+        // src/legal/legalPage.ts. Keeping it a separate entry is the point: it
+        // must not pull the admin bundle, and `vercel.json` routes /legal,
+        // /privacy, /terms and /support to it before the catch-all rewrite.
+        input: { main: 'index.html', legal: 'legal.html' },
+      },
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
