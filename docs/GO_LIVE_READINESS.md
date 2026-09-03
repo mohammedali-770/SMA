@@ -4,6 +4,11 @@
 > source tree on that date. **Re-verify before submitting to either store.**
 > CLAUDE.md §14 warns specifically against carrying dated dashboard facts forward
 > as though they were current, and this document is mostly dashboard facts.
+>
+> **Partially re-verified 2026-09-03:** D7, E7 and G5 were resolved from ⬜ to ✅
+> and E8 was added. Those four rows carry that date; **every other row is still a
+> 2026-09-02 reading** and has not been re-checked. The go/no-go summary is
+> unchanged — none of the four is a blocker.
 
 ## What this is, and what it is not
 
@@ -95,7 +100,7 @@ has, so it is a verification list rather than an aspiration.
 | D4 | Authentication rate limiting | ✅ | Live since 2026-09-02: `auth-send-sms-whatsapp` v2 reserves against a shared per-phone budget before every send — 60 s cooldown, 5/hour, 10/day ([`WHATSAPP_LOGIN.md`](WHATSAPP_LOGIN.md)). **Not yet exercised by a real customer login.** |
 | D5 | Dependency advisories gated in CI | ⚠️ | `Dependency audit (high+)` runs on every PR. One standing exception — two `image-size` advisories with no patched release — **expires 2026-10-02** ([`DEPENDENCY_ADVISORIES.md`](DEPENDENCY_ADVISORIES.md)). If it lapses, every merge blocks. |
 | D6 | No orphan privileged accounts | ✅ | `admin@spicymeal.app` — an admin on an **unregistered domain**, never signed in, no TOTP — was deleted 2026-09-02. `customer@spicymeal.app` is banned with its session revoked. |
-| D7 | Transport security | ⬜ | Verify no cleartext traffic is permitted in the release build. |
+| D7 | Transport security | ✅ | Verified 2026-09-03. `app.json` sets **no** `usesCleartextTraffic`, `networkSecurityConfig` or `NSAppTransportSecurity`/`NSAllowsArbitraryLoads` key, so both platforms' secure defaults apply — and on Expo SDK 57 / React Native 0.86 the Android target SDK is well past 28, where cleartext is denied by default. No `http://` endpoint exists in shipped mobile source; the only occurrences are comments, tests, and `webviewPolicy.ts`, which **blocks** `http://` explicitly. |
 
 ---
 
@@ -109,7 +114,8 @@ has, so it is a verification list rather than an aspiration.
 | E4 | Error monitoring | ⬜ | Sentry is configured for web and native. Confirm native source maps resolve for production builds. |
 | E5 | Incident response is current | ⬜ | [`INCIDENT_RESPONSE.md`](INCIDENT_RESPONSE.md) exists; confirm the contacts and escalation path are real people who are reachable. |
 | E6 | POS integration proven end to end | ✅ | Delivery reaches Lazywait — SM-2026-000059 became POS ticket #3 in 42 s ([`LAZYWAIT.md`](LAZYWAIT.md)). |
-| E7 | Opening-hours enforcement | ⬜ | `branchIsOpen` gates the menu UI. Confirm a closed branch cannot receive an order server-side, not only that the UI discourages it. |
+| E7 | Closed-branch enforcement | ✅ | Verified 2026-09-03, and the question was mis-framed. `place_order` refuses server-side on **`is_active`** ("The selected branch is not available"), on `delivery_enabled` / `delivery_temporarily_closed` for delivery, and on `pickup_enabled` for pickup — the UI is not the only gate. Trading hours are a **separate, deliberately advisory** concept: `branch_working_hours` carries its own table comment *"ADVISORY ONLY … NOTHING enforces these"*, no order path reads it, and the admin editor tells the user so in as many words — *"Orders are not blocked outside these hours — use Open/Closed for that."* **The consequence to accept knowingly: there is no schedule, so orders are accepted around the clock unless a human deactivates or pauses the branch.** Currently moot — the table holds **0 rows** across all 40 branches. |
+| E8 | **OTP delivery is unobservable** | ⚠️ | Found 2026-09-03. `whatsapp-webhook` rejects every Meta delivery callback with a **503**, because the `whatsapp` row in `integration_settings` has no `app_secret` (key presence read; no value). The handler fails closed, which is correct — but it means there is **no delivery, read or failure status for any OTP ever sent**: all 30 `whatsapp_message_logs` rows come from the *send* paths, none from the webhook. Login itself is unaffected and customers do receive codes. The cost is that "my code never arrived" — the commonest launch-day support call for a phone-login app — is currently undiagnosable. One secret to set: [`OWNER_ACTIONS.md`](OWNER_ACTIONS.md) §25. |
 
 ---
 
@@ -133,7 +139,7 @@ has, so it is a verification list rather than an aspiration.
 | G2 | Refunds | ❌ if taking payment | Automated refund processing is intentionally disabled under the freeze. |
 | G3 | Menu content ready | ⬜ | 55 active products; **1** now carries an image. Decide whether launching with mostly image-less products is acceptable. |
 | G4 | Store listing assets | ⬜ | Screenshots, description, category, support contact — in both languages. |
-| G5 | Terms, refund and delivery policy match behaviour | ⬜ | Especially if launching cash-only: the policy must not promise card payment or online refunds. |
+| G5 | Terms, refund and delivery policy match behaviour | ✅ for a cash launch | Verified 2026-09-03 against the **live** `legal_documents` rows (all 9 active, effective 2026-08-18). The copy was already written for a cash-only launch and says so plainly: `payment_policy` — *"paid in cash … Online card payment is not currently available in the app"* and *"We have not yet selected an online payment provider"*; `cancellation_refund_policy` — *"Where a refund is due, it is settled in cash at the branch that prepared the order."* Nothing promises card payment or an online refund. The cancellation window (*"while your order is still Received"*) is also accurate: `received` remains the live status on 62 of 68 orders and the app still renders it as **Received** — only its *push* was retired on 2026-08-27. **Re-check this the moment a payment provider is chosen**, since both documents promise to be updated *before* the option appears. |
 | G6 | **Campaigns / promo codes are not a launch feature** | ⚠️ known gap | The schema (`campaigns`, `campaign_redemptions`, `compute_campaign_discount`) is applied to Production, but **there is no UI in either app** — no admin tab, no customer entry point — and `place_order` has no campaign awareness, so `global_limit`/`per_user_limit` are unenforced and no redemption row is ever written. Established by the 2026-09-02 dead-code audit. **Do not advertise promo codes at launch.** Detail: `docs/DISCOUNTS_CAMPAIGNS.md` Part 1. |
 | G7 | **A failed refund is invisible to operators** | ⚠️ known gap | `list_failed_order_refunds()` is live and correctly admin-gated (role **and** AAL2), but **no admin screen calls it** and `order_refunds` is not read anywhere in `src/` or `apps/`. If a refund fails there is no surface that shows it. FROZEN under §6, so recorded rather than fixed — but it matters the moment G1/G2 are answered. |
 
