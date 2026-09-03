@@ -291,8 +291,14 @@ begin
     raise exception 'external dispatch must stay off';
   end if;
 
+  -- UPDATED FOR v2: enabling external dispatch is no longer a rejection, so it
+  -- moves out of this counter and into a positive round-trip below. The two
+  -- new dispatch settings take its place here, because they DO still validate.
   begin
-    perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
+    perform public.operations_alert_settings_update('{"dispatch_language": "fr"}'::jsonb);
+  exception when sqlstate 'P0001' then v_raised := v_raised + 1; end;
+  begin
+    perform public.operations_alert_settings_update('{"dispatch_min_severity": "chatty"}'::jsonb);
   exception when sqlstate 'P0001' then v_raised := v_raised + 1; end;
   begin
     perform public.operations_alert_settings_update('{"no_such_key": 1}'::jsonb);
@@ -309,9 +315,17 @@ begin
   begin
     perform public.operations_alert_settings_update('"not an object"'::jsonb);
   exception when sqlstate 'P0001' then v_raised := v_raised + 1; end;
-  if v_raised <> 6 then
-    raise exception 'expected 6 validation rejections, got %', v_raised;
+  if v_raised <> 7 then
+    raise exception 'expected 7 validation rejections, got %', v_raised;
   end if;
+
+  -- v2 positive path: the flag is settable and must return to false, so the
+  -- assertion at the end of this block still means what it did before.
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
+  if not (select external_dispatch_enabled from public.operations_alert_settings) then
+    raise exception 'v2 settings RPC must accept enabling external dispatch';
+  end if;
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
 
   -- timezone round-trip stays functional
   perform public.operations_alert_settings_update('{"timezone": "UTC"}'::jsonb);

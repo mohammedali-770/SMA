@@ -226,17 +226,26 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**ONE file is unapplied as of 2026-09-02, and it is the frozen one:**
+**SUPERSEDED 2026-09-03 — TWO files are now unapplied.** A second joined the list
+when the alert-dispatch work merged: `20260903120000_operations_alert_email_dispatch`.
+It is **written and awaiting approval**, not frozen, and it is not Moyasar. The
+distinction matters more than the count: an instruction to "apply the outstanding
+migrations" now has a plausible referent again, and a bulk apply would still sweep
+Moyasar in, because `20260824100000` sorts ahead of everything. **Name the target
+by version.**
+
+**The list as it stood on 2026-09-02 — ONE file, the frozen one:**
 
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260903120000_operations_alert_email_dispatch.sql` | **UNAPPLIED, awaiting approval.** Operations alerts v2 — the email dispatch path for X3. Removes three deliberate v1 interlocks (the outbox dormancy CHECK, the producers' hard-coded `in_app`, and the settings RPC's refusal) for the **email channel only**; `whatsapp` and `push` stay structurally blocked. Applying it changes NO behaviour: `external_dispatch_enabled` stays false, every producer gate is `and external_dispatch_enabled`, and the migration's own self-verification raises if the flag moved or any email row exists. Nothing is sent until `operations-alert-dispatch` is ALSO deployed — two separate §5 actions, plus a third to enable the flag. |
 | `20260902120000_orders_index_cleanup.sql` | **APPLIED 2026-09-02 12:37:37 UTC**, live version `20260902123737`, on explicit owner approval ("apply 20260902120000" — named by version), one call, target named explicitly. Ledger row 78. Dropped `orders_lazywait_deadline_queue_idx` (an exact duplicate) and `orders_sync_queue_idx` (dead); `orders` index count 18 → 16, the survivor still serves the queue predicate by index scan, and the money-path hashes are unchanged. No deploy implied. |
 | `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. Its `auth-send-sms-whatsapp` deploy landed 2026-09-02, so the feature is fully live. |
 | `20260831120000_watchdog_cash_order_coverage.sql` | **APPLIED 2026-09-01 11:54:57 UTC**, live version `20260901115457`, on explicit owner approval, one call, target named explicitly. Ledger row 76. |
 | `20260828090000_customer_order_state_inflight.sql` | **APPLIED 2026-08-28 18:22:28 UTC**, live version `20260828182228`, on explicit owner approval, one call, target named explicitly. Ledger row 75. |
 
-**So the danger is back to its most acute form.** With exactly one file left,
+**Kept because the reasoning outlives the count — it was written when one file was left.** With exactly one file left,
 "apply the outstanding migrations" reads like a no-op and is in fact the one
 instruction that would break the §6 freeze — there is no other file such an
 instruction could plausibly mean.

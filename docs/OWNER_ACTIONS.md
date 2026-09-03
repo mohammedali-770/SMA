@@ -1661,6 +1661,81 @@ emergency.
 
 ---
 
+## 28. Operations alert email dispatch (X3) — BUILT INERT 2026-09-03
+
+**Status:** written and merged; **three separate actions are open, and all three
+are yours.** Nothing has been applied, deployed or enabled.
+
+### Why
+
+The alert engine has worked since 2026-07-23 and has never once reached a person.
+Every row it has produced is `('in_app','recorded')` and stops in the database.
+Read live 2026-09-03: six alert states, all `recovered`, and the only critical
+incident on record — 2026-08-10, stranded orders plus platform health — was seen
+by nobody until somebody opened the console.
+
+`INCIDENT_RESPONSE.md` §1b is the launch-week answer and needs no code. This is
+the durable one.
+
+### What was built, and what it removes
+
+v1 did not forget to dispatch; it refused to, in three independent places. This
+removes all three **for the email channel only**:
+
+| v1 interlock | v2 |
+| --- | --- |
+| `operations_alert_outbox_v1_dormancy` — external rows can never leave `blocked`/`cancelled` | replaced by `operations_alert_outbox_v2_dispatch`; `email` gains a lifecycle, **`whatsapp` and `push` keep the v1 prohibition** |
+| both producers hard-code channel `'in_app'`, so no external row is ever created | they now also emit ONE `email` row — per event, not per language — gated on the flag, a configurable language and a severity floor |
+| the settings RPC raises on any attempt to set `external_dispatch_enabled` | the refusal is lifted; the flag is settable and round-trips |
+
+A fourth guard, the cron activation block in `20260723120000`, checks the v1
+constraint **by name**. It lives in `do $$ … end $$;` anonymous blocks that ran
+once at apply time and are not stored, so replacing the constraint cannot break
+it. Verified before the migration was written rather than assumed.
+
+**The severity floor defaults to `critical`, and that default is measured rather
+than guessed.** `lazywait:sync_degraded` has opened and self-recovered inside the
+evaluator's own 5-minute interval on all four occasions it has fired. Mailing
+every warning would have sent eight emails for four non-events, and an alert
+mailbox that cries wolf is worse than no alert mailbox.
+
+**No recipient address is stored**, which was v1's stated property and is kept.
+`operations_alerts_dispatch_recipients()` derives the list from admin profiles at
+send time, so revoking somebody's admin role stops their alert mail in the same
+act. There is **one** admin with an email address today.
+
+### The three actions, in this order
+
+1. **Apply the migration** — `20260903120000_operations_alert_email_dispatch`.
+   Name it by version. There are now TWO unapplied files and the other is the
+   frozen Moyasar one, which sorts **ahead** of this one; a bulk apply takes it
+   first. Applying changes no behaviour: the flag stays false, every producer
+   gate is `and external_dispatch_enabled`, and the file's own self-verification
+   block raises if the flag moved or if a single `email` row exists.
+2. **Deploy `operations-alert-dispatch`** — `verify_jwt = false`, matching
+   `config.toml`. Still sends nothing: the handler re-checks the master flag
+   itself, so a deploy against a disabled flag is a no-op by construction.
+3. **Enable it** — set `external_dispatch_enabled` true, via the admin console
+   or the settings RPC. **This is the only step that sends mail**, and it is the
+   one to do when somebody is watching.
+
+Order matters. Deploying before applying gives a function whose RPCs do not
+exist; enabling before deploying queues rows nothing drains.
+
+### How to check it worked, without waiting for an incident
+
+After step 3, `operations_digest_generate` produces one digest email per day. To
+force a faster signal, lower `dispatch_min_severity` to `warning` temporarily —
+a `lazywait:sync_degraded` warning historically fires within days — and put it
+back afterwards.
+
+### On completion
+
+Record the applied version, the deployed function version and the read-back, and
+close this section per the rule below.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

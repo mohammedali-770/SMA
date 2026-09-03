@@ -144,26 +144,67 @@ declare
   v_res jsonb;
   v_raised boolean := false;
 begin
-  -- External-dispatch hard reject unchanged (admin context via GUC override).
-  begin
-    perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
-  exception when sqlstate 'P0001' then v_raised := true; end;
-  if not v_raised then
-    raise exception 'settings RPC must still hard-reject enabling external dispatch';
-  end if;
+  -- UPDATED FOR v2 (migration 20260903120000). These three assertions used to
+  -- pin v1's refusal to dispatch at all: the settings RPC hard-rejecting the
+  -- flag, the v1 dormancy constraint, and the absence of any dispatcher-like
+  -- function. Email dispatch now exists, so each is replaced by the v2 property
+  -- it became -- NOT deleted. What must still hold is that applying the
+  -- migration changes no behaviour, and that only EMAIL was widened.
+
+  -- The flag is now settable, and round-trips. It must still be OFF here,
+  -- because the migration does not turn it on.
   if (select external_dispatch_enabled from public.operations_alert_settings) then
-    raise exception 'external dispatch flipped on';
+    raise exception 'external dispatch must be off after migration application';
+  end if;
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
+  if not (select external_dispatch_enabled from public.operations_alert_settings) then
+    raise exception 'v2 settings RPC must accept enabling external dispatch';
+  end if;
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
+  if (select external_dispatch_enabled from public.operations_alert_settings) then
+    raise exception 'external dispatch could not be turned back off';
   end if;
 
-  -- Outbox dormancy constraint still enforced structurally.
-  if not exists (select 1 from pg_constraint where conname = 'operations_alert_outbox_v1_dormancy') then
-    raise exception 'outbox dormancy constraint missing';
+  -- The v1 constraint is REPLACED, not merely dropped.
+  if exists (select 1 from pg_constraint
+              where conname = 'operations_alert_outbox_v1_dormancy'
+                and conrelid = 'public.operations_alert_outbox'::regclass) then
+    raise exception 'v1 dormancy constraint should have been replaced by v2';
+  end if;
+  if not exists (select 1 from pg_constraint
+                  where conname = 'operations_alert_outbox_v2_dispatch'
+                    and conrelid = 'public.operations_alert_outbox'::regclass) then
+    raise exception 'v2 dispatch constraint missing';
   end if;
 
-  -- No dispatcher exists: nothing in public/cron references an outbound send.
-  if exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-             where n.nspname = 'public' and p.proname ~* 'dispatch|send_alert|send_digest') then
-    raise exception 'unexpected dispatcher-like function exists';
+  -- STRUCTURAL, not merely named: the other external channels must STILL be
+  -- unable to leave blocked/cancelled. This is the assertion that would catch a
+  -- v2 constraint written too loosely, which a name check never would.
+  v_raised := false;
+  begin
+    insert into public.operations_alert_outbox
+      (idempotency_key, digest_run_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+    values ('v2-guard-push', null, 'push', 'en', 's', 'b', 'pending', null);
+  exception when check_violation then v_raised := true;
+            when not_null_violation then v_raised := true;
+  end;
+  if not v_raised then
+    raise exception 'v2 constraint must still forbid a pending push row';
+  end if;
+
+  -- A dispatcher now exists BY DESIGN. What matters is that its functions are
+  -- service-role only -- no anon/authenticated execute anywhere near them.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.proname in ('operations_alerts_dispatch_recipients',
+                        'claim_operations_alert_emails',
+                        'finalize_operations_alert_email',
+                        'release_operations_alert_email')
+      and exists (select 1 from aclexplode(p.proacl) a join pg_roles g on g.oid = a.grantee
+                  where g.rolname in ('anon','authenticated'))
+  ) then
+    raise exception 'dispatch functions must not be executable by anon/authenticated';
   end if;
 
   -- Engines stay service-role-only SECURITY DEFINER with pinned search_path.
