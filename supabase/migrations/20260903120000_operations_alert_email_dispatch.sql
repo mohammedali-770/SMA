@@ -16,8 +16,21 @@
 --      row unable to leave 'blocked'/'cancelled';
 --   2. both producers hard-coded channel 'in_app', including in the idempotency
 --      key, so no external row was ever CREATED;
---   3. `operations_alert_settings_update` raised outright on any attempt to set
---      `external_dispatch_enabled` true.
+--   3. `operations_alert_settings_update` refused in TWO places, not one: the
+--      `case` branch raised outright, AND the persistence step at the end of the
+--      function wrote `external_dispatch_enabled = false` unconditionally.
+--      Patching only the branch left the flag unsettable and looked correct.
+--      `operations_alerts_digest_test.sql` caught it on the first CI run, which
+--      is the whole argument for writing the suite before trusting the change.
+--
+-- A fifth guard was a TEST: two suites pinned v1's refusal by name. Each of
+-- those assertions is replaced by the v2 property it became, not deleted.
+--
+-- KNOWN LIMITATION, stated rather than discovered later:
+-- `operations_alert_settings_safe()` is NOT redefined here, so `dispatch_language`
+-- and `dispatch_min_severity` are settable through the RPC but not returned by it.
+-- The admin console can therefore set them but cannot yet display them. Widening
+-- the safe projection is a separate, smaller change.
 --
 -- The constraint's own comment anticipated this migration: external delivery is
 -- "structurally impossible until a future approved migration drops THIS named
@@ -511,7 +524,13 @@ begin
   update public.operations_alert_settings
      set alert_evaluation_enabled = v_s.alert_evaluation_enabled,
          digest_generation_enabled = v_s.digest_generation_enabled,
-         external_dispatch_enabled = false,  -- structurally dormant in v1
+         -- v2: this line WROTE FALSE UNCONDITIONALLY. Patching the `case` branch
+         -- above was not enough -- the settings RPC refused in TWO places, and
+         -- the persistence step was the second. Caught by
+         -- operations_alerts_digest_test.sql on the first CI run.
+         external_dispatch_enabled = v_s.external_dispatch_enabled,
+         dispatch_language = v_s.dispatch_language,
+         dispatch_min_severity = v_s.dispatch_min_severity,
          timezone = v_s.timezone,
          digest_local_time = v_s.digest_local_time,
          warning_reminder_minutes = v_s.warning_reminder_minutes,
