@@ -66,10 +66,11 @@
 -- `operations-alert-dispatch` is also deployed AND INVOKED.
 --
 -- That last word is load-bearing and was missing until review caught it on
--- #328: NOTHING CALLS THAT FUNCTION. There is no cron job and no admin action
--- for it, so enabling the flag fills this outbox and leaves it full. A
--- scheduler is the outstanding piece (OWNER_ACTIONS §28); until it exists the
--- answer to X3 is the named human in INCIDENT_RESPONSE.md §1b.
+-- #328: as this file shipped, NOTHING CALLED THAT FUNCTION -- no cron job, no
+-- admin action -- so enabling the flag filled this outbox and left it full.
+-- Migration 20260903130000 supplies the invocation path (pg_cron every five
+-- minutes, Vault-held URL and trigger secret). BOTH must be applied, and the
+-- Vault secrets created, before enabling the flag sends anything.
 --
 -- EMAIL ONLY. 'whatsapp' and 'push' remain structurally blocked by the v2
 -- constraint, exactly as they were. This migration widens one channel.

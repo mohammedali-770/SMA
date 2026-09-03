@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **119**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260903120000_operations_alert_email_dispatch.sql`.
+Migration files in the repository: **120**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260903130000_operations_alert_dispatch_scheduler.sql`.
 
 ## Tables
 
@@ -168,6 +168,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `insert_order_from_snapshot` | 5 | `20260826100000_comp_order_totals.sql` |
 | `invoke_account_deletion_processor` | 1 | `20260716180000_account_deletion_scheduler_job.sql` |
 | `invoke_lazywait_sync_processor` | 1 | `20260720120000_lazywait_sync_scheduler.sql` |
+| `invoke_operations_alert_dispatch` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
 | `invoke_payment_refund_processor` | 1 | `20260729090000_payment_refund_scheduler.sql` |
 | `is_admin` | 2 | `20260810142000_staff_mfa_aal2.sql` |
 | `is_branch_operator` | 1 | `20260820100500_ops_branch_scoping.sql` |
@@ -275,6 +276,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `validate_coupon` | 1 | `20260707120400_coupons.sql` |
 | `validate_pos_sync_notification_before_send` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `verify_account_deletion_process_secret` | 1 | `20260716160000_account_deletion_scheduler_auth.sql` |
+| `verify_operations_alert_dispatch_secret` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
 | `whatsapp_login_enabled` | 2 | `20260710160000_fix_whatsapp_login_review.sql` |
 
 ## Triggers

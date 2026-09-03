@@ -15,11 +15,17 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
  * the console. This drains the outbox's `email` rows over the SMTP credential
  * that was already configured, and marks each one terminal.
  *
- * NOTHING INVOKES THIS FUNCTION YET. There is no cron job and no admin action
- * that calls it; a repo-wide search finds only this file, its config entry, its
- * source-shape test and the documents describing it. An admin can invoke it by
- * hand. Automatic invocation needs a scheduler (OWNER_ACTIONS §28), and until
- * that exists enabling the flag queues mail rather than sending it.
+ * WHO CALLS IT. `pg_cron` every five minutes, through
+ * `invoke_operations_alert_dispatch()` (migration 20260903130000), which posts
+ * here with a dedicated trigger secret. Until that migration is applied and its
+ * two Vault secrets exist, NOTHING calls this function -- which was true of the
+ * first version of it, and is why the header used to say so.
+ *
+ * THE SECRET IS NEVER READABLE FROM HERE. Rather than fetching the expected
+ * value and comparing it (the older lazywait-sync shape, which puts the secret
+ * somewhere a service-role client can read), this asks Postgres a yes/no
+ * question. The function authenticates its caller without ever being able to
+ * read, log or leak what it is checking against.
  *
  * IT IS INERT UNTIL TWO SEPARATE THINGS ARE TRUE.
  *   1. migration 20260903120000 is applied — without it no `email` row can
@@ -81,8 +87,24 @@ Deno.serve(async (req: Request) => {
 
   const admin = adminClient();
 
-  // Caller gate. Service role for automation; otherwise an admin with AAL2.
-  if (!isServiceRoleCall(req)) {
+  // Caller gate, in order of how often each is used:
+  //   1. the pg_cron driver, carrying the Vault-held trigger secret;
+  //   2. the service role, for any other automation;
+  //   3. an authenticated admin (role AND AAL2), for a manual drain.
+  const triggerSecret = req.headers.get('x-alert-dispatch-secret');
+  let schedulerCall = false;
+  if (triggerSecret !== null) {
+    const { data: ok, error } = await admin.rpc('verify_operations_alert_dispatch_secret', {
+      p_secret: triggerSecret,
+    });
+    if (error) return json({ status: 'error', reason: 'secret check failed' }, 500);
+    // Strict `=== true`: the RPC is fail-closed, but a truthy non-boolean must
+    // never be read as authentication.
+    if (ok !== true) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
+    schedulerCall = true;
+  }
+
+  if (!schedulerCall && !isServiceRoleCall(req)) {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     const caller = userClient(authHeader);

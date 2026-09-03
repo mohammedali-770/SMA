@@ -233,4 +233,100 @@ begin
   raise notice 'RECIPIENTS OK (derived from admin profiles, none stored)';
 end $$;
 
+-- ---- F. The invocation path (migration 20260903130000) ----------------------
+-- The dispatcher shipped with NO caller, which review caught on #328. These
+-- assertions exist so that cannot happen again silently.
+do $$
+declare
+  v_req bigint;
+begin
+  -- The cron job exists, exactly once, on its own schedule and calling the
+  -- driver by name. cron.job stores only command TEXT, so a renamed driver
+  -- would leave a job that fails every tick rather than failing here.
+  if (select count(*) from cron.job where jobname = 'operations-alert-dispatch') <> 1 then
+    raise exception 'expected exactly one operations-alert-dispatch cron job';
+  end if;
+  if (select command from cron.job where jobname = 'operations-alert-dispatch')
+     <> 'select public.invoke_operations_alert_dispatch();' then
+    raise exception 'dispatch cron command is not the reviewed driver call';
+  end if;
+  -- No credential or URL may sit in cron.job: that is the whole reason the
+  -- driver reads Vault instead of the schedule carrying secrets.
+  if exists (
+    select 1 from cron.job
+     where jobname = 'operations-alert-dispatch'
+       and (command ~* 'http|bearer|secret|key|://')
+  ) then
+    raise exception 'dispatch cron command must not contain a URL or credential';
+  end if;
+
+  -- The driver no-ops while dispatch is disabled. It must return WITHOUT
+  -- touching Vault, so this passes even on a database where the secrets have
+  -- never been created -- which is exactly the state on apply.
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
+  v_req := public.invoke_operations_alert_dispatch();
+  if v_req is not null then
+    raise exception 'driver must not post while external dispatch is disabled';
+  end if;
+
+  -- Enabled but nothing queued: still no request. A tick every five minutes
+  -- saying "nothing" would bury real activity in the logs.
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
+  delete from public.operations_alert_outbox where channel = 'email';
+  v_req := public.invoke_operations_alert_dispatch();
+  if v_req is not null then
+    raise exception 'driver must not post with an empty email queue';
+  end if;
+
+  -- Enabled WITH work queued, and Vault not configured: it must RAISE rather
+  -- than return quietly. Silence here would look identical to "nothing to
+  -- send", which is the failure this subsystem exists to prevent.
+  insert into public.operations_alert_outbox
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+  values ('t-driver-pending', gen_random_uuid(), 'email', 'en', 's', 'b', 'pending', null);
+  begin
+    v_req := public.invoke_operations_alert_dispatch();
+    raise exception 'driver must fail closed when Vault is incomplete';
+  exception when others then
+    if sqlerrm not like '%Vault configuration is incomplete%' then
+      raise exception 'expected a Vault-incomplete failure, got: %', sqlerrm;
+    end if;
+  end;
+
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
+  raise notice 'INVOCATION PATH OK (scheduled, credential-free, fail-closed)';
+end $$;
+
+-- ---- G. The trigger secret never leaves Postgres ----------------------------
+do $$
+begin
+  -- Fail closed on every path: no Vault entry yet, so nothing authenticates.
+  if public.verify_operations_alert_dispatch_secret('anything') then
+    raise exception 'secret check must deny when Vault holds no secret';
+  end if;
+  if public.verify_operations_alert_dispatch_secret('') then
+    raise exception 'secret check must deny an empty candidate';
+  end if;
+  if public.verify_operations_alert_dispatch_secret(null) then
+    raise exception 'secret check must deny a null candidate';
+  end if;
+
+  perform vault.create_secret('s3cret-value', 'operations_alert_dispatch_secret', 'test');
+  if not public.verify_operations_alert_dispatch_secret('s3cret-value') then
+    raise exception 'secret check must accept the configured secret';
+  end if;
+  if public.verify_operations_alert_dispatch_secret('s3cret-valu') then
+    raise exception 'secret check must reject a near miss';
+  end if;
+
+  -- It returns a BOOLEAN, never the value: that is what lets the Edge Function
+  -- authenticate its caller without being able to read the secret.
+  if (select pg_get_function_result(oid) from pg_proc
+       where proname = 'verify_operations_alert_dispatch_secret') <> 'boolean' then
+    raise exception 'secret check must return boolean, not the secret';
+  end if;
+
+  raise notice 'TRIGGER SECRET OK (fail-closed, boolean-only)';
+end $$;
+
 rollback;

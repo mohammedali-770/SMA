@@ -107,6 +107,29 @@ describe('recipients and secrets', () => {
   });
 });
 
+describe('the scheduler path', () => {
+  it('accepts the pg_cron trigger secret', () => {
+    const c = code();
+    expect(c).toContain("req.headers.get('x-alert-dispatch-secret')");
+    expect(c).toContain('verify_operations_alert_dispatch_secret');
+  });
+
+  it('never fetches the expected secret, only asks whether one matches', () => {
+    // The point of the RPC: this function must not be able to read, log or leak
+    // the value it authenticates against. Reading it out of a table would be the
+    // older lazywait-sync shape and is deliberately not what happens here.
+    const c = code();
+    expect(c).not.toMatch(/decrypted_secrets/);
+    expect(c).not.toMatch(/dispatch_secret['"]?\s*\]/);
+  });
+
+  it('treats a non-true RPC result as a refusal', () => {
+    // Fail-closed: the RPC already returns a boolean, but a truthy non-boolean
+    // must never authenticate a caller.
+    expect(code()).toContain('ok !== true');
+  });
+});
+
 describe('caller authorization', () => {
   it('uses the shared admin predicate rather than a second role check', () => {
     const c = code();
