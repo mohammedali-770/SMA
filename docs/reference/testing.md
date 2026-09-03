@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**162 TypeScript test files declaring 2492 test blocks, plus 61 SQL suites.**
+**163 TypeScript test files declaring 2497 test blocks, plus 61 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -261,7 +261,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `supabase/functions/`
 
-20 files, 550 declared test blocks.
+21 files, 555 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -276,6 +276,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `supabase/functions/_shared/moyasar.test.ts` | 85 | minor units (halalas) |
 | `supabase/functions/_shared/moyasarRefund.test.ts` | 36 | moyasarRefundUrl / moyasarPaymentUrl |
 | `supabase/functions/_shared/orderIntakeSyncWiring.test.ts` | 35 | order-intake — immediate POS sync, and no premature promise |
+| `supabase/functions/_shared/pushReadyCopyWiring.test.ts` | 5 | push-dispatch ready copy is order-type aware |
 | `supabase/functions/_shared/rest.test.ts` | 41 | cleanSelect — whitespace stripped exactly as postgrest-js stripped it |
 | `supabase/functions/_shared/restNoSupabaseJs.test.ts` | 5 | order-intake carries no npm dependency |
 | `supabase/functions/_shared/syncLog.test.ts` | 8 | syncLogOutcome |
