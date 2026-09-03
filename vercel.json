@@ -14,6 +14,26 @@
       "destination": "/app/index.html"
     },
     {
+      "source": "/legal",
+      "destination": "/legal.html"
+    },
+    {
+      "source": "/legal/(.*)",
+      "destination": "/legal.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/legal.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/legal.html"
+    },
+    {
+      "source": "/support",
+      "destination": "/legal.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

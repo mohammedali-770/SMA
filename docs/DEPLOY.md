@@ -4,14 +4,25 @@
 
 ## 1. What Vercel serves
 
-One repository build produces two web applications:
+One repository build produces two web applications and one public static page:
 
 | Path | Application | Source |
 | --- | --- | --- |
 | `/` | Staff/admin entry surface | root Vite app under `src/` |
 | `/app/` | Customer web application | Expo/React Native Web export from `apps/mobile/` |
+| `/legal`, `/legal/<doc>` | **Public** legal & policy page — no login | second Vite entry `legal.html` + `src/legal/` |
+| `/privacy`, `/terms`, `/support` | Aliases onto the same page | `vercel.json` rewrites |
 
 The customer `/app` surface is the same Expo application used for native development; it is not the historical hand-built emulator.
+
+**Why `/legal` exists and must keep working.** App Store Connect and Play Console both
+require a privacy-policy URL a reviewer can open with **no account**; an in-app screen
+does not satisfy either store. Its rewrites are listed in `vercel.json` **before** the
+`/(.*)` catch-all — put anything after that catch-all and it silently serves the admin
+shell instead, which is exactly the state that made this page necessary. The page reads
+the active `legal_documents` rows anonymously (the `legal_documents_select_public` RLS
+policy grants `anon` SELECT on `is_active` rows only), so editing a document in the
+admin console updates the public page with no redeploy, and a draft can never leak.
 
 The root app determines the signed-in role and exposes the staff/admin experience only through the current server-authorized role/MFA path.
 
@@ -117,9 +128,13 @@ D=https://<production-domain>
 
 curl -sSI "$D/" | head -1
 curl -sSI "$D/app/" | head -1
+curl -sSI "$D/legal" | head -1
+curl -sSI "$D/privacy" | head -1
 ```
 
-Confirm both routes load the expected distinct applications.
+Confirm the routes load the expected distinct applications. For `/legal` and `/privacy`,
+a 200 is not sufficient — the catch-all rewrite also returns 200 while serving the admin
+shell. Open one in a browser and confirm the policy text renders, signed out.
 
 ### Production commit/artifact check
 
