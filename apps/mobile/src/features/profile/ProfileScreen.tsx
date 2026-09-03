@@ -68,7 +68,17 @@ export function ProfileScreen() {
               {profile?.loyaltyPoints ?? 0}
             </Text>
           </View>
-          {profile ? (
+          {/*
+            Gated on AUTH, not on profile data — the same rule as the delete row
+            below, and for the same reason. This read `{profile ? … : null}` until
+            2026-09-03, which hid address management from a signed-in customer
+            whose profile row is null. Nothing here needs a profile: `addressCount`
+            comes from `useAddressBook()`, and AddressProvider loads the book from
+            `status` and `userId` alone (AddressProvider.tsx:58). The destination is
+            `AuthGate`-wrapped, and AuthGate itself gates on `status`, so it renders
+            for exactly the states this condition admits.
+          */}
+          {status === 'signed_in' ? (
             <MenuRow
               label={t('addrManage')}
               subtitle={addressCount === 0 ? t('addrEmptyTitle') : `${addressCount}`}
@@ -135,14 +145,11 @@ export function ProfileScreen() {
             `/account/delete`; the intermediate screen stays reachable from the
             legal list for anyone who arrives that way.
 
-            GATED ON AUTHENTICATION, NOT ON PROFILE DATA — deliberately unlike
-            the Addresses row above, which guards on `profile`. That guard is NOT a
-            data dependency, though this comment claimed it was: `addressCount`
-            comes from `useAddressBook()`, and AddressProvider reads only `status`
-            and `userId`. It is simply the guard that row has — which does mean a
-            signed-in customer with no profile row loses address management too.
-            Pre-existing and left alone; deletion is the one Apple requires to be
-            reachable. `status === 'signed_in'` with `profile === null` is
+            GATED ON AUTHENTICATION, NOT ON PROFILE DATA, which is now the rule
+            for BOTH menu rows on this screen. This comment once said the Addresses
+            row guards on `profile` because it needs one to render the address
+            count; it does not, and that row was corrected to match on 2026-09-03.
+            `status === 'signed_in'` with `profile === null` is
             reachable three ways in AuthProvider: a `fetch_success` carrying an
             authoritative null (no profile row), the synchronous `signed_in` in
             `onChange` before the deferred fetch resolves, and retry exhaustion
