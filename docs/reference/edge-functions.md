@@ -10,7 +10,7 @@
 
 Every Deno Edge Function in the repository, what it does, how it reaches production, and whether it can act with the service role.
 
-**Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list on a schedule; it cannot compare content.
+**Read the deployment column carefully.** A function marked *by hand* has no automated deploy path, so the repository cannot tell you which commit is running in production. `.github/workflows/function-drift.yml` compares the deployed *set* of function names against this list; it cannot compare content. It runs on demand only — the schedule was removed on 2026-09-02 — and needs a `SUPABASE_ACCESS_TOKEN` that `docs/OWNER_ACTIONS.md` §15 recommends against creating.
 
 **Privilege column.** *service role* means the function can obtain the service-role key — through `adminClient()`, through `serviceTarget()` on the dependency-free PostgREST path, or by reading `SUPABASE_SERVICE_ROLE_KEY` itself — and can therefore bypass RLS. Those functions are the ones to read first in a security review: the caller’s identity is not the thing limiting what they can touch. A function may hold it for one narrow read and still use the caller’s own JWT for everything customer-facing; `order-intake` does exactly that.
 
