@@ -39,7 +39,7 @@ export function ProfileScreen() {
   const { t, pick, lang, setLang, rtlRow } = useI18n();
   const { preference, setPreference, colors } = useTheme();
   const s = useStyles();
-  const { profile, signOut } = useAuth();
+  const { profile, status, signOut } = useAuth();
   const addressBook = useAddressBook();
   const onSignOut = async () => {
     await signOut();
@@ -131,15 +131,22 @@ export function ProfileScreen() {
             row existed the only route was Profile -> "Policies, privacy & contact"
             -> a network-fetched list of nine legal documents -> "Account & privacy"
             -> "Delete account": four taps, behind a loading state, under a heading
-            that gives no hint deletion lives there.
+            that gives no hint deletion lives there. It links straight to
+            `/account/delete`; the intermediate screen stays reachable from the
+            legal list for anyone who arrives that way.
 
-            It links straight to `/account/delete` rather than the intermediate
-            screen, which is still reachable from the legal list. The `profile`
-            guard mirrors the Addresses row above: this tab route has no AuthGate,
-            while `/account/delete` does, so an unguarded row would push a signed-out
-            visitor into one.
+            GATED ON AUTHENTICATION, NOT ON PROFILE DATA — deliberately unlike the
+            Addresses row above, which needs a profile because it renders the
+            address count. `status === 'signed_in'` with `profile === null` is
+            reachable three ways in AuthProvider: a `fetch_success` carrying an
+            authoritative null (no profile row), the synchronous `signed_in` in
+            `onChange` before the deferred fetch resolves, and retry exhaustion
+            leaving the last known profile null. `/account/delete` is valid for that
+            auth account in every one of those states, so guarding on `profile`
+            would hide deletion from a signed-in user — the exact failure this row
+            exists to fix.
           */}
-          {profile ? (
+          {status === 'signed_in' ? (
             <MenuRow
               label={t('delAccount')}
               subtitle={pick('Permanently delete your account', 'احذف حسابك نهائياً')}
