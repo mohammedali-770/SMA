@@ -8,7 +8,7 @@
 > **Re-verified in part on 2026-09-03, twice.** First, D7, E7 and G5 moved from ⬜
 > to ✅ and E8 was added. Then a five-dimension live audit — each dimension attacked
 > by an independent adversarial reviewer — produced the **Addendum** below, which
-> adds six blockers this document did not carry, corrects **D3** (it was green and
+> adds seven blockers this document did not carry, corrects **D3** (it was green and
 > wrong), and revises the go/no-go summary.
 >
 > **Everything not named in the addendum or dated 2026-09-03 is still a 2026-09-02
@@ -166,6 +166,9 @@ difference between a task and a decision.
 
 ### New hard blockers this document did not carry
 
+X7 was added after the first pass, when the audit's final round landed; it is the
+most time-sensitive item on this page.
+
 | # | Item | Evidence | Action |
 | --- | --- | --- | --- |
 | **X1** | **A store reviewer cannot sign in.** Authentication is WhatsApp OTP to a **Saudi mobile only**, enforced twice: `SaudiPhoneInput` renders a fixed `+966` and sanitises input to a 9-digit `5XXXXXXXX`, and `phone.ts` accepts only `/^5\d{8}$/`, so `sendCode` refuses and the button is `disabled={!isSaudiMobile(national)}`. A reviewer in Cupertino cannot type their own number, and cannot receive a WhatsApp code for a Saudi one. | source-verified | Apple requires working demo credentials for anything behind sign-in (guideline 2.1). Decide the mechanism — a test number whose code is obtainable, or documented App Review notes — **before** submitting. Owner decision; under an hour once decided. |
@@ -174,6 +177,7 @@ difference between a task and a decision.
 | **X4** | **In-app account deletion is buried three levels deep** — Profile → "Policies, privacy & contact" → a list of nine legal documents → "Account & privacy" → "Delete account". The Profile screen has no deletion entry at all. Apple 5.1.1(v) requires it to be *easily found*. | source-verified | One `MenuRow` on `ProfileScreen`. Under an hour — but it must ride the build in **X2**. |
 | **X5** | **The order lifecycle past `received` has never executed in Production, and every transition pushes a live customer notification.** All 68 orders are `received` (62) or `cancelled` (6). Zero `direction='webhook'` rows from the POS: the status callback has **never fired**. A real customer today gets `pos_confirmed` and then hears nothing, ever. | live-verified | Investigate before coding: confirm with Lazywait whether the callback is registered at all. If it is not, the admin console's manual status path *is* the launch mechanism and must be rehearsed end to end on one order. |
 | **X6** | **The `ready` push tells delivery customers to come and collect.** Delivery has been live since 2026-08-27, and `push-dispatch`'s `ready` copy says collect, in both languages. | source-verified | A one-line copy fix, code-only. It must land **before** any lifecycle rehearsal (**X5**), or the rehearsal sends the wrong message to a real person. |
+| **X7** | **The only customer login channel is unexercised, fallback-free and may expire inside launch week.** WhatsApp OTP is the sole route in: `otp_channel_default='whatsapp'`, `sms_otp_fallback_enabled=false`, and the SMS provider row is `sandbox`/disabled — **there is no fallback of any kind**. Live 2026-09-03: the last `auth_login` OTP was sent **2026-08-21** (**0 in the last 7 days**), the last customer sign-in was the same day, and `otp_send_reservations` is empty — so **no real login has ever run through `auth-send-sms-whatsapp` v2**, deployed 2026-09-02. The WhatsApp `integration_settings` row was last updated **2026-07-10, 54 days ago**. | live-verified; **the expiry is an inference, not a reading** — key *names* only were read, never a value, and a Meta **System User** token does not expire while a standard one lapses at 60 days (which would fall ~2026-09-08) | Confirm in Meta Business Manager which token type is in use and when it expires, and that templates `spicymeal_otp_en`/`_ar` are still approved. Then **run one real end-to-end login before launch.** If the token has lapsed, 100% of signups fail at the front door — and with §25 (no delivery callbacks) and X3 (no external alerting) the first signal is a customer complaint. Owner; minutes to check. |
 
 ### Corrections to claims already in this document
 
@@ -256,7 +260,7 @@ orders are `payment_status='pending'` and the only two `paid` are comped zero-to
 A cash launch is coherent now. A card launch is a provider decision plus merchant
 onboarding measured in weeks, and is not compatible with a one-week go-live.
 
-**Hard blockers for a CASH launch:**
+**Hard blockers for a CASH launch (nine):**
 
 1. **A1 — PDPL cross-border transfer.** Saudi personal data in `eu-central-1` with no
    recorded lawful basis. Counsel, possibly a region move. Longest lead time on the
@@ -276,6 +280,10 @@ onboarding measured in weeks, and is not compatible with a one-week go-live.
 8. **X5/X6 — the order lifecycle past `received` has never run in Production**, and
    the `ready` push currently tells delivery customers to come and collect. Fix the
    copy, then rehearse once. *(2026-09-03)*
+9. **X7 — the only login channel is unexercised, fallback-free, and its credential
+   may lapse inside launch week.** No customer has signed in since 2026-08-21 and the
+   WhatsApp settings row is 54 days old. Cheapest item on this list to check and the
+   most total in its failure: nobody can sign up at all. *(2026-09-03)*
 
 **Additionally, and only if taking card payment:** G1/G2 (no provider, weeks of
 onboarding), the 8-week-old payment bundles that cannot be redeployed safely one at a
