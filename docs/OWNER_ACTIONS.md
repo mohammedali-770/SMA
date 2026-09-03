@@ -1551,6 +1551,85 @@ verification date and the 401-not-503 readback.
 
 ---
 
+## 26. The `ready` push tells delivery customers to come and collect
+
+**Status:** FIXED IN SOURCE 2026-09-03 — **`push-dispatch` must be redeployed
+(v6)** before a customer sees the correction.
+
+### The defect
+
+Delivery went live 2026-08-27. The server-authoritative ladder is
+`preparing → ready → out_for_delivery → delivered`, so **every delivery order
+passes through `ready`** — and `push-dispatch`'s `ready` body said, in both
+languages:
+
+| | before |
+| --- | --- |
+| en | *Your order is ready for pickup.* |
+| ar | *طلبك جاهز للاستلام.* |
+
+A delivery customer was told to come and collect, then contradicted minutes later
+by `out_for_delivery` — "On the way 🛵". The in-app status label is neutral in
+both languages ("Ready" / «جاهز»), so **the push was the only surface making the
+claim.**
+
+### The fix
+
+`order_type` did not reach the copy selection at all — the order read selected
+`id, customer_id, status`. It now also selects `order_type`, on the row that was
+already being fetched: no extra round trip, and no new authorization surface
+(service-role client, RLS already bypassed).
+
+`ready` is the only status whose meaning differs by fulfilment, so it is the only
+one that branches. Pickup copy is **byte-identical** to what it was — this is
+additive, not a rewrite of approved copy. Delivery now reads:
+
+| | after (delivery only) |
+| --- | --- |
+| en | *Your order is ready and will be on its way shortly.* |
+| ar | *طلبك جاهز وسيكون في الطريق إليك قريباً.* |
+
+It deliberately promises no time and does not pre-empt `out_for_delivery`, which
+is the message that actually announces departure.
+
+**The Arabic is engineering-drafted and wants a native read before deploy.**
+
+### Why it is derived from the order row
+
+`order-intake` (`index.ts:331-347`) records that the pickup-only assumption had
+been written down in **five** separate places before delivery went live, and each
+rotted independently. Deriving from `orders.order_type` — not-null,
+`enum('delivery','pickup')` — is the version that cannot become a sixth. Reading
+it from the request body would additionally let a caller choose which copy a
+customer receives.
+
+Pinned by `supabase/functions/_shared/pushReadyCopyWiring.test.ts`, a source-shape
+tripwire in the `adminAuthWiring.test.ts` idiom — the handler ends in `Deno.serve`
+and `STATUS_COPY` is not exported, so no test can execute this. Mutation-tested:
+collapsing the branch, dropping `order_type` from the select, restoring "pickup"
+in the delivery body, and quietly rewording the pickup body each fail it.
+
+### The action
+
+Redeploy **`push-dispatch`** (→ v6), `verify_jwt: false` — it is `false` today and
+must stay so. A §5 owner action.
+
+**The redeploy is clean, and that was checked rather than assumed.** v5 was
+deployed 2026-08-27; since then exactly one commit touched anything this function
+imports (`_shared/adminAuth.ts` and `_shared/supabaseClient.ts`, via #311) and
+**both edits are docblock-only — no executable code**. `index.ts`, `_shared/cors.ts`
+and `_shared/secrets.ts` are untouched. Unlike the payment functions, this carries
+no behavioural drift. Read the bundle back and confirm before and after anyway.
+
+**Sequence it before X5.** The order lifecycle past `received` has never run in
+Production; when it is rehearsed, this copy is what a real customer receives.
+Rehearsing first sends the wrong message to a real person.
+
+**On completion**, per the closeout rule below: delete this section, recording the
+deploy version and the read-back.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

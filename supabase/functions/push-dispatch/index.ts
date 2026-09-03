@@ -70,6 +70,10 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
     en: { title: 'Preparing your order 🔥', body: 'Your order is being prepared now.' },
     ar: { title: 'جارٍ تحضير طلبك 🔥', body: 'يتم تحضير طلبك الآن.' },
   },
+  // PICKUP wording. `ready` is the one status whose meaning differs by fulfilment:
+  // a delivery order passes through it on the way to `out_for_delivery`, so this
+  // body would tell a delivery customer to come and collect. READY_DELIVERY_COPY
+  // below overrides it, selected from the ORDER ROW — see the note there.
   ready: {
     en: { title: 'Order ready ✅', body: 'Your order is ready for pickup.' },
     ar: { title: 'طلبك جاهز ✅', body: 'طلبك جاهز للاستلام.' },
@@ -86,6 +90,32 @@ const STATUS_COPY: Record<OrderStatus, { en: { title: string; body: string }; ar
     en: { title: 'Order cancelled', body: 'Your order was cancelled. Contact support if this is unexpected.' },
     ar: { title: 'تم إلغاء الطلب', body: 'تم إلغاء طلبك. تواصل مع الدعم إذا كان ذلك غير متوقع.' },
   },
+};
+
+/**
+ * `ready` for a DELIVERY order.
+ *
+ * Delivery went live 2026-08-27 and the ladder is
+ * `preparing -> ready -> out_for_delivery -> delivered`, so every delivery order
+ * passes through `ready`. Until this existed it was sent the pickup body, in both
+ * languages, and then contradicted minutes later by "On the way". The in-app label
+ * is neutral ("Ready" / the Arabic equivalent), so the push was the only surface
+ * making the claim.
+ *
+ * The wording deliberately promises no time and does not pre-empt
+ * `out_for_delivery`, which is the message that actually announces departure.
+ *
+ * WHY THIS IS SELECTED FROM THE ORDER ROW rather than from the request:
+ * `order-intake` (index.ts:331-347) records that the pickup-only assumption had
+ * been written down in FIVE separate places before delivery went live, and each
+ * one rotted independently. Deriving it from `orders.order_type` — server-side,
+ * not-null, enum('delivery','pickup') — is the version that cannot become a sixth.
+ * Reading it from the request body would additionally let a caller choose which
+ * copy a customer receives.
+ */
+const READY_DELIVERY_COPY = {
+  en: { title: 'Order ready ✅', body: 'Your order is ready and will be on its way shortly.' },
+  ar: { title: 'طلبك جاهز ✅', body: 'طلبك جاهز وسيكون في الطريق إليك قريباً.' },
 };
 
 // POS confirmation-lifecycle copy (EN/AR). Body strings are the EXACT approved
@@ -310,8 +340,11 @@ Deno.serve(async (req: Request) => {
 
     // Anti-spoof: the order must exist and actually BE in this status — a push
     // can only ever announce a status change that really happened server-side.
+    // `order_type` rides along on the row already being read here — no extra round
+    // trip, no new authorization surface (service-role client, RLS already
+    // bypassed) — and is what picks the `ready` copy further down.
     const { data: order } = await admin.from('orders')
-      .select('id, customer_id, status').eq('id', orderId).maybeSingle();
+      .select('id, customer_id, status, order_type').eq('id', orderId).maybeSingle();
     if (!order) return json({ error: 'order not found' }, 404);
     if (order.status !== status) return json({ status: 'skipped', reason: 'status mismatch' }, 200);
 
@@ -404,7 +437,12 @@ Deno.serve(async (req: Request) => {
       return json({ status: 'ok', send_status: 'no_targets', targeted: 0, sent: 0, failed: 0, deactivated: 0 }, 200);
     }
 
-    const result = await sendToDevices(admin, targets, STATUS_COPY[status], { type: 'order', orderId });
+    // Only `ready` differs by fulfilment; every other status reads the same to a
+    // pickup and a delivery customer, so the table stays the default.
+    const copy = status === 'ready' && order.order_type === 'delivery'
+      ? READY_DELIVERY_COPY
+      : STATUS_COPY[status];
+    const result = await sendToDevices(admin, targets, copy, { type: 'order', orderId });
     // Outcome: any successful delivery → terminal 'sent' (partial failures
     // recorded but NOT retryable — already-delivered devices stay protected);
     // zero deliveries → 'failed' (safe to retry: nobody received anything).
