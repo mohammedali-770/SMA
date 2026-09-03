@@ -5,10 +5,14 @@
 > CLAUDE.md §14 warns specifically against carrying dated dashboard facts forward
 > as though they were current, and this document is mostly dashboard facts.
 >
-> **Partially re-verified 2026-09-03:** D7, E7 and G5 were resolved from ⬜ to ✅
-> and E8 was added. Those four rows carry that date; **every other row is still a
-> 2026-09-02 reading** and has not been re-checked. The go/no-go summary is
-> unchanged — none of the four is a blocker.
+> **Re-verified in part on 2026-09-03, twice.** First, D7, E7 and G5 moved from ⬜
+> to ✅ and E8 was added. Then a five-dimension live audit — each dimension attacked
+> by an independent adversarial reviewer — produced the **Addendum** below, which
+> adds six blockers this document did not carry, corrects **D3** (it was green and
+> wrong), and revises the go/no-go summary.
+>
+> **Everything not named in the addendum or dated 2026-09-03 is still a 2026-09-02
+> reading and has not been re-checked.**
 
 ## What this is, and what it is not
 
@@ -70,7 +74,7 @@ numbers, delivery addresses, map coordinates, and order history.
 | B4 | Privacy manifest / required-reason APIs | ⬜ | Enforced for the binary and its SDKs. Verify Expo, Sentry and Maps SDKs ship manifests. |
 | B5 | Encryption declaration | ✅ | `usesNonExemptEncryption: false` in `apps/mobile/app.json`. Confirm it stays true if cryptography is added. |
 | B6 | Reviewer test account and instructions | ⬜ | Login is **WhatsApp OTP to a Saudi mobile only** (`normalizeSaudiPhoneE164` — foreign numbers are rejected at the hook). A reviewer outside KSA cannot sign in unaided. This needs a working reviewer path, and it is easy to overlook. |
-| B7 | Public privacy policy and support URLs resolve without login | ⚠️ built 2026-09-03, verify live | Was ❌ in substance: `vercel.json` rewrote **every** path to the admin console shell, so no public policy URL existed at all — an in-app screen satisfies neither store. A public page now ships as a second Vite entry (`legal.html` + `src/legal/`, 3.9 kB, no admin bundle) serving the active `legal_documents` rows anonymously, at `/legal`, `/legal/<doc>` and the aliases `/privacy`, `/terms`, `/support`. **Still ⚠️ because source cannot prove a deployed URL**: after this merges and Vercel deploys, open `/privacy` signed out and confirm the policy text renders — a 200 alone proves nothing, since the catch-all also returns 200 while serving the admin shell. Then paste that URL into both store listings. Also required by `RELEASE_CHECKLIST.md` §8. |
+| B7 | Public privacy policy and support URLs resolve without login | ✅ verified live 2026-09-03 | Was ❌ in substance: `vercel.json` rewrote **every** path to the admin shell, so `/privacy` returned 200 **while serving the admin console** — which is why nobody caught it. Fixed by #318 and **verified against the deployed site**, not just merged: `https://app.spicymeal.com.sa/privacy`, `/legal` and `/legal/privacy-policy` each return the 3,944-byte legal entry (`<title>Legal &amp; Policies — Spicy Meal</title>`), the shipped chunk targets the right project and contains no `innerHTML`, and the exact anonymous PostgREST request the page makes returns **all 9 active documents** including the 4,334-byte privacy policy. **The URL to paste into both store listings is `https://app.spicymeal.com.sa/privacy`**; support is `/support`, terms `/terms`. Editing a document in the admin console updates these pages with no redeploy. |
 
 ---
 
@@ -96,7 +100,7 @@ has, so it is a verification list rather than an aspiration.
 | --- | --- | --- | --- |
 | D1 | No secrets in the client bundle | ✅ | CLAUDE.md §9 draws the boundary; `VITE_*` / `EXPO_PUBLIC_*` are client-visible by definition. |
 | D2 | RLS on customer data, deny-by-default | ✅ | Enforced per table; `otp_send_reservations` is the recent example — RLS on, **zero policies**, service-role only. |
-| D3 | Admin actions require role **and** AAL2 | ✅ | `public.is_admin()` checks both; the four admin Edge Functions and `payment-test-config` were corrected to use it (CLAUDE.md §6, §7). |
+| D3 | Admin actions require role **and** AAL2 | ⚠️ one exception, corrected 2026-09-03 | `public.is_admin()` checks both, and the **four** admin Edge Functions were corrected **and deployed**. This row previously also claimed `payment-test-config`; that is **false in Production** and was corrected here after reading the deployed bundle: `payment-test-config` v3 (deployed 2026-07-12) still runs `if (!profile \|\| profile.role !== 'admin')` — role only, no AAL2. The repository version calls `is_admin()`; the deploy was consciously not done (CLAUDE.md §6 says so explicitly), and this table said otherwise. It matters because that function's `verify_order` reaches `confirm_order_payment` through the service-role client, bypassing RLS. Practically unreachable today — online payment is off, so no CAPTURED charge can exist, and the one admin holds a verified TOTP factor — but it is a live AAL1 hole, and it cannot be shipped alone (see the addendum, payment bundles). |
 | D4 | Authentication rate limiting | ✅ | Live since 2026-09-02: `auth-send-sms-whatsapp` v2 reserves against a shared per-phone budget before every send — 60 s cooldown, 5/hour, 10/day ([`WHATSAPP_LOGIN.md`](WHATSAPP_LOGIN.md)). **Not yet exercised by a real customer login.** |
 | D5 | Dependency advisories gated in CI | ⚠️ | `Dependency audit (high+)` runs on every PR. One standing exception — two `image-size` advisories with no patched release — **expires 2026-10-02** ([`DEPENDENCY_ADVISORIES.md`](DEPENDENCY_ADVISORIES.md)). If it lapses, every merge blocks. |
 | D6 | No orphan privileged accounts | ✅ | `admin@spicymeal.app` — an admin on an **unregistered domain**, never signed in, no TOTP — was deleted 2026-09-02. `customer@spicymeal.app` is banned with its session revoked. |
@@ -145,23 +149,152 @@ has, so it is a verification list rather than an aspiration.
 
 ---
 
+## Addendum — 2026-09-03 live audit
+
+**What this is.** A five-dimension audit run on 2026-09-03 against live Production
+and the source tree, each dimension independently re-checked by an adversarial
+reviewer instructed to attack it from both directions. It found items this document
+did not have, and it corrected one row of it (**D3**, above). The sections A–G
+remain a 2026-09-02 snapshot except where a row says otherwise; **this addendum is
+the 2026-09-03 layer, and nothing here silently rewrites a row above it.**
+
+**How to read the evidence labels.** *Live-verified* means a query, an HTTP request
+or a deployed artifact was read on 2026-09-03. *Source-verified* means the claim was
+read out of the repository. *Asserted* means neither was possible from a session and
+a human must check. Items are separated by who can act, because that is the
+difference between a task and a decision.
+
+### New hard blockers this document did not carry
+
+| # | Item | Evidence | Action |
+| --- | --- | --- | --- |
+| **X1** | **A store reviewer cannot sign in.** Authentication is WhatsApp OTP to a **Saudi mobile only**, enforced twice: `SaudiPhoneInput` renders a fixed `+966` and sanitises input to a 9-digit `5XXXXXXXX`, and `phone.ts` accepts only `/^5\d{8}$/`, so `sendCode` refuses and the button is `disabled={!isSaudiMobile(national)}`. A reviewer in Cupertino cannot type their own number, and cannot receive a WhatsApp code for a Saudi one. | source-verified | Apple requires working demo credentials for anything behind sign-in (guideline 2.1). Decide the mechanism — a test number whose code is obtainable, or documented App Review notes — **before** submitting. Owner decision; under an hour once decided. |
+| **X2** | **No production build exists for the code that would ship.** The newest **iOS** production build is 1.0.0 (22), commit `6265781a`, 2026-08-26 — **~54 commits stale**, predating the delivery-to-POS go-live. Every **Android** build ever made is a `preview` APK: **no production app-bundle has ever been produced**, and `eas.json`'s `submit.production` contains only `ios.ascAppId`, so there is no Play track configured. | live-verified via authenticated EAS CLI | One production build per platform, then the §1 physical-device gate. Android additionally needs a Play Console record, data-safety and content-rating forms. Owner; days. |
+| **X3** | **Nothing pages a human, and that is structural rather than a switched-off toggle.** The alert engine works and has proved it — `operations_alert_outbox` holds **112 rows**, including a critical `order_integrity:stranded_orders`, and **every one** is `('in_app','recorded')`. None has ever left the database. If the POS fails during Friday dinner, no person is told. | live-verified | Launch-week stopgap costs nothing: a named human checks Admin → Order Integrity at fixed times each service day, and that expectation is written down. Real dispatch is new code plus a migration. |
+| **X4** | **In-app account deletion is buried three levels deep** — Profile → "Policies, privacy & contact" → a list of nine legal documents → "Account & privacy" → "Delete account". The Profile screen has no deletion entry at all. Apple 5.1.1(v) requires it to be *easily found*. | source-verified | One `MenuRow` on `ProfileScreen`. Under an hour — but it must ride the build in **X2**. |
+| **X5** | **The order lifecycle past `received` has never executed in Production, and every transition pushes a live customer notification.** All 68 orders are `received` (62) or `cancelled` (6). Zero `direction='webhook'` rows from the POS: the status callback has **never fired**. A real customer today gets `pos_confirmed` and then hears nothing, ever. | live-verified | Investigate before coding: confirm with Lazywait whether the callback is registered at all. If it is not, the admin console's manual status path *is* the launch mechanism and must be rehearsed end to end on one order. |
+| **X6** | **The `ready` push tells delivery customers to come and collect.** Delivery has been live since 2026-08-27, and `push-dispatch`'s `ready` copy says collect, in both languages. | source-verified | A one-line copy fix, code-only. It must land **before** any lifecycle rehearsal (**X5**), or the rehearsal sends the wrong message to a real person. |
+
+### Corrections to claims already in this document
+
+- **D3 was green and wrong** — corrected in place above.
+- **Push audience is far smaller than CLAUDE.md §7 implies.** §7 warns a broadcast now
+  reaches "close to the whole active base". Live: `push_devices` holds **4 active rows,
+  all iOS, exactly 1 with `promos_enabled`**. The consent model is as §7 describes; the
+  blast radius today is not. **Android push has therefore never been exercised at all.**
+- **The single-admin lockout is less severe than §16/E2 suggest.** Break-glass exists —
+  removing the factor from the Supabase dashboard re-offers enrolment. It is a lockout
+  inconvenience, not permanent loss. Still worth a second admin.
+- **Security posture is better than this document's silence implies.** `get_advisors`
+  returns **zero ERROR-level findings**; the 15 INFO `rls_enabled_no_policy` hits are all
+  service-role-only operational tables, where deny-all is the correct design.
+- **A second free-plan wall sits behind E1.** The database is **88 MB against the free
+  plan's 500 MB ceiling**. Not urgent, but it is the same upgrade decision.
+
+### Should-fix, cash launch
+
+| Item | Evidence | Note |
+| --- | --- | --- |
+| **62 stale test orders sit in the kitchen's active queue**, spanning 2026-07 onward. Production opens on day one with a board that is not clean. | live-verified | Cancel them through the admin path before launch. A live write, so owner-approved. |
+| **Four real delivery orders still show `received` to customers who never got food** — SM-2026-000032, -000049, -000057, -000058, all `blocked` / `delivery_schema_unconfirmed`. | live-verified | Contact those four customers and cancel the orders. Owner. |
+| **The one live branch has no contact phone** (`phone = ''`), and the branch table holds **40 rows with near-duplicates** — two `Al Jesh`, two `Al-Awjam`, three `City Mall` — where the wrong row is often the unmapped one. | live-verified | Activating a duplicate at launch sends every order from it to `blocked`/`missing_branch_mapping`, and per **X3** silently. Audit `lazywait_branch_id` before activating anything beyond Nasserah. |
+| **The live POS integration posts to a vendor DEV host** (`apiv2-dev.lazywait.com`), unchanged since 2026-07-24. 58 real tickets prove it works, and the owner confirmed on 2026-08-24 that this *is* the POS for this branch. | live-verified | A vendor dev environment normally carries no SLA and can be reset without notice. One email to Lazywait before paying customers depend on it. |
+| **Checkout makes the customer wait 2.3–8.3 s**, by design — `order-intake` waits synchronously for the POS so the receipt can show a real ticket number. | live-verified | Accept consciously for launch; make sure the button shows progress. Making it asynchronous is a redesign, not a launch-week task. |
+| **The POS failure/retry/dead-letter machinery has never executed once.** Zero failed `lazywait` rows in the system's whole history; 0 incidents across 30,977 watchdog runs. | live-verified | Well designed, entirely unproven. Rehearse on a disposable database, **never** against Production during trading. |
+| **`whatsapp-webhook` is dead for want of an `app_secret`** — already `OWNER_ACTIONS.md` §25 and row **E8**, repeated here because WhatsApp OTP is the *only* way a customer signs in, and it is unmonitored. | live-verified | One credential. Minutes. |
+| **Expo SDK patch drift** — `expo-doctor` reports 11 packages behind the SDK's pinned set, including `expo-notifications`. | live-verified | `npx expo install --check` plus a regression pass. Do it *before* the **X2** builds, not after. |
+| **`ACCESS_FINE_LOCATION` is requested while the app's own purpose string describes a coarse use** ("only to center the delivery map on you"). | source-verified | One line in `app.json`, or a written justification for Play's precise-location form. |
+| **No iOS app-level privacy manifest.** `app.json` has no `ios.privacyManifests`, so Expo's plugin emits no `PrivacyInfo.xcprivacy` for the app target. | source-verified | Discovered at upload rather than at build. Minutes if it turns out to be needed. |
+
+### Card-payment launch only — none of this applies to a cash launch
+
+These are recorded so the cash decision is made with its alternative priced honestly.
+
+- **Online card payment is not a week of work.** No provider is selected and no merchant
+  agreement is signed with either candidate. Merchant KYC/onboarding is the long pole and
+  is outside anyone's control here — typically weeks, then 2–4 weeks of engineering.
+  Live: **9 `payment_records`, zero ever `paid`**; the only two `paid` orders are comped
+  zero-total.
+- **Every payment Edge Function is an 8-week-old bundle, and redeploying is not a no-op.**
+  Read directly from the deployed artifact: `payment-test-config` v3's `tapVerify.ts` has
+  no session-first branch, while the repository version calls `finalize_checkout_session`.
+  "Just redeploy the payment functions" would ship checkout-session finalisation and the
+  POS retry/deadline lifecycle into Production as a side effect. This is also why **D3**'s
+  exception cannot be fixed on its own.
+- **Refund *enrolment* is automatic while refund *processing* is disabled.** Two enabled
+  triggers on `orders` write `refund_state='pending'` and an `order_refunds` row for a paid
+  order that provably never reached the POS, while cron job 6 (`payment-refund-worker`) is
+  correctly inactive. The system would promise refunds nothing is running to pay.
+- **There is no operator surface for refunds at all.** `list_failed_order_refunds()` exists
+  and is correctly `is_admin()`-gated, and has **zero call sites** in either client. For a
+  cash launch this costs nothing — the live policy already says refunds are settled in cash
+  at the branch, which matches reality exactly.
+
+### Open, and honestly unresolved
+
+- **Trading hours are enforced nowhere and configured nowhere.** `branch_working_hours`
+  holds **0 rows across all 40 branches**, and no order path reads it — by design, per the
+  table's own comment and row **E7**. The *consequence* is what needs a decision: the shop
+  is orderable **24/7** unless a human toggles `is_active` / `pickup_enabled` /
+  `delivery_enabled`. Both reviewers rated this a blocker; **E7** rates the mechanism
+  correct. Both are right about different things. The launch-week answer is a written
+  human routine, not code.
+- **Arabic word order on printed Lazywait tickets** (`OWNER_ACTIONS.md` §22 item B) could
+  not be confirmed or refuted — no printed ticket is inspectable from a session. It needs
+  somebody to look at one.
+
+---
+
 ## Go / no-go summary
 
-**Hard blockers as assessed on 2026-09-02:**
+**Revised 2026-09-03 by the addendum above. The 2026-09-02 list had three items; it
+now has eight, and the shape of the launch has changed with it.**
 
-1. **A1 — PDPL cross-border transfer.** Saudi personal data in `eu-central-1`
-   without a recorded lawful basis. Needs counsel, and possibly a region move.
-2. **E1 — no PITR.** Free plan; unrecoverable data window.
-3. **G1/G2 — no payment provider**, if the launch is meant to take card payment.
-   Not a blocker for a cash-only launch.
+**Decide this first, because it removes three of the eight:** cash-only, or card at
+launch? The system today *is* a cash system and enforces it end to end — 66 of 68
+orders are `payment_status='pending'` and the only two `paid` are comped zero-total.
+A cash launch is coherent now. A card launch is a provider decision plus merchant
+onboarding measured in weeks, and is not compatible with a one-week go-live.
+
+**Hard blockers for a CASH launch:**
+
+1. **A1 — PDPL cross-border transfer.** Saudi personal data in `eu-central-1` with no
+   recorded lawful basis. Counsel, possibly a region move. Longest lead time on the
+   list; nothing else shortens it. *(2026-09-02)*
+2. **E1 — no PITR.** Free plan, so it cannot even be purchased. Unrecoverable data
+   window before real money. *(2026-09-02)*
+3. **X2 — no production build exists for the code that would ship.** iOS is ~54
+   commits stale; Android has never had a production build at all. *(2026-09-03)*
+4. **§1 — physical-device validation has never been performed**, on either platform.
+   It gates on X2. *(2026-09-02, re-confirmed)*
+5. **X1 — a store reviewer cannot sign in.** Login is hard-locked to Saudi mobiles
+   with a WhatsApp OTP. Apple guideline 2.1. *(2026-09-03)*
+6. **X4 — account deletion is buried three levels deep.** Apple 5.1.1(v). Rides the
+   X2 build, so it must be decided before the build, not after. *(2026-09-03)*
+7. **X3 — nothing pages a human.** All 112 alerts ever raised stopped inside the
+   database. A launch-week human routine closes it for free. *(2026-09-03)*
+8. **X5/X6 — the order lifecycle past `received` has never run in Production**, and
+   the `ready` push currently tells delivery customers to come and collect. Fix the
+   copy, then rehearse once. *(2026-09-03)*
+
+**Additionally, and only if taking card payment:** G1/G2 (no provider, weeks of
+onboarding), the 8-week-old payment bundles that cannot be redeployed safely one at a
+time, and automatic refund *enrolment* against disabled refund *processing*.
 
 **Accepted or decided risks, recorded rather than re-argued:** A4/B2 (opt-out
-marketing push, accepted 2026-08-20), C2 (`ACCESS_FINE_LOCATION` breadth),
-E2 (single admin), D5 (`image-size` exception until 2026-10-02), G6 (campaigns
-built but unreachable), G7 (no operator view of failed refunds).
+marketing push, accepted 2026-08-20 — note the live audience is 4 devices, 1 opted
+into promos), C2 (`ACCESS_FINE_LOCATION` breadth), E2 (single admin — break-glass
+exists), D5 (`image-size` exception until 2026-10-02), G6 (campaigns built but
+unreachable), G7 (no operator view of failed refunds — costless for a cash launch).
 
-**The largest unknowns are legal, not technical.** Everything in section A except
-A6 needs somebody who is not an engineer.
+**The largest unknowns are still legal, not technical.** Everything in section A
+except A6 needs somebody who is not an engineer. **The largest *new* finding is
+operational rather than legal: nothing that fails at 20:00 on a Friday reaches a
+person.**
+
+**Two content facts that decide how launch looks, neither of them a blocker:** 54 of
+55 active products have no image and 40 have no English description; and 62 stale
+test orders plus 4 stranded real delivery orders are sitting in the live queue today.
 
 **Owner sign-off:** ☐ go ☐ no-go — date: ______
 
