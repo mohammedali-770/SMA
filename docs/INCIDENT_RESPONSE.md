@@ -21,6 +21,70 @@ Therefore:
 - keep primary/secondary responder contacts documented;
 - record how an incident was actually detected.
 
+## 1b. The launch-week alert watch — until dispatch exists, this IS the pager
+
+**Added 2026-09-03 for X3.** The alert engine works and has never once reached a
+human: every row it has ever produced is `('in_app','recorded')` and stops in the
+database. A dispatcher is being built (`OPERATIONS_ALERTS_DIGEST.md`), but it is
+inert until three separate owner actions land. Until then **this scheduled human
+check is the entire notification system**, and it should be read that way rather
+than as a nice-to-have.
+
+### Who — owner must fill
+
+| Role | Name | Contact | Days |
+| --- | --- | --- | --- |
+| Alert watcher (primary) | ☐ | | |
+| Alert watcher (backup) | ☐ | | |
+
+One named person per service day, not "whoever is around". An unnamed rota is how
+a check silently stops happening.
+
+### When
+
+Fixed times, every service day. Anchor them to the service, not the clock hour:
+
+| Check | Why this moment |
+| --- | --- |
+| **Before opening** | catches anything that broke overnight, before customers meet it |
+| **Mid-service** (once per peak) | the window where POS sync failures actually happen |
+| **After close** | catches a failure that stranded orders nobody chased |
+
+### What to open
+
+1. **Admin → Operations** — Operations Health and Operations Alerts.
+2. **Admin → Order Integrity**.
+
+### What counts as actionable
+
+Judge on **status**, not on the presence of a row:
+
+- **`open` + `critical`** → treat as SEV-1/SEV-2 and go to §3 and §4 now.
+- **`open` + `warning`** → look, decide, and write down the decision. If the same
+  warning is still open at the next check, escalate it.
+- **`recovered`** → history. Do not chase it.
+
+**The baseline, measured live 2026-09-03 so a watcher knows what normal looks
+like.** Six alert states exist in total and **all six are `recovered`; nothing is
+open.** Everything that has ever fired:
+
+| Fingerprint | Severity | Times | Shape |
+| --- | --- | --- | --- |
+| `lazywait:sync_health` / `sync_degraded` | warning | 4 | opened and recovered within **5 minutes** each time — the evaluator's own interval |
+| `order_integrity:stranded_orders` | critical | 1 | 2026-08-10, 3 stranded orders (all `missing_mapping`, oldest 2026-07-23), recovered in 2 hours |
+| `platform:health` / `failing` | critical | 1 | same incident, same 2-hour window |
+
+So a `lazywait` warning that clears by the next check is the known-normal shape.
+A **critical**, or **any warning that survives two consecutive checks**, is not.
+
+### What this does NOT do, stated plainly
+
+It is a **poll, not a page**. Nothing covers the gap between checks, and nothing
+covers out of hours. If the POS fails an hour after the mid-service check, the
+first signal is still a customer complaint. That is the residual risk the
+dispatcher exists to close, and it is accepted deliberately for launch week
+rather than by omission.
+
 ## 2. Incident roles — owner must fill/maintain
 
 | Role | Name | Contact/channel | Backup |
