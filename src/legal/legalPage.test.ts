@@ -3,13 +3,13 @@ import { describe, it, expect } from 'vitest';
 import { LEGAL_DOCUMENT_TYPES } from '../lib/legal';
 import {
   docTitle,
+  findBySlug,
   metaLine,
   orderDocs,
   pickText,
   preferredLang,
+  requestFromPath,
   slugForType,
-  typeForSlug,
-  typeFromPath,
   type PublicLegalDoc,
 } from './legalPage';
 
@@ -24,57 +24,105 @@ const doc = (over: Partial<PublicLegalDoc> = {}): PublicLegalDoc => ({
   ...over,
 });
 
-describe('slug mapping', () => {
-  it('round-trips every registered document type', () => {
-    for (const type of LEGAL_DOCUMENT_TYPES) {
-      expect(typeForSlug(slugForType(type))).toBe(type);
-    }
-  });
+/** The page's real resolution: path -> slug -> fetched row. */
+const resolve = <T extends { document_type: string }>(path: string, rows: readonly T[]) => {
+  const req = requestFromPath(path);
+  return req.kind === 'doc' ? findBySlug(rows, req.slug) : undefined;
+};
 
-  it('produces hyphenated slugs, which is what a store listing URL wants', () => {
+describe('slugForType', () => {
+  it('produces hyphenated lowercase slugs, which is what a store listing URL wants', () => {
     expect(slugForType('privacy_policy')).toBe('privacy-policy');
     expect(slugForType('cancellation_refund_policy')).toBe('cancellation-refund-policy');
   });
 
-  it('accepts mixed case and percent-encoding', () => {
-    expect(typeForSlug('Privacy-Policy')).toBe('privacy_policy');
-    expect(typeForSlug('privacy%2Dpolicy')).toBe('privacy_policy');
-  });
-
-  it('REFUSES an unknown slug rather than guessing', () => {
-    // A reviewer following a stale or mistyped link must land on the index, not
-    // on a confidently wrong document. Returning null is what routes them there.
-    expect(typeForSlug('privacy')).toBeNull();
-    expect(typeForSlug('refunds')).toBeNull();
-    expect(typeForSlug('')).toBeNull();
-    expect(typeForSlug('../../etc/passwd')).toBeNull();
+  it('round-trips every registered document type back to its row', () => {
+    const rows = LEGAL_DOCUMENT_TYPES.map((t) => ({ document_type: t }));
+    for (const type of LEGAL_DOCUMENT_TYPES) {
+      expect(findBySlug(rows, slugForType(type))?.document_type).toBe(type);
+    }
   });
 });
 
-describe('typeFromPath', () => {
+describe('requestFromPath', () => {
   it('treats the bare page as the index', () => {
-    expect(typeFromPath('/legal')).toBeNull();
-    expect(typeFromPath('/legal/')).toBeNull();
+    expect(requestFromPath('/legal')).toEqual({ kind: 'index' });
+    expect(requestFromPath('/legal/')).toEqual({ kind: 'index' });
+    expect(requestFromPath('/')).toEqual({ kind: 'index' });
   });
 
   it('resolves a document path', () => {
-    expect(typeFromPath('/legal/privacy-policy')).toBe('privacy_policy');
-    expect(typeFromPath('/legal/contact-support/')).toBe('contact_support');
-    expect(typeFromPath('/LEGAL/Terms-Conditions')).toBe('terms_conditions');
+    expect(requestFromPath('/legal/privacy-policy')).toEqual({ kind: 'doc', slug: 'privacy-policy' });
+    expect(requestFromPath('/legal/contact-support/')).toEqual({
+      kind: 'doc',
+      slug: 'contact-support',
+    });
+    expect(requestFromPath('/LEGAL/Terms-Conditions')).toEqual({
+      kind: 'doc',
+      slug: 'terms-conditions',
+    });
   });
 
   it('resolves the store-listing aliases', () => {
-    // These are pasted into App Store Connect and Play Console once and are then
-    // effectively permanent, so they must keep resolving.
-    expect(typeFromPath('/privacy')).toBe('privacy_policy');
-    expect(typeFromPath('/terms')).toBe('terms_conditions');
-    expect(typeFromPath('/support')).toBe('contact_support');
-    expect(typeFromPath('/privacy/')).toBe('privacy_policy');
+    // Pasted into App Store Connect and Play Console once and then effectively
+    // permanent, so these must keep resolving.
+    expect(requestFromPath('/privacy')).toEqual({ kind: 'doc', slug: 'privacy-policy' });
+    expect(requestFromPath('/terms')).toEqual({ kind: 'doc', slug: 'terms-conditions' });
+    expect(requestFromPath('/support')).toEqual({ kind: 'doc', slug: 'contact-support' });
+    expect(requestFromPath('/privacy/')).toEqual({ kind: 'doc', slug: 'privacy-policy' });
   });
 
-  it('falls back to the index for anything else', () => {
-    expect(typeFromPath('/legal/nope')).toBeNull();
-    expect(typeFromPath('/')).toBeNull();
+  it('decodes percent-escaped slugs', () => {
+    expect(requestFromPath('/legal/privacy%2Dpolicy')).toEqual({
+      kind: 'doc',
+      slug: 'privacy-policy',
+    });
+  });
+
+  it('REGRESSION: a malformed percent escape falls back to the index instead of throwing', () => {
+    // decodeURIComponent('privacy%') raises URIError. This runs on the render path
+    // AFTER the fetch resolves, so an uncaught throw left the page on "Loading…"
+    // forever — to a reviewer, indistinguishable from a broken policy URL.
+    expect(() => requestFromPath('/legal/privacy%')).not.toThrow();
+    expect(requestFromPath('/legal/privacy%')).toEqual({ kind: 'index' });
+    expect(requestFromPath('/legal/%E0%A4%A')).toEqual({ kind: 'index' });
+  });
+});
+
+describe('findBySlug', () => {
+  it('matches case-insensitively', () => {
+    const rows = [{ document_type: 'privacy_policy' }];
+    expect(findBySlug(rows, 'PRIVACY-POLICY')?.document_type).toBe('privacy_policy');
+  });
+
+  it('returns undefined for an unknown slug rather than guessing', () => {
+    // A reviewer following a stale or mistyped link must land on the index, not
+    // on a confidently wrong document.
+    const rows = [{ document_type: 'privacy_policy' }];
+    expect(findBySlug(rows, 'refunds')).toBeUndefined();
+    expect(findBySlug(rows, '')).toBeUndefined();
+    expect(findBySlug(rows, '../../etc/passwd')).toBeUndefined();
+  });
+});
+
+describe('REGRESSION: a document type this build does not know is reachable end to end', () => {
+  // orderDocs deliberately keeps such a row and renderIndex links to it. Resolving
+  // the slug against the compiled-in registry made that visible link bounce back
+  // to the index — a document you could see but could not open.
+  const rows = [{ document_type: 'privacy_policy' }, { document_type: 'franchise_terms' }];
+
+  it('keeps it in the index', () => {
+    expect(orderDocs(rows).map((r) => r.document_type)).toContain('franchise_terms');
+  });
+
+  it('opens the link the index builds for it', () => {
+    const href = `/legal/${slugForType('franchise_terms')}`;
+    expect(href).toBe('/legal/franchise-terms');
+    expect(resolve(href, rows)?.document_type).toBe('franchise_terms');
+  });
+
+  it('still refuses a slug that matches nothing', () => {
+    expect(resolve('/legal/nope', rows)).toBeUndefined();
   });
 });
 
@@ -142,8 +190,6 @@ describe('orderDocs', () => {
   });
 
   it('KEEPS a document the registry does not know, sorted last', () => {
-    // Dropping it would make a document published from the admin console silently
-    // invisible on the public page — the worst possible failure for a legal notice.
     const rows = [{ document_type: 'franchise_terms' }, { document_type: 'privacy_policy' }];
     expect(orderDocs(rows).map((r) => r.document_type)).toEqual(['privacy_policy', 'franchise_terms']);
   });

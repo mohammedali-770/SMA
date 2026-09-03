@@ -18,12 +18,13 @@
  */
 import {
   docTitle,
+  findBySlug,
   metaLine,
   orderDocs,
   pickText,
   preferredLang,
+  requestFromPath,
   slugForType,
-  typeFromPath,
   type Lang,
   type PublicLegalDoc,
 } from './legalPage';
@@ -184,9 +185,11 @@ function render(): void {
     app.append(el('h1', undefined, t.heading));
     app.append(el('p', 'notice', t.loading));
   } else {
-    const wanted = typeFromPath(location.pathname);
-    const doc = wanted ? docs.find((d) => d.document_type === wanted) : undefined;
-    if (wanted && !doc) {
+    // Resolved against the FETCHED rows, not the compiled-in registry, so a
+    // document published after this build is reachable rather than a dead link.
+    const req = requestFromPath(location.pathname);
+    const doc = req.kind === 'doc' ? findBySlug(docs, req.slug) : undefined;
+    if (req.kind === 'doc' && !doc) {
       app.append(el('p', 'notice', t.missing));
       renderIndex(docs, t);
     } else if (doc) {

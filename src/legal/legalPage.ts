@@ -12,7 +12,7 @@
  * restating the document list: a public page that disagreed with the app about
  * which documents exist would be worse than no page.
  */
-import { LEGAL_DOCUMENT_TYPES, LEGAL_DOC_TITLES, legalDocOrder, type LegalDocumentType } from '../lib/legal';
+import { LEGAL_DOC_TITLES, legalDocOrder, type LegalDocumentType } from '../lib/legal';
 
 export type Lang = 'en' | 'ar';
 
@@ -29,38 +29,71 @@ export interface PublicLegalDoc {
 
 /** URL slug for a document type: `privacy_policy` -> `privacy-policy`. */
 export function slugForType(type: string): string {
-  return type.replace(/_/g, '-');
+  return type.replace(/_/g, '-').toLowerCase();
 }
 
 /**
- * The document type a slug names, or null when it is not one of ours. Unknown
- * slugs must not be guessed at: a reviewer following a bad link should see the
- * index rather than a confidently wrong document.
- */
-export function typeForSlug(slug: string): LegalDocumentType | null {
-  const normalised = decodeURIComponent(slug).trim().toLowerCase().replace(/-/g, '_');
-  return (LEGAL_DOCUMENT_TYPES as readonly string[]).includes(normalised)
-    ? (normalised as LegalDocumentType)
-    : null;
-}
-
-/**
- * Which document a pathname asks for, or null for the index.
+ * `decodeURIComponent` that returns null instead of throwing.
  *
- * Accepts `/legal`, `/legal/`, `/legal/privacy-policy` and the convenience
- * aliases `/privacy`, `/terms` and `/support` that go into the store listings,
- * because a listing URL is pasted once and then effectively permanent.
+ * A stale or mistyped link carrying an incomplete escape — `/legal/privacy%` —
+ * raises URIError, and this runs on the render path AFTER the fetch resolves, so
+ * an uncaught throw leaves the page on "Loading…" forever. To a store reviewer
+ * that is indistinguishable from a broken policy URL, which is the one outcome
+ * this whole page exists to prevent.
  */
-export function typeFromPath(pathname: string): LegalDocumentType | null {
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+/** What a pathname asks for: the index, or one document identified by slug. */
+export type PathRequest = { kind: 'index' } | { kind: 'doc'; slug: string };
+
+/**
+ * Which document a pathname asks for.
+ *
+ * It resolves to a SLUG rather than to a registered document type, and that is
+ * the point: `orderDocs` deliberately keeps a row whose type this build has never
+ * heard of, and `renderIndex` links to it. Resolving against the static registry
+ * here made those links bounce straight back to the index — a visible document
+ * that could not be opened. Matching happens against the FETCHED rows instead,
+ * in `findBySlug`.
+ *
+ * Accepts `/legal`, `/legal/`, `/legal/privacy-policy` and the aliases
+ * `/privacy`, `/terms` and `/support` that go into the store listings, because a
+ * listing URL is pasted once and is then effectively permanent.
+ */
+export function requestFromPath(pathname: string): PathRequest {
   const path = pathname.replace(/\/+$/, '').toLowerCase();
   const alias: Record<string, LegalDocumentType> = {
     '/privacy': 'privacy_policy',
     '/terms': 'terms_conditions',
     '/support': 'contact_support',
   };
-  if (alias[path]) return alias[path];
+  if (alias[path]) return { kind: 'doc', slug: slugForType(alias[path]) };
   const match = /^\/legal\/(.+)$/.exec(path);
-  return match ? typeForSlug(match[1]) : null;
+  if (!match) return { kind: 'index' };
+  const decoded = safeDecode(match[1]);
+  return decoded === null ? { kind: 'index' } : { kind: 'doc', slug: decoded.trim() };
+}
+
+/**
+ * The fetched document a slug names, or undefined.
+ *
+ * Matching against the fetched rows is what keeps an unknown-but-published
+ * document reachable. An unmatched slug still returns undefined and the caller
+ * falls through to the index, so a bad link never renders a confidently wrong
+ * policy — the property the registry lookup used to provide.
+ */
+export function findBySlug<T extends { document_type: string }>(
+  docs: readonly T[],
+  slug: string,
+): T | undefined {
+  const wanted = slug.toLowerCase();
+  return docs.find((d) => slugForType(d.document_type) === wanted);
 }
 
 /**
