@@ -126,6 +126,26 @@ export function ProfileScreen() {
             label={pick('Policies, privacy & contact', 'السياسات والخصوصية والتواصل')}
             onPress={() => router.push('/legal')}
           />
+          {/*
+            Apple 5.1.1(v) requires account deletion to be EASILY FOUND. Until this
+            row existed the only route was Profile -> "Policies, privacy & contact"
+            -> a network-fetched list of nine legal documents -> "Account & privacy"
+            -> "Delete account": four taps, behind a loading state, under a heading
+            that gives no hint deletion lives there.
+
+            It links straight to `/account/delete` rather than the intermediate
+            screen, which is still reachable from the legal list. The `profile`
+            guard mirrors the Addresses row above: this tab route has no AuthGate,
+            while `/account/delete` does, so an unguarded row would push a signed-out
+            visitor into one.
+          */}
+          {profile ? (
+            <MenuRow
+              label={t('delAccount')}
+              subtitle={pick('Permanently delete your account', 'احذف حسابك نهائياً')}
+              onPress={() => router.push('/account/delete')}
+            />
+          ) : null}
           <Pressable
             onPress={onSignOut}
             accessibilityRole="button"
