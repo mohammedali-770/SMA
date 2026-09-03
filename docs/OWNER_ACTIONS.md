@@ -1551,10 +1551,11 @@ verification date and the 401-not-503 readback.
 
 ---
 
-## 26. The `ready` push tells delivery customers to come and collect
+## 26. ~~The `ready` push tells delivery customers to come and collect~~ — CLOSED
 
-**Status:** FIXED IN SOURCE 2026-09-03 — **`push-dispatch` must be redeployed
-(v6)** before a customer sees the correction.
+**Status:** **DEPLOYED 2026-09-03** — `push-dispatch` **v6**, `verify_jwt: false`,
+on explicit owner approval. The correction is live: a delivery customer passing
+through `ready` is no longer told to come and collect.
 
 ### The defect
 
@@ -1592,8 +1593,6 @@ additive, not a rewrite of approved copy. Delivery now reads:
 It deliberately promises no time and does not pre-empt `out_for_delivery`, which
 is the message that actually announces departure.
 
-**The Arabic is engineering-drafted and wants a native read before deploy.**
-
 ### Why it is derived from the order row
 
 `order-intake` (`index.ts:331-347`) records that the pickup-only assumption had
@@ -1609,24 +1608,56 @@ and `STATUS_COPY` is not exported, so no test can execute this. Mutation-tested:
 collapsing the branch, dropping `order_type` from the select, restoring "pickup"
 in the delivery body, and quietly rewording the pickup body each fail it.
 
-### The action
+### The deploy, 2026-09-03
 
-Redeploy **`push-dispatch`** (→ v6), `verify_jwt: false` — it is `false` today and
-must stay so. A §5 owner action.
+| Function | Version | verify_jwt | Platform bundle hash | Carries |
+| --- | --- | --- | --- | --- |
+| `push-dispatch` | **6** | false | `8128f6a6a42f2150` | the order-type-aware `ready` copy, and nothing else |
 
-**The redeploy is clean, and that was checked rather than assumed.** v5 was
-deployed 2026-08-27; since then exactly one commit touched anything this function
-imports (`_shared/adminAuth.ts` and `_shared/supabaseClient.ts`, via #311) and
-**both edits are docblock-only — no executable code**. `index.ts`, `_shared/cors.ts`
-and `_shared/secrets.ts` are untouched. Unlike the payment functions, this carries
-no behavioural drift. Read the bundle back and confirm before and after anyway.
+**Verified by read-back and hash, which is the stronger proof the 2026-08-27 table
+noted v5 did not have.** All five bundle files were read back from Supabase after
+the deploy and hashed against the merged default branch — every one
+**byte-identical**:
 
-**Sequence it before X5.** The order lifecycle past `received` has never run in
-Production; when it is rehearsed, this copy is what a real customer receives.
-Rehearsing first sends the wrong message to a real person.
+| File | sha256 (prefix) | Bytes |
+| --- | --- | --- |
+| `push-dispatch/index.ts` | `e8dce499de93` | 33 883 |
+| `_shared/cors.ts` | `5262b16eb01e` | 466 |
+| `_shared/adminAuth.ts` | `5422065d9fa3` | 5 703 |
+| `_shared/supabaseClient.ts` | `21e9e910f816` | 2 072 |
+| `_shared/secrets.ts` | `c6a15f7f566b` | 1 373 |
 
-**On completion**, per the closeout rule below: delete this section, recording the
-deploy version and the read-back.
+That check exists because the deploy payload is transcribed inline: a hash match
+is what rules out a silent corruption in 34 KB of source. **Before** deploying,
+the live v5 `index.ts` was read back the same way and confirmed byte-identical to
+the repository's *pre-change* file, so the only delta v5 → v6 is this change.
+
+**Booting, and the JWT gate still off, proven without sending anything.** An
+unauthenticated `GET` returns **405** `{"error":"Method not allowed"}` — the
+handler's own first branch. A platform **401** would have meant `verify_jwt` had
+regressed to `true`, which would break every service-role and admin call on this
+function; the 405 proves the module parsed, `Deno.serve` is running, and the gate
+is still `false`. The probe returns before `adminClient()`, so it read no data and
+sent no push.
+
+**The redeploy carried no drift, and that was checked rather than assumed.** v5
+was deployed 2026-08-27; since then exactly one commit touched anything this
+function imports (`_shared/adminAuth.ts` and `_shared/supabaseClient.ts`, via
+#311) and **both edits are docblock-only — no executable code**.
+
+**No push was sent to verify the new copy.** Nothing here exercised it: the first
+delivery order to reach `ready` is what will. That is X5, and this deploy was
+sequenced before it deliberately — rehearsing the lifecycle first would have sent
+the wrong message to a real person.
+
+### One thing is still open
+
+**The Arabic is engineering-drafted and has not had a native read.** It was
+flagged before the deploy and the owner proceeded, so it is a made decision rather
+than an oversight — but «طلبك جاهز وسيكون في الطريق إليك قريباً.» is now live to
+real customers on the strength of an engineer's draft. Worth ten minutes from a
+native speaker; changing it later is another `push-dispatch` deploy, not a code
+emergency.
 
 ---
 
