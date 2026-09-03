@@ -15,6 +15,12 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
  * the console. This drains the outbox's `email` rows over the SMTP credential
  * that was already configured, and marks each one terminal.
  *
+ * NOTHING INVOKES THIS FUNCTION YET. There is no cron job and no admin action
+ * that calls it; a repo-wide search finds only this file, its config entry, its
+ * source-shape test and the documents describing it. An admin can invoke it by
+ * hand. Automatic invocation needs a scheduler (OWNER_ACTIONS §28), and until
+ * that exists enabling the flag queues mail rather than sending it.
+ *
  * IT IS INERT UNTIL TWO SEPARATE THINGS ARE TRUE.
  *   1. migration 20260903120000 is applied — without it no `email` row can
  *      exist, so there is nothing to claim;

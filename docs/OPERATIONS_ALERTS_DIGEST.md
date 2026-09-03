@@ -53,6 +53,7 @@ anticipated the migration that would lift it. That is what
 | Recipients | derived from admin profiles at send time by `operations_alerts_dispatch_recipients()`. **No address is stored**, which was v1's stated property |
 | Delivery | at most once — a per-invocation fencing token on claim, and every completion write guarded by it |
 | Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
+| Invocation | **None automatic.** No cron job and no admin action calls the function; an admin can invoke it manually. A scheduler is the outstanding piece — see `OWNER_ACTIONS.md` §28 |
 
 ### Why the floor defaults to critical
 

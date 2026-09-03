@@ -42,8 +42,9 @@ to Production.**
 > **Applying it changes no behaviour.** The flag stays false, every producer gate
 > is `and external_dispatch_enabled`, and the file ends in a self-verification
 > block that raises if the flag moved or if a single `email` row exists. Sending
-> additionally requires deploying `operations-alert-dispatch`. Apply, deploy and
-> enable are three separate §5 decisions.
+> additionally requires deploying `operations-alert-dispatch` AND invoking it:
+> nothing calls the function yet, so enabling the flag queues mail rather than
+> sending it. Apply, deploy, enable and schedule are four separate §5 decisions.
 >
 > **The two unapplied files must never be applied together.**
 > `20260824100000_moyasar_payment_provider.sql` sorts ahead of this one, so any

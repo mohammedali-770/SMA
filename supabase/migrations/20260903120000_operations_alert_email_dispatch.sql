@@ -63,7 +63,13 @@
 -- leaves it false, and every producer gate below is `and external_dispatch_enabled`.
 -- Applying this file therefore changes NO behaviour: not one additional row is
 -- written until somebody turns the flag on, and nothing is sent until
--- `operations-alert-dispatch` is also deployed.
+-- `operations-alert-dispatch` is also deployed AND INVOKED.
+--
+-- That last word is load-bearing and was missing until review caught it on
+-- #328: NOTHING CALLS THAT FUNCTION. There is no cron job and no admin action
+-- for it, so enabling the flag fills this outbox and leaves it full. A
+-- scheduler is the outstanding piece (OWNER_ACTIONS §28); until it exists the
+-- answer to X3 is the named human in INCIDENT_RESPONSE.md §1b.
 --
 -- EMAIL ONLY. 'whatsapp' and 'push' remain structurally blocked by the v2
 -- constraint, exactly as they were. This migration widens one channel.

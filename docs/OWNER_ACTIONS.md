@@ -1716,11 +1716,35 @@ act. There is **one** admin with an email address today.
    `config.toml`. Still sends nothing: the handler re-checks the master flag
    itself, so a deploy against a disabled flag is a no-op by construction.
 3. **Enable it** — set `external_dispatch_enabled` true, via the admin console
-   or the settings RPC. **This is the only step that sends mail**, and it is the
-   one to do when somebody is watching.
+   or the settings RPC. This starts email rows being **queued**.
+4. **Invoke the dispatcher.** Nothing does this automatically yet — see below.
 
 Order matters. Deploying before applying gives a function whose RPCs do not
 exist; enabling before deploying queues rows nothing drains.
+
+### The fourth step is real, and this section used to deny it
+
+**Step 3 previously claimed to be "the only step that sends mail". It is not,
+and nothing in this change sends mail on its own.** A repo-wide search for
+`operations-alert-dispatch` finds its definition, its `config.toml` entry, its
+source-shape test and these documents — **no caller**. The chain's cron jobs
+invoke the evaluator and the digest generator only, and the admin console has no
+dispatch action. Enabling the flag therefore fills the outbox and leaves it full.
+
+Found by review on #328 and corrected rather than argued with.
+
+**What works today:** the function accepts an authenticated **admin** caller
+(role + AAL2), so a person can invoke it on demand — enough to verify the deploy
+end to end and to drain the queue by hand.
+
+**What that does NOT do is close X3.** X3 is "nothing pages a human"; a
+dispatcher a human must remember to run is still the human doing the
+remembering. **Automatic invocation needs a scheduler** — a `pg_cron` job
+calling the function through `net.http_post` with a vault-held URL and trigger
+secret, following the `lazywait_sync_scheduler` precedent (`20260720120000`).
+That is deliberately not in this change: it needs its own vault secrets, its own
+timeout sizing and its own review. Until it exists, `INCIDENT_RESPONSE.md` §1b
+— the named human on a fixed schedule — remains the actual answer to X3.
 
 ### How to check it worked, without waiting for an incident
 
