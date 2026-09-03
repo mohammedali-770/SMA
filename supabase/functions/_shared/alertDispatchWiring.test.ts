@@ -65,7 +65,9 @@ describe('delivery is at most once', () => {
     const c = code();
     // A finalize or release that dropped the token would let a dispatcher whose
     // lease was reclaimed overwrite the new owner's outcome.
-    for (const call of c.split('\n').filter((l) => /finalize_operations_alert_email|release_operations_alert_email/.test(l))) {
+    for (const call of c
+      .split('\n')
+      .filter((l) => /finalize_operations_alert_email|release_operations_alert_email/.test(l))) {
       expect(call.length).toBeGreaterThan(0);
     }
     expect(c).toContain('finalize_operations_alert_email');

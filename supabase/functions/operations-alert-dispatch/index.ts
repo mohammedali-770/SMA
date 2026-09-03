@@ -62,7 +62,11 @@ function isServiceRoleCall(req: Request): boolean {
 /** Strip anything that could carry configuration detail into a stored string. */
 function safeError(e: unknown): string {
   const raw = e instanceof Error ? e.message : String(e);
-  return raw.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 200);
+  return raw
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200);
 }
 
 Deno.serve(async (req: Request) => {
@@ -76,7 +80,9 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     const caller = userClient(authHeader);
-    const { data: { user } } = await caller.auth.getUser();
+    const {
+      data: { user },
+    } = await caller.auth.getUser();
     if (!user) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     const [profileRes, rpcRes] = await Promise.all([
       admin.from('profiles').select('role').eq('id', user.id).maybeSingle(),
@@ -119,8 +125,9 @@ Deno.serve(async (req: Request) => {
     return json({ status: 'disabled', reason: 'email provider not fully configured' }, 200);
   }
 
-  const { data: recipientRows, error: recipientsError } = await admin
-    .rpc('operations_alerts_dispatch_recipients');
+  const { data: recipientRows, error: recipientsError } = await admin.rpc(
+    'operations_alerts_dispatch_recipients',
+  );
   if (recipientsError) return json({ status: 'error', reason: 'recipient lookup failed' }, 500);
   const recipients = (recipientRows as string[] | null) ?? [];
   // No recipients is NOT an error, and deliberately does NOT claim anything:
@@ -130,8 +137,10 @@ Deno.serve(async (req: Request) => {
   }
 
   const claimToken = crypto.randomUUID();
-  const { data: claimedRows, error: claimError } = await admin
-    .rpc('claim_operations_alert_emails', { p_claim_token: claimToken, p_limit: CLAIM_LIMIT });
+  const { data: claimedRows, error: claimError } = await admin.rpc('claim_operations_alert_emails', {
+    p_claim_token: claimToken,
+    p_limit: CLAIM_LIMIT,
+  });
   if (claimError) return json({ status: 'error', reason: 'claim failed (transient)' }, 500);
   const claimed = (claimedRows as ClaimedRow[] | null) ?? [];
   if (claimed.length === 0) return json({ status: 'ok', claimed: 0, sent: 0, failed: 0 }, 200);
@@ -156,7 +165,8 @@ Deno.serve(async (req: Request) => {
     // later attempt cannot double-deliver.
     for (const row of claimed) {
       await admin.rpc('release_operations_alert_email', {
-        p_id: row.c_id, p_claim_token: claimToken,
+        p_id: row.c_id,
+        p_claim_token: claimToken,
       });
     }
     return json({ status: 'error', reason: `smtp connect failed — ${safeError(e)}` }, 500);
@@ -173,7 +183,10 @@ Deno.serve(async (req: Request) => {
       // The message has LEFT. Terminal either way from here — an ambiguous
       // post-send state must never be retried.
       await admin.rpc('finalize_operations_alert_email', {
-        p_id: row.c_id, p_claim_token: claimToken, p_status: 'sent', p_error_safe: null,
+        p_id: row.c_id,
+        p_claim_token: claimToken,
+        p_status: 'sent',
+        p_error_safe: null,
       });
       sent += 1;
     } catch (e) {
@@ -181,14 +194,28 @@ Deno.serve(async (req: Request) => {
       // back to 'failed' with its attempt consumed, and the bounded attempt
       // budget in the claim RPC is what stops it retrying for ever.
       await admin.rpc('finalize_operations_alert_email', {
-        p_id: row.c_id, p_claim_token: claimToken, p_status: 'failed', p_error_safe: safeError(e),
+        p_id: row.c_id,
+        p_claim_token: claimToken,
+        p_status: 'failed',
+        p_error_safe: safeError(e),
       });
       failed += 1;
     }
   }
-  try { await client.close(); } catch { /* ignore */ }
+  try {
+    await client.close();
+  } catch {
+    /* ignore */
+  }
 
-  return json({
-    status: 'ok', claimed: claimed.length, sent, failed, recipients: recipients.length,
-  }, 200);
+  return json(
+    {
+      status: 'ok',
+      claimed: claimed.length,
+      sent,
+      failed,
+      recipients: recipients.length,
+    },
+    200,
+  );
 });
