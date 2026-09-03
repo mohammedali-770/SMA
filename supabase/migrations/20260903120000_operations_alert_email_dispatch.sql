@@ -23,6 +23,22 @@
 --      `operations_alerts_digest_test.sql` caught it on the first CI run, which
 --      is the whole argument for writing the suite before trusting the change.
 --
+-- A FOURTH guard is the cron activation block in 20260723120000, which checks
+-- the v1 constraint BY NAME. It lives in `do $$ ... end $$;` anonymous blocks
+-- that ran once at apply time and are not stored, so nothing in Production or in
+-- a fresh in-order chain replay is affected -- both were verified.
+--
+-- Precise about the one case that IS affected, because the earlier wording said
+-- flatly that it "cannot break": REPLAYING that migration a second time, against
+-- a database where this one has already applied, raises
+-- 'activation blocked: outbox dormancy constraint ... is missing'. The CI
+-- harness does exactly that in its report-only idempotency pass. Five migrations
+-- already in the chain fail that pass for their own reasons
+-- (whatsapp_otp, lazywait_sync_scheduler, payment_refund_scheduler,
+-- comp_members), so this is a known and tolerated property of the chain rather
+-- than a new defect -- but it is a real consequence and is written down here
+-- rather than discovered by whoever replays the chain next.
+--
 -- A fifth guard was a TEST: two suites pinned v1's refusal by name. Each of
 -- those assertions is replaced by the v2 property it became, not deleted.
 --
@@ -102,6 +118,14 @@ comment on column public.operations_alert_outbox.claim_token is
 -- state the fencing token protects. Postgres named the original column check
 -- `<table>_<column>_check`; assert that before dropping it so a rename upstream
 -- fails here loudly instead of silently leaving the old vocabulary in force.
+-- IDEMPOTENT BY CONSTRUCTION. The CI harness replays the whole chain a second
+-- time to report whether it is re-runnable, and a migration that only works on
+-- a virgin database corrupts the template every other run: the earlier file
+-- restores its own definitions, this one aborts partway, and the suites then
+-- test a half-applied schema. That is exactly what happened on the first local
+-- replay -- `drop constraint operations_alert_outbox_v1_dormancy` failed on the
+-- second pass (it was already gone), leaving the ORIGINAL settings RPC live and
+-- failing three alert suites for a reason that had nothing to do with them.
 do $$
 begin
   if not exists (select 1 from pg_constraint
@@ -112,7 +136,7 @@ begin
 end $$;
 
 alter table public.operations_alert_outbox
-  drop constraint operations_alert_outbox_status_check;
+  drop constraint if exists operations_alert_outbox_status_check;
 alter table public.operations_alert_outbox
   add constraint operations_alert_outbox_status_check
     check (status in ('recorded','pending','processing','sent','failed','cancelled','blocked'));
@@ -120,7 +144,9 @@ alter table public.operations_alert_outbox
 -- The v1 rule, replaced rather than merely dropped. `in_app` is untouched; only
 -- `email` gains a lifecycle; `whatsapp` and `push` keep the v1 prohibition.
 alter table public.operations_alert_outbox
-  drop constraint operations_alert_outbox_v1_dormancy;
+  drop constraint if exists operations_alert_outbox_v1_dormancy;
+alter table public.operations_alert_outbox
+  drop constraint if exists operations_alert_outbox_v2_dispatch;
 alter table public.operations_alert_outbox
   add constraint operations_alert_outbox_v2_dispatch check (
     (channel = 'in_app' and status in ('recorded','cancelled') and blocked_reason is null)

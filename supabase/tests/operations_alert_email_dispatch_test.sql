@@ -20,6 +20,13 @@
 begin;
 set local session_replication_role = replica;  -- skip FKs/triggers for fixtures
 
+-- EVERY fixture row sets alert_event_id. `operations_alert_outbox_ref` requires
+-- num_nonnulls(alert_event_id, digest_run_id) = 1, and replica mode skips FKs
+-- but NOT check constraints. Omitting it does two different kinds of damage:
+-- the valid inserts below fail outright, and the "must be rejected" cases pass
+-- on the WRONG constraint -- proving the ref rule rather than the dormancy rule
+-- they claim to test. Both happened on the first CI run.
+
 -- ---- A. Constraint shape ----------------------------------------------------
 do $$
 declare
@@ -29,8 +36,8 @@ begin
   v_raised := false;
   begin
     insert into public.operations_alert_outbox
-      (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason)
-    values ('t-inapp-bad', 'in_app', 'en', 's', 'b', 'pending', null);
+      (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+    values ('t-inapp-bad', gen_random_uuid(), 'in_app', 'en', 's', 'b', 'pending', null);
   exception when check_violation then v_raised := true; end;
   if not v_raised then
     raise exception 'in_app must still be limited to recorded/cancelled';
@@ -40,16 +47,16 @@ begin
   v_raised := false;
   begin
     insert into public.operations_alert_outbox
-      (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason)
-    values ('t-wa-bad', 'whatsapp', 'en', 's', 'b', 'pending', null);
+      (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+    values ('t-wa-bad', gen_random_uuid(), 'whatsapp', 'en', 's', 'b', 'pending', null);
   exception when check_violation then v_raised := true; end;
   if not v_raised then raise exception 'whatsapp must still be forbidden a pending row'; end if;
 
   v_raised := false;
   begin
     insert into public.operations_alert_outbox
-      (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason)
-    values ('t-push-bad', 'push', 'en', 's', 'b', 'sent', null);
+      (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+    values ('t-push-bad', gen_random_uuid(), 'push', 'en', 's', 'b', 'sent', null);
   exception when check_violation then v_raised := true; end;
   if not v_raised then raise exception 'push must still be forbidden a sent row'; end if;
 
@@ -67,8 +74,8 @@ declare
   v_status text;
 begin
   insert into public.operations_alert_outbox
-    (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason)
-  values ('t-email-1', 'email', 'en', 'subject one', 'body one', 'pending', null)
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+  values ('t-email-1', gen_random_uuid(), 'email', 'en', 'subject one', 'body one', 'pending', null)
   returning id into v_id;
 
   select count(*) into v_n
@@ -112,17 +119,17 @@ begin
   -- A row that has already burned its budget is not claimable: a dead provider
   -- must not be retried for ever.
   insert into public.operations_alert_outbox
-    (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason, attempt_count)
-  values ('t-email-exhausted', 'email', 'en', 's', 'b', 'pending', null, 5);
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason, attempt_count)
+  values ('t-email-exhausted', gen_random_uuid(), 'email', 'en', 's', 'b', 'pending', null, 5);
   select count(*) into v_n from public.claim_operations_alert_emails(v_tok, 10, 10, 5);
   if v_n <> 0 then raise exception 'an exhausted row must not be claimed'; end if;
 
   -- A processing row whose lease EXPIRED is provably a dead owner, so it is
   -- recoverable; one whose lease is live is not (covered in B).
   insert into public.operations_alert_outbox
-    (idempotency_key, channel, language, subject_safe, body_safe, status, blocked_reason,
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason,
      attempt_count, claim_token, claimed_at)
-  values ('t-email-stale', 'email', 'en', 's', 'b', 'processing', null,
+  values ('t-email-stale', gen_random_uuid(), 'email', 'en', 's', 'b', 'processing', null,
           1, gen_random_uuid(), now() - interval '30 minutes')
   returning id into v_id;
   select count(*) into v_n from public.claim_operations_alert_emails(v_tok, 10, 10, 5);

@@ -182,9 +182,12 @@ begin
   -- v2 constraint written too loosely, which a name check never would.
   v_raised := false;
   begin
+    -- alert_event_id is set, not null: operations_alert_outbox_ref demands
+    -- exactly one reference, so leaving both null would make this raise on THAT
+    -- constraint and prove nothing about dormancy.
     insert into public.operations_alert_outbox
-      (idempotency_key, digest_run_id, channel, language, subject_safe, body_safe, status, blocked_reason)
-    values ('v2-guard-push', null, 'push', 'en', 's', 'b', 'pending', null);
+      (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+    values ('v2-guard-push', gen_random_uuid(), 'push', 'en', 's', 'b', 'pending', null);
   exception when check_violation then v_raised := true;
             when not_null_violation then v_raised := true;
   end;
