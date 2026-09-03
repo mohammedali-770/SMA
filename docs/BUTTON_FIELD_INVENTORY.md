@@ -8,6 +8,14 @@ legacy components are replaced outright rather than maintained in parallel, and
 removed as soon as nothing references them. Consistency beats backwards
 compatibility.
 
+**That premise has expired, recorded 2026-09-03.** It was true when the strategy
+was chosen; it is not true now. There are **68 real orders** in Production, real
+saved addresses, and push notifications that reach real customer devices
+(`GO_LIVE_READINESS.md` X5, live-verified; `CLAUDE.md` §7). The remaining
+unmigrated surfaces are all **Admin**, so "replace outright" still costs no
+customer anything — but it is now a judgement about staff workflow rather than a
+free move, and nothing on this page licenses a customer-facing rewrite.
+
 Business logic, auth flow, payment logic, order workflow, pricing, APIs,
 Supabase, Edge Functions and migrations are **not** touched by any surface pass.
 Where a component mixed logic and presentation, the logic is extracted first.
@@ -138,11 +146,22 @@ Fixes found by the fixture pass:
   and chip. The old rule named two states explicitly; the real rule is "never
   repeat the heading", which is exactly `branchNo != null`.
 
-**Not built: name editing and address management.** Neither exists in the app —
-the screen's own docblock recorded them as deferred, and the addresses API is
-touched only by Checkout and the order-type gate. Adding them means new profile
-writes and address CRUD, which is feature work, not a design migration, and this
-pass adds no API calls. Tracked separately.
+**Deferred by this pass: name editing and address management.** The screen's own
+docblock recorded them as deferred, and at the time the addresses API was touched
+only by Checkout and the order-type gate. Adding them meant new profile writes and
+address CRUD — feature work rather than a design migration, and this pass added no
+API calls, so they were tracked separately.
+
+**CORRECTED 2026-09-03 — both have since been built, and this paragraph claimed
+"Neither exists in the app" for as long as they have existed.** Name and email
+editing is `features/profile/EditableName.tsx`, which writes `full_name` and
+`email` through `profileService.updateCustomerProfile`. Address management is
+`AddressListScreen` and `AddressEditScreen`, behind `/profile/addresses` and
+`/profile/address/[id]`, backed by `AddressProvider`'s `create` / `update` /
+`remove` / `setDefault`. Both are reached from the Profile screen; the Addresses
+row was moved onto an auth guard the same day (#324). The deferral above is kept
+because it accurately records what THIS pass chose not to do — it simply stopped
+being a description of the app.
 
 ## Surface 6 — Order Type Selection + legacy removal ✅
 
