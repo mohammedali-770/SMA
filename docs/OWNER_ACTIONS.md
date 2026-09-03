@@ -1661,6 +1661,97 @@ emergency.
 
 ---
 
+## 27. A store reviewer cannot sign in (X1) — MECHANISM DECIDED 2026-09-03
+
+**Status:** decided; **one Auth configuration action is open, and it is yours.**
+No code change is required, and none was made — that is the finding, not a
+shortcut.
+
+### The problem
+
+Authentication is WhatsApp OTP to a **Saudi mobile only**, enforced twice:
+`SaudiPhoneInput` renders a fixed `+966` and sanitises to a 9-digit `5XXXXXXXX`,
+and `phone.ts` accepts only `/^5\d{8}$/`. The send button is
+`disabled={!isSaudiMobile(national)}`. An App Review tester in Cupertino cannot
+type their own number, and cannot receive a WhatsApp code sent to a Saudi one.
+Apple guideline **2.1** requires working demo credentials for anything behind a
+sign-in wall.
+
+### The decision: a Supabase Auth test-OTP number
+
+Auth supports mapping a phone number to a fixed code. Supabase's own description:
+*"When a test phone number requests an OTP, the Auth service skips SMS delivery
+and accepts only the mapped code. Other phone numbers continue to use the real
+SMS provider."*
+
+That is exactly the shape this problem needs, and it is why no code changes.
+
+### Why it needs no code — traced, not assumed
+
+| Step | Behaviour with a test number |
+| --- | --- |
+| `sanitizeSaudiNationalInput` / `isSaudiMobile` | A test number in `5XXXXXXXX` form passes; the send button enables |
+| `toSaudiE164` | Produces the canonical `+9665XXXXXXXX` both calls must share |
+| `requestLoginCode` (`loginAvailability.ts:85`) | A thin try/catch around `signIn` — **no additional gate** |
+| `auth.signInWithPhone` → `signInWithOtp` | Auth skips delivery for a test number |
+| `auth-send-sms-whatsapp` hook | **Not invoked.** No WhatsApp message, no Meta template cost, and **no `otp_send_reservations` budget consumed** — the rate limiter shipped 2026-09-02 is untouched |
+| `auth.verifyPhone` → `verifyOtp({type:'sms'})` | Accepts only the mapped code and returns a real session |
+| `handle_new_user` on `auth.users` | Creates the `profiles` row, so the reviewer lands on a normal account |
+
+**`phone.ts` deliberately does not narrow to today's operator prefixes** — its
+docblock says a stale allow-list would lock out real customers as CITC allocates
+new `5X` ranges. `phone.test.ts` already canonicalises on `+966512345678`, a `51`
+number, so this breadth is pinned by existing tests rather than assumed.
+
+### The action (yours, §5 — Auth configuration)
+
+1. **Choose a number you control.** This matters: a fixed code for a number
+   belonging to someone else would both lock that person out of their own account
+   and hand their account to anyone who learns the pair. Any `5XXXXXXXX` works.
+2. In the Supabase dashboard, **Authentication → Phone provider → test phone
+   numbers**, map that number to a 6-digit code.
+3. **Set an expiry.** Supabase's guidance is *"remove test OTPs before deploying
+   to production"*; an expiry is the mechanised form of that. Set it a little past
+   the expected review window and diary the removal.
+4. Sign in once on a device to confirm the pair works **before** submitting.
+
+**Do not put the code in this repository, a commit message, a PR description or a
+test.** It is a password-equivalent for that account (§9). The *number* may be
+recorded here if you want; the code may not.
+
+### App Store Connect — review notes to paste
+
+> This app serves customers in Saudi Arabia. Sign-in is by one-time code sent over
+> WhatsApp to a Saudi mobile number, so a reviewer cannot use their own number.
+>
+> Please use the demo account below. It signs in with a fixed code and does not
+> require WhatsApp or any SMS to be received.
+>
+> Phone: +966 5X XXX XXXX
+> Code: XXXXXX
+>
+> Enter the phone number on the sign-in screen, tap send, then enter the code.
+> Account deletion is available in-app at Profile → Delete account.
+
+That last line is deliberate: it answers guideline **5.1.1(v)** in the same breath,
+and the row it points at exists as of 2026-09-03 (X4).
+
+### What was rejected, and why
+
+- **App Review notes alone**, with a human relaying each code — reviewers work in
+  another time zone and Apple commonly rejects under 2.1 when a code must be
+  relayed. It also makes every re-review a manual event.
+- **A build-flagged reviewer mode in the app** — a real authentication backdoor in
+  production code. The risk is permanent; the benefit lasts one review.
+
+### What this does NOT do
+
+It does not make login work for anyone outside Saudi Arabia, and it is not a
+fallback channel. **X7 is untouched**: WhatsApp remains the only real login path,
+with no SMS fallback, and its Meta credential still needs checking.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:
