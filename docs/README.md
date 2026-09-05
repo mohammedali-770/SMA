@@ -54,6 +54,7 @@ npm run docs:check      # what CI runs: drift + ownership
 | Restore data | [Backup and recovery](BACKUP_RECOVERY.md) |
 | See what needs a decision from the owner | [Owner actions](OWNER_ACTIONS.md) |
 | Judge whether the product can launch at all | [Go-live readiness](GO_LIVE_READINESS.md) |
+| Know what the two app stores require of a first submission | [Store submission](STORE_SUBMISSION.md) |
 
 ### I am releasing
 
@@ -62,6 +63,7 @@ npm run docs:check      # what CI runs: drift + ownership
 | Ship a release | [Release checklist](RELEASE_CHECKLIST.md) |
 | Understand how deployment works | [Deploy](DEPLOY.md) |
 | Build for a store or TestFlight | [Mobile guide](../README_MOBILE.md) |
+| Submit to the App Store or Play for the first time | [Store submission](STORE_SUBMISSION.md) |
 | Check dependency advisories | [Dependency advisories](DEPENDENCY_ADVISORIES.md) |
 | Know the Node version | [Node version](NODE_VERSION.md) |
 | Follow branch policy | [Git branches](GIT_BRANCHES.md) |
