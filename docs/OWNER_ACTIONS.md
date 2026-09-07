@@ -1710,10 +1710,44 @@ number, so this breadth is pinned by existing tests rather than assumed.
    and hand their account to anyone who learns the pair. Any `5XXXXXXXX` works.
 2. In the Supabase dashboard, **Authentication → Phone provider → test phone
    numbers**, map that number to a 6-digit code.
-3. **Set an expiry.** Supabase's guidance is *"remove test OTPs before deploying
-   to production"*; an expiry is the mechanised form of that. Set it a little past
-   the expected review window and diary the removal.
-4. Sign in once on a device to confirm the pair works **before** submitting.
+3. Sign in once on a device to confirm the pair works **before** submitting.
+4. **Remove the entry once review concludes, and verify it is gone** — see below.
+
+### Removal is the control, and this section used to say something else
+
+**This step read "Set an expiry" until 2026-09-03. That was wrong, and wrong in
+a way that would have left a live credential enabled indefinitely.** Review
+caught it on #326.
+
+`SMS_TEST_OTP_VALID_UNTIL` is a **self-hosting** environment variable. Neither
+hosted Auth guide documents a per-entry expiry on test phone numbers, and the
+hosted **Email OTP Expiration** setting governs how long a *generated* OTP stays
+valid — it does not expire a **mapped fixed code**. So the instruction pointed at
+a control that probably is not in your dashboard, and demoted the thing that
+actually works to a diary note.
+
+**State the exposure plainly, because it is the reason this matters.** While the
+entry exists, that phone number and code are a **permanent, reusable login** to
+that account — no SMS, no WhatsApp, no second factor. The pair is also written
+into the App Store Connect review notes, so it is not a secret in any meaningful
+sense.
+
+**Therefore:**
+
+- **removal is the control.** When review concludes, delete the test-phone entry
+  in Authentication → Phone provider;
+- **verify it, do not assume it.** Attempt a sign-in with the same number and
+  code afterwards and confirm it is refused. A deletion you did not check is a
+  belief, not a control;
+- **update the review notes** in App Store Connect at the same time, so a later
+  submission does not ship a credential that no longer works — or worse, one that
+  does;
+- if your plan *does* expose a per-entry expiry, set it as well. Belt and braces,
+  never the plan.
+
+`docs/RELEASE_CHECKLIST.md` carries this as an actual checkbox — §8 creates the
+entry, §11 removes and verifies it — because a step that lives only in prose is
+a step that gets skipped.
 
 **Do not put the code in this repository, a commit message, a PR description or a
 test.** It is a password-equivalent for that account (§9). The *number* may be

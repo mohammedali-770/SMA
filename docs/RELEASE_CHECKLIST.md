@@ -162,6 +162,7 @@ Re-check these live immediately before submission; do not copy old audit status 
 - [ ] Terms/refund/delete-account/support pages reflect shipped product behavior.
 - [ ] In-app account deletion and public policy are consistent.
 - [ ] Reviewer login/test instructions work and do not expose production secrets.
+- [ ] **Create the App Review test-phone entry** (a number you control, mapped to a fixed code) and confirm it signs in. It is a permanent reusable login until removed, so §11 removes it — do not skip that. Detail: `OWNER_ACTIONS.md` §27.
 - [ ] Store metadata, screenshots, support contact and category information are current.
 - [ ] iOS bundle identifier / Android package match production config.
 - [ ] Version/build numbers and signing credentials are correct.
@@ -202,4 +203,5 @@ Do not release when:
 - [ ] Watch Sentry and Operations Health for the agreed observation period.
 - [ ] Confirm expected order/operational signals continue.
 - [ ] Record any release-specific manual configuration change.
+- [ ] **Remove the App Review test-phone entry** (Authentication → Phone provider), then **verify** it by attempting a sign-in with the same number and code and confirming it is refused. While it exists it is a permanent reusable login to that account, and the pair is printed in the App Store Connect review notes. Update those notes at the same time. Detail: `OWNER_ACTIONS.md` §27.
 - [ ] If mitigation is required, use `docs/ROLLBACK.md` / `docs/INCIDENT_RESPONSE.md` and prioritize safety over diagnosis.
