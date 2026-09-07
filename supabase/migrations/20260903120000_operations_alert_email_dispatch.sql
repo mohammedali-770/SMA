@@ -74,6 +74,18 @@
 -- EMAIL ONLY. 'whatsapp' and 'push' remain structurally blocked by the v2
 -- constraint, exactly as they were. This migration widens one channel.
 --
+-- DELIVERY SEMANTICS, stated accurately after review corrected them (#328).
+-- This is EXACTLY-ONCE IN THE NORMAL CASE and AT-LEAST-ONCE ACROSS A CRASH.
+-- The fencing token makes concurrent dispatchers safe and stops a stale owner
+-- overwriting a newer outcome. What it cannot do is unsend an email: if a
+-- dispatcher dies between SMTP accepting a message and 'sent' being persisted,
+-- the expired-lease path re-sends it.
+--
+-- Earlier revisions of this file claimed "at most once, not at least once".
+-- That was wrong. The behaviour is deliberate -- for alerting, a duplicate is
+-- noise and a loss is an outage nobody hears about -- but the guarantee had to
+-- be described as it is rather than as it was intended.
+--
 -- NO RECIPIENT ADDRESSES ARE STORED, which was v1's stated property and is kept.
 -- `operations_alerts_dispatch_recipients()` derives them from admin profiles at
 -- send time, so the list cannot drift from who is actually an administrator and
@@ -635,9 +647,29 @@ begin
        and o.attempt_count < greatest(p_max_attempts, 1)
        and (
          o.status = 'pending'
-         -- An EXPIRED lease is provably a dead owner. The lease must exceed the
-         -- platform's maximum invocation wall-clock, or a live owner still
-         -- waiting on SMTP could be reclaimed and the mail delivered twice.
+         -- 'failed' MUST be claimable while the budget allows, or the bounded
+         -- retry this function advertises is dead code: finalize() writes
+         -- 'failed' on an SMTP error, and until review caught this on #328
+         -- nothing ever claimed that status again. One transient SMTP failure
+         -- stranded the alert permanently -- the exact silence this subsystem
+         -- exists to prevent. `attempt_count < p_max_attempts` above is what
+         -- keeps it bounded against a dead provider.
+         or o.status = 'failed'
+         -- An EXPIRED lease is a dead owner. The lease must exceed the
+         -- platform's maximum invocation wall-clock, so a live owner still
+         -- waiting on SMTP is never reclaimed underneath itself.
+         --
+         -- THIS IS THE AT-LEAST-ONCE WINDOW, and it is a deliberate choice
+         -- rather than an oversight (#328). If a dispatcher dies AFTER SMTP
+         -- accepted a message but BEFORE 'sent' is persisted, the row is still
+         -- 'processing' and this branch will re-send it. The fencing token stops
+         -- stale DATABASE writes; it cannot unsend an email.
+         --
+         -- We accept that, because for an ALERTING system the two failure modes
+         -- are not equal: a duplicate alert is noise, a lost alert is the
+         -- outage nobody hears about. Removing the reclaim would trade a rare
+         -- duplicate for a permanent loss. Making it truly at-most-once needs
+         -- provider-level idempotency keys, which SMTP does not offer.
          or (o.status = 'processing'
              and o.claimed_at < now() - make_interval(mins => greatest(p_lease_minutes, 1)))
        )

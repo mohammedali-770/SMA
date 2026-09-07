@@ -29,14 +29,19 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
  *      rows being created and stops this function sending.
  * Deploying it changes nothing on its own. That is deliberate.
  *
- * AT MOST ONCE, NOT AT LEAST ONCE. An alert email that arrives twice trains a
- * responder to ignore alert email, which is worse than the gap it closes. Each
- * row is claimed with a per-invocation fencing token
- * (`claim_operations_alert_emails`), and every completion write is guarded by
- * that token, so a dispatcher that outlived its lease writes nothing. A claim is
- * only reclaimed after a lease longer than the platform's maximum invocation
- * wall-clock, which is what makes an expired lease provably a dead owner rather
- * than a slow one.
+ * DELIVERY SEMANTICS: exactly once in the normal case, AT LEAST ONCE across a
+ * crash. Each row is claimed with a per-invocation fencing token
+ * (`claim_operations_alert_emails`) and every completion write is guarded by it,
+ * so concurrent dispatchers are safe and a stale owner cannot overwrite a newer
+ * outcome. What the token cannot do is unsend an email: if this process dies
+ * between SMTP accepting a message and `sent` being persisted, the expired-lease
+ * path re-sends it.
+ *
+ * This header claimed "at most once, not at least once" until review corrected
+ * it (#328). The behaviour is a deliberate trade -- for alerting, a duplicate is
+ * noise while a loss is an outage nobody hears about -- but it had to be
+ * described as it is. Making it truly at-most-once needs provider-level
+ * idempotency, which SMTP does not offer.
  *
  * CALLERS: the service role (a future scheduler) or an authenticated ADMIN
  * (role AND AAL2, through the same pure predicate every other admin function
@@ -51,12 +56,27 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
 /** Bounded work per invocation: alert mail should arrive promptly or not at all. */
 const CLAIM_LIMIT = 20;
 
+/**
+ * The claim RPC's result shape.
+ *
+ * THESE NAMES COME FROM `RETURNS TABLE (id, language, subject_safe, body_safe,
+ * attempt_count)` IN MIGRATION 20260903120000 -- not from the `c_*` aliases in
+ * that function's final SELECT. Those aliases exist only to keep the plpgsql
+ * body unambiguous; PostgREST serialises the declared OUT parameter names.
+ *
+ * This interface named the aliases until review caught it on #328. Every field
+ * was therefore `undefined`: SMTP received no subject and no body, and every
+ * finalize/release call passed `p_id: undefined`, matching zero rows and
+ * stranding the claim until its lease expired -- at which point it was re-sent.
+ * `alertDispatchWiring.test.ts` now parses the migration's RETURNS TABLE and
+ * fails if these names drift from it again.
+ */
 interface ClaimedRow {
-  c_id: string;
-  c_language: string;
-  c_subject: string;
-  c_body: string;
-  c_attempts: number;
+  id: string;
+  language: string;
+  subject_safe: string;
+  body_safe: string;
+  attempt_count: number;
 }
 
 function isServiceRoleCall(req: Request): boolean {
@@ -171,7 +191,7 @@ Deno.serve(async (req: Request) => {
     // later attempt cannot double-deliver.
     for (const row of claimed) {
       await admin.rpc('release_operations_alert_email', {
-        p_id: row.c_id,
+        p_id: row.id,
         p_claim_token: claimToken,
       });
     }
@@ -183,13 +203,14 @@ Deno.serve(async (req: Request) => {
       await client.send({
         from: `${fromName} <${fromEmail}>`,
         to: recipients,
-        subject: row.c_subject,
-        content: row.c_body,
+        subject: row.subject_safe,
+        content: row.body_safe,
       });
-      // The message has LEFT. Terminal either way from here — an ambiguous
-      // post-send state must never be retried.
+      // The message has LEFT. Finalize immediately, because the window between
+      // SMTP accepting and this write landing is the ONLY window in which a
+      // crash can cause a duplicate (see the at-least-once note in the header).
       await admin.rpc('finalize_operations_alert_email', {
-        p_id: row.c_id,
+        p_id: row.id,
         p_claim_token: claimToken,
         p_status: 'sent',
         p_error_safe: null,
@@ -200,7 +221,7 @@ Deno.serve(async (req: Request) => {
       // back to 'failed' with its attempt consumed, and the bounded attempt
       // budget in the claim RPC is what stops it retrying for ever.
       await admin.rpc('finalize_operations_alert_email', {
-        p_id: row.c_id,
+        p_id: row.id,
         p_claim_token: claimToken,
         p_status: 'failed',
         p_error_safe: safeError(e),
