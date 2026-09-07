@@ -71,7 +71,12 @@ create or replace function public.verify_operations_alert_dispatch_signature(
 )
 returns boolean
 language plpgsql
-stable
+-- VOLATILE, not stable. The double-HMAC comparison below draws a fresh random
+-- probe key on every call, so the planner must never fold two calls into one.
+-- It would still answer correctly if it did -- the boolean does not depend on
+-- the probe -- but a security predicate should not be labelled with a promise
+-- it does not keep.
+volatile
 security definer
 set search_path = public
 as $$
@@ -112,13 +117,16 @@ begin
     'hex'
   );
 
-  -- Double-HMAC comparison under a fresh random probe key. `=` on text is not
-  -- constant time, and this endpoint can be called at whatever rate an attacker
-  -- likes. Comparing digests taken under a key the attacker cannot predict
-  -- means the timing of the short-circuit reveals nothing about the real
-  -- signature, and both operands are a fixed 32 bytes.
-  -- Hex, not bytea: pgcrypto exposes hmac(text,text,text) and
-  -- hmac(bytea,bytea,text), and a mixed pair matches neither.
+  -- Double-HMAC comparison under a fresh random probe key. `=` is not constant
+  -- time, and this endpoint can be called at whatever rate an attacker likes.
+  -- Comparing digests taken under a key the attacker cannot predict means the
+  -- timing of the short-circuit reveals nothing about the real signature. Both
+  -- compared operands are `hmac(...)` results: bytea, a fixed 32 bytes,
+  -- whatever length the candidate signature was.
+  --
+  -- The probe is hex TEXT because pgcrypto exposes only hmac(text,text,text)
+  -- and hmac(bytea,bytea,text); a bytea key against a text message matches
+  -- neither overload. 32 random bytes hex-encoded is still 256 bits of key.
   v_probe := encode(extensions.gen_random_bytes(32), 'hex');
   return extensions.hmac(v_expected, v_probe, 'sha256')
        = extensions.hmac(p_signature, v_probe, 'sha256');
