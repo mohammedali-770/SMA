@@ -1696,7 +1696,7 @@ That is exactly the shape this problem needs, and it is why no code changes.
 | `auth.signInWithPhone` → `signInWithOtp` | Auth skips delivery for a test number |
 | `auth-send-sms-whatsapp` hook | **Not invoked.** No WhatsApp message, no Meta template cost, and **no `otp_send_reservations` budget consumed** — the rate limiter shipped 2026-09-02 is untouched |
 | `auth.verifyPhone` → `verifyOtp({type:'sms'})` | Accepts only the mapped code and returns a real session |
-| `handle_new_user` on `auth.users` | Creates the `profiles` row, so the reviewer lands on a normal account |
+| `handle_new_user` on `auth.users` | Creates the `profiles` row **for a NEW user only** — it is an `after insert` trigger. On an UNUSED number the reviewer lands on a fresh `role = 'customer'` account; on an already-enrolled number they land in **that person's existing account** instead. Step 1 is what keeps this true |
 
 **`phone.ts` deliberately does not narrow to today's operator prefixes** — its
 docblock says a stale allow-list would lock out real customers as CITC allocates
@@ -1705,9 +1705,38 @@ number, so this breadth is pinned by existing tests rather than assumed.
 
 ### The action (yours, §5 — Auth configuration)
 
-1. **Choose a number you control.** This matters: a fixed code for a number
-   belonging to someone else would both lock that person out of their own account
-   and hand their account to anyone who learns the pair. Any `5XXXXXXXX` works.
+1. **Choose a DEDICATED, UNUSED number — and verify it is unused before mapping
+   it.** Any `5XXXXXXXX` is accepted by the client, but which one you pick is the
+   security decision in this whole section.
+
+   **"A number you control" is not the same as "a number nobody has signed up
+   with", and this step said the former until review corrected it (#326).** If the
+   number already has an `auth.users` row, `signInWithOtp` signs the reviewer into
+   **that existing account**. `on_auth_user_created` is `after insert on
+   auth.users`, so it fires only for a NEW user — no fresh profile is created, and
+   the reviewer inherits whatever that account already has.
+
+   **This is not hypothetical here.** Measured live 2026-09-03: **4 of 9
+   `auth.users` rows already carry a phone number.** A number you personally use is
+   *more* likely to be one of them, not less — which is the opposite of what the
+   old wording implied.
+
+   Today all four are `role = 'customer'`, so the exposure is that person's **order
+   history and saved delivery addresses**, published to App Review as a working
+   login. It is not privilege escalation *today* only because no staff or admin
+   account has a phone enrolled; if that ever changes, the same mistake reaches the
+   admin console.
+
+   **Verify before you map it.** Ask the database whether the number is free — a
+   read-only query, and the only way to be sure:
+
+   ```sql
+   select count(*) from auth.users where phone = '+9665XXXXXXXX';
+   ```
+
+   **Zero means safe to use. Anything else: pick a different number.** Do not
+   "clean up" an existing account to reuse its number — deleting a real customer to
+   make room for a test login is a worse outcome than picking another number.
 2. In the Supabase dashboard, **Authentication → Phone provider → test phone
    numbers**, map that number to a 6-digit code.
 3. Sign in once on a device to confirm the pair works **before** submitting.

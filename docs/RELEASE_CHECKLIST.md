@@ -162,7 +162,7 @@ Re-check these live immediately before submission; do not copy old audit status 
 - [ ] Terms/refund/delete-account/support pages reflect shipped product behavior.
 - [ ] In-app account deletion and public policy are consistent.
 - [ ] Reviewer login/test instructions work and do not expose production secrets.
-- [ ] **Create the App Review test-phone entry** (a number you control, mapped to a fixed code) and confirm it signs in. It is a permanent reusable login until removed, so §11 removes it — do not skip that. Detail: `OWNER_ACTIONS.md` §27.
+- [ ] **Create the App Review test-phone entry.** First verify the number is UNUSED — `select count(*) from auth.users where phone = '+9665XXXXXXXX';` must return **0**. A number already enrolled signs the reviewer into that person's existing account (orders, saved addresses), because the profile trigger only fires for new users. Then map the fixed code and confirm it signs in. It is a permanent reusable login until removed, so §11 removes it — do not skip that. Detail: `OWNER_ACTIONS.md` §27.
 - [ ] Store metadata, screenshots, support contact and category information are current.
 - [ ] iOS bundle identifier / Android package match production config.
 - [ ] Version/build numbers and signing credentials are correct.
