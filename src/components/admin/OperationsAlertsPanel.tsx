@@ -185,6 +185,29 @@ export const OperationsAlertsPanel: React.FC<{
     }
   }, [isAr]);
 
+  /**
+   * Is production email actually going out right now? The header answers that,
+   * so it must not guess.
+   *
+   * `settings` FIRST, because `saveSettings` refreshes it and nothing refreshes
+   * `summary` — without this the pill would keep saying "disabled" for the rest
+   * of the session after an admin ticked the box. `summary` SECOND, because it
+   * is fetched on mount and carries the same backend-authoritative flag, so an
+   * operator who never opens the Settings section still sees the truth;
+   * `loadSettings` only runs for that section, so `settings` alone would be null
+   * in the common case.
+   *
+   * `null` is a THIRD state, deliberately, not a synonym for false: before
+   * either has loaded we do not know, and this is the one pill where claiming
+   * "disabled" while real mail is going out would be actively misleading.
+   *
+   * The header was hardcoded to "External delivery disabled" until #333 — true
+   * of v1, and the third place that assumption was written down after the
+   * toggle itself and the API comment.
+   */
+  const externalDispatchOn: boolean | null =
+    settings?.external_dispatch_enabled ?? summary?.external_dispatch_enabled ?? null;
+
   const sectionBtn = (id: Section, icon: React.ReactNode, labelEn: string, labelAr: string) => (
     <button
       type="button"
@@ -215,15 +238,25 @@ export const OperationsAlertsPanel: React.FC<{
               </Text>
             </div>
             <Text variant="caption" tone="tertiary" as="p" className="mt-1">
-              {isAr
-                ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
-                : 'Read-only observability: no auto-remediation, no retries, no external messages.'}
+              {externalDispatchOn === true
+                ? (isAr
+                  ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة — لكن الإرسال الخارجي مُفعّل، والتنبيهات الحرجة تُرسل بالبريد.'
+                  : 'Read-only observability: no auto-remediation, no retries — but external dispatch is ON, and critical alerts are emailed.')
+                : (isAr
+                  ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
+                  : 'Read-only observability: no auto-remediation, no retries, no external messages.')}
             </Text>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <StatusPill
-              label={isAr ? 'الإرسال الخارجي معطل' : 'External delivery disabled'}
-              tone="neutral"
+              label={
+                externalDispatchOn === null
+                  ? (isAr ? 'الإرسال الخارجي' : 'External delivery')
+                  : externalDispatchOn
+                    ? (isAr ? 'الإرسال الخارجي مُفعّل (بريد)' : 'External delivery ON (email)')
+                    : (isAr ? 'الإرسال الخارجي معطل' : 'External delivery disabled')
+              }
+              tone={externalDispatchOn === true ? 'info' : 'neutral'}
             />
             <button
               type="button"

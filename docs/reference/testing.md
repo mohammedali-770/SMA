@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**164 TypeScript test files declaring 2516 test blocks, plus 62 SQL suites.**
+**164 TypeScript test files declaring 2517 test blocks, plus 62 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -174,7 +174,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-81 files, 1069 declared test blocks.
+81 files, 1070 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
-| `src/components/admin/OperationsAlertsPanel.test.tsx` | 18 | OperationsAlertsPanel — summary + inbox |
+| `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |
 | `src/components/admin/OperationsHealthPanel.test.tsx` | 5 | OperationsHealthPanel — push failure metrics |
 | `src/components/admin/ReportsPanel.test.tsx` | 17 | CSV export — the machine contract |
 | `src/components/admin/StaffAccessPanel.test.tsx` | 4 | StaffAccessPanel |

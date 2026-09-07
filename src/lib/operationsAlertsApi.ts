@@ -202,8 +202,10 @@ export function normalizeOperationsAlertsSummary(raw: unknown): OperationsAlerts
     last_digest: safeNullableObject(r.last_digest),
     alert_evaluation_enabled: r.alert_evaluation_enabled === true,
     digest_generation_enabled: r.digest_generation_enabled === true,
-    // Backend-authoritative and expected false in this version; never invented
-    // client-side.
+    // Backend-authoritative; never invented client-side. This said "and expected
+    // false in this version" until 2026-09-07, when external dispatch became
+    // real — the panel header now derives its live/not-live pill from exactly
+    // this field, so an assumption baked in here would reach an operator.
     external_dispatch_enabled: r.external_dispatch_enabled === true,
   };
 }

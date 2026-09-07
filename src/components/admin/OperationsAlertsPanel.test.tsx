@@ -121,13 +121,27 @@ describe('OperationsAlertsPanel — summary + inbox', () => {
     expect(within(row).getByText('Open')).toBeTruthy();
   });
 
-  it('always shows the external-delivery-disabled badge and dormant evaluator notice', async () => {
+  // The badge used to be hardcoded and this test asserted it "always" showed.
+  // It is now derived, because the header answers "is production email going out
+  // right now?" and hardcoding that answer survived three separate changes.
+  it('shows the disabled badge when dispatch is off, plus the dormant evaluator notice', async () => {
     mockInbox(makeSummary(), []);
     render(<OperationsAlertsPanel lang="en" />);
 
     expect(await screen.findByText('External delivery disabled')).toBeTruthy();
     expect(
       await screen.findByText('The evaluator is not enabled yet (dormant mode). No new alerts are being produced.'),
+    ).toBeTruthy();
+  });
+
+  it('shows the ON badge and drops the "no external messages" claim when dispatch is enabled', async () => {
+    mockInbox(makeSummary({ external_dispatch_enabled: true }), []);
+    render(<OperationsAlertsPanel lang="en" />);
+
+    expect(await screen.findByText('External delivery ON (email)')).toBeTruthy();
+    expect(screen.queryByText('External delivery disabled')).toBeNull();
+    expect(
+      screen.getByText('Read-only observability: no auto-remediation, no retries — but external dispatch is ON, and critical alerts are emailed.'),
     ).toBeTruthy();
   });
 
@@ -366,6 +380,13 @@ describe('OperationsAlertsPanel — settings', () => {
     await waitFor(() => {
       expect(update).toHaveBeenCalledWith({ external_dispatch_enabled: true });
     });
+
+    // The header must follow immediately. This is why the pill reads `settings`
+    // BEFORE `summary`: only `settings` is refreshed by saveSettings, so with the
+    // other precedence the badge would still say "disabled" for the rest of the
+    // session while real email went out.
+    expect(await screen.findByText('External delivery ON (email)')).toBeTruthy();
+    expect(screen.queryByText('External delivery disabled')).toBeNull();
   });
 
   it('reflects external dispatch already being on, and can turn it back off', async () => {
