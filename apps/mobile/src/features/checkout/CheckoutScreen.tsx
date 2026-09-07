@@ -33,12 +33,15 @@ import {
   orderNoteMessage,
   orderNoteRemainingMessage,
 } from '../order/orderNote';
-import { appliedCouponSurvives, decideCompChange, decideQuantityChange, resolveBlockReason, type BlockReason } from './checkoutGuards';
+import {
+  appliedCouponSurvives, decideCompChange, decideLoyaltyChannelChange, decideQuantityChange,
+  resolveBlockReason, type BlockReason,
+} from './checkoutGuards';
 import { mismatchWarning, type DeviceFix } from './deliveryLocationWarning';
 import { canSubmitOrder, computePreviewTotals, lineTotal } from './previewTotals';
 import { useI18n } from '../../i18n/I18nProvider';
 import { failureMessage } from '../../lib/errors/reportFailure';
-import { checkout, compMembership, coupons, orders, payments } from '../../services/api';
+import { catalog as catalogApi, checkout, compMembership, coupons, orders, payments } from '../../services/api';
 import { preselectAddress } from '../../store/addressBook';
 import { legalTitle } from '../../lib/legal';
 import {
@@ -370,6 +373,9 @@ export function CheckoutScreen() {
   // It never gates submission: a stale `false` simply shows the ordinary price
   // and the server still charges nothing, which is the safe direction to fail.
   const [comped, setComped] = useState(false);
+  // The submission-time re-read of `app_settings.loyalty_pickup_only`; null
+  // until one has been taken. See the derivation below.
+  const [pickupOnlyOverride, setPickupOnlyOverride] = useState<boolean | null>(null);
   useEffect(() => {
     let alive = true;
     compMembership.isComped().then((v) => { if (alive) setComped(v); });
@@ -384,7 +390,16 @@ export function CheckoutScreen() {
   // replaced by an explanation rather than left to offer a discount the server
   // will not grant. `pickupOnly` defaults TRUE in `mapLoyaltySettings`, so an
   // unloaded settings row withholds the offer rather than making a false one.
-  const loyaltyChannelOk = !(loyalty?.pickupOnly ?? true) || orderType === 'pickup';
+  //
+  // `pickupOnlyOverride` is the fresher answer read at submission, when there is
+  // one. CatalogProvider maps the settings row once at launch and its foreground
+  // refresh does not re-read it, so without this an administrator toggling the
+  // rule mid-checkout would leave the screen offering a redemption the server
+  // refuses. Local state, exactly like `comped` above, for the same reason: the
+  // catalog value is a launch-time snapshot and this screen is the only place
+  // that needs the fresher one. `null` means "nothing fresher has been read".
+  const loyaltyPickupOnly = pickupOnlyOverride ?? loyalty?.pickupOnly ?? true;
+  const loyaltyChannelOk = !loyaltyPickupOnly || orderType === 'pickup';
   // Read at BOTH use sites below, so switching from pickup to delivery with the
   // toggle already on cannot leave a stale redemption in the preview or, worse,
   // in what is submitted.
@@ -609,6 +624,33 @@ export function CheckoutScreen() {
         setComped(compChange.comped);
         if (compChange.action === 'block') {
           setError(t('compEndedBody'));
+          return;
+        }
+      }
+
+      // The same question for the loyalty CHANNEL rule, and the same answer
+      // shape. An administrator can turn `loyalty_pickup_only` on while this
+      // screen sits open on a delivery order; the settings row is read once at
+      // launch and never refreshed, so the screen would keep showing a
+      // reduction `place_order` refuses -- the customer charged MORE than they
+      // were shown. Raised in review on PR #334.
+      //
+      // Only blocks when points were actually being spent: for a customer who
+      // was not redeeming, nothing was promised and nothing is taken away.
+      // Placed BEFORE the online/cash branch below so it covers both paths.
+      const freshPickupOnly = await catalogApi.readLoyaltyPickupOnly();
+      const channelChange = decideLoyaltyChannelChange({
+        redeeming: redeemingPoints > 0,
+        displayedChannelOk: loyaltyChannelOk,
+        // The rule is about the CHANNEL, so it has to be resolved against this
+        // order's type before the guard sees it: pickup is always allowed.
+        freshChannelOk:
+          freshPickupOnly === null ? null : !freshPickupOnly || orderType === 'pickup',
+      });
+      if (channelChange.action !== 'none') {
+        setPickupOnlyOverride(freshPickupOnly);
+        if (channelChange.action === 'block') {
+          setError(t('loyaltyChannelChanged'));
           return;
         }
       }

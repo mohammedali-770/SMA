@@ -94,6 +94,33 @@ where their points used to be reads it as the app having lost them.
 to Pickup Orders* → **No**. It takes effect on the next order; both functions
 read the setting per call, which the SQL suite pins by flipping it mid-test.
 
+**Changing it while a customer is mid-checkout is safe, and that took a fix.**
+`CatalogProvider` maps the settings row once, at launch; its foreground refresh
+reloads availability, modifier availability and branches, and **not** settings.
+So a customer whose app loaded while the rule was OFF would keep seeing a
+delivery redemption after it was turned ON, submit the points, and be charged
+more than the screen showed — the one direction this codebase treats as never
+acceptable (see the comp equivalent in
+[`DISCOUNTS_CAMPAIGNS.md`](DISCOUNTS_CAMPAIGNS.md)).
+
+Checkout therefore re-reads the single column immediately before submitting
+(`catalog.readLoyaltyPickupOnly`) and hands the answer to
+`decideLoyaltyChannelChange` (`checkoutGuards.ts`), which mirrors
+`decideCompChange`'s asymmetry:
+
+| Situation | Outcome |
+| --- | --- |
+| The rule closed **and** points were being spent | Correct the screen and **refuse this submission** — the customer sees the real total before committing |
+| The rule closed while nothing was being spent | Correct the screen only; nothing was promised |
+| The rule **opened** | Correct the screen only; charging less than displayed breaks nothing |
+| Unchanged, or the read failed (`null`) | Do nothing — the server is the authority, and a flaky network must not refuse a valid order |
+
+The last row is the weaker side of the trade: a stale `true` that could not be
+re-read is the overcharge case. It is accepted for the same reason
+`decideCompChange` accepts it — the window is an administrator toggling a setting
+mid-checkout, and refusing orders on every failed read costs more than it saves.
+Found in review on PR #334.
+
 **What it does NOT change.** Comped customers still earn and redeem nothing on
 either channel (the comp branch already refused both). Coupons are untouched —
 the rule is about points, not about discounts. The redemption floor
@@ -107,6 +134,7 @@ the rule is about points, not about discounts. The redemption floor
 | --- | --- |
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
+| `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
 | `src/lib/mappers.test.ts` | The admin mapper reads and defaults the column |
 | `supabase/tests/loyalty_reason_history_safe_test.sql` · `loyalty_reason_no_order_number_test.sql` | Ledger-reason semantics (pre-existing) |
 

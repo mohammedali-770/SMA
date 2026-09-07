@@ -34,7 +34,9 @@ export function LoyaltyChannelNote({
   return (
     <View style={styles.box}>
       <Text variant="label">{title}</Text>
-      <Text variant="caption" tone="secondary">{balanceLine}</Text>
+      <Text variant="caption" tone="secondary">
+        {balanceLine}
+      </Text>
     </View>
   );
 }
@@ -44,8 +46,13 @@ const useStyles = makeStyles((colors) => ({
   // whichever of the two is showing and the page does not jump when the
   // customer switches order type.
   box: {
-    backgroundColor: colors.appSurface, borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth * 2, borderColor: colors.appLine,
-    padding: space.s3, gap: 2, minHeight: 60, justifyContent: 'center',
+    backgroundColor: colors.appSurface,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderColor: colors.appLine,
+    padding: space.s3,
+    gap: 2,
+    minHeight: 60,
+    justifyContent: 'center',
   },
 }));
