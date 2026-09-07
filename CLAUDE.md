@@ -245,12 +245,18 @@ version.**
 06:46:38 (row 79), `operations-alert-dispatch` deployed as version 1 at 07:18:43,
 and the scheduler applied 08:23:17 with its two Vault secrets created first.
 **Only enabling `external_dispatch_enabled` remains** — the step that actually
-starts mail. **It cannot be done today**, which review caught on #332: the admin
-console renders that control disabled under a caption claiming no dispatcher
-exists, both true when written and false now. The backend accepts the flag —
-`20260903120000` removed the settings RPC's refusal — and the RPC needs admin
-AAL2, so a service-role connection cannot substitute. Until the console control
-is made real, X3 cannot be closed by anybody.
+starts mail. It is an owner action in the admin console (Alerts → Settings →
+"External dispatch (email)"), and requires an admin **at AAL2**: the RPC behind
+it is gated on `is_admin()`, so a service-role connection cannot substitute and
+no agent can flip it.
+
+**That control was disabled until 2026-09-07**, labelled "(disabled in this
+version)" under a caption claiming no dispatcher existed — both true of v1 and
+false once the dispatcher shipped — with a **test pinning the disabled state**,
+so the limitation had become self-enforcing while the backend was ready. Review
+caught it on #332. The generalisable lesson: a test that pins a deliberate
+limitation must be revisited when the limitation is lifted, or it quietly becomes
+the limitation.
 
 **The cron job is live and does nothing**, measured rather than assumed:
 `invoke_operations_alert_dispatch()` returns `null` while the flag is false,

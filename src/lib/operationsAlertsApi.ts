@@ -314,7 +314,18 @@ export const operationsAlerts = {
     };
   },
 
-  /** Admin-only. The backend hard-rejects external_dispatch_enabled=true. */
+  /**
+   * Admin-only, and the RPC additionally requires AAL2 — `is_admin()` is
+   * `role = 'admin' AND jwt_has_aal2()`, so a signed-in admin who has not
+   * completed TOTP is refused here exactly as they are by every RLS policy.
+   *
+   * This comment said "the backend hard-rejects external_dispatch_enabled=true"
+   * until 2026-09-07. That was true of v1: `operations_alert_settings_update`
+   * refused the flag in two places at once — the `case` branch raised, and the
+   * persistence step wrote `false` unconditionally. Migration 20260903120000
+   * removed both, so the flag is settable now and this comment was the last
+   * thing still asserting otherwise.
+   */
   async settingsUpdate(patch: Record<string, unknown>): Promise<OperationsAlertSettings> {
     return normalizeOperationsAlertSettings(
       ok(await supabase.rpc('operations_alert_settings_update', { p_patch: patch })),

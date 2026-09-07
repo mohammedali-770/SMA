@@ -1952,23 +1952,25 @@ act. There is **one** admin with an email address today.
 4. **Enable it** — set `external_dispatch_enabled` true. **This is the only step
    left, and the only one that actually sends mail.**
 
-   **NOT CURRENTLY POSSIBLE, and that is a real gap rather than a caveat.** Review
-   caught it on #332. The admin console renders this control **disabled**
-   (`OperationsAlertsPanel.tsx`, the "External dispatch (disabled in this
-   version)" checkbox) under a caption still claiming *"no external dispatcher
+   **How:** admin console → **Alerts** tab → **Settings** → the **"External
+   dispatch (email)"** checkbox. You must be signed in as an admin **with your
+   two-factor step completed** — the RPC behind it requires AAL2, so an admin at
+   AAL1 is refused with a two-factor message. There is no service-role side door,
+   by design.
+
+   **This was briefly impossible, and the note is worth keeping.** Until
+   2026-09-07 the console rendered that control **disabled**, labelled
+   "(disabled in this version)", under a caption reading *"no external dispatcher
    exists in this version; external delivery cannot be enabled even by admins."*
-   Both statements were true when written and are false now — the dispatcher
-   exists, is deployed, and is being called every five minutes.
+   Both were true of v1 and false the moment the dispatcher was deployed —
+   `20260903120000` removed the settings RPC's refusal and nothing removed the
+   front end's, so the backend was ready and the last step was unreachable. A
+   test even pinned the disabled state, so the limitation had become
+   self-enforcing. Review caught it on #332 and it was fixed on its own PR.
 
-   The backend is ready: `20260903120000` removed the settings RPC's refusal, so
-   `operations_alert_settings_update` accepts the flag. Only the UI refuses. And
-   the RPC requires an admin caller at **AAL2**, which a service-role connection
-   cannot satisfy — so there is no side door, and inventing one would be worse
-   than the gap.
-
-   **Until the console control is made real, X3 cannot be completed by anybody.**
-   That work is source-only and is tracked separately; when it lands, this step
-   becomes a single toggle.
+   The lesson generalises: **a test that pins a deliberate limitation has to be
+   revisited when the limitation is lifted, or it quietly becomes the
+   limitation.**
 
 Order mattered, and it was followed: deploying before applying would have given a
 function whose RPCs did not exist, and enabling before deploying would have queued
