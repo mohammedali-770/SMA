@@ -590,10 +590,20 @@ owner actions stand between it and a single email: deploying
 secrets, and enabling `external_dispatch_enabled`. Class B, so the totals move to
 **79/80** above.
 
+Row 79 is also the first row whose safety rested on **checking existing rows
+against a constraint before adding it**. That migration replaces the outbox
+dormancy CHECK, and a CHECK added to a populated table fails on any violating row
+— so all 136 live rows were counted through both new predicates read-only
+*before* sending, returning zero violations. A successful apply would not have
+distinguished "the data fits" from "we were lucky"; the pre-count does. The same
+question arises whenever a constraint lands on a table that already holds data.
+
 Row **80** is `operations_alert_dispatch_scheduler`, applied the same day at
 08:23:17 UTC, and it completes what row 79 started: row 79 built a dispatcher
-nothing called, and this one calls it. Class B again, so the totals move to
-**80/81** above.
+nothing called, and this one calls it. It touches no constraint at all — the
+CHECK evidence above belongs to row 79, and this sentence exists because
+inserting row 80 above that paragraph once made it read as though it did. Class B
+again, so the totals move to **80/81** above.
 
 It is the first row here whose prerequisite was **a secret that nobody was
 allowed to see**, and the method generalises. The trigger secret was generated
@@ -607,14 +617,6 @@ outlive the act.
 It is also the first row to leave **exactly one** unapplied file behind, and that
 file is the frozen payment migration. Read the §1 warning about what "apply the
 outstanding migrations" now means before acting on any unnamed instruction.
-
-It is also the first row whose safety rested on **checking existing rows against a
-constraint before adding it**. The migration replaces the outbox dormancy CHECK,
-and a CHECK added to a populated table fails on any violating row — so all 136
-live rows were counted through both new predicates read-only *before* sending,
-returning zero violations. A successful apply would not have distinguished "the
-data fits" from "we were lucky"; the pre-count does. The same question arises
-whenever a constraint lands on a table that already holds data.
 
 Rows **73–75** were all written on 2026-08-28, and only one of them was written
 by the session that performed the application. **73 and 74 began as GAP ROWS and

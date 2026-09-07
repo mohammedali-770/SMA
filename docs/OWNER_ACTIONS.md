@@ -1949,11 +1949,26 @@ act. There is **one** admin with an email address today.
    harmlessly while the flag is false: `invoke_operations_alert_dispatch()`
    returns `null`, taking the early-return branch before any Vault read or HTTP
    request. How the secrets were created without anyone seeing one is below.
-4. **Enable it** — set `external_dispatch_enabled` true, via the admin console.
-   **This is the only step left, and the only one that actually sends mail.**
-   The settings RPC (`operations_alert_settings_update`) requires an admin caller
-   with **AAL2**, so it cannot be driven over a service-role connection — the
-   console, after your two-factor step, is the path.
+4. **Enable it** — set `external_dispatch_enabled` true. **This is the only step
+   left, and the only one that actually sends mail.**
+
+   **NOT CURRENTLY POSSIBLE, and that is a real gap rather than a caveat.** Review
+   caught it on #332. The admin console renders this control **disabled**
+   (`OperationsAlertsPanel.tsx`, the "External dispatch (disabled in this
+   version)" checkbox) under a caption still claiming *"no external dispatcher
+   exists in this version; external delivery cannot be enabled even by admins."*
+   Both statements were true when written and are false now — the dispatcher
+   exists, is deployed, and is being called every five minutes.
+
+   The backend is ready: `20260903120000` removed the settings RPC's refusal, so
+   `operations_alert_settings_update` accepts the flag. Only the UI refuses. And
+   the RPC requires an admin caller at **AAL2**, which a service-role connection
+   cannot satisfy — so there is no side door, and inventing one would be worse
+   than the gap.
+
+   **Until the console control is made real, X3 cannot be completed by anybody.**
+   That work is source-only and is tracked separately; when it lands, this step
+   becomes a single toggle.
 
 Order mattered, and it was followed: deploying before applying would have given a
 function whose RPCs did not exist, and enabling before deploying would have queued
@@ -2069,10 +2084,16 @@ where the dispatcher itself is what breaks.
 
 ### How to check it worked, without waiting for an incident
 
-After step 3, `operations_digest_generate` produces one digest email per day. To
-force a faster signal, lower `dispatch_min_severity` to `warning` temporarily —
-a `lazywait:sync_degraded` warning historically fires within days — and put it
-back afterwards.
+**After step 4 — not before.** `operations_digest_generate` then produces one
+digest email per day. It cannot produce one earlier: `20260903120000` gates that
+insert on `external_dispatch_enabled`, so while the flag is false the digest
+still writes its `in_app` row and nothing else. This paragraph said "after step
+3" until the steps were renumbered around the scheduler apply, at which point it
+promised a signal that could not arrive.
+
+To force a faster signal once the flag is on, lower `dispatch_min_severity` to
+`warning` temporarily — a `lazywait:sync_degraded` warning historically fires
+within days — and put it back afterwards.
 
 ### On completion
 

@@ -245,7 +245,12 @@ version.**
 06:46:38 (row 79), `operations-alert-dispatch` deployed as version 1 at 07:18:43,
 and the scheduler applied 08:23:17 with its two Vault secrets created first.
 **Only enabling `external_dispatch_enabled` remains** — the step that actually
-starts mail, and it needs admin AAL2, so it is the console rather than an RPC.
+starts mail. **It cannot be done today**, which review caught on #332: the admin
+console renders that control disabled under a caption claiming no dispatcher
+exists, both true when written and false now. The backend accepts the flag —
+`20260903120000` removed the settings RPC's refusal — and the RPC needs admin
+AAL2, so a service-role connection cannot substitute. Until the console control
+is made real, X3 cannot be closed by anybody.
 
 **The cron job is live and does nothing**, measured rather than assumed:
 `invoke_operations_alert_dispatch()` returns `null` while the flag is false,
