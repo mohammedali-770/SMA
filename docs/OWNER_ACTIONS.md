@@ -1815,27 +1815,46 @@ with no SMS fallback, and its Meta credential still needs checking.
 
 ---
 
-## 28. Operations alert email dispatch (X3) — APPLIED AND DEPLOYED 2026-09-07
+## 28. Operations alert email dispatch (X3) — ONE STEP FROM CLOSED (2026-09-07)
 
-**Status:** steps 1 and 2 of four are **DONE**.
+**Status:** steps 1, 2 and 3 of four are **DONE**, all on 2026-09-07, each on its
+own explicit owner approval.
 
-- **Step 1** — `20260903120000_operations_alert_email_dispatch` applied to
-  Production **2026-09-07 06:46:38 UTC** (live version `20260907064638`, ledger
-  row 79 in `MIGRATIONS.md`).
+- **Step 1** — `20260903120000_operations_alert_email_dispatch` applied
+  **06:46:38 UTC** (live version `20260907064638`, ledger row 79).
 - **Step 2** — `operations-alert-dispatch` deployed as **version 1**,
-  **2026-09-07 07:18:43 UTC**, `verify_jwt = false` matching `config.toml`.
+  **07:18:43 UTC**, `verify_jwt = false` matching `config.toml`.
+- **Step 3** — the two Vault secrets created (**08:21:35** and **08:21:44 UTC**),
+  then `20260903130000_operations_alert_dispatch_scheduler` applied **08:23:17 UTC**
+  (live version `20260907082317`, ledger row 80). The `pg_cron` job
+  `operations-alert-dispatch` now exists on `*/5 * * * *`.
 
-Both on explicit owner approval, each its own action.
-
-**Two actions remain open, and both are yours:** apply
-`20260903130000_operations_alert_dispatch_scheduler` and create its two Vault
-secrets; then enable `external_dispatch_enabled`.
+**ONE action remains, and it is yours: enable `external_dispatch_enabled`.**
+That is the step that actually starts mail.
 
 **Nothing has been enabled and no alert has reached anyone.** The flag is still
-false, the outbox still holds its same 136 rows with zero on the `email` channel,
-and nothing invokes the function — so until the two remaining steps are done,
-`INCIDENT_RESPONSE.md` §1b's named watcher is still what actually tells you when
-something breaks.
+false and the outbox still holds its same 136 rows with zero on the `email`
+channel.
+
+**The cron job runs every five minutes and does nothing — and that was watched,
+not assumed.** The first real tick, run **218621** at **08:25:00 UTC**, finished
+`succeeded` in **11 ms**; an HTTP round trip cannot happen that fast. Confirmed
+anyway: `net._http_response` holds two rows in that window and both belong to
+other schedulers (`lazywait-sync` and `account-delete-process`), so this job made
+no outbound request at all. Calling the driver by hand returns `null` for the
+same reason — the flag check comes before any Vault read or HTTP call.
+
+So until the flag goes on, `INCIDENT_RESPONSE.md` §1b's named watcher is still
+what actually tells you when something breaks.
+
+**Before you flip it, know what happens.** Alerts at severity `critical` (the
+default floor) start producing `email` rows; within five minutes the cron job
+posts to the deployed function, which claims up to 20 and sends over the
+already-configured SMTP credential. Recipients are derived live from admin
+profiles — **there is one admin with an email address today**, so that is who
+receives them. The measured baseline says this should be quiet: all six alert
+states are currently `recovered`, and the only recurring signal self-clears
+inside the evaluator's own interval.
 
 This section header said **BUILT INERT 2026-09-03**, then **BASE MIGRATION
 APPLIED**; the status said *"nothing has been applied"* and then *"nothing has
@@ -1924,14 +1943,38 @@ act. There is **one** admin with an email address today.
    Verified after deploying: flag still false, outbox still 136 rows with zero on
    the `email` channel, zero rows `processing`, zero claim tokens, money-path
    hashes unchanged, Moyasar still absent.
-3. **Enable it** — set `external_dispatch_enabled` true, via the admin console
-   or the settings RPC. This starts email rows being **queued**.
-4. **Invoke the dispatcher.** Nothing does this automatically yet — see below.
+3. ~~**Apply the scheduler, and create its two Vault secrets first**~~ — **DONE
+   2026-09-07 08:23:17 UTC**, live version `20260907082317`, ledger row 80. The
+   `pg_cron` job `operations-alert-dispatch` exists on `*/5 * * * *` and ticks
+   harmlessly while the flag is false: `invoke_operations_alert_dispatch()`
+   returns `null`, taking the early-return branch before any Vault read or HTTP
+   request. How the secrets were created without anyone seeing one is below.
+4. **Enable it** — set `external_dispatch_enabled` true. **This is the only step
+   left, and the only one that actually sends mail.**
 
-Order matters. Deploying before applying gives a function whose RPCs do not
-exist; enabling before deploying queues rows nothing drains. Steps 1 and 2 have
-both landed in that order, so **step 3 is unblocked** — and applying the
-scheduler now points a cron job at a function that is already live.
+   **NOT CURRENTLY POSSIBLE, and that is a real gap rather than a caveat.** Review
+   caught it on #332. The admin console renders this control **disabled**
+   (`OperationsAlertsPanel.tsx`, the "External dispatch (disabled in this
+   version)" checkbox) under a caption still claiming *"no external dispatcher
+   exists in this version; external delivery cannot be enabled even by admins."*
+   Both statements were true when written and are false now — the dispatcher
+   exists, is deployed, and is being called every five minutes.
+
+   The backend is ready: `20260903120000` removed the settings RPC's refusal, so
+   `operations_alert_settings_update` accepts the flag. Only the UI refuses. And
+   the RPC requires an admin caller at **AAL2**, which a service-role connection
+   cannot satisfy — so there is no side door, and inventing one would be worse
+   than the gap.
+
+   **Until the console control is made real, X3 cannot be completed by anybody.**
+   That work is source-only and is tracked separately; when it lands, this step
+   becomes a single toggle.
+
+Order mattered, and it was followed: deploying before applying would have given a
+function whose RPCs did not exist, and enabling before deploying would have queued
+rows nothing drained. Steps 1, 2 and 3 landed in that order, so the cron job now
+points at a function that is already live and whose RPCs already exist. **Only
+step 4 is left.**
 
 **Two housekeeping follow-ups the apply surfaced**, neither behavioural and
 neither blocking:
@@ -1956,17 +1999,61 @@ found its definition, its `config.toml` entry, its test and these documents —
 **no caller**. Enabling the flag filled the outbox and left it full. Review
 caught it on #328; migration `20260903130000` closes it.
 
-**Apply `20260903130000_operations_alert_dispatch_scheduler`** and **create two
-Vault secrets**:
+**DONE 2026-09-07.** The two Vault secrets were created at **08:21:35** and
+**08:21:44 UTC**, and `20260903130000_operations_alert_dispatch_scheduler` was
+applied at **08:23:17 UTC** (live version `20260907082317`, ledger row 80). `pg_cron` now calls
+`invoke_operations_alert_dispatch()` every five minutes — the same cadence as the
+evaluator, so an alert cannot sit undelivered longer than it took to notice.
+
+### How the Vault secrets were created, because this section never said
+
+This document listed **what** the two secrets are but never **how** to make one,
+even though it had been done twice before (`account_deletion_*`,
+`lazywait_sync_project_url`). That gap is why the question had to be asked. The
+method, for the next time a scheduler needs one:
 
 | Vault secret | Value |
 | --- | --- |
-| `operations_alert_dispatch_project_url` | the project's base URL, e.g. `https://<ref>.supabase.co` |
-| `operations_alert_dispatch_secret` | a fresh random string you generate; nothing else uses it |
+| `operations_alert_dispatch_project_url` | the project's base URL, `https://<ref>.supabase.co`. **Not secret** — it is in every mobile and web client |
+| `operations_alert_dispatch_secret` | 32 random bytes, hex. **Generated inside Postgres and seen by nobody** |
 
-`pg_cron` then calls `invoke_operations_alert_dispatch()` every five minutes —
-the same cadence as the evaluator, so an alert cannot sit undelivered longer than
-it took to notice.
+```sql
+-- Public value, safe to type anywhere.
+select vault.create_secret(
+  'https://<ref>.supabase.co',
+  'operations_alert_dispatch_project_url',
+  'Base URL for the operations alert dispatch cron driver.'
+);
+
+-- The secret. Generated IN-DATABASE and passed straight into create_secret in
+-- the same statement, so it is never selected, never returned and never crosses
+-- the wire. Only the row UUID comes back.
+select vault.create_secret(
+  encode(extensions.gen_random_bytes(32), 'hex'),
+  'operations_alert_dispatch_secret',
+  'Trigger secret for invoke_operations_alert_dispatch. Never transmitted.'
+);
+```
+
+**Do it this way rather than generating a value yourself.** A secret you create
+by hand exists in at least two places that outlive the act — your terminal
+scrollback and whatever you pasted it into. This one exists only inside Vault.
+Nothing needs to read it: Postgres signs with it and Postgres verifies it.
+
+**Verify without printing it:**
+
+```sql
+select name, length(decrypted_secret)
+  from vault.decrypted_secrets
+ where name like 'operations_alert_dispatch%';
+```
+
+`operations_alert_dispatch_secret` should be **64** characters — 32 bytes as hex.
+The names must match exactly; the driver looks them up by name.
+
+(The Dashboard also has a Vault UI under Project Settings if you prefer clicking,
+but it cannot generate the value in-database, so you would be back to handling
+the plaintext yourself.)
 
 **The secret never leaves Postgres — and the first version of this section said
 so while it was false.** The driver put the decrypted secret verbatim in an
@@ -1997,10 +2084,16 @@ where the dispatcher itself is what breaks.
 
 ### How to check it worked, without waiting for an incident
 
-After step 3, `operations_digest_generate` produces one digest email per day. To
-force a faster signal, lower `dispatch_min_severity` to `warning` temporarily —
-a `lazywait:sync_degraded` warning historically fires within days — and put it
-back afterwards.
+**After step 4 — not before.** `operations_digest_generate` then produces one
+digest email per day. It cannot produce one earlier: `20260903120000` gates that
+insert on `external_dispatch_enabled`, so while the flag is false the digest
+still writes its `in_app` row and nothing else. This paragraph said "after step
+3" until the steps were renumbered around the scheduler apply, at which point it
+promised a signal that could not arrive.
+
+To force a faster signal once the flag is on, lower `dispatch_min_severity` to
+`warning` temporarily — a `lazywait:sync_degraded` warning historically fires
+within days — and put it back afterwards.
 
 ### On completion
 
