@@ -1815,27 +1815,32 @@ with no SMS fallback, and its Meta credential still needs checking.
 
 ---
 
-## 28. Operations alert email dispatch (X3) — BASE MIGRATION APPLIED 2026-09-07
+## 28. Operations alert email dispatch (X3) — APPLIED AND DEPLOYED 2026-09-07
 
-**Status:** step 1 of four is **DONE**.
-`20260903120000_operations_alert_email_dispatch` was applied to Production on
-**2026-09-07 06:46:38 UTC** (live version `20260907064638`, ledger row 79 in
-`MIGRATIONS.md`), on explicit owner approval naming the target by version.
+**Status:** steps 1 and 2 of four are **DONE**.
 
-**Three actions remain open, and all three are yours:** deploy
-`operations-alert-dispatch`; apply
+- **Step 1** — `20260903120000_operations_alert_email_dispatch` applied to
+  Production **2026-09-07 06:46:38 UTC** (live version `20260907064638`, ledger
+  row 79 in `MIGRATIONS.md`).
+- **Step 2** — `operations-alert-dispatch` deployed as **version 1**,
+  **2026-09-07 07:18:43 UTC**, `verify_jwt = false` matching `config.toml`.
+
+Both on explicit owner approval, each its own action.
+
+**Two actions remain open, and both are yours:** apply
 `20260903130000_operations_alert_dispatch_scheduler` and create its two Vault
-secrets; enable `external_dispatch_enabled`.
+secrets; then enable `external_dispatch_enabled`.
 
-**Nothing has been deployed or enabled, and no alert has reached anyone.** The
-apply changed no behaviour — the flag is still false and the outbox still holds
-its same 136 rows with zero on the `email` channel — so until the three remaining
-steps are done, `INCIDENT_RESPONSE.md` §1b's named watcher is still what actually
-tells you when something breaks.
+**Nothing has been enabled and no alert has reached anyone.** The flag is still
+false, the outbox still holds its same 136 rows with zero on the `email` channel,
+and nothing invokes the function — so until the two remaining steps are done,
+`INCIDENT_RESPONSE.md` §1b's named watcher is still what actually tells you when
+something breaks.
 
-This section header said **BUILT INERT 2026-09-03** and this status said *"nothing
-has been applied"* until the apply landed; both are corrected rather than deleted
-so the sequence stays readable.
+This section header said **BUILT INERT 2026-09-03**, then **BASE MIGRATION
+APPLIED**; the status said *"nothing has been applied"* and then *"nothing has
+been deployed"*. Each is corrected as it happened rather than deleted, so the
+sequence stays readable.
 
 ### Why
 
@@ -1897,16 +1902,36 @@ act. There is **one** admin with an email address today.
    also compared against live first, because `create or replace` fails on a
    changed signature.
 
-2. **Deploy `operations-alert-dispatch`** — `verify_jwt = false`, matching
-   `config.toml`. Still sends nothing: the handler re-checks the master flag
-   itself, so a deploy against a disabled flag is a no-op by construction.
+2. ~~**Deploy `operations-alert-dispatch`**~~ — **DONE 2026-09-07 07:18:43 UTC**,
+   **version 1**, `verify_jwt = false` matching `config.toml`. The bundle is five
+   files (the entrypoint plus `_shared/cors|adminAuth|supabaseClient|secrets.ts`),
+   taken from the merged default branch at `b3daea4` and read back after
+   deploying to confirm they match.
+
+   **It sends nothing, and that was tested rather than asserted.** Three probes,
+   none of which writes anything: `GET` → **405** (the module loaded and
+   `Deno.serve` is running, so the imports — including the external denomailer —
+   resolved); unauthenticated `POST` → **401** (the admin gate refuses); `POST`
+   carrying a scheduler header → **500 `signature check failed`**.
+
+   **That third result is the point of deploying before applying
+   `20260903130000`.** The signature RPC lives in that migration and does not
+   exist yet, so the scheduler branch **fails closed** — it does not fall through
+   to the admin gate, and it cannot be talked into running. Doing it the other
+   way round would have been worse: applying the scheduler first creates a cron
+   job POSTing every five minutes to a function that does not exist.
+
+   Verified after deploying: flag still false, outbox still 136 rows with zero on
+   the `email` channel, zero rows `processing`, zero claim tokens, money-path
+   hashes unchanged, Moyasar still absent.
 3. **Enable it** — set `external_dispatch_enabled` true, via the admin console
    or the settings RPC. This starts email rows being **queued**.
 4. **Invoke the dispatcher.** Nothing does this automatically yet — see below.
 
 Order matters. Deploying before applying gives a function whose RPCs do not
-exist; enabling before deploying queues rows nothing drains. Step 1 having
-landed, the RPCs the function calls now exist, so **step 2 is unblocked**.
+exist; enabling before deploying queues rows nothing drains. Steps 1 and 2 have
+both landed in that order, so **step 3 is unblocked** — and applying the
+scheduler now points a cron job at a function that is already live.
 
 **Two housekeeping follow-ups the apply surfaced**, neither behavioural and
 neither blocking:
