@@ -24,6 +24,7 @@ Every Deno Edge Function in the repository, what it does, how it reaches product
 | `lazywait-catalog` | admin-initiated, SERVER-SIDE catalog pull | by hand | service role |
 | `lazywait-sync` | server-side POS sync worker (invoked by a schedule/cron, NOT by the app). Claims due orders (FOR UPDATE SKIP LOCKED), pushes each to the confirmed… | by hand | service role |
 | `lazywait-webhook` | inbound receiver for Lazywait POS callbacks | by hand | service role |
+| `operations-alert-dispatch` | the thing that finally tells a human | by hand | service role |
 | `order-intake` | authenticated "create order + sync to POS" orchestration | by hand | service role |
 | `payment-initiate` | the authenticated customer starts paying for an order they already created (place_order left it payment_status='pending') | workflow | service role |
 | `payment-refund` | the automatic refund worker for orders that were PAID but provably never reached the branch (Issue #94, step 7) | by hand | service role |
@@ -48,6 +49,7 @@ Code under `supabase/functions/_shared/` is imported by the functions above and 
 - `_shared/adminAuth.test.ts`
 - `_shared/adminAuth.ts`
 - `_shared/adminAuthWiring.test.ts`
+- `_shared/alertDispatchWiring.test.ts`
 - `_shared/authHook.test.ts`
 - `_shared/authHook.ts`
 - `_shared/cors.ts`

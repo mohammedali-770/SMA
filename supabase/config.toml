@@ -127,3 +127,9 @@ verify_jwt = false
 # Vault/dedicated-secret authenticated cron gateway into account-delete-process.
 [functions.account-delete-scheduler]
 verify_jwt = false
+
+# Callers are the service role (automation) or an authenticated ADMIN. The
+# function performs its own role+AAL2 check through the shared pure predicate,
+# so this is the only gate on the path — the same shape as push-dispatch.
+[functions.operations-alert-dispatch]
+verify_jwt = false

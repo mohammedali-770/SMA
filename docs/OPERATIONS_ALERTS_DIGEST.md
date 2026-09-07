@@ -27,6 +27,57 @@ Deliverables:
   `src/lib/operationsAlertsApi.test.ts`,
   `src/components/admin/OperationsAlertsPanel.test.tsx`
 
+## v2 — email dispatch (built 2026-09-03, INERT)
+
+**Everything below this heading describes v1 and remains accurate about the
+engine.** What changed is the end of the pipe: v1 deliberately had no dispatcher,
+and now there is one for a single channel. It sends nothing until three separate
+owner actions land (`OWNER_ACTIONS.md` §28).
+
+### What v1 was, stated fairly
+
+v1 did not omit dispatch. It refused, in three independent places — the outbox
+dormancy CHECK, both producers hard-coding channel `'in_app'`, and the settings
+RPC raising on `external_dispatch_enabled`. The constraint's own comment
+anticipated the migration that would lift it. That is what
+`20260903120000_operations_alert_email_dispatch` is.
+
+### What v2 changes
+
+| | |
+| --- | --- |
+| Channel | **`email` only.** `whatsapp` and `push` keep the v1 prohibition under the replacement constraint |
+| Volume | ONE email row per event, not one per language — the `in_app` pair stays bilingual, but a responder reads one mailbox |
+| Severity floor | `dispatch_min_severity`, default **`critical`** |
+| Language | `dispatch_language`, default `en` |
+| Recipients | derived from admin profiles at send time by `operations_alerts_dispatch_recipients()`. **No address is stored**, which was v1's stated property |
+| Delivery | at most once — a per-invocation fencing token on claim, and every completion write guarded by it |
+| Transport | `operations-alert-dispatch`, over the SMTP credential already configured for the email provider |
+| Invocation | **None automatic.** No cron job and no admin action calls the function; an admin can invoke it manually. A scheduler is the outstanding piece — see `OWNER_ACTIONS.md` §28 |
+
+### Why the floor defaults to critical
+
+Measured, not assumed. `lazywait:sync_degraded` has opened and self-recovered
+inside the evaluator's own 5-minute interval on **all four** occasions it has
+fired. At a `warning` floor those four non-events would have produced eight
+emails. An alert mailbox that cries wolf is worse than no alert mailbox, so the
+floor starts high and is a settings change away from lower.
+
+### Why it stays inert on apply
+
+`external_dispatch_enabled` is false, the migration does not change it, every
+producer gate is `and external_dispatch_enabled`, and the handler re-checks the
+flag itself — so turning it off later stops delivery of rows already queued, not
+just the writing of new ones. The migration ends in a self-verification block
+that raises if the flag moved or if a single `email` row exists.
+
+Covered by `supabase/tests/operations_alert_email_dispatch_test.sql` (constraint
+shape, the fence, the attempt budget, stale-lease recovery, producer gates,
+recipient derivation) and by the source-shape tripwire
+`supabase/functions/_shared/alertDispatchWiring.test.ts`.
+
+---
+
 ## Purpose
 
 A deterministic (no-LLM) alerting and daily-digest layer on top of the
