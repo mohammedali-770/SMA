@@ -300,8 +300,11 @@ export const AdminDashboard: React.FC = () => {
             <OperationsHealthPanel lang={adminLang} onNavigate={(tab) => setActiveTab(tab)} />
           )}
 
-          {/* TAB: OPERATIONS ALERTS + DAILY DIGEST (read-only inbox/digest; admin-only
-              dormant settings). External delivery is disabled in this version. */}
+          {/* TAB: OPERATIONS ALERTS + DAILY DIGEST (inbox/digest; admin-only settings).
+              External email delivery is BUILT AND REACHABLE as of 2026-09-07 — the
+              settings panel's external-dispatch toggle turns it on, and turning it on
+              starts mailing administrators. This comment said "disabled in this
+              version" until then, which was true of v1 and is not now. */}
           {activeTab === 'alerts' && alertsVisible && (
             <OperationsAlertsPanel lang={adminLang} isAdmin={canTriage} />
           )}

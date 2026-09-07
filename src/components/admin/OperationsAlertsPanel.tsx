@@ -185,6 +185,29 @@ export const OperationsAlertsPanel: React.FC<{
     }
   }, [isAr]);
 
+  /**
+   * Is production email actually going out right now? The header answers that,
+   * so it must not guess.
+   *
+   * `settings` FIRST, because `saveSettings` refreshes it and nothing refreshes
+   * `summary` — without this the pill would keep saying "disabled" for the rest
+   * of the session after an admin ticked the box. `summary` SECOND, because it
+   * is fetched on mount and carries the same backend-authoritative flag, so an
+   * operator who never opens the Settings section still sees the truth;
+   * `loadSettings` only runs for that section, so `settings` alone would be null
+   * in the common case.
+   *
+   * `null` is a THIRD state, deliberately, not a synonym for false: before
+   * either has loaded we do not know, and this is the one pill where claiming
+   * "disabled" while real mail is going out would be actively misleading.
+   *
+   * The header was hardcoded to "External delivery disabled" until #333 — true
+   * of v1, and the third place that assumption was written down after the
+   * toggle itself and the API comment.
+   */
+  const externalDispatchOn: boolean | null =
+    settings?.external_dispatch_enabled ?? summary?.external_dispatch_enabled ?? null;
+
   const sectionBtn = (id: Section, icon: React.ReactNode, labelEn: string, labelAr: string) => (
     <button
       type="button"
@@ -215,15 +238,25 @@ export const OperationsAlertsPanel: React.FC<{
               </Text>
             </div>
             <Text variant="caption" tone="tertiary" as="p" className="mt-1">
-              {isAr
-                ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
-                : 'Read-only observability: no auto-remediation, no retries, no external messages.'}
+              {externalDispatchOn === true
+                ? (isAr
+                  ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة — لكن الإرسال الخارجي مُفعّل، والتنبيهات الحرجة تُرسل بالبريد.'
+                  : 'Read-only observability: no auto-remediation, no retries — but external dispatch is ON, and critical alerts are emailed.')
+                : (isAr
+                  ? 'مراقبة للقراءة فقط: لا إصلاح تلقائي، لا إعادة محاولة، لا رسائل خارجية.'
+                  : 'Read-only observability: no auto-remediation, no retries, no external messages.')}
             </Text>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <StatusPill
-              label={isAr ? 'الإرسال الخارجي معطل' : 'External delivery disabled'}
-              tone="neutral"
+              label={
+                externalDispatchOn === null
+                  ? (isAr ? 'الإرسال الخارجي' : 'External delivery')
+                  : externalDispatchOn
+                    ? (isAr ? 'الإرسال الخارجي مُفعّل (بريد)' : 'External delivery ON (email)')
+                    : (isAr ? 'الإرسال الخارجي معطل' : 'External delivery disabled')
+              }
+              tone={externalDispatchOn === true ? 'info' : 'neutral'}
             />
             <button
               type="button"
@@ -481,11 +514,39 @@ export const OperationsAlertsPanel: React.FC<{
                   </label>
                 ))}
 
-                <label className="flex items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 px-3 py-2 opacity-80">
-                  <Text variant="label" tone="secondary" as="span">
-                    {isAr ? 'الإرسال الخارجي (معطل في هذا الإصدار)' : 'External dispatch (disabled in this version)'}
+                {/*
+                  THE ONLY CONTROL HERE THAT SENDS SOMETHING TO A PERSON.
+
+                  It was `checked={false} disabled` with the label "(disabled in
+                  this version)" from the day the panel shipped, because at the
+                  time no dispatcher existed and the settings RPC refused the flag
+                  outright. Both of those stopped being true on 2026-09-07:
+                  20260903120000 removed the RPC's refusal,
+                  `operations-alert-dispatch` was deployed, and 20260903130000
+                  gave it a pg_cron caller every five minutes.
+
+                  Nothing removed the front end's refusal, so the backend was
+                  ready and the last step was unreachable -- the original X3
+                  defect (a dispatcher with no caller) recurring one layer up.
+                  Review caught it on #332.
+
+                  It rides the same `saveSettings` path as the four booleans
+                  above rather than getting a bespoke confirm dialog: an operator
+                  who can already turn alert evaluation off can be trusted with
+                  this, and a one-off modal here would be a second pattern to
+                  maintain. The caption below carries the consequence instead.
+                */}
+                <label className="flex items-center justify-between gap-2 rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface-2 px-3 py-2">
+                  <Text variant="label" as="span">
+                    {isAr ? 'الإرسال الخارجي (بريد إلكتروني)' : 'External dispatch (email)'}
                   </Text>
-                  <input type="checkbox" checked={false} disabled aria-label="external dispatch disabled" />
+                  <input
+                    type="checkbox"
+                    checked={settings.external_dispatch_enabled === true}
+                    disabled={!isAdmin || saving}
+                    aria-label="external dispatch"
+                    onChange={(e) => { void saveSettings({ external_dispatch_enabled: e.target.checked }); }}
+                  />
                 </label>
               </div>
 
@@ -496,10 +557,10 @@ export const OperationsAlertsPanel: React.FC<{
                 <AlertMetric label={isAr ? 'تذكير الحرج (دقائق)' : 'Critical reminder (min)'} value={settings.critical_reminder_minutes} />
               </div>
 
-              <Text variant="caption" tone="tertiary" as="p">
+              <Text variant="caption" tone="secondary" as="p">
                 {isAr
-                  ? 'ملاحظة: لا يوجد أي مرسل خارجي في هذا الإصدار؛ لا يمكن تفعيل الإرسال الخارجي حتى مع صلاحيات المشرف.'
-                  : 'Note: no external dispatcher exists in this version; external delivery cannot be enabled even by admins.'}
+                  ? 'تنبيه: تفعيل الإرسال الخارجي يبدأ إرسال بريد فعلي. التنبيهات الحرجة تُنشئ رسائل تُرسل خلال خمس دقائق إلى بريد كل مشرف، ويُشتق المستلمون وقت الإرسال — فإلغاء صلاحية المشرف يوقف بريده في اللحظة نفسها. أوقف المفتاح لإيقاف الإرسال.'
+                  : 'Careful: turning external dispatch on starts sending real email. Critical alerts queue messages that go out within five minutes to every admin’s address; recipients are derived at send time, so removing someone’s admin role stops their alert mail in the same act. Switching it back off stops delivery, including of anything already queued.'}
               </Text>
             </div>
           )}

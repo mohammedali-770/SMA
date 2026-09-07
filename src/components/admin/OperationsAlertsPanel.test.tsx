@@ -121,13 +121,27 @@ describe('OperationsAlertsPanel — summary + inbox', () => {
     expect(within(row).getByText('Open')).toBeTruthy();
   });
 
-  it('always shows the external-delivery-disabled badge and dormant evaluator notice', async () => {
+  // The badge used to be hardcoded and this test asserted it "always" showed.
+  // It is now derived, because the header answers "is production email going out
+  // right now?" and hardcoding that answer survived three separate changes.
+  it('shows the disabled badge when dispatch is off, plus the dormant evaluator notice', async () => {
     mockInbox(makeSummary(), []);
     render(<OperationsAlertsPanel lang="en" />);
 
     expect(await screen.findByText('External delivery disabled')).toBeTruthy();
     expect(
       await screen.findByText('The evaluator is not enabled yet (dormant mode). No new alerts are being produced.'),
+    ).toBeTruthy();
+  });
+
+  it('shows the ON badge and drops the "no external messages" claim when dispatch is enabled', async () => {
+    mockInbox(makeSummary({ external_dispatch_enabled: true }), []);
+    render(<OperationsAlertsPanel lang="en" />);
+
+    expect(await screen.findByText('External delivery ON (email)')).toBeTruthy();
+    expect(screen.queryByText('External delivery disabled')).toBeNull();
+    expect(
+      screen.getByText('Read-only observability: no auto-remediation, no retries — but external dispatch is ON, and critical alerts are emailed.'),
     ).toBeTruthy();
   });
 
@@ -342,28 +356,80 @@ describe('OperationsAlertsPanel — settings', () => {
     expect(await screen.findByText('Settings saved.')).toBeTruthy();
   });
 
-  it('keeps the external-dispatch toggle disabled even for admins', async () => {
+  // REGRESSION (#332). This test used to assert the opposite -- that the
+  // external-dispatch toggle stays disabled even for admins -- and it PASSED
+  // while pinning a control that had become the only thing preventing X3 from
+  // being completed. The backend stopped refusing the flag on 2026-09-07
+  // (20260903120000), the dispatcher was deployed, and pg_cron began calling it;
+  // only this checkbox still said no. A test that pins a deliberate limitation
+  // has to be revisited when the limitation is lifted, or it quietly becomes the
+  // limitation itself.
+  it('lets an admin turn external dispatch on, and sends the patch', async () => {
     mockSettings(makeSettings());
+    const update = vi.spyOn(operationsAlerts, 'settingsUpdate')
+      .mockResolvedValue(makeSettings({ external_dispatch_enabled: true }));
     render(<OperationsAlertsPanel lang="en" isAdmin />);
     fireEvent.click(await screen.findByText('Settings'));
-    await screen.findByText('External dispatch (disabled in this version)');
+    await screen.findByText('External dispatch (email)');
 
-    const external = screen.getByLabelText('external dispatch disabled') as HTMLInputElement;
-    expect(external.disabled).toBe(true);
+    const external = screen.getByLabelText('external dispatch') as HTMLInputElement;
+    expect(external.disabled).toBe(false);
     expect(external.checked).toBe(false);
-    expect(screen.getByText('Note: no external dispatcher exists in this version; external delivery cannot be enabled even by admins.')).toBeTruthy();
+
+    fireEvent.click(external);
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({ external_dispatch_enabled: true });
+    });
+
+    // The header must follow immediately. This is why the pill reads `settings`
+    // BEFORE `summary`: only `settings` is refreshed by saveSettings, so with the
+    // other precedence the badge would still say "disabled" for the rest of the
+    // session while real email went out.
+    expect(await screen.findByText('External delivery ON (email)')).toBeTruthy();
+    expect(screen.queryByText('External delivery disabled')).toBeNull();
   });
 
+  it('reflects external dispatch already being on, and can turn it back off', async () => {
+    mockSettings(makeSettings({ external_dispatch_enabled: true }));
+    const update = vi.spyOn(operationsAlerts, 'settingsUpdate')
+      .mockResolvedValue(makeSettings({ external_dispatch_enabled: false }));
+    render(<OperationsAlertsPanel lang="en" isAdmin />);
+    fireEvent.click(await screen.findByText('Settings'));
+
+    const external = await screen.findByLabelText('external dispatch') as HTMLInputElement;
+    expect(external.checked).toBe(true);
+
+    fireEvent.click(external);
+    await waitFor(() => {
+      expect(update).toHaveBeenCalledWith({ external_dispatch_enabled: false });
+    });
+  });
+
+  it('refuses the external-dispatch toggle to a non-admin', async () => {
+    mockSettings(makeSettings());
+    render(<OperationsAlertsPanel lang="en" isAdmin={false} />);
+    fireEvent.click(await screen.findByText('Settings'));
+
+    const external = await screen.findByLabelText('external dispatch') as HTMLInputElement;
+    expect(external.disabled).toBe(true);
+  });
+
+  // The fixture used to be 'external dispatch cannot be enabled in this version',
+  // the v1 refusal that 20260903120000 removed. The test passed either way -- it
+  // only checks that a rejection reaches the operator verbatim -- but an error
+  // the backend can no longer raise is a misleading thing to leave in a test.
+  // MFA is the realistic refusal now: the RPC requires AAL2, so an admin who has
+  // not completed TOTP is turned away here exactly as they are by RLS.
   it('shows the backend rejection message when a save fails', async () => {
     mockSettings(makeSettings());
     vi.spyOn(operationsAlerts, 'settingsUpdate')
-      .mockRejectedValue(new Error('external dispatch cannot be enabled in this version'));
+      .mockRejectedValue(new Error('This action requires two-factor authentication.'));
     render(<OperationsAlertsPanel lang="en" isAdmin />);
     fireEvent.click(await screen.findByText('Settings'));
 
     const evalToggle = await screen.findByLabelText('Alert evaluation enabled');
     fireEvent.click(evalToggle);
 
-    expect(await screen.findByText('external dispatch cannot be enabled in this version')).toBeTruthy();
+    expect(await screen.findByText('This action requires two-factor authentication.')).toBeTruthy();
   });
 });

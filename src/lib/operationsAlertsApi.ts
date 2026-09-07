@@ -202,8 +202,10 @@ export function normalizeOperationsAlertsSummary(raw: unknown): OperationsAlerts
     last_digest: safeNullableObject(r.last_digest),
     alert_evaluation_enabled: r.alert_evaluation_enabled === true,
     digest_generation_enabled: r.digest_generation_enabled === true,
-    // Backend-authoritative and expected false in this version; never invented
-    // client-side.
+    // Backend-authoritative; never invented client-side. This said "and expected
+    // false in this version" until 2026-09-07, when external dispatch became
+    // real — the panel header now derives its live/not-live pill from exactly
+    // this field, so an assumption baked in here would reach an operator.
     external_dispatch_enabled: r.external_dispatch_enabled === true,
   };
 }
@@ -314,7 +316,18 @@ export const operationsAlerts = {
     };
   },
 
-  /** Admin-only. The backend hard-rejects external_dispatch_enabled=true. */
+  /**
+   * Admin-only, and the RPC additionally requires AAL2 — `is_admin()` is
+   * `role = 'admin' AND jwt_has_aal2()`, so a signed-in admin who has not
+   * completed TOTP is refused here exactly as they are by every RLS policy.
+   *
+   * This comment said "the backend hard-rejects external_dispatch_enabled=true"
+   * until 2026-09-07. That was true of v1: `operations_alert_settings_update`
+   * refused the flag in two places at once — the `case` branch raised, and the
+   * persistence step wrote `false` unconditionally. Migration 20260903120000
+   * removed both, so the flag is settable now and this comment was the last
+   * thing still asserting otherwise.
+   */
   async settingsUpdate(patch: Record<string, unknown>): Promise<OperationsAlertSettings> {
     return normalizeOperationsAlertSettings(
       ok(await supabase.rpc('operations_alert_settings_update', { p_patch: patch })),
