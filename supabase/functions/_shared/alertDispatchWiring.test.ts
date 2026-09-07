@@ -15,7 +15,9 @@ import { describe, expect, it } from 'vitest';
  *     delivery of rows that were ALREADY queued, not just the writing of new
  *     ones;
  *   - every claim/finalize/release carries the fencing token, which is what
- *     makes delivery at-most-once under a stale owner;
+ *     stops a stale owner overwriting a newer outcome. Note it does NOT make
+ *     delivery at-most-once -- a crash after SMTP accepts but before `sent` is
+ *     persisted re-sends. Deliberate, and explained in the handler's header;
  *   - recipients come from the RPC, never a literal address in this repo.
  *
  * The SQL half is covered for real, against a database, by
@@ -53,7 +55,7 @@ describe('operations-alert-dispatch is inert until deliberately enabled', () => 
   });
 });
 
-describe('delivery is at most once', () => {
+describe('delivery is fenced, and at least once across a crash', () => {
   it('claims with a per-invocation fencing token', () => {
     const c = code();
     expect(c).toContain('crypto.randomUUID()');
@@ -75,10 +77,59 @@ describe('delivery is at most once', () => {
     expect(c.match(/p_claim_token: claimToken/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
-  it('treats a post-send outcome as terminal, never as a retry', () => {
+  it('records a terminal outcome for every send attempt', () => {
     const c = code();
     expect(c).toContain("p_status: 'sent'");
     expect(c).toContain("p_status: 'failed'");
+  });
+});
+
+describe('REGRESSION: the claim result shape matches the RPC that produces it', () => {
+  // THE DEFECT THIS PINS (#328). `claim_operations_alert_emails` declares
+  // RETURNS TABLE (id, language, subject_safe, body_safe, attempt_count), and
+  // PostgREST serialises THOSE names. That function's final SELECT aliases them
+  // c_id, c_language, ... purely to keep the plpgsql body unambiguous, and the
+  // TypeScript interface was written against the aliases. Every field was
+  // therefore undefined: SMTP got no subject and no body, and every
+  // finalize/release passed `p_id: undefined`, matching zero rows and stranding
+  // the claim until its lease expired -- at which point it was re-sent.
+  //
+  // Neither existing layer caught it. The SQL suite calls the RPC from SQL,
+  // where output column names do not matter; the source-shape tests grepped for
+  // strings that were present and wrong. This reads BOTH artifacts and compares
+  // them, which is the only way this class of drift is visible.
+  function migrationSource() {
+    return readFileSync(
+      new URL('../../migrations/20260903120000_operations_alert_email_dispatch.sql', import.meta.url),
+      'utf8',
+    );
+  }
+
+  function declaredColumns() {
+    const m = /claim_operations_alert_emails\([\s\S]*?returns table \(([^)]*)\)/i.exec(migrationSource());
+    expect(m).not.toBeNull();
+    return String(m ? m[1] : '')
+      .split(',')
+      .map((part) => part.trim().split(/\s+/)[0])
+      .filter(Boolean);
+  }
+
+  it('declares exactly the columns the handler expects', () => {
+    expect(declaredColumns()).toEqual(['id', 'language', 'subject_safe', 'body_safe', 'attempt_count']);
+  });
+
+  it('reads every claimed field by its DECLARED name, never a CTE alias', () => {
+    const c = code();
+    for (const col of declaredColumns()) {
+      expect(c).toContain(col + ':');
+    }
+    expect(c).not.toMatch(/row\.c_/);
+  });
+
+  it('passes a real row id to finalize and release', () => {
+    const c = code();
+    expect(c).toContain('p_id: row.id');
+    expect(c).not.toContain('p_id: row.c_id');
   });
 });
 

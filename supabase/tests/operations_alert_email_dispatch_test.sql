@@ -138,6 +138,32 @@ begin
     raise exception 'reclaim must consume an attempt';
   end if;
 
+  -- A FAILED row under budget MUST be claimable. Until #328 the predicate
+  -- accepted only 'pending' and expired 'processing', while finalize() writes
+  -- 'failed' on an SMTP error -- so the advertised bounded retry was dead code
+  -- and one transient failure stranded the alert for ever. The suite asserted
+  -- that an EXHAUSTED row is not claimed, and never that a non-exhausted failed
+  -- row IS: the absence of that assertion is what let the defect through.
+  insert into public.operations_alert_outbox
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason,
+     attempt_count, last_error_safe)
+  values ('t-email-failed-retryable', gen_random_uuid(), 'email', 'en', 's', 'b', 'failed', null,
+          1, 'smtp blew up');
+  select count(*) into v_n from public.claim_operations_alert_emails(gen_random_uuid(), 10, 10, 5);
+  if v_n <> 1 then
+    raise exception 'a failed row under the attempt budget must be claimable, got % rows', v_n;
+  end if;
+
+  -- ...and an exhausted FAILED row must still be refused, so the budget bounds it.
+  insert into public.operations_alert_outbox
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason,
+     attempt_count)
+  values ('t-email-failed-exhausted', gen_random_uuid(), 'email', 'en', 's', 'b', 'failed', null, 5);
+  select count(*) into v_n from public.claim_operations_alert_emails(gen_random_uuid(), 10, 10, 5);
+  if v_n <> 0 then
+    raise exception 'an exhausted failed row must not be claimed, got % rows', v_n;
+  end if;
+
   -- Release returns it for a PROVEN pre-send failure.
   if public.release_operations_alert_email(v_id, v_tok) <> 'released' then
     raise exception 'owner release failed';
