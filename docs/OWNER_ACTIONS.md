@@ -1661,6 +1661,160 @@ emergency.
 
 ---
 
+## 27. A store reviewer cannot sign in (X1) — MECHANISM DECIDED 2026-09-03
+
+**Status:** decided; **one Auth configuration action is open, and it is yours.**
+No code change is required, and none was made — that is the finding, not a
+shortcut.
+
+### The problem
+
+Authentication is WhatsApp OTP to a **Saudi mobile only**, enforced twice:
+`SaudiPhoneInput` renders a fixed `+966` and sanitises to a 9-digit `5XXXXXXXX`,
+and `phone.ts` accepts only `/^5\d{8}$/`. The send button is
+`disabled={!isSaudiMobile(national)}`. An App Review tester in Cupertino cannot
+type their own number, and cannot receive a WhatsApp code sent to a Saudi one.
+Apple guideline **2.1** requires working demo credentials for anything behind a
+sign-in wall.
+
+### The decision: a Supabase Auth test-OTP number
+
+Auth supports mapping a phone number to a fixed code. Supabase's own description:
+*"When a test phone number requests an OTP, the Auth service skips SMS delivery
+and accepts only the mapped code. Other phone numbers continue to use the real
+SMS provider."*
+
+That is exactly the shape this problem needs, and it is why no code changes.
+
+### Why it needs no code — traced, not assumed
+
+| Step | Behaviour with a test number |
+| --- | --- |
+| `sanitizeSaudiNationalInput` / `isSaudiMobile` | A test number in `5XXXXXXXX` form passes; the send button enables |
+| `toSaudiE164` | Produces the canonical `+9665XXXXXXXX` both calls must share |
+| `requestLoginCode` (`loginAvailability.ts:85`) | A thin try/catch around `signIn` — **no additional gate** |
+| `auth.signInWithPhone` → `signInWithOtp` | Auth skips delivery for a test number |
+| `auth-send-sms-whatsapp` hook | **Not invoked.** No WhatsApp message, no Meta template cost, and **no `otp_send_reservations` budget consumed** — the rate limiter shipped 2026-09-02 is untouched |
+| `auth.verifyPhone` → `verifyOtp({type:'sms'})` | Accepts only the mapped code and returns a real session |
+| `handle_new_user` on `auth.users` | Creates the `profiles` row **for a NEW user only** — it is an `after insert` trigger. On an UNUSED number the reviewer lands on a fresh `role = 'customer'` account; on an already-enrolled number they land in **that person's existing account** instead. Step 1 is what keeps this true |
+
+**`phone.ts` deliberately does not narrow to today's operator prefixes** — its
+docblock says a stale allow-list would lock out real customers as CITC allocates
+new `5X` ranges. `phone.test.ts` already canonicalises on `+966512345678`, a `51`
+number, so this breadth is pinned by existing tests rather than assumed.
+
+### The action (yours, §5 — Auth configuration)
+
+1. **Choose a DEDICATED, UNUSED number — and verify it is unused before mapping
+   it.** Any `5XXXXXXXX` is accepted by the client, but which one you pick is the
+   security decision in this whole section.
+
+   **"A number you control" is not the same as "a number nobody has signed up
+   with", and this step said the former until review corrected it (#326).** If the
+   number already has an `auth.users` row, `signInWithOtp` signs the reviewer into
+   **that existing account**. `on_auth_user_created` is `after insert on
+   auth.users`, so it fires only for a NEW user — no fresh profile is created, and
+   the reviewer inherits whatever that account already has.
+
+   **This is not hypothetical here.** Measured live 2026-09-03: **4 of 9
+   `auth.users` rows already carry a phone number.** A number you personally use is
+   *more* likely to be one of them, not less — which is the opposite of what the
+   old wording implied.
+
+   Today all four are `role = 'customer'`, so the exposure is that person's **order
+   history and saved delivery addresses**, published to App Review as a working
+   login. It is not privilege escalation *today* only because no staff or admin
+   account has a phone enrolled; if that ever changes, the same mistake reaches the
+   admin console.
+
+   **Verify before you map it.** Ask the database whether the number is free — a
+   read-only query, and the only way to be sure:
+
+   ```sql
+   select count(*) from auth.users where phone = '+9665XXXXXXXX';
+   ```
+
+   **Zero means safe to use. Anything else: pick a different number.** Do not
+   "clean up" an existing account to reuse its number — deleting a real customer to
+   make room for a test login is a worse outcome than picking another number.
+2. In the Supabase dashboard, **Authentication → Phone provider → test phone
+   numbers**, map that number to a 6-digit code.
+3. Sign in once on a device to confirm the pair works **before** submitting.
+4. **Remove the entry once review concludes, and verify it is gone** — see below.
+
+### Removal is the control, and this section used to say something else
+
+**This step read "Set an expiry" until 2026-09-03. That was wrong, and wrong in
+a way that would have left a live credential enabled indefinitely.** Review
+caught it on #326.
+
+`SMS_TEST_OTP_VALID_UNTIL` is a **self-hosting** environment variable. Neither
+hosted Auth guide documents a per-entry expiry on test phone numbers, and the
+hosted **Email OTP Expiration** setting governs how long a *generated* OTP stays
+valid — it does not expire a **mapped fixed code**. So the instruction pointed at
+a control that probably is not in your dashboard, and demoted the thing that
+actually works to a diary note.
+
+**State the exposure plainly, because it is the reason this matters.** While the
+entry exists, that phone number and code are a **permanent, reusable login** to
+that account — no SMS, no WhatsApp, no second factor. The pair is also written
+into the App Store Connect review notes, so it is not a secret in any meaningful
+sense.
+
+**Therefore:**
+
+- **removal is the control.** When review concludes, delete the test-phone entry
+  in Authentication → Phone provider;
+- **verify it, do not assume it.** Attempt a sign-in with the same number and
+  code afterwards and confirm it is refused. A deletion you did not check is a
+  belief, not a control;
+- **update the review notes** in App Store Connect at the same time, so a later
+  submission does not ship a credential that no longer works — or worse, one that
+  does;
+- if your plan *does* expose a per-entry expiry, set it as well. Belt and braces,
+  never the plan.
+
+`docs/RELEASE_CHECKLIST.md` carries this as an actual checkbox — §8 creates the
+entry, §11 removes and verifies it — because a step that lives only in prose is
+a step that gets skipped.
+
+**Do not put the code in this repository, a commit message, a PR description or a
+test.** It is a password-equivalent for that account (§9). The *number* may be
+recorded here if you want; the code may not.
+
+### App Store Connect — review notes to paste
+
+> This app serves customers in Saudi Arabia. Sign-in is by one-time code sent over
+> WhatsApp to a Saudi mobile number, so a reviewer cannot use their own number.
+>
+> Please use the demo account below. It signs in with a fixed code and does not
+> require WhatsApp or any SMS to be received.
+>
+> Phone: +966 5X XXX XXXX
+> Code: XXXXXX
+>
+> Enter the phone number on the sign-in screen, tap send, then enter the code.
+> Account deletion is available in-app at Profile → Delete account.
+
+That last line is deliberate: it answers guideline **5.1.1(v)** in the same breath,
+and the row it points at exists as of 2026-09-03 (X4).
+
+### What was rejected, and why
+
+- **App Review notes alone**, with a human relaying each code — reviewers work in
+  another time zone and Apple commonly rejects under 2.1 when a code must be
+  relayed. It also makes every re-review a manual event.
+- **A build-flagged reviewer mode in the app** — a real authentication backdoor in
+  production code. The risk is permanent; the benefit lasts one review.
+
+### What this does NOT do
+
+It does not make login work for anyone outside Saudi Arabia, and it is not a
+fallback channel. **X7 is untouched**: WhatsApp remains the only real login path,
+with no SMS fallback, and its Meta credential still needs checking.
+
+---
+
 ## 28. Operations alert email dispatch (X3) — BUILT INERT 2026-09-03
 
 **Status:** written and merged; **three separate actions are open, and all three
