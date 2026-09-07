@@ -49,6 +49,7 @@ npm run docs:check      # what CI runs: drift + ownership
 | Undo something that shipped | [Rollback](ROLLBACK.md) |
 | Understand an alert I have been paged about | [Operations alerts digest](OPERATIONS_ALERTS_DIGEST.md) · [Health center](OPERATIONS_HEALTH_CENTER.md) |
 | Investigate a stranded or missing order | [Order integrity watchdog](ORDER_INTEGRITY_WATCHDOG.md) · [Order confirmation flow](ORDER_CONFIRMATION_FLOW.md) |
+| Run or change the loyalty programme | [Loyalty](LOYALTY.md) |
 | Bring a new restaurant branch online | [Branch onboarding](BRANCH_ONBOARDING.md) |
 | Remove a restaurant branch | [Branch deletion](BRANCH_DELETION.md) |
 | Restore data | [Backup and recovery](BACKUP_RECOVERY.md) |
@@ -86,6 +87,7 @@ npm run docs:check      # what CI runs: drift + ownership
 | [Decision records](decisions/README.md) | Why a choice was made, what was rejected, and what it costs |
 | [Payment postponement](PAYMENT_POSTPONEMENT.md) | Why payments are frozen and what the freeze covers |
 | [Discounts and campaigns](DISCOUNTS_CAMPAIGNS.md) | The schema, and the business questions still open |
+| [Loyalty](LOYALTY.md) | How points are earned and spent, why they are pickup-only, and what is planned |
 | [Security review](SECURITY_REVIEW.md) | Security posture and findings |
 | [Security policy](../SECURITY.md) | How to report a vulnerability |
 

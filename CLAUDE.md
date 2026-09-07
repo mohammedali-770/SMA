@@ -226,20 +226,38 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Re-read live 2026-09-07, AFTER the alert-dispatch SCHEDULER apply: 120
-repository files / 125 live history rows / exactly ONE unapplied — Moyasar,
-frozen on purpose.** Latest live version `20260907082317`
+**Current position 2026-09-07, after the loyalty pickup-only migration was
+written: 121 repository files / 125 live history rows / TWO unapplied — Moyasar
+(frozen on purpose) and `20260907120000_loyalty_pickup_only` (written, awaiting
+approval).** The live figure is unchanged from the read below; only the
+repository side moved, because the new file has not been applied.
+
+**The new one touches the MONEY PATH, which is what makes it different from the
+last several.** It redefines `place_order` and `compute_order_snapshot`, so the
+pair of hashes every ledger row since 2026-08-27 has recorded as *unchanged*
+(`8bd7183832108abb25bcca6942dccd70` / `f955b748b698a1704533f4aaffb835cb`) **will
+change on apply**. That is the intended effect of the work, not an anomaly — but
+it retires a signal that has been used as a safety check, so record the new
+hashes deliberately at apply time rather than treating a mismatch as a fault.
+Behaviour and evidence: `docs/LOYALTY.md` §2. Its own closing `DO` block refuses
+to apply unless BOTH functions carry the gate, so it cannot land half-applied.
+
+**Superseded — kept because its reasoning is the point.** For a few hours the
+count was back to ONE, and that is the dangerous shape rather than the safe one:
+with a single file left, "apply the outstanding migrations" reads like a no-op
+and is in fact the one instruction that would break the §6 payment freeze,
+because there is no other file it could mean. The guard that used to catch a bulk
+apply — Moyasar sorting ahead of a second, legitimate file — had run out of second
+files. There is a second file again, which restores the *appearance* of an
+innocent referent without making a bulk apply any safer: `20260824100000` still
+sorts ahead of everything. **Name the target by version.** That is what makes the
+count irrelevant in either shape.
+
+**The read that statement was taken from: live 2026-09-07, AFTER the
+alert-dispatch SCHEDULER apply — 120 repository files / 125 live history rows /
+exactly ONE unapplied.** Latest live version `20260907082317`
 (`20260903130000_operations_alert_dispatch_scheduler`, applied 08:23:17 UTC on
 explicit owner approval; ledger row 80).
-
-**The count is back to ONE, and that is the dangerous shape, not the safe one.**
-Re-read the paragraph further down that this restores: with a single file left,
-"apply the outstanding migrations" reads like a no-op and is in fact the one
-instruction that would break the §6 payment freeze, because there is no other
-file it could mean. The guard that used to catch a bulk apply — Moyasar sorting
-ahead of a second, legitimate file — has run out of second files. A bulk apply
-now applies the payment migration and nothing else. **Name the target by
-version.**
 
 **X3 is one step from closed.** Steps 1-3 are done: the base migration applied
 06:46:38 (row 79), `operations-alert-dispatch` deployed as version 1 at 07:18:43,
@@ -318,6 +336,7 @@ by version.**
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
+| `20260907120000_loyalty_pickup_only.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval.** Not frozen, and not Moyasar. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
 | `20260903130000_operations_alert_dispatch_scheduler.sql` | **APPLIED 2026-09-07 08:23:17 UTC**, live version `20260907082317`, on explicit owner approval, one call, target named explicitly. Ledger row 80. The pg_cron invocation path for the dispatcher — the piece whose absence review caught on #328, when the dispatcher shipped with no caller and the docs claimed enabling sent mail. Its two Vault secrets were created first, at 08:21:35 and 08:21:44; the trigger secret was generated **inside Postgres** and never crossed the wire, so nobody has seen it. Inert while dispatch is disabled, and that was watched rather than assumed: cron run **218621** at 08:25:00 `succeeded` in **11 ms** and made no outbound request. **Only enabling the flag remains.** |
 | `20260903120000_operations_alert_email_dispatch.sql` | **APPLIED 2026-09-07 06:46:38 UTC**, live version `20260907064638`, on explicit owner approval ("apply 20260903120000" — named by version), one call, target named explicitly. Ledger row 79. Operations alerts v2 — the email dispatch path for X3. Removed three deliberate v1 interlocks (the outbox dormancy CHECK, the producers' hard-coded `in_app`, and the settings RPC's refusal) for the **email channel only**; `whatsapp` and `push` stay structurally blocked. It changed NO behaviour, verified after the fact: the flag is still false, the outbox still holds 136 rows with zero on the `email` channel, and the money-path hashes are unchanged. **Deploying `operations-alert-dispatch`, applying `20260903130000` with its Vault secrets, and enabling the flag remain three separate §5 actions.** |
 | `20260902120000_orders_index_cleanup.sql` | **APPLIED 2026-09-02 12:37:37 UTC**, live version `20260902123737`, on explicit owner approval ("apply 20260902120000" — named by version), one call, target named explicitly. Ledger row 78. Dropped `orders_lazywait_deadline_queue_idx` (an exact duplicate) and `orders_sync_queue_idx` (dead); `orders` index count 18 → 16, the survivor still serves the queue predicate by index scan, and the money-path hashes are unchanged. No deploy implied. |

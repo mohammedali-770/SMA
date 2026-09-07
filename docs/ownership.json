@@ -108,6 +108,18 @@
       ]
     },
     {
+      "id": "loyalty",
+      "why": "Loyalty is LIVE: points are earned and spent by real customers, and a silent change here changes what somebody is charged. The rule exists because the earning and redemption logic is duplicated in TWO SQL functions - place_order (what happens) and compute_order_snapshot (what the checkout screen promises) - plus a client mirror in previewTotals.ts, so a rule can be applied in one place and silently missed in another. Migrations are not listed (they are append-only, each its own file); this covers the code that reads the settings, mirrors the rules and lets an administrator change them. Added 2026-09-07 with the pickup-only channel rule, which was the first loyalty behaviour change to discover that no rule fired at all.",
+      "sources": [
+        "apps/mobile/src/features/checkout/previewTotals.ts",
+        "apps/mobile/src/features/checkout/view/Loyalty*.tsx",
+        "src/components/admin/SettingsPanel.tsx",
+        "src/lib/mappers.ts",
+        "apps/mobile/src/lib/mappers.ts"
+      ],
+      "docs": ["docs/LOYALTY.md"]
+    },
+    {
       "id": "order-lifecycle",
       "why": "The confirmation flow spans the app, the POS and the receipt a cashier reads. Its documentation is what makes a customer complaint traceable. The PostgREST transport `supabase/functions/_shared/rest*.ts` was added on 2026-08-30, when order-intake dropped its supabase-js dependency; it is listed because the rule otherwise fires only on the entrypoint, so work that moved order-path behaviour into the shared module and left index.ts untouched would pass the documentation gate in silence.",
       "sources": [

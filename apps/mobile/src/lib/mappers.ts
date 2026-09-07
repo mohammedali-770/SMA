@@ -339,6 +339,10 @@ export function mapLoyaltySettings(s: DbAppSettings): LoyaltySettings {
     pointsPerRiyal: Number(s.points_per_riyal),
     minPointsToRedeem: s.min_points_to_redeem,
     discountPerPoint: Number(s.discount_per_point),
+    // Defaults TRUE, matching the column default. A project that has not been
+    // migrated yet therefore shows the pickup-only rule rather than offering a
+    // redemption the server would refuse.
+    pickupOnly: s.loyalty_pickup_only ?? true,
   };
 }
 

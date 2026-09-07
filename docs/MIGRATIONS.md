@@ -24,6 +24,32 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-07 (later the same day) — there are TWO unapplied
+> repository files again, and the new one is NOT frozen.** It is
+> `20260907120000_loyalty_pickup_only.sql`: loyalty becomes pickup-only, written
+> and awaiting owner approval. **121 repository files / 125 live history rows.**
+>
+> Read that as a change of shape, not only of arithmetic. While exactly one file
+> was outstanding, *"apply the outstanding migrations"* could only have meant
+> Moyasar, and the warning below said so. Now the same sentence has a plausible
+> innocent referent again — and a bulk apply would still sweep Moyasar in,
+> because `20260824100000` sorts ahead of everything. **Name the target by
+> version.** That is what makes the count irrelevant either way.
+>
+> **This one touches the money path, which the recent applies did not.** It
+> redefines `place_order` and `compute_order_snapshot`, so their hashes
+> (`8bd7183832108abb25bcca6942dccd70` / `f955b748b698a1704533f4aaffb835cb`) — the
+> pair every ledger row since 2026-08-27 has recorded as *unchanged* — **will
+> change**. That is the point of the work, not a surprise, but it retires a
+> signal that has been used as a safety check: record the new hashes deliberately
+> at apply time rather than reporting a mismatch as an anomaly.
+>
+> It carries its own interlock. Its closing `DO` block counts
+> `v_loyalty_channel_ok` in each function's `prosrc` and **raises unless both
+> carry four references**, so a gate that reached only one of the twin pricing
+> functions cannot apply at all. Behaviour, evidence and the admin control:
+> [`LOYALTY.md`](LOYALTY.md) §2.
+>
 > **Updated 2026-09-07 — `20260903120000_operations_alert_email_dispatch.sql` is
 > APPLIED.** Live version `20260907064638`, applied 06:46:38 UTC on explicit owner
 > approval naming the target by version; ledger row 79. It changed no behaviour,
@@ -34,9 +60,12 @@ to Production.**
 >
 > **Superseded the same day: `20260903130000_operations_alert_dispatch_scheduler.sql`
 > is ALSO APPLIED** — live version `20260907082317`, 08:23:17 UTC, ledger row 80.
-> **Exactly ONE repository file is now unapplied, and it is Moyasar.**
+> **Exactly ONE repository file was unapplied at that moment, and it was
+> Moyasar** — superseded hours later by `20260907120000_loyalty_pickup_only`, per
+> the block at the top of this section. Kept because the reasoning outlives the
+> count.
 >
-> That returns this repository to the state the warning further down describes,
+> That returned this repository to the state the warning further down describes,
 > and it is worth re-reading rather than skimming: with one file left, *"apply the
 > outstanding migrations"* reads like a no-op and is in fact the single
 > instruction that would break the §6 payment freeze, because there is no other

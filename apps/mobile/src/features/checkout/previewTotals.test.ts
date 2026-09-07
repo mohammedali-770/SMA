@@ -135,8 +135,12 @@ describe('computePreviewTotals — discounts', () => {
   });
 
   it('caps loyalty at what remains after the coupon', () => {
+    // `loyaltyPickupOnly: false` because `base` is a DELIVERY cart and this case
+    // is about the CAP, not the channel. Without it the assertion would pass on
+    // a loyaltyDiscount of 0 for the wrong reason and stop guarding the cap.
     const r = computePreviewTotals({
-      ...base, items: [line(20, 1)], couponDiscount: 15, loyaltyPoints: 100, discountPerPoint: 1,
+      ...base, items: [line(20, 1)], couponDiscount: 15, loyaltyPoints: 100,
+      discountPerPoint: 1, loyaltyPickupOnly: false,
     });
     expect(r.couponDiscount).toBe(15);
     expect(r.loyaltyDiscount).toBe(5); // not 100
@@ -151,8 +155,74 @@ describe('computePreviewTotals — discounts', () => {
   });
 
   it('ignores loyalty entirely when no points are being redeemed', () => {
-    const r = computePreviewTotals({ ...base, items: [line(20, 2)], loyaltyPoints: 0, discountPerPoint: 5 });
+    const r = computePreviewTotals({
+      ...base, items: [line(20, 2)], loyaltyPoints: 0, discountPerPoint: 5,
+      loyaltyPickupOnly: false,   // zero points, not the channel, is the reason
+    });
     expect(r.loyaltyDiscount).toBe(0);
+  });
+});
+
+describe('computePreviewTotals — loyalty is pickup only', () => {
+  // The client half of 20260907120000_loyalty_pickup_only. `place_order` and
+  // `compute_order_snapshot` refuse to redeem on a delivery order; if this
+  // preview did not, the checkout would show a reduction the customer never
+  // receives -- the mirror-drift failure the SQL suite's section 4 also guards.
+  const redeeming = {
+    ...base, items: [line(20, 2)], loyaltyPoints: 100, discountPerPoint: 0.1,
+  };
+
+  it('withholds the discount on a delivery order', () => {
+    const t = computePreviewTotals({ ...redeeming, orderType: 'delivery' });
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.total).toBe(50);            // 40 goods + 10 delivery, nothing off
+    expect(t.loyaltyBlockedByChannel).toBe(true);
+  });
+
+  it('applies it on a pickup order', () => {
+    const t = computePreviewTotals({ ...redeeming, orderType: 'pickup' });
+    expect(t.loyaltyDiscount).toBe(10);
+    expect(t.total).toBe(30);            // no delivery fee on pickup
+    expect(t.loyaltyBlockedByChannel).toBe(false);
+  });
+
+  it('defaults to the rule when the setting is absent', () => {
+    // An unmigrated project, or a settings row that failed to load, must
+    // UNDER-promise. Offering a discount the server refuses is the expensive
+    // direction to fail.
+    const t = computePreviewTotals({ ...redeeming, loyaltyPickupOnly: undefined });
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.loyaltyBlockedByChannel).toBe(true);
+  });
+
+  it('applies it on delivery once the owner turns the rule off', () => {
+    const t = computePreviewTotals({ ...redeeming, loyaltyPickupOnly: false });
+    expect(t.loyaltyDiscount).toBe(10);
+    expect(t.total).toBe(40);
+    expect(t.loyaltyBlockedByChannel).toBe(false);
+  });
+
+  it('has nothing to explain when the customer is redeeming nothing', () => {
+    // A delivery customer who never touched the toggle is not being refused
+    // anything, so the screen must not tell them points were withheld.
+    const t = computePreviewTotals({ ...redeeming, loyaltyPoints: 0 });
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.loyaltyBlockedByChannel).toBe(false);
+  });
+
+  it('has nothing to explain when the customer is comped', () => {
+    // A comped order already costs 0.00 and says why. Two explanations for one
+    // absent discount is worse than one.
+    const t = computePreviewTotals({ ...redeeming, comped: true });
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.loyaltyBlockedByChannel).toBe(false);
+  });
+
+  it('leaves the coupon alone — the rule is about points, not discounts', () => {
+    const t = computePreviewTotals({ ...redeeming, couponDiscount: 10 });
+    expect(t.couponDiscount).toBe(10);
+    expect(t.loyaltyDiscount).toBe(0);
+    expect(t.total).toBe(40);            // 40 goods + 10 delivery - 10 coupon
   });
 });
 
@@ -205,6 +275,7 @@ describe('computePreviewTotals — comped customers', () => {
     const t = computePreviewTotals({
       ...base, items: [line(20, 2)], couponDiscount: 10,
       loyaltyPoints: 100, discountPerPoint: 0.1, comped: true,
+      loyaltyPickupOnly: false,   // the COMP is the reason, not the channel
     });
     expect(t.couponDiscount).toBe(0);
     expect(t.loyaltyDiscount).toBe(0);
@@ -215,7 +286,7 @@ describe('computePreviewTotals — comped customers', () => {
   it('still applies both for a customer who is not comped', () => {
     const t = computePreviewTotals({
       ...base, items: [line(20, 2)], couponDiscount: 10,
-      loyaltyPoints: 100, discountPerPoint: 0.1,
+      loyaltyPoints: 100, discountPerPoint: 0.1, loyaltyPickupOnly: false,
     });
     expect(t.couponDiscount).toBe(10);
     expect(t.loyaltyDiscount).toBe(10);

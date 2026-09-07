@@ -59,6 +59,7 @@ import { CheckoutLines } from './view/CheckoutLines';
 import { CouponRow } from './view/CouponRow';
 import { DeliveryLocationSection } from './view/DeliveryLocationSection';
 import { ConfirmDialog } from './view/Dialog';
+import { LoyaltyChannelNote } from './view/LoyaltyChannelNote';
 import { LoyaltyToggle } from './view/LoyaltyToggle';
 import { OrderTypeRow } from './view/OrderTypeRow';
 import { PaymentMethodPicker } from './view/PaymentMethodPicker';
@@ -377,6 +378,17 @@ export function CheckoutScreen() {
 
   const availablePoints = profile?.loyaltyPoints ?? 0;
   const loyaltyEnabled = Boolean(loyalty?.isEnabled) && availablePoints >= (loyalty?.minPointsToRedeem ?? Infinity);
+  // Loyalty is a PICKUP incentive. `place_order` and `compute_order_snapshot`
+  // both refuse to redeem on a delivery order while
+  // `app_settings.loyalty_pickup_only` is on (20260907120000), so the toggle is
+  // replaced by an explanation rather than left to offer a discount the server
+  // will not grant. `pickupOnly` defaults TRUE in `mapLoyaltySettings`, so an
+  // unloaded settings row withholds the offer rather than making a false one.
+  const loyaltyChannelOk = !(loyalty?.pickupOnly ?? true) || orderType === 'pickup';
+  // Read at BOTH use sites below, so switching from pickup to delivery with the
+  // toggle already on cannot leave a stale redemption in the preview or, worse,
+  // in what is submitted.
+  const redeemingPoints = redeemPoints && loyaltyChannelOk ? availablePoints : 0;
   const couponDiscount = couponResult?.ok ? couponResult.discount : 0;
 
   const totals = useMemo(() => computePreviewTotals({
@@ -385,10 +397,11 @@ export function CheckoutScreen() {
     deliveryFee: selectedBranch?.deliveryFee ?? 0,
     minDeliveryOrder: selectedBranch?.minDeliveryOrder ?? 0,
     couponDiscount,
-    loyaltyPoints: redeemPoints ? availablePoints : 0,
+    loyaltyPoints: redeemingPoints,
     discountPerPoint: loyalty?.discountPerPoint ?? 0,
+    loyaltyPickupOnly: loyalty?.pickupOnly ?? true,
     comped,
-  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemPoints, availablePoints, loyalty, comped]);
+  }), [cart.items, orderType, selectedBranch, couponDiscount, redeemingPoints, loyalty, comped]);
 
   // The confirmed location, and the landmark that travels WITH it.
   //
@@ -644,7 +657,7 @@ export function CheckoutScreen() {
         addressId: deliveryAddressId,
         couponCode: couponResult?.ok ? couponCode.trim() : null,
         notes: normalizeOrderNote(notes),
-        loyaltyPoints: redeemPoints ? availablePoints : 0,
+        loyaltyPoints: redeemingPoints,
         idempotencyKey: cart.idempotencyKey,
         paymentMethod,
       };
@@ -897,12 +910,22 @@ export function CheckoutScreen() {
 
           {loyaltyEnabled ? (
             <Section>
-              <LoyaltyToggle
-                on={redeemPoints}
-                onToggle={() => setRedeemPoints((v) => !v)}
-                label={t('useLoyalty')}
-                pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
-              />
+              {loyaltyChannelOk ? (
+                <LoyaltyToggle
+                  on={redeemPoints}
+                  onToggle={() => setRedeemPoints((v) => !v)}
+                  label={t('useLoyalty')}
+                  pointsLabel={`${availablePoints} ${t('pointsAvailable')}`}
+                />
+              ) : (
+                // A customer holding a redeemable balance who is shown nothing
+                // reads it as the app having lost their points. Say why, and say
+                // the points are still there.
+                <LoyaltyChannelNote
+                  title={t('loyaltyPickupOnly')}
+                  balanceLine={`${availablePoints} ${t('pointsAvailable')} — ${t('loyaltyPickupOnlyBalance')}`}
+                />
+              )}
             </Section>
           ) : null}
 
