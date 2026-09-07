@@ -241,11 +241,15 @@ rows with **zero** on the `email` channel, and `place_order` /
 Moyasar was re-verified absent immediately afterwards: zero `%moyasar%`
 functions, zero history rows, `provider_name` still `tap`, still disabled.
 
-**X3 is NOT closed by this.** Applying it was step 1 of four. Nothing is sent
-until `operations-alert-dispatch` is deployed, `20260903130000` is applied with
-its two Vault secrets, and the flag is turned on — three further §5 actions.
-Until all four, `docs/INCIDENT_RESPONSE.md` §1b's named watcher is still the
-real answer to "who finds out when something breaks".
+**X3 is NOT closed by this.** Applying it was step 1 of four, and
+**`operations-alert-dispatch` was deployed as version 1 the same day** (step 2,
+2026-09-07 07:18:43 UTC, `verify_jwt = false`) — verified inert by probe: `GET`
+405, unauthenticated `POST` 401, and a scheduler-header `POST` **fails closed**
+at 500 because the signature RPC ships in the still-unapplied `20260903130000`.
+Nothing is sent until that migration is applied with its two Vault secrets and
+the flag is turned on — two further §5 actions. Until all four,
+`docs/INCIDENT_RESPONSE.md` §1b's named watcher is still the real answer to "who
+finds out when something breaks".
 
 **SUPERSEDED 2026-09-07 — the statement below was written when THREE files were
 unapplied.** The third of them is the one just applied.
