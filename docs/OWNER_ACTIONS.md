@@ -1815,10 +1815,27 @@ with no SMS fallback, and its Meta credential still needs checking.
 
 ---
 
-## 28. Operations alert email dispatch (X3) — BUILT INERT 2026-09-03
+## 28. Operations alert email dispatch (X3) — BASE MIGRATION APPLIED 2026-09-07
 
-**Status:** written and merged; **three separate actions are open, and all three
-are yours.** Nothing has been applied, deployed or enabled.
+**Status:** step 1 of four is **DONE**.
+`20260903120000_operations_alert_email_dispatch` was applied to Production on
+**2026-09-07 06:46:38 UTC** (live version `20260907064638`, ledger row 79 in
+`MIGRATIONS.md`), on explicit owner approval naming the target by version.
+
+**Three actions remain open, and all three are yours:** deploy
+`operations-alert-dispatch`; apply
+`20260903130000_operations_alert_dispatch_scheduler` and create its two Vault
+secrets; enable `external_dispatch_enabled`.
+
+**Nothing has been deployed or enabled, and no alert has reached anyone.** The
+apply changed no behaviour — the flag is still false and the outbox still holds
+its same 136 rows with zero on the `email` channel — so until the three remaining
+steps are done, `INCIDENT_RESPONSE.md` §1b's named watcher is still what actually
+tells you when something breaks.
+
+This section header said **BUILT INERT 2026-09-03** and this status said *"nothing
+has been applied"* until the apply landed; both are corrected rather than deleted
+so the sequence stays readable.
 
 ### Why
 
@@ -1858,14 +1875,28 @@ mailbox that cries wolf is worse than no alert mailbox.
 send time, so revoking somebody's admin role stops their alert mail in the same
 act. There is **one** admin with an email address today.
 
-### The three actions, in this order
+### The four actions, in this order — step 1 is DONE
 
-1. **Apply the migration** — `20260903120000_operations_alert_email_dispatch`.
-   Name it by version. There are now TWO unapplied files and the other is the
-   frozen Moyasar one, which sorts **ahead** of this one; a bulk apply takes it
-   first. Applying changes no behaviour: the flag stays false, every producer
-   gate is `and external_dispatch_enabled`, and the file's own self-verification
-   block raises if the flag moved or if a single `email` row exists.
+1. ~~**Apply the migration**~~ — **DONE 2026-09-07 06:46:38 UTC**, live version
+   `20260907064638`, on explicit owner approval naming the target by version
+   ("apply 20260903120000"), via MCP `apply_migration`, one call, that file only.
+   Ledger row 79 in `MIGRATIONS.md`.
+
+   **It changed nothing, and that was measured afterwards rather than assumed:**
+   `external_dispatch_enabled` is still false, the outbox still holds its same
+   **136** rows with **zero** on the `email` channel, and `place_order` /
+   `compute_order_snapshot` hash identically before and after. Moyasar was
+   re-verified absent immediately after — it sorts ahead of everything, which is
+   exactly why the target was named by version. Supabase security advisors:
+   **0 ERROR**, and no finding names any of the four new functions.
+
+   **The riskiest part was cleared before sending, not after:** the new CHECK
+   constrains `in_app` rows, and adding a CHECK to a populated table fails if any
+   row violates it. All 136 live rows were counted through both new predicates
+   read-only first — 0 violations. The three replaced function signatures were
+   also compared against live first, because `create or replace` fails on a
+   changed signature.
+
 2. **Deploy `operations-alert-dispatch`** — `verify_jwt = false`, matching
    `config.toml`. Still sends nothing: the handler re-checks the master flag
    itself, so a deploy against a disabled flag is a no-op by construction.
@@ -1874,7 +1905,23 @@ act. There is **one** admin with an email address today.
 4. **Invoke the dispatcher.** Nothing does this automatically yet — see below.
 
 Order matters. Deploying before applying gives a function whose RPCs do not
-exist; enabling before deploying queues rows nothing drains.
+exist; enabling before deploying queues rows nothing drains. Step 1 having
+landed, the RPCs the function calls now exist, so **step 2 is unblocked**.
+
+**Two housekeeping follow-ups the apply surfaced**, neither behavioural and
+neither blocking:
+
+- two `comment on function` descriptions set by `20260723090000` survived
+  `create or replace` and now understate what the settings RPC permits (they say
+  external dispatch "cannot be enabled in this version"). Nothing reads
+  `pg_description` — no test, no console, no generator — so this is stale text
+  with no consumer;
+- the applied file's header calls it a "KNOWN LIMITATION" that
+  `operations_alert_settings_safe()` will not return `dispatch_language` and
+  `dispatch_min_severity`. That is wrong: the function is
+  `select to_jsonb(p) - 'updated_by'`, a whole-row projection, so both columns
+  surface already. The admin console's normalizer discards keys it does not
+  model, so nothing breaks either way.
 
 ### Step 4 in detail — the invocation path
 
