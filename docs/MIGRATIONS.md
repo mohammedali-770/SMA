@@ -24,6 +24,28 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-07 — `20260903120000_operations_alert_email_dispatch.sql` is
+> APPLIED.** Live version `20260907064638`, applied 06:46:38 UTC on explicit owner
+> approval naming the target by version; ledger row 79. It changed no behaviour,
+> and that was measured rather than assumed: `external_dispatch_enabled` is still
+> false, the outbox still holds its same 136 rows with **zero** on the `email`
+> channel, and `place_order` / `compute_order_snapshot` hash identically before
+> and after. Moyasar was re-verified absent immediately afterwards.
+>
+> **The two unapplied files are now Moyasar (frozen under §6) and
+> `20260903130000_operations_alert_dispatch_scheduler.sql` (written, awaiting
+> approval).** Moyasar still sorts ahead of the scheduler, so the pairing rule
+> below is unchanged in substance — only in which file it names second.
+>
+> **X3 is not closed by that apply.** It was step 1 of four; the deploy, the
+> scheduler apply with its two Vault secrets, and the flag are three further §5
+> actions. Until all four, `INCIDENT_RESPONSE.md` §1b's named watcher is the real
+> answer.
+>
+> **SUPERSEDED 2026-09-07 — the block below was written while this file was still
+> unapplied.** It is kept because it explains why the file exists at all, which
+> the status line above does not.
+>
 > **Updated 2026-09-03 — there are now TWO unapplied repository files, and only
 > one of them is frozen.** The second is
 > `20260903120000_operations_alert_email_dispatch.sql`: operations alerts v2,
@@ -51,10 +73,12 @@ to Production.**
 > ahead of both, so a bulk apply still takes the payment file first. Apply,
 > deploy, apply-the-scheduler and enable are four separate §5 decisions.
 >
-> **The two unapplied files must never be applied together.**
-> `20260824100000_moyasar_payment_provider.sql` sorts ahead of this one, so any
-> bulk operation sweeps the frozen payment file in first. Name the target by
-> version, as every apply since 2026-08-26 has done.
+> **The two unapplied files must never be applied together.** Since 2026-09-07
+> those are `20260824100000_moyasar_payment_provider.sql` and
+> `20260903130000_operations_alert_dispatch_scheduler.sql`; Moyasar sorts ahead
+> of the scheduler exactly as it sorted ahead of the file that used to stand
+> here, so any bulk operation sweeps the frozen payment file in first. Name the
+> target by version, as every apply since 2026-08-26 has done.
 
 Two files were applied on 2026-08-22 with explicit owner approval, via the MCP
 `apply_migration` workflow, one call per file. Full evidence — pre-live gate,
@@ -489,11 +513,11 @@ production.
 | 78 | 20260902120000 | orders_index_cleanup | `fd3072ed0cec` | 20260902123737 | 20260902120000_orders_index_cleanup | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-02 12:37:37 UTC** on explicit owner approval ("apply 20260902120000" — the target named by version), via MCP `apply_migration`, **one call, target named explicitly**. Merged in PR #313 as `fc3d76a`; the file was hashed from the **default branch** before sending (sha256 `34211d128b21d80294fa03077a7779e2ca1db0ddb65d35e32bf9613965c299ee`, 90 lines / 4 999 bytes) and confirmed identical to the copy CI replayed. **What it does:** two `drop index if exists` statements and nothing else — 88 of the 90 lines are the header. `orders_lazywait_deadline_queue_idx` was a byte-identical DUPLICATE of `orders_lazywait_queue_idx` (same column, same predicate, different name, so `create index if not exists` could not dedupe them); `orders_sync_queue_idx` was DEAD, its `where sync_status` predicate being the only such filter anywhere in the repository. **Verified after the apply:** both gone, the survivor present and `indisvalid`, and `orders` index count **18 → 16** — exactly two, nothing else. **The decisive check is a plan, not a count:** the live queue predicate (`lazywait_sync_state in ('pending','failed') and sync_next_attempt_at <= now()`) still plans as `Index Scan using orders_lazywait_queue_idx`, so every query the dropped duplicate used to split traffic with is still served, with the same plan. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after, and identical to the figures recorded on 2026-08-27. **Moyasar re-verified absent:** 0 `%moyasar%` functions, 0 history rows. Supabase security advisors afterwards: **0 ERROR**, and no finding names either dropped index. No row was read or written; `orders` still holds 66 rows. **Version NOT aligned** — live carries the apply-time stamp `20260902123737` (§9-D). Live history **122 → 123**. **Current latest live version** |
 | 79 | 20260903120000 | operations_alert_email_dispatch | `d3ea9fce042f` | 20260907064638 | operations_alert_email_dispatch | = | B | ✔ verified live | CONFIRMED | none | high if `db push` | **Applied 2026-09-07 06:46:38 UTC** on explicit owner approval ("apply 20260903120000" — the target named by version, leaving nothing to infer), via MCP `apply_migration`, **one call, target named explicitly**. At apply time **three** repository files were outstanding, and one of them is the frozen Moyasar file, which sorts ahead of both — so a bulk apply would have taken the payment file first. Naming the version is what made the count irrelevant. Merged first in PR #328 as squash `5d39c64`; the file was hashed **from the merged default branch** immediately before sending (sha256 `87030c05fcc6be474e417fb2ab8f26b7700dd3526c66fd077e5a6e404dee4a45`, 805 lines / 37 166 bytes) and confirmed byte-identical to the copy CI and the local harness had tested. **What it does:** operations alerts v2, the email dispatch path for X3. Adds `dispatch_language` and `dispatch_min_severity` to the settings singleton; adds `claim_token`, `claimed_at` and `last_error_safe` to the outbox; widens the status vocabulary with `processing`; replaces the `operations_alert_outbox_v1_dormancy` CHECK with `operations_alert_outbox_v2_dispatch`; redefines three functions (the two producers and the settings RPC) and creates four (`operations_alerts_dispatch_recipients`, `claim_operations_alert_emails`, `finalize_operations_alert_email`, `release_operations_alert_email`); adds one partial index on the claim path. **Why:** the alert engine has run since 2026-07-23 and had never reached a human. All 136 outbox rows are `('in_app','recorded')` and stop in the database; the one critical incident on record (2026-08-10, stranded orders + platform health) was seen by nobody until somebody opened the console. **It widens ONE channel.** `whatsapp` and `push` keep the v1 prohibition under the v2 CHECK, which was read back from `pg_constraint` after the apply rather than assumed. **The `=` is earned rather than assumed, and the transform is written down here because §4 names it without defining it:** strip `--` comments, collapse all whitespace runs to a single space, trim, sha256, first 12 hex. That gives `d3ea9fce042f` over the merged repository file and `d3ea9fce042f` over the live row's joined statements (1 statement, 37 156 stored chars) — identical, so content equivalence was measured on both sides rather than inferred from a successful apply. **The riskiest statement was proven safe against real data BEFORE sending, not after:** the v2 CHECK constrains `in_app` rows to `status in ('recorded','cancelled') and blocked_reason is null`, and adding a CHECK to a populated table fails if any row violates it. All **136** live rows were counted through both new predicates read-only first — **0** would violate `operations_alert_outbox_v2_dispatch` and **0** the widened status check. They are uniformly `in_app`/`recorded`/null-reason. **The second abort risk was also cleared first:** `create or replace function` fails if a replaced function's signature or return type changed, so all three were compared against live `pg_get_function_identity_arguments` and `pg_get_function_result` before the apply — `operations_alerts_outbox_for_event(uuid,text,text,text,text) returns integer` (not SECURITY DEFINER), `operations_digest_generate(timestamptz) returns jsonb` and `operations_alert_settings_update(jsonb) returns jsonb` (both SECURITY DEFINER) — all three matching the file exactly. Confirmed after: **7** function names, **7** overloads, so nothing forked into a second signature. **Independently audited before the write.** Nineteen agents across six dimensions (money path, preconditions vs. measured live state, inertness, atomicity, self-verification, privilege/RLS) raised **13** findings; every one was refuted under adversarial verification, leaving **zero** standing. The money-path dimension returned nothing at all. The two that reproduced but did not matter are recorded rather than dropped: two `comment on function` descriptions from `20260723090000` survive `create or replace` and now understate what the settings RPC permits (nothing reads `pg_description` — grep returns no consumer outside migrations), and the file's own header calls it a "KNOWN LIMITATION" that `operations_alert_settings_safe()` will not return the two new columns, which is wrong: that function is `select to_jsonb(p) - 'updated_by'`, a whole-row projection, so they surface immediately. Neither changes behaviour; both are follow-up housekeeping. **Inertness verified after the apply, not merely claimed:** `external_dispatch_enabled` still **false**; outbox still **136** rows with **0** on the `email` channel; both producers carry the `coalesce(..., false)` flag gate in their live bodies; the v1 refusal string is **absent** from the live settings RPC and the persistence step now writes the variable rather than a hard-coded false; and the claim predicate admits `'failed'` (the bounded-retry fix review caught on #328). Settings defaults landed as `en` / `critical`. **Exposure verified, which matters because the recipients function returns administrator email addresses:** `anon` and `authenticated` have **no** execute on any of the four new functions; `service_role` has execute on all four. Supabase security advisors afterwards: **0 ERROR**, and **no finding names any of the four**. **Money path untouched and measured rather than assumed:** `place_order` `8bd7183832108abb25bcca6942dccd70` and `compute_order_snapshot` `f955b748b698a1704533f4aaffb835cb` (`md5(pg_get_functiondef)`), identical before and after and identical to the figures carried since 2026-08-27. **Moyasar re-verified absent immediately after:** 0 `%moyasar%` functions, 0 history rows, `provider_name` still `tap`, still disabled. No order was read or written; `orders` still holds 71 rows. Live history **123 → 124**. Covered by `supabase/tests/operations_alert_email_dispatch_test.sql`, whose sections were run against a real PostgreSQL 16 + PostGIS from a cold template (120 migrations, 62 suites, 60 passed, 2 pre-existing quarantined, 0 new failures). **Applied is not delivered, which is row 77's lesson and applies here too:** this is **step 1 of four**. Nothing reaches a mailbox until `operations-alert-dispatch` is deployed, `20260903130000` is applied with its two Vault secrets, and the flag is enabled — three separate §5 actions. Until then `docs/INCIDENT_RESPONSE.md` §1b's named watcher remains the actual answer to X3. **One consequence for the CI harness, already documented in the applied file's own header:** replaying `20260723120000_activate_operations_alerts_digest_cron` against a database where this has applied raises `activation blocked: outbox dormancy constraint ... is missing`, because that migration checks the v1 constraint by name. The harness's idempotency pass is report-only and five migrations already fail it for their own reasons, so this is a tolerated property of the chain rather than a new defect. Production is unaffected — those are anonymous `do $$ ... end $$;` blocks that ran once and are not stored. **Version NOT aligned** — live carries the apply-time stamp `20260907064638` (§9-D). **Current latest live version** |
 
-Reconciliation check: the rows above detail **78 repository / 79 live** rows.
+Reconciliation check: the rows above detail **79 repository / 80 live** rows.
 That is a **subset**, not the whole picture — rows 1–56 stop at 2026-07-29 and
 omit the five account-deletion migrations, the three applied 2026-08-05, the
 four applied 2026-08-07, everything applied between 2026-08-10 and 2026-08-21
-(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–78
+(§28), `branch_availability_retention` (§30), and the `noop` probe. Rows 57–79
 are appended out of that sequence: 57–58 because §1 now turns on them, 59–61
 because they were the most recent applications at the time (2026-08-25 and
 2026-08-26, §32 and §33), 62–63 because they are the applications of
@@ -543,6 +567,23 @@ count. Dropping `orders_lazywait_deadline_queue_idx` is only safe if
 `Index Scan using orders_lazywait_queue_idx` — can. Recorded because the same
 question will arise the next time an index looks redundant: measure what the
 planner does, not how many objects remain.
+
+Row **79** is `operations_alert_email_dispatch`, applied 2026-09-07 06:46:38 UTC,
+and it is the first row here whose feature is **applied but not yet reachable at
+all** — a further step on from row 77's half-live state. Row 77 was applied and
+partly working; this one is applied and, by design, does nothing. Three separate
+owner actions stand between it and a single email: deploying
+`operations-alert-dispatch`, applying `20260903130000` with its two Vault
+secrets, and enabling `external_dispatch_enabled`. Class B, so the totals move to
+**79/80** above.
+
+It is also the first row whose safety rested on **checking existing rows against a
+constraint before adding it**. The migration replaces the outbox dormancy CHECK,
+and a CHECK added to a populated table fails on any violating row — so all 136
+live rows were counted through both new predicates read-only *before* sending,
+returning zero violations. A successful apply would not have distinguished "the
+data fits" from "we were lucky"; the pre-count does. The same question arises
+whenever a constraint lands on a table that already holds data.
 
 Rows **73–75** were all written on 2026-08-28, and only one of them was written
 by the session that performed the application. **73 and 74 began as GAP ROWS and

@@ -1815,10 +1815,27 @@ with no SMS fallback, and its Meta credential still needs checking.
 
 ---
 
-## 28. Operations alert email dispatch (X3) — BUILT INERT 2026-09-03
+## 28. Operations alert email dispatch (X3) — BASE MIGRATION APPLIED 2026-09-07
 
-**Status:** written and merged; **three separate actions are open, and all three
-are yours.** Nothing has been applied, deployed or enabled.
+**Status:** step 1 of four is **DONE**.
+`20260903120000_operations_alert_email_dispatch` was applied to Production on
+**2026-09-07 06:46:38 UTC** (live version `20260907064638`, ledger row 79 in
+`MIGRATIONS.md`), on explicit owner approval naming the target by version.
+
+**Three actions remain open, and all three are yours:** deploy
+`operations-alert-dispatch`; apply
+`20260903130000_operations_alert_dispatch_scheduler` and create its two Vault
+secrets; enable `external_dispatch_enabled`.
+
+**Nothing has been deployed or enabled, and no alert has reached anyone.** The
+apply changed no behaviour — the flag is still false and the outbox still holds
+its same 136 rows with zero on the `email` channel — so until the three remaining
+steps are done, `INCIDENT_RESPONSE.md` §1b's named watcher is still what actually
+tells you when something breaks.
+
+This section header said **BUILT INERT 2026-09-03** and this status said *"nothing
+has been applied"* until the apply landed; both are corrected rather than deleted
+so the sequence stays readable.
 
 ### Why
 
