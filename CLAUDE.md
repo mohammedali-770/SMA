@@ -226,6 +226,38 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
+**Re-read live 2026-09-07, AFTER the alert-dispatch SCHEDULER apply: 120
+repository files / 125 live history rows / exactly ONE unapplied — Moyasar,
+frozen on purpose.** Latest live version `20260907082317`
+(`20260903130000_operations_alert_dispatch_scheduler`, applied 08:23:17 UTC on
+explicit owner approval; ledger row 80).
+
+**The count is back to ONE, and that is the dangerous shape, not the safe one.**
+Re-read the paragraph further down that this restores: with a single file left,
+"apply the outstanding migrations" reads like a no-op and is in fact the one
+instruction that would break the §6 payment freeze, because there is no other
+file it could mean. The guard that used to catch a bulk apply — Moyasar sorting
+ahead of a second, legitimate file — has run out of second files. A bulk apply
+now applies the payment migration and nothing else. **Name the target by
+version.**
+
+**X3 is one step from closed.** Steps 1-3 are done: the base migration applied
+06:46:38 (row 79), `operations-alert-dispatch` deployed as version 1 at 07:18:43,
+and the scheduler applied 08:23:17 with its two Vault secrets created first.
+**Only enabling `external_dispatch_enabled` remains** — the step that actually
+starts mail, and it needs admin AAL2, so it is the console rather than an RPC.
+
+**The cron job is live and does nothing**, measured rather than assumed:
+`invoke_operations_alert_dispatch()` returns `null` while the flag is false,
+taking the early-return branch before any Vault read or HTTP request. The trigger
+secret was generated **inside Postgres** and never crossed the wire — no
+terminal, no transcript, no repository holds it; it was verified by length rather
+than by reading. Copy that method for any future scheduler secret
+(`docs/OWNER_ACTIONS.md` §28 now documents it).
+
+**SUPERSEDED 2026-09-07 — the statement below was written between the base apply
+and the scheduler apply, when TWO files were unapplied.**
+
 **Re-read live 2026-09-07, AFTER the alert-email-dispatch apply: 120 repository
 files / 124 live history rows / TWO unapplied — Moyasar (frozen on purpose) and
 `20260903130000_operations_alert_dispatch_scheduler` (written, awaiting
@@ -275,7 +307,7 @@ by version.**
 | File | Status |
 | --- | --- |
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
-| `20260903130000_operations_alert_dispatch_scheduler.sql` | **UNAPPLIED, awaiting approval.** The pg_cron invocation path for the dispatcher — the piece whose absence review caught on #328, when the dispatcher shipped with no caller and the docs claimed enabling sent mail. Needs two Vault secrets. Inert while dispatch is disabled: the driver checks the master flag before it reads Vault, so the job ticks and does nothing. Apply it AFTER `20260903120000`, whose functions it calls. |
+| `20260903130000_operations_alert_dispatch_scheduler.sql` | **APPLIED 2026-09-07 08:23:17 UTC**, live version `20260907082317`, on explicit owner approval, one call, target named explicitly. Ledger row 80. The pg_cron invocation path for the dispatcher — the piece whose absence review caught on #328, when the dispatcher shipped with no caller and the docs claimed enabling sent mail. Its two Vault secrets were created first, at 08:21:35 and 08:21:44; the trigger secret was generated **inside Postgres** and never crossed the wire, so nobody has seen it. Inert while dispatch is disabled, and that was watched rather than assumed: cron run **218621** at 08:25:00 `succeeded` in **11 ms** and made no outbound request. **Only enabling the flag remains.** |
 | `20260903120000_operations_alert_email_dispatch.sql` | **APPLIED 2026-09-07 06:46:38 UTC**, live version `20260907064638`, on explicit owner approval ("apply 20260903120000" — named by version), one call, target named explicitly. Ledger row 79. Operations alerts v2 — the email dispatch path for X3. Removed three deliberate v1 interlocks (the outbox dormancy CHECK, the producers' hard-coded `in_app`, and the settings RPC's refusal) for the **email channel only**; `whatsapp` and `push` stay structurally blocked. It changed NO behaviour, verified after the fact: the flag is still false, the outbox still holds 136 rows with zero on the `email` channel, and the money-path hashes are unchanged. **Deploying `operations-alert-dispatch`, applying `20260903130000` with its Vault secrets, and enabling the flag remain three separate §5 actions.** |
 | `20260902120000_orders_index_cleanup.sql` | **APPLIED 2026-09-02 12:37:37 UTC**, live version `20260902123737`, on explicit owner approval ("apply 20260902120000" — named by version), one call, target named explicitly. Ledger row 78. Dropped `orders_lazywait_deadline_queue_idx` (an exact duplicate) and `orders_sync_queue_idx` (dead); `orders` index count 18 → 16, the survivor still serves the queue predicate by index scan, and the money-path hashes are unchanged. No deploy implied. |
 | `20260831130000_otp_login_rate_limit.sql` | **APPLIED 2026-09-01 12:46:15 UTC**, live version `20260901124615`, on explicit owner approval ("apply 20260831130000" — named by version), one call, target named explicitly. Ledger row 77. Its `auth-send-sms-whatsapp` deploy landed 2026-09-02, so the feature is fully live. |
