@@ -158,6 +158,54 @@ describe('recipients and secrets', () => {
   });
 });
 
+describe('the scheduler path', () => {
+  // THE DEFECT THIS PINS (#329). The first version read the trigger secret out
+  // of an `x-alert-dispatch-secret` header while the docs claimed this function
+  // could never read, log or leak it. The plaintext arrived on every tick. What
+  // arrives now is a nonce, a timestamp and an HMAC over them.
+  it('reads a signature, never the secret itself', () => {
+    const c = code();
+    expect(c).toContain("req.headers.get('x-alert-dispatch-nonce')");
+    expect(c).toContain("req.headers.get('x-alert-dispatch-timestamp')");
+    expect(c).toContain("req.headers.get('x-alert-dispatch-signature')");
+    expect(c).toContain('verify_operations_alert_dispatch_signature');
+    // The header name, and the RPC that took the plaintext, must both be gone.
+    expect(c).not.toContain("headers.get('x-alert-dispatch-secret')");
+    expect(c).not.toContain('verify_operations_alert_dispatch_secret');
+  });
+
+  it('never fetches the expected secret from anywhere', () => {
+    // Reading it out of a table would be the older lazywait-sync shape, and is
+    // deliberately not what happens here.
+    const c = code();
+    expect(c).not.toMatch(/decrypted_secrets/);
+    expect(c).not.toMatch(/dispatch_secret['"]?\s*\]/);
+  });
+
+  it('sends all three signature components to the RPC', () => {
+    // Passing only some of them would let Postgres verify a signature over
+    // material the caller did not actually present.
+    const c = code();
+    expect(c).toContain('p_nonce: nonce');
+    expect(c).toContain('p_timestamp: stamp');
+    expect(c).toContain('p_signature: signature');
+  });
+
+  it('treats a partial header set as an attempted scheduler call, not a bypass', () => {
+    // If the gate required all three to be present, a caller could omit one and
+    // fall through to whichever gate comes next. Any one of them must commit
+    // the request to signature verification.
+    const c = code();
+    expect(c).toMatch(/nonce !== null \|\| stamp !== null \|\| signature !== null/);
+  });
+
+  it('treats a non-true RPC result as a refusal', () => {
+    // Fail-closed: the RPC already returns a boolean, but a truthy non-boolean
+    // must never authenticate a caller.
+    expect(code()).toContain('ok !== true');
+  });
+});
+
 describe('caller authorization', () => {
   it('uses the shared admin predicate rather than a second role check', () => {
     const c = code();

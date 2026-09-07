@@ -15,11 +15,22 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
  * the console. This drains the outbox's `email` rows over the SMTP credential
  * that was already configured, and marks each one terminal.
  *
- * NOTHING INVOKES THIS FUNCTION YET. There is no cron job and no admin action
- * that calls it; a repo-wide search finds only this file, its config entry, its
- * source-shape test and the documents describing it. An admin can invoke it by
- * hand. Automatic invocation needs a scheduler (OWNER_ACTIONS §28), and until
- * that exists enabling the flag queues mail rather than sending it.
+ * WHO CALLS IT. `pg_cron` every five minutes, through
+ * `invoke_operations_alert_dispatch()` (migration 20260903130000), which posts
+ * here with a dedicated trigger secret. Until that migration is applied and its
+ * two Vault secrets exist, NOTHING calls this function -- which was true of the
+ * first version of it, and is why the header used to say so.
+ *
+ * THE SECRET NEVER REACHES THIS PROCESS. The driver sends nonce + timestamp +
+ * HMAC-SHA256 over them; Postgres recomputes the signature against the
+ * Vault-held secret and answers yes or no
+ * (`verify_operations_alert_dispatch_signature`). So the value cannot appear in
+ * an Edge Function log, in request instrumentation, or in a dump of this
+ * process -- and it cannot be read out of Vault from here either.
+ *
+ * The first version DID receive it, in an `x-alert-dispatch-secret` header,
+ * while this header claimed the opposite. Review caught it on #329. The claim
+ * was made true rather than softened.
  *
  * IT IS INERT UNTIL TWO SEPARATE THINGS ARE TRUE.
  *   1. migration 20260903120000 is applied — without it no `email` row can
@@ -101,8 +112,35 @@ Deno.serve(async (req: Request) => {
 
   const admin = adminClient();
 
-  // Caller gate. Service role for automation; otherwise an admin with AAL2.
-  if (!isServiceRoleCall(req)) {
+  // Caller gate, in order of how often each is used:
+  //   1. the pg_cron driver, carrying a SIGNATURE over the Vault-held secret;
+  //   2. the service role, for any other automation;
+  //   3. an authenticated admin (role AND AAL2), for a manual drain.
+  //
+  // Nothing here ever holds the trigger secret. An earlier version took it
+  // verbatim from an `x-alert-dispatch-secret` header while the docs claimed
+  // this function could not read or leak it; review caught that on #329. What
+  // arrives now is nonce + timestamp + HMAC, and Postgres recomputes it.
+  const nonce = req.headers.get('x-alert-dispatch-nonce');
+  const stamp = req.headers.get('x-alert-dispatch-timestamp');
+  const signature = req.headers.get('x-alert-dispatch-signature');
+  let schedulerCall = false;
+  if (nonce !== null || stamp !== null || signature !== null) {
+    // Any ONE of the three present means a scheduler call was attempted. A
+    // partial set is a denial, never a fall-through to another gate.
+    const { data: ok, error } = await admin.rpc('verify_operations_alert_dispatch_signature', {
+      p_nonce: nonce,
+      p_timestamp: stamp,
+      p_signature: signature,
+    });
+    if (error) return json({ status: 'error', reason: 'signature check failed' }, 500);
+    // Strict `=== true`: the RPC is fail-closed, but a truthy non-boolean must
+    // never be read as authentication.
+    if (ok !== true) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
+    schedulerCall = true;
+  }
+
+  if (!schedulerCall && !isServiceRoleCall(req)) {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);
     const caller = userClient(authHeader);

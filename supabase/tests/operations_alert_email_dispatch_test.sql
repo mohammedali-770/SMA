@@ -106,7 +106,7 @@ begin
   select count(*) into v_n from public.claim_operations_alert_emails(gen_random_uuid(), 10, 10, 5);
   if v_n <> 0 then raise exception 'a sent row must never be reclaimed'; end if;
 
-  raise notice 'CLAIM/FINALIZE OK (fenced, at most once)';
+  raise notice 'CLAIM/FINALIZE OK (fenced; exactly once normally, at least once across a crash)';
 end $$;
 
 -- ---- C. Attempt budget and stale-lease recovery -----------------------------
@@ -257,6 +257,151 @@ begin
   if v_n <> 1 then raise exception 'an admin address must be an alert recipient'; end if;
 
   raise notice 'RECIPIENTS OK (derived from admin profiles, none stored)';
+end $$;
+
+-- ---- F. The invocation path (migration 20260903130000) ----------------------
+-- The dispatcher shipped with NO caller, which review caught on #328. These
+-- assertions exist so that cannot happen again silently.
+do $$
+declare
+  v_req bigint;
+begin
+  -- The cron job exists, exactly once, on its own schedule and calling the
+  -- driver by name. cron.job stores only command TEXT, so a renamed driver
+  -- would leave a job that fails every tick rather than failing here.
+  if (select count(*) from cron.job where jobname = 'operations-alert-dispatch') <> 1 then
+    raise exception 'expected exactly one operations-alert-dispatch cron job';
+  end if;
+  if (select command from cron.job where jobname = 'operations-alert-dispatch')
+     <> 'select public.invoke_operations_alert_dispatch();' then
+    raise exception 'dispatch cron command is not the reviewed driver call';
+  end if;
+  -- No credential or URL may sit in cron.job: that is the whole reason the
+  -- driver reads Vault instead of the schedule carrying secrets.
+  if exists (
+    select 1 from cron.job
+     where jobname = 'operations-alert-dispatch'
+       and (command ~* 'http|bearer|secret|key|://')
+  ) then
+    raise exception 'dispatch cron command must not contain a URL or credential';
+  end if;
+
+  -- The driver no-ops while dispatch is disabled. It must return WITHOUT
+  -- touching Vault, so this passes even on a database where the secrets have
+  -- never been created -- which is exactly the state on apply.
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
+  v_req := public.invoke_operations_alert_dispatch();
+  if v_req is not null then
+    raise exception 'driver must not post while external dispatch is disabled';
+  end if;
+
+  -- Enabled but nothing queued: still no request. A tick every five minutes
+  -- saying "nothing" would bury real activity in the logs.
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": true}'::jsonb);
+  delete from public.operations_alert_outbox where channel = 'email';
+  v_req := public.invoke_operations_alert_dispatch();
+  if v_req is not null then
+    raise exception 'driver must not post with an empty email queue';
+  end if;
+
+  -- Enabled WITH work queued, and Vault not configured: it must RAISE rather
+  -- than return quietly. Silence here would look identical to "nothing to
+  -- send", which is the failure this subsystem exists to prevent.
+  insert into public.operations_alert_outbox
+    (idempotency_key, alert_event_id, channel, language, subject_safe, body_safe, status, blocked_reason)
+  values ('t-driver-pending', gen_random_uuid(), 'email', 'en', 's', 'b', 'pending', null);
+  begin
+    v_req := public.invoke_operations_alert_dispatch();
+    raise exception 'driver must fail closed when Vault is incomplete';
+  exception when others then
+    if sqlerrm not like '%Vault configuration is incomplete%' then
+      raise exception 'expected a Vault-incomplete failure, got: %', sqlerrm;
+    end if;
+  end;
+
+  perform public.operations_alert_settings_update('{"external_dispatch_enabled": false}'::jsonb);
+  raise notice 'INVOCATION PATH OK (scheduled, credential-free, fail-closed)';
+end $$;
+
+-- ---- G. The trigger secret never leaves Postgres ----------------------------
+-- The first version of the scheduler put the plaintext secret in a request
+-- header while claiming the function could not read it. Review caught that on
+-- #329. These assertions pin the property that replaced the claim.
+do $$
+declare
+  v_nonce  text := 'abcdef0123456789abcdef0123456789';
+  v_stamp  text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_old    text := to_char((now() - interval '20 minutes') at time zone 'UTC',
+                           'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_sig    text;
+  v_sigold text;
+begin
+  -- No Vault entry yet: nothing authenticates, whatever is presented.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, 'deadbeef') then
+    raise exception 'signature check must deny when Vault holds no secret';
+  end if;
+
+  perform vault.create_secret('s3cret-value', 'operations_alert_dispatch_secret', 'test');
+  v_sig := encode(extensions.hmac(v_nonce || '.' || v_stamp, 's3cret-value', 'sha256'), 'hex');
+  v_sigold := encode(extensions.hmac(v_nonce || '.' || v_old, 's3cret-value', 'sha256'), 'hex');
+
+  -- The happy path, so a failure below is a real denial and not a broken fixture.
+  if not public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, v_sig) then
+    raise exception 'signature check must accept a correctly signed request';
+  end if;
+
+  -- Every missing or empty part denies. A partial header set must never fall
+  -- through to acceptance.
+  if public.verify_operations_alert_dispatch_signature(null, v_stamp, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, null, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, null)
+     or public.verify_operations_alert_dispatch_signature('', v_stamp, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, '', v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, '') then
+    raise exception 'signature check must deny a null or empty component';
+  end if;
+
+  -- A near miss, and a signature that is valid for OTHER material. The second
+  -- is the one that matters: it proves the nonce and timestamp are actually
+  -- covered by the MAC rather than merely travelling alongside it.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, left(v_sig, 63) || 'f') then
+    raise exception 'signature check must reject a near miss';
+  end if;
+  if public.verify_operations_alert_dispatch_signature('0000000000000000', v_stamp, v_sig) then
+    raise exception 'signature must be bound to the nonce it was computed over';
+  end if;
+
+  -- Freshness: a correctly signed but stale request is refused, so a captured
+  -- header set stops working. 20 minutes is outside the 10-minute window.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_old, v_sigold) then
+    raise exception 'signature check must reject a request outside the freshness window';
+  end if;
+
+  -- Attacker-supplied garbage in the timestamp is a DENIAL, not a 500: this
+  -- runs on an unauthenticated path.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, 'not-a-timestamp', v_sig) then
+    raise exception 'a malformed timestamp must deny';
+  end if;
+
+  -- It returns a BOOLEAN, never the value.
+  if (select pg_get_function_result(oid) from pg_proc
+       where proname = 'verify_operations_alert_dispatch_signature') <> 'boolean' then
+    raise exception 'signature check must return boolean, not the secret';
+  end if;
+
+  -- The plaintext-secret oracle it replaced must be GONE, not merely unused.
+  if exists (select 1 from pg_proc where proname = 'verify_operations_alert_dispatch_secret') then
+    raise exception 'the plaintext-secret comparison function must not survive';
+  end if;
+
+  -- And the driver must not put the secret on the wire. Its body is the only
+  -- place the plaintext is legitimately touched, and only to sign with.
+  if (select prosrc from pg_proc where proname = 'invoke_operations_alert_dispatch')
+     ~* 'x-alert-dispatch-secret' then
+    raise exception 'the driver must send a signature, never the secret itself';
+  end if;
+
+  raise notice 'TRIGGER SECRET OK (signed, fresh, fail-closed, never transmitted)';
 end $$;
 
 rollback;

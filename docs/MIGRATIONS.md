@@ -42,9 +42,14 @@ to Production.**
 > **Applying it changes no behaviour.** The flag stays false, every producer gate
 > is `and external_dispatch_enabled`, and the file ends in a self-verification
 > block that raises if the flag moved or if a single `email` row exists. Sending
-> additionally requires deploying `operations-alert-dispatch` AND invoking it:
-> nothing calls the function yet, so enabling the flag queues mail rather than
-> sending it. Apply, deploy, enable and schedule are four separate §5 decisions.
+> additionally requires deploying `operations-alert-dispatch` AND applying
+> `20260903130000_operations_alert_dispatch_scheduler.sql`, which supplies the
+> pg_cron invocation path the first version lacked entirely — review caught on
+> #328 that nothing called the function, so enabling the flag queued mail rather
+> than sending it. That scheduler also needs two Vault secrets. **THREE
+> repository files are now unapplied**, and only Moyasar is frozen; it sorts
+> ahead of both, so a bulk apply still takes the payment file first. Apply,
+> deploy, apply-the-scheduler and enable are four separate §5 decisions.
 >
 > **The two unapplied files must never be applied together.**
 > `20260824100000_moyasar_payment_provider.sql` sorts ahead of this one, so any

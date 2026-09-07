@@ -1876,29 +1876,52 @@ act. There is **one** admin with an email address today.
 Order matters. Deploying before applying gives a function whose RPCs do not
 exist; enabling before deploying queues rows nothing drains.
 
-### The fourth step is real, and this section used to deny it
+### Step 4 in detail — the invocation path
 
-**Step 3 previously claimed to be "the only step that sends mail". It is not,
-and nothing in this change sends mail on its own.** A repo-wide search for
-`operations-alert-dispatch` finds its definition, its `config.toml` entry, its
-source-shape test and these documents — **no caller**. The chain's cron jobs
-invoke the evaluator and the digest generator only, and the admin console has no
-dispatch action. Enabling the flag therefore fills the outbox and leaves it full.
+**This step used to be missing entirely, and step 3 claimed to be "the only step
+that sends mail".** It was not: a repo-wide search for `operations-alert-dispatch`
+found its definition, its `config.toml` entry, its test and these documents —
+**no caller**. Enabling the flag filled the outbox and left it full. Review
+caught it on #328; migration `20260903130000` closes it.
 
-Found by review on #328 and corrected rather than argued with.
+**Apply `20260903130000_operations_alert_dispatch_scheduler`** and **create two
+Vault secrets**:
 
-**What works today:** the function accepts an authenticated **admin** caller
-(role + AAL2), so a person can invoke it on demand — enough to verify the deploy
-end to end and to drain the queue by hand.
+| Vault secret | Value |
+| --- | --- |
+| `operations_alert_dispatch_project_url` | the project's base URL, e.g. `https://<ref>.supabase.co` |
+| `operations_alert_dispatch_secret` | a fresh random string you generate; nothing else uses it |
 
-**What that does NOT do is close X3.** X3 is "nothing pages a human"; a
-dispatcher a human must remember to run is still the human doing the
-remembering. **Automatic invocation needs a scheduler** — a `pg_cron` job
-calling the function through `net.http_post` with a vault-held URL and trigger
-secret, following the `lazywait_sync_scheduler` precedent (`20260720120000`).
-That is deliberately not in this change: it needs its own vault secrets, its own
-timeout sizing and its own review. Until it exists, `INCIDENT_RESPONSE.md` §1b
-— the named human on a fixed schedule — remains the actual answer to X3.
+`pg_cron` then calls `invoke_operations_alert_dispatch()` every five minutes —
+the same cadence as the evaluator, so an alert cannot sit undelivered longer than
+it took to notice.
+
+**The secret never leaves Postgres — and the first version of this section said
+so while it was false.** The driver put the decrypted secret verbatim in an
+`x-alert-dispatch-secret` header, so the Edge Function received the plaintext on
+every tick and could log or leak it exactly like the older `lazywait-sync` shape
+this was supposed to improve on. Review caught it on #329.
+
+What crosses the boundary now is a **signature**: the driver sends a random
+nonce, a UTC timestamp and `HMAC-SHA256(nonce.timestamp)` taken under the Vault
+secret, and `verify_operations_alert_dispatch_signature` recomputes it inside
+Postgres. The value itself is never transmitted, so it cannot reach an Edge
+Function log or request instrumentation, and the function cannot read it out of
+Vault either. Stale requests are refused outside a 10-minute window.
+
+**This changes nothing you have to do.** The same two Vault secrets, created the
+same way. If you generated `operations_alert_dispatch_secret` already, keep it.
+
+**Applying it before the secrets exist is safe.** The driver checks the master
+flag first and returns without touching Vault, so the job ticks and does nothing.
+Once enabled, a missing secret **raises** rather than returning quietly — silence
+would look exactly like "nothing to send", which is the failure this subsystem
+exists to prevent.
+
+**Only after all four steps is X3 actually closed.** Until then
+`INCIDENT_RESPONSE.md` §1b — the named human on a fixed schedule — remains the
+real answer, and it stays worth keeping afterwards as the fallback for the case
+where the dispatcher itself is what breaks.
 
 ### How to check it worked, without waiting for an incident
 
