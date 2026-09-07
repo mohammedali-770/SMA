@@ -21,11 +21,16 @@ import { SMTPClient } from 'https://deno.land/x/denomailer@1.6.0/mod.ts';
  * two Vault secrets exist, NOTHING calls this function -- which was true of the
  * first version of it, and is why the header used to say so.
  *
- * THE SECRET IS NEVER READABLE FROM HERE. Rather than fetching the expected
- * value and comparing it (the older lazywait-sync shape, which puts the secret
- * somewhere a service-role client can read), this asks Postgres a yes/no
- * question. The function authenticates its caller without ever being able to
- * read, log or leak what it is checking against.
+ * THE SECRET NEVER REACHES THIS PROCESS. The driver sends nonce + timestamp +
+ * HMAC-SHA256 over them; Postgres recomputes the signature against the
+ * Vault-held secret and answers yes or no
+ * (`verify_operations_alert_dispatch_signature`). So the value cannot appear in
+ * an Edge Function log, in request instrumentation, or in a dump of this
+ * process -- and it cannot be read out of Vault from here either.
+ *
+ * The first version DID receive it, in an `x-alert-dispatch-secret` header,
+ * while this header claimed the opposite. Review caught it on #329. The claim
+ * was made true rather than softened.
  *
  * IT IS INERT UNTIL TWO SEPARATE THINGS ARE TRUE.
  *   1. migration 20260903120000 is applied — without it no `email` row can
@@ -108,16 +113,27 @@ Deno.serve(async (req: Request) => {
   const admin = adminClient();
 
   // Caller gate, in order of how often each is used:
-  //   1. the pg_cron driver, carrying the Vault-held trigger secret;
+  //   1. the pg_cron driver, carrying a SIGNATURE over the Vault-held secret;
   //   2. the service role, for any other automation;
   //   3. an authenticated admin (role AND AAL2), for a manual drain.
-  const triggerSecret = req.headers.get('x-alert-dispatch-secret');
+  //
+  // Nothing here ever holds the trigger secret. An earlier version took it
+  // verbatim from an `x-alert-dispatch-secret` header while the docs claimed
+  // this function could not read or leak it; review caught that on #329. What
+  // arrives now is nonce + timestamp + HMAC, and Postgres recomputes it.
+  const nonce = req.headers.get('x-alert-dispatch-nonce');
+  const stamp = req.headers.get('x-alert-dispatch-timestamp');
+  const signature = req.headers.get('x-alert-dispatch-signature');
   let schedulerCall = false;
-  if (triggerSecret !== null) {
-    const { data: ok, error } = await admin.rpc('verify_operations_alert_dispatch_secret', {
-      p_secret: triggerSecret,
+  if (nonce !== null || stamp !== null || signature !== null) {
+    // Any ONE of the three present means a scheduler call was attempted. A
+    // partial set is a denial, never a fall-through to another gate.
+    const { data: ok, error } = await admin.rpc('verify_operations_alert_dispatch_signature', {
+      p_nonce: nonce,
+      p_timestamp: stamp,
+      p_signature: signature,
     });
-    if (error) return json({ status: 'error', reason: 'secret check failed' }, 500);
+    if (error) return json({ status: 'error', reason: 'signature check failed' }, 500);
     // Strict `=== true`: the RPC is fail-closed, but a truthy non-boolean must
     // never be read as authentication.
     if (ok !== true) return json({ error: 'unauthorized', code: 'unauthorized' }, 401);

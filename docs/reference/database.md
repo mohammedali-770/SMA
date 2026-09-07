@@ -276,7 +276,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `validate_coupon` | 1 | `20260707120400_coupons.sql` |
 | `validate_pos_sync_notification_before_send` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `verify_account_deletion_process_secret` | 1 | `20260716160000_account_deletion_scheduler_auth.sql` |
-| `verify_operations_alert_dispatch_secret` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
+| `verify_operations_alert_dispatch_signature` | 1 | `20260903130000_operations_alert_dispatch_scheduler.sql` |
 | `whatsapp_login_enabled` | 2 | `20260710160000_fix_whatsapp_login_review.sql` |
 
 ## Triggers

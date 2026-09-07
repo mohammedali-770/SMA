@@ -18,14 +18,40 @@
 -- over net.http_post with a dedicated trigger secret, and pg_cron calls the
 -- driver. cron.job stores only a bare internal call -- no credentials, no URL.
 --
--- WHY THE FUNCTION NEVER LEARNS THE EXPECTED SECRET
+-- WHY THE FUNCTION NEVER LEARNS THE SECRET -- AND WHY THE FIRST VERSION DID
 -- lazywait-sync reads its expected trigger secret out of
--- `integration_settings.secret_config` and compares in TypeScript. That works,
--- but it puts the secret somewhere a service-role client can read. Here the
--- secret stays in Vault and the Edge Function asks Postgres a yes/no question
--- (`verify_operations_alert_dispatch_secret`). The function can therefore
--- authenticate its caller without ever being able to read, log or leak the
--- value it is checking against.
+-- `integration_settings.secret_config` and compares in TypeScript, which puts
+-- the secret somewhere a service-role client can read.
+--
+-- The first version of THIS file claimed to fix that by keeping the secret in
+-- Vault and having the Edge Function ask Postgres a yes/no question. It did not:
+-- the driver put the decrypted secret verbatim in an `x-alert-dispatch-secret`
+-- header, so the function received the plaintext on every single tick and could
+-- read, log or leak it exactly as before. The only thing the boolean RPC
+-- prevented was the function reading the secret when NOBODY had called it.
+-- Review caught that on #329 and it was right; the claim was retired by making
+-- it true rather than by softening it.
+--
+-- What the driver sends now is a SIGNATURE, never the secret:
+--
+--     nonce     = 16 random bytes, hex
+--     timestamp = now(), ISO-8601 UTC to the second
+--     signature = HMAC-SHA256(nonce || '.' || timestamp, secret)
+--
+-- `verify_operations_alert_dispatch_signature` recomputes it in Postgres. The
+-- secret never crosses the process boundary, so it cannot appear in an Edge
+-- Function log, in request instrumentation, or in a memory dump of a
+-- compromised function. The function still cannot read it from Vault either.
+--
+-- REPLAY, stated rather than glossed. A captured request can be replayed inside
+-- the freshness window (10 minutes -- wide enough for clock skew and the
+-- driver's own 60s timeout). The effect is one extra dispatch run, which is what
+-- the next tick does anyway: claims are fenced by a per-invocation token and
+-- bounded to 20 rows, so a replay drains the queue rather than double-sending a
+-- row that is already `sent`. A consumed-nonce table would close the window at
+-- the cost of a write per tick and a cleanup job, which is not proportionate to
+-- "the alert mail goes out a few minutes early". The nonce's job here is to make
+-- each signature unique, not to prevent replay.
 --
 -- STILL INERT ON APPLY. The driver returns early while
 -- `external_dispatch_enabled` is false -- which this file does not change -- so
@@ -34,8 +60,15 @@
 -- safe and silent.
 -- ============================================================================
 
--- ---- 1. Secret verification, without disclosing the secret ------------------
-create or replace function public.verify_operations_alert_dispatch_secret(p_secret text)
+-- ---- 1. Signature verification, without disclosing the secret ---------------
+-- Freshness window. Wide enough that clock skew between Postgres and the Edge
+-- runtime cannot reject a legitimate tick, narrow enough that a captured
+-- request stops working within one alert cycle.
+create or replace function public.verify_operations_alert_dispatch_signature(
+  p_nonce      text,
+  p_timestamp  text,
+  p_signature  text
+)
 returns boolean
 language plpgsql
 stable
@@ -43,26 +76,62 @@ security definer
 set search_path = public
 as $$
 declare
+  v_secret   text;
+  v_when     timestamptz;
   v_expected text;
+  v_probe    text;
 begin
-  -- Fail CLOSED on every path: an empty candidate, a missing Vault entry, or an
-  -- empty stored secret all deny. Never `p_secret = v_expected` alone, or an
-  -- unconfigured deployment would accept an empty header.
-  if p_secret is null or length(p_secret) = 0 then
+  -- Fail CLOSED on every path. Never fall through to a comparison: an
+  -- unconfigured deployment must deny, not accept an empty signature.
+  if p_nonce is null or length(p_nonce) = 0
+     or p_timestamp is null or length(p_timestamp) = 0
+     or p_signature is null or length(p_signature) = 0 then
     return false;
   end if;
-  select decrypted_secret into v_expected
+
+  -- A malformed timestamp is a denial, not an exception: this runs on an
+  -- unauthenticated path and must not turn attacker input into a 500.
+  begin
+    v_when := p_timestamp::timestamptz;
+  exception when others then
+    return false;
+  end;
+  if abs(extract(epoch from (now() - v_when))) > 600 then
+    return false;
+  end if;
+
+  select decrypted_secret into v_secret
     from vault.decrypted_secrets
    where name = 'operations_alert_dispatch_secret';
-  if v_expected is null or length(v_expected) = 0 then
+  if v_secret is null or length(v_secret) = 0 then
     return false;
   end if;
-  return p_secret = v_expected;
+
+  v_expected := encode(
+    extensions.hmac(p_nonce || '.' || p_timestamp, v_secret, 'sha256'),
+    'hex'
+  );
+
+  -- Double-HMAC comparison under a fresh random probe key. `=` on text is not
+  -- constant time, and this endpoint can be called at whatever rate an attacker
+  -- likes. Comparing digests taken under a key the attacker cannot predict
+  -- means the timing of the short-circuit reveals nothing about the real
+  -- signature, and both operands are a fixed 32 bytes.
+  -- Hex, not bytea: pgcrypto exposes hmac(text,text,text) and
+  -- hmac(bytea,bytea,text), and a mixed pair matches neither.
+  v_probe := encode(extensions.gen_random_bytes(32), 'hex');
+  return extensions.hmac(v_expected, v_probe, 'sha256')
+       = extensions.hmac(p_signature, v_probe, 'sha256');
 end;
 $$;
 
-comment on function public.verify_operations_alert_dispatch_secret(text) is
-  'Yes/no check of the dispatch trigger secret against Vault. Returns a boolean so the Edge Function can authenticate its caller without ever reading the secret.';
+comment on function public.verify_operations_alert_dispatch_signature(text, text, text) is
+  'Recomputes HMAC-SHA256(nonce.timestamp) against the Vault-held dispatch secret and returns a boolean. The secret never leaves Postgres: the Edge Function sends a signature, not the value it is checked against.';
+
+-- The plaintext-secret check this replaces. Dropped rather than left in place:
+-- an unused SECURITY DEFINER function that compares a caller-supplied string to
+-- a Vault secret is a disclosure oracle waiting for its second caller.
+drop function if exists public.verify_operations_alert_dispatch_secret(text);
 
 -- ---- 2. The driver pg_cron calls -------------------------------------------
 create or replace function public.invoke_operations_alert_dispatch()
@@ -77,6 +146,9 @@ declare
   v_pending     bigint;
   v_project_url text;
   v_secret      text;
+  v_nonce       text;
+  v_stamp       text;
+  v_signature   text;
   v_request_id  bigint;
 begin
   -- Gate 1: the master flag. Checked FIRST so that applying this migration
@@ -113,11 +185,22 @@ begin
   -- Bounded: the dispatcher claims at most 20 rows and talks to SMTP, so a
   -- generous-but-finite timeout. Async fire-and-forget, like every other
   -- scheduler here; the outbox itself is the durable record of what happened.
+  -- SIGN, do not send. `v_secret` is used to compute the signature and never
+  -- leaves this function -- see the header for what the first version did.
+  v_nonce := encode(extensions.gen_random_bytes(16), 'hex');
+  v_stamp := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_signature := encode(
+    extensions.hmac(v_nonce || '.' || v_stamp, v_secret, 'sha256'),
+    'hex'
+  );
+
   select net.http_post(
     url := rtrim(v_project_url, '/') || '/functions/v1/operations-alert-dispatch',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'x-alert-dispatch-secret', v_secret
+      'x-alert-dispatch-nonce', v_nonce,
+      'x-alert-dispatch-timestamp', v_stamp,
+      'x-alert-dispatch-signature', v_signature
     ),
     body := jsonb_build_object('source', 'pg_cron', 'scheduled_at', now()),
     timeout_milliseconds := 60000
@@ -130,9 +213,9 @@ $$;
 comment on function public.invoke_operations_alert_dispatch() is
   'pg_cron driver for operations-alert-dispatch. No-ops while external dispatch is disabled or the email queue is empty; raises if Vault is incomplete once enabled.';
 
-revoke all on function public.verify_operations_alert_dispatch_secret(text) from public, anon, authenticated;
+revoke all on function public.verify_operations_alert_dispatch_signature(text, text, text) from public, anon, authenticated;
 revoke all on function public.invoke_operations_alert_dispatch() from public, anon, authenticated;
-grant execute on function public.verify_operations_alert_dispatch_secret(text) to service_role;
+grant execute on function public.verify_operations_alert_dispatch_signature(text, text, text) to service_role;
 grant execute on function public.invoke_operations_alert_dispatch() to service_role;
 
 -- ---- 3. Schedule -------------------------------------------------------------
@@ -165,5 +248,12 @@ begin
 
   if (select count(*) from public.operations_alert_outbox where channel = 'email') <> 0 then
     raise exception 'expected zero email outbox rows on apply';
+  end if;
+
+  -- The plaintext-secret comparison must not survive the apply. Leaving it
+  -- would leave a SECURITY DEFINER oracle that answers "is this the secret?"
+  -- for anyone who finds a second way to call it.
+  if exists (select 1 from pg_proc where proname = 'verify_operations_alert_dispatch_secret') then
+    raise exception 'verify_operations_alert_dispatch_secret must not exist after apply';
   end if;
 end $$;

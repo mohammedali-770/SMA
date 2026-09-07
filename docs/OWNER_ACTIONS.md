@@ -1896,12 +1896,21 @@ Vault secrets**:
 the same cadence as the evaluator, so an alert cannot sit undelivered longer than
 it took to notice.
 
-**The secret never leaves Postgres.** The Edge Function does not fetch it and
-compare; it asks Postgres a yes/no question
-(`verify_operations_alert_dispatch_secret`), so it can authenticate its caller
-without being able to read, log or leak the value. That is deliberately stricter
-than the older `lazywait-sync` shape, which keeps its expected secret in
-`integration_settings.secret_config`.
+**The secret never leaves Postgres — and the first version of this section said
+so while it was false.** The driver put the decrypted secret verbatim in an
+`x-alert-dispatch-secret` header, so the Edge Function received the plaintext on
+every tick and could log or leak it exactly like the older `lazywait-sync` shape
+this was supposed to improve on. Review caught it on #329.
+
+What crosses the boundary now is a **signature**: the driver sends a random
+nonce, a UTC timestamp and `HMAC-SHA256(nonce.timestamp)` taken under the Vault
+secret, and `verify_operations_alert_dispatch_signature` recomputes it inside
+Postgres. The value itself is never transmitted, so it cannot reach an Edge
+Function log or request instrumentation, and the function cannot read it out of
+Vault either. Stale requests are refused outside a 10-minute window.
+
+**This changes nothing you have to do.** The same two Vault secrets, created the
+same way. If you generated `operations_alert_dispatch_secret` already, keep it.
 
 **Applying it before the secrets exist is safe.** The driver checks the master
 flag first and returns without touching Vault, so the job ticks and does nothing.

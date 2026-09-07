@@ -106,7 +106,7 @@ begin
   select count(*) into v_n from public.claim_operations_alert_emails(gen_random_uuid(), 10, 10, 5);
   if v_n <> 0 then raise exception 'a sent row must never be reclaimed'; end if;
 
-  raise notice 'CLAIM/FINALIZE OK (fenced, at most once)';
+  raise notice 'CLAIM/FINALIZE OK (fenced; exactly once normally, at least once across a crash)';
 end $$;
 
 -- ---- C. Attempt budget and stale-lease recovery -----------------------------
@@ -324,35 +324,84 @@ begin
 end $$;
 
 -- ---- G. The trigger secret never leaves Postgres ----------------------------
+-- The first version of the scheduler put the plaintext secret in a request
+-- header while claiming the function could not read it. Review caught that on
+-- #329. These assertions pin the property that replaced the claim.
 do $$
+declare
+  v_nonce  text := 'abcdef0123456789abcdef0123456789';
+  v_stamp  text := to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_old    text := to_char((now() - interval '20 minutes') at time zone 'UTC',
+                           'YYYY-MM-DD"T"HH24:MI:SS"Z"');
+  v_sig    text;
+  v_sigold text;
 begin
-  -- Fail closed on every path: no Vault entry yet, so nothing authenticates.
-  if public.verify_operations_alert_dispatch_secret('anything') then
-    raise exception 'secret check must deny when Vault holds no secret';
-  end if;
-  if public.verify_operations_alert_dispatch_secret('') then
-    raise exception 'secret check must deny an empty candidate';
-  end if;
-  if public.verify_operations_alert_dispatch_secret(null) then
-    raise exception 'secret check must deny a null candidate';
+  -- No Vault entry yet: nothing authenticates, whatever is presented.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, 'deadbeef') then
+    raise exception 'signature check must deny when Vault holds no secret';
   end if;
 
   perform vault.create_secret('s3cret-value', 'operations_alert_dispatch_secret', 'test');
-  if not public.verify_operations_alert_dispatch_secret('s3cret-value') then
-    raise exception 'secret check must accept the configured secret';
-  end if;
-  if public.verify_operations_alert_dispatch_secret('s3cret-valu') then
-    raise exception 'secret check must reject a near miss';
+  v_sig := encode(extensions.hmac(v_nonce || '.' || v_stamp, 's3cret-value', 'sha256'), 'hex');
+  v_sigold := encode(extensions.hmac(v_nonce || '.' || v_old, 's3cret-value', 'sha256'), 'hex');
+
+  -- The happy path, so a failure below is a real denial and not a broken fixture.
+  if not public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, v_sig) then
+    raise exception 'signature check must accept a correctly signed request';
   end if;
 
-  -- It returns a BOOLEAN, never the value: that is what lets the Edge Function
-  -- authenticate its caller without being able to read the secret.
+  -- Every missing or empty part denies. A partial header set must never fall
+  -- through to acceptance.
+  if public.verify_operations_alert_dispatch_signature(null, v_stamp, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, null, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, null)
+     or public.verify_operations_alert_dispatch_signature('', v_stamp, v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, '', v_sig)
+     or public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, '') then
+    raise exception 'signature check must deny a null or empty component';
+  end if;
+
+  -- A near miss, and a signature that is valid for OTHER material. The second
+  -- is the one that matters: it proves the nonce and timestamp are actually
+  -- covered by the MAC rather than merely travelling alongside it.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_stamp, left(v_sig, 63) || 'f') then
+    raise exception 'signature check must reject a near miss';
+  end if;
+  if public.verify_operations_alert_dispatch_signature('0000000000000000', v_stamp, v_sig) then
+    raise exception 'signature must be bound to the nonce it was computed over';
+  end if;
+
+  -- Freshness: a correctly signed but stale request is refused, so a captured
+  -- header set stops working. 20 minutes is outside the 10-minute window.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, v_old, v_sigold) then
+    raise exception 'signature check must reject a request outside the freshness window';
+  end if;
+
+  -- Attacker-supplied garbage in the timestamp is a DENIAL, not a 500: this
+  -- runs on an unauthenticated path.
+  if public.verify_operations_alert_dispatch_signature(v_nonce, 'not-a-timestamp', v_sig) then
+    raise exception 'a malformed timestamp must deny';
+  end if;
+
+  -- It returns a BOOLEAN, never the value.
   if (select pg_get_function_result(oid) from pg_proc
-       where proname = 'verify_operations_alert_dispatch_secret') <> 'boolean' then
-    raise exception 'secret check must return boolean, not the secret';
+       where proname = 'verify_operations_alert_dispatch_signature') <> 'boolean' then
+    raise exception 'signature check must return boolean, not the secret';
   end if;
 
-  raise notice 'TRIGGER SECRET OK (fail-closed, boolean-only)';
+  -- The plaintext-secret oracle it replaced must be GONE, not merely unused.
+  if exists (select 1 from pg_proc where proname = 'verify_operations_alert_dispatch_secret') then
+    raise exception 'the plaintext-secret comparison function must not survive';
+  end if;
+
+  -- And the driver must not put the secret on the wire. Its body is the only
+  -- place the plaintext is legitimately touched, and only to sign with.
+  if (select prosrc from pg_proc where proname = 'invoke_operations_alert_dispatch')
+     ~* 'x-alert-dispatch-secret' then
+    raise exception 'the driver must send a signature, never the secret itself';
+  end if;
+
+  raise notice 'TRIGGER SECRET OK (signed, fresh, fail-closed, never transmitted)';
 end $$;
 
 rollback;
