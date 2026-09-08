@@ -240,9 +240,12 @@ codes are deleted after a short period; until this applied, nothing did —
 sweep is scheduled daily at 00:40 UTC. **Applying it deleted nothing**: it
 schedules the job, and the first run is the next tick — verified rather than
 assumed, since `otp_challenges` still held its 3 rows immediately afterwards.
-**So the policy sentence becomes true at that first run, not at the apply**, and
-`docs/OWNER_ACTIONS.md` §30 stays open until the run is recorded. Review caught
-that item being closed on the apply alone (#342).
+**So the policy sentence becomes true at the first run, not at the apply** — and
+the sweep was therefore executed once on separate owner approval the same day,
+deleting all 3 July rows and leaving `otp_challenges` at 0 rows and 0 outside
+the window. `docs/OWNER_ACTIONS.md` §30 is closed on that evidence. Review caught
+the item being closed on the apply alone first (#342), which is why the
+distinction is spelled out here.
 
 **The money path was untouched, and a hashing trap is worth remembering from
 this apply.** The pre-apply read used `md5(prosrc)` and produced values that look

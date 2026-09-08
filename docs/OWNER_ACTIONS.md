@@ -2139,7 +2139,7 @@ other engineering-drafted string on a live customer path.
 
 ---
 
-## 30. OTP retention sweep — APPLIED 2026-09-08, NOT YET CLOSED
+## 30. ~~OTP retention sweep~~ — APPLIED AND RUN 2026-09-08 (closed)
 
 **Applied 2026-09-08 12:31:16 UTC**, live version `20260908123116`, on explicit
 owner approval naming the target by version. Ledger row 81.
@@ -2148,22 +2148,34 @@ Verified after the apply: exactly one cron job with the canonical schedule and
 command; the function callable by `service_role` only, not by `anon` or
 `authenticated`; the money-path hashes identical; Moyasar still absent.
 
-**STILL OPEN, because applying is not running.** The sweep deleted nothing —
-`otp_challenges` still held its three rows immediately afterwards, including the
-ones from 10 July — and the function has never executed. A cron job that exists
-is not a cron job that works, which §28 of this file already learned the hard
-way when a dispatcher shipped with no caller.
+**CLOSED by running it, not by asserting the schedule.** Applying deleted
+nothing, so on separate owner approval the sweep was executed once at
+2026-09-08:
 
-**It was briefly marked closed here on the strength of the apply alone**, and
-review caught that on #342: the completion criteria below had been written two
-commits earlier and were not met. Recording the mistake rather than quietly
-fixing it, because it is the same shape as the errors the legal-document audit
-was created to find.
+```
+{"ran": true, "challenges_deleted": 3, "reservations_deleted": 0}
+```
 
-**Two ways to finish it.** Either wait for the 00:40 UTC tick and record the
-run, or call `select public.purge_expired_otp_records();` once — a live delete of
-personal data, so a separate §5 action either way. The scheduled route needs no
-approval and costs only time.
+The three rows were from 10 and 21 July — two abandoned, one consumed — all
+roughly two months past a five-minute expiry. **`otp_challenges` now holds 0
+rows and 0 outside the window.** All six OTP functions intact; `profiles` (9),
+`orders` (71) and `loyalty_transactions` (111) untouched, so the sweep reached
+nothing it should not.
+
+**Stated precisely, because this item was closed once already on weaker
+evidence:** the function is proven against real data, the job is registered and
+`active`, and pg_cron is demonstrably working (470 successful runs across seven
+other jobs in the surrounding two hours). **The sweep's own first scheduled tick
+is 2026-09-09 00:40 UTC and has not been observed.** Nothing depends on it — the
+data is already inside the window — but it is not the same as having watched it
+fire.
+
+**It was briefly marked closed on the strength of the apply alone**, and review
+caught that on #342: the completion criteria below had been written two commits
+earlier and were not met. Recorded rather than quietly fixed, because it is the
+same shape as the errors the legal-document audit was created to find. A cron job
+that exists is not a cron job that works — §28 of this file learned that when a
+dispatcher shipped with no caller at all.
 
 The section below is kept as the record of why it was needed.
 

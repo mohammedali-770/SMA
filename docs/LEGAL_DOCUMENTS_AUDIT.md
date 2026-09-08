@@ -49,19 +49,32 @@ direction for a retention commitment.
 **APPLIED 2026-09-08 12:31:16 UTC** (live version `20260908123116`, ledger row
 81). The mechanism is installed and the schedule is live.
 
-**The sentence is not true yet, and that distinction is the point.** Applying the
-migration deleted nothing — it schedules the job — so the July rows are still
-there, and the function has never actually executed. Installing a cron job is
-not evidence that it runs; this repository has a worked example of exactly that
-gap (`OWNER_ACTIONS.md` §28, where a dispatcher shipped with no caller). The
-promise becomes true at the first tick, 00:40 UTC.
+**The sentence is now true, and it was made true by running the sweep rather
+than by asserting the schedule.** Applying the migration deleted nothing — it
+schedules the job — so on the owner's approval `purge_expired_otp_records()` was
+executed once, immediately:
 
-**This item therefore stays open until the first run is recorded**, per §30's own
-completion criteria. Review caught it being closed early on #342 — the criteria
-had been written two commits before and then not met, which is the same
-declare-done-on-partial-evidence error this whole audit exists to correct.
+```
+{"ran": true, "challenges_deleted": 3, "reservations_deleted": 0}
+```
 
-Everything else in the set is accurate. **This is the one open item.**
+All three rows were from July, ~2 months past their own five-minute expiry: two
+abandoned, one consumed. **`otp_challenges` now holds 0 rows and 0 outside the
+retention window**, which is §30's completion criterion answered directly. All
+six OTP functions are intact, and `profiles` (9), `orders` (71) and
+`loyalty_transactions` (111) were untouched.
+
+**What is proven, and what is not.** The function is proven to execute and delete
+correctly against real data; the job is registered, `active`, and pg_cron is
+demonstrably working (470 successful runs across seven other jobs in the two
+hours around the apply). **The sweep's own first scheduled tick has still not
+been observed** — that is 2026-09-09 00:40 UTC. The distinction is kept because
+this item was already closed once on weaker evidence.
+
+Review caught that on #342: §30's criteria had been written two commits before
+and then not met — the same declare-done-on-partial-evidence error this whole
+audit exists to correct, committed inside the pull request that records the
+audit.
 
 A second, quieter gap in the same area: `otp_send_reservations` already deletes
 rows older than two days inside `otp_reserve_send` — but only **for the phone
