@@ -380,6 +380,26 @@ begin
   end if;
   raise notice 'case 11 ok -- customers see the result, never the campaign list';
 end $$;
+
+-- ...and the same information must not be reachable through the RESOLVER, which
+-- is the door review found open on #338. `loyalty_multiplier_for` takes `p_at`,
+-- so a grant to `authenticated` would let a customer ask what the multiplier on
+-- a given product will be NEXT MONTH and enumerate targeted, not-yet-started
+-- campaigns a probe at a time -- handing back exactly what the select policy
+-- above withholds. A protection one object provides and another undoes is not a
+-- protection.
+do $$
+declare v_denied boolean := false; v_m numeric;
+begin
+  begin
+    select public.loyalty_multiplier_for(null, null, null, now()) into v_m;
+  exception when insufficient_privilege then v_denied := true;
+  end;
+  if not v_denied then
+    raise exception 'FAIL 11b: a customer executed loyalty_multiplier_for directly (got %)', v_m;
+  end if;
+  raise notice 'case 11b ok -- the resolver is not callable by a customer';
+end $$;
 reset role;
 
 do $$ begin

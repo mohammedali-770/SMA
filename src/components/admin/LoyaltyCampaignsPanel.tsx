@@ -19,6 +19,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Percent, RefreshCw, Trash2 } from 'lucide-react';
 
+import { useApp } from '../../context/AppContext';
 import { Button } from '../../design-system/ui/Button';
 import { Card } from '../../design-system/ui/Card';
 import { Notice } from '../../design-system/ui/Notice';
@@ -31,8 +32,56 @@ const INPUT = [
   'bg-con-surface px-3 text-[14px] text-con-text transition-colors duration-150',
   'focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50',
 ].join(' ');
+const SELECT = INPUT;
 const LABEL = 'block text-[9px] font-black text-con-text-3 uppercase mb-1';
+
+/**
+ * `datetime-local` yields a wall-clock string with NO offset ("2026-09-10T09:00").
+ * Sent as-is to a `timestamptz` column, Postgres reads it in the DATABASE session
+ * timezone rather than the administrator's, so a campaign scheduled from Riyadh
+ * would start and end three hours out — paying double points at the wrong times,
+ * in both directions. `new Date(v)` parses the string in the browser's zone,
+ * which is the one the operator was actually looking at.
+ *
+ * Same helper, same reason, as `BannerManagementPanel.toIso`. Review caught the
+ * omission on #338.
+ */
+const toIso = (v: string): string | null => (v ? new Date(v).toISOString() : null);
 const TD = 'px-3 py-2 align-middle';
+
+/**
+ * What a campaign applies to, in words. Three independent narrowings, all
+ * optional; none set means house-wide. A scope whose target has since been
+ * deleted falls back to a marker rather than rendering a bare uuid or an empty
+ * string, because "—" would read as "everything", which is the opposite of what
+ * a narrowed campaign does.
+ */
+export function scopeLabel(
+  c: Pick<LoyaltyCampaign, 'branch_id' | 'category_id' | 'product_id'>,
+  ctx: {
+    branches: { id: string; nameEn: string; nameAr: string }[];
+    categories: { id: string; nameEn: string; nameAr: string }[];
+    products: { id: string; nameEn: string; nameAr: string }[];
+    isRTL: boolean;
+  },
+): string {
+  const pick = (
+    list: { id: string; nameEn: string; nameAr: string }[],
+    id: string | null,
+  ): string | null => {
+    if (!id) return null;
+    const hit = list.find((x) => x.id === id);
+    if (!hit) return ctx.isRTL ? '(محذوف)' : '(deleted)';
+    return ctx.isRTL ? hit.nameAr : hit.nameEn;
+  };
+  const parts = [
+    pick(ctx.products, c.product_id),
+    pick(ctx.categories, c.category_id),
+    pick(ctx.branches, c.branch_id),
+  ].filter(Boolean) as string[];
+  if (parts.length === 0) return ctx.isRTL ? 'كل الطلبات' : 'Everything';
+  return parts.join(ctx.isRTL ? ' · ' : ' · ');
+}
 
 /** Live now, scheduled, finished, or switched off — decided in one place. */
 export function campaignState(
@@ -54,6 +103,13 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
   const [multiplier, setMultiplier] = useState('2');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  // Scope. Empty string means "house-wide", which is what the resolver's null
+  // means; the three are independent, and the resolver prefers the most
+  // specific match when more than one campaign covers a line.
+  const [branchId, setBranchId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [productId, setProductId] = useState('');
+  const { branches, categories, products } = useApp();
 
   const refresh = useCallback(async () => {
     try {
@@ -87,14 +143,20 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
         name_en: nameEn,
         name_ar: nameAr,
         multiplier: m,
-        starts_at: startsAt || null,
-        ends_at: endsAt || null,
+        starts_at: toIso(startsAt),
+        ends_at: toIso(endsAt),
+        branch_id: branchId || null,
+        category_id: categoryId || null,
+        product_id: productId || null,
       });
       setNameEn('');
       setNameAr('');
       setMultiplier('2');
       setStartsAt('');
       setEndsAt('');
+      setBranchId('');
+      setCategoryId('');
+      setProductId('');
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -215,7 +277,64 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
               disabled={busy}
             />
           </div>
-          <div className="md:col-span-5">
+          {/* SCOPE. Three independent narrowings, each optional; leaving all
+              three alone makes the campaign house-wide, which is what the
+              resolver's nulls mean. Without these the panel could only ever
+              create house-wide campaigns, so "double points on burgers" — the
+              shape these campaigns actually take — was unreachable from the UI
+              the documentation points at. Review caught that on #338. */}
+          <div>
+            <label className={LABEL} htmlFor="lc-b">
+              {isRTL ? 'الفرع (الكل)' : 'Branch (all)'}
+            </label>
+            <select
+              id="lc-b"
+              className={SELECT}
+              value={branchId}
+              onChange={(e) => setBranchId(e.target.value)}
+              disabled={busy}
+            >
+              <option value="">{isRTL ? 'كل الفروع' : 'All branches'}</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{isRTL ? b.nameAr : b.nameEn}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="lc-c">
+              {isRTL ? 'التصنيف (الكل)' : 'Category (all)'}
+            </label>
+            <select
+              id="lc-c"
+              className={SELECT}
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              disabled={busy}
+            >
+              <option value="">{isRTL ? 'كل التصنيفات' : 'All categories'}</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{isRTL ? c.nameAr : c.nameEn}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className={LABEL} htmlFor="lc-p">
+              {isRTL ? 'الصنف (الكل)' : 'Product (all)'}
+            </label>
+            <select
+              id="lc-p"
+              className={SELECT}
+              value={productId}
+              onChange={(e) => setProductId(e.target.value)}
+              disabled={busy}
+            >
+              <option value="">{isRTL ? 'كل الأصناف' : 'All products'}</option>
+              {products.map((pr) => (
+                <option key={pr.id} value={pr.id}>{isRTL ? pr.nameAr : pr.nameEn}</option>
+              ))}
+            </select>
+          </div>
+          <div className="md:col-span-2">
             <Button
               onClick={() => void create()}
               disabled={busy}
@@ -252,6 +371,16 @@ export function LoyaltyCampaignsPanel({ isRTL, readOnly }: { isRTL: boolean; rea
                     <td className={TD}>
                       <Text variant="caption" tone="secondary" as="span">
                         {(c.starts_at ?? '—').slice(0, 10)} → {(c.ends_at ?? '—').slice(0, 10)}
+                      </Text>
+                    </td>
+                    {/* WHAT IT APPLIES TO. Added with the scope controls: a list
+                        that shows two "Double points" rows and no way to tell
+                        which one is the burgers-only campaign is worse than no
+                        list. Names rather than ids, because an id tells the
+                        operator nothing at a glance. */}
+                    <td className={TD}>
+                      <Text variant="caption" tone="secondary" as="span">
+                        {scopeLabel(c, { branches, categories, products, isRTL })}
                       </Text>
                     </td>
                     <td className={TD}>

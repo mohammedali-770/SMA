@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**166 TypeScript test files declaring 2546 test blocks, plus 66 SQL suites.**
+**166 TypeScript test files declaring 2551 test blocks, plus 66 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -179,7 +179,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-82 files, 1079 declared test blocks.
+82 files, 1084 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -189,7 +189,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/components/admin/CompMembersPanel.test.tsx` | 12 | CompMembersPanel |
 | `src/components/admin/IntegrationCard.test.ts` | 4 | Lazywait base_url placeholder |
 | `src/components/admin/LiveOrdersPanel.test.tsx` | 15 | permission gate |
-| `src/components/admin/loyaltyCampaignState.test.ts` | 5 | campaignState |
+| `src/components/admin/loyaltyCampaignState.test.ts` | 10 | campaignState |
 | `src/components/admin/MenuManagementPanel.test.tsx` | 16 | product price validation — the money contract |
 | `src/components/admin/OperationsAlertsPanel.states.test.tsx` | 20 | in-flight states |
 | `src/components/admin/OperationsAlertsPanel.test.tsx` | 19 | OperationsAlertsPanel — summary + inbox |

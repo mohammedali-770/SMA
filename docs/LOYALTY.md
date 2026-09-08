@@ -376,6 +376,34 @@ fourth mirror of it.
 Customers never read `loyalty_multipliers`: the select policy requires
 `is_staff()`. They see the result, not the campaign list.
 
+**And they cannot reach the same information through the resolver either**,
+which is where the first version leaked it. `loyalty_multiplier_for` was granted
+to `authenticated`, and it takes `p_at` — so a customer could ask what the
+multiplier on a given product will be *next month* and enumerate targeted,
+not-yet-started campaigns a probe at a time, recovering exactly what the select
+policy withholds. It is now granted to `service_role` only. Nothing legitimate
+lost access: `place_order`, `compute_order_snapshot` and `preview_loyalty_points`
+are all `security definer` owned by the same role that owns the resolver, so
+they call it as the owner rather than through the caller's grants. Case 11b
+asserts a customer session is refused. Review caught it on #338, and the
+generalisable form is worth keeping: **a protection one object provides and a
+helper undoes is not a protection** — check the grants on every function that
+reads a policy-protected table, not just the table.
+
+### Scope is set from the panel, not only from the resolver
+
+The resolver has always supported branch, category and product narrowing, and
+the headline use case for this feature — *"double points on burgers this week"*
+— depends on it. The first version of the admin form omitted the controls, so
+every campaign it could create was house-wide and the per-line behaviour was
+unreachable without direct database calls. The form now carries three optional
+selects, and the list carries a **Scope** column: a table showing two rows both
+called "Double points" with no way to tell which is the burgers-only one is
+worse than no table. `scopeLabel` renders names rather than ids, and a narrowing
+whose target has been deleted shows `(deleted)` rather than an empty cell —
+because an empty cell reads as *everything*, which is the opposite of what a
+narrowed campaign does.
+
 ## 6. Testing
 
 | Suite | Covers |
