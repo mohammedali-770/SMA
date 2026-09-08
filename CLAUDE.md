@@ -226,10 +226,22 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-07, after the loyalty multiplier migration was
-written: 124 repository files / 125 live history rows / FIVE unapplied — Moyasar
-(frozen on purpose) and the four loyalty files, all written and awaiting
-approval.** The live figure is unchanged; only the repository side moved.
+**Current position 2026-09-08, after the OTP retention sweep was written: 125
+repository files / 125 live history rows / SIX unapplied — Moyasar (frozen on
+purpose), the four loyalty files, and
+`20260911120000_otp_retention_sweep` (written, awaiting approval).** The live
+figure is unchanged; only the repository side moved.
+
+**The sweep is the one outstanding file whose ABSENCE makes a live customer
+document false.** `privacy_policy` v2.1 says verification codes are deleted after
+a short period; nothing does that until this is applied — `otp_challenges` holds
+rows from 10 July carrying `phone_e164` and `ip_hash`. It is independent of the
+loyalty files, redefines neither money-path function, and touches no order,
+payment or loyalty data. Detail: `docs/OWNER_ACTIONS.md` §30 and
+`docs/LEGAL_DOCUMENTS_AUDIT.md`.
+
+**Superseded, kept because the count is the point: 124 files / FIVE unapplied**
+after the loyalty multiplier migration was written.
 
 **THE APPLY ORDER FOR THE LOYALTY FILES IS NOT OPTIONAL, and two of the four
 enforce it themselves.** `20260907120000` (pickup-only) →

@@ -2104,16 +2104,18 @@ close this section per the rule below.
 
 ---
 
-## 29. Native Arabic read of the loyalty terms (v2.1) and the loyalty UI copy
+## 29. Native Arabic read of the FOUR corrected legal documents (v2.1) and the loyalty UI copy
 
 **Not blocking anything. It is here because the Arabic in question is now
 BINDING, which the rest of the engineering-drafted Arabic is not.**
 
-On 2026-09-08 the live `offers_loyalty_terms` document was corrected in place to
-version 2.1 — three statements that the system does not do were removed in both
-languages (detail and evidence: [`LOYALTY.md`](LOYALTY.md) §7). The English is
-plain and checked against the code. **The three Arabic replacements are
-engineering-drafted and have not had a native read.**
+On 2026-09-08 **four** live documents were corrected in place to version 2.1 —
+`offers_loyalty_terms`, `privacy_policy`, `delivery_pickup_policy` and
+`allergen_food_notice`. Every correction was made in both languages. Detail and
+evidence: [`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md), with the
+loyalty specifics in [`LOYALTY.md`](LOYALTY.md) §7. The English is plain and
+checked against the code. **The Arabic replacements are engineering-drafted and
+have not had a native read.**
 
 They were published rather than held back deliberately: leaving the Arabic
 stating something false while the English told the truth would have been the
@@ -2123,8 +2125,8 @@ bound by.
 
 What is wanted:
 
-- a native Arabic speaker reads the three corrected passages in the live document
-  (Admin → Legal Documents → Offers & Loyalty Terms) against the English;
+- a native Arabic speaker reads the corrected passages in all four live
+  documents (Admin → Legal Documents) against the English;
 - anything reworded is edited in the admin console, which is an ordinary admin
   write and needs no engineering;
 - the same read covers the loyalty UI strings shipped in the five-part series —
@@ -2134,6 +2136,40 @@ What is wanted:
 
 Related and still open: the delivery `ready` push Arabic (§26), which is the
 other engineering-drafted string on a live customer path.
+
+---
+
+## 30. Apply the OTP retention sweep — the Privacy Policy is false until you do
+
+**This is the one outstanding inaccuracy in the whole legal set.**
+
+`privacy_policy` says, under HOW LONG WE KEEP IT: *"Verification codes: a short
+period, then deleted."* Nothing deletes them on a schedule. `otp_challenges`
+holds rows going back to **10 July**, carrying `phone_e164` and `ip_hash`; the
+only thing that ever removed them was account deletion.
+
+The wording was deliberately **not** softened to match — the policy states the
+right intention, and lowering a retention promise to fit the code is the wrong
+direction. The fix is
+`supabase/migrations/20260911120000_otp_retention_sweep.sql`, which adds
+`purge_expired_otp_records()` and a daily `otp-retention-sweep` cron job at
+00:40 UTC.
+
+**What applying it does:** deletes `otp_challenges` rows more than 24 hours past
+their own expiry, and `otp_send_reservations` rows older than two days — the
+identical rule `otp_reserve_send` already applies per phone, so the login rate
+limiter cannot be affected. Both bounds are asserted by the migration's own
+verification block and mutation-tested.
+
+**What it does not do:** it touches no order, payment or loyalty data, and
+redefines neither money-path function.
+
+Applying it is a §5 action. Name the target by version: `20260911120000`.
+
+### On completion
+
+Record the applied version and the first cron run, and confirm the oldest
+remaining `otp_challenges` row is inside the window.
 
 ---
 

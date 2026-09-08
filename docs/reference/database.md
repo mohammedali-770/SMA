@@ -12,7 +12,7 @@ Tables, functions, policies and triggers **as declared by the migrations in this
 
 > This is a source-derived index, not a live schema dump. It is built by reading migration text, so it shows what the repository declares. For what Production actually holds — including migration-history rows that have no file here — see the dated read-only snapshot in [`../OWNER_ACTIONS.md`](../OWNER_ACTIONS.md) and [`../MIGRATION_RECONCILIATION_20260812.md`](../MIGRATION_RECONCILIATION_20260812.md). Never reconcile the two by applying anything.
 
-Migration files in the repository: **124**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260910120000_loyalty_multipliers.sql`.
+Migration files in the repository: **125**. Earliest `20260707120000_extensions_enums_helpers.sql`, latest `20260911120000_otp_retention_sweep.sql`.
 
 ## Tables
 
@@ -243,6 +243,7 @@ A function defined by more than one migration has been redefined; the last defin
 | `pos_next_attempt_at` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `pos_sync_status_matches` | 1 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `preview_loyalty_points` | 1 | `20260908120000_loyalty_item_exclusion.sql` |
+| `purge_expired_otp_records` | 1 | `20260911120000_otp_retention_sweep.sql` |
 | `reap_stale_lazywait_syncs` | 2 | `20260721120000_lazywait_confirmation_lifecycle.sql` |
 | `record_lazywait_sync` | 3 | `20260721130000_lazywait_synced_ref_guard.sql` |
 | `record_order_sync` | 1 | `20260707121300_payments_and_sync.sql` |

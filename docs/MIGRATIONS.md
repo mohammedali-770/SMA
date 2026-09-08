@@ -24,6 +24,32 @@ to Production.**
 > CLAUDE.md §8 (**107 repository files / 112 live rows**), and the row-level
 > detail in §5 rows 59–67 with §32, §33, §34 and §35.
 
+> **Updated 2026-09-08 — SIX unapplied, and the newest one is the only file
+> whose ABSENCE makes a live customer document false.**
+> `20260911120000_otp_retention_sweep.sql` joins the list: a daily job that
+> deletes expired OTP records. **125 repository files / 125 live history rows.**
+>
+> The Privacy Policy says verification codes are kept "a short period, then
+> deleted". Nothing did that — `otp_challenges` held rows from 10 July carrying
+> `phone_e164` and `ip_hash`, and only account deletion ever removed them. The
+> policy wording was deliberately NOT softened to match the code, because
+> lowering a retention promise to fit the implementation is the wrong direction;
+> this migration is the fix instead. Until it is applied, that sentence is false.
+>
+> **Independent of every other outstanding file.** It redefines neither
+> money-path function, so their hashes are untouched, and it can be applied at
+> any point relative to the loyalty sequence. It touches no order, payment or
+> loyalty data.
+>
+> Its two bounds are the safety-critical part and are asserted by its own
+> verification block: challenges go 24 hours past their own expiry, and
+> reservations at two days — the identical rule `otp_reserve_send` already
+> applies per phone, which is what makes it impossible for the sweep to change
+> the login rate limiter's behaviour. Both were mutation-tested. Detail:
+> [`LEGAL_DOCUMENTS_AUDIT.md`](LEGAL_DOCUMENTS_AUDIT.md).
+>
+> **Superseded, kept because the count is the point:**
+>
 > **Updated 2026-09-07 (last of the series) — FIVE unapplied repository files,
 > and the apply ORDER now matters for three of them.**
 > `20260910120000_loyalty_multipliers.sql` joins the list: points-earning
