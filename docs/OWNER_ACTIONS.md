@@ -2104,6 +2104,39 @@ close this section per the rule below.
 
 ---
 
+## 29. Native Arabic read of the loyalty terms (v2.1) and the loyalty UI copy
+
+**Not blocking anything. It is here because the Arabic in question is now
+BINDING, which the rest of the engineering-drafted Arabic is not.**
+
+On 2026-09-08 the live `offers_loyalty_terms` document was corrected in place to
+version 2.1 — three statements that the system does not do were removed in both
+languages (detail and evidence: [`LOYALTY.md`](LOYALTY.md) §7). The English is
+plain and checked against the code. **The three Arabic replacements are
+engineering-drafted and have not had a native read.**
+
+They were published rather than held back deliberately: leaving the Arabic
+stating something false while the English told the truth would have been the
+worse of the two options, since the Arabic is what most customers read. The
+trade is that the wording may be stiff or subtly off in a document a customer is
+bound by.
+
+What is wanted:
+
+- a native Arabic speaker reads the three corrected passages in the live document
+  (Admin → Legal Documents → Offers & Loyalty Terms) against the English;
+- anything reworded is edited in the admin console, which is an ordinary admin
+  write and needs no engineering;
+- the same read covers the loyalty UI strings shipped in the five-part series —
+  the pickup-only checkout note, the "you'll earn N points" line, the Profile
+  expiry notice, and the campaign panel labels. Those are not binding, so they
+  are the lower half of this item.
+
+Related and still open: the delivery `ready` push Arabic (§26), which is the
+other engineering-drafted string on a live customer path.
+
+---
+
 ## Owner-action closeout rule
 
 When an item is completed:

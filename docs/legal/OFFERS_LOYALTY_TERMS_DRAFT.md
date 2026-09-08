@@ -6,19 +6,31 @@ terms and so the owner can see exactly which promises the current live text make
 that the system does not keep.
 
 **Where the real document lives.** `public.legal_documents`, row
-`offers_loyalty_terms`, edited in the admin console (Legal Documents). It is
-**version 2.0, effective 18 August 2026, active** and visible to customers today.
-Nothing in this file is live until somebody pastes it there — deliberately, since
-that is a live data write and the owner's decision.
+`offers_loyalty_terms`, edited in the admin console (Legal Documents). It is now
+**version 2.1, effective 8 September 2026, active**.
+
+**Version 2.1 is a targeted correction, not this draft.** On 2026-09-08 the three
+false statements described in §1 were corrected in place, in both languages, on
+the owner's approval. Everything else in the live text is unchanged. This file is
+still the fuller rewrite, and nothing in it is live until somebody puts it
+there.
 
 ---
 
-## 1. The live text is already wrong in two places
+## 1. Three things version 2.0 said that the system does not do — CORRECTED 2026-09-08
 
-Found while drafting, and worth fixing regardless of whether any loyalty change
-ships.
+Found by reading the live text against the code, and fixed without waiting for
+any loyalty change to ship, because none of them depended on one. **Live version
+2.1 no longer contains any of them.** They are kept here in full because the
+reasoning is the useful part, and because a document that quietly drops the
+errors it once recorded teaches nobody anything.
 
-### "Points are added when the order is completed."
+The third was found only while making the other two — it had survived every
+earlier review of this feature, in a customer-facing document, because nobody had
+read the *whole* live text against the code. That is the lesson worth carrying:
+the errors you find are bounded by the passages you actually check.
+
+### "Points are added when the order is completed." — CORRECTED
 
 **They are not.** Points are granted when the order is **created** —
 `place_order` writes the ledger row and updates the balance in the same
@@ -30,7 +42,7 @@ This is not a quibble: the whole cancellation-reversal mechanism
 (`20260810100000`) exists *because* points are granted early. A reader of the
 current terms would not expect a reversal to be necessary at all.
 
-### "points added to an order that is later cancelled or refunded are reversed"
+### "points added to an order that is later cancelled or refunded are reversed" — CORRECTED
 
 **Approximately true for cancellation, and the approximation matters.**
 `admin_set_order_status` on `cancelled`:
@@ -42,9 +54,34 @@ current terms would not expect a reversal to be necessary at all.
   so points spent on a cancelled order can never be consumed to cover an
   earn-reversal shortfall.
 
-**"refunded" is unverified.** Refund processing is disabled under the payment
-freeze and no refund path touches loyalty today. The terms promise behaviour that
-has never run.
+**"refunded" is false, and that was measured rather than inferred.** All nine
+live functions matching `%refund%` were checked against their source: not one
+mentions loyalty. Refund processing is disabled under the payment freeze, so the
+clause promised behaviour that has never run.
+
+### "You choose how many points to use on an order." — CORRECTED
+
+**You do not.** `LoyaltyToggle` is a boolean. When it is on, `CheckoutScreen`
+submits the entire available balance and the server clamps it to the value of the
+order; there is no control anywhere in the flow for choosing an amount.
+
+This one is the reason §1 is worth re-reading rather than skimming. It was live
+in a binding customer document from version 2.0, through the whole five-part
+loyalty series, and it surfaced only when the live text was read end to end — the
+same sentence had already been caught and corrected in *this draft* on #339
+without anybody thinking to check whether the live document said it too.
+
+**How the correction was applied**, since the method matters more than the edit:
+SQL `replace()` against the stored content rather than a re-paste of the whole
+document, so every untouched clause is byte-identical by construction. Each
+anchor was confirmed present before the write and verified absent after it, with
+the other sections and the quoted figures (1 point per SAR, 0.10 SAR per point,
+100 minimum — all matching live `app_settings`) asserted intact in both
+languages.
+
+**The Arabic replacements are engineering-drafted and have not had a native
+read.** They were published rather than held so neither language was left stating
+something false; the wording is a follow-up.
 
 ---
 
