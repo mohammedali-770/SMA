@@ -32,12 +32,14 @@ export function loyaltyRulesSummary(s: LoyaltySettings): RuleLine[] {
   // Programme off is the whole answer — appending "points expire in January" to
   // it would describe a programme that is not running.
   if (!s.isEnabled) {
-    return [{
-      id: 'off',
-      en: 'The loyalty programme is OFF. No order earns or redeems points.',
-      ar: 'برنامج الولاء متوقف. لا يكتسب أي طلب نقاطاً ولا يستبدلها.',
-      tone: 'warn',
-    }];
+    return [
+      {
+        id: 'off',
+        en: 'The loyalty programme is OFF. No order earns or redeems points.',
+        ar: 'برنامج الولاء متوقف. لا يكتسب أي طلب نقاطاً ولا يستبدلها.',
+        tone: 'warn',
+      },
+    ];
   }
 
   const lines: RuleLine[] = [
@@ -49,12 +51,14 @@ export function loyaltyRulesSummary(s: LoyaltySettings): RuleLine[] {
     },
     {
       id: 'floor',
-      en: s.minPointsToRedeem > 0
-        ? `At least ${s.minPointsToRedeem} points are needed before any can be spent.`
-        : 'There is no minimum before points can be spent.',
-      ar: s.minPointsToRedeem > 0
-        ? `يلزم ${s.minPointsToRedeem} نقطة على الأقل قبل الاستبدال.`
-        : 'لا يوجد حد أدنى للاستبدال.',
+      en:
+        s.minPointsToRedeem > 0
+          ? `At least ${s.minPointsToRedeem} points are needed before any can be spent.`
+          : 'There is no minimum before points can be spent.',
+      ar:
+        s.minPointsToRedeem > 0
+          ? `يلزم ${s.minPointsToRedeem} نقطة على الأقل قبل الاستبدال.`
+          : 'لا يوجد حد أدنى للاستبدال.',
       tone: 'info',
     },
     {
