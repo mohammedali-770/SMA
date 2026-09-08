@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import type { LoyaltyCampaign } from './loyaltyCampaignsApi';
 import { loyaltyRulesSummary } from './loyaltyRulesSummary';
 import type { LoyaltySettings } from '../types';
 
@@ -75,6 +76,69 @@ describe('loyaltyRulesSummary', () => {
       expect(l.en.length).toBeGreaterThan(0);
       expect(l.ar.length).toBeGreaterThan(0);
       expect(l.ar).not.toBe(l.en);
+    }
+  });
+
+  it('keeps four decimals, because the column has four', () => {
+    // `discount_per_point` is numeric(10,4). Rounding to two turned a saved
+    // 0.0051 into "0.01" — nearly double what a point is worth, printed under a
+    // heading claiming to state the rule in force.
+    expect(line({ ...base, discountPerPoint: 0.0051 }, 'rate').en).toContain('0.0051 SAR');
+    // Trailing zeros still go: an ordinary rate must not read as "0.1000".
+    expect(line({ ...base, discountPerPoint: 0.1 }, 'rate').en).toContain('0.1 SAR');
+  });
+});
+
+/**
+ * Campaigns. The block is read as authoritative, so the two failure modes are
+ * asymmetric: saying nothing when a campaign is running understates the rate,
+ * and asserting "none running" when the list never loaded is a claim the code
+ * has not checked. The second is worse, so `undefined` stays silent.
+ */
+describe('loyaltyRulesSummary — campaigns', () => {
+  const NOW = new Date('2026-09-15T12:00:00Z');
+  const campaign = (over: Partial<LoyaltyCampaign> = {}): LoyaltyCampaign =>
+    ({
+      id: 'x',
+      name_en: 'Double points',
+      name_ar: 'نقاط مضاعفة',
+      multiplier: 2,
+      starts_at: null,
+      ends_at: null,
+      branch_id: null,
+      product_id: null,
+      category_id: null,
+      is_active: true,
+      created_at: '2026-09-01T00:00:00Z',
+      ...over,
+    }) as LoyaltyCampaign;
+
+  const ids = (c?: LoyaltyCampaign[]) =>
+    loyaltyRulesSummary(base, c, NOW).map((l) => l.id);
+
+  it('says nothing about campaigns when the list has not loaded', () => {
+    expect(ids(undefined)).not.toContain('campaigns');
+  });
+
+  it('states plainly that none is running when the list is empty', () => {
+    expect(loyaltyRulesSummary(base, [], NOW).find((l) => l.id === 'campaigns')?.en)
+      .toContain('No points campaign is running');
+  });
+
+  it('names a live campaign and its multiplier', () => {
+    const l = loyaltyRulesSummary(base, [campaign()], NOW).find((x) => x.id === 'campaigns');
+    expect(l?.en).toContain('Double points (x2)');
+    expect(l?.en).toContain('earn MORE than the rate above');
+    expect(l?.ar).toContain('نقاط مضاعفة');
+  });
+
+  it('ignores a campaign that is scheduled, finished, or switched off', () => {
+    const notYet = campaign({ starts_at: '2026-10-01T00:00:00Z' });
+    const over = campaign({ ends_at: '2026-09-01T00:00:00Z' });
+    const off = campaign({ is_active: false });
+    for (const c of [notYet, over, off]) {
+      expect(loyaltyRulesSummary(base, [c], NOW).find((l) => l.id === 'campaigns')?.en)
+        .toContain('No points campaign is running');
     }
   });
 });

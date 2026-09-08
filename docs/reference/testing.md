@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**167 TypeScript test files declaring 2560 test blocks, plus 66 SQL suites.**
+**167 TypeScript test files declaring 2565 test blocks, plus 66 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -179,7 +179,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-83 files, 1093 declared test blocks.
+83 files, 1098 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -244,7 +244,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/loyaltyRulesSummary.test.ts` | 9 | loyaltyRulesSummary |
+| `src/lib/loyaltyRulesSummary.test.ts` | 14 | loyaltyRulesSummary |
 | `src/lib/mappers.test.ts` | 31 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |

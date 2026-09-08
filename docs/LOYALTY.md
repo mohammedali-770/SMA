@@ -489,6 +489,29 @@ only *narrow* future earning. It is probably **not** enough for expiry, which
 forfeits value a customer already holds. That is counsel's call, and it is why
 expiry ships switched off.
 
+### What the summary block does and does not claim
+
+Three corrections came out of review on #339, and each is about the block being
+read as authoritative:
+
+- **It shows four decimals, not two.** `app_settings.discount_per_point` is
+  `numeric(10,4)`, so rounding to two turned a saved 0.0051 into "0.01" — nearly
+  double what a point is worth, printed under a heading stating the rule in
+  force. Trailing zeros are still dropped, so an ordinary rate does not read as
+  "0.1000".
+- **It names live campaigns.** Without them the block was least accurate exactly
+  when it mattered most: during a campaign, the rate line alone understates what
+  a qualifying order earns. `undefined` and `[]` are deliberately different — an
+  unloaded list stays silent rather than asserting "no campaigns are running",
+  because the one thing an authoritative block must not do is claim an absence
+  it has not checked.
+- **It stops calling itself "in force" after a failed write.**
+  `updateLoyaltySettings` sets local state immediately and `flushSettings` only
+  raises `writeError` on failure — it does not revert or re-read — so the block
+  could describe rules the server never saved. When a write has failed the
+  heading reads *"UNSAVED DRAFT — the last save failed"* and says the list
+  describes the screen rather than the server.
+
 ## 8. Regulatory shape (KSA)
 
 Not legal advice; it is why the design looks the way it does.

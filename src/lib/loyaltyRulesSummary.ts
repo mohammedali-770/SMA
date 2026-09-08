@@ -12,6 +12,7 @@
  * here feeds a total, so it cannot drift into being a third copy of the earning
  * rule — it restates settings the operator has already saved.
  */
+import type { LoyaltyCampaign } from './loyaltyCampaignsApi';
 import type { LoyaltySettings } from '../types';
 
 export interface RuleLine {
@@ -23,12 +24,39 @@ export interface RuleLine {
   tone: 'info' | 'warn';
 }
 
-/** How many decimals a rate needs, without printing "1.00 point". */
+/**
+ * As many decimals as the value actually has, and no more.
+ *
+ * Two decimals is NOT enough here, which review caught on #339:
+ * `app_settings.discount_per_point` is `numeric(10,4)`, so a saved 0.0051
+ * rendered as "0.01" — nearly double what a point is worth. In a block headed
+ * "what the programme is doing right now" that is not a formatting nicety, it
+ * is the summary contradicting the rule it claims to describe. Four decimals is
+ * the column's own scale; trailing zeros are still dropped so an ordinary rate
+ * does not print as "1.0000 point".
+ */
 function num(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4)));
 }
 
-export function loyaltyRulesSummary(s: LoyaltySettings): RuleLine[] {
+/** Live NOW — not merely active. A row can be active and scheduled for August. */
+function liveNow(c: LoyaltyCampaign, now: Date): boolean {
+  if (!c.is_active) return false;
+  if (c.starts_at && new Date(c.starts_at) > now) return false;
+  if (c.ends_at && new Date(c.ends_at) <= now) return false;
+  return true;
+}
+
+export function loyaltyRulesSummary(
+  s: LoyaltySettings,
+  /**
+   * Live campaigns, so the rate line is not read as the whole answer during
+   * one. Optional because the settings tab may not have loaded them yet, and a
+   * missing list must not be reported as "no campaigns" — see the line below.
+   */
+  campaigns?: LoyaltyCampaign[],
+  now: Date = new Date(),
+): RuleLine[] {
   // Programme off is the whole answer — appending "points expire in January" to
   // it would describe a programme that is not running.
   if (!s.isEnabled) {
@@ -98,6 +126,35 @@ export function loyaltyRulesSummary(s: LoyaltySettings): RuleLine[] {
           tone: 'info',
         },
   );
+
+  // CAMPAIGNS. Review found the block silent about them on #339, which made it
+  // wrong precisely when an operator most needs it: during a campaign, the rate
+  // line alone understates what a qualifying order earns.
+  //
+  // `undefined` and `[]` are deliberately different. An unloaded list says
+  // nothing rather than "no campaigns are running" — this block is read as
+  // authoritative, so the one thing it must never do is assert an absence it has
+  // not checked.
+  if (campaigns) {
+    const live = campaigns.filter((c) => liveNow(c, now));
+    if (live.length === 0) {
+      lines.push({
+        id: 'campaigns',
+        en: 'No points campaign is running, so the rate above is the whole rate.',
+        ar: 'لا توجد حملة نقاط فعّالة، فالمعدل أعلاه هو المعدل الكامل.',
+        tone: 'info',
+      });
+    } else {
+      const names = live.map((c) => `${c.name_en} (x${num(Number(c.multiplier))})`).join(', ');
+      const namesAr = live.map((c) => `${c.name_ar} (×${num(Number(c.multiplier))})`).join('، ');
+      lines.push({
+        id: 'campaigns',
+        en: `${live.length} points campaign(s) running now, so qualifying orders earn MORE than the rate above: ${names}. Check the campaign list for what each one applies to.`,
+        ar: `${live.length} حملة نقاط فعّالة الآن، لذا تكتسب الطلبات المؤهلة أكثر من المعدل أعلاه: ${namesAr}. راجع قائمة الحملات لمعرفة نطاق كل حملة.`,
+        tone: 'info',
+      });
+    }
+  }
 
   return lines;
 }

@@ -9,14 +9,33 @@ import { mapConfig } from '../../lib/map';
 import { admin, catalog } from '../../lib/api';
 import { isPlaceholderValue, mailtoLink, telLink, whatsappLink } from '../../lib/supportContact';
 import { LoyaltyCampaignsPanel } from './LoyaltyCampaignsPanel';
+import { loyaltyCampaigns, type LoyaltyCampaign } from '../../lib/loyaltyCampaignsApi';
 import { loyaltyRulesSummary } from '../../lib/loyaltyRulesSummary';
 
 export const SettingsPanel: React.FC = () => {
   const {
     brandSettings, updateBrandSettings, loyaltySettings, updateLoyaltySettings,
     profiles, updateCustomerPoints, loyaltyMutationsEnabled, currentUser, adminLang,
-    paymentSettings, updatePaymentSettings,
+    paymentSettings, updatePaymentSettings, writeError,
   } = useApp();
+
+  /**
+   * Campaigns for the rules block below. Loaded here rather than lifted out of
+   * `LoyaltyCampaignsPanel`, because the summary must be able to distinguish
+   * "no campaigns" from "not loaded yet" — `undefined` until the read returns,
+   * and the summary stays silent about campaigns until then rather than
+   * asserting an absence it has not checked. A failed read leaves it undefined
+   * for the same reason.
+   */
+  const [liveCampaigns, setLiveCampaigns] = useState<LoyaltyCampaign[] | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void loyaltyCampaigns
+      .list()
+      .then((rows) => { if (alive) setLiveCampaigns(rows); })
+      .catch(() => { /* stay undefined: silence beats a false "none running" */ });
+    return () => { alive = false; };
+  }, []);
   const t = ADMIN_LOCALES[adminLang];
   const isRTL = adminLang === 'ar';
   const [settingsSubTab, setSettingsSubTab] = useState<'brand' | 'payments' | 'maps' | 'loyalty' | 'support'>('brand');
@@ -651,11 +670,32 @@ export const SettingsPanel: React.FC = () => {
                           sentences — it computes nothing, so it cannot drift
                           into being a second copy of the earning rule. */}
                       <div className="p-4 bg-con-surface-2 border border-con-line rounded-2xl space-y-2">
+                        {/* THE HEADING IS CONDITIONAL, and that is the point.
+                            `updateLoyaltySettings` writes local state
+                            immediately and `flushSettings` only raises
+                            `writeError` on failure — it does not revert or
+                            re-read. So after a failed write this block would
+                            describe rules the server never saved while calling
+                            them "in force". Review caught it on #339. When a
+                            write has failed the block says so instead. */}
                         <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">
-                          {isRTL ? 'القواعد المطبَّقة حالياً' : 'Rules In Force Right Now'}
+                          {writeError
+                            ? isRTL
+                              ? 'مسودة غير محفوظة — فشل آخر حفظ'
+                              : 'UNSAVED DRAFT — the last save failed'
+                            : isRTL
+                              ? 'القواعد المطبَّقة حالياً'
+                              : 'Rules In Force Right Now'}
                         </span>
+                        {writeError ? (
+                          <span className="text-[9.5px] leading-relaxed font-bold text-ember block">
+                            {isRTL
+                              ? 'ما يلي يصف ما على هذه الشاشة، لا ما لدى الخادم. أعد المحاولة أو حدّث الصفحة قبل الاعتماد عليه.'
+                              : 'What follows describes this screen, not the server. Retry or reload before relying on it.'}
+                          </span>
+                        ) : null}
                         <ul className="space-y-1">
-                          {loyaltyRulesSummary(loyaltySettings).map((r) => (
+                          {loyaltyRulesSummary(loyaltySettings, liveCampaigns).map((r) => (
                             <li
                               key={r.id}
                               className={`text-[9.5px] leading-relaxed font-bold ${

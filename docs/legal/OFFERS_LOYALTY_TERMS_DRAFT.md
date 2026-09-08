@@ -50,9 +50,18 @@ has never run.
 
 ## 2. What each shipped change adds, if and when it is switched on
 
-None of this is live yet: four migrations are written and unapplied, and each
-feature defaults to today's behaviour. **The terms must be updated before the
-corresponding switch is flipped, not after.**
+None of this is live yet: four migrations are written and unapplied. **The terms
+must be updated before the corresponding switch is flipped, not after.**
+
+**Three of the four default to today's behaviour on apply. Pickup-only does
+NOT** — and review caught this paragraph glossing over it on #339, which is
+exactly the kind of error that gets terms published too late.
+`20260907120000_loyalty_pickup_only.sql` defaults `loyalty_pickup_only` to
+**true**, so the moment it is applied every delivery order stops earning *and*
+stops being able to redeem, with no later switch to flip. For that one, applying
+the migration IS the change: the terms have to be published before the apply, not
+before some subsequent toggle. (Per-item exclusion excludes nothing until an item
+is turned off; multipliers start with an empty table; expiry starts switched off.)
 
 | Change | What a customer needs told |
 | --- | --- |
@@ -93,7 +102,9 @@ straight away.
 What counts towards points:
 - The price of the food, including VAT.
 - The delivery fee does not earn points.
-- Some items do not earn points. Where that applies it is shown with the item.
+- Some items do not earn points. **[The app does not currently mark these items
+  individually — see the note below. Counsel should choose wording that does not
+  promise a per-item label until one exists.]**
 - Points are earned on pickup orders only. A delivery order does not earn points.
 - If you use a discount or spend points on an order, the points you earn are
   calculated on what you actually pay for the eligible items.
@@ -107,8 +118,10 @@ is worth [0.10] SAR, and you need at least [100] points before you can redeem.
 
 Points can be spent on pickup orders only.
 
-You choose how many points to use on an order. The discount is applied to the
-order total by our system, and the amounts confirmed at checkout are final.
+You choose **whether** to use your points on an order. When you do, your whole
+available balance is applied, up to the value of the order — the app has a single
+on/off control, not a field for choosing an amount. The discount is applied to
+the order total by our system, and the amounts confirmed at checkout are final.
 
 Points cannot be exchanged for cash, transferred to another account, or combined
 across accounts. They have no cash value.
@@ -170,7 +183,7 @@ info@spicymeal.com.sa — 9200 31495
 ما الذي يُحتسب:
 - قيمة الطعام شاملة ضريبة القيمة المضافة.
 - رسوم التوصيل لا تمنح نقاطاً.
-- بعض الأصناف لا تمنح نقاطاً، ويظهر ذلك مع الصنف.
+- بعض الأصناف لا تمنح نقاطاً. **[لا يميّز التطبيق هذه الأصناف حالياً — راجع الملاحظة في القسم ٥.]**
 - تُكتسب النقاط على طلبات الاستلام فقط، ولا تمنح طلبات التوصيل نقاطاً.
 - عند استخدام خصم أو استبدال نقاط، تُحتسب النقاط على ما تدفعه فعلياً مقابل
   الأصناف المؤهلة.
@@ -183,7 +196,9 @@ info@spicymeal.com.sa — 9200 31495
 
 يمكن استخدام النقاط في طلبات الاستلام فقط.
 
-أنت تختار عدد النقاط المستخدمة، ويطبّق النظام الخصم على إجمالي الطلب، والمبالغ
+أنت تختار **ما إذا كنت** ستستخدم نقاطك في الطلب. وعند اختيار ذلك يُستخدم رصيدك
+المتاح بالكامل بما لا يتجاوز قيمة الطلب — إذ يوفّر التطبيق زر تشغيل/إيقاف واحداً
+لا حقلاً لتحديد عدد النقاط. ويطبّق النظام الخصم على إجمالي الطلب، والمبالغ
 المؤكدة عند الدفع نهائية.
 
 لا يمكن استبدال النقاط نقداً ولا نقلها إلى حساب آخر ولا دمجها بين الحسابات، وليست
@@ -231,6 +246,27 @@ click-wrap mechanism.
 customer accepted a given version**, and nothing gates ordering on it. Building
 that is a schema change and a checkout-flow change; it is deliberately not in
 this pull request, which adds no migration.
+
+### Two things this draft must NOT promise, because the app does not do them
+
+Review found both on #339, by checking the draft against the code rather than
+against the feature descriptions. A legal document is the one place where a
+plausible-sounding sentence is most expensive, so they are marked in the draft
+itself rather than only noted here.
+
+**1. There is no per-item "earns no points" label.** `products.earns_loyalty_points`
+exists, and `place_order` honours it, but the flag reaches the admin console
+only: the mobile product model and the catalog it is built from do not carry it,
+so nothing marks an excluded item in the menu or the basket. Checkout shows one
+aggregate figure — deliberately, since you asked for the total with no
+breakdown. So the customer's actual disclosure today is "you will earn N
+points", and a term promising a per-item label would be untrue. Either counsel
+words it around the aggregate, or the flag has to reach the customer app first.
+
+**2. Redemption is all-or-nothing, not an amount the customer picks.**
+`LoyaltyToggle` is a boolean; when it is on, `CheckoutScreen` submits the entire
+available balance and the server clamps it to the order value. There is no field
+for choosing a point count. The draft now says "whether", not "how many".
 
 What this means practically: publishing updated terms is enough for the changes
 in §2 that only *narrow* how points are earned going forward. **It is probably
