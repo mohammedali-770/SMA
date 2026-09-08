@@ -186,15 +186,133 @@ begin
   raise notice 'case 3c ok -- enabling overrides a due date written in the same statement';
 end $$;
 
+-- ...and the case 3c does NOT reach, which is the same gap one step along:
+-- expiry ALREADY enabled, and the administrator writes only the due date.
+-- Every clause 3c relies on is false here -- the enable transition already
+-- happened, the anchors are untouched, and the supplied value is not null -- so
+-- before the fix the past date simply survived and the next tick zeroed every
+-- balance. Found by review on #337, and reproduced against a chain database
+-- before being fixed.
+--
+-- The lesson is the one case 3c already taught, one level up: fixing the
+-- transition path does not protect the steady state. A column the system owns
+-- has to be owned on EVERY write, not on the interesting ones.
+do $$
+declare v_next date; v_expected date; v_res jsonb; v_a int;
+begin
+  update public.app_settings
+     set loyalty_expiry_enabled       = true,
+         loyalty_expiry_anchor_month  = 1,
+         loyalty_expiry_anchor_day    = 1,
+         loyalty_expiry_period_months = 12
+   where id = true;
+  update public.profiles set loyalty_points = 400
+   where id = '0a000000-0000-0000-0000-00000000e001';
+
+  select loyalty_expiry_next_run_on into v_expected
+    from public.app_settings where id = true;
+
+  -- Already enabled. Touch ONLY the scheduler-owned column.
+  update public.app_settings
+     set loyalty_expiry_next_run_on = date '2020-01-01'
+   where id = true;
+
+  select loyalty_expiry_next_run_on into v_next from public.app_settings where id = true;
+  if v_next <> v_expected then
+    raise exception 'FAIL 3d: a direct write to the scheduler-owned date stuck (%, expected %)',
+      v_next, v_expected;
+  end if;
+
+  v_res := public.run_loyalty_expiry();
+  if (v_res ->> 'ran')::boolean then
+    raise exception 'FAIL 3d: the directly-written date fired: %', v_res;
+  end if;
+  select loyalty_points into v_a from public.profiles
+   where id = '0a000000-0000-0000-0000-00000000e001';
+  if v_a <> 400 then
+    raise exception 'FAIL 3d: balances were destroyed by a direct write (%)', v_a;
+  end if;
+
+  raise notice 'case 3d ok -- the scheduler-owned date cannot be written directly';
+end $$;
+
+-- The other half of the same rule: the trigger must not FIGHT the driver.
+-- `run_loyalty_expiry()` advances the same column, so a recompute that landed
+-- on a different value would either skip a cycle or repeat one. It advances
+-- with the identical `loyalty_next_expiry_on(current_date, ...)` expression the
+-- trigger recomputes with, so the two converge -- asserted rather than argued,
+-- because this is what makes the fix above safe.
+do $$
+declare v_next date; v_res jsonb; v_a int; v_b int; v_c int;
+begin
+  -- This case runs the driver for real, and the driver zeroes every positive
+  -- balance. Park the shared fixture at zero first so it writes no ledger rows
+  -- -- case 4 asserts there are exactly two expire rows in the whole database
+  -- -- then put the balances back. The convergence being tested here is about
+  -- the schedule, not about the balances.
+  select loyalty_points into v_a from public.profiles where id = '0a000000-0000-0000-0000-00000000e001';
+  select loyalty_points into v_b from public.profiles where id = '0a000000-0000-0000-0000-00000000e002';
+  select loyalty_points into v_c from public.profiles where id = '0a000000-0000-0000-0000-00000000e003';
+  update public.profiles set loyalty_points = 0 where loyalty_points > 0;
+
+  update public.app_settings
+     set loyalty_expiry_enabled       = true,
+         loyalty_expiry_anchor_month  = extract(month from current_date)::int,
+         loyalty_expiry_anchor_day    = least(extract(day from current_date)::int, 28),
+         loyalty_expiry_period_months = 12
+   where id = true;
+  -- The trigger owns this column now, so the due date has to be planted
+  -- underneath it. Disabling the trigger for one statement is the honest way to
+  -- say "pretend a year passed"; the alternative would be to weaken the very
+  -- rule case 3d exists to pin.
+  alter table public.app_settings disable trigger set_app_settings_loyalty_expiry_next_run;
+  update public.app_settings set loyalty_expiry_next_run_on = current_date where id = true;
+  alter table public.app_settings enable trigger set_app_settings_loyalty_expiry_next_run;
+
+  v_res := public.run_loyalty_expiry();
+  if not (v_res ->> 'ran')::boolean then
+    raise exception 'FAIL 3e: the driver did not run on its due date: %', v_res;
+  end if;
+  if (v_res ->> 'customers_expired')::int <> 0 then
+    raise exception 'FAIL 3e: expected no balances to expire in this case, got %',
+      v_res ->> 'customers_expired';
+  end if;
+
+  select loyalty_expiry_next_run_on into v_next from public.app_settings where id = true;
+  if v_next <= current_date then
+    raise exception 'FAIL 3e: after running, the schedule is % which is not in the future', v_next;
+  end if;
+  if v_next <> (v_res ->> 'next_run_on')::date then
+    raise exception 'FAIL 3e: the trigger overrode the driver (stored %, driver reported %)',
+      v_next, v_res ->> 'next_run_on';
+  end if;
+
+  update public.profiles set loyalty_points = v_a where id = '0a000000-0000-0000-0000-00000000e001';
+  update public.profiles set loyalty_points = v_b where id = '0a000000-0000-0000-0000-00000000e002';
+  update public.profiles set loyalty_points = v_c where id = '0a000000-0000-0000-0000-00000000e003';
+
+  raise notice 'case 3e ok -- the trigger and the driver converge on the same next date';
+end $$;
+
 -- ============================================================================
 -- 4. THE DAY ITSELF: balances go to zero, once, with an audit row each
 -- ============================================================================
 do $$
 declare v_res jsonb; v_a int; v_b int; v_c int; v_row public.loyalty_transactions;
 begin
-  -- Force the schedule to today. Written directly rather than by waiting a year;
-  -- the trigger only recomputes when the ANCHOR changes, so this survives.
+  -- Force the schedule to today, rather than waiting a year for it.
+  --
+  -- This used to be a plain UPDATE, with a comment explaining that the trigger
+  -- "only recomputes when the ANCHOR changes, so this survives". That comment
+  -- was describing the defect review found on #337: the scheduler-owned date
+  -- was writable by anyone who could update `app_settings`, and a past value
+  -- would have zeroed every balance on the next tick. Case 3d pins the fix, so
+  -- the date now has to be planted with the trigger held off for one statement
+  -- -- which is the honest way to say "pretend a year passed" without
+  -- weakening the rule.
+  alter table public.app_settings disable trigger set_app_settings_loyalty_expiry_next_run;
   update public.app_settings set loyalty_expiry_next_run_on = current_date where id = true;
+  alter table public.app_settings enable trigger set_app_settings_loyalty_expiry_next_run;
 
   v_res := public.run_loyalty_expiry();
   if not (v_res ->> 'ran')::boolean then
@@ -276,7 +394,12 @@ do $$
 declare v_res jsonb;
 begin
   -- Pretend the job did not fire: the due date is yesterday, and points remain.
+  -- Planted with the trigger held off, because the scheduler owns this column
+  -- now (case 3d) -- a plain UPDATE would be recomputed straight back into the
+  -- future, which is exactly the protection being relied on everywhere else.
+  alter table public.app_settings disable trigger set_app_settings_loyalty_expiry_next_run;
   update public.app_settings set loyalty_expiry_next_run_on = current_date - 1 where id = true;
+  alter table public.app_settings enable trigger set_app_settings_loyalty_expiry_next_run;
   v_res := public.run_loyalty_expiry();
   if not (v_res ->> 'ran')::boolean then
     raise exception 'FAIL 6: an overdue reset was skipped instead of caught up: %', v_res;

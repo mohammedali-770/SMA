@@ -29,6 +29,16 @@ import {
 import { isBranchDependencyError, branchDeletionBlockedMessage } from '../lib/branchDeletion';
 import { isOpsConsoleRole } from '../lib/roles';
 
+// Patch keys whose write changes the trigger-computed expiry date. Listed
+// rather than "any loyalty key" so an unrelated edit -- the points rate, the
+// pickup-only rule -- does not pay for a second round trip.
+const SCHEDULE_KEYS = [
+  'loyalty_expiry_enabled',
+  'loyalty_expiry_anchor_month',
+  'loyalty_expiry_anchor_day',
+  'loyalty_expiry_period_months',
+] as const;
+
 /**
  * Minimum gap between two event-driven order refetches, in ms.
  *
@@ -299,7 +309,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const patch = settingsPatchRef.current;
     settingsPatchRef.current = {};
     if (Object.keys(patch).length === 0) return;
-    try { await adminApi.updateSettings(patch); }
+    try {
+      await adminApi.updateSettings(patch);
+      // `loyalty_expiry_next_run_on` is written by a trigger, never by the
+      // form -- `loyaltyPatchToDb` omits it on purpose, because a stale value
+      // posted back would be a client scheduling a destructive reset. The cost
+      // of that omission is that the local copy is WRONG the moment the
+      // schedule changes: after a first enable it is still null and the panel
+      // shows "-", and after a period change it still shows the old date.
+      // Re-read the row so the administrator sees the date the server actually
+      // computed, since that date is when every balance goes to zero.
+      // Review found this on #337.
+      if (SCHEDULE_KEYS.some((k) => k in patch)) {
+        const fresh = await catalog.settings();
+        setLoyaltySettings(mapLoyaltySettings(fresh));
+      }
+    }
     catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
   }, []);
 

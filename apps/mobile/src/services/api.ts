@@ -166,6 +166,28 @@ export const catalog = {
     if (error || !data) return null;
     return (data as { loyalty_pickup_only?: boolean | null }).loyalty_pickup_only ?? true;
   },
+  /**
+   * The expiry schedule, re-read on demand.
+   *
+   * `CatalogProvider` loads settings once at mount and its foreground refresh
+   * covers availability and branches only, so a session left open across an
+   * administrator enabling expiry would show no warning at all — and the
+   * customer would lose points having been promised a notice. Same shape and
+   * same reason as `readLoyaltyPickupOnly` above.
+   *
+   * Returns null on any failure, which the caller treats as "keep what you
+   * have": a failed read must never invent or erase a date.
+   */
+  async readLoyaltyExpiry(): Promise<{ enabled: boolean; nextRunOn: string | null } | null> {
+    const { data, error } = await supabase
+      .from('app_settings')
+      .select('loyalty_expiry_enabled, loyalty_expiry_next_run_on')
+      .eq('id', true)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as { loyalty_expiry_enabled?: boolean | null; loyalty_expiry_next_run_on?: string | null };
+    return { enabled: row.loyalty_expiry_enabled ?? false, nextRunOn: row.loyalty_expiry_next_run_on ?? null };
+  },
   /** Active delivery zones (safe columns only — never `updated_by`). */
   deliveryZones: async () =>
     ok<DbBranchDeliveryZone[]>(await supabase
