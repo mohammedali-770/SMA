@@ -438,31 +438,50 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 7. The customer-facing terms, and where they are wrong today
+## 7. The customer-facing terms — corrected 2026-09-08
 
 The binding document is `public.legal_documents`, row `offers_loyalty_terms` —
-**version 2.0, effective 18 August 2026, active and visible to customers now**.
-The engineering draft that should replace it, with the reasoning behind every
+now **version 2.1, effective 8 September 2026, active**. The engineering draft
+that should eventually replace it wholesale, with the reasoning behind every
 clause, is [`legal/OFFERS_LOYALTY_TERMS_DRAFT.md`](legal/OFFERS_LOYALTY_TERMS_DRAFT.md).
 
-**Two things in the live text are already false, independently of anything in
-§§2-5**, and both were found by reading it against the code rather than by
-assuming it was fine:
+**Version 2.0 stated three things the system does not do**, all found by reading
+the live text against the code rather than assuming it was fine. They were
+corrected in place on the owner's approval — a live write, recorded here because
+the previous version of this section told a reader they were still wrong:
 
 1. **"Points are added when the order is completed."** They are added when the
-   order is **created** — `place_order` writes the ledger row in the same
-   transaction as the order, and the online path does the same immediately after
-   payment. The whole cancellation-reversal mechanism (`20260810100000`) exists
-   *because* points are granted early; a reader of the current terms would not
-   expect a reversal to be needed at all.
-2. **"points … cancelled or refunded are reversed"** is approximately true for
-   cancellation and unverified for refunds. Cancellation reverses earning
-   **bounded by the balance that still exists** (a shortfall is recorded rather
-   than the balance going negative) and restores redemption **in full**. No
-   refund path touches loyalty at all — refund processing is disabled under the
-   payment freeze, so the terms promise behaviour that has never run.
+   order is **placed** — `place_order` writes the ledger row in the same
+   transaction as the order. The whole cancellation-reversal mechanism
+   (`20260810100000`) exists *because* points are granted early; a reader of the
+   old terms would not expect a reversal to be needed at all.
+2. **"points … cancelled or refunded are reversed."** Approximately true for
+   cancellation, **entirely false for refunds**. Cancellation reverses earning
+   bounded by the balance that still exists — `least(greatest(v_balance, 0),
+   v_earn_requested)` in `admin_set_order_status`, with the shortfall written
+   into the ledger reason rather than the balance going negative — and restores
+   redemption **in full**. All nine live `%refund%` functions were checked and
+   **none touches loyalty**, so the clause promised behaviour that has never run.
+3. **"You choose how many points to use on an order."** Found only while making
+   the other two corrections, and live since 2.0. Redemption is all-or-nothing:
+   `LoyaltyToggle` is a boolean, `CheckoutScreen` submits the entire available
+   balance, and the server clamps it to the order value. There is no control for
+   choosing an amount.
 
-Correcting those needs no feature switch and should not wait for one.
+The third is the one worth remembering. It had been sitting in a customer-facing
+document through every previous review of this feature, and it surfaced only
+because the *whole* live text was finally read against the code — not because
+anybody suspected it. The corrections were applied with SQL `replace()` on the
+stored content so every untouched clause is byte-identical by construction, then
+verified by predicate: each false string absent, each replacement present, the
+other sections and the quoted figures intact, in both languages.
+
+**The Arabic replacements are engineering-drafted and have not had a native
+read.** They were published rather than held so that neither language was left
+stating something false, but the wording is a follow-up
+(`docs/OWNER_ACTIONS.md` shape: a native review of loyalty terms v2.1).
+
+Correcting these needed no feature switch, and did not wait for one.
 
 ### Before flipping each switch
 
