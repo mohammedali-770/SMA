@@ -226,19 +226,30 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-08, after the OTP retention sweep was written: 125
-repository files / 125 live history rows / SIX unapplied — Moyasar (frozen on
-purpose), the four loyalty files, and
-`20260911120000_otp_retention_sweep` (written, awaiting approval).** The live
-figure is unchanged; only the repository side moved.
+**Current position 2026-09-08, after the OTP retention sweep was APPLIED: 125
+repository files / 126 live history rows / FIVE unapplied — Moyasar (frozen on
+purpose) and the four loyalty files.** Latest live version `20260908123116`
+(`20260911120000_otp_retention_sweep`, applied 12:31:16 UTC on explicit owner
+approval naming the target by version; ledger row 81).
 
-**The sweep is the one outstanding file whose ABSENCE makes a live customer
-document false.** `privacy_policy` v2.1 says verification codes are deleted after
-a short period; nothing does that until this is applied — `otp_challenges` holds
-rows from 10 July carrying `phone_e164` and `ip_hash`. It is independent of the
-loyalty files, redefines neither money-path function, and touches no order,
-payment or loyalty data. Detail: `docs/OWNER_ACTIONS.md` §30 and
-`docs/LEGAL_DOCUMENTS_AUDIT.md`.
+**It closed the one gap where a live customer document was false because of
+missing code rather than wrong wording.** `privacy_policy` v2.1 says verification
+codes are deleted after a short period; until this applied, nothing did —
+`otp_challenges` held rows from 10 July carrying `phone_e164` and `ip_hash`. The
+sweep now runs daily at 00:40 UTC. **Applying it deleted nothing**: it schedules
+the job, and the first run is the next tick, which was verified rather than
+assumed (`otp_challenges` still held its 3 rows immediately afterwards).
+
+**The money path was untouched, and a hashing trap is worth remembering from
+this apply.** The pre-apply read used `md5(prosrc)` and produced values that look
+like a money-path change and are not: this repository's ledger records
+`md5(pg_get_functiondef(oid))`. On the correct basis both are identical before
+and after (`8bd7183832108abb25bcca6942dccd70`,
+`f955b748b698a1704533f4aaffb835cb`). Check the hash basis before reporting an
+anomaly.
+
+**Superseded, kept because the count is the point: 125 files / 125 rows / SIX
+unapplied** while the sweep was written and awaiting approval.
 
 **Superseded, kept because the count is the point: 124 files / FIVE unapplied**
 after the loyalty multiplier migration was written.

@@ -2139,9 +2139,25 @@ other engineering-drafted string on a live customer path.
 
 ---
 
-## 30. Apply the OTP retention sweep — the Privacy Policy is false until you do
+## 30. ~~Apply the OTP retention sweep~~ — DONE 2026-09-08 (closed)
 
-**This is the one outstanding inaccuracy in the whole legal set.**
+**CLOSED. Applied 2026-09-08 12:31:16 UTC**, live version `20260908123116`, on
+explicit owner approval naming the target by version. Ledger row 81. The Privacy
+Policy's retention sentence is now true: `otp-retention-sweep` runs daily at
+00:40 UTC.
+
+Verified after the apply: exactly one cron job with the canonical schedule and
+command; the function callable by `service_role` only, not by `anon` or
+`authenticated`; the money-path hashes identical; Moyasar still absent. Applying
+deleted nothing — it schedules the sweep, and `otp_challenges` still held its
+three rows immediately afterwards. **The rows from 10 July go on the first
+run.**
+
+The section below is kept as the record of why it was needed.
+
+---
+
+**This was the one outstanding inaccuracy in the whole legal set.**
 
 `privacy_policy` says, under HOW LONG WE KEEP IT: *"Verification codes: a short
 period, then deleted."* Nothing deletes them on a schedule. `otp_challenges`

@@ -46,8 +46,10 @@ would have made the document honest by lowering the promise, which is the wrong
 direction for a retention commitment.
 `supabase/migrations/20260911120000_otp_retention_sweep.sql` is the fix.
 
-**Until that migration is applied, this sentence is still false.** That is the
-one outstanding inaccuracy in the whole set.
+**APPLIED 2026-09-08 12:31:16 UTC** (live version `20260908123116`, ledger row
+81), so the sentence is now true: `otp-retention-sweep` runs daily at 00:40 UTC.
+Applying it deleted nothing — it schedules the job, and the July rows go on the
+first run. **There is no remaining inaccuracy in the set.**
 
 A second, quieter gap in the same area: `otp_send_reservations` already deletes
 rows older than two days inside `otp_reserve_send` — but only **for the phone
