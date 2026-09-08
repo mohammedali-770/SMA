@@ -2139,9 +2139,49 @@ other engineering-drafted string on a live customer path.
 
 ---
 
-## 30. Apply the OTP retention sweep — the Privacy Policy is false until you do
+## 30. ~~OTP retention sweep~~ — APPLIED AND RUN 2026-09-08 (closed)
 
-**This is the one outstanding inaccuracy in the whole legal set.**
+**Applied 2026-09-08 12:31:16 UTC**, live version `20260908123116`, on explicit
+owner approval naming the target by version. Ledger row 81.
+
+Verified after the apply: exactly one cron job with the canonical schedule and
+command; the function callable by `service_role` only, not by `anon` or
+`authenticated`; the money-path hashes identical; Moyasar still absent.
+
+**CLOSED by running it, not by asserting the schedule.** Applying deleted
+nothing, so on separate owner approval the sweep was executed once at
+2026-09-08:
+
+```
+{"ran": true, "challenges_deleted": 3, "reservations_deleted": 0}
+```
+
+The three rows were from 10 and 21 July — two abandoned, one consumed — all
+roughly two months past a five-minute expiry. **`otp_challenges` now holds 0
+rows and 0 outside the window.** All six OTP functions intact; `profiles` (9),
+`orders` (71) and `loyalty_transactions` (111) untouched, so the sweep reached
+nothing it should not.
+
+**Stated precisely, because this item was closed once already on weaker
+evidence:** the function is proven against real data, the job is registered and
+`active`, and pg_cron is demonstrably working (470 successful runs across seven
+other jobs in the surrounding two hours). **The sweep's own first scheduled tick
+is 2026-09-09 00:40 UTC and has not been observed.** Nothing depends on it — the
+data is already inside the window — but it is not the same as having watched it
+fire.
+
+**It was briefly marked closed on the strength of the apply alone**, and review
+caught that on #342: the completion criteria below had been written two commits
+earlier and were not met. Recorded rather than quietly fixed, because it is the
+same shape as the errors the legal-document audit was created to find. A cron job
+that exists is not a cron job that works — §28 of this file learned that when a
+dispatcher shipped with no caller at all.
+
+The section below is kept as the record of why it was needed.
+
+---
+
+**This was the one outstanding inaccuracy in the whole legal set.**
 
 `privacy_policy` says, under HOW LONG WE KEEP IT: *"Verification codes: a short
 period, then deleted."* Nothing deletes them on a schedule. `otp_challenges`

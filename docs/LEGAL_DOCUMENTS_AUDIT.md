@@ -46,8 +46,35 @@ would have made the document honest by lowering the promise, which is the wrong
 direction for a retention commitment.
 `supabase/migrations/20260911120000_otp_retention_sweep.sql` is the fix.
 
-**Until that migration is applied, this sentence is still false.** That is the
-one outstanding inaccuracy in the whole set.
+**APPLIED 2026-09-08 12:31:16 UTC** (live version `20260908123116`, ledger row
+81). The mechanism is installed and the schedule is live.
+
+**The sentence is now true, and it was made true by running the sweep rather
+than by asserting the schedule.** Applying the migration deleted nothing — it
+schedules the job — so on the owner's approval `purge_expired_otp_records()` was
+executed once, immediately:
+
+```
+{"ran": true, "challenges_deleted": 3, "reservations_deleted": 0}
+```
+
+All three rows were from July, ~2 months past their own five-minute expiry: two
+abandoned, one consumed. **`otp_challenges` now holds 0 rows and 0 outside the
+retention window**, which is §30's completion criterion answered directly. All
+six OTP functions are intact, and `profiles` (9), `orders` (71) and
+`loyalty_transactions` (111) were untouched.
+
+**What is proven, and what is not.** The function is proven to execute and delete
+correctly against real data; the job is registered, `active`, and pg_cron is
+demonstrably working (470 successful runs across seven other jobs in the two
+hours around the apply). **The sweep's own first scheduled tick has still not
+been observed** — that is 2026-09-09 00:40 UTC. The distinction is kept because
+this item was already closed once on weaker evidence.
+
+Review caught that on #342: §30's criteria had been written two commits before
+and then not met — the same declare-done-on-partial-evidence error this whole
+audit exists to correct, committed inside the pull request that records the
+audit.
 
 A second, quieter gap in the same area: `otp_send_reservations` already deletes
 rows older than two days inside `otp_reserve_send` — but only **for the phone
