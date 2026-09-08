@@ -114,6 +114,13 @@ begin
         'paid_at', o.paid_at,
         'points_earned', o.loyalty_points_earned,
         'points_redeemed', o.loyalty_points_redeemed,
+        -- Included because without it the record is confusing rather than
+        -- merely terse: a comped order shows a total of 0.00 and, with no
+        -- `comped` flag beside it, nothing explains why. A subject-access
+        -- response that leaves the reader unable to account for their own
+        -- figures has not really answered the request.
+        'comped', coalesce(o.is_comped, false),
+        'comp_discount', o.comp_discount_amount,
         'items', coalesce((
           select jsonb_agg(jsonb_build_object(
             'item', i.name_en,
