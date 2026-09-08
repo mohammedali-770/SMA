@@ -240,10 +240,24 @@ describe('reverse patch mappers (app -> DB)', () => {
     expect(branchPatchToDb({ deliveryTemporarilyClosed: false, deliveryClosedUntil: '2026-08-20T18:00:00Z' }))
       .toEqual({ delivery_temporarily_closed: false });
   });
+  it('defaults earnsLoyaltyPoints TRUE when the column is absent, and reads it when present', () => {
+    // A project that has not run 20260908120000 must show every item as
+    // earning, because that is exactly what the server does.
+    const base = {
+      id: 'p1', category_id: 'c1', name_en: 'X', name_ar: 'س',
+      description_en: null, description_ar: null, price: 10, image_url: null,
+      calories: null, is_active: true, sort_order: 1,
+    } as unknown as Parameters<typeof mapProduct>[0];
+    expect(mapProduct(base, []).earnsLoyaltyPoints).toBe(true);
+    expect(mapProduct({ ...base, earns_loyalty_points: false }, []).earnsLoyaltyPoints).toBe(false);
+    expect(mapProduct({ ...base, earns_loyalty_points: true }, []).earnsLoyaltyPoints).toBe(true);
+  });
+
   it('maps a product insert with sort order', () => {
     const ins = productToDbInsert({
       categoryId: 'c1', nameEn: 'X', nameAr: 'س', descriptionEn: 'd', descriptionAr: 'د',
-      price: 10, imageUrl: 'u', calories: 5, isActive: true, modifierGroupIds: [], variants: [],
+      price: 10, imageUrl: 'u', calories: 5, isActive: true, earnsLoyaltyPoints: true,
+      modifierGroupIds: [], variants: [],
     }, 3);
     expect(ins).toMatchObject({ category_id: 'c1', name_en: 'X', price: 10, sort_order: 3, is_active: true });
   });

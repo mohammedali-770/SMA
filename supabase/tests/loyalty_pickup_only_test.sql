@@ -304,14 +304,29 @@ begin
         '[{"product_id":"a0000000-0000-0000-0000-000000000001","quantity":2}]'::jsonb,
         '0e000000-0000-0000-0000-0000000ad001'::uuid);
 
-  -- 64.00 goods + 15.00 delivery = 79.00 payable, earning 79 at 1 point/riyal.
-  if o.loyalty_points_earned <> 79 then
-    raise exception 'FAIL 5: with pickup_only off, delivery earned %, expected 79',
+  -- 64.00 of goods earns 64. The customer still pays 79.00 -- 64.00 of food plus
+  -- the 15.00 delivery fee -- but the FEE DOES NOT EARN.
+  --
+  -- This figure was 79 until 20260908120000, which moved earning from the
+  -- payable total to an eligible LINE base. The delivery fee is not a line, so
+  -- it left the base structurally. That is the owner's decision of 2026-09-07
+  -- (docs/LOYALTY.md section 3), and this is the ONE configuration in which it
+  -- is observable: with pickup_only ON, an earning order is a pickup order and
+  -- its fee is 0.
+  --
+  -- The assertion's PURPOSE is unchanged and still sharp: it proves the setting
+  -- is live, because delivery earns something here and nothing when the setting
+  -- is on. Only the arithmetic moved.
+  if o.loyalty_points_earned <> 64 then
+    raise exception 'FAIL 5: with pickup_only off, delivery earned %, expected 64 (the 15.00 fee must not earn)',
       o.loyalty_points_earned;
   end if;
+  if o.total <> 79.00 then
+    raise exception 'FAIL 5: delivery total is %, expected 79.00 -- the fee is still CHARGED', o.total;
+  end if;
   -- The preview follows the setting too, not just the order.
-  if (snap ->> 'loyalty_points_earned')::int <> 79 then
-    raise exception 'FAIL 5: with pickup_only off, the delivery preview promised %, expected 79',
+  if (snap ->> 'loyalty_points_earned')::int <> 64 then
+    raise exception 'FAIL 5: with pickup_only off, the delivery preview promised %, expected 64',
       snap ->> 'loyalty_points_earned';
   end if;
 

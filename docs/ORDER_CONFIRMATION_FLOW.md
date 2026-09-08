@@ -1351,6 +1351,51 @@ redeemed on pickup orders only"* alongside their balance. Full detail, including
 the measured justification and how an administrator turns the rule off:
 [`LOYALTY.md`](LOYALTY.md) §2.
 
+## 10a-ter. The checkout now states what the order will earn
+
+Since `20260908120000_loyalty_item_exclusion`, checkout shows a single line —
+*"You'll earn N points"* — above the totals, and it is shown only when `N > 0`.
+There is no per-item attribution, by product decision: the customer is told the
+figure, not the derivation.
+
+**The number is computed by the server, and that is the whole design.** An
+administrator can now mark any product as earning nothing
+(`products.earns_loyalty_points`), so earning comes off the eligible lines
+rather than the payable total, with coupon and redemption shared pro-rata across
+them. Reproducing that in the app would be a **third** copy of a formula whose
+two existing copies are already this document's recurring failure mode — and it
+would have to absorb every later loyalty rule as well. So checkout calls
+`preview_loyalty_points`, a narrow `security definer` RPC that runs
+`compute_order_snapshot` and returns the loyalty figures and nothing else.
+
+Three properties of that RPC are load-bearing rather than incidental:
+
+- it takes **no customer id**; it uses `auth.uid()`. `compute_order_snapshot`
+  itself accepts `p_customer uuid` with no caller check, which is exactly why
+  `20260712160000_checkout_sessions.sql` revokes it from `anon` and
+  `authenticated` — exposing it directly would let anyone read another
+  customer's name, phone and address snapshot;
+- it returns only `loyalty_points_earned`, `loyalty_points_redeemed`,
+  `loyalty_discount_amount` and `total` — no PII, no comp state;
+- it is **executable by `authenticated` only**, and the migration's own
+  verification block asserts `anon` cannot call it.
+
+Operationally it behaves like `refreshAvailability`: it is refetched whenever
+the cart, order type, address, coupon, redemption or comp state changes, and
+**any failure means no estimate rather than a blocked submission**. A number the
+customer cannot see is a smaller harm than an order they cannot place.
+
+**The figure is cleared before each refetch rather than held across it**, and
+that is the opposite of what the first draft did. Holding the previous value to
+avoid a flicker sounds like a kindness, but every input the effect watches
+*changes the answer* — so the held number is not a stale-but-close estimate, it
+is a promise about an order the customer is no longer placing, and it would
+stay on screen until the reply landed or forever if it never did. A customer
+could submit a changed cart while reading points computed for the old one.
+Review caught it on #336. The general shape is worth remembering: **"keep the
+last value while refreshing" is only safe when the refresh was triggered by
+time, not by the input changing.**
+
 ## 10b. Tap `description` (closed)
 
 Tap documents `description` only as *"an arbitrary string which you can attach to

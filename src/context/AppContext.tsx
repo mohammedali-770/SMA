@@ -154,6 +154,8 @@ interface AppContextType {
   addProduct: (product: Omit<Product, 'id'>) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (id: string) => void;
+  /** Earn-side loyalty exclusion. Narrow by design — see adminApi. */
+  setProductEarnsPoints: (id: string, earns: boolean) => void;
   toggleProductAvailability: (productId: string, branchId: string) => void;
   isProductAvailableInBranch: (productId: string, branchId: string) => boolean;
   updateBranchSettings: (id: string, updates: Partial<Branch>) => void;
@@ -998,6 +1000,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
     })();
   };
+  // Narrow and explicit; see adminApi.setProductEarnsPoints. Refreshes the
+  // catalog afterwards so the table shows what the server stored rather than
+  // what the click assumed.
+  const setProductEarnsPoints = (id: string, earns: boolean) => {
+    void (async () => {
+      try {
+        await adminApi.setProductEarnsPoints(id, earns);
+        await refreshCatalog();
+      } catch (e) { setWriteError(e instanceof Error ? e.message : String(e)); }
+    })();
+  };
   const deleteProduct = (id: string) => {
     void (async () => {
       try {
@@ -1244,6 +1257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addProduct,
       updateProduct,
       deleteProduct,
+      setProductEarnsPoints,
       toggleProductAvailability,
       isProductAvailableInBranch,
       updateBranchSettings,

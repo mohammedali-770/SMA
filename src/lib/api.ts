@@ -56,6 +56,13 @@ export interface DbBranchDeliveryZone {
 }
 export interface DbCategory { id: string; name_en: string; name_ar: string; sort_order: number; is_active: boolean; lazywait_category_id?: string | null; }
 export interface DbProduct {
+  /**
+   * Earn-side only: FALSE means ordering this item grants no loyalty points.
+   * Points may still be REDEEMED against an order containing it. Optional so a
+   * pre-migration project still parses; every reader defaults it TRUE, matching
+   * the column default (20260908120000).
+   */
+  earns_loyalty_points?: boolean;
   id: string; category_id: string; name_en: string; name_ar: string;
   description_en: string | null; description_ar: string | null;
   price: number; calories: number | null; image_url: string | null;
@@ -844,6 +851,15 @@ export const coupons = {
 export const admin = {
   createProduct: (p: Partial<DbProduct>) => wrapInsert('products', p),
   updateProduct: (id: string, patch: Partial<DbProduct>) => wrapUpdate('products', id, patch),
+  /**
+   * ONE column, on purpose. Whether an item earns loyalty points is an
+   * administrator's standing decision, and it must not be reachable from the
+   * generic product edit — `productToDbUpdate` omits it for the same reason it
+   * omits `is_active`, so that correcting a price cannot silently restore
+   * earning on an item somebody deliberately zeroed.
+   */
+  setProductEarnsPoints: (id: string, earns: boolean) =>
+    wrapUpdate('products', id, { earns_loyalty_points: earns }),
   deleteProduct: (id: string) => wrapDelete('products', id),
   createCategory: (c: Partial<DbCategory>) => wrapInsert('categories', c),
   updateCategory: (id: string, patch: Partial<DbCategory>) => wrapUpdate('categories', id, patch),

@@ -273,6 +273,10 @@ export function parseCSVMenu(csvText: string, existingCategories: Category[]): {
     const newProduct: Product = {
       // CSV import carries a single price per row, so no tiers.
       variants: [],
+      // A CSV row cannot express the loyalty exclusion, and defaulting it TRUE
+      // matches the column default: an imported item earns until an
+      // administrator says otherwise.
+      earnsLoyaltyPoints: true,
       id: prodId,
       categoryId: category.id,
       nameEn: prodNameEn,
