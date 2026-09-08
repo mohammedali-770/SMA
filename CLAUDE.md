@@ -226,12 +226,20 @@ Before that deploy, every column, grant and embed FK the new select needs was ve
 
 **A naive bulk apply would still sweep the frozen Moyasar file in**, because `20260824100000` sorts ahead of everything applied on 2026-08-25. Any future `supabase migration` operation must name its target explicitly.
 
-**Current position 2026-09-07, after the loyalty item-exclusion migration was
-written: 122 repository files / 125 live history rows / THREE unapplied — Moyasar
-(frozen on purpose), `20260907120000_loyalty_pickup_only` and
-`20260908120000_loyalty_item_exclusion` (both written, awaiting approval).** The
-live figure is unchanged; only the repository side moved, because neither new
-file has been applied.
+**Current position 2026-09-07, after the loyalty expiry migration was written:
+123 repository files / 125 live history rows / FOUR unapplied — Moyasar (frozen
+on purpose), `20260907120000_loyalty_pickup_only`,
+`20260908120000_loyalty_item_exclusion` and `20260909120000_loyalty_expiry` (the
+three loyalty files written, awaiting approval).** The live figure is unchanged;
+only the repository side moved, because none of them has been applied.
+
+**`20260909120000_loyalty_expiry` is the first migration in this series that can
+DESTROY customer value**, and it is the one to read before approving rather than
+after. Applying it changes nothing — expiry defaults OFF, nothing is scheduled,
+and the file's own verification asserts both against the live row. It does not
+redefine either money-path function, so their hashes are untouched by it.
+Enabling expiry afterwards is a separate decision, and it needs updated T&Cs
+first (`docs/LOYALTY.md` §4 and §6).
 
 **The two loyalty files have a DEPENDENCY ORDER and it is not optional.**
 `20260908120000` derives both money-path function bodies from `20260907120000`,
@@ -349,6 +357,7 @@ by version.**
 | `20260824100000_moyasar_payment_provider.sql` | **UNAPPLIED, on purpose.** Frozen under §6. Applying it is a §5 action. Re-verified absent immediately after the 2026-09-01 OTP apply: zero `%moyasar%` functions, zero history rows, `provider_name` still `tap`, still disabled. |
 | `20260907120000_loyalty_pickup_only.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval.** Not frozen, and not Moyasar. Makes loyalty pickup-only: while `app_settings.loyalty_pickup_only` is on (it defaults on), a delivery order neither earns points nor may redeem them. sha256 `cbede76c6efae91d3d5981d984b7d0f1189abbc57359dcba4b960a685e28b9ac`  833 lines / 39 052 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions**, so their hashes will change; see the paragraph above. Its closing `DO` block raises unless both `place_order` and `compute_order_snapshot` carry four `v_loyalty_channel_ok` references, so it cannot land in only one. Validated on the local chain harness (121 migrations, 63 suites, 0 new failures) and mutation-tested; no deploy is implied — the clients read the setting through `app_settings`, which they already select in full. |
 | `20260908120000_loyalty_item_exclusion.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval. APPLY AFTER `20260907120000`, never before.** Per-item loyalty exclusion: `products.earns_loyalty_points` (defaults TRUE, so applying it excludes nothing), earning moved from the payable total to an eligible line base with pro-rata discount sharing, plus `preview_loyalty_points` — a narrow `SECURITY DEFINER` RPC so checkout can show the figure without a third copy of the rule or opening `compute_order_snapshot` to clients. sha256 `5e7fd42da4226d3b65e3db6c75c1675b704e65ded315d20905ce8f096af01ac2`, 1 038 lines / 49 965 bytes — re-hash the MERGED copy before applying, per §15. **It redefines both money-path functions again**, so their hashes change a second time. Its self-verification refuses to land unless the pickup-only gate from `20260907120000` is already present in both functions, which is what enforces the order. Validated on the local chain harness (122 migrations, 64 suites, 0 new failures) and mutation-tested three ways. No deploy implied. |
+| `20260909120000_loyalty_expiry.sql` | **UNAPPLIED — written 2026-09-07, awaiting owner approval.** Points expiry on a fixed calendar reset: four settings columns plus a system-owned `loyalty_expiry_next_run_on`, the ledger type CHECK widened to admit `expire`, `run_loyalty_expiry()` and a daily `pg_cron` job. **Independent of the other two loyalty files — it redefines neither money-path function, so their hashes are unchanged by it.** Applying it changes nothing: expiry defaults OFF and its self-verification asserts the live row is disabled and unscheduled. **Enabling it is a separate decision and needs updated T&Cs first.** No deploy implied. |
 | `20260903130000_operations_alert_dispatch_scheduler.sql` | **APPLIED 2026-09-07 08:23:17 UTC**, live version `20260907082317`, on explicit owner approval, one call, target named explicitly. Ledger row 80. The pg_cron invocation path for the dispatcher — the piece whose absence review caught on #328, when the dispatcher shipped with no caller and the docs claimed enabling sent mail. Its two Vault secrets were created first, at 08:21:35 and 08:21:44; the trigger secret was generated **inside Postgres** and never crossed the wire, so nobody has seen it. Inert while dispatch is disabled, and that was watched rather than assumed: cron run **218621** at 08:25:00 `succeeded` in **11 ms** and made no outbound request. **Only enabling the flag remains.** |
 | `20260903120000_operations_alert_email_dispatch.sql` | **APPLIED 2026-09-07 06:46:38 UTC**, live version `20260907064638`, on explicit owner approval ("apply 20260903120000" — named by version), one call, target named explicitly. Ledger row 79. Operations alerts v2 — the email dispatch path for X3. Removed three deliberate v1 interlocks (the outbox dormancy CHECK, the producers' hard-coded `in_app`, and the settings RPC's refusal) for the **email channel only**; `whatsapp` and `push` stay structurally blocked. It changed NO behaviour, verified after the fact: the flag is still false, the outbox still holds 136 rows with zero on the `email` channel, and the money-path hashes are unchanged. **Deploying `operations-alert-dispatch`, applying `20260903130000` with its Vault secrets, and enabling the flag remain three separate §5 actions.** |
 | `20260902120000_orders_index_cleanup.sql` | **APPLIED 2026-09-02 12:37:37 UTC**, live version `20260902123737`, on explicit owner approval ("apply 20260902120000" — named by version), one call, target named explicitly. Ledger row 78. Dropped `orders_lazywait_deadline_queue_idx` (an exact duplicate) and `orders_sync_queue_idx` (dead); `orders` index count 18 → 16, the survivor still serves the queue predicate by index scan, and the money-path hashes are unchanged. No deploy implied. |

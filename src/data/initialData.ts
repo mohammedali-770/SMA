@@ -41,6 +41,11 @@ export const INITIAL_LOYALTY_SETTINGS: LoyaltySettings = {
   pointsPerRiyal: 1,
   minPointsToRedeem: 100,
   discountPerPoint: 0.10, // 100 points = 10 SAR
-  pickupOnly: true // matches the app_settings column default
+  pickupOnly: true, // matches the app_settings column default
+  expiryEnabled: false, // expiry is OFF until an owner turns it on
+  expiryAnchorMonth: 1,
+  expiryAnchorDay: 1,
+  expiryPeriodMonths: 12,
+  expiryNextRunOn: null
 };
 

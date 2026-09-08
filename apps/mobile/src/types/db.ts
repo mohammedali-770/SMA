@@ -102,6 +102,11 @@ export interface DbAppSettings {
   // every reader defaults it to TRUE — the same direction as the column default,
   // so an unknown value withholds points rather than promising them.
   loyalty_pickup_only?: boolean;
+  // Points expiry (20260909120000). Optional so a pre-migration project parses.
+  // `loyalty_expiry_next_run_on` is written by the system and is the date the
+  // customer is shown; it is null whenever expiry is disabled.
+  loyalty_expiry_enabled?: boolean;
+  loyalty_expiry_next_run_on?: string | null;
   // Admin-configured payment availability (optional so a pre-migration project
   // still parses; the app falls back to cash-on / online-off defaults).
   online_payment_enabled?: boolean;

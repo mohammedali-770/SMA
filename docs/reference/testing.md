@@ -10,7 +10,7 @@
 
 What is tested, where those tests live, and how to run them. Use it to find whether a behaviour you are about to change already has coverage.
 
-**164 TypeScript test files declaring 2531 test blocks, plus 64 SQL suites.**
+**165 TypeScript test files declaring 2541 test blocks, plus 65 SQL suites.**
 
 > The block count is a **floor, not the executed total**. A parameterised `it.each([...])` is one declared block that runs once per row, so vitest reports more cases than are counted here. `npm test` is the authoritative number; this table is for finding files, not for reporting coverage.
 
@@ -59,6 +59,7 @@ SQL suites run against a **disposable** database, never Production (CLAUDE.md §
 - `supabase/tests/lazywait_sync_health_summary_test.sql`
 - `supabase/tests/lazywait_sync_scheduler_test.sql`
 - `supabase/tests/lazywait_variant_import_test.sql`
+- `supabase/tests/loyalty_expiry_test.sql`
 - `supabase/tests/loyalty_item_exclusion_test.sql`
 - `supabase/tests/loyalty_pickup_only_test.sql`
 - `supabase/tests/loyalty_reason_history_safe_test.sql`
@@ -109,7 +110,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `apps/mobile/src/`
 
-60 files, 880 declared test blocks.
+61 files, 888 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -151,6 +152,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `apps/mobile/src/features/otp/otpInput.test.ts` | 6 | sanitizeOtpDigits |
 | `apps/mobile/src/features/profile/addressForm.test.ts` | 34 | validateAddressForm — a complete address |
 | `apps/mobile/src/features/profile/customerName.test.ts` | 28 | normalizeCustomerName |
+| `apps/mobile/src/features/profile/loyaltyExpiry.test.ts` | 8 | formatExpiryDate |
 | `apps/mobile/src/features/profile/profileEdit.test.ts` | 4 | profile email |
 | `apps/mobile/src/i18n/rtl.test.ts` | 2 | rtlText |
 | `apps/mobile/src/i18n/strings.test.ts` | 6 | STRINGS |
@@ -176,7 +178,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 
 ### `src/`
 
-81 files, 1072 declared test blocks.
+81 files, 1074 declared test blocks.
 
 | File | Blocks | First suite |
 | --- | --- | --- |
@@ -240,7 +242,7 @@ Collected from the `include` patterns in `vitest.config.ts`: `src/**/*.test.{ts,
 | `src/lib/lazywaitMatch.test.ts` | 11 | normalizeName |
 | `src/lib/lazywaitRequeue.test.ts` | 12 | lazywaitRequeueEligibility (mirror of SQL rule) |
 | `src/lib/legal.test.ts` | 6 | legal document registry |
-| `src/lib/mappers.test.ts` | 29 | catalog mappers |
+| `src/lib/mappers.test.ts` | 31 | catalog mappers |
 | `src/lib/maps.test.ts` | 8 | isPlottable |
 | `src/lib/menuOrdering.test.ts` | 13 | sortRows |
 | `src/lib/mirrorParity.test.ts` | 4 | cross-app lib mirrors stay identical |

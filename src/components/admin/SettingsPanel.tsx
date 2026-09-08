@@ -641,6 +641,87 @@ export const SettingsPanel: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* POINTS EXPIRY.
+                          The only control on this page that DESTROYS customer
+                          value, so it is separated from the rest and states what
+                          it will do. The next-reset date is READ-ONLY: the
+                          database owns it, a trigger recomputes it whenever the
+                          schedule changes, and enabling expiry always schedules
+                          the NEXT occurrence — never a date in the past. */}
+                      <div className="p-4 bg-con-surface-2 border border-con-line rounded-2xl space-y-3">
+                        <span className="font-extrabold text-ember text-[10px] block border-b border-con-line pb-1">
+                          {isRTL ? 'انتهاء صلاحية النقاط' : 'Points Expiry'}
+                        </span>
+                        <p className="text-[9.5px] leading-relaxed text-con-text-3 font-bold">
+                          {isRTL
+                            ? 'عند التفعيل، تُصفَّر نقاط جميع العملاء في التاريخ المحدد أدناه، ويُسجَّل ذلك في سجل كل عميل. التفعيل لا يُصفِّر أي نقاط اليوم — يبدأ العمل من الموعد القادم فقط.'
+                            : 'While on, EVERY customer\u2019s points are zeroed on the date below and the reset is written to each customer\u2019s ledger. Turning it on never expires anything today — it schedules the next occurrence.'}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div>
+                            <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">
+                              {isRTL ? 'تفعيل انتهاء الصلاحية' : 'Expiry Enabled'}
+                            </label>
+                            <select
+                              value={loyaltySettings.expiryEnabled ? 'true' : 'false'}
+                              onChange={(e) => updateLoyaltySettings({ expiryEnabled: e.target.value === 'true' })}
+                              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+                              disabled={isAccountant}
+                            >
+                              <option value="false">{isRTL ? 'لا (النقاط لا تنتهي)' : 'No (points never expire)'}</option>
+                              <option value="true">{isRTL ? 'نعم (تصفير دوري)' : 'Yes (periodic reset)'}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">
+                              {isRTL ? 'شهر التصفير' : 'Reset Month'}
+                            </label>
+                            <input
+                              type="number" min={1} max={12}
+                              value={loyaltySettings.expiryAnchorMonth}
+                              onChange={(e) => updateLoyaltySettings({ expiryAnchorMonth: parseInt(e.target.value) || 1 })}
+                              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 font-ds-num"
+                              disabled={isAccountant}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">
+                              {isRTL ? 'يوم التصفير (١-٢٨)' : 'Reset Day (1-28)'}
+                            </label>
+                            <input
+                              type="number" min={1} max={28}
+                              value={loyaltySettings.expiryAnchorDay}
+                              onChange={(e) => updateLoyaltySettings({ expiryAnchorDay: parseInt(e.target.value) || 1 })}
+                              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 font-ds-num"
+                              disabled={isAccountant}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-black text-con-text-3 uppercase mb-1">
+                              {isRTL ? 'المدة (بالأشهر)' : 'Validity Period (months)'}
+                            </label>
+                            <select
+                              value={String(loyaltySettings.expiryPeriodMonths)}
+                              onChange={(e) => updateLoyaltySettings({ expiryPeriodMonths: parseInt(e.target.value) || 12 })}
+                              className="ds-motion min-h-11 w-full rounded-[var(--radius-ds-md)] border border-con-line bg-con-surface px-3 text-[15px] text-con-text transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50"
+                              disabled={isAccountant}
+                            >
+                              {/* Only divisors of 12: anything else makes the reset
+                                  date depend on an arbitrary starting year rather
+                                  than repeating on the same calendar date. */}
+                              {[1, 2, 3, 4, 6, 12].map((m) => (
+                                <option key={m} value={String(m)}>{m}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="text-[9.5px] font-bold text-con-text-2">
+                          {loyaltySettings.expiryEnabled
+                            ? `${isRTL ? 'التصفير القادم:' : 'Next reset:'} ${loyaltySettings.expiryNextRunOn ?? '—'}`
+                            : (isRTL ? 'النقاط لا تنتهي حالياً.' : 'Points do not currently expire.')}
+                        </div>
+                      </div>
+
                       {/* CHANNEL RULE.
                           Server-enforced in place_order and
                           compute_order_snapshot, so this select changes real

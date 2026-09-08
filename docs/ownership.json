@@ -114,6 +114,7 @@
         "apps/mobile/src/features/checkout/previewTotals.ts",
         "apps/mobile/src/features/checkout/view/Loyalty*.tsx",
         "apps/mobile/src/features/checkout/view/TotalsCard.tsx",
+        "apps/mobile/src/features/profile/loyaltyExpiry*.ts",
         "src/components/admin/MenuManagementPanel.tsx",
         "src/components/admin/SettingsPanel.tsx",
         "src/lib/mappers.ts",

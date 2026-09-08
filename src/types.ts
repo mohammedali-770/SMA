@@ -303,5 +303,17 @@ export interface LoyaltySettings {
    * `app_settings.loyalty_pickup_only`.
    */
   pickupOnly: boolean;
+  /** Points expire on a fixed calendar reset. Defaults OFF. */
+  expiryEnabled: boolean;
+  expiryAnchorMonth: number;
+  expiryAnchorDay: number;
+  /** Must divide 12: 1, 2, 3, 4, 6 or 12. */
+  expiryPeriodMonths: number;
+  /**
+   * The next reset, READ-ONLY. Written by `set_loyalty_expiry_next_run` and
+   * advanced by `run_loyalty_expiry`; never sent from the admin form, so a
+   * stale form value cannot schedule a wipe.
+   */
+  expiryNextRunOn: string | null;
 }
 

@@ -198,13 +198,127 @@ It **never blocks an order**: any failure renders nothing, the same rule
 `refreshAvailability` follows. The line is hidden at 0 points, because an item may
 legitimately earn nothing.
 
-## 4. Testing
+## 4. Expiry — a fixed calendar reset (`loyalty_expiry_enabled`, default OFF)
+
+**The rule.** Everybody's points expire together, on a date the administrator
+sets, rather than each batch ageing out on its own anniversary. That is the
+owner's choice: *"let me decide the validity period from portal, but fixed
+calendar reset"*.
+
+**This is the only part of the loyalty system that destroys customer value**, so
+read the guarantees before changing anything in
+`20260909120000_loyalty_expiry.sql`.
+
+| Guarantee | How it is enforced |
+| --- | --- |
+| **Off by default** | `loyalty_expiry_enabled` is FALSE, and the driver returns before reading a single profile row |
+| **Never retroactive** | The driver acts only on `loyalty_expiry_next_run_on`, which is always computed **strictly in the future**. The column is **system-owned**: a trigger recomputes it whenever expiry is enabled, the schedule changes, or a caller supplies a value of its own — see below |
+| **Idempotent** | The settings singleton is locked `FOR UPDATE` and the date advances in the same transaction, so a second tick sees nothing due |
+| **Auditable** | One ledger row per customer — type `expire`, negative `points`, `balance_after` 0 — readable by that customer under the existing RLS policy |
+| **Survives a missed day** | The test is `current_date >= next_run_on`, so a job that fails on the day catches up the next day instead of skipping a cycle |
+
+### Settings
+
+| Column | Meaning |
+| --- | --- |
+| `loyalty_expiry_enabled` | Off by default |
+| `loyalty_expiry_anchor_month` / `_day` | The reset date. Day is capped at **28** — there is no 31st of February, and a reset that slides or throws once a year is worse than a range that cannot express the problem |
+| `loyalty_expiry_period_months` | **1, 2, 3, 4, 6 or 12 only.** Anything else makes the reset depend on an arbitrary epoch year: "every 24 months from 1 January" is a fixed date in *alternating* years, and which years depends on when somebody first enabled it. A divisor of 12 repeats identically every year |
+| `loyalty_expiry_next_run_on` | **System-owned, read-only to the admin form.** `loyaltyPatchToDb` deliberately omits it, so a stale form value cannot schedule a wipe |
+
+Set from **Admin → Settings → Loyalty Program → Points Expiry**.
+
+### The customer is told before it happens
+
+The Profile screen shows *"Your points expire on 1 January 2027"* — but only when
+expiry is on, a reset is scheduled, **and** the customer has points to lose.
+`loyaltyExpiry.ts` holds that decision as a pure function with its own tests,
+because each of the three silences exists for a different reason and "0 points
+expire on…" would make the warning worthless for the customers it is for.
+
+### What this step deliberately does NOT do
+
+- **No push reminder.** An "expiring soon" notification is a change to live
+  customer messaging and is its own owner approval (CLAUDE.md §7 and §5). The
+  Profile date is the notice this step ships.
+- **No expiry of the existing balances.** The current points ride to the first
+  configured reset. Dropping them would be a live data write needing approval and
+  buys nothing.
+- **It does not make expiry lawful to enable.** See §5 — expiry needs updated
+  T&Cs and an acceptance moment first. The mechanism existing is not permission
+  to switch it on.
+
+
+### The reset date is system-owned, and that took two goes to get right
+
+`loyalty_expiry_next_run_on` is the date the nightly job acts on. It is an
+ordinary column on a table administrators may update, so **nothing at the grant
+level stops one writing to it** — by hand, by SQL, or by a request that names
+the column. If a past date can be stored, the next tick zeroes every balance in
+the system.
+
+The first version guarded the obvious path: the trigger recomputed on the
+`false -> true` enable transition and whenever an anchor field changed. That was
+found by mutation testing, and case 3c pins it.
+
+**Review found the steady state still open.** With expiry *already* enabled,
+`update app_settings set loyalty_expiry_next_run_on = <a past date>` made every
+one of those conditions false — no transition, no anchor change, and the value
+supplied was not null — so it simply stuck. It was reproduced against a chain
+database before being fixed, not argued about.
+
+The rule now is that the trigger recomputes whenever the caller's value differs
+from the stored one: whatever was supplied is discarded and the date is
+re-derived from the anchor settings, which are the administrator's actual knobs.
+Case 3d pins it, and removing the guard kills that case and no other.
+
+Two details worth keeping:
+
+- **The recompute is conditional on the value having changed, not
+  unconditional.** `loyalty_next_expiry_on` always returns a date strictly after
+  the one it is given, so recomputing on every update would push the reset a
+  whole cycle into the future if an administrator happened to save an unrelated
+  setting on the due date itself — silently skipping a reset rather than running
+  it.
+- **The trigger does not fight the driver.** `run_loyalty_expiry()` advances the
+  same column, using the identical `loyalty_next_expiry_on(current_date, ...)`
+  expression the trigger recomputes with, so the two land on the same value.
+  Case 3e asserts that rather than assuming it.
+
+The generalisable lesson, which is the same one case 3c taught one level down:
+**fixing the transition path does not protect the steady state.** A column the
+system owns has to be owned on every write, not on the interesting ones.
+
+### Two staleness bugs in the same review, both about a date nobody re-read
+
+Both were the same shape — a value generated by the server, displayed from a
+snapshot taken before it existed.
+
+- **The customer's warning.** `CatalogProvider` loads settings once at mount and
+  its foreground refresh covers availability and branches only, so a session
+  left open across an administrator enabling expiry would keep reporting
+  `expiryEnabled: false` forever — and the customer would lose points having
+  been shown no notice, which is the one thing this screen exists to prevent.
+  Profile now re-reads the two expiry columns on focus (`readLoyaltyExpiry`),
+  the same narrow shape as the pickup-only re-read checkout uses. A failed read
+  keeps whatever is on screen: never invent a date, never erase one because the
+  network blinked.
+- **The administrator's confirmation.** `loyaltyPatchToDb` deliberately omits
+  the reset date, so the local copy is wrong the moment the schedule changes —
+  after a first enable the panel showed `—`, and after a period change it showed
+  the previous date. `flushSettings` now re-reads the row when a patch touched
+  any of the four schedule keys, so the date shown is the one the server
+  computed. That date is when every balance goes to zero; showing a stale one is
+  worse than showing none.
+
+## 5. Testing
 
 | Suite | Covers |
 | --- | --- |
 | `supabase/tests/loyalty_pickup_only_test.sql` | The channel rule end to end: earn, redeem, the balance never moving on delivery, **preview vs actual on both channels**, the setting being live in both directions, and composition with the comp rule |
 | `apps/mobile/src/features/checkout/previewTotals.test.ts` | The client mirror, including the fail-closed default |
 | `apps/mobile/src/features/checkout/checkoutGuards.test.ts` | `decideLoyaltyChannelChange` — all four outcomes of the rule changing mid-checkout |
+| `supabase/tests/loyalty_expiry_test.sql` · `loyaltyExpiry.test.ts` | Expiry: off by default, never retroactive (a hand-written past due date on enable, **and** a direct write while already enabled), the trigger and driver converging on one date, once per reset, a missed day caught up, one auditable row each, and when the customer is told nothing |
 | `supabase/tests/loyalty_item_exclusion_test.sql` | The eligible base end to end: mixed carts, earn-side-only redemption, pro-rata sharing, the comp trap, preview/actual parity, the PII boundary, the delivery fee, and the importer |
 | `src/lib/mappers.test.ts` · `productEditMapper.test.ts` | The admin mappers read and default both columns, and the generic edit contract carries neither |
 | `supabase/tests/loyalty_reason_history_safe_test.sql` · `loyalty_reason_no_order_number_test.sql` | Ledger-reason semantics (pre-existing) |
@@ -229,7 +343,7 @@ PGHOST=/tmp PGPORT=55432 PGUSER=postgres PGPASSWORD=postgres PGDATABASE=postgres
 
 ---
 
-## 5. Regulatory shape (KSA)
+## 6. Regulatory shape (KSA)
 
 Not legal advice; it is why the design looks the way it does.
 
@@ -247,7 +361,7 @@ Not legal advice; it is why the design looks the way it does.
 
 ---
 
-## 6. Planned, not built
+## 7. Planned, not built
 
 Recorded here so nobody re-derives them. Each is a separate pull request with its
 own migration and its own owner approval.
@@ -255,7 +369,7 @@ own migration and its own owner approval.
 | | Change | Note |
 | --- | --- | --- |
 | ~~2~~ | ~~`products.earns_loyalty_points`~~ | **DONE — see §3.** Kept in this table so the sequence still reads in order |
-| 3 | Expiry — a fixed calendar reset, period set in the admin portal | Needs `loyalty_transactions_type_check` widened to admit `expire`, a `pg_cron` driver, a customer-facing expiry date, and the T&C acceptance moment in §4 |
+| ~~3~~ | ~~Expiry~~ | **BUILT — see §4.** Still needs the T&C acceptance moment in §6 before it can be ENABLED, and the "expiring soon" push is a separate owner decision |
 | 4 | `loyalty_multipliers` — x2 points, or +x% for a period | Deliberately a **separate table** from `campaigns`, which is discount-shaped and blocked on eight open business questions (`docs/DISCOUNTS_CAMPAIGNS.md`) |
 | 5 | Customer-facing copy, T&C mechanics, admin polish | |
 
@@ -265,7 +379,7 @@ per-order redemption cap.
 
 ---
 
-## 7. Related
+## 8. Related
 
 - [Discounts, campaigns and comped customers](DISCOUNTS_CAMPAIGNS.md) — the comp
   rule that composes with this one, and the blocked campaigns table

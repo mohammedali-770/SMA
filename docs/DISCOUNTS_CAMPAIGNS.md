@@ -234,6 +234,18 @@ does not touch); `subtotal` still records the real value of the goods; and
 `discount_amount` still means *coupon*, so the admin coupon-usage report is not
 silently corrupted.
 
+**A comped customer is not exempt from points EXPIRY, and the combination is
+worth seeing.** `run_loyalty_expiry` selects on `profiles.loyalty_points > 0`
+with no comp filter ([`LOYALTY.md`](LOYALTY.md) §4), so a comped customer's
+balance is zeroed on the reset like anybody else's — while rule 3 above means
+they can no longer earn anything to replace it. A long-standing comped member's
+balance therefore only ever shrinks, and eventually goes to zero. That is the
+intended reading of both rules rather than an oversight: comping makes a
+customer's orders free, which is a stronger benefit than points, and it is not a
+membership of the loyalty programme. It is called out here because a
+`comp_members` row is the one place an administrator might reasonably expect
+loyalty to be suspended rather than merely unearnable.
+
 ## Why `payment_status = 'paid'` is load-bearing, not tidiness
 
 This is the part that decides whether the food gets cooked.
